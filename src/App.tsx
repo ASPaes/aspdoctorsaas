@@ -2,9 +2,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import AuthGuard from "@/components/AuthGuard";
+import AppLayout from "@/components/AppLayout";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
+import Clientes from "@/pages/Clientes";
+import Cadastros from "@/pages/Cadastros";
+import Configuracoes from "@/pages/Configuracoes";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -15,8 +23,20 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Protected routes */}
+          <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/cadastros" element={<Cadastros />} />
+            <Route path="/configuracoes" element={<Configuracoes />} />
+          </Route>
+
+          <Route path="/" element={<Navigate to="/clientes" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
