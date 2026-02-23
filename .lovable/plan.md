@@ -1,121 +1,101 @@
+# Filtros e Pesquisa na Lista de Clientes
 
+## Visao Geral
 
-# Reestruturar Card Produto/Contrato com Novos Campos e Espelho Financeiro Moderno
+Reestruturar a pagina `Clientes.tsx` com busca textual, filtros rapidos e filtros avancados colapsaveis, conforme a imagem de referencia. Todas as datas usam date range pickers (de X a Y) com calendario.
 
-## 1. Migracoes de Banco de Dados
+## Estrutura da Interface
 
-Adicionar 4 novas colunas na tabela `clientes`:
+### Barra Principal (sempre visivel)
 
-- `data_ativacao` (date, nullable) - Data de ativacao do produto
-- `fornecedor_id` (bigint, nullable) - Referencia ao fornecedor
-- `codigo_fornecedor` (text, nullable) - Codigo recebido do fornecedor
-- `link_portal_fornecedor` (text, nullable) - Link do portal do fornecedor para este cliente
+- Campo de busca: "Buscar por ID, razao social, fantasia, CNPJ ou codigo fornecedor..."
+- Select Status: Ativos / Cancelados / Todos (default: Ativos)
+- Select Recorrencia: Todas / Mensal / Trimestral / Semestral / Anual
 
-## 2. Alteracoes no Schema do Formulario
+### Filtros Avancados (colapsavel com Collapsible)
 
-**Arquivo: `src/pages/ClienteForm.tsx`**
+Botao com icone Filter + "Filtros Avancados" + seta toggle.
 
-- Adicionar ao `clienteSchema` (zod): `data_ativacao`, `fornecedor_id`, `codigo_fornecedor`, `link_portal_fornecedor` (todos nullable)
-- Adicionar defaultValues correspondentes (null)
-- Atualizar o `form.reset()` no carregamento do cliente existente
-- Atualizar o payload de submit
-- Passar `fornecedores` do lookup para o componente VendaProdutoTab
+**Linha 1 - Periodos de data (date range pickers com calendario):**
 
-## 3. Lookup de Fornecedores
+- Periodo de Cadastro (de/ate)
+- Periodo de Cancelamento (de/ate)
+- Periodo da Venda (de/ate)
+- Periodo de Ativacao (de/ate)
 
-**Arquivo: `src/hooks/useLookups.ts`**
+Cada date range picker tera dois botoes (De / Ate) que abrem um Popover com Calendar. Ao clicar "De", abre calendario para selecionar data inicial; ao clicar "Ate", abre calendario para data final.
 
-- Adicionar query para buscar `fornecedores` (id, nome, site) da tabela existente
-- Expor no retorno do hook
+**Linha 2 - Selects de lookup:**
 
-## 4. Reestruturar o Card Produto/Contrato em SubCards
-
-**Arquivo: `src/components/clientes/VendaProdutoTab.tsx`**
-
-Substituir o layout atual por 3 SubCards visuais (usando div com bordas/titulos):
-
-### SubCard "Informacoes do Contrato"
-- Data Venda
-- Origem da Venda
 - Recorrencia
-- Funcionario (Consultor)
+- Vertical (tabela verticais)
+- Produto (tabela produtos)
+- Fornecedor (tabela fornecedores)
 
-### SubCard "Informacoes do Produto"
-- Data Ativacao (novo campo date)
-- Fornecedor (select, da tabela fornecedores)
-- Codigo Fornecedor (input texto)
-- Link Fornecedor (input texto + icone clicavel ExternalLink ao lado)
-- Produto (select)
+**Linha 3 - Selects + range:**
 
-### SubCard "Observacoes"
-- Observacao da Negociacao (textarea, largura total)
+- Estado (tabela estados)
+- Cidade (tabela cidades, filtrada por estado)
+- Motivo Cancelamento (tabela motivos_cancelamento)
+- Mensalidade R$ (Min / Max)
 
-Remover recorrencia duplicada (estava no pedido do usuario em "Informacoes do Produto" mas ja aparece em "Contrato").
+**Linha 4 - Ranges numericos:**
 
-**Arquivo: `src/components/clientes/FinanceiroTab.tsx`**
+- Lucro Real R$ (Min / Max)
+- Margem % (Min / Max)
 
-Reestruturar como SubCard "Valores":
-- Valor Ativacao + Forma Pgto Ativacao (mesma linha)
-- Mensalidade/MRR + Forma Pgto Mensalidade (mesma linha)
-- Custo Operacao
-- Imposto % - **com mascara percentual**: exibir como `8,00` (usuario digita percentual), salvar como `0.08` no banco. Usar NumericInput com conversao *100 para display e /100 para armazenamento
-- Custo Fixo % - mesma logica: exibir `35,00`, salvar `0.35`
+### Tabela de Resultados
 
-## 5. Mascara Percentual nos Campos Imposto e Custo Fixo
-
-Atualmente os campos salvam decimais (0.08, 0.35) mas o NumericInput exibe como esta. Precisamos:
-
-- No carregamento do form (reset e config defaults): multiplicar por 100 os valores vindos do banco
-- No submit (mutationFn): dividir por 100 antes de enviar ao banco
-- Atualizar schema zod: imposto_percentual e custo_fixo_percentual com max(100) em vez de max(1)
-- Adicionar suffix "%" no NumericInput desses campos
-- Atualizar o `useEspelhoFinanceiro` para receber os valores ja como percentuais (dividir por 100 internamente no calculo)
-
-## 6. Espelho Financeiro Moderno
-
-**Arquivo: `src/components/clientes/EspelhoFinanceiro.tsx`**
-
-Redesenhar com layout moderno:
-- Titulo "Espelho Financeiro" com icone
-- Cards com cores condicionais: valores positivos em verde (bg-green-50/text-green-700 no claro, equivalente no escuro), negativos em vermelho (bg-red-50/text-red-700)
-- Layout em grid responsivo 2x3 ou 3x3
-- Cada metrica com icone pequeno, label descritivo, e valor grande
-- Separacao visual entre metricas de custo e metricas de lucro
-- Indicadores visuais: setas para cima (positivo) e para baixo (negativo)
-
-Metricas exibidas:
-- Valor Repasse (R$)
-- Impostos (R$)
-- Custos Fixos (R$)
-- Lucro Bruto (R$)
-- Margem Bruta (%)
-- Markup COGS (%)
-- Fator Preco (x)
-- Margem Contribuicao (R$)
-- Lucro Real (R$) - destaque maior
+- Colunas: Razao Social, Nome Fantasia, CNPJ, Produto, Recorrencia, Mensalidade, Status
+- Linha clicavel navega para `/clientes/{id}`
+- Loading com Skeletons
+- Estado vazio: "Nenhum cliente encontrado"
+- Todas as colunas deve ter opcao de ordenar de forma crescente e decrescente
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
+### Fonte de dados
 
-```text
-ALTER TABLE clientes ADD COLUMN data_ativacao date;
-ALTER TABLE clientes ADD COLUMN fornecedor_id bigint;
-ALTER TABLE clientes ADD COLUMN codigo_fornecedor text;
-ALTER TABLE clientes ADD COLUMN link_portal_fornecedor text;
-```
+Usar a view `vw_clientes_financeiro` que ja possui campos calculados (`lucro_real`, `margem_bruta_percent`) - evita recalcular client-side.
+
+### Query Supabase
+
+- Busca textual: `.or()` com `ilike` em `razao_social`, `nome_fantasia`, `cnpj`, `codigo_fornecedor` e `id::text`
+- Datas: `.gte('data_cadastro', from)` e `.lte('data_cadastro', to)` para cada campo
+- Selects: `.eq('vertical_id', value)` etc.
+- Ranges numericos: `.gte('mensalidade', min)` e `.lte('mensalidade', max)`
+- Status: `cancelado = false` (Ativos), `cancelado = true` (Cancelados), sem filtro (Todos)
+- Lucro Real e Margem: filtrar via `.gte()` / `.lte()` direto na view
+
+### Date Range Picker
+
+Componente inline usando Popover + Calendar (Shadcn). Cada filtro de data tera:
+
+- Botao "De" com icone CalendarIcon - abre Popover com Calendar mode="single"
+- Botao "Ate" com icone CalendarIcon - abre Popover com Calendar mode="single"
+- `pointer-events-auto` no Calendar conforme instrucoes do Shadcn
+
+### Estado do filtro de Cidade
+
+- Dependente do Estado selecionado
+- Usa `useLookups(estadoId)` para buscar cidades filtradas
+- Ao mudar Estado, limpa Cidade selecionada
+
+### Performance
+
+- Debounce de 300ms no campo de busca textual
+- Filtros de select aplicam imediatamente
+- Todos os filtros disparam re-fetch da query
 
 ### Arquivos modificados
-- `src/pages/ClienteForm.tsx` - schema, defaults, reset, submit (conversao %), props
-- `src/hooks/useLookups.ts` - adicionar query fornecedores
-- `src/components/clientes/VendaProdutoTab.tsx` - reestruturar com 3 subcards, novos campos
-- `src/components/clientes/FinanceiroTab.tsx` - reestruturar como SubCard "Valores", mascara %
-- `src/components/clientes/EspelhoFinanceiro.tsx` - redesign visual moderno com cores
-- `src/hooks/useEspelhoFinanceiro.ts` - ajustar para receber % como valor inteiro (ex: 8) e dividir internamente
 
-### Fluxo da Conversao Percentual
-1. Banco: `0.08` -> Form carrega: `8.00` (x100)
-2. Usuario digita: `8,00` com suffix `%`
-3. Submit: `8.00` -> Banco: `0.08` (/100)
-4. Espelho: recebe `8.00`, divide por 100 internamente para calcular
+- `src/pages/Clientes.tsx` - reescrita completa com filtros, tabela e logica de query
 
+### Dependencias existentes utilizadas
+
+- `@radix-ui/react-collapsible` (Collapsible)
+- `@radix-ui/react-popover` (Popover para date pickers)
+- `react-day-picker` (Calendar)
+- `date-fns` (format)
+- `@tanstack/react-query` (useQuery)
+- `lucide-react` (Search, Filter, CalendarIcon, ChevronUp/Down)
