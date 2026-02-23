@@ -3,8 +3,8 @@ import { useMemo } from "react";
 interface EspelhoInput {
   mensalidade: number | null;
   custo_operacao: number | null;
-  imposto_percentual: number | null;
-  custo_fixo_percentual: number | null;
+  imposto_percentual: number | null;   // now receives as display value (e.g. 8 for 8%)
+  custo_fixo_percentual: number | null; // now receives as display value (e.g. 35 for 35%)
 }
 
 export interface EspelhoResult {
@@ -23,8 +23,9 @@ export function useEspelhoFinanceiro(input: EspelhoInput): EspelhoResult {
   return useMemo(() => {
     const m = input.mensalidade ?? 0;
     const c = input.custo_operacao ?? 0;
-    const imp = input.imposto_percentual ?? 0;
-    const fix = input.custo_fixo_percentual ?? 0;
+    // Convert from display % (e.g. 8) to decimal (0.08)
+    const imp = (input.imposto_percentual ?? 0) / 100;
+    const fix = (input.custo_fixo_percentual ?? 0) / 100;
 
     const valor_repasse = m - c;
     const impostos_rs = m * imp;

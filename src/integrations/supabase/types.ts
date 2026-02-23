@@ -64,9 +64,11 @@ export type Database = {
           cancelado: boolean
           cidade_id: number | null
           cnpj: string | null
+          codigo_fornecedor: string | null
           created_at: string
           custo_fixo_percentual: number | null
           custo_operacao: number | null
+          data_ativacao: string | null
           data_cadastro: string | null
           data_cancelamento: string | null
           data_venda: string | null
@@ -74,9 +76,11 @@ export type Database = {
           estado_id: number | null
           forma_pagamento_ativacao_id: number | null
           forma_pagamento_mensalidade_id: number | null
+          fornecedor_id: number | null
           funcionario_id: number | null
           id: string
           imposto_percentual: number | null
+          link_portal_fornecedor: string | null
           mensalidade: number | null
           motivo_cancelamento_id: number | null
           nome_fantasia: string | null
@@ -99,9 +103,11 @@ export type Database = {
           cancelado?: boolean
           cidade_id?: number | null
           cnpj?: string | null
+          codigo_fornecedor?: string | null
           created_at?: string
           custo_fixo_percentual?: number | null
           custo_operacao?: number | null
+          data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_venda?: string | null
@@ -109,9 +115,11 @@ export type Database = {
           estado_id?: number | null
           forma_pagamento_ativacao_id?: number | null
           forma_pagamento_mensalidade_id?: number | null
+          fornecedor_id?: number | null
           funcionario_id?: number | null
           id?: string
           imposto_percentual?: number | null
+          link_portal_fornecedor?: string | null
           mensalidade?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
@@ -134,9 +142,11 @@ export type Database = {
           cancelado?: boolean
           cidade_id?: number | null
           cnpj?: string | null
+          codigo_fornecedor?: string | null
           created_at?: string
           custo_fixo_percentual?: number | null
           custo_operacao?: number | null
+          data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_venda?: string | null
@@ -144,9 +154,11 @@ export type Database = {
           estado_id?: number | null
           forma_pagamento_ativacao_id?: number | null
           forma_pagamento_mensalidade_id?: number | null
+          fornecedor_id?: number | null
           funcionario_id?: number | null
           id?: string
           imposto_percentual?: number | null
+          link_portal_fornecedor?: string | null
           mensalidade?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
@@ -198,6 +210,13 @@ export type Database = {
             columns: ["forma_pagamento_mensalidade_id"]
             isOneToOne: false
             referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
             referencedColumns: ["id"]
           },
           {
