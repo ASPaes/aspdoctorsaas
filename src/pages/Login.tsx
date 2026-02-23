@@ -26,13 +26,6 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
-    if (error) toast.error(error.message);
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -57,15 +50,6 @@ export default function Login() {
               Entrar
             </Button>
           </form>
-
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-            <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
-          </div>
-
-          <Button variant="outline" className="w-full" onClick={handleGoogle}>
-            Entrar com Google
-          </Button>
 
           <div className="mt-4 flex flex-col items-center gap-2 text-sm">
             <Link to="/forgot-password" className="text-primary hover:underline">Esqueci minha senha</Link>
