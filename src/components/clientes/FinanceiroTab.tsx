@@ -1,7 +1,7 @@
 import { UseFormReturn } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NumericInput } from "@/components/ui/numeric-input";
 import EspelhoFinanceiro from "./EspelhoFinanceiro";
 import { useEspelhoFinanceiro } from "@/hooks/useEspelhoFinanceiro";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
@@ -31,10 +31,7 @@ export default function FinanceiroTab({ form, formasPagamento }: Props) {
           <FormItem>
             <FormLabel>Valor Ativação</FormLabel>
             <FormControl>
-              <Input type="number" step="0.01" min="0" {...field}
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-              />
+              <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -59,10 +56,7 @@ export default function FinanceiroTab({ form, formasPagamento }: Props) {
           <FormItem>
             <FormLabel>Mensalidade / MRR</FormLabel>
             <FormControl>
-              <Input type="number" step="0.01" min="0" {...field}
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-              />
+              <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -87,10 +81,7 @@ export default function FinanceiroTab({ form, formasPagamento }: Props) {
           <FormItem>
             <FormLabel>Custo Operação</FormLabel>
             <FormControl>
-              <Input type="number" step="0.01" min="0" {...field}
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-              />
+              <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -100,10 +91,7 @@ export default function FinanceiroTab({ form, formasPagamento }: Props) {
           <FormItem>
             <FormLabel>Imposto %</FormLabel>
             <FormControl>
-              <Input type="number" step="0.001" min="0" max="1" {...field}
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-              />
+              <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" decimals={3} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -113,10 +101,7 @@ export default function FinanceiroTab({ form, formasPagamento }: Props) {
           <FormItem>
             <FormLabel>Custo Fixo %</FormLabel>
             <FormControl>
-              <Input type="number" step="0.001" min="0" max="1" {...field}
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-              />
+              <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" decimals={3} />
             </FormControl>
             <FormMessage />
           </FormItem>
