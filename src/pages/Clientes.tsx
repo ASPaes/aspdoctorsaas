@@ -1,12 +1,221 @@
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useLookups } from "@/hooks/useLookups";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+
+type SortField = "razao_social" | "nome_fantasia" | "cnpj" | "produto_id" | "recorrencia" | "mensalidade" | "cancelado";
+type SortDir = "asc" | "desc";
+
+interface DateRange {
+  from?: Date;
+  to?: Date;
+}
+
+function DateRangePicker({ label, value, onChange }: { label: string; value: DateRange; onChange: (v: DateRange) => void }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <div className="flex gap-1">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("flex-1 justify-start text-left text-xs h-8", !value.from && "text-muted-foreground")}>
+              <CalendarIcon className="mr-1 h-3 w-3" />
+              {value.from ? format(value.from, "dd/MM/yy") : "De"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={value.from} onSelect={(d) => onChange({ ...value, from: d })} initialFocus className="p-3 pointer-events-auto" locale={ptBR} />
+          </PopoverContent>
+        </Popover>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("flex-1 justify-start text-left text-xs h-8", !value.to && "text-muted-foreground")}>
+              <CalendarIcon className="mr-1 h-3 w-3" />
+              {value.to ? format(value.to, "dd/MM/yy") : "Até"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar mode="single" selected={value.to} onSelect={(d) => onChange({ ...value, to: d })} initialFocus className="p-3 pointer-events-auto" locale={ptBR} />
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
+}
+
+function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
+  label: string; min: string; max: string; onMinChange: (v: string) => void; onMaxChange: (v: string) => void; prefix?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <div className="flex gap-1">
+        <Input type="number" placeholder={prefix ? `${prefix} Min` : "Min"} value={min} onChange={(e) => onMinChange(e.target.value)} className="h-8 text-xs" />
+        <Input type="number" placeholder={prefix ? `${prefix} Max` : "Max"} value={max} onChange={(e) => onMaxChange(e.target.value)} className="h-8 text-xs" />
+      </div>
+    </div>
+  );
+}
 
 export default function Clientes() {
   const navigate = useNavigate();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Quick filters
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState("ativos");
+  const [recorrenciaQuick, setRecorrenciaQuick] = useState("todas");
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchText), 300);
+    return () => clearTimeout(t);
+  }, [searchText]);
+
+  // Advanced filters
+  const [periodoCadastro, setPeriodoCadastro] = useState<DateRange>({});
+  const [periodoCancelamento, setPeriodoCancelamento] = useState<DateRange>({});
+  const [periodoVenda, setPeriodoVenda] = useState<DateRange>({});
+  const [periodoAtivacao, setPeriodoAtivacao] = useState<DateRange>({});
+
+  const [recorrenciaAdv, setRecorrenciaAdv] = useState("");
+  const [verticalId, setVerticalId] = useState("");
+  const [produtoId, setProdutoId] = useState("");
+  const [fornecedorId, setFornecedorId] = useState("");
+
+  const [estadoId, setEstadoId] = useState<number | null>(null);
+  const [cidadeId, setCidadeId] = useState("");
+  const [motivoCancelamentoId, setMotivoCancelamentoId] = useState("");
+
+  const [mensalidadeMin, setMensalidadeMin] = useState("");
+  const [mensalidadeMax, setMensalidadeMax] = useState("");
+  const [lucroMin, setLucroMin] = useState("");
+  const [lucroMax, setLucroMax] = useState("");
+  const [margemMin, setMargemMin] = useState("");
+  const [margemMax, setMargemMax] = useState("");
+
+  // Sort
+  const [sortField, setSortField] = useState<SortField>("razao_social");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  // Clear city when state changes
+  useEffect(() => { setCidadeId(""); }, [estadoId]);
+
+  const lookups = useLookups(estadoId);
+
+  // Build query key from all filters
+  const filterKey = useMemo(() => ({
+    debouncedSearch, status, recorrenciaQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+    recorrenciaAdv, verticalId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
+    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir,
+  }), [debouncedSearch, status, recorrenciaQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+    recorrenciaAdv, verticalId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
+    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
+
+  const { data: clientes, isLoading } = useQuery({
+    queryKey: ["clientes_lista", filterKey],
+    queryFn: async () => {
+      let q = supabase.from("vw_clientes_financeiro").select("id, razao_social, nome_fantasia, cnpj, produto_id, recorrencia, mensalidade, cancelado, lucro_real, margem_bruta_percent") as any;
+
+      // Status
+      if (status === "ativos") q = q.eq("cancelado", false);
+      else if (status === "cancelados") q = q.eq("cancelado", true);
+
+      // Text search
+      if (debouncedSearch) {
+        const s = `%${debouncedSearch}%`;
+        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s}`);
+      }
+
+      // Quick recurrence
+      if (recorrenciaQuick !== "todas") q = q.eq("recorrencia", recorrenciaQuick as any);
+
+      // Advanced recurrence (overrides quick if set)
+      if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
+
+      // Date ranges
+      const applyDateRange = (field: string, range: DateRange) => {
+        if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
+        if (range.to) q = q.lte(field, format(range.to, "yyyy-MM-dd"));
+      };
+      applyDateRange("data_cadastro", periodoCadastro);
+      applyDateRange("data_cancelamento", periodoCancelamento);
+      applyDateRange("data_venda", periodoVenda);
+      applyDateRange("data_ativacao", periodoAtivacao);
+
+      // Lookups
+      if (verticalId) q = q.eq("vertical_id", Number(verticalId));
+      if (produtoId) q = q.eq("produto_id", Number(produtoId));
+      if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
+      if (estadoId) q = q.eq("estado_id", estadoId);
+      if (cidadeId) q = q.eq("cidade_id", Number(cidadeId));
+      if (motivoCancelamentoId) q = q.eq("motivo_cancelamento_id", Number(motivoCancelamentoId));
+
+      // Numeric ranges
+      if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
+      if (mensalidadeMax) q = q.lte("mensalidade", Number(mensalidadeMax));
+      if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));
+      if (lucroMax) q = q.lte("lucro_real", Number(lucroMax));
+      if (margemMin) q = q.gte("margem_bruta_percent", Number(margemMin));
+      if (margemMax) q = q.lte("margem_bruta_percent", Number(margemMax));
+
+      // Sort
+      q = q.order(sortField, { ascending: sortDir === "asc" });
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Lookup maps for display
+  const produtoMap = useMemo(() => {
+    const m = new Map<number, string>();
+    lookups.produtos.data?.forEach((p) => m.set(p.id, p.nome));
+    return m;
+  }, [lookups.produtos.data]);
+
+  const toggleSort = useCallback((field: SortField) => {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("asc"); }
+  }, [sortField]);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
+
+  const recorrenciaLabel = (v: string | null) => {
+    if (!v) return "—";
+    return v.charAt(0).toUpperCase() + v.slice(1);
+  };
+
+  const clearFilters = () => {
+    setPeriodoCadastro({}); setPeriodoCancelamento({}); setPeriodoVenda({}); setPeriodoAtivacao({});
+    setRecorrenciaAdv(""); setVerticalId(""); setProdutoId(""); setFornecedorId("");
+    setEstadoId(null); setCidadeId(""); setMotivoCancelamentoId("");
+    setMensalidadeMin(""); setMensalidadeMax("");
+    setLucroMin(""); setLucroMax(""); setMargemMin(""); setMargemMax("");
+  };
 
   return (
-    <div>
+    <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Clientes</h1>
@@ -16,6 +225,208 @@ export default function Clientes() {
           <Plus className="h-4 w-4" />
           Novo Cliente
         </Button>
+      </div>
+
+      {/* Quick filters bar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por ID, razão social, fantasia, CNPJ..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ativos">Ativos</SelectItem>
+            <SelectItem value="cancelados">Cancelados</SelectItem>
+            <SelectItem value="todos">Todos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={recorrenciaQuick} onValueChange={setRecorrenciaQuick}>
+          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas Recorr.</SelectItem>
+            <SelectItem value="mensal">Mensal</SelectItem>
+            <SelectItem value="semestral">Semestral</SelectItem>
+            <SelectItem value="anual">Anual</SelectItem>
+            <SelectItem value="semanal">Semanal</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Advanced filters */}
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Filter className="mr-1 h-4 w-4" />
+              Filtros Avançados
+              {filtersOpen ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          {filtersOpen && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground">
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+        <CollapsibleContent className="mt-2">
+          <div className="rounded-lg border bg-card p-4 space-y-4">
+            {/* Row 1 - Date ranges */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <DateRangePicker label="Período de Cadastro" value={periodoCadastro} onChange={setPeriodoCadastro} />
+              <DateRangePicker label="Período de Cancelamento" value={periodoCancelamento} onChange={setPeriodoCancelamento} />
+              <DateRangePicker label="Período da Venda" value={periodoVenda} onChange={setPeriodoVenda} />
+              <DateRangePicker label="Período de Ativação" value={periodoAtivacao} onChange={setPeriodoAtivacao} />
+            </div>
+
+            {/* Row 2 - Lookups */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Recorrência</label>
+                <Select value={recorrenciaAdv} onValueChange={setRecorrenciaAdv}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensal">Mensal</SelectItem>
+                    <SelectItem value="semestral">Semestral</SelectItem>
+                    <SelectItem value="anual">Anual</SelectItem>
+                    <SelectItem value="semanal">Semanal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Vertical</label>
+                <Select value={verticalId} onValueChange={setVerticalId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                  <SelectContent>
+                    {lookups.verticais.data?.map((v) => <SelectItem key={v.id} value={String(v.id)}>{v.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Produto</label>
+                <Select value={produtoId} onValueChange={setProdutoId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    {lookups.produtos.data?.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
+                <Select value={fornecedorId} onValueChange={setFornecedorId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    {lookups.fornecedores.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Row 3 - Estado/Cidade/Motivo/Mensalidade */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Estado</label>
+                <Select value={estadoId ? String(estadoId) : ""} onValueChange={(v) => setEstadoId(v ? Number(v) : null)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    {lookups.estados.data?.map((e) => <SelectItem key={e.id} value={String(e.id)}>{e.sigla} - {e.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Cidade</label>
+                <Select value={cidadeId} onValueChange={setCidadeId} disabled={!estadoId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={estadoId ? "Todas" : "Selecione estado"} /></SelectTrigger>
+                  <SelectContent>
+                    {lookups.cidades.data?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Motivo Cancelamento</label>
+                <Select value={motivoCancelamentoId} onValueChange={setMotivoCancelamentoId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    {lookups.motivosCancelamento.data?.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.descricao}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <RangeInput label="Mensalidade R$" min={mensalidadeMin} max={mensalidadeMax} onMinChange={setMensalidadeMin} onMaxChange={setMensalidadeMax} prefix="R$" />
+            </div>
+
+            {/* Row 4 - Numeric ranges */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={setLucroMin} onMaxChange={setLucroMax} prefix="R$" />
+              <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={setMargemMin} onMaxChange={setMargemMax} prefix="%" />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Results table */}
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {([
+                ["razao_social", "Razão Social"],
+                ["nome_fantasia", "Nome Fantasia"],
+                ["cnpj", "CNPJ"],
+                ["produto_id", "Produto"],
+                ["recorrencia", "Recorrência"],
+                ["mensalidade", "Mensalidade"],
+                ["cancelado", "Status"],
+              ] as [SortField, string][]).map(([field, label]) => (
+                <TableHead key={field}>
+                  <button className="flex items-center font-medium hover:text-foreground" onClick={() => toggleSort(field)}>
+                    {label}
+                    <SortIcon field={field} />
+                  </button>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 7 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : !clientes?.length ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  Nenhum cliente encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              clientes.map((c) => (
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/clientes/${c.id}`)}>
+                  <TableCell className="font-medium">{c.razao_social || "—"}</TableCell>
+                  <TableCell>{c.nome_fantasia || "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{c.cnpj || "—"}</TableCell>
+                  <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
+                  <TableCell>{recorrenciaLabel(c.recorrencia)}</TableCell>
+                  <TableCell>{c.mensalidade != null ? `R$ ${Number(c.mensalidade).toFixed(2)}` : "—"}</TableCell>
+                  <TableCell>
+                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                      c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                    )}>
+                      {c.cancelado ? "Cancelado" : "Ativo"}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
