@@ -7,11 +7,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLookups } from "@/hooks/useLookups";
-import { Form } from "@/components/ui/form";
+import { Form, FormField, FormControl } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle } from "lucide-react";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
@@ -130,7 +130,6 @@ export default function ClienteForm() {
 
   const mutation = useMutation({
     mutationFn: async (values: ClienteFormValues) => {
-      // Convert empty strings to null for email
       const payload = {
         ...values,
         email: values.email || null,
@@ -157,72 +156,97 @@ export default function ClienteForm() {
   const onSubmit = (values: ClienteFormValues) => mutation.mutate(values);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/clientes")}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-bold">{isEditing ? "Editar Cliente" : "Novo Cliente"}</h1>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/clientes")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{isEditing ? "Editar Cliente" : "Novo Cliente"}</h1>
+            <p className="text-sm text-muted-foreground">Preencha os dados do cliente e contrato</p>
+          </div>
+        </div>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Card: Dados Cadastrais */}
           <Card>
-            <CardContent className="pt-6">
-              <Tabs defaultValue="dados">
-                <TabsList className="mb-4 w-full justify-start">
-                  <TabsTrigger value="dados">Dados do Cliente</TabsTrigger>
-                  <TabsTrigger value="venda">Venda & Produto</TabsTrigger>
-                  <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
-                  <TabsTrigger value="cancelamento" disabled={!cancelado && !isEditing}>
-                    Cancelamento
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="dados">
-                  <DadosClienteTab
-                    form={form}
-                    estados={lookups.estados.data ?? []}
-                    cidades={lookups.cidades.data ?? []}
-                    areasAtuacao={lookups.areasAtuacao.data ?? []}
-                    segmentos={lookups.segmentos.data ?? []}
-                    verticais={lookups.verticais.data ?? []}
-                  />
-                </TabsContent>
-
-                <TabsContent value="venda">
-                  <VendaProdutoTab
-                    form={form}
-                    funcionarios={lookups.funcionarios.data ?? []}
-                    produtos={lookups.produtos.data ?? []}
-                  />
-                </TabsContent>
-
-                <TabsContent value="financeiro">
-                  <FinanceiroTab
-                    form={form}
-                    formasPagamento={lookups.formasPagamento.data ?? []}
-                  />
-                </TabsContent>
-
-                <TabsContent value="cancelamento">
-                  <CancelamentoTab
-                    form={form}
-                    motivosCancelamento={lookups.motivosCancelamento.data ?? []}
-                  />
-                </TabsContent>
-              </Tabs>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Building2 className="h-5 w-5 text-primary" />
+                Dados Cadastrais
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DadosClienteTab
+                form={form}
+                estados={lookups.estados.data ?? []}
+                cidades={lookups.cidades.data ?? []}
+                areasAtuacao={lookups.areasAtuacao.data ?? []}
+                segmentos={lookups.segmentos.data ?? []}
+                verticais={lookups.verticais.data ?? []}
+              />
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-3 mt-4">
+          {/* Card: Produto / Contrato */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="h-5 w-5 text-primary" />
+                Produto / Contrato
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <VendaProdutoTab
+                form={form}
+                funcionarios={lookups.funcionarios.data ?? []}
+                produtos={lookups.produtos.data ?? []}
+              />
+              <FinanceiroTab
+                form={form}
+                formasPagamento={lookups.formasPagamento.data ?? []}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Card: Cancelamento */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <XCircle className="h-5 w-5 text-destructive" />
+                  Cancelamento
+                </CardTitle>
+                <CardDescription>Ative para registrar o cancelamento do cliente</CardDescription>
+              </div>
+              <FormField control={form.control} name="cancelado" render={({ field }) => (
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              )} />
+            </CardHeader>
+            {cancelado && (
+              <CardContent>
+                <CancelamentoTab
+                  form={form}
+                  motivosCancelamento={lookups.motivosCancelamento.data ?? []}
+                />
+              </CardContent>
+            )}
+          </Card>
+
+          {/* Botões de ação */}
+          <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={() => navigate("/clientes")}>
-              Voltar
+              Cancelar
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Save className="h-4 w-4" />
-              Salvar
+              Salvar Cliente
             </Button>
           </div>
         </form>
