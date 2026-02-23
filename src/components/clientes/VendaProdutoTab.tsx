@@ -21,7 +21,7 @@ const RECORRENCIA_OPTIONS = [
   { value: "semanal", label: "Semanal" },
 ];
 
-export default function VendaProdutoTab({ form, funcionarios, produtos, fornecedores }: Props) {
+export default function VendaProdutoTab({ form, funcionarios = [], produtos = [], fornecedores = [] }: Props) {
   const linkFornecedor = form.watch("link_portal_fornecedor");
 
   return (
