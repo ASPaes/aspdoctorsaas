@@ -13,8 +13,8 @@ import { Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const schema = z.object({
-  imposto_percentual: z.number().min(0, "Mínimo 0").max(1, "Máximo 1"),
-  custo_fixo_percentual: z.number().min(0, "Mínimo 0").max(1, "Máximo 1"),
+  imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
+  custo_fixo_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -25,7 +25,7 @@ export default function Configuracoes() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { imposto_percentual: 0.135, custo_fixo_percentual: 0.08 },
+    defaultValues: { imposto_percentual: 13.5, custo_fixo_percentual: 8 },
   });
 
   const { data: config, isLoading } = useQuery({
@@ -40,19 +40,23 @@ export default function Configuracoes() {
   useEffect(() => {
     if (config) {
       form.reset({
-        imposto_percentual: config.imposto_percentual,
-        custo_fixo_percentual: config.custo_fixo_percentual,
+        imposto_percentual: config.imposto_percentual * 100,
+        custo_fixo_percentual: config.custo_fixo_percentual * 100,
       });
     }
   }, [config]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
+      const payload = {
+        imposto_percentual: values.imposto_percentual / 100,
+        custo_fixo_percentual: values.custo_fixo_percentual / 100,
+      };
       if (config?.id) {
-        const { error } = await supabase.from("configuracoes").update(values).eq("id", config.id);
+        const { error } = await supabase.from("configuracoes").update(payload).eq("id", config.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("configuracoes").insert(values);
+        const { error } = await supabase.from("configuracoes").insert(payload);
         if (error) throw error;
       }
     },
@@ -84,7 +88,7 @@ export default function Configuracoes() {
       <Card className="max-w-lg">
         <CardHeader>
           <CardTitle>Percentuais Financeiros</CardTitle>
-          <CardDescription>Valores padrão aplicados a novos clientes (entre 0 e 1, ex: 0.135 = 13,5%).</CardDescription>
+          <CardDescription>Valores padrão aplicados a novos clientes. Insira o percentual diretamente (ex: 13,5 para 13,5%).</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -93,11 +97,11 @@ export default function Configuracoes() {
                 <FormItem>
                   <FormLabel>Imposto %</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.001" min="0" max="1" {...field}
+                    <Input type="number" step="0.01" min="0" max="100" placeholder="13,50" {...field}
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Ex: 0.135 = 13,5%</FormDescription>
+                  <FormDescription>Ex: 13,50 para 13,5%</FormDescription>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -106,11 +110,11 @@ export default function Configuracoes() {
                 <FormItem>
                   <FormLabel>Custo Fixo %</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.001" min="0" max="1" {...field}
+                    <Input type="number" step="0.01" min="0" max="100" placeholder="8,00" {...field}
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>Ex: 0.08 = 8%</FormDescription>
+                  <FormDescription>Ex: 8,00 para 8%</FormDescription>
                   <FormMessage />
                 </FormItem>
               )} />
