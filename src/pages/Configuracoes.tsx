@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Save, Loader2 } from "lucide-react";
@@ -97,8 +97,11 @@ export default function Configuracoes() {
                 <FormItem>
                   <FormLabel>Imposto %</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" min="0" max="100" placeholder="13,50" {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    <NumericInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="13,50"
+                      suffix="%"
                     />
                   </FormControl>
                   <FormDescription>Ex: 13,50 para 13,5%</FormDescription>
@@ -110,8 +113,11 @@ export default function Configuracoes() {
                 <FormItem>
                   <FormLabel>Custo Fixo %</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" min="0" max="100" placeholder="8,00" {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    <NumericInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="8,00"
+                      suffix="%"
                     />
                   </FormControl>
                   <FormDescription>Ex: 8,00 para 8%</FormDescription>
