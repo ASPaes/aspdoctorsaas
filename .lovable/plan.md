@@ -1,52 +1,37 @@
 
+# Sincronizar Estados e Cidades via IBGE
 
-# Doctor SaaS — MVP Setup Plan
+## Resumo
+Criar uma Edge Function que busca dados do IBGE e popula as tabelas `estados` e `cidades` via UPSERT, e adicionar um botao na tela de Cadastros para acionar essa sincronizacao.
 
-## 🎨 Identidade Visual
-- **Logo** DoctorSaaS exibida na sidebar (topo) e nas telas de autenticação
-- **Dark mode** como padrão: fundo escuro (#1a1a1a / tons escuros) em todo o app
-- **Cor primária** (botões, seleções, links ativos): verde da marca (~#2D6A4F / #40916C extraído da logo)
-- **Sidebar** com fundo verde escuro (#1B4332), ícones e texto claros
-- **Cards e superfícies** em tons de cinza escuro, bordas sutis
+## 1. Edge Function `populate-cidades`
 
-## 1. Autenticação
-- Página de **Login** com email/senha + botão "Entrar com Google"
-- Página de **Cadastro** com email/senha
-- Página de **Esqueci minha senha** + página `/reset-password`
-- Logo DoctorSaaS centralizada nas telas de auth
-- Botões em verde da marca
-- Instruções fornecidas para configurar Google OAuth no painel Supabase
+**Arquivo:** `supabase/functions/populate-cidades/index.ts`
 
-## 2. Proteção de Rotas (AuthGuard)
-- Componente `AuthGuard` com listener `onAuthStateChange`
-- Redireciona para `/login` se não autenticado
-- Loading spinner enquanto verifica sessão
+- Recebe requisicao POST
+- Busca estados da API publica do IBGE: `https://servicodados.ibge.gov.br/api/v1/localidades/estados`
+- Para cada estado, faz UPSERT na tabela `estados` usando `sigla` como chave unica (indice ja existe: `ux_estados_sigla`)
+- Busca cidades: `https://servicodados.ibge.gov.br/api/v1/localidades/municipios`
+- Faz UPSERT na tabela `cidades` usando `codigo_ibge` como chave unica (indice ja existe: `ux_cidades_codigo_ibge`)
+- Usa `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` (ja existem nos secrets) para autenticar no banco sem depender do token do usuario
+- Retorna contagem de estados e cidades sincronizados
+- CORS habilitado para chamadas do frontend
+- Nenhuma chave sensivel exposta no frontend (a API do IBGE e publica, sem necessidade de chave)
 
-## 3. Layout com Sidebar (Verde Escuro)
-- Sidebar com fundo verde escuro, logo no topo
-- Itens de navegação:
-  - 👥 **Clientes** (`/clientes`)
-  - 📋 **Cadastros** (`/cadastros`)
-  - ⚙️ **Configurações** (`/configuracoes`)
-- Destaque visual na rota ativa (fundo verde mais claro)
-- Sidebar colapsável com ícones visíveis no modo mini
-- Botão de **Logout** na parte inferior
-- Header com trigger para abrir/fechar sidebar
+**Configuracao:** Adicionar `[functions.populate-cidades]` com `verify_jwt = false` no `supabase/config.toml` (a funcao valida o token manualmente)
 
-## 4. Estrutura de Rotas
-| Rota | Tipo | Descrição |
-|------|------|-----------|
-| `/login` | Pública | Login email/senha + Google |
-| `/signup` | Pública | Cadastro |
-| `/reset-password` | Pública | Redefinição de senha |
-| `/clientes` | Protegida | Página placeholder |
-| `/cadastros` | Protegida | Página placeholder |
-| `/configuracoes` | Protegida | Página placeholder |
-| `/` | — | Redireciona para `/clientes` |
+## 2. Frontend - Botao na tela Cadastros
 
-## 5. Configuração Técnica
-- Supabase client já existente no projeto (externo)
-- Tema dark aplicado via CSS variables no `index.css`
-- Sem criação de tabelas no banco nesta etapa
-- Páginas internas serão placeholders prontos para funcionalidades futuras
+**Arquivo:** `src/pages/Cadastros.tsx`
 
+- Adicionar botao "Sincronizar Estados/Cidades" com icone de refresh
+- Ao clicar, chama a Edge Function via `supabase.functions.invoke('populate-cidades')`
+- Exibe estados de loading (spinner no botao), sucesso (toast verde com contagem) e erro (toast vermelho)
+- Botao desabilitado durante o carregamento
+
+## Detalhes Tecnicos
+
+- A API do IBGE e publica e gratuita, sem necessidade de API key
+- Os indices unicos `ux_estados_sigla` e `ux_cidades_codigo_ibge` ja existem no banco, garantindo que o UPSERT funcione sem duplicatas
+- Nenhuma migracao de banco necessaria
+- A Edge Function usa o service role key para bypassa RLS e fazer os inserts diretamente
