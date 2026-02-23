@@ -105,6 +105,15 @@ export function useLookups(estadoId?: number | null) {
     },
   });
 
+  const fornecedores = useQuery({
+    queryKey: ["fornecedores"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("fornecedores").select("id, nome, site").order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return {
     estados,
     cidades,
@@ -116,5 +125,6 @@ export function useLookups(estadoId?: number | null) {
     formasPagamento,
     motivosCancelamento,
     configuracoes,
+    fornecedores,
   };
 }

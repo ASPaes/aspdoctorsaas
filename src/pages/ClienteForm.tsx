@@ -38,13 +38,17 @@ const clienteSchema = z.object({
   recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"]).nullable(),
   produto_id: z.number().nullable(),
   observacao_negociacao: z.string().nullable(),
+  data_ativacao: z.string().nullable(),
+  fornecedor_id: z.number().nullable(),
+  codigo_fornecedor: z.string().nullable(),
+  link_portal_fornecedor: z.string().nullable(),
   valor_ativacao: z.number().min(0, "Deve ser >= 0").nullable(),
   forma_pagamento_ativacao_id: z.number().nullable(),
   mensalidade: z.number().min(0, "Deve ser >= 0").nullable(),
   forma_pagamento_mensalidade_id: z.number().nullable(),
   custo_operacao: z.number().min(0, "Deve ser >= 0").nullable(),
-  imposto_percentual: z.number().min(0).max(1).nullable(),
-  custo_fixo_percentual: z.number().min(0).max(1).nullable(),
+  imposto_percentual: z.number().min(0).max(100).nullable(),
+  custo_fixo_percentual: z.number().min(0).max(100).nullable(),
   cancelado: z.boolean(),
   data_cancelamento: z.string().nullable(),
   motivo_cancelamento_id: z.number().nullable(),
@@ -68,7 +72,9 @@ export default function ClienteForm() {
       telefone_contato: null, telefone_whatsapp: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, vertical_id: null, observacao_cliente: null,
       data_venda: null, funcionario_id: null, origem_venda: null, recorrencia: null,
-      produto_id: null, observacao_negociacao: null, valor_ativacao: null,
+      produto_id: null, observacao_negociacao: null,
+      data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
+      valor_ativacao: null,
       forma_pagamento_ativacao_id: null, mensalidade: null, forma_pagamento_mensalidade_id: null,
       custo_operacao: null, imposto_percentual: null, custo_fixo_percentual: null,
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
@@ -84,10 +90,10 @@ export default function ClienteForm() {
     if (!isEditing && lookups.configuracoes.data) {
       const cfg = lookups.configuracoes.data;
       if (form.getValues("imposto_percentual") === null) {
-        form.setValue("imposto_percentual", cfg.imposto_percentual);
+        form.setValue("imposto_percentual", Number(cfg.imposto_percentual) * 100);
       }
       if (form.getValues("custo_fixo_percentual") === null) {
-        form.setValue("custo_fixo_percentual", cfg.custo_fixo_percentual);
+        form.setValue("custo_fixo_percentual", Number(cfg.custo_fixo_percentual) * 100);
       }
     }
   }, [isEditing, lookups.configuracoes.data]);
@@ -114,13 +120,18 @@ export default function ClienteForm() {
         observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
         funcionario_id: c.funcionario_id, origem_venda: c.origem_venda,
         recorrencia: c.recorrencia, produto_id: c.produto_id,
-        observacao_negociacao: c.observacao_negociacao, valor_ativacao: c.valor_ativacao ? Number(c.valor_ativacao) : null,
+        observacao_negociacao: c.observacao_negociacao,
+        data_ativacao: (c as any).data_ativacao ?? null,
+        fornecedor_id: (c as any).fornecedor_id ?? null,
+        codigo_fornecedor: (c as any).codigo_fornecedor ?? null,
+        link_portal_fornecedor: (c as any).link_portal_fornecedor ?? null,
+        valor_ativacao: c.valor_ativacao ? Number(c.valor_ativacao) : null,
         forma_pagamento_ativacao_id: c.forma_pagamento_ativacao_id,
         mensalidade: c.mensalidade ? Number(c.mensalidade) : null,
         forma_pagamento_mensalidade_id: c.forma_pagamento_mensalidade_id,
         custo_operacao: c.custo_operacao ? Number(c.custo_operacao) : null,
-        imposto_percentual: c.imposto_percentual ? Number(c.imposto_percentual) : null,
-        custo_fixo_percentual: c.custo_fixo_percentual ? Number(c.custo_fixo_percentual) : null,
+        imposto_percentual: c.imposto_percentual ? Number(c.imposto_percentual) * 100 : null,
+        custo_fixo_percentual: c.custo_fixo_percentual ? Number(c.custo_fixo_percentual) * 100 : null,
         cancelado: c.cancelado, data_cancelamento: c.data_cancelamento,
         motivo_cancelamento_id: c.motivo_cancelamento_id,
         observacao_cancelamento: c.observacao_cancelamento,
@@ -133,6 +144,8 @@ export default function ClienteForm() {
       const payload = {
         ...values,
         email: values.email || null,
+        imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
+        custo_fixo_percentual: values.custo_fixo_percentual != null ? values.custo_fixo_percentual / 100 : null,
       };
 
       if (isEditing) {
@@ -205,6 +218,7 @@ export default function ClienteForm() {
                 form={form}
                 funcionarios={lookups.funcionarios.data ?? []}
                 produtos={lookups.produtos.data ?? []}
+                fornecedores={lookups.fornecedores?.data ?? []}
               />
               <FinanceiroTab
                 form={form}
