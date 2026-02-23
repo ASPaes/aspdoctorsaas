@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import logo from "@/assets/logo-doctorsaas.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +33,10 @@ export default function Signup() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto mb-2 text-3xl font-bold text-primary">DoctorSaaS</div>
+        <CardHeader className="text-center space-y-3 pb-2">
+          <div className="mx-auto">
+            <img src={logo} alt="DoctorSaaS" className="h-24 w-auto mx-auto" />
+          </div>
           <CardTitle className="text-xl">Criar conta</CardTitle>
           <CardDescription>Preencha os dados para se cadastrar</CardDescription>
         </CardHeader>
