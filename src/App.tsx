@@ -10,6 +10,7 @@ import Signup from "@/pages/Signup";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import Clientes from "@/pages/Clientes";
+import ClienteForm from "@/pages/ClienteForm";
 import Cadastros from "@/pages/Cadastros";
 import Configuracoes from "@/pages/Configuracoes";
 import NotFound from "@/pages/NotFound";
@@ -32,6 +33,8 @@ const App = () => (
           {/* Protected routes */}
           <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
             <Route path="/clientes" element={<Clientes />} />
+            <Route path="/clientes/novo" element={<ClienteForm />} />
+            <Route path="/clientes/:id" element={<ClienteForm />} />
             <Route path="/cadastros" element={<Cadastros />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
           </Route>
