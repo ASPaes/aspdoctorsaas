@@ -1,101 +1,62 @@
-# Filtros e Pesquisa na Lista de Clientes
 
-## Visao Geral
+# Aplicar Tema Supabase do tweakcn.com
 
-Reestruturar a pagina `Clientes.tsx` com busca textual, filtros rapidos e filtros avancados colapsaveis, conforme a imagem de referencia. Todas as datas usam date range pickers (de X a Y) com calendario.
+## Contexto
 
-## Estrutura da Interface
+O tema fornecido pelo tweakcn usa **Tailwind CSS v4** com cores em formato `oklch()`. O projeto atual usa **Tailwind CSS v3** com cores em formato `hsl()`. Nao e possivel simplesmente colar o CSS - e necessario adaptar para compatibilidade com v3.
 
-### Barra Principal (sempre visivel)
+## Estrategia de Adaptacao
 
-- Campo de busca: "Buscar por ID, razao social, fantasia, CNPJ ou codigo fornecedor..."
-- Select Status: Ativos / Cancelados / Todos (default: Ativos)
-- Select Recorrencia: Todas / Mensal / Trimestral / Semestral / Anual
+Em vez de converter oklch para hsl (perda de qualidade de cor), vamos mudar a abordagem: armazenar as cores como valores completos (incluindo `oklch(...)`) nas CSS variables e referenciar diretamente no `tailwind.config.ts` sem o wrapper `hsl()`.
 
-### Filtros Avancados (colapsavel com Collapsible)
+## Arquivos a Modificar
 
-Botao com icone Filter + "Filtros Avancados" + seta toggle.
+### 1. `index.html`
+- Adicionar import da fonte **Outfit** do Google Fonts (usada pelo tema)
 
-**Linha 1 - Periodos de data (date range pickers com calendario):**
+### 2. `src/index.css`
+- Substituir todas as variaveis CSS por valores `oklch()` completos do tema fornecido
+- Adicionar novas variaveis: `--chart-1` a `--chart-5`, shadows customizados, font families, tracking
+- Manter estrutura `:root` / `.dark` existente
+- Atualizar o `@layer base` para incluir `outline-ring/50` e `letter-spacing`
 
-- Periodo de Cadastro (de/ate)
-- Periodo de Cancelamento (de/ate)
-- Periodo da Venda (de/ate)
-- Periodo de Ativacao (de/ate)
+### 3. `tailwind.config.ts`
+- Trocar todas as referencias de `hsl(var(--xxx))` para `var(--xxx)` (pois os valores ja incluem `oklch(...)`)
+- Adicionar cores `chart-1` a `chart-5` ao theme
+- Adicionar configuracao de `fontFamily` com Outfit como sans-serif principal
+- Atualizar sidebar para usar `var(--sidebar)` em vez de `var(--sidebar-background)`
 
-Cada date range picker tera dois botoes (De / Ate) que abrem um Popover com Calendar. Ao clicar "De", abre calendario para selecionar data inicial; ao clicar "Ate", abre calendario para data final.
-
-**Linha 2 - Selects de lookup:**
-
-- Recorrencia
-- Vertical (tabela verticais)
-- Produto (tabela produtos)
-- Fornecedor (tabela fornecedores)
-
-**Linha 3 - Selects + range:**
-
-- Estado (tabela estados)
-- Cidade (tabela cidades, filtrada por estado)
-- Motivo Cancelamento (tabela motivos_cancelamento)
-- Mensalidade R$ (Min / Max)
-
-**Linha 4 - Ranges numericos:**
-
-- Lucro Real R$ (Min / Max)
-- Margem % (Min / Max)
-
-### Tabela de Resultados
-
-- Colunas: Razao Social, Nome Fantasia, CNPJ, Produto, Recorrencia, Mensalidade, Status
-- Linha clicavel navega para `/clientes/{id}`
-- Loading com Skeletons
-- Estado vazio: "Nenhum cliente encontrado"
-- Todas as colunas deve ter opcao de ordenar de forma crescente e decrescente
+### 4. `src/components/AppSidebar.tsx` (se necessario)
+- Verificar se ha cores hardcoded que precisam ser atualizadas
 
 ## Detalhes Tecnicos
 
-### Fonte de dados
+### Mudanca no formato de cores
 
-Usar a view `vw_clientes_financeiro` que ja possui campos calculados (`lucro_real`, `margem_bruta_percent`) - evita recalcular client-side.
+```text
+ANTES (v3 com hsl):
+  CSS:    --primary: 153 40% 36%;
+  Config: "hsl(var(--primary))"
 
-### Query Supabase
+DEPOIS (v3 com oklch):
+  CSS:    --primary: oklch(0.8348 0.1302 160.9080);
+  Config: "var(--primary)"
+```
 
-- Busca textual: `.or()` com `ilike` em `razao_social`, `nome_fantasia`, `cnpj`, `codigo_fornecedor` e `id::text`
-- Datas: `.gte('data_cadastro', from)` e `.lte('data_cadastro', to)` para cada campo
-- Selects: `.eq('vertical_id', value)` etc.
-- Ranges numericos: `.gte('mensalidade', min)` e `.lte('mensalidade', max)`
-- Status: `cancelado = false` (Ativos), `cancelado = true` (Cancelados), sem filtro (Todos)
-- Lucro Real e Margem: filtrar via `.gte()` / `.lte()` direto na view
+### Variaveis CSS - Light (:root)
+Todas as variaveis do tema fornecido serao convertidas mantendo `oklch()` como valor completo. O dark mode recebe seus proprios valores conforme especificado.
 
-### Date Range Picker
+### Fonte Outfit
+- Importar via Google Fonts no `index.html`
+- Configurar como `fontFamily.sans` no tailwind.config.ts
+- Variavel CSS `--font-sans: Outfit, sans-serif`
 
-Componente inline usando Popover + Calendar (Shadcn). Cada filtro de data tera:
+### Shadows customizados
+- Adicionar as variaveis de shadow do tema (`--shadow-2xs` ate `--shadow-2xl`)
+- Podem ser usadas via classes utilitarias customizadas se necessario
 
-- Botao "De" com icone CalendarIcon - abre Popover com Calendar mode="single"
-- Botao "Ate" com icone CalendarIcon - abre Popover com Calendar mode="single"
-- `pointer-events-auto` no Calendar conforme instrucoes do Shadcn
+### Chart Colors
+- Adicionar 5 cores de graficos ao tema para uso com Recharts/componentes de chart
 
-### Estado do filtro de Cidade
-
-- Dependente do Estado selecionado
-- Usa `useLookups(estadoId)` para buscar cidades filtradas
-- Ao mudar Estado, limpa Cidade selecionada
-
-### Performance
-
-- Debounce de 300ms no campo de busca textual
-- Filtros de select aplicam imediatamente
-- Todos os filtros disparam re-fetch da query
-
-### Arquivos modificados
-
-- `src/pages/Clientes.tsx` - reescrita completa com filtros, tabela e logica de query
-
-### Dependencias existentes utilizadas
-
-- `@radix-ui/react-collapsible` (Collapsible)
-- `@radix-ui/react-popover` (Popover para date pickers)
-- `react-day-picker` (Calendar)
-- `date-fns` (format)
-- `@tanstack/react-query` (useQuery)
-- `lucide-react` (Search, Filter, CalendarIcon, ChevronUp/Down)
+### Novas variaveis de sidebar
+- O tema usa `--sidebar` em vez de `--sidebar-background` - atualizar tanto CSS quanto config para manter consistencia
