@@ -1,171 +1,154 @@
 
 
-# Modulo de Certificados Digitais A1
+# Correcoes e Melhorias no Cadastro de Cliente
 
-## Visao Geral
+## Resumo
 
-Replicar o modulo de certificados digitais do projeto [Sistema ASP Softwares](/projects/58135b32-0c2e-43bd-baad-b9aab6717679), adaptado para a arquitetura do DoctorSaaS. O modulo consiste em:
+Corrigir 3 bugs (mascaras de CNPJ/telefone e decimais nos valores), mostrar o card de Certificado A1 tambem na criacao de cliente, adicionar 4 novos campos de contato principal e criar tabela auxiliar de contatos adicionais com modal inline.
 
-1. **Campos de certificado no cadastro do cliente** (seção no formulario de edição)
-2. **Tabela de historico de vendas de certificados** (por cliente)
-3. **Pagina dedicada de gestao de certificados** (lista geral com filtros e KPIs)
-4. **Importacao em massa via CSV** (opcional, fase 2)
+---
 
-## Adaptacoes em relacao ao projeto original
+## 1. Mascaras de CNPJ e Telefone
 
-O projeto original usa `profiles` (auth users) como vendedores. O DoctorSaaS usa a tabela `funcionarios` para isso. Todas as referencias a `profiles/user_id` serao adaptadas para `funcionarios/id`.
+### Novo arquivo: `src/lib/masks.ts`
 
-O projeto original tem `id_cliente` (inteiro sequencial) e `cliente_codigo`. O DoctorSaaS usa `id` (UUID) e `codigo_fornecedor` na tabela clientes.
+Funcoes utilitarias reutilizaveis:
 
-## Fase 1 - Estrutura de Dados
+- **maskCNPJ(value)**: remove nao-digitos, aplica formato `XX.XXX.XXX/XXXX-XX`, limita a 14 digitos
+- **maskPhone(value)**: remove nao-digitos, aplica `(XX) XXXXX-XXXX` (11 digitos) ou `(XX) XXXX-XXXX` (10 digitos)
+- **maskCPF(value)**: remove nao-digitos, aplica formato `XXX.XXX.XXX-XX`, limita a 11 digitos
 
-### Migration 1: Adicionar campos na tabela `clientes`
+### Modificar: `src/components/clientes/DadosClienteTab.tsx`
+
+- Campo **CNPJ**: aplicar `maskCNPJ` no `onChange` antes de chamar `field.onChange`
+- Campo **Telefone Contato**: aplicar `maskPhone` no `onChange`
+- Campo **Telefone WhatsApp**: aplicar `maskPhone` no `onChange`
+- Novos campos de contato (CPF e Fone) tambem usarao as mascaras correspondentes
+
+Os valores sao armazenados com mascara (texto) no banco.
+
+---
+
+## 2. Correcao do NumericInput (decimais)
+
+### Modificar: `src/components/ui/numeric-input.tsx`
+
+**Problema**: o `useEffect` que sincroniza o `displayValue` dispara sempre que `value` muda. Quando o usuario digita "735,", o `onChange` envia `735`, o effect reformata para "735,00" e o cursor pula.
+
+**Solucao**: adicionar um ref `isFocused`. Quando `isFocused === true`, o `useEffect` nao reformata o displayValue. Apenas no `onBlur` (quando `isFocused` volta a `false`) o valor e reformatado com as casas decimais completas.
+
+```text
+Logica:
+- onFocus: isFocused.current = true
+- onChange: atualiza displayValue e chama onChange normalmente (sem reformatacao)
+- onBlur: isFocused.current = false, reformata displayValue
+- useEffect: so sincroniza se !isFocused.current (mudancas externas)
+```
+
+---
+
+## 3. Certificado A1 visivel na criacao
+
+### Modificar: `src/pages/ClienteForm.tsx`
+
+- Remover a condicao `{isEditing && ...}` do CertificadoA1Section
+- Passar `clienteId` como `id ?? undefined`
+
+### Modificar: `src/components/clientes/CertificadoA1Section.tsx`
+
+- Tornar `clienteId` opcional (`string | undefined`)
+- Quando `clienteId` esta ausente:
+  - Exibir campo de vencimento editavel e badge de status normalmente
+  - Ocultar botao "Registrar Venda", historico de vendas e info de ultima venda
+  - Exibir mensagem sutil: "Salve o cliente para registrar vendas de certificado"
+
+---
+
+## 4. Novos campos de contato principal
+
+### Migration SQL
+
+Adicionar 4 colunas na tabela `clientes`:
 
 ```sql
 ALTER TABLE clientes
-  ADD COLUMN cert_a1_vencimento date,
-  ADD COLUMN cert_a1_ultima_venda_em date,
-  ADD COLUMN cert_a1_ultimo_vendedor_id bigint;
+  ADD COLUMN contato_nome text,
+  ADD COLUMN contato_cpf text,
+  ADD COLUMN contato_fone text,
+  ADD COLUMN contato_aniversario date;
 ```
 
-### Migration 2: Criar tabela `certificado_a1_vendas`
+### Modificar: `src/pages/ClienteForm.tsx`
+
+- Adicionar os 4 campos ao schema Zod (todos `z.string().nullable()` exceto `contato_aniversario` que e `z.string().nullable()` tambem, armazenado como date string)
+- Adicionar aos defaultValues e ao `form.reset` no carregamento do cliente
+
+### Modificar: `src/components/clientes/DadosClienteTab.tsx`
+
+Adicionar os 4 campos no grid, agrupados visualmente com um sub-titulo "Contato Principal":
+
+- **Nome do Contato** (text input)
+- **CPF do Contato** (text input com mascara `XXX.XXX.XXX-XX`)
+- **Fone do Contato** (text input com mascara de telefone)
+- **Data de Aniversario** (input date)
+
+Ao lado do sub-titulo "Contato Principal", exibir um botao pequeno (icone `Users`) que abre o modal de contatos adicionais.
+
+---
+
+## 5. Tabela auxiliar de contatos adicionais
+
+### Migration SQL
 
 ```sql
-CREATE TABLE certificado_a1_vendas (
+CREATE TABLE cliente_contatos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cliente_id uuid NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-  data_venda date NOT NULL,
-  valor_venda numeric,
-  vendedor_id bigint REFERENCES funcionarios(id),
+  nome text NOT NULL,
+  cpf text,
+  fone text,
+  email text,
+  cargo text,
+  aniversario date,
   observacao text,
-  status text NOT NULL DEFAULT 'ganho' CHECK (status IN ('ganho', 'perdido_terceiro')),
-  data_base_renovacao date,
-  motivo_perda text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE cliente_contatos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY auth_read_cliente_contatos ON cliente_contatos
+  FOR SELECT USING (true);
+
+CREATE POLICY auth_write_cliente_contatos ON cliente_contatos
+  FOR ALL USING (true) WITH CHECK (true);
 ```
 
-RLS: mesma politica das demais tabelas (autenticados leem/escrevem tudo).
+### Novo arquivo: `src/components/clientes/ContatosAdicionaisModal.tsx`
 
-### Migration 3: Trigger para atualizar campos do cliente automaticamente
+Dialog/modal que recebe `clienteId` (obrigatorio - so aparece quando o cliente ja foi salvo):
 
-Ao inserir uma venda, um trigger atualiza automaticamente:
-- `cert_a1_vencimento` = data_venda + 12 meses (ou data_base_renovacao + 12 meses se perdido_terceiro)
-- `cert_a1_ultima_venda_em` = data_venda
-- `cert_a1_ultimo_vendedor_id` = vendedor_id
+- Lista de contatos do cliente em uma tabela compacta (nome, fone, email, cargo)
+- Botao "+ Adicionar Contato" abre formulario inline (campos: nome, cpf com mascara, fone com mascara, email, cargo, aniversario, observacao)
+- Botao de excluir em cada linha
+- Usa TanStack Query para fetch e mutations com Supabase
 
-### Migration 4: Atualizar a view `vw_clientes_financeiro`
+### Integracao no DadosClienteTab
 
-Adicionar os 3 novos campos (`cert_a1_vencimento`, `cert_a1_ultima_venda_em`, `cert_a1_ultimo_vendedor_id`) na view para que fiquem disponiveis na listagem geral.
+- Botao ao lado do sub-titulo "Contato Principal" com icone `Users` e texto "Contatos Adicionais"
+- Quando `clienteId` esta ausente (novo cliente): botao desabilitado com tooltip "Salve o cliente primeiro"
+- Quando `clienteId` existe: abre o modal `ContatosAdicionaisModal`
 
-## Fase 2 - Secao no Formulario do Cliente
+---
 
-### Arquivo: `src/components/clientes/CertificadoA1Section.tsx` (novo)
-
-Componente Card integrado ao formulario de edição do cliente (`ClienteForm.tsx`), contendo:
-
-- **Vencimento**: campo date editavel manualmente
-- **Status**: badge colorido (Vencido / Vence em breve / Valido / Sem certificado)
-  - Vencido (vermelho): data passada
-  - Vence em breve (ambar): ate 30 dias
-  - Valido (verde): mais de 30 dias
-  - Sem certificado (cinza): sem data
-- **Ultima Venda**: data + nome do vendedor (funcionario)
-- **Botao "Registrar Venda"**: abre modal
-- **Historico de Vendas**: tabela com as ultimas 5 vendas (data, valor, vendedor, observacao)
-
-### Modal de Registro de Venda
-
-Dois modos via checkbox "Ja renovado com terceiro":
-
-**Modo Venda Normal:**
-- Data da Venda (date)
-- Valor R$ (input)
-- Vendedor (select de funcionarios ativos)
-- Observacao (textarea)
-
-**Modo Perdido para Terceiro:**
-- Data base da renovacao (date)
-- Registrado por (select de funcionarios)
-- Motivo / Observacao (textarea)
-- Nao conta como venda, apenas atualiza o vencimento
-
-Ambos exibem preview do novo vencimento (data + 12 meses).
-
-### Arquivo: `src/pages/ClienteForm.tsx` (modificar)
-
-- Adicionar campos `cert_a1_vencimento`, `cert_a1_ultima_venda_em`, `cert_a1_ultimo_vendedor_id` ao schema e form
-- Inserir o componente `CertificadoA1Section` como novo Card apos "Produto / Contrato" e antes de "Cancelamento"
-
-## Fase 3 - Pagina de Gestao de Certificados
-
-### Arquivo: `src/pages/CertificadosA1.tsx` (novo)
-
-Pagina dedicada acessivel via sidebar, contendo:
-
-**KPIs (5 cards):**
-- Total de clientes (filtrados)
-- Vencidos (vermelho)
-- Vencendo em ate 30 dias (ambar)
-- Ativos / validos (verde)
-- Sem data de vencimento
-
-**Filtros Rapidos (botoes):**
-- Todos
-- Janela de Renovacao (-20 a +30 dias)
-- Vence em 30 dias
-- Vencido ate 20 dias
-- Personalizado
-
-**Filtros Detalhados:**
-- Busca textual (razao social, fantasia, CNPJ, codigo fornecedor)
-- Status (todos / vencido / vencendo / ativo / sem data)
-- Periodo de vencimento (de/ate)
-
-**Tabela com colunas ordenáveis:**
-- Razao Social / Fantasia
-- Codigo Fornecedor
-- Telefone
-- Vencimento (formatado dd/MM/yyyy)
-- Status (badge colorido)
-- Ultima Venda (data)
-- Acoes: Editar Vencimento + Registrar Venda
-
-**Modais:**
-- Editar Vencimento (input date simples)
-- Registrar Venda (mesmo modal da secao do cliente)
-
-### Arquivo: `src/App.tsx` (modificar)
-
-- Adicionar rota `/certificados-a1` apontando para `CertificadosA1`
-
-### Arquivo: `src/components/AppSidebar.tsx` (modificar)
-
-- Adicionar item "Certificados A1" no menu com icone `ShieldCheck`
-
-## Fase 4 (Futura) - Importacao em Massa
-
-### Tabela staging + funcoes RPC
-
-- Tabela `staging_certificados_a1_import` para upload temporario de CSV
-- Funcao `validate_cert_a1_import` para validacao (match por codigo_fornecedor)
-- Funcao `apply_cert_a1_import` para aplicar atualizacoes em massa
-- Componente `CertA1ImportModal` com fluxo: Upload CSV -> Validacao -> Preview -> Aplicar
-
-Esta fase pode ser implementada separadamente apos as fases 1-3 estarem funcionando.
-
-## Resumo de Arquivos
+## Resumo de arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| Migration SQL (4 scripts) | Criar campos, tabela, trigger, atualizar view |
-| `src/components/clientes/CertificadoA1Section.tsx` | Criar (novo) |
-| `src/pages/CertificadosA1.tsx` | Criar (novo) |
-| `src/pages/ClienteForm.tsx` | Modificar (adicionar campos + secao) |
-| `src/App.tsx` | Modificar (nova rota) |
-| `src/components/AppSidebar.tsx` | Modificar (novo item menu) |
-
-## Dependencias
-
-Todas ja instaladas: `date-fns`, `lucide-react`, `@tanstack/react-query`, componentes shadcn/ui (Card, Dialog, Table, Badge, Select, Input, Checkbox, Textarea, Separator, Skeleton).
+| Migration SQL | Adicionar 4 colunas em clientes + criar tabela `cliente_contatos` |
+| `src/lib/masks.ts` | Criar (novo) |
+| `src/components/ui/numeric-input.tsx` | Corrigir sincronizacao durante digitacao |
+| `src/pages/ClienteForm.tsx` | Adicionar campos contato ao schema, mostrar CertA1 sempre |
+| `src/components/clientes/DadosClienteTab.tsx` | Mascaras CNPJ/telefone, novos campos contato, botao contatos adicionais |
+| `src/components/clientes/CertificadoA1Section.tsx` | clienteId opcional |
+| `src/components/clientes/ContatosAdicionaisModal.tsx` | Criar (novo) |
 
