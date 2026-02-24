@@ -9,9 +9,10 @@ import type { ClienteFormValues } from "@/pages/ClienteForm";
 interface Props {
   form: UseFormReturn<ClienteFormValues>;
   formasPagamento: { id: number; nome: string }[];
+  clienteId?: string;
 }
 
-export default function FinanceiroTab({ form, formasPagamento }: Props) {
+export default function FinanceiroTab({ form, formasPagamento, clienteId }: Props) {
   const mensalidade = form.watch("mensalidade");
   const custo_operacao = form.watch("custo_operacao");
   const imposto_percentual = form.watch("imposto_percentual");
@@ -112,7 +113,12 @@ export default function FinanceiroTab({ form, formasPagamento }: Props) {
         </div>
       </div>
 
-      <EspelhoFinanceiro espelho={espelho} />
+      <EspelhoFinanceiro
+        espelho={espelho}
+        clienteId={clienteId}
+        mensalidadeBase={mensalidade ?? 0}
+        custoBase={custo_operacao ?? 0}
+      />
     </div>
   );
 }
