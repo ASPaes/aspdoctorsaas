@@ -1,50 +1,87 @@
 
 
-# Reorganizar Layout dos Campos - Dados Cadastrais
+# Ajustes de Layout e UX no Formulario de Cliente
 
-## Objetivo
+## 1. Mover "Modelo de Contrato" para o card Produto / Contrato
 
-Redistribuir os campos do formulario em grids de 3 e 4 colunas, similar a imagem de referencia, para melhor aproveitamento do espaco horizontal e leitura mais fluida.
+- Remover o campo `modelo_contrato_id` do `DadosClienteTab.tsx`
+- Adicionar no `VendaProdutoTab.tsx`, dentro do subcard "Informacoes do Contrato"
+- Remover prop `modelosContrato` de `DadosClienteTab` e passar para `VendaProdutoTab`
+- Na linha 1 do DadosClienteTab, ficam apenas: Data Cadastro | Unidade Base (2 cols no grid de 3, ou ajustar)
 
-## Layout proposto
+## 2. Botao WhatsApp ao lado do campo Telefone WhatsApp
+
+- No `DadosClienteTab.tsx`, envolver o input de `telefone_whatsapp` em um `div flex` com um botao de icone WhatsApp (usar icone de `MessageCircle` do lucide ou SVG do WhatsApp)
+- Ao clicar, abrir `https://wa.me/{numero_limpo}` em nova aba (removendo formatacao do numero)
+
+## 3. Reorganizar layout para ergonomia (adaptar col-spans por tamanho do dado)
+
+### DadosClienteTab.tsx (grid de 3 colunas)
 
 ```text
-Linha 1 (3 cols):  Data Cadastro | Unidade Base | Modelo de Contrato
-Linha 2 (2 cols):  Razão Social  | Nome Fantasia
-Linha 3 (3 cols):  CNPJ | Email | Telefone Contato
-Linha 4 (3 cols):  Telefone WhatsApp | Área de Atuação | Segmento
-Linha 5 (full):    Observação do Cliente
-
---- Separator ---
-Endereço
-Linha 1 (3 cols):  CEP | Estado | Cidade
-Linha 2 (3 cols):  Endereço | Número | Bairro
-
---- Separator ---
-Contato Principal
-Linha 1 (2 cols):  Nome do Contato | CPF do Contato
-Linha 2 (2 cols):  Fone do Contato | Data de Aniversário
+Linha 1: Data Cadastro (1 col) | Unidade Base (1 col) | [vazio ou ajustar para 2 cols]
+Linha 2: Razao Social (col-span-2) | Nome Fantasia (1 col)
+Linha 3: CNPJ (1 col) | Email (col-span-2, emails tendem a ser longos)
+Linha 4: Telefone Contato (1 col) | Telefone WhatsApp + botao (1 col) | Area Atuacao (1 col)
+Linha 5: Segmento (1 col) | [pode ficar sozinho ou agrupar]
+Linha 6: Observacao (col-span-3)
 ```
 
-## Mudancas tecnicas
+Ajuste: Com Modelo de Contrato removido, linha 1 fica Data Cadastro + Unidade Base. Para aproveitar, usar grid de 2 cols nessa linha ou deixar espaço.
 
-### `src/components/clientes/DadosClienteTab.tsx`
+Melhor proposta com grid-cols-4 para mais flexibilidade:
 
-- Trocar o grid principal de `grid-cols-1 md:grid-cols-2` para `grid-cols-1 md:grid-cols-3`
-- Linha 1: Data Cadastro, Unidade Base e Modelo de Contrato lado a lado (3 cols)
-- Linha 2: Razao Social e Nome Fantasia ocupando `md:col-span-3` dividido em 2 (usar um sub-grid de 2 cols com `md:col-span-3` wrapper, ou fazer cada um `col-span-1` com Razao Social em `md:col-span-2` para dar mais espaco)
-  - Melhor: Razao Social com `md:col-span-2` e Nome Fantasia com `md:col-span-1` (razao social tende a ser maior)
-- Linha 3: CNPJ, Email, Telefone Contato (3 cols naturais)
-- Linha 4: Telefone WhatsApp, Area Atuacao, Segmento (3 cols naturais)
-- Observacao: `md:col-span-3` (full width)
-- Secao Endereco: grid de 3 cols tambem
-  - CEP, Estado, Cidade (linha 1)
-  - Endereco (`md:col-span-1`), Numero, Bairro (linha 2) - ou Endereco com col-span-2 + Numero, depois Bairro na mesma linha... melhor: Endereco, Numero, Bairro em 3 cols
-- Contato Principal: manter 2 cols (4 campos, 2 linhas)
+```text
+Linha 1 (4 cols): Data Cadastro | Unidade Base | [vazio] | [vazio]
+  -> Melhor manter grid-cols-3: Data Cadastro | Unidade Base | Segmento
+Linha 2: Razao Social (col-span-2) | Nome Fantasia
+Linha 3: CNPJ | Email (col-span-2)
+Linha 4: Telefone Contato | Telefone WhatsApp [+btn] | Area Atuacao
+Linha 5: Observacao (col-span-3)
+```
 
-### Arquivo unico modificado
+### VendaProdutoTab.tsx - Informacoes do Contrato (grid de 3 cols)
+
+```text
+Linha 1: Data Venda | Origem Venda | Modelo de Contrato (NOVO aqui)
+Linha 2: Recorrencia | Funcionario (Consultor) | [vazio]
+```
+
+### VendaProdutoTab.tsx - Informacoes do Produto (grid de 3 cols)
+
+```text
+Linha 1: Data Ativacao | Fornecedor | Codigo Fornecedor
+Linha 2: Link Portal Fornecedor (col-span-2) | Produto
+```
+
+### FinanceiroTab.tsx - Valores (grid de 4 cols para 4 campos por linha)
+
+```text
+Linha 1: Valor Ativacao | Forma Pgto Ativacao | Mensalidade/MRR | Forma Pgto Mensalidade
+Linha 2: Custo Operacao | Imposto % | Custo Fixo % | [vazio]
+```
+
+Usar `grid-cols-1 md:grid-cols-4` para encaixar os 4 campos de pagamento na mesma linha.
+
+### Endereco (manter grid-cols-3, ja esta bom)
+
+### Contato Principal (manter grid-cols-2, ja esta bom)
+
+---
+
+## Arquivos modificados
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/components/clientes/DadosClienteTab.tsx` | Alterar grids para 3 colunas, reordenar campos, ajustar col-spans |
+| `src/components/clientes/DadosClienteTab.tsx` | Remover modelo_contrato; adicionar botao WhatsApp; reordenar campos (Email col-span-2, Segmento sobe) |
+| `src/components/clientes/VendaProdutoTab.tsx` | Adicionar prop + campo modelo_contrato_id; grids de 3 cols |
+| `src/components/clientes/FinanceiroTab.tsx` | Grid de 4 cols para valores (4 campos por linha) |
+| `src/pages/ClienteForm.tsx` | Mover prop modelosContrato de DadosClienteTab para VendaProdutoTab |
+
+## Detalhes tecnicos
+
+- Botao WhatsApp: `onClick={() => window.open(\`https://wa.me/55\${digits}\`, "_blank")}` onde digits = telefone sem formatacao
+- Icone: usar `MessageCircle` do lucide-react (nao existe icone WhatsApp nativo no lucide, mas MessageCircle comunica bem, alternativa e um SVG inline)
+- Nenhuma alteracao de schema ou banco de dados necessaria
+- Ordem dos campos mantida conforme solicitado
 
