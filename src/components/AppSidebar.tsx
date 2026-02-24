@@ -1,5 +1,5 @@
 import { Users, ClipboardList, Settings, LogOut, ShieldCheck } from "lucide-react";
-import logo from "@/assets/logo-doctorsaas.png";
+import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { NavLink } from "@/components/NavLink";
@@ -38,11 +38,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
-        {!collapsed ? (
-          <img src={logo} alt="DoctorSaaS" className="h-10 w-auto" />
-        ) : (
-          <img src={logo} alt="DoctorSaaS" className="h-8 w-8 object-contain" />
-        )}
+        <Logo size={collapsed ? "sm" : "md"} />
       </div>
 
       <SidebarContent>
