@@ -1,82 +1,50 @@
 
 
-# Adicionar Secao de Endereco no Cadastro do Cliente
+# Reorganizar Layout dos Campos - Dados Cadastrais
 
-## Resumo
+## Objetivo
 
-Criar uma secao "Endereco" dentro do card Dados Cadastrais, agrupando Estado e Cidade (ja existentes) com novos campos: CEP, Endereco, Numero e Bairro. O CEP tera mascara e consulta automatica via API publica ViaCEP.
+Redistribuir os campos do formulario em grids de 3 e 4 colunas, similar a imagem de referencia, para melhor aproveitamento do espaco horizontal e leitura mais fluida.
 
----
-
-## 1. Banco de Dados
-
-Adicionar 4 colunas na tabela `clientes`:
-
-```sql
-ALTER TABLE clientes ADD COLUMN cep text;
-ALTER TABLE clientes ADD COLUMN endereco text;
-ALTER TABLE clientes ADD COLUMN numero text;
-ALTER TABLE clientes ADD COLUMN bairro text;
-```
-
----
-
-## 2. Mascara de CEP
-
-Adicionar funcao `maskCEP` em `src/lib/masks.ts`:
-- Formato: `00000-000` (5 digitos, hifen, 3 digitos)
-
----
-
-## 3. Consulta automatica via ViaCEP
-
-Quando o usuario digitar os 8 digitos do CEP (formato completo `00000-000`), o sistema chamara a API publica `https://viacep.com.br/ws/{cep}/json/` e preenchera automaticamente:
-- `endereco` (logradouro)
-- `bairro`
-- `estado_id` (buscando pela sigla UF retornada)
-- `cidade_id` (buscando pelo nome da cidade retornada + estado)
-
-Isso sera implementado diretamente no componente `DadosClienteTab.tsx` com um `useEffect` ou callback no `onChange` do CEP.
-
----
-
-## 4. Frontend - DadosClienteTab.tsx
-
-Reorganizar o layout para criar uma subsecao visual "Endereco" (com Separator e titulo, igual ao "Contato Principal"):
+## Layout proposto
 
 ```text
-[Campos cadastrais existentes: data_cadastro, razao_social, nome_fantasia, cnpj, email, telefones, area_atuacao, segmento, modelo_contrato, unidade_base, observacao]
+Linha 1 (3 cols):  Data Cadastro | Unidade Base | Modelo de Contrato
+Linha 2 (2 cols):  Razão Social  | Nome Fantasia
+Linha 3 (3 cols):  CNPJ | Email | Telefone Contato
+Linha 4 (3 cols):  Telefone WhatsApp | Área de Atuação | Segmento
+Linha 5 (full):    Observação do Cliente
 
 --- Separator ---
-Endereco
-  CEP (com mascara e auto-fill) | Estado (Select - movido para ca)
-  Cidade (Select - movido para ca) | Bairro
-  Endereco (input) | Numero
+Endereço
+Linha 1 (3 cols):  CEP | Estado | Cidade
+Linha 2 (3 cols):  Endereço | Número | Bairro
 
 --- Separator ---
 Contato Principal
-  [campos existentes]
+Linha 1 (2 cols):  Nome do Contato | CPF do Contato
+Linha 2 (2 cols):  Fone do Contato | Data de Aniversário
 ```
 
-Os campos Estado e Cidade serao removidos da grid superior e colocados na secao Endereco.
+## Mudancas tecnicas
 
----
+### `src/components/clientes/DadosClienteTab.tsx`
 
-## 5. ClienteForm.tsx - Schema e Reset
+- Trocar o grid principal de `grid-cols-1 md:grid-cols-2` para `grid-cols-1 md:grid-cols-3`
+- Linha 1: Data Cadastro, Unidade Base e Modelo de Contrato lado a lado (3 cols)
+- Linha 2: Razao Social e Nome Fantasia ocupando `md:col-span-3` dividido em 2 (usar um sub-grid de 2 cols com `md:col-span-3` wrapper, ou fazer cada um `col-span-1` com Razao Social em `md:col-span-2` para dar mais espaco)
+  - Melhor: Razao Social com `md:col-span-2` e Nome Fantasia com `md:col-span-1` (razao social tende a ser maior)
+- Linha 3: CNPJ, Email, Telefone Contato (3 cols naturais)
+- Linha 4: Telefone WhatsApp, Area Atuacao, Segmento (3 cols naturais)
+- Observacao: `md:col-span-3` (full width)
+- Secao Endereco: grid de 3 cols tambem
+  - CEP, Estado, Cidade (linha 1)
+  - Endereco (`md:col-span-1`), Numero, Bairro (linha 2) - ou Endereco com col-span-2 + Numero, depois Bairro na mesma linha... melhor: Endereco, Numero, Bairro em 3 cols
+- Contato Principal: manter 2 cols (4 campos, 2 linhas)
 
-- Adicionar ao schema Zod: `cep`, `endereco`, `numero`, `bairro` (todos `z.string().nullable()`)
-- Adicionar nos `defaultValues`
-- Adicionar no `form.reset()` ao carregar cliente existente
-
----
-
-## Arquivos modificados
+### Arquivo unico modificado
 
 | Arquivo | Mudanca |
 |---|---|
-| Migration SQL | 4 novas colunas em clientes |
-| `src/lib/masks.ts` | Adicionar `maskCEP` |
-| `src/components/clientes/DadosClienteTab.tsx` | Criar secao Endereco, mover Estado/Cidade, adicionar CEP/Endereco/Numero/Bairro, logica ViaCEP |
-| `src/pages/ClienteForm.tsx` | Adicionar campos no schema, defaultValues e reset |
-| `src/integrations/supabase/types.ts` | Atualizado automaticamente |
+| `src/components/clientes/DadosClienteTab.tsx` | Alterar grids para 3 colunas, reordenar campos, ajustar col-spans |
 
