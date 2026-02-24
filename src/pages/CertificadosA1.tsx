@@ -31,7 +31,7 @@ function getCertStatus(vencimento: string | null) {
 }
 
 const statusBadgeClasses: Record<string, string> = {
-  vencido: "bg-red-500/15 text-red-600 border-red-500/30",
+  vencido: "bg-primary/15 text-primary border-primary/30",
   vencendo: "bg-amber-500/15 text-amber-600 border-amber-500/30",
   valido: "bg-green-500/15 text-green-600 border-green-500/30",
   sem_data: "",
@@ -231,7 +231,7 @@ export default function CertificadosA1() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { label: "Total", value: kpis.total, icon: ShieldCheck, color: "" },
-          { label: "Vencidos", value: kpis.vencidos, icon: ShieldOff, color: "text-red-600" },
+          { label: "Vencidos", value: kpis.vencidos, icon: ShieldOff, color: "text-primary" },
           { label: "Vencendo (30d)", value: kpis.vencendo, icon: ShieldAlert, color: "text-amber-600" },
           { label: "Válidos", value: kpis.validos, icon: ShieldCheck, color: "text-green-600" },
           { label: "Sem Data", value: kpis.semData, icon: ShieldQuestion, color: "text-muted-foreground" },

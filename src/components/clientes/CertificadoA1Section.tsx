@@ -35,7 +35,7 @@ function getCertStatus(vencimento: string | null) {
 }
 
 const badgeClasses: Record<string, string> = {
-  destructive: "bg-red-500/15 text-red-600 border-red-500/30",
+  destructive: "bg-primary/15 text-primary border-primary/30",
   warning: "bg-amber-500/15 text-amber-600 border-amber-500/30",
   success: "bg-green-500/15 text-green-600 border-green-500/30",
   secondary: "",

@@ -19,9 +19,9 @@ function fmtX(value: number | null) {
 
 function getColorClasses(value: number | null, isCost = false) {
   if (value === null || isNaN(value)) return "bg-muted/50 text-foreground";
-  if (isCost) return "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400";
+  if (isCost) return "bg-primary/10 dark:bg-primary/20 text-primary";
   if (value > 0) return "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400";
-  if (value < 0) return "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400";
+  if (value < 0) return "bg-primary/10 dark:bg-primary/20 text-primary";
   return "bg-muted/50 text-foreground";
 }
 
@@ -63,7 +63,7 @@ export default function EspelhoFinanceiro({ espelho }: Props) {
                   {item.raw !== null && !isNaN(item.raw) && !item.isCost && (
                     isPositive
                       ? <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                      : <TrendingDown className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                      : <TrendingDown className="h-3.5 w-3.5 text-primary" />
                   )}
                 </div>
                 <p className="text-[11px] font-medium opacity-70 leading-tight">{item.label}</p>
@@ -77,21 +77,21 @@ export default function EspelhoFinanceiro({ espelho }: Props) {
       {/* Destaque: Lucro Real */}
       <Card className={`border-2 shadow-md ${lucroPositivo
         ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30"
-        : "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/30"
+        : "border-primary/30 dark:border-primary/50 bg-primary/10 dark:bg-primary/20"
       }`}>
         <CardContent className="p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium opacity-70">Lucro Real</p>
             <p className={`text-2xl font-bold ${lucroPositivo
               ? "text-green-700 dark:text-green-400"
-              : "text-red-700 dark:text-red-400"
+              : "text-primary"
             }`}>
               {fmt(lucroReal)}
             </p>
           </div>
           {lucroPositivo
             ? <TrendingUp className="h-8 w-8 text-green-500 dark:text-green-400" />
-            : <TrendingDown className="h-8 w-8 text-red-500 dark:text-red-400" />
+            : <TrendingDown className="h-8 w-8 text-primary" />
           }
         </CardContent>
       </Card>
