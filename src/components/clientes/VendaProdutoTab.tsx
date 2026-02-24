@@ -13,6 +13,7 @@ interface Props {
   produtos: { id: number; nome: string }[];
   fornecedores: { id: number; nome: string; site: string | null }[];
   origensVenda: { id: number; nome: string }[];
+  modelosContrato: { id: number; nome: string }[];
 }
 
 const RECORRENCIA_OPTIONS = [
@@ -22,7 +23,7 @@ const RECORRENCIA_OPTIONS = [
   { value: "semanal", label: "Semanal" },
 ];
 
-export default function VendaProdutoTab({ form, funcionarios = [], produtos = [], fornecedores = [], origensVenda = [] }: Props) {
+export default function VendaProdutoTab({ form, funcionarios = [], produtos = [], fornecedores = [], origensVenda = [], modelosContrato = [] }: Props) {
   const linkFornecedor = form.watch("link_portal_fornecedor");
 
   return (
@@ -30,7 +31,8 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
       {/* SubCard: Informações do Contrato */}
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações do Contrato</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Linha 1: Data Venda | Origem Venda | Modelo de Contrato */}
           <FormField control={form.control} name="data_venda" render={({ field }) => (
             <FormItem>
               <FormLabel>Data da Venda</FormLabel>
@@ -54,6 +56,22 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
             </FormItem>
           )} />
 
+          <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Modelo de Contrato</FormLabel>
+              <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {modelosContrato.map((m) => (
+                    <SelectItem key={m.id} value={m.id.toString()}>{m.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          {/* Linha 2: Recorrência | Funcionário */}
           <FormField control={form.control} name="recorrencia" render={({ field }) => (
             <FormItem>
               <FormLabel>Recorrência</FormLabel>
@@ -89,7 +107,8 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
       {/* SubCard: Informações do Produto */}
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações do Produto</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Linha 1: Data Ativação | Fornecedor | Código Fornecedor */}
           <FormField control={form.control} name="data_ativacao" render={({ field }) => (
             <FormItem>
               <FormLabel>Data Ativação</FormLabel>
@@ -121,26 +140,29 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
             </FormItem>
           )} />
 
-          <FormField control={form.control} name="link_portal_fornecedor" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Link Portal Fornecedor</FormLabel>
-              <div className="flex gap-2">
-                <FormControl><Input {...field} value={field.value ?? ""} placeholder="https://..." /></FormControl>
-                {linkFornecedor && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => window.open(linkFornecedor, "_blank")}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              <FormMessage />
-            </FormItem>
-          )} />
+          {/* Linha 2: Link Portal Fornecedor (col-span-2) | Produto */}
+          <div className="md:col-span-2">
+            <FormField control={form.control} name="link_portal_fornecedor" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Link Portal Fornecedor</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl><Input {...field} value={field.value ?? ""} placeholder="https://..." /></FormControl>
+                  {linkFornecedor && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => window.open(linkFornecedor, "_blank")}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
 
           <FormField control={form.control} name="produto_id" render={({ field }) => (
             <FormItem>

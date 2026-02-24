@@ -232,7 +232,6 @@ export default function ClienteForm() {
                 cidades={lookups.cidades.data ?? []}
                 areasAtuacao={lookups.areasAtuacao.data ?? []}
                 segmentos={lookups.segmentos.data ?? []}
-                modelosContrato={lookups.modelosContrato.data ?? []}
                 unidadesBase={lookups.unidadesBase.data ?? []}
                 clienteId={id}
               />
@@ -260,6 +259,7 @@ export default function ClienteForm() {
                 produtos={lookups.produtos.data ?? []}
                 fornecedores={lookups.fornecedores?.data ?? []}
                 origensVenda={lookups.origensVenda?.data ?? []}
+                modelosContrato={lookups.modelosContrato.data ?? []}
               />
               <FinanceiroTab
                 form={form}
