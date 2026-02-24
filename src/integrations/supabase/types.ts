@@ -210,7 +210,7 @@ export type Database = {
           observacao_cancelamento: string | null
           observacao_cliente: string | null
           observacao_negociacao: string | null
-          origem_venda: string | null
+          origem_venda_id: number | null
           produto_id: number | null
           razao_social: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
@@ -257,7 +257,7 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
-          origem_venda?: string | null
+          origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
@@ -304,7 +304,7 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
-          origem_venda?: string | null
+          origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
@@ -377,6 +377,13 @@ export type Database = {
             columns: ["motivo_cancelamento_id"]
             isOneToOne: false
             referencedRelation: "motivos_cancelamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_origem_venda_id_fkey"
+            columns: ["origem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "origens_venda"
             referencedColumns: ["id"]
           },
           {
@@ -876,37 +883,35 @@ export type Database = {
           },
         ]
       }
-      produtos: {
+      origens_venda: {
         Row: {
-          codigo_fornecedor: string | null
-          fornecedor_id: number | null
           id: number
-          link_portal: string | null
           nome: string
         }
         Insert: {
-          codigo_fornecedor?: string | null
-          fornecedor_id?: number | null
           id?: number
-          link_portal?: string | null
           nome: string
         }
         Update: {
-          codigo_fornecedor?: string | null
-          fornecedor_id?: number | null
           id?: number
-          link_portal?: string | null
           nome?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "produtos_fornecedor_id_fkey"
-            columns: ["fornecedor_id"]
-            isOneToOne: false
-            referencedRelation: "fornecedores"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      produtos: {
+        Row: {
+          id: number
+          nome: string
+        }
+        Insert: {
+          id?: number
+          nome: string
+        }
+        Update: {
+          id?: number
+          nome?: string
+        }
+        Relationships: []
       }
       segmentos: {
         Row: {
@@ -977,7 +982,7 @@ export type Database = {
           observacao_cancelamento: string | null
           observacao_cliente: string | null
           observacao_negociacao: string | null
-          origem_venda: string | null
+          origem_venda_id: number | null
           produto_id: number | null
           razao_social: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
@@ -1025,7 +1030,7 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
-          origem_venda?: string | null
+          origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
@@ -1073,7 +1078,7 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
-          origem_venda?: string | null
+          origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
@@ -1140,6 +1145,13 @@ export type Database = {
             columns: ["motivo_cancelamento_id"]
             isOneToOne: false
             referencedRelation: "motivos_cancelamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_origem_venda_id_fkey"
+            columns: ["origem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "origens_venda"
             referencedColumns: ["id"]
           },
           {

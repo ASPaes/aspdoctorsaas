@@ -10,15 +10,6 @@ import CrudTable, { type ColumnDef } from "@/components/CrudTable";
 export default function Cadastros() {
   const [syncing, setSyncing] = useState(false);
 
-  const { data: fornecedores } = useQuery({
-    queryKey: ["fornecedores_lookup"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("fornecedores").select("id, nome").order("nome");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -32,8 +23,6 @@ export default function Cadastros() {
       setSyncing(false);
     }
   };
-
-  const fornecedorOptions = (fornecedores ?? []).map((f) => ({ value: f.id, label: f.nome }));
 
   const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string }[] = [
     {
@@ -54,16 +43,8 @@ export default function Cadastros() {
     },
     {
       value: "produtos", label: "Produtos", table: "produtos", queryKey: "crud_produtos", orderBy: "nome",
-      selectQuery: "*, fornecedores(nome)",
       columns: [
         { key: "nome", label: "Nome" },
-        { key: "codigo_fornecedor", label: "Cód. Fornecedor" },
-        { key: "link_portal", label: "Link Portal" },
-        {
-          key: "fornecedor_id", label: "Fornecedor", type: "select",
-          options: fornecedorOptions,
-          render: (_val: any, row: any) => row.fornecedores?.nome ?? "—",
-        },
       ],
     },
     {
@@ -81,6 +62,10 @@ export default function Cadastros() {
     {
       value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", orderBy: "descricao",
       columns: [{ key: "descricao", label: "Descrição" }],
+    },
+    {
+      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", orderBy: "nome",
+      columns: [{ key: "nome", label: "Nome" }],
     },
     {
       value: "formas_pagamento", label: "Formas Pgto", table: "formas_pagamento", queryKey: "crud_formas_pgto", orderBy: "nome",

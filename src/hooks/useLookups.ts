@@ -105,6 +105,15 @@ export function useLookups(estadoId?: number | null) {
     },
   });
 
+  const origensVenda = useQuery({
+    queryKey: ["origens_venda"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("origens_venda").select("id, nome").order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const fornecedores = useQuery({
     queryKey: ["fornecedores"],
     queryFn: async () => {
@@ -134,6 +143,7 @@ export function useLookups(estadoId?: number | null) {
     formasPagamento,
     motivosCancelamento,
     configuracoes,
+    origensVenda,
     fornecedores,
     unidadesBase,
   };

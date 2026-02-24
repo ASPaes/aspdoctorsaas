@@ -37,7 +37,7 @@ const clienteSchema = z.object({
   observacao_cliente: z.string().nullable(),
   data_venda: z.string().nullable(),
   funcionario_id: z.number().nullable(),
-  origem_venda: z.string().nullable(),
+  origem_venda_id: z.number().nullable(),
   recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"]).nullable(),
   produto_id: z.number().nullable(),
   observacao_negociacao: z.string().nullable(),
@@ -83,7 +83,7 @@ export default function ClienteForm() {
       razao_social: null, nome_fantasia: null, cnpj: null, email: null,
       telefone_contato: null, telefone_whatsapp: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
-      data_venda: null, funcionario_id: null, origem_venda: null, recorrencia: null,
+      data_venda: null, funcionario_id: null, origem_venda_id: null, recorrencia: null,
       produto_id: null, observacao_negociacao: null,
       data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
       valor_ativacao: null,
@@ -133,7 +133,7 @@ export default function ClienteForm() {
         telefone_whatsapp: c.telefone_whatsapp, estado_id: c.estado_id, cidade_id: c.cidade_id,
         area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
         observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
-        funcionario_id: c.funcionario_id, origem_venda: c.origem_venda,
+        funcionario_id: c.funcionario_id, origem_venda_id: (c as any).origem_venda_id ?? null,
         recorrencia: c.recorrencia, produto_id: c.produto_id,
         observacao_negociacao: c.observacao_negociacao,
         data_ativacao: (c as any).data_ativacao ?? null,
@@ -250,6 +250,7 @@ export default function ClienteForm() {
                 funcionarios={lookups.funcionarios.data ?? []}
                 produtos={lookups.produtos.data ?? []}
                 fornecedores={lookups.fornecedores?.data ?? []}
+                origensVenda={lookups.origensVenda?.data ?? []}
               />
               <FinanceiroTab
                 form={form}
