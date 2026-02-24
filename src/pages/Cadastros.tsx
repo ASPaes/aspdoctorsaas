@@ -71,7 +71,7 @@ export default function Cadastros() {
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "verticais", label: "Verticais", table: "verticais", queryKey: "crud_verticais", orderBy: "nome",
+      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {

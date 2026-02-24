@@ -204,6 +204,7 @@ export type Database = {
           imposto_percentual: number | null
           link_portal_fornecedor: string | null
           mensalidade: number | null
+          modelo_contrato_id: number | null
           motivo_cancelamento_id: number | null
           nome_fantasia: string | null
           observacao_cancelamento: string | null
@@ -218,7 +219,6 @@ export type Database = {
           telefone_whatsapp: string | null
           updated_at: string
           valor_ativacao: number | null
-          vertical_id: number | null
         }
         Insert: {
           area_atuacao_id?: number | null
@@ -250,6 +250,7 @@ export type Database = {
           imposto_percentual?: number | null
           link_portal_fornecedor?: string | null
           mensalidade?: number | null
+          modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
           observacao_cancelamento?: string | null
@@ -264,7 +265,6 @@ export type Database = {
           telefone_whatsapp?: string | null
           updated_at?: string
           valor_ativacao?: number | null
-          vertical_id?: number | null
         }
         Update: {
           area_atuacao_id?: number | null
@@ -296,6 +296,7 @@ export type Database = {
           imposto_percentual?: number | null
           link_portal_fornecedor?: string | null
           mensalidade?: number | null
+          modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
           observacao_cancelamento?: string | null
@@ -310,7 +311,6 @@ export type Database = {
           telefone_whatsapp?: string | null
           updated_at?: string
           valor_ativacao?: number | null
-          vertical_id?: number | null
         }
         Relationships: [
           {
@@ -392,9 +392,9 @@ export type Database = {
           },
           {
             foreignKeyName: "clientes_vertical_id_fkey"
-            columns: ["vertical_id"]
+            columns: ["modelo_contrato_id"]
             isOneToOne: false
-            referencedRelation: "verticais"
+            referencedRelation: "modelos_contrato"
             referencedColumns: ["id"]
           },
         ]
@@ -736,6 +736,21 @@ export type Database = {
         }
         Relationships: []
       }
+      modelos_contrato: {
+        Row: {
+          id: number
+          nome: string
+        }
+        Insert: {
+          id?: number
+          nome: string
+        }
+        Update: {
+          id?: number
+          nome?: string
+        }
+        Relationships: []
+      }
       motivos_cancelamento: {
         Row: {
           descricao: string
@@ -884,21 +899,6 @@ export type Database = {
         ]
       }
       segmentos: {
-        Row: {
-          id: number
-          nome: string
-        }
-        Insert: {
-          id?: number
-          nome: string
-        }
-        Update: {
-          id?: number
-          nome?: string
-        }
-        Relationships: []
-      }
-      verticais: {
         Row: {
           id: number
           nome: string
@@ -1132,7 +1132,7 @@ export type Database = {
             foreignKeyName: "clientes_vertical_id_fkey"
             columns: ["vertical_id"]
             isOneToOne: false
-            referencedRelation: "verticais"
+            referencedRelation: "modelos_contrato"
             referencedColumns: ["id"]
           },
         ]

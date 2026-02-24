@@ -47,10 +47,10 @@ export function useLookups(estadoId?: number | null) {
     },
   });
 
-  const verticais = useQuery({
-    queryKey: ["verticais"],
+  const modelosContrato = useQuery({
+    queryKey: ["modelos_contrato"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("verticais").select("id, nome").order("nome");
+      const { data, error } = await supabase.from("modelos_contrato").select("id, nome").order("nome");
       if (error) throw error;
       return data;
     },
@@ -119,7 +119,7 @@ export function useLookups(estadoId?: number | null) {
     cidades,
     areasAtuacao,
     segmentos,
-    verticais,
+    modelosContrato,
     funcionarios,
     produtos,
     formasPagamento,

@@ -18,11 +18,11 @@ interface Props {
   cidades: { id: number; nome: string }[];
   areasAtuacao: { id: number; nome: string }[];
   segmentos: { id: number; nome: string }[];
-  verticais: { id: number; nome: string }[];
+  modelosContrato: { id: number; nome: string }[];
   clienteId?: string;
 }
 
-export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, verticais, clienteId }: Props) {
+export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, modelosContrato, clienteId }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
 
   return (
@@ -172,13 +172,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="vertical_id" render={({ field }) => (
+        <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
           <FormItem>
-            <FormLabel>Vertical</FormLabel>
+            <FormLabel>Modelo de Contrato</FormLabel>
             <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
               <SelectContent>
-                {verticais.map((v) => (
+                {modelosContrato.map((v) => (
                   <SelectItem key={v.id} value={v.id.toString()}>{v.nome}</SelectItem>
                 ))}
               </SelectContent>

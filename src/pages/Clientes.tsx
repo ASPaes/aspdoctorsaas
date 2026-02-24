@@ -95,7 +95,7 @@ export default function Clientes() {
   const [periodoAtivacao, setPeriodoAtivacao] = useState<DateRange>({});
 
   const [recorrenciaAdv, setRecorrenciaAdv] = useState("");
-  const [verticalId, setVerticalId] = useState("");
+  const [modeloContratoId, setModeloContratoId] = useState("");
   const [produtoId, setProdutoId] = useState("");
   const [fornecedorId, setFornecedorId] = useState("");
 
@@ -122,10 +122,10 @@ export default function Clientes() {
   // Build query key from all filters
   const filterKey = useMemo(() => ({
     debouncedSearch, status, recorrenciaQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
-    recorrenciaAdv, verticalId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
+    recorrenciaAdv, modeloContratoId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir,
   }), [debouncedSearch, status, recorrenciaQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
-    recorrenciaAdv, verticalId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
+    recorrenciaAdv, modeloContratoId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
 
   const { data: clientes, isLoading } = useQuery({
@@ -160,7 +160,7 @@ export default function Clientes() {
       applyDateRange("data_ativacao", periodoAtivacao);
 
       // Lookups
-      if (verticalId) q = q.eq("vertical_id", Number(verticalId));
+      if (modeloContratoId) q = q.eq("modelo_contrato_id", Number(modeloContratoId));
       if (produtoId) q = q.eq("produto_id", Number(produtoId));
       if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
       if (estadoId) q = q.eq("estado_id", estadoId);
@@ -231,7 +231,7 @@ export default function Clientes() {
 
   const clearFilters = () => {
     setPeriodoCadastro({}); setPeriodoCancelamento({}); setPeriodoVenda({}); setPeriodoAtivacao({});
-    setRecorrenciaAdv(""); setVerticalId(""); setProdutoId(""); setFornecedorId("");
+    setRecorrenciaAdv(""); setModeloContratoId(""); setProdutoId(""); setFornecedorId("");
     setEstadoId(null); setCidadeId(""); setMotivoCancelamentoId("");
     setMensalidadeMin(""); setMensalidadeMax("");
     setLucroMin(""); setLucroMax(""); setMargemMin(""); setMargemMax("");
@@ -354,11 +354,11 @@ export default function Clientes() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Vertical</label>
-                <Select value={verticalId} onValueChange={setVerticalId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <label className="text-xs font-medium text-muted-foreground">Modelo de Contrato</label>
+                <Select value={modeloContratoId} onValueChange={setModeloContratoId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
-                    {lookups.verticais.data?.map((v) => <SelectItem key={v.id} value={String(v.id)}>{v.nome}</SelectItem>)}
+                    {lookups.modelosContrato.data?.map((v) => <SelectItem key={v.id} value={String(v.id)}>{v.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
