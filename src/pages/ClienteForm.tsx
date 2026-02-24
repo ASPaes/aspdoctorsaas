@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,8 @@ import { Form, FormField, FormControl } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown } from "lucide-react";
+import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
@@ -71,6 +72,7 @@ export default function ClienteForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!id;
+  const [mrrModalOpen, setMrrModalOpen] = useState(false);
 
   const form = useForm<ClienteFormValues>({
     resolver: zodResolver(clienteSchema),
@@ -225,11 +227,17 @@ export default function ClienteForm() {
 
           {/* Card: Produto / Contrato */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <FileText className="h-5 w-5 text-primary" />
                 Produto / Contrato
               </CardTitle>
+              {isEditing && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setMrrModalOpen(true)}>
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Movimentos MRR
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <VendaProdutoTab
@@ -302,6 +310,18 @@ export default function ClienteForm() {
           </div>
         </form>
       </Form>
+
+      {isEditing && id && (
+        <MovimentosMrrModal
+          open={mrrModalOpen}
+          onOpenChange={setMrrModalOpen}
+          clienteId={id}
+          clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
+          mensalidadeBase={form.watch("mensalidade") ?? 0}
+          custoBase={form.watch("custo_operacao") ?? 0}
+          funcionarios={(lookups.funcionarios.data ?? []).filter((f: any) => f.ativo).map((f: any) => ({ id: f.id, nome: f.nome }))}
+        />
+      )}
     </div>
   );
 }

@@ -516,6 +516,106 @@ export type Database = {
         }
         Relationships: []
       }
+      movimentos_mrr: {
+        Row: {
+          cliente_id: string
+          criado_em: string
+          custo_delta: number
+          data_movimento: string
+          descricao: string | null
+          estornado_por: string | null
+          estorno_de: string | null
+          funcionario_id: number | null
+          id: string
+          inativado_em: string | null
+          inativado_por_id: number | null
+          origem_venda: string | null
+          status: string
+          tipo: Database["public"]["Enums"]["movimento_mrr_tipo"]
+          valor_delta: number
+          valor_venda_avulsa: number | null
+        }
+        Insert: {
+          cliente_id: string
+          criado_em?: string
+          custo_delta?: number
+          data_movimento: string
+          descricao?: string | null
+          estornado_por?: string | null
+          estorno_de?: string | null
+          funcionario_id?: number | null
+          id?: string
+          inativado_em?: string | null
+          inativado_por_id?: number | null
+          origem_venda?: string | null
+          status?: string
+          tipo: Database["public"]["Enums"]["movimento_mrr_tipo"]
+          valor_delta?: number
+          valor_venda_avulsa?: number | null
+        }
+        Update: {
+          cliente_id?: string
+          criado_em?: string
+          custo_delta?: number
+          data_movimento?: string
+          descricao?: string | null
+          estornado_por?: string | null
+          estorno_de?: string | null
+          funcionario_id?: number | null
+          id?: string
+          inativado_em?: string | null
+          inativado_por_id?: number | null
+          origem_venda?: string | null
+          status?: string
+          tipo?: Database["public"]["Enums"]["movimento_mrr_tipo"]
+          valor_delta?: number
+          valor_venda_avulsa?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentos_mrr_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estornado_por_fkey"
+            columns: ["estornado_por"]
+            isOneToOne: false
+            referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_estorno_de_fkey"
+            columns: ["estorno_de"]
+            isOneToOne: false
+            referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_inativado_por_id_fkey"
+            columns: ["inativado_por_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           codigo_fornecedor: string | null
@@ -807,6 +907,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      movimento_mrr_tipo: "upsell" | "cross_sell" | "downsell" | "venda_avulsa"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
     }
     CompositeTypes: {
@@ -935,6 +1036,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      movimento_mrr_tipo: ["upsell", "cross_sell", "downsell", "venda_avulsa"],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
     },
   },
