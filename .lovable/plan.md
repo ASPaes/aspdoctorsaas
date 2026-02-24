@@ -1,87 +1,83 @@
 
 
-# Ajustes de Layout e UX no Formulario de Cliente
+# Plano: Reorganizar Campos + Consulta CNPJ + Correcoes
 
-## 1. Mover "Modelo de Contrato" para o card Produto / Contrato
+## Resumo das mudancas
 
-- Remover o campo `modelo_contrato_id` do `DadosClienteTab.tsx`
-- Adicionar no `VendaProdutoTab.tsx`, dentro do subcard "Informacoes do Contrato"
-- Remover prop `modelosContrato` de `DadosClienteTab` e passar para `VendaProdutoTab`
-- Na linha 1 do DadosClienteTab, ficam apenas: Data Cadastro | Unidade Base (2 cols no grid de 3, ou ajustar)
+1. **Mover Segmento para ao lado de Area de Atuacao** -- Segmento sai da linha 1 e vai para a linha 4 (junto com Area de Atuacao)
+2. **Colocar CNPJ na posicao do Segmento (linha 1)** -- Linha 1 fica: Data Cadastro | Unidade Base | CNPJ (com consulta automatica)
+3. **Consulta CNPJ via BrasilAPI** -- Ao digitar 14 digitos de CNPJ, consultar `https://brasilapi.com.br/api/cnpj/v1/{cnpj}` e preencher automaticamente: razao_social, nome_fantasia, email, telefone_contato, cep (que dispara auto-fill de endereco), endereco, numero, bairro, estado, cidade
+4. **Corrigir dado errado no campo codigo_fornecedor** -- O cliente `3f4abc08` tem o valor `88502-160` (um CEP) gravado no campo `codigo_fornecedor`. Sera corrigido via migration SQL
+5. **Nao alterar ordem dos campos** -- Apenas tamanhos podem ser ajustados
 
-## 2. Botao WhatsApp ao lado do campo Telefone WhatsApp
-
-- No `DadosClienteTab.tsx`, envolver o input de `telefone_whatsapp` em um `div flex` com um botao de icone WhatsApp (usar icone de `MessageCircle` do lucide ou SVG do WhatsApp)
-- Ao clicar, abrir `https://wa.me/{numero_limpo}` em nova aba (removendo formatacao do numero)
-
-## 3. Reorganizar layout para ergonomia (adaptar col-spans por tamanho do dado)
-
-### DadosClienteTab.tsx (grid de 3 colunas)
+## Layout final do DadosClienteTab
 
 ```text
-Linha 1: Data Cadastro (1 col) | Unidade Base (1 col) | [vazio ou ajustar para 2 cols]
-Linha 2: Razao Social (col-span-2) | Nome Fantasia (1 col)
-Linha 3: CNPJ (1 col) | Email (col-span-2, emails tendem a ser longos)
-Linha 4: Telefone Contato (1 col) | Telefone WhatsApp + botao (1 col) | Area Atuacao (1 col)
-Linha 5: Segmento (1 col) | [pode ficar sozinho ou agrupar]
-Linha 6: Observacao (col-span-3)
+Linha 1 (3 cols): Data Cadastro | Unidade Base | CNPJ (com loader de consulta)
+Linha 2 (3 cols): Razao Social (col-span-2) | Nome Fantasia
+Linha 3 (3 cols): Email (col-span-2) | Telefone Contato
+Linha 4 (3 cols): Telefone WhatsApp [+btn] | Area de Atuacao | Segmento
+Linha 5 (full):   Observacao do Cliente
+
+--- Separator ---
+Endereco (sem mudancas)
+--- Separator ---
+Contato Principal (sem mudancas)
 ```
 
-Ajuste: Com Modelo de Contrato removido, linha 1 fica Data Cadastro + Unidade Base. Para aproveitar, usar grid de 2 cols nessa linha ou deixar espaço.
+## Detalhes tecnicos
 
-Melhor proposta com grid-cols-4 para mais flexibilidade:
+### 1. Migration SQL -- Corrigir dado errado
 
-```text
-Linha 1 (4 cols): Data Cadastro | Unidade Base | [vazio] | [vazio]
-  -> Melhor manter grid-cols-3: Data Cadastro | Unidade Base | Segmento
-Linha 2: Razao Social (col-span-2) | Nome Fantasia
-Linha 3: CNPJ | Email (col-span-2)
-Linha 4: Telefone Contato | Telefone WhatsApp [+btn] | Area Atuacao
-Linha 5: Observacao (col-span-3)
+```sql
+UPDATE clientes 
+SET codigo_fornecedor = NULL 
+WHERE id = '3f4abc08-2dc1-4481-a3b0-a011a9816162' 
+  AND codigo_fornecedor = '88502-160';
 ```
 
-### VendaProdutoTab.tsx - Informacoes do Contrato (grid de 3 cols)
+### 2. `src/components/clientes/DadosClienteTab.tsx`
 
-```text
-Linha 1: Data Venda | Origem Venda | Modelo de Contrato (NOVO aqui)
-Linha 2: Recorrencia | Funcionario (Consultor) | [vazio]
-```
+- Adicionar estado `cnpjLoading` para indicar consulta em andamento
+- Criar funcao `handleCnpjChange(maskedValue)`:
+  - Aplica mascara CNPJ
+  - Quando tiver 14 digitos, chama `https://brasilapi.com.br/api/cnpj/v1/{digits}`
+  - Preenche campos: `razao_social`, `nome_fantasia`, `email`, `telefone_contato`, `cep` (e dispara `handleCepChange` para auto-fill do endereco), `endereco`, `numero`, `bairro`
+  - Busca estado pela UF retornada e cidade pelo nome retornado
+- Reorganizar grid:
+  - Linha 1: Data Cadastro | Unidade Base | CNPJ (movido da linha 3 para ca)
+  - Linha 2: Razao Social (col-span-2) | Nome Fantasia (sem mudanca)
+  - Linha 3: Email (col-span-2) | Telefone Contato (CNPJ saiu daqui)
+  - Linha 4: Telefone WhatsApp [+btn] | Area de Atuacao | Segmento (movido da linha 1 para ca)
+  - Linha 5: Observacao (full width, sem mudanca)
 
-### VendaProdutoTab.tsx - Informacoes do Produto (grid de 3 cols)
+### 3. API BrasilAPI -- Campos retornados
 
-```text
-Linha 1: Data Ativacao | Fornecedor | Codigo Fornecedor
-Linha 2: Link Portal Fornecedor (col-span-2) | Produto
-```
+A BrasilAPI (`https://brasilapi.com.br/api/cnpj/v1/{cnpj}`) retorna:
+- `razao_social` -> campo razao_social
+- `nome_fantasia` -> campo nome_fantasia  
+- `email` -> campo email
+- `ddd_telefone_1` -> campo telefone_contato (formatar com mascara)
+- `cep` -> campo cep (dispara handleCepChange para auto-fill completo)
+- `logradouro` -> campo endereco
+- `numero` -> campo numero
+- `bairro` -> campo bairro
+- `uf` -> buscar estado_id
+- `municipio` -> buscar cidade_id
 
-### FinanceiroTab.tsx - Valores (grid de 4 cols para 4 campos por linha)
+E uma API publica, gratuita, com CORS habilitado -- pode ser chamada diretamente do frontend.
 
-```text
-Linha 1: Valor Ativacao | Forma Pgto Ativacao | Mensalidade/MRR | Forma Pgto Mensalidade
-Linha 2: Custo Operacao | Imposto % | Custo Fixo % | [vazio]
-```
+### 4. Verificacao de outros campos
 
-Usar `grid-cols-1 md:grid-cols-4` para encaixar os 4 campos de pagamento na mesma linha.
-
-### Endereco (manter grid-cols-3, ja esta bom)
-
-### Contato Principal (manter grid-cols-2, ja esta bom)
-
----
+Alem do `codigo_fornecedor`, verifiquei:
+- Todos os mapeamentos de campos no `form.reset()` estao corretos
+- Os campos de endereco (cep, endereco, numero, bairro) estao mapeados corretamente
+- Nenhum outro campo apresenta cruzamento de dados
 
 ## Arquivos modificados
 
 | Arquivo | Mudanca |
 |---|---|
-| `src/components/clientes/DadosClienteTab.tsx` | Remover modelo_contrato; adicionar botao WhatsApp; reordenar campos (Email col-span-2, Segmento sobe) |
-| `src/components/clientes/VendaProdutoTab.tsx` | Adicionar prop + campo modelo_contrato_id; grids de 3 cols |
-| `src/components/clientes/FinanceiroTab.tsx` | Grid de 4 cols para valores (4 campos por linha) |
-| `src/pages/ClienteForm.tsx` | Mover prop modelosContrato de DadosClienteTab para VendaProdutoTab |
-
-## Detalhes tecnicos
-
-- Botao WhatsApp: `onClick={() => window.open(\`https://wa.me/55\${digits}\`, "_blank")}` onde digits = telefone sem formatacao
-- Icone: usar `MessageCircle` do lucide-react (nao existe icone WhatsApp nativo no lucide, mas MessageCircle comunica bem, alternativa e um SVG inline)
-- Nenhuma alteracao de schema ou banco de dados necessaria
-- Ordem dos campos mantida conforme solicitado
+| Migration SQL | Corrigir codigo_fornecedor com valor de CEP |
+| `src/components/clientes/DadosClienteTab.tsx` | Mover CNPJ para linha 1, Segmento para linha 4 (ao lado de Area Atuacao); adicionar consulta CNPJ via BrasilAPI; adicionar loader no CNPJ |
 
