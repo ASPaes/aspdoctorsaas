@@ -47,11 +47,9 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       form.setValue("endereco", data.logradouro || "");
       form.setValue("bairro", data.bairro || "");
 
-      // Find estado by sigla
       const estado = estados.find((e) => e.sigla === data.uf);
       if (estado) {
         form.setValue("estado_id", estado.id);
-        // Fetch cidade by name + estado
         const { data: cidadesResult } = await supabase
           .from("cidades")
           .select("id")
@@ -71,7 +69,9 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Dados Cadastrais ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Linha 1: Data Cadastro | Unidade Base | Modelo de Contrato */}
         <FormField control={form.control} name="data_cadastro" render={({ field }) => (
           <FormItem>
             <FormLabel>Data Cadastro</FormLabel>
@@ -80,13 +80,46 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="razao_social" render={({ field }) => (
+        <FormField control={form.control} name="unidade_base_id" render={({ field }) => (
           <FormItem>
-            <FormLabel>Razão Social</FormLabel>
-            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormLabel>Unidade Base</FormLabel>
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+              <SelectContent>
+                {unidadesBase.map((u) => (
+                  <SelectItem key={u.id} value={u.id.toString()}>{u.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <FormMessage />
           </FormItem>
         )} />
+
+        <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Modelo de Contrato</FormLabel>
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+              <SelectContent>
+                {modelosContrato.map((v) => (
+                  <SelectItem key={v.id} value={v.id.toString()}>{v.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        {/* Linha 2: Razão Social (2 cols) | Nome Fantasia (1 col) */}
+        <div className="md:col-span-2">
+          <FormField control={form.control} name="razao_social" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Razão Social</FormLabel>
+              <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
 
         <FormField control={form.control} name="nome_fantasia" render={({ field }) => (
           <FormItem>
@@ -96,6 +129,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
+        {/* Linha 3: CNPJ | Email | Telefone Contato */}
         <FormField control={form.control} name="cnpj" render={({ field }) => (
           <FormItem>
             <FormLabel>CNPJ</FormLabel>
@@ -132,6 +166,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
+        {/* Linha 4: Telefone WhatsApp | Área de Atuação | Segmento */}
         <FormField control={form.control} name="telefone_whatsapp" render={({ field }) => (
           <FormItem>
             <FormLabel>Telefone WhatsApp</FormLabel>
@@ -176,37 +211,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Modelo de Contrato</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-              <SelectContent>
-                {modelosContrato.map((v) => (
-                  <SelectItem key={v.id} value={v.id.toString()}>{v.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
-
-        <FormField control={form.control} name="unidade_base_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Unidade Base</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-              <SelectContent>
-                {unidadesBase.map((u) => (
-                  <SelectItem key={u.id} value={u.id.toString()}>{u.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
-
-        <div className="md:col-span-2">
+        {/* Linha 5: Observação (full width) */}
+        <div className="md:col-span-3">
           <FormField control={form.control} name="observacao_cliente" render={({ field }) => (
             <FormItem>
               <FormLabel>Observação do Cliente</FormLabel>
@@ -217,10 +223,11 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         </div>
       </div>
 
-      {/* Endereço */}
+      {/* ── Endereço ── */}
       <Separator />
       <h3 className="text-sm font-semibold">Endereço</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Linha 1: CEP | Estado | Cidade */}
         <FormField control={form.control} name="cep" render={({ field }) => (
           <FormItem>
             <FormLabel>CEP</FormLabel>
@@ -278,14 +285,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="bairro" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Bairro</FormLabel>
-            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-
+        {/* Linha 2: Endereço | Número | Bairro */}
         <FormField control={form.control} name="endereco" render={({ field }) => (
           <FormItem>
             <FormLabel>Endereço</FormLabel>
@@ -301,9 +301,17 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormMessage />
           </FormItem>
         )} />
+
+        <FormField control={form.control} name="bairro" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Bairro</FormLabel>
+            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
       </div>
 
-      {/* Contato Principal */}
+      {/* ── Contato Principal ── */}
       <Separator />
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Contato Principal</h3>
