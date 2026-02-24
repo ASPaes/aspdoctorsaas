@@ -307,10 +307,10 @@ export default function Clientes() {
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={unidadeBaseQuick} onValueChange={setUnidadeBaseQuick}>
+        <Select value={unidadeBaseQuick || "__all__"} onValueChange={(v) => setUnidadeBaseQuick(v === "__all__" ? "" : v)}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Unidade Base" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todas Unidades</SelectItem>
+            <SelectItem value="__all__">Todas Unidades</SelectItem>
             {lookups.unidadesBase.data?.map((u) => (
               <SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>
             ))}
