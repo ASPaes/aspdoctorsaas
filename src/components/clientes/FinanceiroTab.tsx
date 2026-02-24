@@ -81,7 +81,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
       {/* SubCard: Valores */}
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Valores</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <FormField control={form.control} name="valor_ativacao" render={({ field }) => (
             <FormItem>
               <FormLabel>Valor Ativação</FormLabel>

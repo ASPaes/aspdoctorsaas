@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, Loader2 } from "lucide-react";
+import { Users, Loader2, MessageCircle } from "lucide-react";
 import { maskCNPJ, maskPhone, maskCPF, maskCEP } from "@/lib/masks";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,15 +20,15 @@ interface Props {
   cidades: { id: number; nome: string }[];
   areasAtuacao: { id: number; nome: string }[];
   segmentos: { id: number; nome: string }[];
-  modelosContrato: { id: number; nome: string }[];
   unidadesBase: { id: number; nome: string }[];
   clienteId?: string;
 }
 
-export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, modelosContrato, unidadesBase, clienteId }: Props) {
+export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const { toast } = useToast();
+  const whatsappValue = form.watch("telefone_whatsapp");
 
   const handleCepChange = useCallback(async (maskedValue: string) => {
     form.setValue("cep", maskedValue);
@@ -67,11 +67,16 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     }
   }, [estados, form, toast]);
 
+  const openWhatsApp = () => {
+    const digits = (whatsappValue ?? "").replace(/\D/g, "");
+    if (digits) window.open(`https://wa.me/55${digits}`, "_blank");
+  };
+
   return (
     <div className="space-y-6">
       {/* ── Dados Cadastrais ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Linha 1: Data Cadastro | Unidade Base | Modelo de Contrato */}
+        {/* Linha 1: Data Cadastro | Unidade Base | Segmento */}
         <FormField control={form.control} name="data_cadastro" render={({ field }) => (
           <FormItem>
             <FormLabel>Data Cadastro</FormLabel>
@@ -95,14 +100,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
+        <FormField control={form.control} name="segmento_id" render={({ field }) => (
           <FormItem>
-            <FormLabel>Modelo de Contrato</FormLabel>
+            <FormLabel>Segmento</FormLabel>
             <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
               <SelectContent>
-                {modelosContrato.map((v) => (
-                  <SelectItem key={v.id} value={v.id.toString()}>{v.nome}</SelectItem>
+                {segmentos.map((s) => (
+                  <SelectItem key={s.id} value={s.id.toString()}>{s.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -129,7 +134,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        {/* Linha 3: CNPJ | Email | Telefone Contato */}
+        {/* Linha 3: CNPJ | Email (col-span-2) */}
         <FormField control={form.control} name="cnpj" render={({ field }) => (
           <FormItem>
             <FormLabel>CNPJ</FormLabel>
@@ -144,14 +149,17 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="email" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Email</FormLabel>
-            <FormControl><Input type="email" {...field} value={field.value ?? ""} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <div className="md:col-span-2">
+          <FormField control={form.control} name="email" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl><Input type="email" {...field} value={field.value ?? ""} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
 
+        {/* Linha 4: Telefone Contato | Telefone WhatsApp + btn | Área Atuação */}
         <FormField control={form.control} name="telefone_contato" render={({ field }) => (
           <FormItem>
             <FormLabel>Telefone Contato</FormLabel>
@@ -166,17 +174,29 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        {/* Linha 4: Telefone WhatsApp | Área de Atuação | Segmento */}
         <FormField control={form.control} name="telefone_whatsapp" render={({ field }) => (
           <FormItem>
             <FormLabel>Telefone WhatsApp</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="(00) 00000-0000"
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(maskPhone(e.target.value))}
-              />
-            </FormControl>
+            <div className="flex gap-2">
+              <FormControl>
+                <Input
+                  placeholder="(00) 00000-0000"
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                />
+              </FormControl>
+              {whatsappValue && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={openWhatsApp}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
             <FormMessage />
           </FormItem>
         )} />
@@ -189,21 +209,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
               <SelectContent>
                 {areasAtuacao.map((a) => (
                   <SelectItem key={a.id} value={a.id.toString()}>{a.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
-
-        <FormField control={form.control} name="segmento_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Segmento</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-              <SelectContent>
-                {segmentos.map((s) => (
-                  <SelectItem key={s.id} value={s.id.toString()}>{s.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
