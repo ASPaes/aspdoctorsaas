@@ -1,7 +1,7 @@
 import { Users, ClipboardList, Settings, LogOut, ShieldCheck } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -28,9 +28,10 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     toast.success("Logout realizado.");
     navigate("/login", { replace: true });
   };
