@@ -217,6 +217,7 @@ export type Database = {
           segmento_id: number | null
           telefone_contato: string | null
           telefone_whatsapp: string | null
+          unidade_base_id: number | null
           updated_at: string
           valor_ativacao: number | null
         }
@@ -263,6 +264,7 @@ export type Database = {
           segmento_id?: number | null
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
+          unidade_base_id?: number | null
           updated_at?: string
           valor_ativacao?: number | null
         }
@@ -309,6 +311,7 @@ export type Database = {
           segmento_id?: number | null
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
+          unidade_base_id?: number | null
           updated_at?: string
           valor_ativacao?: number | null
         }
@@ -388,6 +391,13 @@ export type Database = {
             columns: ["segmento_id"]
             isOneToOne: false
             referencedRelation: "segmentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
             referencedColumns: ["id"]
           },
           {
@@ -913,6 +923,21 @@ export type Database = {
         }
         Relationships: []
       }
+      unidades_base: {
+        Row: {
+          id: number
+          nome: string
+        }
+        Insert: {
+          id?: number
+          nome: string
+        }
+        Update: {
+          id?: number
+          nome?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       vw_clientes_financeiro: {
@@ -946,6 +971,7 @@ export type Database = {
           margem_contribuicao: number | null
           markup_cogs_percent: number | null
           mensalidade: number | null
+          modelo_contrato_id: number | null
           motivo_cancelamento_id: number | null
           nome_fantasia: string | null
           observacao_cancelamento: string | null
@@ -958,10 +984,10 @@ export type Database = {
           segmento_id: number | null
           telefone_contato: string | null
           telefone_whatsapp: string | null
+          unidade_base_id: number | null
           updated_at: string | null
           valor_ativacao: number | null
           valor_repasse: number | null
-          vertical_id: number | null
         }
         Insert: {
           area_atuacao_id?: number | null
@@ -993,6 +1019,7 @@ export type Database = {
           margem_contribuicao?: never
           markup_cogs_percent?: never
           mensalidade?: number | null
+          modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
           observacao_cancelamento?: string | null
@@ -1005,10 +1032,10 @@ export type Database = {
           segmento_id?: number | null
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
+          unidade_base_id?: number | null
           updated_at?: string | null
           valor_ativacao?: number | null
           valor_repasse?: never
-          vertical_id?: number | null
         }
         Update: {
           area_atuacao_id?: number | null
@@ -1040,6 +1067,7 @@ export type Database = {
           margem_contribuicao?: never
           markup_cogs_percent?: never
           mensalidade?: number | null
+          modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
           observacao_cancelamento?: string | null
@@ -1052,10 +1080,10 @@ export type Database = {
           segmento_id?: number | null
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
+          unidade_base_id?: number | null
           updated_at?: string | null
           valor_ativacao?: number | null
           valor_repasse?: never
-          vertical_id?: number | null
         }
         Relationships: [
           {
@@ -1129,8 +1157,15 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clientes_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clientes_vertical_id_fkey"
-            columns: ["vertical_id"]
+            columns: ["modelo_contrato_id"]
             isOneToOne: false
             referencedRelation: "modelos_contrato"
             referencedColumns: ["id"]

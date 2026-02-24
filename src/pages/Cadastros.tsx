@@ -86,6 +86,10 @@ export default function Cadastros() {
       value: "formas_pagamento", label: "Formas Pgto", table: "formas_pagamento", queryKey: "crud_formas_pgto", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
+    {
+      value: "unidades_base", label: "Unidades Base", table: "unidades_base", queryKey: "crud_unidades_base", orderBy: "nome",
+      columns: [{ key: "nome", label: "Nome" }],
+    },
   ];
 
   return (

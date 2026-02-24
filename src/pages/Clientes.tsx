@@ -80,7 +80,7 @@ export default function Clientes() {
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("ativos");
-  const [recorrenciaQuick, setRecorrenciaQuick] = useState("todas");
+  const [unidadeBaseQuick, setUnidadeBaseQuick] = useState("");
 
   // Debounce search
   useEffect(() => {
@@ -121,17 +121,17 @@ export default function Clientes() {
 
   // Build query key from all filters
   const filterKey = useMemo(() => ({
-    debouncedSearch, status, recorrenciaQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+    debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir,
-  }), [debouncedSearch, status, recorrenciaQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+  }), [debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
 
   const { data: clientes, isLoading } = useQuery({
     queryKey: ["clientes_lista", filterKey],
     queryFn: async () => {
-      let q = supabase.from("vw_clientes_financeiro").select("id, razao_social, nome_fantasia, cnpj, produto_id, recorrencia, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda") as any;
+      let q = supabase.from("vw_clientes_financeiro").select("id, razao_social, nome_fantasia, cnpj, produto_id, recorrencia, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id") as any;
 
       // Status
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -143,10 +143,10 @@ export default function Clientes() {
         q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s}`);
       }
 
-      // Quick recurrence
-      if (recorrenciaQuick !== "todas") q = q.eq("recorrencia", recorrenciaQuick as any);
+      // Quick unidade base
+      if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
 
-      // Advanced recurrence (overrides quick if set)
+      // Advanced recurrence
       if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
 
       // Date ranges
@@ -190,6 +190,12 @@ export default function Clientes() {
     lookups.produtos.data?.forEach((p) => m.set(p.id, p.nome));
     return m;
   }, [lookups.produtos.data]);
+
+  const unidadeBaseMap = useMemo(() => {
+    const m = new Map<number, string>();
+    lookups.unidadesBase.data?.forEach((u) => m.set(u.id, u.nome));
+    return m;
+  }, [lookups.unidadesBase.data]);
 
   const kpis = useMemo(() => {
     const list = clientes ?? [];
@@ -301,14 +307,13 @@ export default function Clientes() {
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={recorrenciaQuick} onValueChange={setRecorrenciaQuick}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+        <Select value={unidadeBaseQuick} onValueChange={setUnidadeBaseQuick}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Unidade Base" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas Recorr.</SelectItem>
-            <SelectItem value="mensal">Mensal</SelectItem>
-            <SelectItem value="semestral">Semestral</SelectItem>
-            <SelectItem value="anual">Anual</SelectItem>
-            <SelectItem value="semanal">Semanal</SelectItem>
+            <SelectItem value="">Todas Unidades</SelectItem>
+            {lookups.unidadesBase.data?.map((u) => (
+              <SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -444,20 +449,21 @@ export default function Clientes() {
                   </button>
                 </TableHead>
               ))}
+              <TableHead>Unidade Base</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: 8 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : !clientes?.length ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -477,6 +483,7 @@ export default function Clientes() {
                       {c.cancelado ? "Cancelado" : "Ativo"}
                     </span>
                   </TableCell>
+                  <TableCell>{c.unidade_base_id ? unidadeBaseMap.get(c.unidade_base_id) || "—" : "—"}</TableCell>
                 </TableRow>
               ))
             )}
