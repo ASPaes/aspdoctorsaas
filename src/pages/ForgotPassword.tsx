@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,7 @@ export default function ForgotPassword() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto mb-2 text-3xl font-bold text-primary">DoctorSaaS</div>
+          <Logo size="xl" className="mx-auto mb-2" />
           <CardTitle className="text-xl">Esqueci minha senha</CardTitle>
           <CardDescription>Informe seu email para receber o link de redefinição</CardDescription>
         </CardHeader>

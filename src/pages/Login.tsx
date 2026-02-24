@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import logo from "@/assets/logo-doctorsaas.png";
+import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +33,7 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-3 pb-2">
           <div className="mx-auto">
-            <img src={logo} alt="DoctorSaaS" className="h-24 w-auto mx-auto" />
+            <Logo size="xl" />
           </div>
           <CardTitle className="text-xl">Entrar</CardTitle>
           <CardDescription>Acesse sua conta para continuar</CardDescription>
