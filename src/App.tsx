@@ -15,6 +15,7 @@ import ClienteForm from "@/pages/ClienteForm";
 import Cadastros from "@/pages/Cadastros";
 import Configuracoes from "@/pages/Configuracoes";
 import CertificadosA1 from "@/pages/CertificadosA1";
+import CustomerSuccess from "@/pages/CustomerSuccess";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/cadastros" element={<Cadastros />} />
             <Route path="/certificados-a1" element={<CertificadosA1 />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/customer-success" element={<CustomerSuccess />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/clientes" replace />} />
