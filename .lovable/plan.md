@@ -1,126 +1,82 @@
 
 
-# Modulo Movimento MRR
+# Reestruturacao do Espelho Financeiro com Composicao MRR
 
-## Objetivo
-Replicar o modulo de Movimentos MRR do projeto "Sistema ASP Softwares", adaptado para este projeto. Permite registrar upsell, cross-sell, downsell e vendas avulsas por cliente, com rastreio do funcionario que registrou (para futuro controle de comissoes). O campo "Origem" sera um texto livre, igual ao campo `origem_venda` ja existente na tabela `clientes`.
+## Conceito
+
+A secao financeira sera reorganizada em 2 blocos visuais sequenciais:
+
+1. **Composicao MRR** (primeiro) -- mostra como se chega ao MRR Atual e Custo Atual
+2. **Espelho Financeiro** (depois) -- resultado dos calculos usando MRR Atual e Custo Atual como base
+
+Vendas Avulsas serao somadas ao valor de ativacao (exibido na composicao MRR, nao afetam MRR recorrente).
+
+Cada card de indicador tera um icone "?" com tooltip explicando a formula e o objetivo do indicador.
 
 ---
 
-## Etapa 1 - Migration SQL
+## Mudancas Tecnicas
 
-### Enum
+### 1. `useEspelhoFinanceiro.ts`
+
+Adicionar parametros opcionais para receber os deltas MRR/Custo dos movimentos:
+
+- Novo input: `deltaMrr` e `deltaCusto` (ambos default 0)
+- A mensalidade efetiva passa a ser: `mensalidade + deltaMrr`
+- O custo efetivo passa a ser: `custo_operacao + deltaCusto`
+- Todos os calculos (valor_repasse, impostos, lucro_bruto, margem, markup, fator_preco, margem_contribuicao, lucro_real) usam esses valores ajustados
+
+### 2. `FinanceiroTab.tsx`
+
+- Buscar movimentos MRR do cliente (via hook `useMrrTotals` -- movido para ca ou reutilizado)
+- Calcular `somaDeltaMrr` e `somaDeltaCusto` dos movimentos ativos
+- Passar esses deltas para `useEspelhoFinanceiro`
+- Passar dados de composicao MRR para o componente visual
+
+### 3. `EspelhoFinanceiro.tsx` -- Reestruturacao completa
+
+**Ordem visual:**
+
 ```text
-CREATE TYPE movimento_mrr_tipo AS ENUM ('upsell', 'cross_sell', 'downsell', 'venda_avulsa');
++--------------------------------------------------+
+| COMPOSICAO MRR (titulo + badge qtd movimentos)   |
+| [MRR Base] [Movimentos] [MRR Atual]              |
+| (vendas avulsas somadas no valor ativacao)        |
++--------------------------------------------------+
+|                                                   |
+| ESPELHO FINANCEIRO (titulo)                       |
+| [Valor Repasse ?] [Impostos ?] [Custos Fixos ?]   |
+| [Lucro Bruto ?] [Margem Bruta ?] [Markup COGS ?]  |
+| [Fator Preco ?] [Margem Contrib ?]                |
+| === LUCRO REAL (destaque) ===                     |
++--------------------------------------------------+
 ```
 
-### Tabela `movimentos_mrr`
+**Tooltips de cada indicador (icone "?" no canto superior direito de cada card):**
 
-| Coluna | Tipo | Default | Observacao |
-|---|---|---|---|
-| id | uuid PK | gen_random_uuid() | |
-| cliente_id | uuid NOT NULL | | FK clientes(id) |
-| tipo | movimento_mrr_tipo NOT NULL | | |
-| data_movimento | date NOT NULL | | |
-| valor_delta | numeric NOT NULL | 0 | Delta no MRR (positivo p/ up/cross, negativo p/ down, 0 p/ avulsa) |
-| custo_delta | numeric NOT NULL | 0 | Delta no custo operacional |
-| valor_venda_avulsa | numeric | null | Valor pontual (so para tipo venda_avulsa) |
-| origem_venda | text | null | Texto livre (mesma logica do campo origem_venda em clientes) |
-| descricao | text | null | |
-| funcionario_id | bigint | null | **NOVO** - FK funcionarios(id) - quem registrou (comissoes) |
-| status | text NOT NULL | 'ativo' | 'ativo' ou 'inativo' |
-| estorno_de | uuid | null | FK movimentos_mrr(id) - se este e um estorno |
-| estornado_por | uuid | null | FK movimentos_mrr(id) - se foi estornado |
-| inativado_em | timestamptz | null | |
-| inativado_por_id | bigint | null | FK funcionarios(id) - quem inativou |
-| criado_em | timestamptz | now() | |
+| Indicador | Formula | Objetivo |
+|---|---|---|
+| Valor Repasse | MRR Atual - Custo Atual | Quanto sobra apos pagar o custo de operacao |
+| Impostos | MRR Atual x Imposto% | Valor estimado de impostos sobre a receita |
+| Custos Fixos | MRR Atual x Custo Fixo% | Despesas fixas proporcionais a receita |
+| Lucro Bruto | MRR Atual - Custo Atual - Impostos | Lucro antes dos custos fixos |
+| Margem Bruta | (Lucro Bruto / MRR Atual) x 100 | Percentual de lucro sobre a receita |
+| Markup COGS | ((MRR / Custo) - 1) x 100 | Percentual de acrescimo sobre o custo |
+| Fator Preco | MRR Atual / Custo Atual | Quantas vezes o preco cobre o custo |
+| Margem Contribuicao | Lucro Bruto - Custos Fixos | Quanto cada cliente contribui para cobrir despesas |
+| Lucro Real | Margem de Contribuicao | Resultado liquido final da operacao |
 
-### RLS e Indices
-- RLS habilitado com politica permissiva para usuarios autenticados (mesmo padrao do projeto)
-- Indice em `cliente_id` para performance das queries por cliente
-
-### Diferencas do projeto fonte
-- `criado_por` (uuid auth) e `criado_por_email` (text) **removidos** - substituidos por `funcionario_id` (bigint FK funcionarios)
-- `inativado_por` (uuid auth) **trocado** por `inativado_por_id` (bigint FK funcionarios)
-- Sem trigger de validacao de MRR negativo (simplificacao - validacao no frontend)
+Implementacao dos tooltips usando `Tooltip` + `TooltipTrigger` + `TooltipContent` do shadcn/ui (ja disponivel no projeto), com icone `HelpCircle` do lucide-react.
 
 ---
 
-## Etapa 2 - Componente `MovimentosMrrModal.tsx`
+## Arquivos modificados
 
-### Arquivo: `src/components/clientes/MovimentosMrrModal.tsx`
-
-Replicar do projeto fonte com as seguintes adaptacoes:
-
-**Adaptacoes de dados:**
-- Remover `useAuth()` para identificar usuario - substituir por um Select de funcionario no formulario
-- Trocar `criado_por: user?.id` e `criado_por_email: user?.email` por `funcionario_id: selectedFuncionarioId`
-- Trocar `inativado_por: user?.id` por `inativado_por_id: selectedFuncionarioId`
-- Receber `funcionarios` como prop (lista de funcionarios ativos)
-- O campo "Funcionario" sera obrigatorio no formulario de novo movimento
-
-**Campo Origem:**
-- Manter como Input de texto livre (identico ao projeto fonte e ao campo `origem_venda` em clientes)
-
-**UI (mantida do fonte):**
-- Dialog modal com summary cards (MRR Base, Upsell, Cross-sell, Downsell, V. Avulsas, MRR Atual)
-- Card de composicao MRR + Custo
-- Formulario inline para novo movimento
-- Tabela de movimentos com badges de tipo/status
-- Botao de inativar com AlertDialog de confirmacao
-- Coluna extra na tabela mostrando o nome do funcionario que registrou
-
-**Props:**
-```text
-open: boolean
-onOpenChange: (open: boolean) => void
-clienteId: string
-clienteNome: string
-mensalidadeBase: number
-custoBase: number
-funcionarios: { id: number; nome: string }[]
-```
-
----
-
-## Etapa 3 - Integracao no ClienteForm
-
-### Arquivo: `src/pages/ClienteForm.tsx`
-
-- Adicionar botao "Movimentos MRR" no Card de Produto/Contrato (proximo ao campo Mensalidade), visivel apenas quando `isEditing`
-- O botao abre o `MovimentosMrrModal` passando:
-  - `clienteId` = `id` (do useParams)
-  - `clienteNome` = `razao_social || nome_fantasia`
-  - `mensalidadeBase` = valor do campo `mensalidade` do form
-  - `custoBase` = valor do campo `custo_operacao` do form
-  - `funcionarios` = `lookups.funcionarios.data`
-- Adicionar state `mrrModalOpen` para controlar abertura/fechamento
-
----
-
-## Resumo de Arquivos
-
-| Tipo | Arquivo |
+| Arquivo | Tipo |
 |---|---|
-| Migration SQL | 1 migration: enum + tabela movimentos_mrr + RLS + indice |
-| Novo componente | `src/components/clientes/MovimentosMrrModal.tsx` |
-| Modificado | `src/pages/ClienteForm.tsx` (botao + modal) |
+| `src/hooks/useEspelhoFinanceiro.ts` | Modificado -- aceita deltaMrr/deltaCusto |
+| `src/components/clientes/FinanceiroTab.tsx` | Modificado -- calcula deltas e passa ao hook |
+| `src/components/clientes/EspelhoFinanceiro.tsx` | Modificado -- reordena layout, adiciona tooltips |
 
----
-
-## Fluxo do usuario
-
-```text
-ClienteForm (editando)
-  -> Card Produto/Contrato
-    -> Botao "Movimentos MRR"
-      -> Modal abre
-        -> Ve resumo (MRR Base + movimentos = MRR Atual)
-        -> Clica "Adicionar Movimento"
-          -> Seleciona tipo (upsell/cross/down/avulsa)
-          -> Seleciona funcionario (obrigatorio - para comissoes)
-          -> Preenche valor, custo, origem, descricao
-          -> Salva
-        -> Pode inativar movimentos existentes
-```
+Nenhuma migration SQL necessaria.
 
