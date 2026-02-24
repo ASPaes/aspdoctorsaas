@@ -63,6 +63,7 @@ const clienteSchema = z.object({
   contato_cpf: z.string().nullable(),
   contato_fone: z.string().nullable(),
   contato_aniversario: z.string().nullable(),
+  unidade_base_id: z.number().nullable(),
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
@@ -91,6 +92,7 @@ export default function ClienteForm() {
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
+      unidade_base_id: null,
     },
   });
 
@@ -155,6 +157,7 @@ export default function ClienteForm() {
         contato_cpf: (c as any).contato_cpf ?? null,
         contato_fone: (c as any).contato_fone ?? null,
         contato_aniversario: (c as any).contato_aniversario ?? null,
+        unidade_base_id: (c as any).unidade_base_id ?? null,
       });
     }
   }, [clienteQuery.data]);
@@ -221,6 +224,7 @@ export default function ClienteForm() {
                 areasAtuacao={lookups.areasAtuacao.data ?? []}
                 segmentos={lookups.segmentos.data ?? []}
                 modelosContrato={lookups.modelosContrato.data ?? []}
+                unidadesBase={lookups.unidadesBase.data ?? []}
                 clienteId={id}
               />
             </CardContent>

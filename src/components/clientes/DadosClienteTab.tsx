@@ -19,10 +19,11 @@ interface Props {
   areasAtuacao: { id: number; nome: string }[];
   segmentos: { id: number; nome: string }[];
   modelosContrato: { id: number; nome: string }[];
+  unidadesBase: { id: number; nome: string }[];
   clienteId?: string;
 }
 
-export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, modelosContrato, clienteId }: Props) {
+export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, modelosContrato, unidadesBase, clienteId }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
 
   return (
@@ -180,6 +181,21 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
               <SelectContent>
                 {modelosContrato.map((v) => (
                   <SelectItem key={v.id} value={v.id.toString()}>{v.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="unidade_base_id" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Unidade Base</FormLabel>
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+              <SelectContent>
+                {unidadesBase.map((u) => (
+                  <SelectItem key={u.id} value={u.id.toString()}>{u.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

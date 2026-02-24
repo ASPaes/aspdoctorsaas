@@ -114,6 +114,15 @@ export function useLookups(estadoId?: number | null) {
     },
   });
 
+  const unidadesBase = useQuery({
+    queryKey: ["unidades_base"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("unidades_base").select("id, nome").order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return {
     estados,
     cidades,
@@ -126,5 +135,6 @@ export function useLookups(estadoId?: number | null) {
     motivosCancelamento,
     configuracoes,
     fornecedores,
+    unidadesBase,
   };
 }
