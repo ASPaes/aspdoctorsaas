@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Settings, LogOut } from "lucide-react";
+import { Users, ClipboardList, Settings, LogOut, ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo-doctorsaas.png";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 
 const navItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
+  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
   { title: "Cadastros", url: "/cadastros", icon: ClipboardList },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];

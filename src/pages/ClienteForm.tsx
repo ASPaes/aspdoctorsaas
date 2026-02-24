@@ -16,6 +16,7 @@ import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
+import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
@@ -53,6 +54,9 @@ const clienteSchema = z.object({
   data_cancelamento: z.string().nullable(),
   motivo_cancelamento_id: z.number().nullable(),
   observacao_cancelamento: z.string().nullable(),
+  cert_a1_vencimento: z.string().nullable(),
+  cert_a1_ultima_venda_em: z.string().nullable(),
+  cert_a1_ultimo_vendedor_id: z.number().nullable(),
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
@@ -78,6 +82,7 @@ export default function ClienteForm() {
       forma_pagamento_ativacao_id: null, mensalidade: null, forma_pagamento_mensalidade_id: null,
       custo_operacao: null, imposto_percentual: null, custo_fixo_percentual: null,
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
+      cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
     },
   });
 
@@ -135,6 +140,9 @@ export default function ClienteForm() {
         cancelado: c.cancelado, data_cancelamento: c.data_cancelamento,
         motivo_cancelamento_id: c.motivo_cancelamento_id,
         observacao_cancelamento: c.observacao_cancelamento,
+        cert_a1_vencimento: (c as any).cert_a1_vencimento ?? null,
+        cert_a1_ultima_venda_em: (c as any).cert_a1_ultima_venda_em ?? null,
+        cert_a1_ultimo_vendedor_id: (c as any).cert_a1_ultimo_vendedor_id ?? null,
       });
     }
   }, [clienteQuery.data]);
@@ -226,6 +234,26 @@ export default function ClienteForm() {
               />
             </CardContent>
           </Card>
+
+          {/* Card: Certificado A1 */}
+          {isEditing && (
+            <CertificadoA1Section
+              clienteId={id!}
+              vencimento={form.watch("cert_a1_vencimento") ?? null}
+              ultimaVendaEm={form.watch("cert_a1_ultima_venda_em") ?? null}
+              ultimoVendedorId={form.watch("cert_a1_ultimo_vendedor_id") ?? null}
+              onVencimentoChange={(v) => form.setValue("cert_a1_vencimento", v)}
+              onVendaRegistrada={async () => {
+                const { data } = await supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id!).single();
+                if (data) {
+                  form.setValue("cert_a1_vencimento", (data as any).cert_a1_vencimento ?? null);
+                  form.setValue("cert_a1_ultima_venda_em", (data as any).cert_a1_ultima_venda_em ?? null);
+                  form.setValue("cert_a1_ultimo_vendedor_id", (data as any).cert_a1_ultimo_vendedor_id ?? null);
+                }
+              }}
+              funcionarios={lookups.funcionarios.data ?? []}
+            />
+          )}
 
           {/* Card: Cancelamento */}
           <Card>
