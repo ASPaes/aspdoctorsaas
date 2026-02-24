@@ -53,7 +53,7 @@ export function ClienteTicketsSection({ clienteId, clienteNome }: ClienteTickets
               <Ticket className="h-4 w-4" />Tickets CS
               {openTickets.length > 0 && <Badge variant="secondary">{openTickets.length} aberto(s)</Badge>}
             </CardTitle>
-            <Button size="sm" onClick={() => setShowCreateForm(true)}><Plus className="h-4 w-4 mr-1" />Novo Ticket</Button>
+            <Button type="button" size="sm" onClick={() => setShowCreateForm(true)}><Plus className="h-4 w-4 mr-1" />Novo Ticket</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
