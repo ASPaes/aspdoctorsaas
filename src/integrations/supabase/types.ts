@@ -29,6 +29,67 @@ export type Database = {
         }
         Relationships: []
       }
+      certificado_a1_vendas: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          data_base_renovacao: string | null
+          data_venda: string
+          id: string
+          motivo_perda: string | null
+          observacao: string | null
+          status: string
+          valor_venda: number | null
+          vendedor_id: number | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          data_base_renovacao?: string | null
+          data_venda: string
+          id?: string
+          motivo_perda?: string | null
+          observacao?: string | null
+          status?: string
+          valor_venda?: number | null
+          vendedor_id?: number | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          data_base_renovacao?: string | null
+          data_venda?: string
+          id?: string
+          motivo_perda?: string | null
+          observacao?: string | null
+          status?: string
+          valor_venda?: number | null
+          vendedor_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificado_a1_vendas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificado_a1_vendas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificado_a1_vendas_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cidades: {
         Row: {
           codigo_ibge: string | null
@@ -62,6 +123,9 @@ export type Database = {
         Row: {
           area_atuacao_id: number | null
           cancelado: boolean
+          cert_a1_ultima_venda_em: string | null
+          cert_a1_ultimo_vendedor_id: number | null
+          cert_a1_vencimento: string | null
           cidade_id: number | null
           cnpj: string | null
           codigo_fornecedor: string | null
@@ -101,6 +165,9 @@ export type Database = {
         Insert: {
           area_atuacao_id?: number | null
           cancelado?: boolean
+          cert_a1_ultima_venda_em?: string | null
+          cert_a1_ultimo_vendedor_id?: number | null
+          cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
           codigo_fornecedor?: string | null
@@ -140,6 +207,9 @@ export type Database = {
         Update: {
           area_atuacao_id?: number | null
           cancelado?: boolean
+          cert_a1_ultima_venda_em?: string | null
+          cert_a1_ultimo_vendedor_id?: number | null
+          cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
           codigo_fornecedor?: string | null
@@ -182,6 +252,13 @@ export type Database = {
             columns: ["area_atuacao_id"]
             isOneToOne: false
             referencedRelation: "areas_atuacao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_cert_a1_ultimo_vendedor_id_fkey"
+            columns: ["cert_a1_ultimo_vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
           {
@@ -441,6 +518,9 @@ export type Database = {
         Row: {
           area_atuacao_id: number | null
           cancelado: boolean | null
+          cert_a1_ultima_venda_em: string | null
+          cert_a1_ultimo_vendedor_id: number | null
+          cert_a1_vencimento: string | null
           cidade_id: number | null
           cnpj: string | null
           created_at: string | null
@@ -485,6 +565,9 @@ export type Database = {
         Insert: {
           area_atuacao_id?: number | null
           cancelado?: boolean | null
+          cert_a1_ultima_venda_em?: string | null
+          cert_a1_ultimo_vendedor_id?: number | null
+          cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
           created_at?: string | null
@@ -529,6 +612,9 @@ export type Database = {
         Update: {
           area_atuacao_id?: number | null
           cancelado?: boolean | null
+          cert_a1_ultima_venda_em?: string | null
+          cert_a1_ultimo_vendedor_id?: number | null
+          cert_a1_vencimento?: string | null
           cidade_id?: number | null
           cnpj?: string | null
           created_at?: string | null
@@ -576,6 +662,13 @@ export type Database = {
             columns: ["area_atuacao_id"]
             isOneToOne: false
             referencedRelation: "areas_atuacao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_cert_a1_ultimo_vendedor_id_fkey"
+            columns: ["cert_a1_ultimo_vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
           {

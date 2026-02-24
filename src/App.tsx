@@ -14,6 +14,7 @@ import Clientes from "@/pages/Clientes";
 import ClienteForm from "@/pages/ClienteForm";
 import Cadastros from "@/pages/Cadastros";
 import Configuracoes from "@/pages/Configuracoes";
+import CertificadosA1 from "@/pages/CertificadosA1";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/clientes/novo" element={<ClienteForm />} />
             <Route path="/clientes/:id" element={<ClienteForm />} />
             <Route path="/cadastros" element={<Cadastros />} />
+            <Route path="/certificados-a1" element={<CertificadosA1 />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
           </Route>
 
