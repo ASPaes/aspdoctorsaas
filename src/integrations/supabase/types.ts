@@ -176,7 +176,9 @@ export type Database = {
       clientes: {
         Row: {
           area_atuacao_id: number | null
+          bairro: string | null
           cancelado: boolean
+          cep: string | null
           cert_a1_ultima_venda_em: string | null
           cert_a1_ultimo_vendedor_id: number | null
           cert_a1_vencimento: string | null
@@ -195,6 +197,7 @@ export type Database = {
           data_cancelamento: string | null
           data_venda: string | null
           email: string | null
+          endereco: string | null
           estado_id: number | null
           forma_pagamento_ativacao_id: number | null
           forma_pagamento_mensalidade_id: number | null
@@ -207,6 +210,7 @@ export type Database = {
           modelo_contrato_id: number | null
           motivo_cancelamento_id: number | null
           nome_fantasia: string | null
+          numero: string | null
           observacao_cancelamento: string | null
           observacao_cliente: string | null
           observacao_negociacao: string | null
@@ -223,7 +227,9 @@ export type Database = {
         }
         Insert: {
           area_atuacao_id?: number | null
+          bairro?: string | null
           cancelado?: boolean
+          cep?: string | null
           cert_a1_ultima_venda_em?: string | null
           cert_a1_ultimo_vendedor_id?: number | null
           cert_a1_vencimento?: string | null
@@ -242,6 +248,7 @@ export type Database = {
           data_cancelamento?: string | null
           data_venda?: string | null
           email?: string | null
+          endereco?: string | null
           estado_id?: number | null
           forma_pagamento_ativacao_id?: number | null
           forma_pagamento_mensalidade_id?: number | null
@@ -254,6 +261,7 @@ export type Database = {
           modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
+          numero?: string | null
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
@@ -270,7 +278,9 @@ export type Database = {
         }
         Update: {
           area_atuacao_id?: number | null
+          bairro?: string | null
           cancelado?: boolean
+          cep?: string | null
           cert_a1_ultima_venda_em?: string | null
           cert_a1_ultimo_vendedor_id?: number | null
           cert_a1_vencimento?: string | null
@@ -289,6 +299,7 @@ export type Database = {
           data_cancelamento?: string | null
           data_venda?: string | null
           email?: string | null
+          endereco?: string | null
           estado_id?: number | null
           forma_pagamento_ativacao_id?: number | null
           forma_pagamento_mensalidade_id?: number | null
@@ -301,6 +312,7 @@ export type Database = {
           modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
           nome_fantasia?: string | null
+          numero?: string | null
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null

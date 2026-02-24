@@ -64,6 +64,10 @@ const clienteSchema = z.object({
   contato_fone: z.string().nullable(),
   contato_aniversario: z.string().nullable(),
   unidade_base_id: z.number().nullable(),
+  cep: z.string().nullable(),
+  endereco: z.string().nullable(),
+  numero: z.string().nullable(),
+  bairro: z.string().nullable(),
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
@@ -93,6 +97,7 @@ export default function ClienteForm() {
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
       unidade_base_id: null,
+      cep: null, endereco: null, numero: null, bairro: null,
     },
   });
 
@@ -158,6 +163,10 @@ export default function ClienteForm() {
         contato_fone: (c as any).contato_fone ?? null,
         contato_aniversario: (c as any).contato_aniversario ?? null,
         unidade_base_id: (c as any).unidade_base_id ?? null,
+        cep: (c as any).cep ?? null,
+        endereco: (c as any).endereco ?? null,
+        numero: (c as any).numero ?? null,
+        bairro: (c as any).bairro ?? null,
       });
     }
   }, [clienteQuery.data]);
