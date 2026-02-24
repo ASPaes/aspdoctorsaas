@@ -14,7 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Outfit", "sans-serif"],
+        sans: ["Alan Sans", "ui-sans-serif", "sans-serif", "system-ui"],
+        serif: ["Source Serif 4", "serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
         border: "var(--border)",
