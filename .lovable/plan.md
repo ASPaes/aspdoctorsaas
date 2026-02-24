@@ -1,61 +1,126 @@
 
 
-# AuthContext - Estado Global de Autenticacao
+# Modulo Movimento MRR
 
 ## Objetivo
-Criar um contexto de autenticacao centralizado para eliminar chamadas diretas ao `supabase.auth` espalhadas pelo app, evitar "flash" de login no refresh e preparar o terreno para o modulo CS que precisa de `useAuth()`.
+Replicar o modulo de Movimentos MRR do projeto "Sistema ASP Softwares", adaptado para este projeto. Permite registrar upsell, cross-sell, downsell e vendas avulsas por cliente, com rastreio do funcionario que registrou (para futuro controle de comissoes). O campo "Origem" sera um texto livre, igual ao campo `origem_venda` ja existente na tabela `clientes`.
 
-## Arquivos a Criar
+---
 
-### `src/contexts/AuthContext.tsx`
-- `AuthProvider` com estado: `user`, `session`, `isLoading`
-- No mount: `getSession()` primeiro, depois `onAuthStateChange()` (nessa ordem, conforme best practice Supabase)
-- Expor via hook `useAuth()`: `user`, `session`, `isLoading`, `signInWithPassword(email, password)`, `signOut()`
-- Cleanup da subscription no unmount
+## Etapa 1 - Migration SQL
 
-## Arquivos a Modificar
-
-### `src/main.tsx`
-- Envolver `<App />` com `<AuthProvider>` (acima do Router para estar disponivel em toda a arvore)
-
-### `src/App.tsx`
-- Mover `<AuthProvider>` para dentro do `<BrowserRouter>` (alternativa) ou manter em `main.tsx` fora do Router
-- Como `signOut` no contexto nao precisa de `navigate`, o provider pode ficar em `main.tsx`
-
-### `src/components/AuthGuard.tsx`
-- Substituir toda a logica local de `useState` + `useEffect` + `supabase.auth` por `useAuth()`
-- Se `isLoading` -> loader
-- Se `!user` -> redirect `/login`
-- Codigo resultante fica com ~15 linhas
-
-### `src/pages/Login.tsx`
-- Substituir `supabase.auth.signInWithPassword` por `useAuth().signInWithPassword`
-- Remover import do `supabase`
-
-### `src/components/AppSidebar.tsx`
-- Substituir `supabase.auth.signOut()` por `useAuth().signOut()`
-- Remover import do `supabase`
-
-### Arquivos NAO alterados (por ora)
-- `Signup.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx` - sao paginas publicas que usam chamadas one-shot ao Supabase Auth. Podem continuar usando `supabase` diretamente sem problema, pois nao dependem do estado de sessao.
-
-## Fluxo Resultante
-
+### Enum
 ```text
-main.tsx
-  AuthProvider          <- getSession + onAuthStateChange
-    App
-      BrowserRouter
-        Routes
-          /login        <- useAuth().signInWithPassword
-          AuthGuard     <- useAuth().user / isLoading
-            AppLayout
-              Sidebar   <- useAuth().signOut
-              Outlet
+CREATE TYPE movimento_mrr_tipo AS ENUM ('upsell', 'cross_sell', 'downsell', 'venda_avulsa');
 ```
 
-## Criterios Atendidos
-- Refresh mantem sessao sem piscar para login (session recuperada antes de renderizar)
-- Rotas protegidas usam estado centralizado via `useAuth()`
-- Nenhum componente referencia `AuthContext` inexistente
-- Zero dependencia de Lovable Cloud auth
+### Tabela `movimentos_mrr`
+
+| Coluna | Tipo | Default | Observacao |
+|---|---|---|---|
+| id | uuid PK | gen_random_uuid() | |
+| cliente_id | uuid NOT NULL | | FK clientes(id) |
+| tipo | movimento_mrr_tipo NOT NULL | | |
+| data_movimento | date NOT NULL | | |
+| valor_delta | numeric NOT NULL | 0 | Delta no MRR (positivo p/ up/cross, negativo p/ down, 0 p/ avulsa) |
+| custo_delta | numeric NOT NULL | 0 | Delta no custo operacional |
+| valor_venda_avulsa | numeric | null | Valor pontual (so para tipo venda_avulsa) |
+| origem_venda | text | null | Texto livre (mesma logica do campo origem_venda em clientes) |
+| descricao | text | null | |
+| funcionario_id | bigint | null | **NOVO** - FK funcionarios(id) - quem registrou (comissoes) |
+| status | text NOT NULL | 'ativo' | 'ativo' ou 'inativo' |
+| estorno_de | uuid | null | FK movimentos_mrr(id) - se este e um estorno |
+| estornado_por | uuid | null | FK movimentos_mrr(id) - se foi estornado |
+| inativado_em | timestamptz | null | |
+| inativado_por_id | bigint | null | FK funcionarios(id) - quem inativou |
+| criado_em | timestamptz | now() | |
+
+### RLS e Indices
+- RLS habilitado com politica permissiva para usuarios autenticados (mesmo padrao do projeto)
+- Indice em `cliente_id` para performance das queries por cliente
+
+### Diferencas do projeto fonte
+- `criado_por` (uuid auth) e `criado_por_email` (text) **removidos** - substituidos por `funcionario_id` (bigint FK funcionarios)
+- `inativado_por` (uuid auth) **trocado** por `inativado_por_id` (bigint FK funcionarios)
+- Sem trigger de validacao de MRR negativo (simplificacao - validacao no frontend)
+
+---
+
+## Etapa 2 - Componente `MovimentosMrrModal.tsx`
+
+### Arquivo: `src/components/clientes/MovimentosMrrModal.tsx`
+
+Replicar do projeto fonte com as seguintes adaptacoes:
+
+**Adaptacoes de dados:**
+- Remover `useAuth()` para identificar usuario - substituir por um Select de funcionario no formulario
+- Trocar `criado_por: user?.id` e `criado_por_email: user?.email` por `funcionario_id: selectedFuncionarioId`
+- Trocar `inativado_por: user?.id` por `inativado_por_id: selectedFuncionarioId`
+- Receber `funcionarios` como prop (lista de funcionarios ativos)
+- O campo "Funcionario" sera obrigatorio no formulario de novo movimento
+
+**Campo Origem:**
+- Manter como Input de texto livre (identico ao projeto fonte e ao campo `origem_venda` em clientes)
+
+**UI (mantida do fonte):**
+- Dialog modal com summary cards (MRR Base, Upsell, Cross-sell, Downsell, V. Avulsas, MRR Atual)
+- Card de composicao MRR + Custo
+- Formulario inline para novo movimento
+- Tabela de movimentos com badges de tipo/status
+- Botao de inativar com AlertDialog de confirmacao
+- Coluna extra na tabela mostrando o nome do funcionario que registrou
+
+**Props:**
+```text
+open: boolean
+onOpenChange: (open: boolean) => void
+clienteId: string
+clienteNome: string
+mensalidadeBase: number
+custoBase: number
+funcionarios: { id: number; nome: string }[]
+```
+
+---
+
+## Etapa 3 - Integracao no ClienteForm
+
+### Arquivo: `src/pages/ClienteForm.tsx`
+
+- Adicionar botao "Movimentos MRR" no Card de Produto/Contrato (proximo ao campo Mensalidade), visivel apenas quando `isEditing`
+- O botao abre o `MovimentosMrrModal` passando:
+  - `clienteId` = `id` (do useParams)
+  - `clienteNome` = `razao_social || nome_fantasia`
+  - `mensalidadeBase` = valor do campo `mensalidade` do form
+  - `custoBase` = valor do campo `custo_operacao` do form
+  - `funcionarios` = `lookups.funcionarios.data`
+- Adicionar state `mrrModalOpen` para controlar abertura/fechamento
+
+---
+
+## Resumo de Arquivos
+
+| Tipo | Arquivo |
+|---|---|
+| Migration SQL | 1 migration: enum + tabela movimentos_mrr + RLS + indice |
+| Novo componente | `src/components/clientes/MovimentosMrrModal.tsx` |
+| Modificado | `src/pages/ClienteForm.tsx` (botao + modal) |
+
+---
+
+## Fluxo do usuario
+
+```text
+ClienteForm (editando)
+  -> Card Produto/Contrato
+    -> Botao "Movimentos MRR"
+      -> Modal abre
+        -> Ve resumo (MRR Base + movimentos = MRR Atual)
+        -> Clica "Adicionar Movimento"
+          -> Seleciona tipo (upsell/cross/down/avulsa)
+          -> Seleciona funcionario (obrigatorio - para comissoes)
+          -> Preenche valor, custo, origem, descricao
+          -> Salva
+        -> Pode inativar movimentos existentes
+```
+
