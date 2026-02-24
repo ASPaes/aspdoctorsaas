@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -69,6 +70,8 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     },
   });
 
+  const [dependencyError, setDependencyError] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await (supabase.from(table as any) as any).delete().eq("id", id);
@@ -80,8 +83,12 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
       setDeleteId(null);
     },
     onError: (err: any) => {
-      toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" });
       setDeleteId(null);
+      if (err.message?.includes("violates foreign key constraint") || err.code === "23503") {
+        setDependencyError("Este registro não pode ser excluído porque está sendo utilizado em outros cadastros. Remova as dependências antes de excluir.");
+      } else {
+        toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" });
+      }
     },
   });
 
@@ -254,6 +261,21 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Excluir
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Dependency Error Dialog */}
+      <AlertDialog open={dependencyError !== null} onOpenChange={(o) => !o && setDependencyError(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Não é possível excluir
+            </AlertDialogTitle>
+            <AlertDialogDescription>{dependencyError}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDependencyError(null)}>Entendi</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
