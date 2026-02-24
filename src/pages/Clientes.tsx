@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -15,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus } from "lucide-react";
 
 type SortField = "razao_social" | "nome_fantasia" | "cnpj" | "produto_id" | "recorrencia" | "mensalidade" | "cancelado";
 type SortDir = "asc" | "desc";
@@ -130,7 +131,7 @@ export default function Clientes() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ["clientes_lista", filterKey],
     queryFn: async () => {
-      let q = supabase.from("vw_clientes_financeiro").select("id, razao_social, nome_fantasia, cnpj, produto_id, recorrencia, mensalidade, cancelado, lucro_real, margem_bruta_percent") as any;
+      let q = supabase.from("vw_clientes_financeiro").select("id, razao_social, nome_fantasia, cnpj, produto_id, recorrencia, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda") as any;
 
       // Status
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -190,6 +191,29 @@ export default function Clientes() {
     return m;
   }, [lookups.produtos.data]);
 
+  const kpis = useMemo(() => {
+    const list = clientes ?? [];
+    const qtdClientes = list.length;
+
+    const comMensalidade = list.filter((c) => c.mensalidade != null && Number(c.mensalidade) > 0);
+    const ticketMedio = comMensalidade.length > 0
+      ? comMensalidade.reduce((acc, c) => acc + Number(c.mensalidade), 0) / comMensalidade.length
+      : null;
+
+    const now = new Date();
+    const mesAtual = now.getMonth();
+    const anoAtual = now.getFullYear();
+    const clientesNovosMes = list.filter((c) => {
+      if (!c.data_venda) return false;
+      const d = new Date(c.data_venda + "T00:00:00");
+      return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
+    }).length;
+
+    return { qtdClientes, ticketMedio, clientesNovosMes };
+  }, [clientes]);
+
+  const formatCurrency = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
+
   const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortField(field); setSortDir("asc"); }
@@ -225,6 +249,37 @@ export default function Clientes() {
           <Plus className="h-4 w-4" />
           Novo Cliente
         </Button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Qtde de Clientes</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-7 w-16" /> : <p className="text-2xl font-bold">{kpis.qtdClientes}</p>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ticket Médio</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-7 w-24" /> : <p className="text-2xl font-bold">{kpis.ticketMedio != null ? formatCurrency.format(kpis.ticketMedio) : "—"}</p>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Novos no Mês</CardTitle>
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-7 w-12" /> : <p className="text-2xl font-bold">{kpis.clientesNovosMes}</p>}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick filters bar */}
