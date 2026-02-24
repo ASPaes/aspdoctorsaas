@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users } from "lucide-react";
-import { maskCNPJ, maskPhone, maskCPF } from "@/lib/masks";
+import { Users, Loader2 } from "lucide-react";
+import { maskCNPJ, maskPhone, maskCPF, maskCEP } from "@/lib/masks";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
 
 interface Props {
@@ -25,6 +27,47 @@ interface Props {
 
 export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, modelosContrato, unidadesBase, clienteId }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+  const { toast } = useToast();
+
+  const handleCepChange = useCallback(async (maskedValue: string) => {
+    form.setValue("cep", maskedValue);
+    const digits = maskedValue.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await res.json();
+      if (data.erro) {
+        toast({ title: "CEP não encontrado", variant: "destructive" });
+        return;
+      }
+
+      form.setValue("endereco", data.logradouro || "");
+      form.setValue("bairro", data.bairro || "");
+
+      // Find estado by sigla
+      const estado = estados.find((e) => e.sigla === data.uf);
+      if (estado) {
+        form.setValue("estado_id", estado.id);
+        // Fetch cidade by name + estado
+        const { data: cidadesResult } = await supabase
+          .from("cidades")
+          .select("id")
+          .eq("estado_id", estado.id)
+          .ilike("nome", data.localidade)
+          .limit(1);
+        if (cidadesResult && cidadesResult.length > 0) {
+          form.setValue("cidade_id", cidadesResult[0].id);
+        }
+      }
+    } catch {
+      toast({ title: "Erro ao consultar CEP", variant: "destructive" });
+    } finally {
+      setCepLoading(false);
+    }
+  }, [estados, form, toast]);
 
   return (
     <div className="space-y-6">
@@ -103,46 +146,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="estado_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Estado</FormLabel>
-            <Select
-              value={field.value?.toString() ?? ""}
-              onValueChange={(v) => {
-                field.onChange(v ? Number(v) : null);
-                form.setValue("cidade_id", null);
-              }}
-            >
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-              <SelectContent>
-                {estados.map((e) => (
-                  <SelectItem key={e.id} value={e.id.toString()}>{e.sigla} - {e.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
-
-        <FormField control={form.control} name="cidade_id" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Cidade</FormLabel>
-            <Select
-              value={field.value?.toString() ?? ""}
-              onValueChange={(v) => field.onChange(v ? Number(v) : null)}
-              disabled={!form.watch("estado_id")}
-            >
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione o estado primeiro..." /></SelectTrigger></FormControl>
-              <SelectContent>
-                {cidades.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()}>{c.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
-
         <FormField control={form.control} name="area_atuacao_id" render={({ field }) => (
           <FormItem>
             <FormLabel>Área de Atuação</FormLabel>
@@ -212,6 +215,92 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             </FormItem>
           )} />
         </div>
+      </div>
+
+      {/* Endereço */}
+      <Separator />
+      <h3 className="text-sm font-semibold">Endereço</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FormField control={form.control} name="cep" render={({ field }) => (
+          <FormItem>
+            <FormLabel>CEP</FormLabel>
+            <FormControl>
+              <div className="relative">
+                <Input
+                  placeholder="00000-000"
+                  value={field.value ?? ""}
+                  onChange={(e) => handleCepChange(maskCEP(e.target.value))}
+                />
+                {cepLoading && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="estado_id" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Estado</FormLabel>
+            <Select
+              value={field.value?.toString() ?? ""}
+              onValueChange={(v) => {
+                field.onChange(v ? Number(v) : null);
+                form.setValue("cidade_id", null);
+              }}
+            >
+              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+              <SelectContent>
+                {estados.map((e) => (
+                  <SelectItem key={e.id} value={e.id.toString()}>{e.sigla} - {e.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="cidade_id" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Cidade</FormLabel>
+            <Select
+              value={field.value?.toString() ?? ""}
+              onValueChange={(v) => field.onChange(v ? Number(v) : null)}
+              disabled={!form.watch("estado_id")}
+            >
+              <FormControl><SelectTrigger><SelectValue placeholder="Selecione o estado primeiro..." /></SelectTrigger></FormControl>
+              <SelectContent>
+                {cidades.map((c) => (
+                  <SelectItem key={c.id} value={c.id.toString()}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="bairro" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Bairro</FormLabel>
+            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="endereco" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Endereço</FormLabel>
+            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="numero" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Número</FormLabel>
+            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
       </div>
 
       {/* Contato Principal */}
