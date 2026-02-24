@@ -27,6 +27,7 @@ interface Props {
 export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
   const { toast } = useToast();
   const whatsappValue = form.watch("telefone_whatsapp");
 
@@ -67,6 +68,71 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     }
   }, [estados, form, toast]);
 
+  const handleCnpjChange = useCallback(async (maskedValue: string) => {
+    const masked = maskCNPJ(maskedValue);
+    form.setValue("cnpj", masked);
+    const digits = masked.replace(/\D/g, "");
+    if (digits.length !== 14) return;
+
+    setCnpjLoading(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
+      if (!res.ok) {
+        toast({ title: "CNPJ não encontrado", variant: "destructive" });
+        return;
+      }
+      const data = await res.json();
+
+      if (data.razao_social) form.setValue("razao_social", data.razao_social);
+      if (data.nome_fantasia) form.setValue("nome_fantasia", data.nome_fantasia);
+      if (data.email) form.setValue("email", data.email);
+
+      // Telefone: ddd_telefone_1 vem como "1133334444"
+      if (data.ddd_telefone_1) {
+        const phoneDig = data.ddd_telefone_1.replace(/\D/g, "");
+        if (phoneDig.length >= 10) {
+          form.setValue("telefone_contato", maskPhone(phoneDig));
+        }
+      }
+
+      // Endereço direto
+      if (data.logradouro) form.setValue("endereco", data.logradouro);
+      if (data.numero) form.setValue("numero", data.numero);
+      if (data.bairro) form.setValue("bairro", data.bairro);
+
+      // Estado e cidade
+      if (data.uf) {
+        const estado = estados.find((e) => e.sigla === data.uf);
+        if (estado) {
+          form.setValue("estado_id", estado.id);
+          if (data.municipio) {
+            const { data: cidadesResult } = await supabase
+              .from("cidades")
+              .select("id")
+              .eq("estado_id", estado.id)
+              .ilike("nome", data.municipio)
+              .limit(1);
+            if (cidadesResult && cidadesResult.length > 0) {
+              form.setValue("cidade_id", cidadesResult[0].id);
+            }
+          }
+        }
+      }
+
+      // CEP por último (dispara auto-fill de endereço se os campos acima não vieram)
+      if (data.cep) {
+        const cepFormatted = maskCEP(data.cep.toString().replace(/\D/g, ""));
+        form.setValue("cep", cepFormatted);
+      }
+
+      toast({ title: "Dados do CNPJ preenchidos com sucesso" });
+    } catch {
+      toast({ title: "Erro ao consultar CNPJ", variant: "destructive" });
+    } finally {
+      setCnpjLoading(false);
+    }
+  }, [estados, form, toast]);
+
   const openWhatsApp = () => {
     const digits = (whatsappValue ?? "").replace(/\D/g, "");
     if (digits) window.open(`https://wa.me/55${digits}`, "_blank");
@@ -76,7 +142,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     <div className="space-y-6">
       {/* ── Dados Cadastrais ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Linha 1: Data Cadastro | Unidade Base | Segmento */}
+        {/* Linha 1: Data Cadastro | Unidade Base | CNPJ */}
         <FormField control={form.control} name="data_cadastro" render={({ field }) => (
           <FormItem>
             <FormLabel>Data Cadastro</FormLabel>
@@ -100,17 +166,19 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="segmento_id" render={({ field }) => (
+        <FormField control={form.control} name="cnpj" render={({ field }) => (
           <FormItem>
-            <FormLabel>Segmento</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
-              <SelectContent>
-                {segmentos.map((s) => (
-                  <SelectItem key={s.id} value={s.id.toString()}>{s.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FormLabel>CNPJ</FormLabel>
+            <FormControl>
+              <div className="relative">
+                <Input
+                  placeholder="00.000.000/0000-00"
+                  value={field.value ?? ""}
+                  onChange={(e) => handleCnpjChange(e.target.value)}
+                />
+                {cnpjLoading && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+            </FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -134,21 +202,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        {/* Linha 3: CNPJ | Email (col-span-2) */}
-        <FormField control={form.control} name="cnpj" render={({ field }) => (
-          <FormItem>
-            <FormLabel>CNPJ</FormLabel>
-            <FormControl>
-              <Input
-                placeholder="00.000.000/0000-00"
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(maskCNPJ(e.target.value))}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-
+        {/* Linha 3: Email (col-span-2) | Telefone Contato */}
         <div className="md:col-span-2">
           <FormField control={form.control} name="email" render={({ field }) => (
             <FormItem>
@@ -159,7 +213,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           )} />
         </div>
 
-        {/* Linha 4: Telefone Contato | Telefone WhatsApp + btn | Área Atuação */}
         <FormField control={form.control} name="telefone_contato" render={({ field }) => (
           <FormItem>
             <FormLabel>Telefone Contato</FormLabel>
@@ -174,6 +227,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
+        {/* Linha 4: Telefone WhatsApp [+btn] | Área Atuação | Segmento */}
         <FormField control={form.control} name="telefone_whatsapp" render={({ field }) => (
           <FormItem>
             <FormLabel>Telefone WhatsApp</FormLabel>
@@ -209,6 +263,21 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
               <SelectContent>
                 {areasAtuacao.map((a) => (
                   <SelectItem key={a.id} value={a.id.toString()}>{a.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="segmento_id" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Segmento</FormLabel>
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+              <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+              <SelectContent>
+                {segmentos.map((s) => (
+                  <SelectItem key={s.id} value={s.id.toString()}>{s.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
