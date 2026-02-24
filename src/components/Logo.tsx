@@ -11,10 +11,10 @@ interface LogoProps {
 }
 
 const sizeMap: Record<LogoSize, string> = {
-  sm: "h-16 w-16",
-  md: "h-20 w-auto",
-  lg: "h-32 w-auto",
-  xl: "h-48 w-auto",
+  sm: "h-10 w-10",
+  md: "h-14 w-auto",
+  lg: "h-20 w-auto",
+  xl: "h-32 w-auto",
 };
 
 export function Logo({ variant = "color", size = "md", className = "", showText = false }: LogoProps) {
