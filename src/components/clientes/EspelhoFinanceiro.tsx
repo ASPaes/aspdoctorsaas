@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, Percent, BarChart3, Calculator, ArrowUpDown, Zap, HelpCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Percent, BarChart3, Calculator, ArrowUpDown, Zap, HelpCircle, Minus, Equal } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { EspelhoResult } from "@/hooks/useEspelhoFinanceiro";
@@ -19,29 +19,22 @@ function fmtX(value: number | null) {
   return `${value.toFixed(2)}x`;
 }
 
-function getColorClasses(value: number | null, isCost = false) {
-  if (value === null || isNaN(value)) return "bg-muted/50 text-foreground";
-  if (isCost) return "bg-primary/10 dark:bg-primary/20 text-primary";
-  if (value > 0) return "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400";
-  if (value < 0) return "bg-primary/10 dark:bg-primary/20 text-primary";
-  return "bg-muted/50 text-foreground";
-}
+/* ── Tooltip data ── */
 
-interface TooltipInfo {
-  formula: string;
-  objetivo: string;
-}
+interface TooltipInfo { formula: string; objetivo: string }
 
 const tooltips: Record<string, TooltipInfo> = {
-  "Valor Repasse": { formula: "MRR Atual − Custo Atual", objetivo: "Quanto sobra após pagar o custo de operação" },
-  "Impostos": { formula: "MRR Atual × Imposto%", objetivo: "Valor estimado de impostos sobre a receita" },
-  "Custos Fixos": { formula: "MRR Atual × Custo Fixo%", objetivo: "Despesas fixas proporcionais à receita" },
-  "Lucro Bruto": { formula: "MRR Atual − Custo Atual − Impostos", objetivo: "Lucro antes dos custos fixos" },
-  "Margem Bruta": { formula: "(Lucro Bruto / MRR Atual) × 100", objetivo: "Percentual de lucro sobre a receita" },
-  "Markup COGS": { formula: "((MRR / Custo) − 1) × 100", objetivo: "Percentual de acréscimo sobre o custo" },
-  "Fator Preço": { formula: "MRR Atual / Custo Atual", objetivo: "Quantas vezes o preço cobre o custo" },
-  "Margem Contribuição": { formula: "Lucro Bruto − Custos Fixos", objetivo: "Quanto cada cliente contribui para cobrir despesas" },
-  "Lucro Real": { formula: "Margem de Contribuição", objetivo: "Resultado líquido final da operação" },
+  "Receita (MRR Atual)":        { formula: "MRR Base + Movimentos", objetivo: "Faturamento recorrente mensal efetivo" },
+  "(-) Custo Operação (COGS)":  { formula: "Custo Base + Custo Movimentos", objetivo: "Custo variável pago ao fornecedor" },
+  "Receita após COGS":          { formula: "MRR Atual − COGS Atual", objetivo: "Quanto sobra após pagar o custo de operação" },
+  "(-) Impostos":               { formula: "MRR Atual × Imposto%", objetivo: "Valor estimado de impostos sobre o faturamento" },
+  "Margem de Contribuição":     { formula: "MRR Atual − COGS − Impostos", objetivo: "Quanto cada cliente contribui para cobrir despesas fixas" },
+  "MC %":                       { formula: "(MC / MRR Atual) × 100", objetivo: "Percentual de contribuição sobre a receita" },
+  "(-) Custos Fixos":           { formula: "MRR Atual × Custo Fixo%", objetivo: "Despesas fixas alocadas proporcionalmente" },
+  "Lucro Real":                 { formula: "MC − Custos Fixos", objetivo: "Resultado líquido final da operação" },
+  "Lucro Real %":               { formula: "(Lucro Real / MRR Atual) × 100", objetivo: "Rentabilidade líquida percentual" },
+  "Markup COGS":                { formula: "((MRR / COGS) − 1) × 100", objetivo: "Percentual de acréscimo sobre o custo" },
+  "Fator Preço":                { formula: "MRR Atual / COGS Atual", objetivo: "Quantas vezes o preço cobre o custo" },
 };
 
 function InfoTooltip({ label }: { label: string }) {
@@ -59,6 +52,60 @@ function InfoTooltip({ label }: { label: string }) {
     </Tooltip>
   );
 }
+
+/* ── Color helpers ── */
+
+function valueColor(value: number | null) {
+  if (value === null || isNaN(value)) return "text-foreground";
+  if (value > 0) return "text-green-700 dark:text-green-400";
+  if (value < 0) return "text-primary";
+  return "text-foreground";
+}
+
+function cardBg(value: number | null, isDeduction = false) {
+  if (value === null || isNaN(value)) return "bg-muted/50";
+  if (isDeduction) return "bg-primary/10 dark:bg-primary/20";
+  if (value > 0) return "bg-green-50 dark:bg-green-950/30";
+  if (value < 0) return "bg-primary/10 dark:bg-primary/20";
+  return "bg-muted/50";
+}
+
+/* ── Step row (used in the funnel) ── */
+
+interface StepProps {
+  label: string;
+  value: string;
+  raw: number | null;
+  icon: React.ElementType;
+  isDeduction?: boolean;
+  large?: boolean;
+  extra?: React.ReactNode;
+}
+
+function StepCard({ label, value, raw, icon: Icon, isDeduction = false, large = false, extra }: StepProps) {
+  return (
+    <Card className={`border-0 shadow-sm ${cardBg(raw, isDeduction)}`}>
+      <CardContent className={large ? "p-4" : "p-3"}>
+        <div className="flex items-center justify-between mb-1">
+          <Icon className="h-3.5 w-3.5 opacity-60" />
+          <div className="flex items-center gap-1">
+            <InfoTooltip label={label} />
+            {raw !== null && !isNaN(raw) && !isDeduction && (
+              raw > 0
+                ? <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                : <TrendingDown className="h-3.5 w-3.5 text-primary" />
+            )}
+          </div>
+        </div>
+        <p className="text-[11px] font-medium opacity-70 leading-tight">{label}</p>
+        <p className={`${large ? "text-xl" : "text-base"} font-bold mt-0.5 ${valueColor(raw)}`}>{value}</p>
+        {extra}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ── Main component ── */
 
 interface Props {
   espelho: EspelhoResult;
@@ -87,25 +134,14 @@ export default function EspelhoFinanceiro({
 }: Props) {
   const mrrAtual = espelho.mrrEfetivo;
   const custoAtual = espelho.custoEfetivo;
-
-  const metrics = [
-    { label: "Valor Repasse", value: fmt(espelho.valor_repasse), raw: espelho.valor_repasse, icon: DollarSign, isCost: false },
-    { label: "Impostos", value: fmt(espelho.impostos_rs), raw: espelho.impostos_rs, icon: Calculator, isCost: true },
-    { label: "Custos Fixos", value: fmt(espelho.fixos_rs), raw: espelho.fixos_rs, icon: Calculator, isCost: true },
-    { label: "Lucro Bruto", value: fmt(espelho.lucro_bruto), raw: espelho.lucro_bruto, icon: TrendingUp, isCost: false },
-    { label: "Margem Bruta", value: fmtPct(espelho.margem_bruta_percent), raw: espelho.margem_bruta_percent, icon: Percent, isCost: false },
-    { label: "Markup COGS", value: fmtPct(espelho.markup_cogs_percent), raw: espelho.markup_cogs_percent, icon: BarChart3, isCost: false },
-    { label: "Fator Preço", value: fmtX(espelho.fator_preco_x), raw: espelho.fator_preco_x, icon: BarChart3, isCost: false },
-    { label: "Margem Contribuição", value: fmt(espelho.margem_contribuicao), raw: espelho.margem_contribuicao, icon: TrendingUp, isCost: false },
-  ];
-
   const lucroReal = espelho.lucro_real;
   const lucroPositivo = lucroReal !== null && !isNaN(lucroReal) && lucroReal > 0;
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-4">
-        {/* ===== COMPOSIÇÃO MRR (aparece primeiro) ===== */}
+
+        {/* ═══════ A) COMPOSIÇÃO MRR ═══════ */}
         {clienteId && (
           <>
             <div className="flex items-center gap-2">
@@ -119,7 +155,7 @@ export default function EspelhoFinanceiro({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* MRR Base */}
+              {/* MRR Base + Custo Base */}
               <Card className="border border-border/60 bg-card shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -135,7 +171,7 @@ export default function EspelhoFinanceiro({
                 </CardContent>
               </Card>
 
-              {/* Movements Breakdown */}
+              {/* Movimentos Breakdown */}
               <Card className="border border-border/60 bg-card shadow-sm">
                 <CardContent className="p-4 space-y-2">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Movimentos</p>
@@ -173,7 +209,7 @@ export default function EspelhoFinanceiro({
                 </CardContent>
               </Card>
 
-              {/* MRR Current */}
+              {/* MRR Atual + Custo Atual */}
               <Card className={`border-2 shadow-md ${
                 mrrAtual > mensalidadeBase
                   ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30"
@@ -225,36 +261,31 @@ export default function EspelhoFinanceiro({
           </>
         )}
 
-        {/* ===== ESPELHO FINANCEIRO (resultado) ===== */}
+        {/* ═══════ B) ESPELHO FINANCEIRO — funil lógico ═══════ */}
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold">Espelho Financeiro</h3>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {metrics.map((item) => {
-            const Icon = item.icon;
-            const isPositive = item.raw !== null && !isNaN(item.raw) && item.raw > 0;
-            return (
-              <Card key={item.label} className={`border-0 shadow-sm ${getColorClasses(item.raw, item.isCost)}`}>
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <Icon className="h-3.5 w-3.5 opacity-60" />
-                    <div className="flex items-center gap-1">
-                      <InfoTooltip label={item.label} />
-                      {item.raw !== null && !isNaN(item.raw) && !item.isCost && (
-                        isPositive
-                          ? <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                          : <TrendingDown className="h-3.5 w-3.5 text-primary" />
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-[11px] font-medium opacity-70 leading-tight">{item.label}</p>
-                  <p className="text-base font-bold mt-0.5">{item.value}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
+        {/* Linha 1: Receita → (−) COGS → (=) Receita após COGS */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <StepCard label="Receita (MRR Atual)" value={fmt(mrrAtual)} raw={mrrAtual} icon={DollarSign} />
+          <StepCard label="(-) Custo Operação (COGS)" value={fmt(custoAtual)} raw={custoAtual} icon={Minus} isDeduction />
+          <StepCard label="Receita após COGS" value={fmt(espelho.valor_apos_cogs)} raw={espelho.valor_apos_cogs} icon={Equal} />
+        </div>
+
+        {/* Linha 2: (−) Impostos → MC R$ → MC % */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <StepCard label="(-) Impostos" value={fmt(espelho.impostos_rs)} raw={espelho.impostos_rs} icon={Calculator} isDeduction />
+          <StepCard label="Margem de Contribuição" value={fmt(espelho.margem_contribuicao)} raw={espelho.margem_contribuicao} icon={TrendingUp} />
+          <StepCard label="MC %" value={fmtPct(espelho.margem_contribuicao_percent)} raw={espelho.margem_contribuicao_percent} icon={Percent} />
+        </div>
+
+        {/* Linha 3: (−) Custos Fixos → Indicadores auxiliares */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <StepCard label="(-) Custos Fixos" value={fmt(espelho.fixos_rs)} raw={espelho.fixos_rs} icon={Calculator} isDeduction />
+          <StepCard label="Markup COGS" value={fmtPct(espelho.markup_cogs_percent)} raw={espelho.markup_cogs_percent} icon={BarChart3} />
+          <StepCard label="Fator Preço" value={fmtX(espelho.fator_preco_x)} raw={espelho.fator_preco_x} icon={BarChart3} />
         </div>
 
         {/* Destaque: Lucro Real */}
@@ -268,12 +299,16 @@ export default function EspelhoFinanceiro({
                 <p className="text-sm font-medium opacity-70">Lucro Real</p>
                 <InfoTooltip label="Lucro Real" />
               </div>
-              <p className={`text-2xl font-bold ${lucroPositivo
-                ? "text-green-700 dark:text-green-400"
-                : "text-primary"
-              }`}>
-                {fmt(lucroReal)}
-              </p>
+              <div className="flex items-baseline gap-3">
+                <p className={`text-2xl font-bold ${lucroPositivo ? "text-green-700 dark:text-green-400" : "text-primary"}`}>
+                  {fmt(lucroReal)}
+                </p>
+                {espelho.lucro_real_percent !== null && (
+                  <p className={`text-sm font-semibold ${lucroPositivo ? "text-green-600 dark:text-green-400" : "text-primary"}`}>
+                    {fmtPct(espelho.lucro_real_percent)}
+                  </p>
+                )}
+              </div>
             </div>
             {lucroPositivo
               ? <TrendingUp className="h-8 w-8 text-green-500 dark:text-green-400" />
