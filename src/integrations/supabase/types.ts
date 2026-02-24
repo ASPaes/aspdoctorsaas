@@ -423,6 +423,241 @@ export type Database = {
         }
         Relationships: []
       }
+      cs_ticket_reassignments: {
+        Row: {
+          criado_em: string
+          de_id: number | null
+          id: string
+          motivo: string | null
+          para_id: number
+          reatribuido_por_id: number | null
+          ticket_id: string
+        }
+        Insert: {
+          criado_em?: string
+          de_id?: number | null
+          id?: string
+          motivo?: string | null
+          para_id: number
+          reatribuido_por_id?: number | null
+          ticket_id: string
+        }
+        Update: {
+          criado_em?: string
+          de_id?: number | null
+          id?: string
+          motivo?: string | null
+          para_id?: number
+          reatribuido_por_id?: number | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_ticket_reassignments_de_id_fkey"
+            columns: ["de_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_ticket_reassignments_para_id_fkey"
+            columns: ["para_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_ticket_reassignments_reatribuido_por_id_fkey"
+            columns: ["reatribuido_por_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_ticket_reassignments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "cs_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_ticket_updates: {
+        Row: {
+          conteudo: string
+          criado_em: string
+          criado_por_id: number | null
+          id: string
+          privado: boolean
+          ticket_id: string
+          tipo: Database["public"]["Enums"]["cs_update_tipo"]
+        }
+        Insert: {
+          conteudo?: string
+          criado_em?: string
+          criado_por_id?: number | null
+          id?: string
+          privado?: boolean
+          ticket_id: string
+          tipo?: Database["public"]["Enums"]["cs_update_tipo"]
+        }
+        Update: {
+          conteudo?: string
+          criado_em?: string
+          criado_por_id?: number | null
+          id?: string
+          privado?: boolean
+          ticket_id?: string
+          tipo?: Database["public"]["Enums"]["cs_update_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_ticket_updates_criado_por_id_fkey"
+            columns: ["criado_por_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_ticket_updates_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "cs_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_tickets: {
+        Row: {
+          assunto: string
+          atualizado_em: string
+          cliente_id: string | null
+          concluido_em: string | null
+          criado_em: string
+          criado_por_id: number | null
+          descricao_curta: string
+          escalado: boolean
+          id: string
+          impacto_categoria:
+            | Database["public"]["Enums"]["cs_ticket_impacto"]
+            | null
+          indicacao_cidade: string | null
+          indicacao_contato: string | null
+          indicacao_nome: string | null
+          indicacao_status:
+            | Database["public"]["Enums"]["cs_indicacao_status"]
+            | null
+          mrr_em_risco: number | null
+          mrr_recuperado: number | null
+          owner_id: number | null
+          primeira_acao_em: string | null
+          prioridade: Database["public"]["Enums"]["cs_ticket_prioridade"]
+          prob_churn_percent: number | null
+          prob_sucesso_percent: number | null
+          proxima_acao: string | null
+          proximo_followup_em: string | null
+          sla_conclusao_ate: string | null
+          sla_primeira_acao_ate: string | null
+          status: Database["public"]["Enums"]["cs_ticket_status"]
+          tipo: Database["public"]["Enums"]["cs_ticket_tipo"]
+        }
+        Insert: {
+          assunto: string
+          atualizado_em?: string
+          cliente_id?: string | null
+          concluido_em?: string | null
+          criado_em?: string
+          criado_por_id?: number | null
+          descricao_curta?: string
+          escalado?: boolean
+          id?: string
+          impacto_categoria?:
+            | Database["public"]["Enums"]["cs_ticket_impacto"]
+            | null
+          indicacao_cidade?: string | null
+          indicacao_contato?: string | null
+          indicacao_nome?: string | null
+          indicacao_status?:
+            | Database["public"]["Enums"]["cs_indicacao_status"]
+            | null
+          mrr_em_risco?: number | null
+          mrr_recuperado?: number | null
+          owner_id?: number | null
+          primeira_acao_em?: string | null
+          prioridade?: Database["public"]["Enums"]["cs_ticket_prioridade"]
+          prob_churn_percent?: number | null
+          prob_sucesso_percent?: number | null
+          proxima_acao?: string | null
+          proximo_followup_em?: string | null
+          sla_conclusao_ate?: string | null
+          sla_primeira_acao_ate?: string | null
+          status?: Database["public"]["Enums"]["cs_ticket_status"]
+          tipo: Database["public"]["Enums"]["cs_ticket_tipo"]
+        }
+        Update: {
+          assunto?: string
+          atualizado_em?: string
+          cliente_id?: string | null
+          concluido_em?: string | null
+          criado_em?: string
+          criado_por_id?: number | null
+          descricao_curta?: string
+          escalado?: boolean
+          id?: string
+          impacto_categoria?:
+            | Database["public"]["Enums"]["cs_ticket_impacto"]
+            | null
+          indicacao_cidade?: string | null
+          indicacao_contato?: string | null
+          indicacao_nome?: string | null
+          indicacao_status?:
+            | Database["public"]["Enums"]["cs_indicacao_status"]
+            | null
+          mrr_em_risco?: number | null
+          mrr_recuperado?: number | null
+          owner_id?: number | null
+          primeira_acao_em?: string | null
+          prioridade?: Database["public"]["Enums"]["cs_ticket_prioridade"]
+          prob_churn_percent?: number | null
+          prob_sucesso_percent?: number | null
+          proxima_acao?: string | null
+          proximo_followup_em?: string | null
+          sla_conclusao_ate?: string | null
+          sla_primeira_acao_ate?: string | null
+          status?: Database["public"]["Enums"]["cs_ticket_status"]
+          tipo?: Database["public"]["Enums"]["cs_ticket_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_tickets_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_tickets_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_tickets_criado_por_id_fkey"
+            columns: ["criado_por_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_tickets_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       estados: {
         Row: {
           codigo_ibge: string | null
@@ -907,6 +1142,38 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      cs_indicacao_status:
+        | "recebida"
+        | "contatada"
+        | "qualificada"
+        | "enviada_ao_comercial"
+        | "fechou"
+        | "nao_fechou"
+      cs_ticket_impacto: "risco" | "expansao" | "relacionamento" | "processo"
+      cs_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
+      cs_ticket_status:
+        | "aberto"
+        | "em_andamento"
+        | "aguardando_cliente"
+        | "aguardando_interno"
+        | "em_monitoramento"
+        | "concluido"
+        | "cancelado"
+      cs_ticket_tipo:
+        | "relacionamento_90d"
+        | "risco_churn"
+        | "adocao_engajamento"
+        | "indicacao"
+        | "oportunidade"
+        | "clube_comunidade"
+        | "interno_processo"
+      cs_update_tipo:
+        | "comentario"
+        | "mudanca_status"
+        | "mudanca_prioridade"
+        | "mudanca_owner"
+        | "nota_ia"
+        | "registro_acao"
       movimento_mrr_tipo: "upsell" | "cross_sell" | "downsell" | "venda_avulsa"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
     }
@@ -1036,6 +1303,42 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      cs_indicacao_status: [
+        "recebida",
+        "contatada",
+        "qualificada",
+        "enviada_ao_comercial",
+        "fechou",
+        "nao_fechou",
+      ],
+      cs_ticket_impacto: ["risco", "expansao", "relacionamento", "processo"],
+      cs_ticket_prioridade: ["baixa", "media", "alta", "urgente"],
+      cs_ticket_status: [
+        "aberto",
+        "em_andamento",
+        "aguardando_cliente",
+        "aguardando_interno",
+        "em_monitoramento",
+        "concluido",
+        "cancelado",
+      ],
+      cs_ticket_tipo: [
+        "relacionamento_90d",
+        "risco_churn",
+        "adocao_engajamento",
+        "indicacao",
+        "oportunidade",
+        "clube_comunidade",
+        "interno_processo",
+      ],
+      cs_update_tipo: [
+        "comentario",
+        "mudanca_status",
+        "mudanca_prioridade",
+        "mudanca_owner",
+        "nota_ia",
+        "registro_acao",
+      ],
       movimento_mrr_tipo: ["upsell", "cross_sell", "downsell", "venda_avulsa"],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
     },

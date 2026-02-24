@@ -18,6 +18,7 @@ import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
+import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
@@ -311,6 +312,13 @@ export default function ClienteForm() {
           </div>
         </form>
       </Form>
+
+      {isEditing && id && (
+        <ClienteTicketsSection
+          clienteId={id}
+          clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
+        />
+      )}
 
       {isEditing && id && (
         <MovimentosMrrModal
