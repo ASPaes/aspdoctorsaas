@@ -3,8 +3,10 @@ import { useMemo } from "react";
 interface EspelhoInput {
   mensalidade: number | null;
   custo_operacao: number | null;
-  imposto_percentual: number | null;   // now receives as display value (e.g. 8 for 8%)
-  custo_fixo_percentual: number | null; // now receives as display value (e.g. 35 for 35%)
+  imposto_percentual: number | null;   // display value (e.g. 8 for 8%)
+  custo_fixo_percentual: number | null; // display value (e.g. 35 for 35%)
+  deltaMrr?: number;
+  deltaCusto?: number;
 }
 
 export interface EspelhoResult {
@@ -17,13 +19,16 @@ export interface EspelhoResult {
   fator_preco_x: number | null;
   margem_contribuicao: number | null;
   lucro_real: number | null;
+  mrrEfetivo: number;
+  custoEfetivo: number;
 }
 
 export function useEspelhoFinanceiro(input: EspelhoInput): EspelhoResult {
   return useMemo(() => {
-    const m = input.mensalidade ?? 0;
-    const c = input.custo_operacao ?? 0;
-    // Convert from display % (e.g. 8) to decimal (0.08)
+    const mBase = input.mensalidade ?? 0;
+    const cBase = input.custo_operacao ?? 0;
+    const m = mBase + (input.deltaMrr ?? 0);
+    const c = cBase + (input.deltaCusto ?? 0);
     const imp = (input.imposto_percentual ?? 0) / 100;
     const fix = (input.custo_fixo_percentual ?? 0) / 100;
 
@@ -47,6 +52,8 @@ export function useEspelhoFinanceiro(input: EspelhoInput): EspelhoResult {
       fator_preco_x,
       margem_contribuicao,
       lucro_real,
+      mrrEfetivo: m,
+      custoEfetivo: c,
     };
-  }, [input.mensalidade, input.custo_operacao, input.imposto_percentual, input.custo_fixo_percentual]);
+  }, [input.mensalidade, input.custo_operacao, input.imposto_percentual, input.custo_fixo_percentual, input.deltaMrr, input.deltaCusto]);
 }
