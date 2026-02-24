@@ -33,7 +33,7 @@ const clienteSchema = z.object({
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
   segmento_id: z.number().nullable(),
-  vertical_id: z.number().nullable(),
+  modelo_contrato_id: z.number().nullable(),
   observacao_cliente: z.string().nullable(),
   data_venda: z.string().nullable(),
   funcionario_id: z.number().nullable(),
@@ -81,7 +81,7 @@ export default function ClienteForm() {
       data_cadastro: new Date().toISOString().split("T")[0],
       razao_social: null, nome_fantasia: null, cnpj: null, email: null,
       telefone_contato: null, telefone_whatsapp: null, estado_id: null, cidade_id: null,
-      area_atuacao_id: null, segmento_id: null, vertical_id: null, observacao_cliente: null,
+      area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
       data_venda: null, funcionario_id: null, origem_venda: null, recorrencia: null,
       produto_id: null, observacao_negociacao: null,
       data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
@@ -129,7 +129,7 @@ export default function ClienteForm() {
         data_cadastro: c.data_cadastro, razao_social: c.razao_social, nome_fantasia: c.nome_fantasia,
         cnpj: c.cnpj, email: c.email, telefone_contato: c.telefone_contato,
         telefone_whatsapp: c.telefone_whatsapp, estado_id: c.estado_id, cidade_id: c.cidade_id,
-        area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, vertical_id: c.vertical_id,
+        area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
         observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
         funcionario_id: c.funcionario_id, origem_venda: c.origem_venda,
         recorrencia: c.recorrencia, produto_id: c.produto_id,
@@ -220,7 +220,7 @@ export default function ClienteForm() {
                 cidades={lookups.cidades.data ?? []}
                 areasAtuacao={lookups.areasAtuacao.data ?? []}
                 segmentos={lookups.segmentos.data ?? []}
-                verticais={lookups.verticais.data ?? []}
+                modelosContrato={lookups.modelosContrato.data ?? []}
                 clienteId={id}
               />
             </CardContent>
