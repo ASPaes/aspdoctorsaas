@@ -249,6 +249,7 @@ export default function ClienteForm() {
               <FinanceiroTab
                 form={form}
                 formasPagamento={lookups.formasPagamento.data ?? []}
+                clienteId={id}
               />
             </CardContent>
           </Card>
