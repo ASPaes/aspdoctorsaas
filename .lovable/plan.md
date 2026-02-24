@@ -1,58 +1,61 @@
 
 
-# Substituir Vermelho por Verde em Todo o Sistema
+# AuthContext - Estado Global de Autenticacao
 
-## Resumo
+## Objetivo
+Criar um contexto de autenticacao centralizado para eliminar chamadas diretas ao `supabase.auth` espalhadas pelo app, evitar "flash" de login no refresh e preparar o terreno para o modulo CS que precisa de `useAuth()`.
 
-Trocar todas as ocorrencias de vermelho (incluindo as variaveis CSS `--destructive`, `--secondary` dark, `--accent` dark e `--sidebar-accent` dark) pelo verde primario do sistema, e substituir classes hardcoded `red-*` por equivalentes verdes nos componentes.
+## Arquivos a Criar
 
----
+### `src/contexts/AuthContext.tsx`
+- `AuthProvider` com estado: `user`, `session`, `isLoading`
+- No mount: `getSession()` primeiro, depois `onAuthStateChange()` (nessa ordem, conforme best practice Supabase)
+- Expor via hook `useAuth()`: `user`, `session`, `isLoading`, `signInWithPassword(email, password)`, `signOut()`
+- Cleanup da subscription no unmount
 
-## 1. Variaveis CSS - `src/index.css`
+## Arquivos a Modificar
 
-### Modo claro (`:root`)
-- `--destructive`: trocar de `oklch(0.5783 0.2301 28.5639)` (vermelho) para `oklch(0.4500 0.1280 150.4756)` (verde escuro, variacao do primary para manter contraste)
+### `src/main.tsx`
+- Envolver `<App />` com `<AuthProvider>` (acima do Router para estar disponivel em toda a arvore)
 
-### Modo escuro (`.dark`)
-- `--secondary`: trocar de `oklch(0.3403 0.1182 25.1469)` (vermelho escuro) para `oklch(0.3403 0.1000 150.4756)` (verde escuro)
-- `--accent`: trocar de `oklch(0.3403 0.1182 25.1469)` para `oklch(0.3403 0.1000 150.4756)`
-- `--destructive`: trocar de `oklch(0.3403 0.1182 25.1469)` para `oklch(0.3403 0.1000 150.4756)`
-- `--sidebar-accent`: trocar de `oklch(0.3403 0.1182 25.1469)` para `oklch(0.3403 0.1000 150.4756)`
+### `src/App.tsx`
+- Mover `<AuthProvider>` para dentro do `<BrowserRouter>` (alternativa) ou manter em `main.tsx` fora do Router
+- Como `signOut` no contexto nao precisa de `navigate`, o provider pode ficar em `main.tsx`
 
-Isso corrige o fundo vermelho do item ativo na sidebar (visivel no screenshot).
+### `src/components/AuthGuard.tsx`
+- Substituir toda a logica local de `useState` + `useEffect` + `supabase.auth` por `useAuth()`
+- Se `isLoading` -> loader
+- Se `!user` -> redirect `/login`
+- Codigo resultante fica com ~15 linhas
 
----
+### `src/pages/Login.tsx`
+- Substituir `supabase.auth.signInWithPassword` por `useAuth().signInWithPassword`
+- Remover import do `supabase`
 
-## 2. Classes hardcoded `red-*` nos componentes
+### `src/components/AppSidebar.tsx`
+- Substituir `supabase.auth.signOut()` por `useAuth().signOut()`
+- Remover import do `supabase`
 
-### `src/components/clientes/CertificadoA1Section.tsx`
-- Badge "Vencido": trocar `bg-red-500/15 text-red-600 border-red-500/30` por classes usando o verde primario (ex: `bg-primary/15 text-primary border-primary/30`) ou manter um tom diferenciado para status negativo usando `amber` em vez de vermelho.
+### Arquivos NAO alterados (por ora)
+- `Signup.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx` - sao paginas publicas que usam chamadas one-shot ao Supabase Auth. Podem continuar usando `supabase` diretamente sem problema, pois nao dependem do estado de sessao.
 
-### `src/pages/CertificadosA1.tsx`
-- Badge "vencido": trocar `bg-red-500/15 text-red-600 border-red-500/30` por `bg-primary/15 text-primary border-primary/30`
-- KPI "Vencidos": trocar `text-red-600` por `text-primary`
+## Fluxo Resultante
 
-### `src/components/clientes/EspelhoFinanceiro.tsx`
-- Valores negativos/custos: trocar classes `red-*` por equivalentes usando `primary` ou um tom de verde mais escuro para diferenciar
+```text
+main.tsx
+  AuthProvider          <- getSession + onAuthStateChange
+    App
+      BrowserRouter
+        Routes
+          /login        <- useAuth().signInWithPassword
+          AuthGuard     <- useAuth().user / isLoading
+            AppLayout
+              Sidebar   <- useAuth().signOut
+              Outlet
+```
 
-### `src/components/ui/toast.tsx`
-- Classes `group-[.destructive]:text-red-300`, `group-[.destructive]:hover:text-red-50`, etc.: trocar para equivalentes verdes (`green-300`, `green-50`, `green-400`, `green-600`)
-
----
-
-## 3. Memoria de estilo
-
-Atualizar a diretriz de identidade visual para registrar que o sistema nao usa vermelho - o padrao e verde primario para todas as acoes, incluindo destructive/alertas.
-
----
-
-## Arquivos modificados
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/index.css` | Atualizar variaveis destructive, secondary dark, accent dark, sidebar-accent dark |
-| `src/components/clientes/CertificadoA1Section.tsx` | Trocar classes red por green/primary |
-| `src/pages/CertificadosA1.tsx` | Trocar classes red por green/primary |
-| `src/components/clientes/EspelhoFinanceiro.tsx` | Trocar classes red por green/primary |
-| `src/components/ui/toast.tsx` | Trocar classes red por green |
-
+## Criterios Atendidos
+- Refresh mantem sessao sem piscar para login (session recuperada antes de renderizar)
+- Rotas protegidas usam estado centralizado via `useAuth()`
+- Nenhum componente referencia `AuthContext` inexistente
+- Zero dependencia de Lovable Cloud auth
