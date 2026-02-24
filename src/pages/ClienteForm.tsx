@@ -319,7 +319,7 @@ export default function ClienteForm() {
           clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
           mensalidadeBase={form.watch("mensalidade") ?? 0}
           custoBase={form.watch("custo_operacao") ?? 0}
-          funcionarios={(lookups.funcionarios.data ?? []).filter((f: any) => f.ativo).map((f: any) => ({ id: f.id, nome: f.nome }))}
+          funcionarios={(lookups.funcionarios.data ?? []).map((f: any) => ({ id: f.id, nome: f.nome }))}
         />
       )}
     </div>
