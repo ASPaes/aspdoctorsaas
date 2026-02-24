@@ -12,6 +12,7 @@ interface Props {
   funcionarios: { id: number; nome: string }[];
   produtos: { id: number; nome: string }[];
   fornecedores: { id: number; nome: string; site: string | null }[];
+  origensVenda: { id: number; nome: string }[];
 }
 
 const RECORRENCIA_OPTIONS = [
@@ -21,7 +22,7 @@ const RECORRENCIA_OPTIONS = [
   { value: "semanal", label: "Semanal" },
 ];
 
-export default function VendaProdutoTab({ form, funcionarios = [], produtos = [], fornecedores = [] }: Props) {
+export default function VendaProdutoTab({ form, funcionarios = [], produtos = [], fornecedores = [], origensVenda = [] }: Props) {
   const linkFornecedor = form.watch("link_portal_fornecedor");
 
   return (
@@ -38,10 +39,17 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
             </FormItem>
           )} />
 
-          <FormField control={form.control} name="origem_venda" render={({ field }) => (
+          <FormField control={form.control} name="origem_venda_id" render={({ field }) => (
             <FormItem>
               <FormLabel>Origem da Venda</FormLabel>
-              <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+              <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {origensVenda.map((o) => (
+                    <SelectItem key={o.id} value={o.id.toString()}>{o.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )} />

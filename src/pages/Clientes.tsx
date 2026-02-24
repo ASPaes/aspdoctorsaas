@@ -97,7 +97,7 @@ export default function Clientes() {
   const [recorrenciaAdv, setRecorrenciaAdv] = useState("");
   const [modeloContratoId, setModeloContratoId] = useState("");
   const [produtoId, setProdutoId] = useState("");
-  const [fornecedorId, setFornecedorId] = useState("");
+  const [origemVendaId, setOrigemVendaId] = useState("");
 
   const [estadoId, setEstadoId] = useState<number | null>(null);
   const [cidadeId, setCidadeId] = useState("");
@@ -122,10 +122,10 @@ export default function Clientes() {
   // Build query key from all filters
   const filterKey = useMemo(() => ({
     debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
-    recorrenciaAdv, modeloContratoId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
+    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir,
   }), [debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
-    recorrenciaAdv, modeloContratoId, produtoId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId,
+    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
 
   const { data: clientes, isLoading } = useQuery({
@@ -162,7 +162,7 @@ export default function Clientes() {
       // Lookups
       if (modeloContratoId) q = q.eq("modelo_contrato_id", Number(modeloContratoId));
       if (produtoId) q = q.eq("produto_id", Number(produtoId));
-      if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
+      if (origemVendaId) q = q.eq("origem_venda_id", Number(origemVendaId));
       if (estadoId) q = q.eq("estado_id", estadoId);
       if (cidadeId) q = q.eq("cidade_id", Number(cidadeId));
       if (motivoCancelamentoId) q = q.eq("motivo_cancelamento_id", Number(motivoCancelamentoId));
@@ -237,7 +237,7 @@ export default function Clientes() {
 
   const clearFilters = () => {
     setPeriodoCadastro({}); setPeriodoCancelamento({}); setPeriodoVenda({}); setPeriodoAtivacao({});
-    setRecorrenciaAdv(""); setModeloContratoId(""); setProdutoId(""); setFornecedorId("");
+    setRecorrenciaAdv(""); setModeloContratoId(""); setProdutoId(""); setOrigemVendaId("");
     setEstadoId(null); setCidadeId(""); setMotivoCancelamentoId("");
     setMensalidadeMin(""); setMensalidadeMax("");
     setLucroMin(""); setLucroMax(""); setMargemMin(""); setMargemMax("");
@@ -377,11 +377,11 @@ export default function Clientes() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
-                <Select value={fornecedorId} onValueChange={setFornecedorId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <label className="text-xs font-medium text-muted-foreground">Origem da Venda</label>
+                <Select value={origemVendaId} onValueChange={setOrigemVendaId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
                   <SelectContent>
-                    {lookups.fornecedores.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                    {lookups.origensVenda.data?.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
