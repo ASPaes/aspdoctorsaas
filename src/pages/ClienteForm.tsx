@@ -274,6 +274,14 @@ export default function ClienteForm() {
             funcionarios={lookups.funcionarios.data ?? []}
           />
 
+          {/* Tickets CS (apenas em edição) */}
+          {isEditing && id && (
+            <ClienteTicketsSection
+              clienteId={id}
+              clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
+            />
+          )}
+
           {/* Card: Cancelamento */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -312,13 +320,6 @@ export default function ClienteForm() {
           </div>
         </form>
       </Form>
-
-      {isEditing && id && (
-        <ClienteTicketsSection
-          clienteId={id}
-          clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
-        />
-      )}
 
       {isEditing && id && (
         <MovimentosMrrModal
