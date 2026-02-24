@@ -57,6 +57,10 @@ const clienteSchema = z.object({
   cert_a1_vencimento: z.string().nullable(),
   cert_a1_ultima_venda_em: z.string().nullable(),
   cert_a1_ultimo_vendedor_id: z.number().nullable(),
+  contato_nome: z.string().nullable(),
+  contato_cpf: z.string().nullable(),
+  contato_fone: z.string().nullable(),
+  contato_aniversario: z.string().nullable(),
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
@@ -83,6 +87,7 @@ export default function ClienteForm() {
       custo_operacao: null, imposto_percentual: null, custo_fixo_percentual: null,
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
+      contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
     },
   });
 
@@ -143,13 +148,17 @@ export default function ClienteForm() {
         cert_a1_vencimento: (c as any).cert_a1_vencimento ?? null,
         cert_a1_ultima_venda_em: (c as any).cert_a1_ultima_venda_em ?? null,
         cert_a1_ultimo_vendedor_id: (c as any).cert_a1_ultimo_vendedor_id ?? null,
+        contato_nome: (c as any).contato_nome ?? null,
+        contato_cpf: (c as any).contato_cpf ?? null,
+        contato_fone: (c as any).contato_fone ?? null,
+        contato_aniversario: (c as any).contato_aniversario ?? null,
       });
     }
   }, [clienteQuery.data]);
 
   const mutation = useMutation({
     mutationFn: async (values: ClienteFormValues) => {
-      const payload = {
+      const payload: any = {
         ...values,
         email: values.email || null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
@@ -209,6 +218,7 @@ export default function ClienteForm() {
                 areasAtuacao={lookups.areasAtuacao.data ?? []}
                 segmentos={lookups.segmentos.data ?? []}
                 verticais={lookups.verticais.data ?? []}
+                clienteId={id}
               />
             </CardContent>
           </Card>
@@ -236,24 +246,23 @@ export default function ClienteForm() {
           </Card>
 
           {/* Card: Certificado A1 */}
-          {isEditing && (
-            <CertificadoA1Section
-              clienteId={id!}
-              vencimento={form.watch("cert_a1_vencimento") ?? null}
-              ultimaVendaEm={form.watch("cert_a1_ultima_venda_em") ?? null}
-              ultimoVendedorId={form.watch("cert_a1_ultimo_vendedor_id") ?? null}
-              onVencimentoChange={(v) => form.setValue("cert_a1_vencimento", v)}
-              onVendaRegistrada={async () => {
-                const { data } = await supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id!).single();
-                if (data) {
-                  form.setValue("cert_a1_vencimento", (data as any).cert_a1_vencimento ?? null);
-                  form.setValue("cert_a1_ultima_venda_em", (data as any).cert_a1_ultima_venda_em ?? null);
-                  form.setValue("cert_a1_ultimo_vendedor_id", (data as any).cert_a1_ultimo_vendedor_id ?? null);
-                }
-              }}
-              funcionarios={lookups.funcionarios.data ?? []}
-            />
-          )}
+          <CertificadoA1Section
+            clienteId={id}
+            vencimento={form.watch("cert_a1_vencimento") ?? null}
+            ultimaVendaEm={form.watch("cert_a1_ultima_venda_em") ?? null}
+            ultimoVendedorId={form.watch("cert_a1_ultimo_vendedor_id") ?? null}
+            onVencimentoChange={(v) => form.setValue("cert_a1_vencimento", v)}
+            onVendaRegistrada={async () => {
+              if (!id) return;
+              const { data } = await supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id).single();
+              if (data) {
+                form.setValue("cert_a1_vencimento", (data as any).cert_a1_vencimento ?? null);
+                form.setValue("cert_a1_ultima_venda_em", (data as any).cert_a1_ultima_venda_em ?? null);
+                form.setValue("cert_a1_ultimo_vendedor_id", (data as any).cert_a1_ultimo_vendedor_id ?? null);
+              }
+            }}
+            funcionarios={lookups.funcionarios.data ?? []}
+          />
 
           {/* Card: Cancelamento */}
           <Card>

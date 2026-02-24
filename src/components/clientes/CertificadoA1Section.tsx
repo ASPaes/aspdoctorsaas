@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
 interface Props {
-  clienteId: string;
+  clienteId?: string;
   vencimento: string | null;
   ultimaVendaEm: string | null;
   ultimoVendedorId: number | null;
@@ -148,61 +148,70 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
                 </Badge>
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Última Venda</label>
-              <p className="text-sm pt-2">
-                {ultimaVendaEm ? format(parseISO(ultimaVendaEm), "dd/MM/yyyy") : "—"}
-                {ultimaVendaEm && <span className="text-muted-foreground"> por {vendedorNome}</span>}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Registrar Venda
-            </Button>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h4 className="text-sm font-medium mb-2">Histórico de Vendas</h4>
-            {vendasLoading ? (
-              <Skeleton className="h-20 w-full" />
-            ) : !vendas || vendas.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma venda registrada.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Data</TableHead>
-                    <TableHead className="text-xs">Valor</TableHead>
-                    <TableHead className="text-xs">Vendedor</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
-                    <TableHead className="text-xs">Obs.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vendas.map((v: any) => (
-                    <TableRow key={v.id}>
-                      <TableCell className="text-xs">{format(parseISO(v.data_venda), "dd/MM/yyyy")}</TableCell>
-                      <TableCell className="text-xs">{v.valor_venda ? formatBRL.format(Number(v.valor_venda)) : "—"}</TableCell>
-                      <TableCell className="text-xs">{funcionarios.find((f) => f.id === v.vendedor_id)?.nome ?? "—"}</TableCell>
-                      <TableCell className="text-xs">
-                        {v.status === "perdido_terceiro" ? (
-                          <Badge variant="outline" className={badgeClasses.warning}>Perdido p/ terceiro</Badge>
-                        ) : (
-                          <Badge variant="outline" className={badgeClasses.success}>Ganho</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs max-w-[150px] truncate">{v.observacao || v.motivo_perda || "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            {clienteId && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Última Venda</label>
+                <p className="text-sm pt-2">
+                  {ultimaVendaEm ? format(parseISO(ultimaVendaEm), "dd/MM/yyyy") : "—"}
+                  {ultimaVendaEm && <span className="text-muted-foreground"> por {vendedorNome}</span>}
+                </p>
+              </div>
             )}
           </div>
+
+          {clienteId ? (
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Registrar Venda
+              </Button>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">Salve o cliente para registrar vendas de certificado.</p>
+          )}
+
+          {clienteId && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="text-sm font-medium mb-2">Histórico de Vendas</h4>
+                {vendasLoading ? (
+                  <Skeleton className="h-20 w-full" />
+                ) : !vendas || vendas.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma venda registrada.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Data</TableHead>
+                        <TableHead className="text-xs">Valor</TableHead>
+                        <TableHead className="text-xs">Vendedor</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs">Obs.</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {vendas.map((v: any) => (
+                        <TableRow key={v.id}>
+                          <TableCell className="text-xs">{format(parseISO(v.data_venda), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="text-xs">{v.valor_venda ? formatBRL.format(Number(v.valor_venda)) : "—"}</TableCell>
+                          <TableCell className="text-xs">{funcionarios.find((f) => f.id === v.vendedor_id)?.nome ?? "—"}</TableCell>
+                          <TableCell className="text-xs">
+                            {v.status === "perdido_terceiro" ? (
+                              <Badge variant="outline" className={badgeClasses.warning}>Perdido p/ terceiro</Badge>
+                            ) : (
+                              <Badge variant="outline" className={badgeClasses.success}>Ganho</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[150px] truncate">{v.observacao || v.motivo_perda || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

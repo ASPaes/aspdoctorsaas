@@ -119,6 +119,60 @@ export type Database = {
           },
         ]
       }
+      cliente_contatos: {
+        Row: {
+          aniversario: string | null
+          cargo: string | null
+          cliente_id: string
+          cpf: string | null
+          created_at: string
+          email: string | null
+          fone: string | null
+          id: string
+          nome: string
+          observacao: string | null
+        }
+        Insert: {
+          aniversario?: string | null
+          cargo?: string | null
+          cliente_id: string
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          fone?: string | null
+          id?: string
+          nome: string
+          observacao?: string | null
+        }
+        Update: {
+          aniversario?: string | null
+          cargo?: string | null
+          cliente_id?: string
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          fone?: string | null
+          id?: string
+          nome?: string
+          observacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_contatos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           area_atuacao_id: number | null
@@ -129,6 +183,10 @@ export type Database = {
           cidade_id: number | null
           cnpj: string | null
           codigo_fornecedor: string | null
+          contato_aniversario: string | null
+          contato_cpf: string | null
+          contato_fone: string | null
+          contato_nome: string | null
           created_at: string
           custo_fixo_percentual: number | null
           custo_operacao: number | null
@@ -171,6 +229,10 @@ export type Database = {
           cidade_id?: number | null
           cnpj?: string | null
           codigo_fornecedor?: string | null
+          contato_aniversario?: string | null
+          contato_cpf?: string | null
+          contato_fone?: string | null
+          contato_nome?: string | null
           created_at?: string
           custo_fixo_percentual?: number | null
           custo_operacao?: number | null
@@ -213,6 +275,10 @@ export type Database = {
           cidade_id?: number | null
           cnpj?: string | null
           codigo_fornecedor?: string | null
+          contato_aniversario?: string | null
+          contato_cpf?: string | null
+          contato_fone?: string | null
+          contato_nome?: string | null
           created_at?: string
           custo_fixo_percentual?: number | null
           custo_operacao?: number | null

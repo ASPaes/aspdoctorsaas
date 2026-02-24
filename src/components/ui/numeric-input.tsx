@@ -16,6 +16,7 @@ interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
   ({ className, value, onChange, decimals = 2, suffix, ...props }, ref) => {
     const [displayValue, setDisplayValue] = React.useState("");
+    const isFocused = React.useRef(false);
 
     // Format number to display string with comma
     const formatValue = React.useCallback(
@@ -26,10 +27,17 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
       [decimals]
     );
 
-    // Sync display when value changes externally
+    // Sync display when value changes externally (only when not focused)
     React.useEffect(() => {
-      setDisplayValue(formatValue(value));
+      if (!isFocused.current) {
+        setDisplayValue(formatValue(value));
+      }
     }, [value, formatValue]);
+
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      isFocused.current = true;
+      props.onFocus?.(e);
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let raw = e.target.value;
@@ -63,6 +71,7 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      isFocused.current = false;
       // Re-format on blur
       if (value !== null && value !== undefined) {
         setDisplayValue(formatValue(value));
@@ -79,6 +88,7 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
           className={cn(suffix && "pr-8", className)}
           value={displayValue}
           onChange={handleChange}
+          onFocus={handleFocus}
           onBlur={handleBlur}
           {...props}
         />
