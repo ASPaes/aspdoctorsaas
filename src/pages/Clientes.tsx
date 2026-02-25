@@ -128,10 +128,18 @@ export default function Clientes() {
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
 
-  const { data: clientes, isLoading } = useQuery({
-    queryKey: ["clientes_lista", filterKey],
+  // Pagination
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [filterKey]);
+
+  const { data: queryResult, isLoading, isPlaceholderData } = useQuery({
+    queryKey: ["clientes_lista", filterKey, page],
     queryFn: async () => {
-      let q = supabase.from("vw_clientes_financeiro").select("id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id") as any;
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
+      let q = supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" }) as any;
 
       // Status
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -183,11 +191,20 @@ export default function Clientes() {
       // Sort
       q = q.order(sortField, { ascending: sortDir === "asc" });
 
-      const { data, error } = await q;
+      // Pagination
+      const from = page * PAGE_SIZE;
+      q = q.range(from, from + PAGE_SIZE - 1);
+
+      const { data, error, count } = await q;
       if (error) throw error;
-      return data;
+      return { rows: data as any[], totalCount: count as number };
     },
+    placeholderData: (prev) => prev, // keep previous data while loading next page
   });
+
+  const clientes = queryResult?.rows ?? [];
+  const totalCount = queryResult?.totalCount ?? 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   // Lookup maps for display
   const produtoMap = useMemo(() => {
@@ -203,8 +220,8 @@ export default function Clientes() {
   }, [lookups.unidadesBase.data]);
 
   const kpis = useMemo(() => {
-    const list = clientes ?? [];
-    const qtdClientes = list.length;
+    const list = clientes;
+    const qtdClientes = totalCount;
 
     const comMensalidade = list.filter((c) => c.mensalidade != null && Number(c.mensalidade) > 0);
     const ticketMedio = comMensalidade.length > 0
@@ -221,7 +238,7 @@ export default function Clientes() {
     }).length;
 
     return { qtdClientes, ticketMedio, clientesNovosMes };
-  }, [clientes]);
+  }, [clientes, totalCount]);
 
   const formatCurrency = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
 
@@ -495,6 +512,23 @@ export default function Clientes() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-sm text-muted-foreground">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount}
+          </p>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              Anterior
+            </Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

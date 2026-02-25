@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function useLookups(estadoId?: number | null) {
   const estados = useQuery({
     queryKey: ["estados"],
+    staleTime: 30 * 60 * 1000, // 30 min – lookup data rarely changes
     queryFn: async () => {
       const { data, error } = await supabase
         .from("estados")
@@ -16,6 +17,7 @@ export function useLookups(estadoId?: number | null) {
 
   const cidades = useQuery({
     queryKey: ["cidades", estadoId],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       if (!estadoId) return [];
       const { data, error } = await supabase
@@ -31,6 +33,7 @@ export function useLookups(estadoId?: number | null) {
 
   const areasAtuacao = useQuery({
     queryKey: ["areas_atuacao"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("areas_atuacao").select("id, nome").order("nome");
       if (error) throw error;
@@ -40,6 +43,7 @@ export function useLookups(estadoId?: number | null) {
 
   const segmentos = useQuery({
     queryKey: ["segmentos"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("segmentos").select("id, nome").order("nome");
       if (error) throw error;
@@ -49,6 +53,7 @@ export function useLookups(estadoId?: number | null) {
 
   const modelosContrato = useQuery({
     queryKey: ["modelos_contrato"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("modelos_contrato").select("id, nome").order("nome");
       if (error) throw error;
@@ -58,6 +63,7 @@ export function useLookups(estadoId?: number | null) {
 
   const funcionarios = useQuery({
     queryKey: ["funcionarios_ativos"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("funcionarios")
@@ -71,6 +77,7 @@ export function useLookups(estadoId?: number | null) {
 
   const produtos = useQuery({
     queryKey: ["produtos"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("produtos").select("id, nome").order("nome");
       if (error) throw error;
@@ -80,6 +87,7 @@ export function useLookups(estadoId?: number | null) {
 
   const formasPagamento = useQuery({
     queryKey: ["formas_pagamento"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("formas_pagamento").select("id, nome").order("nome");
       if (error) throw error;
@@ -89,6 +97,7 @@ export function useLookups(estadoId?: number | null) {
 
   const motivosCancelamento = useQuery({
     queryKey: ["motivos_cancelamento"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("motivos_cancelamento").select("id, descricao").order("descricao");
       if (error) throw error;
@@ -98,6 +107,7 @@ export function useLookups(estadoId?: number | null) {
 
   const configuracoes = useQuery({
     queryKey: ["configuracoes"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("configuracoes").select("*").limit(1).single();
       if (error) throw error;
@@ -107,6 +117,7 @@ export function useLookups(estadoId?: number | null) {
 
   const origensVenda = useQuery({
     queryKey: ["origens_venda"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("origens_venda").select("id, nome").order("nome");
       if (error) throw error;
@@ -116,6 +127,7 @@ export function useLookups(estadoId?: number | null) {
 
   const fornecedores = useQuery({
     queryKey: ["fornecedores"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("fornecedores").select("id, nome, site").order("nome");
       if (error) throw error;
@@ -125,6 +137,7 @@ export function useLookups(estadoId?: number | null) {
 
   const unidadesBase = useQuery({
     queryKey: ["unidades_base"],
+    staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase.from("unidades_base").select("id, nome").order("nome");
       if (error) throw error;
