@@ -141,7 +141,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   return (
     <div className="space-y-6">
       {/* ── Dados Cadastrais ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {/* Linha 1: Data Cadastro | Unidade Base | CNPJ */}
         <FormField control={form.control} name="data_cadastro" render={({ field }) => (
           <FormItem>
@@ -184,7 +184,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
 
         {/* Linha 2: Razão Social (2 cols) | Nome Fantasia (1 col) */}
-        <div className="md:col-span-2">
+        <div className="sm:col-span-2">
           <FormField control={form.control} name="razao_social" render={({ field }) => (
             <FormItem>
               <FormLabel>Razão Social</FormLabel>
@@ -203,7 +203,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
 
         {/* Linha 3: Email (col-span-2) | Telefone Contato */}
-        <div className="md:col-span-2">
+        <div className="sm:col-span-2">
           <FormField control={form.control} name="email" render={({ field }) => (
             <FormItem>
               <FormLabel>Email</FormLabel>
@@ -286,7 +286,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
 
         {/* Linha 5: Observação (full width) */}
-        <div className="md:col-span-3">
+        <div className="sm:col-span-2 md:col-span-3">
           <FormField control={form.control} name="observacao_cliente" render={({ field }) => (
             <FormItem>
               <FormLabel>Observação do Cliente</FormLabel>
@@ -300,7 +300,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       {/* ── Endereço ── */}
       <Separator />
       <h3 className="text-sm font-semibold">Endereço</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {/* Linha 1: CEP | Estado | Cidade */}
         <FormField control={form.control} name="cep" render={({ field }) => (
           <FormItem>

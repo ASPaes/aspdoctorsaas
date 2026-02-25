@@ -31,7 +31,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
       {/* SubCard: Informações do Contrato */}
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações do Contrato</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* Linha 1: Data Venda | Origem Venda | Modelo de Contrato */}
           <FormField control={form.control} name="data_venda" render={({ field }) => (
             <FormItem>
@@ -107,7 +107,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
       {/* SubCard: Informações do Produto */}
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações do Produto</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* Linha 1: Data Ativação | Fornecedor | Código Fornecedor */}
           <FormField control={form.control} name="data_ativacao" render={({ field }) => (
             <FormItem>
@@ -141,7 +141,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
           )} />
 
           {/* Linha 2: Link Portal Fornecedor (col-span-2) | Produto */}
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <FormField control={form.control} name="link_portal_fornecedor" render={({ field }) => (
               <FormItem>
                 <FormLabel>Link Portal Fornecedor</FormLabel>
