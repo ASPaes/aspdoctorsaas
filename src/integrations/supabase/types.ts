@@ -1604,6 +1604,17 @@ export type Database = {
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
+      get_tenant_users_with_email: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          is_super_admin: boolean
+          role: string
+          status: string
+          user_id: string
+        }[]
+      }
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
