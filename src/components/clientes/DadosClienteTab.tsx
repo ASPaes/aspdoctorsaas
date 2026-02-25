@@ -133,23 +133,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     }
   }, [estados, form, toast]);
 
-  const openWhatsApp = () => {
-    const digits = (whatsappValue ?? "").replace(/\D/g, "");
-    if (digits) {
-      const url = `https://wa.me/55${digits}`;
-      const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-      if (!newWindow) {
-        // Fallback: create a temporary link
-        const a = document.createElement("a");
-        a.href = url;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-    }
-  };
+  const whatsappDigits = (whatsappValue ?? "").replace(/\D/g, "");
+  const whatsappHref = whatsappDigits ? `https://api.whatsapp.com/send?phone=55${whatsappDigits}` : null;
+  const whatsappTarget =
+    typeof window !== "undefined" && window.self !== window.top ? "_top" : "_blank";
 
   return (
     <div className="space-y-6">
@@ -252,15 +239,16 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
                   onChange={(e) => field.onChange(maskPhone(e.target.value))}
                 />
               </FormControl>
-              {whatsappValue && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0"
-                  onClick={openWhatsApp}
-                >
-                  <MessageCircle className="h-4 w-4" />
+              {whatsappHref && (
+                <Button type="button" variant="outline" size="icon" className="shrink-0" asChild>
+                  <a
+                    href={whatsappHref}
+                    target={whatsappTarget}
+                    rel="noopener noreferrer"
+                    aria-label="Abrir conversa no WhatsApp"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </a>
                 </Button>
               )}
             </div>
