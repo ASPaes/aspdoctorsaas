@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export interface TenantProfile {
   user_id: string;
+  email: string;
   tenant_id: string;
   role: string;
   status: string;
@@ -54,13 +55,9 @@ export function useTenantUsers() {
     enabled: !!profile?.tenant_id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, tenant_id, role, status, is_super_admin, created_at")
-        .eq("tenant_id", profile!.tenant_id)
-        .order("created_at", { ascending: true })
-        .limit(50);
+        .rpc("get_tenant_users_with_email", { p_tenant_id: profile!.tenant_id });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as TenantProfile[];
     },
   });
 }

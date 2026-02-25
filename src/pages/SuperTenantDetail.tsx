@@ -48,7 +48,7 @@ export default function SuperTenantDetail() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User ID</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Super Admin</TableHead>
@@ -58,7 +58,7 @@ export default function SuperTenantDetail() {
             <TableBody>
               {users.map((u: any) => (
                 <TableRow key={u.user_id}>
-                  <TableCell className="font-mono text-xs max-w-[200px] truncate">{u.user_id}</TableCell>
+                  <TableCell className="text-sm">{u.email ?? u.user_id}</TableCell>
                   <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
                   <TableCell><Badge variant={u.status === "ativo" ? "default" : "secondary"}>{u.status}</Badge></TableCell>
                   <TableCell>{u.is_super_admin ? "✓" : "—"}</TableCell>

@@ -50,12 +50,7 @@ export function useSuperTenantDetail(tenantId: string | undefined) {
     queryFn: async () => {
       const [tenantRes, usersRes, invitesRes] = await Promise.all([
         supabase.from("tenants").select("*").eq("id", tenantId!).single(),
-        supabase
-          .from("profiles")
-          .select("user_id, tenant_id, role, status, is_super_admin, created_at")
-          .eq("tenant_id", tenantId!)
-          .order("created_at")
-          .limit(50),
+        supabase.rpc("get_tenant_users_with_email", { p_tenant_id: tenantId! }),
         supabase
           .from("invites")
           .select("*")

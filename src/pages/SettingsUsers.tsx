@@ -113,7 +113,7 @@ export default function SettingsUsers() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User ID</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
@@ -122,7 +122,7 @@ export default function SettingsUsers() {
             <TableBody>
               {users.map((u) => (
                 <TableRow key={u.user_id}>
-                  <TableCell className="font-mono text-xs max-w-[200px] truncate">{u.user_id}</TableCell>
+                  <TableCell className="text-sm">{u.email ?? u.user_id}</TableCell>
                   <TableCell>
                     <Select
                       value={u.role}
