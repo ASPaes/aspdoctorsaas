@@ -1,83 +1,98 @@
 
 
-# Plano: Reorganizar Campos + Consulta CNPJ + Correcoes
+# Plano: ID Sequencial + Controle Matriz/Filial
 
-## Resumo das mudancas
+## Resumo
 
-1. **Mover Segmento para ao lado de Area de Atuacao** -- Segmento sai da linha 1 e vai para a linha 4 (junto com Area de Atuacao)
-2. **Colocar CNPJ na posicao do Segmento (linha 1)** -- Linha 1 fica: Data Cadastro | Unidade Base | CNPJ (com consulta automatica)
-3. **Consulta CNPJ via BrasilAPI** -- Ao digitar 14 digitos de CNPJ, consultar `https://brasilapi.com.br/api/cnpj/v1/{cnpj}` e preencher automaticamente: razao_social, nome_fantasia, email, telefone_contato, cep (que dispara auto-fill de endereco), endereco, numero, bairro, estado, cidade
-4. **Corrigir dado errado no campo codigo_fornecedor** -- O cliente `3f4abc08` tem o valor `88502-160` (um CEP) gravado no campo `codigo_fornecedor`. Sera corrigido via migration SQL
-5. **Nao alterar ordem dos campos** -- Apenas tamanhos podem ser ajustados
+Adicionar um ID sequencial visivel na tela e um campo de vinculo matriz/filial que busca clientes pelo `codigo_fornecedor` e armazena o `id` (UUID) da matriz.
 
-## Layout final do DadosClienteTab
-
-```text
-Linha 1 (3 cols): Data Cadastro | Unidade Base | CNPJ (com loader de consulta)
-Linha 2 (3 cols): Razao Social (col-span-2) | Nome Fantasia
-Linha 3 (3 cols): Email (col-span-2) | Telefone Contato
-Linha 4 (3 cols): Telefone WhatsApp [+btn] | Area de Atuacao | Segmento
-Linha 5 (full):   Observacao do Cliente
-
---- Separator ---
-Endereco (sem mudancas)
---- Separator ---
-Contato Principal (sem mudancas)
-```
-
-## Detalhes tecnicos
-
-### 1. Migration SQL -- Corrigir dado errado
+## 1. Migration SQL -- Duas novas colunas na tabela `clientes`
 
 ```sql
-UPDATE clientes 
-SET codigo_fornecedor = NULL 
-WHERE id = '3f4abc08-2dc1-4481-a3b0-a011a9816162' 
-  AND codigo_fornecedor = '88502-160';
+-- ID sequencial auto-incremento, visivel na tela
+ALTER TABLE clientes ADD COLUMN codigo_sequencial serial;
+
+-- Referencia a matriz (self-referencing FK)
+ALTER TABLE clientes ADD COLUMN matriz_id uuid REFERENCES clientes(id);
 ```
 
-### 2. `src/components/clientes/DadosClienteTab.tsx`
+O `codigo_sequencial` sera gerado automaticamente para novos registros. Para registros existentes, sera preenchido com valores sequenciais automaticamente pelo tipo `serial`.
 
-- Adicionar estado `cnpjLoading` para indicar consulta em andamento
-- Criar funcao `handleCnpjChange(maskedValue)`:
-  - Aplica mascara CNPJ
-  - Quando tiver 14 digitos, chama `https://brasilapi.com.br/api/cnpj/v1/{digits}`
-  - Preenche campos: `razao_social`, `nome_fantasia`, `email`, `telefone_contato`, `cep` (e dispara `handleCepChange` para auto-fill do endereco), `endereco`, `numero`, `bairro`
-  - Busca estado pela UF retornada e cidade pelo nome retornado
-- Reorganizar grid:
-  - Linha 1: Data Cadastro | Unidade Base | CNPJ (movido da linha 3 para ca)
-  - Linha 2: Razao Social (col-span-2) | Nome Fantasia (sem mudanca)
-  - Linha 3: Email (col-span-2) | Telefone Contato (CNPJ saiu daqui)
-  - Linha 4: Telefone WhatsApp [+btn] | Area de Atuacao | Segmento (movido da linha 1 para ca)
-  - Linha 5: Observacao (full width, sem mudanca)
+## 2. Alteracoes no schema do formulario (`ClienteForm.tsx`)
 
-### 3. API BrasilAPI -- Campos retornados
+- Adicionar `matriz_id: z.string().nullable()` ao `clienteSchema`
+- Adicionar `matriz_id: null` nos `defaultValues`
+- Mapear no `form.reset()`: `matriz_id: c.matriz_id ?? null`
+- Carregar `codigo_sequencial` do cliente (query existente ja traz `select("*")`)
+- Exibir `codigo_sequencial` como campo read-only no header ou no card
 
-A BrasilAPI (`https://brasilapi.com.br/api/cnpj/v1/{cnpj}`) retorna:
-- `razao_social` -> campo razao_social
-- `nome_fantasia` -> campo nome_fantasia  
-- `email` -> campo email
-- `ddd_telefone_1` -> campo telefone_contato (formatar com mascara)
-- `cep` -> campo cep (dispara handleCepChange para auto-fill completo)
-- `logradouro` -> campo endereco
-- `numero` -> campo numero
-- `bairro` -> campo bairro
-- `uf` -> buscar estado_id
-- `municipio` -> buscar cidade_id
+## 3. Alteracoes no layout (`DadosClienteTab.tsx`)
 
-E uma API publica, gratuita, com CORS habilitado -- pode ser chamada diretamente do frontend.
+### Campo "Codigo Sequencial" (read-only)
+- Exibido na **Linha 1**, que passara a ter 4 colunas: `Cod. Seq. | Data Cadastro | Unidade Base | CNPJ`
+- Campo somente leitura, com fundo cinza, mostrando o numero sequencial
+- Em clientes novos (antes de salvar), mostra "Auto" ou fica vazio
 
-### 4. Verificacao de outros campos
+### Campo "Matriz" (busca por codigo_fornecedor)
+- Posicionado na **Linha 2**, antes da Razao Social: `Matriz | Razao Social (col-span-2)`
+- Grid de 3 colunas mantido
+- Funcionamento:
+  - Input de texto onde o usuario digita o `codigo_fornecedor` da matriz
+  - Ao digitar (com debounce), busca na tabela `clientes` por `codigo_fornecedor` igual ao valor digitado
+  - Ao encontrar, exibe o nome da matriz abaixo do campo (ou como tooltip/badge) e armazena o `id` no campo `matriz_id`
+  - Se nao encontrar, exibe mensagem "Nenhum cliente com este codigo"
+  - Botao "X" para limpar o vinculo
 
-Alem do `codigo_fornecedor`, verifiquei:
-- Todos os mapeamentos de campos no `form.reset()` estao corretos
-- Os campos de endereco (cep, endereco, numero, bairro) estao mapeados corretamente
-- Nenhum outro campo apresenta cruzamento de dados
+### Layout final
+
+```text
+Linha 1 (4 cols): Cod.Seq (read-only) | Data Cadastro | Unidade Base | CNPJ
+Linha 2 (3 cols): Matriz (busca por cod.fornecedor) | Razao Social (col-span-2)
+Linha 3 (3 cols): Nome Fantasia | Email (col-span-2) -- ajuste para manter 3 cols
+Linha 4 (3 cols): Telefone Contato | Telefone WhatsApp [+btn] | Area Atuacao
+Linha 5 (3 cols): Segmento | Observacao (col-span-2)
+```
+
+**Nota**: A ordem dos campos existentes sera mantida, apenas o grid sera reorganizado para acomodar os 2 novos campos. Se preferir manter o layout exatamente como esta e apenas adicionar os campos em linhas novas, posso ajustar.
+
+## 4. Props adicionais no DadosClienteTab
+
+- `codigoSequencial?: number | null` -- recebido do `ClienteForm` para exibicao
+- O campo `matriz_id` ja esta no form, entao a busca e feita diretamente no componente
+
+## 5. Logica de busca da matriz
+
+```typescript
+// Dentro de DadosClienteTab
+const handleMatrizSearch = async (codigoFornecedor: string) => {
+  if (!codigoFornecedor.trim()) {
+    form.setValue("matriz_id", null);
+    setMatrizNome(null);
+    return;
+  }
+  const { data } = await supabase
+    .from("clientes")
+    .select("id, razao_social, nome_fantasia")
+    .eq("codigo_fornecedor", codigoFornecedor.trim())
+    .limit(1)
+    .single();
+  if (data) {
+    form.setValue("matriz_id", data.id);
+    setMatrizNome(data.razao_social || data.nome_fantasia || "");
+  } else {
+    form.setValue("matriz_id", null);
+    setMatrizNome(null);
+  }
+};
+```
+
+Ao carregar um cliente existente com `matriz_id` preenchido, faz-se uma query reversa para buscar o `codigo_fornecedor` da matriz e exibir no campo.
 
 ## Arquivos modificados
 
 | Arquivo | Mudanca |
 |---|---|
-| Migration SQL | Corrigir codigo_fornecedor com valor de CEP |
-| `src/components/clientes/DadosClienteTab.tsx` | Mover CNPJ para linha 1, Segmento para linha 4 (ao lado de Area Atuacao); adicionar consulta CNPJ via BrasilAPI; adicionar loader no CNPJ |
+| Migration SQL | `ADD COLUMN codigo_sequencial serial` + `ADD COLUMN matriz_id uuid REFERENCES clientes(id)` |
+| `src/pages/ClienteForm.tsx` | Adicionar `matriz_id` no schema/defaults/reset; passar `codigoSequencial` ao DadosClienteTab |
+| `src/components/clientes/DadosClienteTab.tsx` | Adicionar campos Cod.Seq (read-only) e Matriz (busca); reorganizar grid |
 
