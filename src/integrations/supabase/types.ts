@@ -185,6 +185,7 @@ export type Database = {
           cidade_id: number | null
           cnpj: string | null
           codigo_fornecedor: string | null
+          codigo_sequencial: number
           contato_aniversario: string | null
           contato_cpf: string | null
           contato_fone: string | null
@@ -206,6 +207,7 @@ export type Database = {
           id: string
           imposto_percentual: number | null
           link_portal_fornecedor: string | null
+          matriz_id: string | null
           mensalidade: number | null
           modelo_contrato_id: number | null
           motivo_cancelamento_id: number | null
@@ -236,6 +238,7 @@ export type Database = {
           cidade_id?: number | null
           cnpj?: string | null
           codigo_fornecedor?: string | null
+          codigo_sequencial?: number
           contato_aniversario?: string | null
           contato_cpf?: string | null
           contato_fone?: string | null
@@ -257,6 +260,7 @@ export type Database = {
           id?: string
           imposto_percentual?: number | null
           link_portal_fornecedor?: string | null
+          matriz_id?: string | null
           mensalidade?: number | null
           modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
@@ -287,6 +291,7 @@ export type Database = {
           cidade_id?: number | null
           cnpj?: string | null
           codigo_fornecedor?: string | null
+          codigo_sequencial?: number
           contato_aniversario?: string | null
           contato_cpf?: string | null
           contato_fone?: string | null
@@ -308,6 +313,7 @@ export type Database = {
           id?: string
           imposto_percentual?: number | null
           link_portal_fornecedor?: string | null
+          matriz_id?: string | null
           mensalidade?: number | null
           modelo_contrato_id?: number | null
           motivo_cancelamento_id?: number | null
@@ -382,6 +388,20 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_matriz_id_fkey"
+            columns: ["matriz_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_matriz_id_fkey"
+            columns: ["matriz_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
             referencedColumns: ["id"]
           },
           {
