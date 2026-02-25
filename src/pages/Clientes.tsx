@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus } from "lucide-react";
 
-type SortField = "razao_social" | "nome_fantasia" | "cnpj" | "produto_id" | "recorrencia" | "mensalidade" | "cancelado";
+type SortField = "codigo_sequencial" | "razao_social" | "nome_fantasia" | "cnpj" | "produto_id" | "mensalidade" | "cancelado";
 type SortDir = "asc" | "desc";
 
 interface DateRange {
@@ -131,7 +131,7 @@ export default function Clientes() {
   const { data: clientes, isLoading } = useQuery({
     queryKey: ["clientes_lista", filterKey],
     queryFn: async () => {
-      let q = supabase.from("vw_clientes_financeiro").select("id, razao_social, nome_fantasia, cnpj, produto_id, recorrencia, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id") as any;
+      let q = supabase.from("vw_clientes_financeiro").select("id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id") as any;
 
       // Status
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -140,7 +140,12 @@ export default function Clientes() {
       // Text search
       if (debouncedSearch) {
         const s = `%${debouncedSearch}%`;
-        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s}`);
+        const isNumeric = /^\d+$/.test(debouncedSearch.trim());
+        if (isNumeric) {
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
+        } else {
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s}`);
+        }
       }
 
       // Quick unidade base
@@ -230,9 +235,9 @@ export default function Clientes() {
     return sortDir === "asc" ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />;
   };
 
-  const recorrenciaLabel = (v: string | null) => {
-    if (!v) return "—";
-    return v.charAt(0).toUpperCase() + v.slice(1);
+  const recorrenciaLabel = (_v: string | null) => {
+    // kept for potential future use
+    return "";
   };
 
   const clearFilters = () => {
@@ -293,7 +298,7 @@ export default function Clientes() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por ID, razão social, fantasia, CNPJ..."
+            placeholder="Buscar por Cód. Seq., razão social, fantasia, CNPJ..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="pl-9"
@@ -434,11 +439,11 @@ export default function Clientes() {
           <TableHeader>
             <TableRow>
               {([
+                ["codigo_sequencial", "Cód. Seq."],
                 ["razao_social", "Razão Social"],
                 ["nome_fantasia", "Nome Fantasia"],
                 ["cnpj", "CNPJ"],
                 ["produto_id", "Produto"],
-                ["recorrencia", "Recorrência"],
                 ["mensalidade", "Mensalidade"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
@@ -470,11 +475,11 @@ export default function Clientes() {
             ) : (
               clientes.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/clientes/${c.id}`)}>
+                  <TableCell className="font-mono text-xs">{c.codigo_sequencial ?? "—"}</TableCell>
                   <TableCell className="font-medium">{c.razao_social || "—"}</TableCell>
                   <TableCell>{c.nome_fantasia || "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{c.cnpj || "—"}</TableCell>
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
-                  <TableCell>{recorrenciaLabel(c.recorrencia)}</TableCell>
                   <TableCell>{c.mensalidade != null ? `R$ ${Number(c.mensalidade).toFixed(2)}` : "—"}</TableCell>
                   <TableCell>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
