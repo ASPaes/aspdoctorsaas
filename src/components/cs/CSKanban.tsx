@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { format, parseISO, isBefore, startOfToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,6 +94,7 @@ export function CSKanban({ onViewTicket, onEditTicket }: CSKanbanProps) {
   const [prioridadeFilter, setPrioridadeFilter] = useState<string>('__all__');
   const [showConcluidos, setShowConcluidos] = useState(false);
 
+  const queryClient = useQueryClient();
   const { data: funcionarios } = useFuncionariosAtivos();
   const { data: tickets, isLoading } = useCSTickets();
   const updateTicket = useUpdateCSTicket();
@@ -112,13 +115,47 @@ export function CSKanban({ onViewTicket, onEditTicket }: CSKanbanProps) {
     return grouped;
   }, [filteredTickets]);
 
-  const handleChangeStatus = async (ticketId: string, newStatus: CSTicketStatus) => {
-    await updateTicket.mutateAsync({ id: ticketId, status: newStatus, ...(newStatus === 'concluido' ? { concluido_em: new Date().toISOString() } : {}) });
+  const handleChangeStatus = async (ticketId: string, newStatus: CSTicketStatus, oldStatus?: CSTicketStatus) => {
+    const ticket = tickets?.find(t => t.id === ticketId);
+    const previousStatus = oldStatus || ticket?.status;
+
+    // Optimistic update
+    queryClient.setQueryData(['cs-tickets', undefined], (old: CSTicket[] | undefined) => {
+      if (!old) return old;
+      return old.map(t => t.id === ticketId ? { ...t, status: newStatus } : t);
+    });
+
+    const updates: Record<string, unknown> = { id: ticketId, status: newStatus };
+
+    if (ticket && !ticket.primeira_acao_em && previousStatus === 'aberto') {
+      updates.primeira_acao_em = new Date().toISOString();
+    }
+    if (newStatus === 'concluido' || newStatus === 'cancelado') {
+      updates.concluido_em = new Date().toISOString();
+    }
+
+    try {
+      await updateTicket.mutateAsync(updates as any);
+
+      // Registrar na timeline
+      if (previousStatus && previousStatus !== newStatus) {
+        await supabase.from('cs_ticket_updates').insert({
+          ticket_id: ticketId,
+          tipo: 'mudanca_status' as const,
+          conteudo: `Status alterado de "${CS_TICKET_STATUS_LABELS[previousStatus]}" para "${CS_TICKET_STATUS_LABELS[newStatus]}"`,
+          privado: false,
+        });
+      }
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ['cs-tickets'] });
+    }
   };
 
   const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination || (result.destination.droppableId === result.source.droppableId && result.destination.index === result.source.index)) return;
-    await handleChangeStatus(result.draggableId, result.destination.droppableId as CSTicketStatus);
+    if (!result.destination || result.destination.droppableId === result.source.droppableId) return;
+    const oldStatus = result.source.droppableId as CSTicketStatus;
+    const newStatus = result.destination.droppableId as CSTicketStatus;
+    await handleChangeStatus(result.draggableId, newStatus, oldStatus);
   };
 
   if (isLoading) {

@@ -760,12 +760,22 @@ export type Database = {
         Row: {
           assunto: string
           atualizado_em: string
+          avulsa_data_prevista: string | null
+          avulsa_data_realizada: string | null
+          avulsa_descricao: string | null
+          avulsa_movimento_id: string | null
+          avulsa_status: Database["public"]["Enums"]["cs_avulsa_status"] | null
+          avulsa_tipo: Database["public"]["Enums"]["cs_avulsa_tipo"] | null
+          avulsa_valor_previsto: number | null
+          avulsa_valor_realizado: number | null
           cliente_id: string | null
           concluido_em: string | null
           criado_em: string
           criado_por_id: number | null
+          criado_por_uid: string | null
           descricao_curta: string
           escalado: boolean
+          has_avulsa: boolean
           id: string
           impacto_categoria:
             | Database["public"]["Enums"]["cs_ticket_impacto"]
@@ -779,6 +789,7 @@ export type Database = {
           mrr_em_risco: number | null
           mrr_recuperado: number | null
           owner_id: number | null
+          owner_uid: string | null
           primeira_acao_em: string | null
           prioridade: Database["public"]["Enums"]["cs_ticket_prioridade"]
           prob_churn_percent: number | null
@@ -793,12 +804,22 @@ export type Database = {
         Insert: {
           assunto: string
           atualizado_em?: string
+          avulsa_data_prevista?: string | null
+          avulsa_data_realizada?: string | null
+          avulsa_descricao?: string | null
+          avulsa_movimento_id?: string | null
+          avulsa_status?: Database["public"]["Enums"]["cs_avulsa_status"] | null
+          avulsa_tipo?: Database["public"]["Enums"]["cs_avulsa_tipo"] | null
+          avulsa_valor_previsto?: number | null
+          avulsa_valor_realizado?: number | null
           cliente_id?: string | null
           concluido_em?: string | null
           criado_em?: string
           criado_por_id?: number | null
+          criado_por_uid?: string | null
           descricao_curta?: string
           escalado?: boolean
+          has_avulsa?: boolean
           id?: string
           impacto_categoria?:
             | Database["public"]["Enums"]["cs_ticket_impacto"]
@@ -812,6 +833,7 @@ export type Database = {
           mrr_em_risco?: number | null
           mrr_recuperado?: number | null
           owner_id?: number | null
+          owner_uid?: string | null
           primeira_acao_em?: string | null
           prioridade?: Database["public"]["Enums"]["cs_ticket_prioridade"]
           prob_churn_percent?: number | null
@@ -826,12 +848,22 @@ export type Database = {
         Update: {
           assunto?: string
           atualizado_em?: string
+          avulsa_data_prevista?: string | null
+          avulsa_data_realizada?: string | null
+          avulsa_descricao?: string | null
+          avulsa_movimento_id?: string | null
+          avulsa_status?: Database["public"]["Enums"]["cs_avulsa_status"] | null
+          avulsa_tipo?: Database["public"]["Enums"]["cs_avulsa_tipo"] | null
+          avulsa_valor_previsto?: number | null
+          avulsa_valor_realizado?: number | null
           cliente_id?: string | null
           concluido_em?: string | null
           criado_em?: string
           criado_por_id?: number | null
+          criado_por_uid?: string | null
           descricao_curta?: string
           escalado?: boolean
+          has_avulsa?: boolean
           id?: string
           impacto_categoria?:
             | Database["public"]["Enums"]["cs_ticket_impacto"]
@@ -845,6 +877,7 @@ export type Database = {
           mrr_em_risco?: number | null
           mrr_recuperado?: number | null
           owner_id?: number | null
+          owner_uid?: string | null
           primeira_acao_em?: string | null
           prioridade?: Database["public"]["Enums"]["cs_ticket_prioridade"]
           prob_churn_percent?: number | null
@@ -857,6 +890,13 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["cs_ticket_tipo"]
         }
         Relationships: [
+          {
+            foreignKeyName: "cs_tickets_avulsa_movimento_id_fkey"
+            columns: ["avulsa_movimento_id"]
+            isOneToOne: false
+            referencedRelation: "movimentos_mrr"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cs_tickets_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -1404,6 +1444,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      cs_avulsa_status: "previsto" | "confirmado" | "realizado" | "perdido"
+      cs_avulsa_tipo:
+        | "instalacao"
+        | "treinamento"
+        | "visita_tecnica"
+        | "migracao"
+        | "consultoria"
+        | "outro"
       cs_indicacao_status:
         | "recebida"
         | "contatada"
@@ -1565,6 +1613,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      cs_avulsa_status: ["previsto", "confirmado", "realizado", "perdido"],
+      cs_avulsa_tipo: [
+        "instalacao",
+        "treinamento",
+        "visita_tecnica",
+        "migracao",
+        "consultoria",
+        "outro",
+      ],
       cs_indicacao_status: [
         "recebida",
         "contatada",
