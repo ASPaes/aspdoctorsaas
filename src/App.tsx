@@ -21,6 +21,11 @@ const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
 const CustomerSuccess = lazy(() => import("@/pages/CustomerSuccess"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
+const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
+const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
+
+import SuperAdminGuard from "@/components/SuperAdminGuard";
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center">
@@ -62,7 +67,14 @@ const App = () => (
               <Route path="/cadastros" element={<Cadastros />} />
               <Route path="/certificados-a1" element={<CertificadosA1 />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/settings/users" element={<SettingsUsers />} />
               <Route path="/customer-success" element={<CustomerSuccess />} />
+
+              {/* Super Admin routes */}
+              <Route element={<SuperAdminGuard />}>
+                <Route path="/super/tenants" element={<SuperTenants />} />
+                <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
+              </Route>
             </Route>
 
             <Route path="/" element={<Navigate to="/clientes" replace />} />

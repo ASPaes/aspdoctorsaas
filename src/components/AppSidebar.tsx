@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Settings, LogOut, ShieldCheck, HeadphonesIcon } from "lucide-react";
+import { Users, ClipboardList, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, UserCog } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,13 +23,15 @@ const navItems = [
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
   { title: "Cadastros", url: "/cadastros", icon: ClipboardList },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
+  { title: "Usuários", url: "/settings/users", icon: UserCog },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
+  const isSuperAdmin = profile?.is_super_admin === true;
 
   const handleLogout = async () => {
     await signOut();
@@ -64,6 +66,16 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu>
+          {isSuperAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Super Admin">
+                <NavLink to="/super/tenants" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                  <Crown className="h-4 w-4" />
+                  <span>Super Admin</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sair">
               <button onClick={handleLogout} className="flex w-full items-center gap-2">
