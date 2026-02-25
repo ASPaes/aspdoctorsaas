@@ -1311,23 +1311,29 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          max_users: number
           nome: string
           plano: string | null
           status: string
+          trial_ends_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          max_users?: number
           nome: string
           plano?: string | null
           status?: string
+          trial_ends_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          max_users?: number
           nome?: string
           plano?: string | null
           status?: string
+          trial_ends_at?: string | null
         }
         Relationships: []
       }
@@ -1595,9 +1601,12 @@ export type Database = {
       }
     }
     Functions: {
+      can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
+      is_tenant_admin: { Args: never; Returns: boolean }
+      tenant_user_count: { Args: { p_tenant: string }; Returns: number }
     }
     Enums: {
       cs_avulsa_status: "previsto" | "confirmado" | "realizado" | "perdido"
