@@ -142,9 +142,9 @@ export default function Clientes() {
         const s = `%${debouncedSearch}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
         if (isNumeric) {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
         } else {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},id.ilike.${s}`);
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
         }
       }
 
