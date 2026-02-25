@@ -273,7 +273,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           <FormLabel>Código Matriz</FormLabel>
           <div className="relative">
             <Input
-              placeholder="Cód. sequencial"
+              placeholder="Cód. da Matriz (Cód Seq)"
               value={matrizSearch}
               maxLength={10}
               onChange={(e) => handleMatrizSearch(e.target.value)}
