@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Users, UserPlus, Trash2, Loader2 } from "lucide-react";
+import { Users, UserPlus, Trash2, Loader2, Copy, Link } from "lucide-react";
 
 export default function SettingsUsers() {
   const { profile } = useAuth();
@@ -222,19 +222,34 @@ export default function SettingsUsers() {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(inv.expires_at).toLocaleDateString("pt-BR")}
                     </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          cancelInvite.mutate(inv.id, {
-                            onSuccess: () => toast.success("Convite cancelado."),
-                            onError: (err: any) => toast.error(err.message),
-                          })
-                        }
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Copiar link do convite"
+                          onClick={() => {
+                            const link = `${window.location.origin}/signup?invite=${inv.token}`;
+                            navigator.clipboard.writeText(link);
+                            toast.success("Link copiado!");
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Cancelar convite"
+                          onClick={() =>
+                            cancelInvite.mutate(inv.id, {
+                              onSuccess: () => toast.success("Convite cancelado."),
+                              onError: (err: any) => toast.error(err.message),
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

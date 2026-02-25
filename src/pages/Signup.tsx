@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -10,25 +10,74 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export default function Signup() {
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("invite");
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<{ email: string; role: string; tenant_id: string } | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(!!inviteToken);
+
+  // Load invite info if token is present
+  useEffect(() => {
+    if (!inviteToken) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from("invites")
+        .select("email, role, tenant_id")
+        .eq("token", inviteToken)
+        .is("used_at", null)
+        .gte("expires_at", new Date().toISOString())
+        .maybeSingle();
+      setInviteLoading(false);
+      if (error || !data) {
+        toast.error("Convite inválido ou expirado.");
+        return;
+      }
+      setInviteInfo(data);
+      setEmail(data.email);
+    })();
+  }, [inviteToken]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: window.location.origin },
     });
-    setLoading(false);
+
     if (error) {
+      setLoading(false);
       toast.error(error.message);
-    } else {
-      toast.success("Verifique seu email para confirmar o cadastro.");
+      return;
     }
+
+    // If invite token, accept invite via secure RPC
+    if (inviteToken && signUpData.user) {
+      const { error: acceptError } = await supabase.rpc("accept_invite", {
+        p_token: inviteToken,
+      });
+      if (acceptError) {
+        console.error("Error accepting invite:", acceptError);
+      }
+    }
+
+    setLoading(false);
+    toast.success("Verifique seu email para confirmar o cadastro.");
   };
+
+  if (inviteLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -38,13 +87,25 @@ export default function Signup() {
             <Logo size="xl" />
           </div>
           <CardTitle className="text-xl">Criar conta</CardTitle>
-          <CardDescription>Preencha os dados para se cadastrar</CardDescription>
+          <CardDescription>
+            {inviteInfo
+              ? `Você foi convidado como ${inviteInfo.role}. Crie sua senha para acessar.`
+              : "Preencha os dados para se cadastrar"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" required />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
+                readOnly={!!inviteInfo}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
