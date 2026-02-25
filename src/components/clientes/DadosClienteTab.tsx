@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, Loader2, MessageCircle } from "lucide-react";
+import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
 import { maskCNPJ, maskPhone, maskCPF, maskCEP } from "@/lib/masks";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,14 +22,85 @@ interface Props {
   segmentos: { id: number; nome: string }[];
   unidadesBase: { id: number; nome: string }[];
   clienteId?: string;
+  codigoSequencial?: number | null;
 }
 
-export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId }: Props) {
+export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const { toast } = useToast();
   const whatsappValue = form.watch("telefone_whatsapp");
+
+  // Matriz lookup state
+  const [matrizSearch, setMatrizSearch] = useState("");
+  const [matrizNome, setMatrizNome] = useState<string | null>(null);
+  const [matrizSearching, setMatrizSearching] = useState(false);
+  const [matrizNotFound, setMatrizNotFound] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Load matriz info when editing existing client with matriz_id
+  const matrizId = form.watch("matriz_id");
+  useEffect(() => {
+    if (!matrizId) {
+      setMatrizSearch("");
+      setMatrizNome(null);
+      return;
+    }
+    // Fetch the matriz's codigo_fornecedor to display in the search field
+    (async () => {
+      const { data } = await supabase
+        .from("clientes")
+        .select("codigo_fornecedor, razao_social, nome_fantasia")
+        .eq("id", matrizId)
+        .single();
+      if (data) {
+        setMatrizSearch((data as any).codigo_fornecedor ?? "");
+        setMatrizNome((data as any).razao_social || (data as any).nome_fantasia || "");
+      }
+    })();
+  }, [matrizId]);
+
+  const handleMatrizSearch = useCallback(async (codigoFornecedor: string) => {
+    setMatrizSearch(codigoFornecedor);
+    setMatrizNotFound(false);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!codigoFornecedor.trim()) {
+      form.setValue("matriz_id", null);
+      setMatrizNome(null);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setMatrizSearching(true);
+      const { data } = await supabase
+        .from("clientes")
+        .select("id, razao_social, nome_fantasia")
+        .eq("codigo_fornecedor", codigoFornecedor.trim())
+        .limit(1)
+        .single();
+      setMatrizSearching(false);
+
+      if (data) {
+        form.setValue("matriz_id", data.id);
+        setMatrizNome(data.razao_social || data.nome_fantasia || "");
+        setMatrizNotFound(false);
+      } else {
+        form.setValue("matriz_id", null);
+        setMatrizNome(null);
+        setMatrizNotFound(true);
+      }
+    }, 500);
+  }, [form]);
+
+  const clearMatriz = useCallback(() => {
+    setMatrizSearch("");
+    setMatrizNome(null);
+    setMatrizNotFound(false);
+    form.setValue("matriz_id", null);
+  }, [form]);
 
   const handleCepChange = useCallback(async (maskedValue: string) => {
     form.setValue("cep", maskedValue);
@@ -141,8 +212,18 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   return (
     <div className="space-y-6">
       {/* ── Dados Cadastrais ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {/* Linha 1: Data Cadastro | Unidade Base | CNPJ */}
+      {/* Linha 1: Cod.Seq | Data Cadastro | Unidade Base | CNPJ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <FormItem>
+          <FormLabel>Cód. Seq.</FormLabel>
+          <Input
+            readOnly
+            disabled
+            value={codigoSequencial ? String(codigoSequencial) : "Auto"}
+            className="bg-muted"
+          />
+        </FormItem>
+
         <FormField control={form.control} name="data_cadastro" render={({ field }) => (
           <FormItem>
             <FormLabel>Data Cadastro</FormLabel>
@@ -182,8 +263,40 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormMessage />
           </FormItem>
         )} />
+      </div>
 
-        {/* Linha 2: Razão Social (2 cols) | Nome Fantasia (1 col) */}
+      {/* Linha 2: Matriz | Razão Social (col-span-2) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <FormItem>
+          <FormLabel>Código Matriz</FormLabel>
+          <div className="relative">
+            <Input
+              placeholder="Cód. fornecedor da matriz"
+              value={matrizSearch}
+              onChange={(e) => handleMatrizSearch(e.target.value)}
+            />
+            {matrizSearching && <Loader2 className="absolute right-8 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+            {matrizSearch && (
+              <button
+                type="button"
+                onClick={clearMatriz}
+                className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {matrizNome && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <Search className="h-3 w-3" />
+              {matrizNome}
+            </p>
+          )}
+          {matrizNotFound && !matrizSearching && (
+            <p className="text-xs text-destructive mt-1">Nenhum cliente com este código</p>
+          )}
+        </FormItem>
+
         <div className="sm:col-span-2">
           <FormField control={form.control} name="razao_social" render={({ field }) => (
             <FormItem>
@@ -193,6 +306,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             </FormItem>
           )} />
         </div>
+      </div>
+
+      {/* Restante dos campos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 
         <FormField control={form.control} name="nome_fantasia" render={({ field }) => (
           <FormItem>
