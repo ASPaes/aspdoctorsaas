@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,19 +7,37 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
-import Login from "@/pages/Login";
-import Signup from "@/pages/Signup";
-import ForgotPassword from "@/pages/ForgotPassword";
-import ResetPassword from "@/pages/ResetPassword";
-import Clientes from "@/pages/Clientes";
-import ClienteForm from "@/pages/ClienteForm";
-import Cadastros from "@/pages/Cadastros";
-import Configuracoes from "@/pages/Configuracoes";
-import CertificadosA1 from "@/pages/CertificadosA1";
-import CustomerSuccess from "@/pages/CustomerSuccess";
-import NotFound from "@/pages/NotFound";
+import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
+// Lazy-loaded pages for code splitting
+const Login = lazy(() => import("@/pages/Login"));
+const Signup = lazy(() => import("@/pages/Signup"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const Clientes = lazy(() => import("@/pages/Clientes"));
+const ClienteForm = lazy(() => import("@/pages/ClienteForm"));
+const Cadastros = lazy(() => import("@/pages/Cadastros"));
+const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
+const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
+const CustomerSuccess = lazy(() => import("@/pages/CustomerSuccess"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+const PageLoader = () => (
+  <div className="flex min-h-[50vh] items-center justify-center">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,   // 5 min – avoid refetching on every mount
+      gcTime: 10 * 60 * 1000,     // 10 min garbage collection
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -27,27 +46,29 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* Protected routes */}
-          <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
-            <Route path="/clientes" element={<Clientes />} />
-            <Route path="/clientes/novo" element={<ClienteForm />} />
-            <Route path="/clientes/:id" element={<ClienteForm />} />
-            <Route path="/cadastros" element={<Cadastros />} />
-            <Route path="/certificados-a1" element={<CertificadosA1 />} />
-            <Route path="/configuracoes" element={<Configuracoes />} />
-            <Route path="/customer-success" element={<CustomerSuccess />} />
-          </Route>
+            {/* Protected routes */}
+            <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/clientes/novo" element={<ClienteForm />} />
+              <Route path="/clientes/:id" element={<ClienteForm />} />
+              <Route path="/cadastros" element={<Cadastros />} />
+              <Route path="/certificados-a1" element={<CertificadosA1 />} />
+              <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/customer-success" element={<CustomerSuccess />} />
+            </Route>
 
-          <Route path="/" element={<Navigate to="/clientes" replace />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="/" element={<Navigate to="/clientes" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
     </ThemeProvider>
