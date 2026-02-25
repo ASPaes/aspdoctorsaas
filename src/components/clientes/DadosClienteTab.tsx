@@ -268,7 +268,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       </div>
 
       {/* Linha 2: Cod Matriz | Razão Social | Nome Fantasia */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_2fr] gap-4">
         <FormItem>
           <FormLabel>Código Matriz</FormLabel>
           <div className="relative">
