@@ -47,27 +47,29 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       setMatrizNome(null);
       return;
     }
-    // Fetch the matriz's codigo_fornecedor to display in the search field
+    // Fetch the matriz's codigo_sequencial to display in the search field
     (async () => {
       const { data } = await supabase
         .from("clientes")
-        .select("codigo_fornecedor, razao_social, nome_fantasia")
+        .select("codigo_sequencial, razao_social, nome_fantasia")
         .eq("id", matrizId)
         .single();
       if (data) {
-        setMatrizSearch((data as any).codigo_fornecedor ?? "");
+        setMatrizSearch(String((data as any).codigo_sequencial ?? ""));
         setMatrizNome((data as any).razao_social || (data as any).nome_fantasia || "");
       }
     })();
   }, [matrizId]);
 
-  const handleMatrizSearch = useCallback(async (codigoFornecedor: string) => {
-    setMatrizSearch(codigoFornecedor);
+  const handleMatrizSearch = useCallback(async (codigoSeq: string) => {
+    // Limit to 10 characters, digits only
+    const cleaned = codigoSeq.replace(/\D/g, "").slice(0, 10);
+    setMatrizSearch(cleaned);
     setMatrizNotFound(false);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (!codigoFornecedor.trim()) {
+    if (!cleaned) {
       form.setValue("matriz_id", null);
       setMatrizNome(null);
       return;
@@ -78,7 +80,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       const { data } = await supabase
         .from("clientes")
         .select("id, razao_social, nome_fantasia")
-        .eq("codigo_fornecedor", codigoFornecedor.trim())
+        .eq("codigo_sequencial", Number(cleaned))
         .limit(1)
         .single();
       setMatrizSearching(false);
@@ -265,14 +267,15 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
       </div>
 
-      {/* Linha 2: Matriz | Razão Social (col-span-2) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Linha 2: Cod Matriz | Razão Social | Nome Fantasia */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormItem>
           <FormLabel>Código Matriz</FormLabel>
           <div className="relative">
             <Input
-              placeholder="Cód. fornecedor da matriz"
+              placeholder="Cód. sequencial"
               value={matrizSearch}
+              maxLength={10}
               onChange={(e) => handleMatrizSearch(e.target.value)}
             />
             {matrizSearching && <Loader2 className="absolute right-8 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
@@ -297,19 +300,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           )}
         </FormItem>
 
-        <div className="sm:col-span-2">
-          <FormField control={form.control} name="razao_social" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Razão Social</FormLabel>
-              <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )} />
-        </div>
-      </div>
-
-      {/* Restante dos campos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <FormField control={form.control} name="razao_social" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Razão Social</FormLabel>
+            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
 
         <FormField control={form.control} name="nome_fantasia" render={({ field }) => (
           <FormItem>
@@ -318,6 +315,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormMessage />
           </FormItem>
         )} />
+      </div>
+
+      {/* Restante dos campos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
 
         {/* Linha 3: Email (col-span-2) | Telefone Contato */}
         <div className="sm:col-span-2">
