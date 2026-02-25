@@ -135,6 +135,24 @@ export default function Clientes() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filterKey]);
 
+  // Query separada para "Novos no Mês" — conta TODOS os clientes com data_venda no mês atual
+  const { data: novosNoMes } = useQuery({
+    queryKey: ["clientes_novos_mes"],
+    queryFn: async () => {
+      const now = new Date();
+      const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
+      const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
+      const { count, error } = await supabase
+        .from("clientes")
+        .select("id", { count: "exact", head: true })
+        .eq("cancelado", false)
+        .gte("data_venda", firstDay)
+        .lte("data_venda", lastDay);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const { data: queryResult, isLoading, isPlaceholderData } = useQuery({
     queryKey: ["clientes_lista", filterKey, page],
     queryFn: async () => {
@@ -228,17 +246,8 @@ export default function Clientes() {
       ? comMensalidade.reduce((acc, c) => acc + Number(c.mensalidade), 0) / comMensalidade.length
       : null;
 
-    const now = new Date();
-    const mesAtual = now.getMonth();
-    const anoAtual = now.getFullYear();
-    const clientesNovosMes = list.filter((c) => {
-      if (!c.data_venda) return false;
-      const d = new Date(c.data_venda + "T00:00:00");
-      return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
-    }).length;
-
-    return { qtdClientes, ticketMedio, clientesNovosMes };
-  }, [clientes, totalCount]);
+    return { qtdClientes, ticketMedio, clientesNovosMes: novosNoMes ?? 0 };
+  }, [clientes, totalCount, novosNoMes]);
 
   const formatCurrency = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
 
