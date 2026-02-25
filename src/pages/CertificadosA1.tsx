@@ -19,7 +19,7 @@ import { Search, ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion, ArrowUpDow
 import { toast } from "sonner";
 
 type QuickFilter = "todos" | "janela" | "vence30" | "vencido20" | "personalizado";
-type SortField = "razao_social" | "codigo_fornecedor" | "cert_a1_vencimento" | "cert_a1_ultima_venda_em";
+type SortField = "codigo_sequencial" | "razao_social" | "cert_a1_vencimento" | "cert_a1_ultima_venda_em";
 type SortDir = "asc" | "desc";
 
 function getCertStatus(vencimento: string | null) {
@@ -48,6 +48,7 @@ export default function CertificadosA1() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("todos");
   const [statusFilter, setStatusFilter] = useState("");
+  const [somenteGanho, setSomenteGanho] = useState(false);
   const [vencimentoDe, setVencimentoDe] = useState("");
   const [vencimentoAte, setVencimentoAte] = useState("");
 
@@ -93,22 +94,39 @@ export default function CertificadosA1() {
   }, [quickFilter, vencimentoDe, vencimentoAte]);
 
   const { data: clientes, isLoading } = useQuery({
-    queryKey: ["cert_a1_lista", debouncedSearch, quickFilter, statusFilter, quickFilterDates, sortField, sortDir],
+    queryKey: ["cert_a1_lista", debouncedSearch, quickFilter, statusFilter, quickFilterDates, sortField, sortDir, somenteGanho],
     queryFn: async () => {
+      // If "somente ganho" is active, fetch sold client IDs first
+      let ganhoIds: string[] | null = null;
+      if (somenteGanho) {
+        const { data: vendas } = await supabase.from("certificado_a1_vendas").select("cliente_id").eq("status", "ganho");
+        ganhoIds = [...new Set((vendas ?? []).map((v: any) => v.cliente_id))];
+        if (ganhoIds.length === 0) return [];
+      }
+
       let q = supabase.from("clientes" as any)
-        .select("id, razao_social, nome_fantasia, cnpj, codigo_fornecedor, telefone_contato, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
+        .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
         .eq("cancelado", false) as any;
+
+      if (ganhoIds) {
+        q = q.in("id", ganhoIds);
+      }
 
       if (debouncedSearch) {
         const s = `%${debouncedSearch}%`;
-        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_fornecedor.ilike.${s}`);
+        const trimmed = debouncedSearch.trim();
+        const isNumeric = /^\d+$/.test(trimmed);
+        if (isNumeric) {
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${trimmed}`);
+        } else {
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+        }
       }
 
       // Date filter from quick filter
       if (quickFilterDates.de) q = q.gte("cert_a1_vencimento", quickFilterDates.de);
       if (quickFilterDates.ate) q = q.lte("cert_a1_vencimento", quickFilterDates.ate);
 
-      // Status filter (post-query since it depends on computed status)
       // Sort
       const nullsFirst = sortDir === "asc";
       q = q.order(sortField, { ascending: sortDir === "asc", nullsFirst });
@@ -281,7 +299,7 @@ export default function CertificadosA1() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar razão social, fantasia, CNPJ, código fornecedor..."
+           placeholder="Buscar cód. sequencial, razão social, fantasia, CNPJ..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             className="pl-9"
@@ -297,6 +315,10 @@ export default function CertificadosA1() {
             <SelectItem value="sem_data">Sem data</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2">
+          <Checkbox id="somenteGanho" checked={somenteGanho} onCheckedChange={(v) => setSomenteGanho(v === true)} />
+          <label htmlFor="somenteGanho" className="text-sm whitespace-nowrap">Somente vendidos</label>
+        </div>
       </div>
 
       {/* Table */}
@@ -304,11 +326,11 @@ export default function CertificadosA1() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="cursor-pointer" onClick={() => toggleSort("codigo_sequencial")}>
+                <span className="flex items-center text-xs">Cód. Seq.<SortIcon field="codigo_sequencial" /></span>
+              </TableHead>
               <TableHead className="cursor-pointer" onClick={() => toggleSort("razao_social")}>
                 <span className="flex items-center text-xs">Razão Social<SortIcon field="razao_social" /></span>
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("codigo_fornecedor")}>
-                <span className="flex items-center text-xs">Cód. Fornec.<SortIcon field="codigo_fornecedor" /></span>
               </TableHead>
               <TableHead className="text-xs">Telefone</TableHead>
               <TableHead className="cursor-pointer" onClick={() => toggleSort("cert_a1_vencimento")}>
@@ -341,11 +363,11 @@ export default function CertificadosA1() {
                 const st = getCertStatus(c.cert_a1_vencimento);
                 return (
                   <TableRow key={c.id}>
+                    <TableCell className="text-xs">{c.codigo_sequencial || "—"}</TableCell>
                     <TableCell className="text-xs">
                       <div>{c.razao_social || "—"}</div>
                       {c.nome_fantasia && <div className="text-muted-foreground">{c.nome_fantasia}</div>}
                     </TableCell>
-                    <TableCell className="text-xs">{c.codigo_fornecedor || "—"}</TableCell>
                     <TableCell className="text-xs">{c.telefone_contato || "—"}</TableCell>
                     <TableCell className="text-xs">
                       {c.cert_a1_vencimento ? format(parseISO(c.cert_a1_vencimento), "dd/MM/yyyy") : "—"}
