@@ -47,8 +47,8 @@ function KanbanCard({ ticket, index, onView, onEdit, onChangeStatus }: { ticket:
   return (
     <Draggable draggableId={ticket.id} index={index}>
       {(provided, snapshot) => (
-        <div ref={provided.innerRef} {...provided.draggableProps} className={`group relative p-3 rounded-lg border border-l-4 ${PRIORIDADE_BORDER[ticket.prioridade]} bg-card transition-shadow ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md'}`}>
-          <div {...provided.dragHandleProps} className="absolute top-2 left-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity">
+        <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`group relative p-3 rounded-lg border border-l-4 ${PRIORIDADE_BORDER[ticket.prioridade]} bg-card transition-shadow cursor-grab active:cursor-grabbing ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md'}`}>
+          <div className="absolute top-2 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex items-start justify-between gap-2 mb-2 pl-4" onClick={onView}>
