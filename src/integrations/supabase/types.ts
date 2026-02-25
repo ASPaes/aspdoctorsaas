@@ -1011,30 +1011,30 @@ export type Database = {
           email: string
           expires_at: string
           id: string
-          invited_by: string | null
           role: string
-          status: string
           tenant_id: string
+          token: string
+          used_at: string | null
         }
         Insert: {
           created_at?: string
           email: string
           expires_at?: string
           id?: string
-          invited_by?: string | null
           role?: string
-          status?: string
           tenant_id: string
+          token?: string
+          used_at?: string | null
         }
         Update: {
           created_at?: string
           email?: string
           expires_at?: string
           id?: string
-          invited_by?: string | null
           role?: string
-          status?: string
           tenant_id?: string
+          token?: string
+          used_at?: string | null
         }
         Relationships: [
           {
@@ -1209,7 +1209,6 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          id: string
           is_super_admin: boolean
           role: string
           status: string
@@ -1218,7 +1217,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          id?: string
           is_super_admin?: boolean
           role?: string
           status?: string
@@ -1227,7 +1225,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          id?: string
           is_super_admin?: boolean
           role?: string
           status?: string
@@ -1261,28 +1258,25 @@ export type Database = {
       }
       tenants: {
         Row: {
-          ativo: boolean
           created_at: string
           id: string
           nome: string
-          slug: string
-          updated_at: string
+          plano: string | null
+          status: string
         }
         Insert: {
-          ativo?: boolean
           created_at?: string
           id?: string
           nome: string
-          slug: string
-          updated_at?: string
+          plano?: string | null
+          status?: string
         }
         Update: {
-          ativo?: boolean
           created_at?: string
           id?: string
           nome?: string
-          slug?: string
-          updated_at?: string
+          plano?: string | null
+          status?: string
         }
         Relationships: []
       }
