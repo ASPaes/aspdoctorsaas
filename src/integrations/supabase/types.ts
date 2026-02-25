@@ -1595,6 +1595,7 @@ export type Database = {
       }
     }
     Functions: {
+      create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
     }
