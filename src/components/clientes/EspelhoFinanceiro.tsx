@@ -154,7 +154,7 @@ export default function EspelhoFinanceiro({
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {/* MRR Base + Custo Base */}
               <Card className="border border-border/60 bg-card shadow-sm">
                 <CardContent className="p-4">
@@ -268,21 +268,21 @@ export default function EspelhoFinanceiro({
         </div>
 
         {/* Linha 1: Receita → (−) COGS → (=) Receita após COGS */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           <StepCard label="Receita (MRR Atual)" value={fmt(mrrAtual)} raw={mrrAtual} icon={DollarSign} />
           <StepCard label="(-) Custo Operação (COGS)" value={fmt(custoAtual)} raw={custoAtual} icon={Minus} isDeduction />
           <StepCard label="Receita após COGS" value={fmt(espelho.valor_apos_cogs)} raw={espelho.valor_apos_cogs} icon={Equal} />
         </div>
 
         {/* Linha 2: (−) Impostos → MC R$ → MC % */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           <StepCard label="(-) Impostos" value={fmt(espelho.impostos_rs)} raw={espelho.impostos_rs} icon={Calculator} isDeduction />
           <StepCard label="Margem de Contribuição" value={fmt(espelho.margem_contribuicao)} raw={espelho.margem_contribuicao} icon={TrendingUp} />
           <StepCard label="MC %" value={fmtPct(espelho.margem_contribuicao_percent)} raw={espelho.margem_contribuicao_percent} icon={Percent} />
         </div>
 
         {/* Linha 3: (−) Custos Fixos → Indicadores auxiliares */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           <StepCard label="(-) Custos Fixos" value={fmt(espelho.fixos_rs)} raw={espelho.fixos_rs} icon={Calculator} isDeduction />
           <StepCard label="Markup COGS" value={fmtPct(espelho.markup_cogs_percent)} raw={espelho.markup_cogs_percent} icon={BarChart3} />
           <StepCard label="Fator Preço" value={fmtX(espelho.fator_preco_x)} raw={espelho.fator_preco_x} icon={BarChart3} />
