@@ -1601,6 +1601,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invite: { Args: { p_token: string }; Returns: undefined }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
