@@ -1,125 +1,110 @@
 
 
-# Plano: Estrutura de Multi-Tenancy
+# Plano: Recriar estrutura multi-tenant conforme novo schema
 
-## Objetivo
+## Situacao atual
 
-Criar as tabelas e funcoes auxiliares para suportar multi-tenant sem habilitar RLS e sem quebrar o app atual.
+As tabelas `tenants`, `profiles` e `invites` ja existem (criadas na migracao anterior), mas estao **vazias** e com schema diferente do que voce quer agora.
 
-## Migracoes SQL
+### Diferencas encontradas
 
-Uma unica migracao com:
+| Tabela | Atual | Desejado |
+|---|---|---|
+| **tenants** | `slug` (NOT NULL, UNIQUE), `ativo` (bool), `updated_at` | `plano` (nullable), `status` (default 'ativo'), sem slug/ativo/updated_at |
+| **profiles** | PK = `id` (uuid separado), `user_id` + UNIQUE(user_id,tenant_id), role default 'user', status default 'active' | PK = `user_id`, sem `id` separado, role default 'admin', status default 'ativo' |
+| **invites** | `invited_by`, `status`, UNIQUE(tenant_id,email) | `token` (uuid), `used_at`, sem invited_by/status |
 
-### 1. Tabela `public.tenants`
+As funcoes `current_tenant_id()` e `is_super_admin()` existem mas com `SECURITY DEFINER` e `SET search_path` -- o novo SQL as simplifica (sem SECURITY DEFINER).
+
+## Migracao SQL
+
+Uma unica migracao que:
+
+1. **DROP** as 3 tabelas (seguro pois estao vazias)
+2. **DROP** o trigger `set_tenants_updated_at` (depende da tabela antiga)
+3. **Recria** as tabelas com o schema exato do seu SQL
+4. **Recria** os indices
+5. **Substitui** as funcoes `current_tenant_id()` e `is_super_admin()`
 
 ```sql
+-- Drop dependencias
+DROP TRIGGER IF EXISTS set_tenants_updated_at ON public.tenants;
+
+-- Drop tabelas (vazias, sem risco)
+DROP TABLE IF EXISTS public.invites CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+DROP TABLE IF EXISTS public.tenants CASCADE;
+
+-- 1) EXT
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- 2) TENANTS
 CREATE TABLE public.tenants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nome text NOT NULL,
-  slug text UNIQUE NOT NULL,
-  ativo boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  plano text NULL,
+  status text NOT NULL DEFAULT 'ativo',
+  created_at timestamptz NOT NULL DEFAULT now()
 );
-```
 
-### 2. Tabela `public.profiles`
-
-```sql
+-- 3) PROFILES (1 user -> 1 tenant)
 CREATE TABLE public.profiles (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid PRIMARY KEY,
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  role text NOT NULL DEFAULT 'user',
+  role text NOT NULL DEFAULT 'admin',
   is_super_admin boolean NOT NULL DEFAULT false,
-  status text NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, tenant_id)
+  status text NOT NULL DEFAULT 'ativo',
+  created_at timestamptz NOT NULL DEFAULT now()
 );
-```
 
-### 3. Tabela `public.invites`
+CREATE INDEX idx_profiles_tenant_id ON public.profiles(tenant_id);
 
-```sql
+-- 4) INVITES
 CREATE TABLE public.invites (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   email text NOT NULL,
-  role text NOT NULL DEFAULT 'user',
-  invited_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  status text NOT NULL DEFAULT 'pending',
+  role text NOT NULL DEFAULT 'viewer',
+  token uuid NOT NULL DEFAULT gen_random_uuid(),
   expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id, email)
+  used_at timestamptz NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
-```
 
-### 4. Funcao `current_tenant_id()`
+CREATE INDEX idx_invites_tenant_id ON public.invites(tenant_id);
+CREATE INDEX idx_invites_token ON public.invites(token);
 
-```sql
+-- 5) FUNCOES
 CREATE OR REPLACE FUNCTION public.current_tenant_id()
 RETURNS uuid
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
-  SELECT tenant_id
-  FROM public.profiles
-  WHERE user_id = auth.uid()
-    AND status = 'active'
+  SELECT p.tenant_id
+  FROM public.profiles p
+  WHERE p.user_id = auth.uid()
   LIMIT 1
 $$;
-```
 
-### 5. Funcao `is_super_admin()`
-
-```sql
 CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
-  SELECT COALESCE(
-    (SELECT is_super_admin
-     FROM public.profiles
-     WHERE user_id = auth.uid()
-       AND status = 'active'
-     LIMIT 1),
-    false
-  )
+  SELECT COALESCE(p.is_super_admin, false)
+  FROM public.profiles p
+  WHERE p.user_id = auth.uid()
+  LIMIT 1
 $$;
-```
-
-### 6. Trigger `updated_at` no `tenants`
-
-Reutiliza a funcao `set_updated_at()` ja existente:
-
-```sql
-CREATE TRIGGER set_tenants_updated_at
-  BEFORE UPDATE ON public.tenants
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 ```
 
 ## O que NAO muda
 
-- Nenhuma tabela existente e alterada (sem `tenant_id` adicionado agora).
-- RLS nao e habilitado nestas novas tabelas.
-- Nenhum codigo frontend e modificado.
-- O app continua funcionando exatamente como antes.
+- Nenhuma tabela de negocio e alterada
+- Nenhum codigo frontend e modificado
+- O app continua funcionando exatamente como antes
 
-## Arquivo
+## Atualizacao de tipos
 
-| Recurso | Acao |
-|---|---|
-| Migracao SQL | Cria `tenants`, `profiles`, `invites`, `current_tenant_id()`, `is_super_admin()` |
-
-## Proximos passos (fora deste plano)
-
-1. Adicionar `tenant_id` nas tabelas de negocio (`clientes`, `movimentos_mrr`, etc.).
-2. Habilitar RLS com policies usando `current_tenant_id()`.
-3. Criar trigger para auto-criar profile ao cadastrar usuario.
-4. Atualizar frontend para lidar com contexto de tenant.
+Apos a migracao, o arquivo `src/integrations/supabase/types.ts` sera atualizado automaticamente para refletir o novo schema.
 
