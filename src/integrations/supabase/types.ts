@@ -1485,6 +1485,17 @@ export type Database = {
           },
         ]
       }
+      vw_cohort_logos: {
+        Row: {
+          age_months: number | null
+          cohort_month: string | null
+          cohort_size: number | null
+          retained: number | null
+          retention_percent: number | null
+          tenant_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invite: { Args: { p_token: string }; Returns: undefined }
