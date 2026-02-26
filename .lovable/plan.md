@@ -1,48 +1,51 @@
 
 
-## Plan: Persistent Filters, In-Form Navigation, and State Preservation
+## Plan: Add Despesas CAC to Configuracoes
 
-### Problem Summary
-1. Filters reset when navigating away and back
-2. No way to navigate between client records from within the edit form
-3. Clicking a client row always navigates in the same tab (no Cmd+Click support)
-4. React Query refetches on every mount, losing scroll/page position
+Porting the CAC expenses feature from the reference project, adapted to use this project's multi-tenant architecture and the existing `unidades_base` table instead of hardcoded product/unit values.
 
-### Implementation Steps
+### 1. Database Migration
 
-#### 1. Create a shared filter store with `sessionStorage` persistence
-- Create `src/hooks/useClientesFilters.ts` — a custom hook using `useState` + `sessionStorage`
-- Store all filter values (search, status, dates, selects, ranges, sort, page, filtersOpen) as a single JSON object in `sessionStorage` under key `clientes-filters`
-- On init: read from `sessionStorage`; on every change: write back
-- This solves items 1 and 4 — filters survive navigation
+Create `cac_despesas` table:
+- `id` uuid PK (gen_random_uuid)
+- `tenant_id` uuid (auto-set via trigger)
+- `mes_inicial` date NOT NULL
+- `mes_final` date NULL
+- `ativo` boolean default true
+- `categoria` text NOT NULL (marketing, custos_vendas, comissoes, salarios_diretos, salarios_parciais, ferramentas, outros_vendas)
+- `descricao` text NOT NULL
+- `valor_total` numeric NOT NULL
+- `percentual_alocado_vendas` numeric NULL (only for salarios_parciais)
+- `valor_alocado` numeric NOT NULL (auto-calculated)
+- `unidade_base_id` bigint NULL (FK to `unidades_base.id`) -- replaces the hardcoded `produto_unidade`
+- `created_at` timestamptz default now()
 
-#### 2. Persist filtered client IDs for in-form navigation
-- When the Clientes list loads data, store the ordered array of client IDs in `sessionStorage` under key `clientes-nav-ids`
-- In `ClienteForm.tsx`, read this array and find the current client's position
-- Add "Previous" / "Next" buttons (with `ChevronLeft`/`ChevronRight` icons) in the form header, navigating to `/clientes/{prevId}` and `/clientes/{nextId}`
-- Show position indicator like "3 / 47"
-- Disable buttons at boundaries
+RLS policy: `tenant_id = current_tenant_id() OR is_super_admin()` for ALL.
+Trigger: `set_tenant_id_on_insert`.
 
-#### 3. Enable Cmd+Click (open in new tab)
-- In `Clientes.tsx`, change the table row click handler from `onClick={() => navigate(...)}` to use an `<a>` tag or handle the click event to check for `metaKey`/`ctrlKey`:
-  ```tsx
-  onClick={(e) => {
-    if (e.metaKey || e.ctrlKey) {
-      window.open(`/clientes/${c.id}`, '_blank');
-    } else {
-      navigate(`/clientes/${c.id}`);
-    }
-  }}
-  ```
-- Also wrap the row content in a way that right-click "Open in new tab" works (wrap row in `<Link>` or add `href`)
+### 2. Create `src/components/configuracoes/CacDespesasTab.tsx`
 
-#### 4. Prevent unnecessary refetches
-- The `QueryClient` already has `staleTime: 5min` and `refetchOnWindowFocus: false`
-- Ensure the `queryKey` in Clientes uses the persisted filter state so React Query cache matches on return
-- The key fix is item 1 (persisted filters) — without it, filters reset to defaults which creates a new queryKey, triggering a refetch
+Standalone component with:
+- React Query for fetching `cac_despesas` (joined with `unidades_base` for display name)
+- CRUD via mutations (insert/update/delete)
+- Table with columns: Categoria, Descricao, Periodo, Valor Total, Valor Alocado, Unidade Base, Ativo (Switch), Acoes (edit/delete)
+- Dialog for create/edit with fields:
+  - mes_inicial (date input), mes_final (date input)
+  - categoria (Select from static list)
+  - descricao (text)
+  - valor_total (numeric)
+  - percentual_alocado_vendas (numeric, conditional on `salarios_parciais`)
+  - unidade_base_id (Select from `unidades_base` lookup + "Geral" option)
+  - ativo (Switch)
+- `valor_alocado` auto-calculated: if salarios_parciais then `valor_total * percentual`, else `valor_total`
 
-### Files to Create/Edit
-- **Create** `src/hooks/useClientesFilters.ts` — persistent filter state hook
-- **Edit** `src/pages/Clientes.tsx` — use the new hook instead of individual `useState`; store nav IDs; handle Cmd+Click
-- **Edit** `src/pages/ClienteForm.tsx` — add prev/next navigation buttons reading from sessionStorage
+### 3. Update `src/pages/Configuracoes.tsx`
+
+- Wrap existing content in `Tabs` with two tabs: "Percentuais" (existing card) and "Despesas CAC" (new component)
+- Import and render `CacDespesasTab`
+
+### Files
+- **Create**: migration SQL
+- **Create**: `src/components/configuracoes/CacDespesasTab.tsx`
+- **Edit**: `src/pages/Configuracoes.tsx`
 
