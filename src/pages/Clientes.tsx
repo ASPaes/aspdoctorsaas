@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X } from "lucide-react";
 
 type SortField = "codigo_sequencial" | "razao_social" | "nome_fantasia" | "cnpj" | "produto_id" | "mensalidade" | "cancelado";
 type SortDir = "asc" | "desc";
@@ -103,7 +104,8 @@ export default function Clientes() {
   const [funcionarioId, setFuncionarioId] = useState("");
   const [fornecedorId, setFornecedorId] = useState("");
 
-  const [estadoId, setEstadoId] = useState<number | null>(null);
+  // estadoId is now string: "" = all, "__null__" = null filter, "123" = id
+  const [estadoId, setEstadoId] = useState("");
   const [cidadeId, setCidadeId] = useState("");
   const [motivoCancelamentoId, setMotivoCancelamentoId] = useState("");
 
@@ -121,7 +123,9 @@ export default function Clientes() {
   // Clear city when state changes
   useEffect(() => { setCidadeId(""); }, [estadoId]);
 
-  const lookups = useLookups(estadoId);
+  // Convert estadoId to number for useLookups (needs numeric id to fetch cidades)
+  const estadoIdNumeric = estadoId && estadoId !== "__null__" ? Number(estadoId) : null;
+  const lookups = useLookups(estadoIdNumeric);
 
   // Build query key from all filters
   const filterKey = useMemo(() => ({
@@ -141,7 +145,7 @@ export default function Clientes() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filterKey]);
 
-  // Query separada para "Novos no Mês" — conta TODOS os clientes com data_venda no mês atual
+  // Query separada para "Novos no Mês"
   const { data: novosNoMes } = useQuery({
     queryKey: ["clientes_novos_mes"],
     queryFn: async () => {
@@ -198,27 +202,22 @@ export default function Clientes() {
       applyDateRange("data_venda", periodoVenda);
       applyDateRange("data_ativacao", periodoAtivacao);
 
-      // Lookups
-      if (modeloContratoId === "__null__") q = q.is("modelo_contrato_id", null);
-      else if (modeloContratoId) q = q.eq("modelo_contrato_id", Number(modeloContratoId));
-      if (produtoId === "__null__") q = q.is("produto_id", null);
-      else if (produtoId) q = q.eq("produto_id", Number(produtoId));
-      if (origemVendaId === "__null__") q = q.is("origem_venda_id", null);
-      else if (origemVendaId) q = q.eq("origem_venda_id", Number(origemVendaId));
-      if (estadoId === -1) q = q.is("estado_id", null);
-      else if (estadoId) q = q.eq("estado_id", estadoId);
-      if (cidadeId === "__null__") q = q.is("cidade_id", null);
-      else if (cidadeId) q = q.eq("cidade_id", Number(cidadeId));
-      if (motivoCancelamentoId === "__null__") q = q.is("motivo_cancelamento_id", null);
-      else if (motivoCancelamentoId) q = q.eq("motivo_cancelamento_id", Number(motivoCancelamentoId));
-      if (areaAtuacaoId === "__null__") q = q.is("area_atuacao_id", null);
-      else if (areaAtuacaoId) q = q.eq("area_atuacao_id", Number(areaAtuacaoId));
-      if (segmentoId === "__null__") q = q.is("segmento_id", null);
-      else if (segmentoId) q = q.eq("segmento_id", Number(segmentoId));
-      if (funcionarioId === "__null__") q = q.is("funcionario_id", null);
-      else if (funcionarioId) q = q.eq("funcionario_id", Number(funcionarioId));
-      if (fornecedorId === "__null__") q = q.is("fornecedor_id", null);
-      else if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
+      // Lookup filters helper
+      const applyLookupFilter = (field: string, val: string) => {
+        if (val === "__null__") q = q.is(field, null);
+        else if (val) q = q.eq(field, Number(val));
+      };
+
+      applyLookupFilter("modelo_contrato_id", modeloContratoId);
+      applyLookupFilter("produto_id", produtoId);
+      applyLookupFilter("origem_venda_id", origemVendaId);
+      applyLookupFilter("estado_id", estadoId);
+      applyLookupFilter("cidade_id", cidadeId);
+      applyLookupFilter("motivo_cancelamento_id", motivoCancelamentoId);
+      applyLookupFilter("area_atuacao_id", areaAtuacaoId);
+      applyLookupFilter("segmento_id", segmentoId);
+      applyLookupFilter("funcionario_id", funcionarioId);
+      applyLookupFilter("fornecedor_id", fornecedorId);
 
       // Numeric ranges
       if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
@@ -239,7 +238,7 @@ export default function Clientes() {
       if (error) throw error;
       return { rows: data as any[], totalCount: count as number };
     },
-    placeholderData: (prev) => prev, // keep previous data while loading next page
+    placeholderData: (prev) => prev,
   });
 
   const clientes = queryResult?.rows ?? [];
@@ -262,12 +261,10 @@ export default function Clientes() {
   const kpis = useMemo(() => {
     const list = clientes;
     const qtdClientes = totalCount;
-
     const comMensalidade = list.filter((c) => c.mensalidade != null && Number(c.mensalidade) > 0);
     const ticketMedio = comMensalidade.length > 0
       ? comMensalidade.reduce((acc, c) => acc + Number(c.mensalidade), 0) / comMensalidade.length
       : null;
-
     return { qtdClientes, ticketMedio, clientesNovosMes: novosNoMes ?? 0 };
   }, [clientes, totalCount, novosNoMes]);
 
@@ -283,19 +280,60 @@ export default function Clientes() {
     return sortDir === "asc" ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />;
   };
 
-  const recorrenciaLabel = (_v: string | null) => {
-    // kept for potential future use
-    return "";
-  };
-
   const clearFilters = () => {
     setPeriodoCadastro({}); setPeriodoCancelamento({}); setPeriodoVenda({}); setPeriodoAtivacao({});
     setRecorrenciaAdv(""); setModeloContratoId(""); setProdutoId(""); setOrigemVendaId("");
     setAreaAtuacaoId(""); setSegmentoId(""); setFuncionarioId(""); setFornecedorId("");
-    setEstadoId(null); setCidadeId(""); setMotivoCancelamentoId("");
+    setEstadoId(""); setCidadeId(""); setMotivoCancelamentoId("");
     setMensalidadeMin(""); setMensalidadeMax("");
     setLucroMin(""); setLucroMax(""); setMargemMin(""); setMargemMax("");
+    setUnidadeBaseQuick("");
   };
+
+  // Helper to resolve display name for a filter value
+  const resolveLabel = (val: string, items: { id: number; nome?: string; descricao?: string; sigla?: string }[] | undefined): string => {
+    if (val === "__null__") return "Nulo";
+    const item = items?.find((i) => String(i.id) === val);
+    if (!item) return val;
+    if (item.sigla) return `${item.sigla} - ${(item as any).nome}`;
+    return item.nome || (item as any).descricao || val;
+  };
+
+  const recorrenciaLabels: Record<string, string> = { mensal: "Mensal", semestral: "Semestral", anual: "Anual", semanal: "Semanal", __null__: "Nulo" };
+
+  // Active filter badges
+  const activeFilters = useMemo(() => {
+    const badges: { key: string; label: string; displayValue: string; onClear: () => void }[] = [];
+
+    if (unidadeBaseQuick) badges.push({ key: "ub", label: "Unidade Base", displayValue: resolveLabel(unidadeBaseQuick, lookups.unidadesBase.data), onClear: () => setUnidadeBaseQuick("") });
+    if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => setRecorrenciaAdv("") });
+    if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => setModeloContratoId("") });
+    if (produtoId) badges.push({ key: "prod", label: "Produto", displayValue: resolveLabel(produtoId, lookups.produtos.data), onClear: () => setProdutoId("") });
+    if (origemVendaId) badges.push({ key: "ov", label: "Origem Venda", displayValue: resolveLabel(origemVendaId, lookups.origensVenda.data), onClear: () => setOrigemVendaId("") });
+    if (areaAtuacaoId) badges.push({ key: "aa", label: "Área Atuação", displayValue: resolveLabel(areaAtuacaoId, lookups.areasAtuacao.data), onClear: () => setAreaAtuacaoId("") });
+    if (segmentoId) badges.push({ key: "seg", label: "Segmento", displayValue: resolveLabel(segmentoId, lookups.segmentos.data), onClear: () => setSegmentoId("") });
+    if (funcionarioId) badges.push({ key: "func", label: "Funcionário", displayValue: resolveLabel(funcionarioId, lookups.funcionarios.data), onClear: () => setFuncionarioId("") });
+    if (fornecedorId) badges.push({ key: "forn", label: "Fornecedor", displayValue: resolveLabel(fornecedorId, lookups.fornecedores.data), onClear: () => setFornecedorId("") });
+    if (estadoId) badges.push({ key: "est", label: "Estado", displayValue: resolveLabel(estadoId, lookups.estados.data as any), onClear: () => setEstadoId("") });
+    if (cidadeId) badges.push({ key: "cid", label: "Cidade", displayValue: resolveLabel(cidadeId, lookups.cidades.data), onClear: () => setCidadeId("") });
+    if (motivoCancelamentoId) badges.push({ key: "mot", label: "Motivo Cancel.", displayValue: resolveLabel(motivoCancelamentoId, lookups.motivosCancelamento.data?.map(m => ({ id: m.id, nome: m.descricao }))), onClear: () => setMotivoCancelamentoId("") });
+
+    const fmtDate = (d: Date) => format(d, "dd/MM/yy");
+    if (periodoCadastro.from || periodoCadastro.to) badges.push({ key: "pc", label: "Cadastro", displayValue: `${periodoCadastro.from ? fmtDate(periodoCadastro.from) : "…"} – ${periodoCadastro.to ? fmtDate(periodoCadastro.to) : "…"}`, onClear: () => setPeriodoCadastro({}) });
+    if (periodoCancelamento.from || periodoCancelamento.to) badges.push({ key: "pcan", label: "Cancelamento", displayValue: `${periodoCancelamento.from ? fmtDate(periodoCancelamento.from) : "…"} – ${periodoCancelamento.to ? fmtDate(periodoCancelamento.to) : "…"}`, onClear: () => setPeriodoCancelamento({}) });
+    if (periodoVenda.from || periodoVenda.to) badges.push({ key: "pv", label: "Venda", displayValue: `${periodoVenda.from ? fmtDate(periodoVenda.from) : "…"} – ${periodoVenda.to ? fmtDate(periodoVenda.to) : "…"}`, onClear: () => setPeriodoVenda({}) });
+    if (periodoAtivacao.from || periodoAtivacao.to) badges.push({ key: "pa", label: "Ativação", displayValue: `${periodoAtivacao.from ? fmtDate(periodoAtivacao.from) : "…"} – ${periodoAtivacao.to ? fmtDate(periodoAtivacao.to) : "…"}`, onClear: () => setPeriodoAtivacao({}) });
+
+    if (mensalidadeMin || mensalidadeMax) badges.push({ key: "mens", label: "Mensalidade", displayValue: `${mensalidadeMin || "…"} – ${mensalidadeMax || "…"}`, onClear: () => { setMensalidadeMin(""); setMensalidadeMax(""); } });
+    if (lucroMin || lucroMax) badges.push({ key: "luc", label: "Lucro", displayValue: `${lucroMin || "…"} – ${lucroMax || "…"}`, onClear: () => { setLucroMin(""); setLucroMax(""); } });
+    if (margemMin || margemMax) badges.push({ key: "marg", label: "Margem", displayValue: `${margemMin || "…"} – ${margemMax || "…"}`, onClear: () => { setMargemMin(""); setMargemMax(""); } });
+
+    return badges;
+  }, [unidadeBaseQuick, recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups]);
+
+  // Helper for Select value/onChange with __all__ pattern
+  const selVal = (v: string) => v || "__all__";
+  const selChange = (setter: (v: string) => void) => (v: string) => setter(v === "__all__" ? "" : v);
 
   return (
     <div className="space-y-4">
@@ -361,7 +399,7 @@ export default function Clientes() {
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={unidadeBaseQuick || "__all__"} onValueChange={(v) => setUnidadeBaseQuick(v === "__all__" ? "" : v)}>
+        <Select value={selVal(unidadeBaseQuick)} onValueChange={selChange(setUnidadeBaseQuick)}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Unidade Base" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todas Unidades</SelectItem>
@@ -383,12 +421,30 @@ export default function Clientes() {
               {filtersOpen ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
             </Button>
           </CollapsibleTrigger>
-          {filtersOpen && (
+          {activeFilters.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground">
               Limpar filtros
             </Button>
           )}
         </div>
+
+        {/* Active filter badges — always visible */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {activeFilters.map((f) => (
+              <Badge key={f.key} variant="secondary" className="pl-2 pr-1 py-0.5 text-xs gap-1 cursor-default">
+                <span className="font-medium">{f.label}:</span> {f.displayValue}
+                <button
+                  onClick={(e) => { e.stopPropagation(); f.onClear(); }}
+                  className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
+
         <CollapsibleContent className="mt-2">
           <div className="rounded-lg border bg-card p-4 space-y-4">
             {/* Row 1 - Date ranges */}
@@ -403,9 +459,10 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Recorrência</label>
-                <Select value={recorrenciaAdv} onValueChange={setRecorrenciaAdv}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <Select value={selVal(recorrenciaAdv)} onValueChange={selChange(setRecorrenciaAdv)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     <SelectItem value="mensal">Mensal</SelectItem>
                     <SelectItem value="semestral">Semestral</SelectItem>
@@ -416,9 +473,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Modelo de Contrato</label>
-                <Select value={modeloContratoId} onValueChange={setModeloContratoId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(modeloContratoId)} onValueChange={selChange(setModeloContratoId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.modelosContrato.data?.map((v) => <SelectItem key={v.id} value={String(v.id)}>{v.nome}</SelectItem>)}
                   </SelectContent>
@@ -426,9 +484,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Produto</label>
-                <Select value={produtoId} onValueChange={setProdutoId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(produtoId)} onValueChange={selChange(setProdutoId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.produtos.data?.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
                   </SelectContent>
@@ -436,9 +495,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Origem da Venda</label>
-                <Select value={origemVendaId} onValueChange={setOrigemVendaId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <Select value={selVal(origemVendaId)} onValueChange={selChange(setOrigemVendaId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.origensVenda.data?.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.nome}</SelectItem>)}
                   </SelectContent>
@@ -446,13 +506,14 @@ export default function Clientes() {
               </div>
             </div>
 
-            {/* Row 3 - New lookup filters */}
+            {/* Row 3 - More lookups */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Área de Atuação</label>
-                <Select value={areaAtuacaoId} onValueChange={setAreaAtuacaoId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                <Select value={selVal(areaAtuacaoId)} onValueChange={selChange(setAreaAtuacaoId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.areasAtuacao.data?.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}
                   </SelectContent>
@@ -460,9 +521,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Segmento</label>
-                <Select value={segmentoId} onValueChange={setSegmentoId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(segmentoId)} onValueChange={selChange(setSegmentoId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.segmentos.data?.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>)}
                   </SelectContent>
@@ -470,9 +532,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Funcionário</label>
-                <Select value={funcionarioId} onValueChange={setFuncionarioId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(funcionarioId)} onValueChange={selChange(setFuncionarioId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.funcionarios.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
                   </SelectContent>
@@ -480,9 +543,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
-                <Select value={fornecedorId} onValueChange={setFornecedorId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(fornecedorId)} onValueChange={selChange(setFornecedorId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.fornecedores.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
                   </SelectContent>
@@ -494,9 +558,10 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Estado</label>
-                <Select value={estadoId ? String(estadoId) : ""} onValueChange={(v) => setEstadoId(v === "__null__" ? -1 : v ? Number(v) : null)}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(estadoId)} onValueChange={selChange(setEstadoId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.estados.data?.map((e) => <SelectItem key={e.id} value={String(e.id)}>{e.sigla} - {e.nome}</SelectItem>)}
                   </SelectContent>
@@ -504,9 +569,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Cidade</label>
-                <Select value={cidadeId} onValueChange={setCidadeId} disabled={!estadoId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={estadoId ? "Todas" : "Selecione estado"} /></SelectTrigger>
+                <Select value={selVal(cidadeId)} onValueChange={selChange(setCidadeId)} disabled={!estadoIdNumeric}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={estadoIdNumeric ? undefined : "Selecione estado"} /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todas</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.cidades.data?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
                   </SelectContent>
@@ -514,9 +580,10 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Motivo Cancelamento</label>
-                <Select value={motivoCancelamentoId} onValueChange={setMotivoCancelamentoId}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={selVal(motivoCancelamentoId)} onValueChange={selChange(setMotivoCancelamentoId)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="__null__">Nulo</SelectItem>
                     {lookups.motivosCancelamento.data?.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.descricao}</SelectItem>)}
                   </SelectContent>
