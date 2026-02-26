@@ -32,6 +32,59 @@ export type Database = {
         }
         Relationships: []
       }
+      cac_despesas: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          created_at: string
+          descricao: string
+          id: string
+          mes_final: string | null
+          mes_inicial: string
+          percentual_alocado_vendas: number | null
+          tenant_id: string | null
+          unidade_base_id: number | null
+          valor_alocado: number
+          valor_total: number
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          created_at?: string
+          descricao: string
+          id?: string
+          mes_final?: string | null
+          mes_inicial: string
+          percentual_alocado_vendas?: number | null
+          tenant_id?: string | null
+          unidade_base_id?: number | null
+          valor_alocado: number
+          valor_total: number
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          mes_final?: string | null
+          mes_inicial?: string
+          percentual_alocado_vendas?: number | null
+          tenant_id?: string | null
+          unidade_base_id?: number | null
+          valor_alocado?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cac_despesas_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificado_a1_vendas: {
         Row: {
           cliente_id: string
