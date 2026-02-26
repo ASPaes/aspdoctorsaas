@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useMemo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
+import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +20,6 @@ import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, Arr
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
 type SortDir = "asc" | "desc";
-
-
 
 function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
   label: string; min: string; max: string; onMinChange: (v: string) => void; onMaxChange: (v: string) => void; prefix?: string;
@@ -39,55 +37,32 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
 
 export default function Clientes() {
   const navigate = useNavigate();
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { filters, updateFilter, clearAdvancedFilters } = useClientesFilters();
 
-  // Quick filters
-  const [searchText, setSearchText] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState("ativos");
-  const [unidadeBaseQuick, setUnidadeBaseQuick] = useState("");
+  // Destructure for readability
+  const {
+    searchText, status, unidadeBaseQuick,
+    periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId,
+    areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    estadoId, cidadeId, motivoCancelamentoId,
+    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax,
+    sortField: sortFieldRaw, sortDir: sortDirRaw, page, filtersOpen,
+  } = filters;
+
+  const sortField = sortFieldRaw as SortField;
+  const sortDir = sortDirRaw as SortDir;
 
   // Debounce search
+  const [debouncedSearch, setDebouncedSearch] = useState(searchText);
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchText), 300);
     return () => clearTimeout(t);
   }, [searchText]);
 
-  // Advanced filters
-  const [periodoCadastro, setPeriodoCadastro] = useState<DateRange>({});
-  const [periodoCancelamento, setPeriodoCancelamento] = useState<DateRange>({});
-  const [periodoVenda, setPeriodoVenda] = useState<DateRange>({});
-  const [periodoAtivacao, setPeriodoAtivacao] = useState<DateRange>({});
+  const PAGE_SIZE = 50;
 
-  const [recorrenciaAdv, setRecorrenciaAdv] = useState("");
-  const [modeloContratoId, setModeloContratoId] = useState("");
-  const [produtoId, setProdutoId] = useState("");
-  const [origemVendaId, setOrigemVendaId] = useState("");
-  const [areaAtuacaoId, setAreaAtuacaoId] = useState("");
-  const [segmentoId, setSegmentoId] = useState("");
-  const [funcionarioId, setFuncionarioId] = useState("");
-  const [fornecedorId, setFornecedorId] = useState("");
-
-  // estadoId is now string: "" = all, "__null__" = null filter, "123" = id
-  const [estadoId, setEstadoId] = useState("");
-  const [cidadeId, setCidadeId] = useState("");
-  const [motivoCancelamentoId, setMotivoCancelamentoId] = useState("");
-
-  const [mensalidadeMin, setMensalidadeMin] = useState("");
-  const [mensalidadeMax, setMensalidadeMax] = useState("");
-  const [lucroMin, setLucroMin] = useState("");
-  const [lucroMax, setLucroMax] = useState("");
-  const [margemMin, setMargemMin] = useState("");
-  const [margemMax, setMargemMax] = useState("");
-
-  // Sort
-  const [sortField, setSortField] = useState<SortField>("razao_social");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-
-  // Clear city when state changes
-  useEffect(() => { setCidadeId(""); }, [estadoId]);
-
-  // Convert estadoId to number for useLookups (needs numeric id to fetch cidades)
+  // Convert estadoId to number for useLookups
   const estadoIdNumeric = estadoId && estadoId !== "__null__" ? Number(estadoId) : null;
   const lookups = useLookups(estadoIdNumeric);
 
@@ -101,13 +76,6 @@ export default function Clientes() {
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
-
-  // Pagination
-  const [page, setPage] = useState(0);
-  const PAGE_SIZE = 50;
-
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [filterKey]);
 
   const parseFilterNumber = useCallback((value: string): number | null => {
     const raw = value.trim();
@@ -223,43 +191,17 @@ export default function Clientes() {
 
     return q;
   }, [
-    areaAtuacaoId,
-    cidadeId,
-    debouncedSearch,
-    estadoId,
-    fornecedorId,
-    funcionarioId,
-    modeloContratoId,
-    motivoCancelamentoId,
-    origemVendaId,
-    periodoAtivacao,
-    periodoCadastro,
-    periodoCancelamento,
-    periodoVenda,
-    produtoId,
-    recorrenciaAdv,
-    segmentoId,
-    status,
-    unidadeBaseQuick,
-    valueFilters,
+    areaAtuacaoId, cidadeId, debouncedSearch, estadoId, fornecedorId, funcionarioId,
+    modeloContratoId, motivoCancelamentoId, origemVendaId, periodoAtivacao, periodoCadastro,
+    periodoCancelamento, periodoVenda, produtoId, recorrenciaAdv, segmentoId, status,
+    unidadeBaseQuick, valueFilters,
   ]);
 
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
-      "id",
-      "codigo_sequencial",
-      "razao_social",
-      "nome_fantasia",
-      "cnpj",
-      "produto_id",
-      "mensalidade",
-      "data_ativacao",
-      "cancelado",
-      "data_venda",
-      "unidade_base_id",
-      "custo_operacao",
-      "imposto_percentual",
-      "custo_fixo_percentual",
+      "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
+      "mensalidade", "data_ativacao", "cancelado", "data_venda", "unidade_base_id",
+      "custo_operacao", "imposto_percentual", "custo_fixo_percentual",
     ].join(",");
 
     const pageSize = 1000;
@@ -273,7 +215,6 @@ export default function Clientes() {
       const { data, error } = await q;
       if (error) throw error;
       if (!data || data.length === 0) break;
-
       rows.push(...data);
       if (data.length < pageSize) break;
     }
@@ -281,12 +222,10 @@ export default function Clientes() {
     const filtered = rows.filter((row) => {
       const lucroReal = computeLucroReal(row);
       const margemBruta = computeMargemBruta(row);
-
       if (valueFilters.lucroMin !== null && lucroReal < valueFilters.lucroMin) return false;
       if (valueFilters.lucroMax !== null && lucroReal > valueFilters.lucroMax) return false;
       if (valueFilters.margemMin !== null && margemBruta < valueFilters.margemMin) return false;
       if (valueFilters.margemMax !== null && margemBruta > valueFilters.margemMax) return false;
-
       return true;
     });
 
@@ -301,7 +240,6 @@ export default function Clientes() {
     const sorted = [...withCalculated].sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
-
       let cmp = 0;
       if (sortField === "mensalidade" || sortField === "codigo_sequencial") {
         cmp = Number(aVal ?? Number.NEGATIVE_INFINITY) - Number(bVal ?? Number.NEGATIVE_INFINITY);
@@ -310,14 +248,13 @@ export default function Clientes() {
       } else {
         cmp = String(aVal ?? "").localeCompare(String(bVal ?? ""), "pt-BR", { sensitivity: "base" });
       }
-
       return sortDir === "asc" ? cmp : -cmp;
     });
 
     return sorted;
   }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters]);
 
-  // Query "Novos no Mês" respeitando os filtros ativos
+  // Query "Novos no Mês"
   const { data: novosNoMes } = useQuery({
     queryKey: ["clientes_novos_mes", filterKey],
     queryFn: async () => {
@@ -382,6 +319,7 @@ export default function Clientes() {
         return {
           rows: rows.slice(from, from + PAGE_SIZE),
           totalCount: rows.length,
+          allIds: rows.map((r: any) => r.id),
         };
       }
 
@@ -429,7 +367,7 @@ export default function Clientes() {
 
       const { data, error, count } = await q;
       if (error) throw error;
-      return { rows: data as any[], totalCount: count as number };
+      return { rows: data as any[], totalCount: count as number, allIds: null };
     },
     placeholderData: (prev) => prev,
   });
@@ -437,6 +375,19 @@ export default function Clientes() {
   const clientes = queryResult?.rows ?? [];
   const totalCount = queryResult?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Store navigation IDs for in-form navigation
+  useEffect(() => {
+    if (queryResult) {
+      if (queryResult.allIds) {
+        // Client-side filtered — we have all IDs
+        storeNavIds(queryResult.allIds);
+      } else {
+        // Server-side paginated — store current page IDs
+        storeNavIds(clientes.map((c: any) => c.id));
+      }
+    }
+  }, [queryResult, clientes]);
 
   // Lookup maps for display
   const produtoMap = useMemo(() => {
@@ -464,23 +415,17 @@ export default function Clientes() {
   const formatCurrency = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
 
   const toggleSort = useCallback((field: SortField) => {
-    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortField(field); setSortDir("asc"); }
-  }, [sortField]);
+    if (sortField === field) {
+      updateFilter("sortDir", sortDir === "asc" ? "desc" : "asc");
+    } else {
+      updateFilter("sortField", field);
+      updateFilter("sortDir", "asc");
+    }
+  }, [sortField, sortDir, updateFilter]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />;
     return sortDir === "asc" ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />;
-  };
-
-  const clearFilters = () => {
-    setPeriodoCadastro({}); setPeriodoCancelamento({}); setPeriodoVenda({}); setPeriodoAtivacao({});
-    setRecorrenciaAdv(""); setModeloContratoId(""); setProdutoId(""); setOrigemVendaId("");
-    setAreaAtuacaoId(""); setSegmentoId(""); setFuncionarioId(""); setFornecedorId("");
-    setEstadoId(""); setCidadeId(""); setMotivoCancelamentoId("");
-    setMensalidadeMin(""); setMensalidadeMax("");
-    setLucroMin(""); setLucroMax(""); setMargemMin(""); setMargemMax("");
-    setUnidadeBaseQuick("");
   };
 
   // Helper to resolve display name for a filter value
@@ -498,35 +443,44 @@ export default function Clientes() {
   const activeFilters = useMemo(() => {
     const badges: { key: string; label: string; displayValue: string; onClear: () => void }[] = [];
 
-    if (unidadeBaseQuick) badges.push({ key: "ub", label: "Unidade Base", displayValue: resolveLabel(unidadeBaseQuick, lookups.unidadesBase.data), onClear: () => setUnidadeBaseQuick("") });
-    if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => setRecorrenciaAdv("") });
-    if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => setModeloContratoId("") });
-    if (produtoId) badges.push({ key: "prod", label: "Produto", displayValue: resolveLabel(produtoId, lookups.produtos.data), onClear: () => setProdutoId("") });
-    if (origemVendaId) badges.push({ key: "ov", label: "Origem Venda", displayValue: resolveLabel(origemVendaId, lookups.origensVenda.data), onClear: () => setOrigemVendaId("") });
-    if (areaAtuacaoId) badges.push({ key: "aa", label: "Área Atuação", displayValue: resolveLabel(areaAtuacaoId, lookups.areasAtuacao.data), onClear: () => setAreaAtuacaoId("") });
-    if (segmentoId) badges.push({ key: "seg", label: "Segmento", displayValue: resolveLabel(segmentoId, lookups.segmentos.data), onClear: () => setSegmentoId("") });
-    if (funcionarioId) badges.push({ key: "func", label: "Funcionário", displayValue: resolveLabel(funcionarioId, lookups.funcionarios.data), onClear: () => setFuncionarioId("") });
-    if (fornecedorId) badges.push({ key: "forn", label: "Fornecedor", displayValue: resolveLabel(fornecedorId, lookups.fornecedores.data), onClear: () => setFornecedorId("") });
-    if (estadoId) badges.push({ key: "est", label: "Estado", displayValue: resolveLabel(estadoId, lookups.estados.data as any), onClear: () => setEstadoId("") });
-    if (cidadeId) badges.push({ key: "cid", label: "Cidade", displayValue: resolveLabel(cidadeId, lookups.cidades.data), onClear: () => setCidadeId("") });
-    if (motivoCancelamentoId) badges.push({ key: "mot", label: "Motivo Cancel.", displayValue: resolveLabel(motivoCancelamentoId, lookups.motivosCancelamento.data?.map(m => ({ id: m.id, nome: m.descricao }))), onClear: () => setMotivoCancelamentoId("") });
+    if (unidadeBaseQuick) badges.push({ key: "ub", label: "Unidade Base", displayValue: resolveLabel(unidadeBaseQuick, lookups.unidadesBase.data), onClear: () => updateFilter("unidadeBaseQuick", "") });
+    if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => updateFilter("recorrenciaAdv", "") });
+    if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => updateFilter("modeloContratoId", "") });
+    if (produtoId) badges.push({ key: "prod", label: "Produto", displayValue: resolveLabel(produtoId, lookups.produtos.data), onClear: () => updateFilter("produtoId", "") });
+    if (origemVendaId) badges.push({ key: "ov", label: "Origem Venda", displayValue: resolveLabel(origemVendaId, lookups.origensVenda.data), onClear: () => updateFilter("origemVendaId", "") });
+    if (areaAtuacaoId) badges.push({ key: "aa", label: "Área Atuação", displayValue: resolveLabel(areaAtuacaoId, lookups.areasAtuacao.data), onClear: () => updateFilter("areaAtuacaoId", "") });
+    if (segmentoId) badges.push({ key: "seg", label: "Segmento", displayValue: resolveLabel(segmentoId, lookups.segmentos.data), onClear: () => updateFilter("segmentoId", "") });
+    if (funcionarioId) badges.push({ key: "func", label: "Funcionário", displayValue: resolveLabel(funcionarioId, lookups.funcionarios.data), onClear: () => updateFilter("funcionarioId", "") });
+    if (fornecedorId) badges.push({ key: "forn", label: "Fornecedor", displayValue: resolveLabel(fornecedorId, lookups.fornecedores.data), onClear: () => updateFilter("fornecedorId", "") });
+    if (estadoId) badges.push({ key: "est", label: "Estado", displayValue: resolveLabel(estadoId, lookups.estados.data as any), onClear: () => updateFilter("estadoId", "") });
+    if (cidadeId) badges.push({ key: "cid", label: "Cidade", displayValue: resolveLabel(cidadeId, lookups.cidades.data), onClear: () => updateFilter("cidadeId", "") });
+    if (motivoCancelamentoId) badges.push({ key: "mot", label: "Motivo Cancel.", displayValue: resolveLabel(motivoCancelamentoId, lookups.motivosCancelamento.data?.map(m => ({ id: m.id, nome: m.descricao }))), onClear: () => updateFilter("motivoCancelamentoId", "") });
 
     const fmtDate = (d: Date) => format(d, "dd/MM/yy");
-    if (periodoCadastro.from || periodoCadastro.to) badges.push({ key: "pc", label: "Cadastro", displayValue: `${periodoCadastro.from ? fmtDate(periodoCadastro.from) : "…"} – ${periodoCadastro.to ? fmtDate(periodoCadastro.to) : "…"}`, onClear: () => setPeriodoCadastro({}) });
-    if (periodoCancelamento.from || periodoCancelamento.to) badges.push({ key: "pcan", label: "Cancelamento", displayValue: `${periodoCancelamento.from ? fmtDate(periodoCancelamento.from) : "…"} – ${periodoCancelamento.to ? fmtDate(periodoCancelamento.to) : "…"}`, onClear: () => setPeriodoCancelamento({}) });
-    if (periodoVenda.from || periodoVenda.to) badges.push({ key: "pv", label: "Venda", displayValue: `${periodoVenda.from ? fmtDate(periodoVenda.from) : "…"} – ${periodoVenda.to ? fmtDate(periodoVenda.to) : "…"}`, onClear: () => setPeriodoVenda({}) });
-    if (periodoAtivacao.from || periodoAtivacao.to) badges.push({ key: "pa", label: "Ativação", displayValue: `${periodoAtivacao.from ? fmtDate(periodoAtivacao.from) : "…"} – ${periodoAtivacao.to ? fmtDate(periodoAtivacao.to) : "…"}`, onClear: () => setPeriodoAtivacao({}) });
+    if (periodoCadastro.from || periodoCadastro.to) badges.push({ key: "pc", label: "Cadastro", displayValue: `${periodoCadastro.from ? fmtDate(periodoCadastro.from) : "…"} – ${periodoCadastro.to ? fmtDate(periodoCadastro.to) : "…"}`, onClear: () => updateFilter("periodoCadastro", {}) });
+    if (periodoCancelamento.from || periodoCancelamento.to) badges.push({ key: "pcan", label: "Cancelamento", displayValue: `${periodoCancelamento.from ? fmtDate(periodoCancelamento.from) : "…"} – ${periodoCancelamento.to ? fmtDate(periodoCancelamento.to) : "…"}`, onClear: () => updateFilter("periodoCancelamento", {}) });
+    if (periodoVenda.from || periodoVenda.to) badges.push({ key: "pv", label: "Venda", displayValue: `${periodoVenda.from ? fmtDate(periodoVenda.from) : "…"} – ${periodoVenda.to ? fmtDate(periodoVenda.to) : "…"}`, onClear: () => updateFilter("periodoVenda", {}) });
+    if (periodoAtivacao.from || periodoAtivacao.to) badges.push({ key: "pa", label: "Ativação", displayValue: `${periodoAtivacao.from ? fmtDate(periodoAtivacao.from) : "…"} – ${periodoAtivacao.to ? fmtDate(periodoAtivacao.to) : "…"}`, onClear: () => updateFilter("periodoAtivacao", {}) });
 
-    if (mensalidadeMin || mensalidadeMax) badges.push({ key: "mens", label: "Mensalidade", displayValue: `${mensalidadeMin || "…"} – ${mensalidadeMax || "…"}`, onClear: () => { setMensalidadeMin(""); setMensalidadeMax(""); } });
-    if (lucroMin || lucroMax) badges.push({ key: "luc", label: "Lucro", displayValue: `${lucroMin || "…"} – ${lucroMax || "…"}`, onClear: () => { setLucroMin(""); setLucroMax(""); } });
-    if (margemMin || margemMax) badges.push({ key: "marg", label: "Margem", displayValue: `${margemMin || "…"} – ${margemMax || "…"}`, onClear: () => { setMargemMin(""); setMargemMax(""); } });
+    if (mensalidadeMin || mensalidadeMax) badges.push({ key: "mens", label: "Mensalidade", displayValue: `${mensalidadeMin || "…"} – ${mensalidadeMax || "…"}`, onClear: () => { updateFilter("mensalidadeMin", ""); updateFilter("mensalidadeMax", ""); } });
+    if (lucroMin || lucroMax) badges.push({ key: "luc", label: "Lucro", displayValue: `${lucroMin || "…"} – ${lucroMax || "…"}`, onClear: () => { updateFilter("lucroMin", ""); updateFilter("lucroMax", ""); } });
+    if (margemMin || margemMax) badges.push({ key: "marg", label: "Margem", displayValue: `${margemMin || "…"} – ${margemMax || "…"}`, onClear: () => { updateFilter("margemMin", ""); updateFilter("margemMax", ""); } });
 
     return badges;
-  }, [unidadeBaseQuick, recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups]);
+  }, [unidadeBaseQuick, recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
 
   // Helper for Select value/onChange with __all__ pattern
   const selVal = (v: string) => v || "__all__";
-  const selChange = (setter: (v: string) => void) => (v: string) => setter(v === "__all__" ? "" : v);
+  const selChange = (key: keyof typeof filters) => (v: string) => updateFilter(key as any, v === "__all__" ? "" : v);
+
+  // Handle row click with Cmd+Click support
+  const handleRowClick = useCallback((e: React.MouseEvent, clienteId: string) => {
+    if (e.metaKey || e.ctrlKey) {
+      window.open(`/clientes/${clienteId}`, '_blank');
+    } else {
+      navigate(`/clientes/${clienteId}`);
+    }
+  }, [navigate]);
 
   return (
     <div className="space-y-4">
@@ -580,11 +534,11 @@ export default function Clientes() {
           <Input
             placeholder="Buscar por Cód. Seq., razão social, fantasia, CNPJ..."
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => updateFilter("searchText", e.target.value)}
             className="pl-9"
           />
         </div>
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={(v) => updateFilter("status", v)}>
           <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="ativos">Ativos</SelectItem>
@@ -592,7 +546,7 @@ export default function Clientes() {
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={selVal(unidadeBaseQuick)} onValueChange={selChange(setUnidadeBaseQuick)}>
+        <Select value={selVal(unidadeBaseQuick)} onValueChange={selChange("unidadeBaseQuick")}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Unidade Base" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Todas Unidades</SelectItem>
@@ -605,7 +559,7 @@ export default function Clientes() {
       </div>
 
       {/* Advanced filters */}
-      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+      <Collapsible open={filtersOpen} onOpenChange={(v) => updateFilter("filtersOpen", v)}>
         <div className="flex items-center gap-2">
           <CollapsibleTrigger asChild>
             <Button variant="outline" size="sm">
@@ -615,7 +569,7 @@ export default function Clientes() {
             </Button>
           </CollapsibleTrigger>
           {activeFilters.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs text-muted-foreground">
+            <Button variant="ghost" size="sm" onClick={clearAdvancedFilters} className="text-xs text-muted-foreground">
               Limpar filtros
             </Button>
           )}
@@ -642,17 +596,17 @@ export default function Clientes() {
           <div className="rounded-lg border bg-card p-4 space-y-4">
             {/* Row 1 - Date ranges */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <DateRangePicker label="Período de Cadastro" value={periodoCadastro} onChange={setPeriodoCadastro} />
-              <DateRangePicker label="Período de Cancelamento" value={periodoCancelamento} onChange={setPeriodoCancelamento} />
-              <DateRangePicker label="Período da Venda" value={periodoVenda} onChange={setPeriodoVenda} />
-              <DateRangePicker label="Período de Ativação" value={periodoAtivacao} onChange={setPeriodoAtivacao} />
+              <DateRangePicker label="Período de Cadastro" value={periodoCadastro} onChange={(v) => updateFilter("periodoCadastro", v)} />
+              <DateRangePicker label="Período de Cancelamento" value={periodoCancelamento} onChange={(v) => updateFilter("periodoCancelamento", v)} />
+              <DateRangePicker label="Período da Venda" value={periodoVenda} onChange={(v) => updateFilter("periodoVenda", v)} />
+              <DateRangePicker label="Período de Ativação" value={periodoAtivacao} onChange={(v) => updateFilter("periodoAtivacao", v)} />
             </div>
 
             {/* Row 2 - Lookups */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Recorrência</label>
-                <Select value={selVal(recorrenciaAdv)} onValueChange={selChange(setRecorrenciaAdv)}>
+                <Select value={selVal(recorrenciaAdv)} onValueChange={selChange("recorrenciaAdv")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
@@ -666,7 +620,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Modelo de Contrato</label>
-                <Select value={selVal(modeloContratoId)} onValueChange={selChange(setModeloContratoId)}>
+                <Select value={selVal(modeloContratoId)} onValueChange={selChange("modeloContratoId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -677,7 +631,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Produto</label>
-                <Select value={selVal(produtoId)} onValueChange={selChange(setProdutoId)}>
+                <Select value={selVal(produtoId)} onValueChange={selChange("produtoId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -688,7 +642,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Origem da Venda</label>
-                <Select value={selVal(origemVendaId)} onValueChange={selChange(setOrigemVendaId)}>
+                <Select value={selVal(origemVendaId)} onValueChange={selChange("origemVendaId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
@@ -703,7 +657,7 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Área de Atuação</label>
-                <Select value={selVal(areaAtuacaoId)} onValueChange={selChange(setAreaAtuacaoId)}>
+                <Select value={selVal(areaAtuacaoId)} onValueChange={selChange("areaAtuacaoId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
@@ -714,7 +668,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Segmento</label>
-                <Select value={selVal(segmentoId)} onValueChange={selChange(setSegmentoId)}>
+                <Select value={selVal(segmentoId)} onValueChange={selChange("segmentoId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -725,7 +679,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Funcionário</label>
-                <Select value={selVal(funcionarioId)} onValueChange={selChange(setFuncionarioId)}>
+                <Select value={selVal(funcionarioId)} onValueChange={selChange("funcionarioId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -736,7 +690,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
-                <Select value={selVal(fornecedorId)} onValueChange={selChange(setFornecedorId)}>
+                <Select value={selVal(fornecedorId)} onValueChange={selChange("fornecedorId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -751,7 +705,7 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Estado</label>
-                <Select value={selVal(estadoId)} onValueChange={selChange(setEstadoId)}>
+                <Select value={selVal(estadoId)} onValueChange={selChange("estadoId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -762,7 +716,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Cidade</label>
-                <Select value={selVal(cidadeId)} onValueChange={selChange(setCidadeId)} disabled={!estadoIdNumeric}>
+                <Select value={selVal(cidadeId)} onValueChange={selChange("cidadeId")} disabled={!estadoIdNumeric}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={estadoIdNumeric ? undefined : "Selecione estado"} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todas</SelectItem>
@@ -773,7 +727,7 @@ export default function Clientes() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Motivo Cancelamento</label>
-                <Select value={selVal(motivoCancelamentoId)} onValueChange={selChange(setMotivoCancelamentoId)}>
+                <Select value={selVal(motivoCancelamentoId)} onValueChange={selChange("motivoCancelamentoId")}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
@@ -782,13 +736,13 @@ export default function Clientes() {
                   </SelectContent>
                 </Select>
               </div>
-              <RangeInput label="Mensalidade R$" min={mensalidadeMin} max={mensalidadeMax} onMinChange={setMensalidadeMin} onMaxChange={setMensalidadeMax} prefix="R$" />
+              <RangeInput label="Mensalidade R$" min={mensalidadeMin} max={mensalidadeMax} onMinChange={(v) => updateFilter("mensalidadeMin", v)} onMaxChange={(v) => updateFilter("mensalidadeMax", v)} prefix="R$" />
             </div>
 
             {/* Row 5 - Numeric ranges */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={setLucroMin} onMaxChange={setLucroMax} prefix="R$" />
-              <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={setMargemMin} onMaxChange={setMargemMax} prefix="%" />
+              <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={(v) => updateFilter("lucroMin", v)} onMaxChange={(v) => updateFilter("lucroMax", v)} prefix="R$" />
+              <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={(v) => updateFilter("margemMin", v)} onMaxChange={(v) => updateFilter("margemMax", v)} prefix="%" />
             </div>
           </div>
         </CollapsibleContent>
@@ -835,7 +789,11 @@ export default function Clientes() {
               </TableRow>
             ) : (
               clientes.map((c) => (
-                <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/clientes/${c.id}`)}>
+                <TableRow
+                  key={c.id}
+                  className="cursor-pointer"
+                  onClick={(e) => handleRowClick(e, c.id)}
+                >
                   <TableCell className="font-mono text-xs">{c.codigo_sequencial ?? "—"}</TableCell>
                   <TableCell>
                     <div className="font-medium">{c.razao_social || "—"}</div>
@@ -867,10 +825,10 @@ export default function Clientes() {
             {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount}
           </p>
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => updateFilter("page", page - 1)}>
               Anterior
             </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => updateFilter("page", page + 1)}>
               Próxima
             </Button>
           </div>

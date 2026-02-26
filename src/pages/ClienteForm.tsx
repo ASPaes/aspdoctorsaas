@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,11 +7,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLookups } from "@/hooks/useLookups";
+import { getNavIds } from "@/hooks/useClientesFilters";
 import { Form, FormField, FormControl } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
@@ -80,6 +81,21 @@ export default function ClienteForm() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
   const [mrrModalOpen, setMrrModalOpen] = useState(false);
+
+  // Navigation between records
+  const navInfo = useMemo(() => {
+    if (!id) return null;
+    const ids = getNavIds();
+    if (!ids.length) return null;
+    const idx = ids.indexOf(id);
+    if (idx === -1) return null;
+    return {
+      currentIndex: idx,
+      total: ids.length,
+      prevId: idx > 0 ? ids[idx - 1] : null,
+      nextId: idx < ids.length - 1 ? ids[idx + 1] : null,
+    };
+  }, [id]);
 
   const form = useForm<ClienteFormValues>({
     resolver: zodResolver(clienteSchema),
@@ -211,10 +227,37 @@ export default function ClienteForm() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/clientes")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">{isEditing ? "Editar Cliente" : "Novo Cliente"}</h1>
             <p className="text-sm text-muted-foreground">Preencha os dados do cliente e contrato</p>
           </div>
+
+          {/* Prev/Next navigation */}
+          {isEditing && navInfo && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!navInfo.prevId}
+                onClick={() => navInfo.prevId && navigate(`/clientes/${navInfo.prevId}`)}
+                title="Cliente anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground px-2 whitespace-nowrap">
+                {navInfo.currentIndex + 1} / {navInfo.total}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!navInfo.nextId}
+                onClick={() => navInfo.nextId && navigate(`/clientes/${navInfo.nextId}`)}
+                title="Próximo cliente"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
