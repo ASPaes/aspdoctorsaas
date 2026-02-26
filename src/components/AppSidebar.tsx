@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, UserCog } from "lucide-react";
+import { Users, ClipboardList, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, UserCog, LayoutDashboard } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const navItems = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },

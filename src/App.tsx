@@ -14,6 +14,7 @@ const Login = lazy(() => import("@/pages/Login"));
 const Signup = lazy(() => import("@/pages/Signup"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Clientes = lazy(() => import("@/pages/Clientes"));
 const ClienteForm = lazy(() => import("@/pages/ClienteForm"));
 const Cadastros = lazy(() => import("@/pages/Cadastros"));
@@ -61,6 +62,7 @@ const App = () => (
 
             {/* Protected routes */}
             <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/clientes/novo" element={<ClienteForm />} />
               <Route path="/clientes/:id" element={<ClienteForm />} />
@@ -77,7 +79,7 @@ const App = () => (
               </Route>
             </Route>
 
-            <Route path="/" element={<Navigate to="/clientes" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
