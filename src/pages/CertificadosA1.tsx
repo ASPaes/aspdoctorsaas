@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
+import { useCertA1Filters } from "@/hooks/useCertA1Filters";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -42,19 +43,16 @@ const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: 
 export default function CertificadosA1() {
   const queryClient = useQueryClient();
   const lookups = useLookups();
+  const { filters, updateFilter } = useCertA1Filters();
 
-  // Filters
-  const [searchText, setSearchText] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>("todos");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [somenteGanho, setSomenteGanho] = useState(false);
-  const [vencimentoDe, setVencimentoDe] = useState("");
-  const [vencimentoAte, setVencimentoAte] = useState("");
+  const {
+    searchText, quickFilter: quickFilterRaw, statusFilter, somenteGanho,
+    vencimentoDe, vencimentoAte, sortField: sortFieldRaw, sortDir: sortDirRaw,
+  } = filters;
 
-  // Sort
-  const [sortField, setSortField] = useState<SortField>("cert_a1_vencimento");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const quickFilter = quickFilterRaw as QuickFilter;
+  const sortField = sortFieldRaw as SortField;
+  const sortDir = sortDirRaw as SortDir;
 
   // Modals
   const [editVencimentoCliente, setEditVencimentoCliente] = useState<any>(null);
@@ -70,6 +68,7 @@ export default function CertificadosA1() {
   const [dataBaseRenovacao, setDataBaseRenovacao] = useState("");
   const [motivoPerda, setMotivoPerda] = useState("");
 
+  const [debouncedSearch, setDebouncedSearch] = useState(searchText);
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchText), 300);
     return () => clearTimeout(t);
@@ -162,9 +161,9 @@ export default function CertificadosA1() {
   }, [funcionarios]);
 
   const toggleSort = useCallback((field: SortField) => {
-    if (sortField === field) setSortDir((d) => d === "asc" ? "desc" : "asc");
-    else { setSortField(field); setSortDir("asc"); }
-  }, [sortField]);
+    if (sortField === field) updateFilter("sortDir", sortDir === "asc" ? "desc" : "asc");
+    else { updateFilter("sortField", field); updateFilter("sortDir", "asc"); }
+  }, [sortField, sortDir, updateFilter]);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />;
@@ -273,7 +272,7 @@ export default function CertificadosA1() {
             key={b.key}
             variant={quickFilter === b.key ? "default" : "outline"}
             size="sm"
-            onClick={() => setQuickFilter(b.key)}
+            onClick={() => updateFilter("quickFilter", b.key)}
           >
             {b.label}
           </Button>
@@ -285,11 +284,11 @@ export default function CertificadosA1() {
         <div className="flex gap-2 items-end">
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">De</label>
-            <Input type="date" value={vencimentoDe} onChange={(e) => setVencimentoDe(e.target.value)} className="h-8 text-xs" />
+            <Input type="date" value={vencimentoDe} onChange={(e) => updateFilter("vencimentoDe", e.target.value)} className="h-8 text-xs" />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Até</label>
-            <Input type="date" value={vencimentoAte} onChange={(e) => setVencimentoAte(e.target.value)} className="h-8 text-xs" />
+            <Input type="date" value={vencimentoAte} onChange={(e) => updateFilter("vencimentoAte", e.target.value)} className="h-8 text-xs" />
           </div>
         </div>
       )}
@@ -301,11 +300,11 @@ export default function CertificadosA1() {
           <Input
            placeholder="Buscar cód. sequencial, razão social, fantasia, CNPJ..."
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => updateFilter("searchText", e.target.value)}
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => updateFilter("statusFilter", v)}>
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Todos status" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos_status">Todos</SelectItem>
@@ -316,7 +315,7 @@ export default function CertificadosA1() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2">
-          <Checkbox id="somenteGanho" checked={somenteGanho} onCheckedChange={(v) => setSomenteGanho(v === true)} />
+          <Checkbox id="somenteGanho" checked={somenteGanho} onCheckedChange={(v) => updateFilter("somenteGanho", v === true)} />
           <label htmlFor="somenteGanho" className="text-sm whitespace-nowrap">Somente vendidos</label>
         </div>
       </div>
