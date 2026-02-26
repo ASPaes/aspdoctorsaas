@@ -217,28 +217,7 @@ export default function Clientes() {
       applyLookupFilter("area_atuacao_id", areaAtuacaoId);
       applyLookupFilter("segmento_id", segmentoId);
       applyLookupFilter("funcionario_id", funcionarioId);
-
-      // fornecedor_id não existe na view vw_clientes_financeiro;
-      // aplicamos o filtro via tabela base e intersectamos pelos IDs de cliente.
-      if (fornecedorId) {
-        let fornecedorClientesQuery = supabase.from("clientes").select("id");
-
-        if (fornecedorId === "__null__") {
-          fornecedorClientesQuery = fornecedorClientesQuery.is("fornecedor_id", null);
-        } else {
-          fornecedorClientesQuery = fornecedorClientesQuery.eq("fornecedor_id", Number(fornecedorId));
-        }
-
-        const { data: fornecedorClientes, error: fornecedorError } = await fornecedorClientesQuery;
-        if (fornecedorError) throw fornecedorError;
-
-        const fornecedorClienteIds = fornecedorClientes?.map((c) => c.id) ?? [];
-        if (!fornecedorClienteIds.length) return { rows: [], totalCount: 0 };
-
-        q = q.in("id", fornecedorClienteIds);
-      }
-
-      // Numeric ranges
+      applyLookupFilter("fornecedor_id", fornecedorId);
       if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
       if (mensalidadeMax) q = q.lte("mensalidade", Number(mensalidadeMax));
       if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));

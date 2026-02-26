@@ -1556,6 +1556,7 @@ export type Database = {
           fixos_rs: number | null
           forma_pagamento_ativacao_id: number | null
           forma_pagamento_mensalidade_id: number | null
+          fornecedor_id: number | null
           funcionario_id: number | null
           id: string | null
           imposto_percentual: number | null
@@ -1605,6 +1606,7 @@ export type Database = {
           fixos_rs?: never
           forma_pagamento_ativacao_id?: number | null
           forma_pagamento_mensalidade_id?: number | null
+          fornecedor_id?: number | null
           funcionario_id?: number | null
           id?: string | null
           imposto_percentual?: number | null
@@ -1654,6 +1656,7 @@ export type Database = {
           fixos_rs?: never
           forma_pagamento_ativacao_id?: number | null
           forma_pagamento_mensalidade_id?: number | null
+          fornecedor_id?: number | null
           funcionario_id?: number | null
           id?: string | null
           imposto_percentual?: number | null
@@ -1723,6 +1726,13 @@ export type Database = {
             columns: ["forma_pagamento_mensalidade_id"]
             isOneToOne: false
             referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
             referencedColumns: ["id"]
           },
           {
