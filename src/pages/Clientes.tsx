@@ -145,6 +145,22 @@ export default function Clientes() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filterKey]);
 
+  const applyAtivacaoDateFilter = async (q: any) => {
+    if (!periodoAtivacao.from && !periodoAtivacao.to) return q;
+
+    let ativacaoQ = supabase.from("clientes").select("id");
+    if (periodoAtivacao.from) ativacaoQ = ativacaoQ.gte("data_ativacao", format(periodoAtivacao.from, "yyyy-MM-dd"));
+    if (periodoAtivacao.to) ativacaoQ = ativacaoQ.lte("data_ativacao", format(periodoAtivacao.to, "yyyy-MM-dd"));
+
+    const { data: ativacaoRows, error: ativacaoError } = await ativacaoQ;
+    if (ativacaoError) throw ativacaoError;
+
+    const ativacaoIds = (ativacaoRows ?? []).map((row: { id: string }) => row.id);
+    if (ativacaoIds.length === 0) return q.eq("id", "00000000-0000-0000-0000-000000000000");
+
+    return q.in("id", ativacaoIds);
+  };
+
   // Query "Novos no Mês" respeitando os filtros ativos
   const { data: novosNoMes } = useQuery({
     queryKey: ["clientes_novos_mes", filterKey],
@@ -173,6 +189,19 @@ export default function Clientes() {
       if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
       else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
 
+      if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
+      else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
+
+      const applyDateRange = (field: string, range: DateRange) => {
+        if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
+        if (range.to) q = q.lte(field, format(range.to, "yyyy-MM-dd"));
+      };
+      applyDateRange("data_cadastro", periodoCadastro);
+      applyDateRange("data_cancelamento", periodoCancelamento);
+      applyDateRange("data_venda", periodoVenda);
+
+      q = await applyAtivacaoDateFilter(q);
+
       const applyLookup = (field: string, val: string) => {
         if (val === "__null__") q = q.is(field, null);
         else if (val) q = q.eq(field, Number(val));
@@ -187,9 +216,6 @@ export default function Clientes() {
       applyLookup("segmento_id", segmentoId);
       applyLookup("funcionario_id", funcionarioId);
       applyLookup("fornecedor_id", fornecedorId);
-
-      if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
-      else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
 
       if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
       if (mensalidadeMax) q = q.lte("mensalidade", Number(mensalidadeMax));
@@ -241,7 +267,8 @@ export default function Clientes() {
       applyDateRange("data_cadastro", periodoCadastro);
       applyDateRange("data_cancelamento", periodoCancelamento);
       applyDateRange("data_venda", periodoVenda);
-      applyDateRange("data_ativacao", periodoAtivacao);
+
+      q = await applyAtivacaoDateFilter(q);
 
       // Lookup filters helper
       const applyLookupFilter = (field: string, val: string) => {
