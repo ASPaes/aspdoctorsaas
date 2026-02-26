@@ -289,6 +289,7 @@ export default function Clientes() {
       "cnpj",
       "produto_id",
       "mensalidade",
+      "data_ativacao",
       "cancelado",
       "data_venda",
       "unidade_base_id",
