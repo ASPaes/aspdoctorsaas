@@ -145,103 +145,222 @@ export default function Clientes() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filterKey]);
 
-  // Helper: aplica filtros de datas e valores via tabela clientes (sub-query por IDs)
-  const applyClientesSubFilters = async (q: any) => {
+  const parseFilterNumber = useCallback((value: string): number | null => {
+    const raw = value.trim();
+    if (!raw) return null;
+    let normalized = raw;
+    if (normalized.includes(",") && normalized.includes(".")) normalized = normalized.replace(/\./g, "").replace(",", ".");
+    else if (normalized.includes(",")) normalized = normalized.replace(",", ".");
+    const num = Number(normalized);
+    return Number.isFinite(num) ? num : null;
+  }, []);
+
+  const valueFilters = useMemo(() => ({
+    mensalidadeMin: parseFilterNumber(mensalidadeMin),
+    mensalidadeMax: parseFilterNumber(mensalidadeMax),
+    lucroMin: parseFilterNumber(lucroMin),
+    lucroMax: parseFilterNumber(lucroMax),
+    margemMin: parseFilterNumber(margemMin),
+    margemMax: parseFilterNumber(margemMax),
+  }), [mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, parseFilterNumber]);
+
+  const hasDateOrValueFilters = useMemo(() => {
     const hasDateFilter = periodoCadastro.from || periodoCadastro.to
       || periodoCancelamento.from || periodoCancelamento.to
       || periodoVenda.from || periodoVenda.to
       || periodoAtivacao.from || periodoAtivacao.to;
 
-    const hasValueFilter = [mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax]
-      .some((v) => v.trim() !== "");
+    const hasValueFilter = valueFilters.mensalidadeMin !== null
+      || valueFilters.mensalidadeMax !== null
+      || valueFilters.lucroMin !== null
+      || valueFilters.lucroMax !== null
+      || valueFilters.margemMin !== null
+      || valueFilters.margemMax !== null;
 
-    if (!hasDateFilter && !hasValueFilter) return q;
+    return Boolean(hasDateFilter || hasValueFilter);
+  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters]);
 
-    const parseFilterNumber = (value: string): number | null => {
-      const raw = value.trim();
-      if (!raw) return null;
-      let normalized = raw;
-      if (normalized.includes(",") && normalized.includes(".")) normalized = normalized.replace(/\./g, "").replace(",", ".");
-      else if (normalized.includes(",")) normalized = normalized.replace(",", ".");
-      const num = Number(normalized);
-      return Number.isFinite(num) ? num : null;
+  const round2 = useCallback((n: number) => Math.round((n + Number.EPSILON) * 100) / 100, []);
+
+  const computeLucroReal = useCallback((row: any) => {
+    const mensalidade = Number(row.mensalidade ?? 0);
+    if (!(mensalidade > 0)) return 0;
+    const custo = Number(row.custo_operacao ?? 0);
+    const imposto = Number(row.imposto_percentual ?? 0);
+    const fixo = Number(row.custo_fixo_percentual ?? 0);
+    return round2((mensalidade - custo) - round2(mensalidade * imposto) - round2(mensalidade * fixo));
+  }, [round2]);
+
+  const computeMargemBruta = useCallback((row: any) => {
+    const mensalidade = Number(row.mensalidade ?? 0);
+    if (!(mensalidade > 0)) return 0;
+    const custo = Number(row.custo_operacao ?? 0);
+    return round2(((mensalidade - custo) / mensalidade) * 100);
+  }, [round2]);
+
+  const applyCommonFiltersOnClientes = useCallback((query: any, options?: { forNovosNoMes?: boolean }) => {
+    let q = query;
+    const forNovosNoMes = options?.forNovosNoMes === true;
+
+    if (forNovosNoMes) {
+      const now = new Date();
+      const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
+      const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
+      q = q.eq("cancelado", false)
+        .gte("data_venda", firstDay)
+        .lte("data_venda", lastDay);
+    } else {
+      if (status === "ativos") q = q.eq("cancelado", false);
+      else if (status === "cancelados") q = q.eq("cancelado", true);
+    }
+
+    if (debouncedSearch) {
+      const s = `%${debouncedSearch}%`;
+      const isNumeric = /^\d+$/.test(debouncedSearch.trim());
+      if (isNumeric) {
+        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
+      } else {
+        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+      }
+    }
+
+    if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
+    else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
+
+    if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
+    else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
+
+    const applyLookupFilter = (field: string, val: string) => {
+      if (val === "__null__") q = q.is(field, null);
+      else if (val) q = q.eq(field, Number(val));
     };
-
-    const mensalidadeMinNum = parseFilterNumber(mensalidadeMin);
-    const mensalidadeMaxNum = parseFilterNumber(mensalidadeMax);
-    const lucroMinNum = parseFilterNumber(lucroMin);
-    const lucroMaxNum = parseFilterNumber(lucroMax);
-    const margemMinNum = parseFilterNumber(margemMin);
-    const margemMaxNum = parseFilterNumber(margemMax);
-
-    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-
-    const computeLucroReal = (row: any) => {
-      const mensalidade = Number(row.mensalidade ?? 0);
-      if (!(mensalidade > 0)) return 0;
-      const custo = Number(row.custo_operacao ?? 0);
-      const imposto = Number(row.imposto_percentual ?? 0);
-      const fixo = Number(row.custo_fixo_percentual ?? 0);
-      return round2((mensalidade - custo) - round2(mensalidade * imposto) - round2(mensalidade * fixo));
-    };
-
-    const computeMargemBruta = (row: any) => {
-      const mensalidade = Number(row.mensalidade ?? 0);
-      if (!(mensalidade > 0)) return 0;
-      const custo = Number(row.custo_operacao ?? 0);
-      return round2(((mensalidade - custo) / mensalidade) * 100);
-    };
-
-    let baseQ = supabase
-      .from("clientes")
-      .select("id, data_cadastro, data_cancelamento, data_venda, data_ativacao, mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual") as any;
+    applyLookupFilter("modelo_contrato_id", modeloContratoId);
+    applyLookupFilter("produto_id", produtoId);
+    applyLookupFilter("origem_venda_id", origemVendaId);
+    applyLookupFilter("estado_id", estadoId);
+    applyLookupFilter("cidade_id", cidadeId);
+    applyLookupFilter("motivo_cancelamento_id", motivoCancelamentoId);
+    applyLookupFilter("area_atuacao_id", areaAtuacaoId);
+    applyLookupFilter("segmento_id", segmentoId);
+    applyLookupFilter("funcionario_id", funcionarioId);
+    applyLookupFilter("fornecedor_id", fornecedorId);
 
     const applyDateRange = (field: string, range: DateRange) => {
-      if (range.from) baseQ = baseQ.gte(field, format(range.from, "yyyy-MM-dd"));
-      if (range.to) baseQ = baseQ.lte(field, format(range.to, "yyyy-MM-dd"));
+      if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
+      if (range.to) q = q.lte(field, format(range.to, "yyyy-MM-dd"));
     };
     applyDateRange("data_cadastro", periodoCadastro);
     applyDateRange("data_cancelamento", periodoCancelamento);
     applyDateRange("data_venda", periodoVenda);
     applyDateRange("data_ativacao", periodoAtivacao);
 
-    if (mensalidadeMinNum !== null) baseQ = baseQ.gte("mensalidade", mensalidadeMinNum);
-    if (mensalidadeMaxNum !== null) baseQ = baseQ.lte("mensalidade", mensalidadeMaxNum);
+    if (valueFilters.mensalidadeMin !== null) q = q.gte("mensalidade", valueFilters.mensalidadeMin);
+    if (valueFilters.mensalidadeMax !== null) q = q.lte("mensalidade", valueFilters.mensalidadeMax);
+
+    return q;
+  }, [
+    areaAtuacaoId,
+    cidadeId,
+    debouncedSearch,
+    estadoId,
+    fornecedorId,
+    funcionarioId,
+    modeloContratoId,
+    motivoCancelamentoId,
+    origemVendaId,
+    periodoAtivacao,
+    periodoCadastro,
+    periodoCancelamento,
+    periodoVenda,
+    produtoId,
+    recorrenciaAdv,
+    segmentoId,
+    status,
+    unidadeBaseQuick,
+    valueFilters,
+  ]);
+
+  const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
+    const selectFields = [
+      "id",
+      "codigo_sequencial",
+      "razao_social",
+      "nome_fantasia",
+      "cnpj",
+      "produto_id",
+      "mensalidade",
+      "cancelado",
+      "data_venda",
+      "unidade_base_id",
+      "custo_operacao",
+      "imposto_percentual",
+      "custo_fixo_percentual",
+    ].join(",");
 
     const pageSize = 1000;
-    let from = 0;
     const rows: any[] = [];
 
-    while (true) {
-      const { data, error } = await baseQ.range(from, from + pageSize - 1);
+    for (let offset = 0; ; offset += pageSize) {
+      let q = supabase.from("clientes").select(selectFields) as any;
+      q = applyCommonFiltersOnClientes(q, options);
+      q = q.range(offset, offset + pageSize - 1);
+
+      const { data, error } = await q;
       if (error) throw error;
       if (!data || data.length === 0) break;
+
       rows.push(...data);
       if (data.length < pageSize) break;
-      from += pageSize;
     }
 
-    const filteredRows = rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       const lucroReal = computeLucroReal(row);
       const margemBruta = computeMargemBruta(row);
 
-      if (lucroMinNum !== null && lucroReal < lucroMinNum) return false;
-      if (lucroMaxNum !== null && lucroReal > lucroMaxNum) return false;
-      if (margemMinNum !== null && margemBruta < margemMinNum) return false;
-      if (margemMaxNum !== null && margemBruta > margemMaxNum) return false;
+      if (valueFilters.lucroMin !== null && lucroReal < valueFilters.lucroMin) return false;
+      if (valueFilters.lucroMax !== null && lucroReal > valueFilters.lucroMax) return false;
+      if (valueFilters.margemMin !== null && margemBruta < valueFilters.margemMin) return false;
+      if (valueFilters.margemMax !== null && margemBruta > valueFilters.margemMax) return false;
 
       return true;
     });
 
-    const ids = filteredRows.map((r: { id: string }) => r.id);
-    if (ids.length === 0) return q.eq("id", "00000000-0000-0000-0000-000000000000");
-    return q.in("id", ids);
-  };
+    const withCalculated = filtered.map((row) => ({
+      ...row,
+      lucro_real: computeLucroReal(row),
+      margem_bruta_percent: computeMargemBruta(row),
+    }));
+
+    if (options?.forNovosNoMes) return withCalculated;
+
+    const sorted = [...withCalculated].sort((a, b) => {
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+
+      let cmp = 0;
+      if (sortField === "mensalidade" || sortField === "codigo_sequencial") {
+        cmp = Number(aVal ?? Number.NEGATIVE_INFINITY) - Number(bVal ?? Number.NEGATIVE_INFINITY);
+      } else if (sortField === "cancelado") {
+        cmp = Number(Boolean(aVal)) - Number(Boolean(bVal));
+      } else {
+        cmp = String(aVal ?? "").localeCompare(String(bVal ?? ""), "pt-BR", { sensitivity: "base" });
+      }
+
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters]);
 
   // Query "Novos no Mês" respeitando os filtros ativos
   const { data: novosNoMes } = useQuery({
     queryKey: ["clientes_novos_mes", filterKey],
     queryFn: async () => {
+      if (hasDateOrValueFilters) {
+        const rows = await fetchClientesFilteredRows({ forNovosNoMes: true });
+        return rows.length;
+      }
+
       const now = new Date();
       const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
       const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
@@ -268,8 +387,6 @@ export default function Clientes() {
       if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
       else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
 
-      q = await applyClientesSubFilters(q);
-
       const applyLookup = (field: string, val: string) => {
         if (val === "__null__") q = q.is(field, null);
         else if (val) q = q.eq(field, Number(val));
@@ -285,8 +402,6 @@ export default function Clientes() {
       applyLookup("funcionario_id", funcionarioId);
       applyLookup("fornecedor_id", fornecedorId);
 
-      // Lucro e margem já são aplicados em applyClientesSubFilters (base clientes)
-
       const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
@@ -296,6 +411,15 @@ export default function Clientes() {
   const { data: queryResult, isLoading, isPlaceholderData } = useQuery({
     queryKey: ["clientes_lista", filterKey, page],
     queryFn: async () => {
+      if (hasDateOrValueFilters) {
+        const rows = await fetchClientesFilteredRows();
+        const from = page * PAGE_SIZE;
+        return {
+          rows: rows.slice(from, from + PAGE_SIZE),
+          totalCount: rows.length,
+        };
+      }
+
       const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
       let q = supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" }) as any;
 
@@ -318,9 +442,6 @@ export default function Clientes() {
       if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
       else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
 
-      // Datas e mensalidade via sub-query na tabela clientes
-      q = await applyClientesSubFilters(q);
-
       const applyLookupFilter = (field: string, val: string) => {
         if (val === "__null__") q = q.is(field, null);
         else if (val) q = q.eq(field, Number(val));
@@ -335,8 +456,6 @@ export default function Clientes() {
       applyLookupFilter("segmento_id", segmentoId);
       applyLookupFilter("funcionario_id", funcionarioId);
       applyLookupFilter("fornecedor_id", fornecedorId);
-
-      // Lucro e margem já são aplicados em applyClientesSubFilters (base clientes)
 
       q = q.order(sortField, { ascending: sortDir === "asc" });
 
