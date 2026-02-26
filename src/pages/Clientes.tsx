@@ -98,6 +98,10 @@ export default function Clientes() {
   const [modeloContratoId, setModeloContratoId] = useState("");
   const [produtoId, setProdutoId] = useState("");
   const [origemVendaId, setOrigemVendaId] = useState("");
+  const [areaAtuacaoId, setAreaAtuacaoId] = useState("");
+  const [segmentoId, setSegmentoId] = useState("");
+  const [funcionarioId, setFuncionarioId] = useState("");
+  const [fornecedorId, setFornecedorId] = useState("");
 
   const [estadoId, setEstadoId] = useState<number | null>(null);
   const [cidadeId, setCidadeId] = useState("");
@@ -122,10 +126,12 @@ export default function Clientes() {
   // Build query key from all filters
   const filterKey = useMemo(() => ({
     debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
-    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, estadoId, cidadeId, motivoCancelamentoId,
+    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir,
   }), [debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
-    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, estadoId, cidadeId, motivoCancelamentoId,
+    recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
 
   // Pagination
@@ -205,6 +211,14 @@ export default function Clientes() {
       else if (cidadeId) q = q.eq("cidade_id", Number(cidadeId));
       if (motivoCancelamentoId === "__null__") q = q.is("motivo_cancelamento_id", null);
       else if (motivoCancelamentoId) q = q.eq("motivo_cancelamento_id", Number(motivoCancelamentoId));
+      if (areaAtuacaoId === "__null__") q = q.is("area_atuacao_id", null);
+      else if (areaAtuacaoId) q = q.eq("area_atuacao_id", Number(areaAtuacaoId));
+      if (segmentoId === "__null__") q = q.is("segmento_id", null);
+      else if (segmentoId) q = q.eq("segmento_id", Number(segmentoId));
+      if (funcionarioId === "__null__") q = q.is("funcionario_id", null);
+      else if (funcionarioId) q = q.eq("funcionario_id", Number(funcionarioId));
+      if (fornecedorId === "__null__") q = q.is("fornecedor_id", null);
+      else if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
 
       // Numeric ranges
       if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
@@ -277,6 +291,7 @@ export default function Clientes() {
   const clearFilters = () => {
     setPeriodoCadastro({}); setPeriodoCancelamento({}); setPeriodoVenda({}); setPeriodoAtivacao({});
     setRecorrenciaAdv(""); setModeloContratoId(""); setProdutoId(""); setOrigemVendaId("");
+    setAreaAtuacaoId(""); setSegmentoId(""); setFuncionarioId(""); setFornecedorId("");
     setEstadoId(null); setCidadeId(""); setMotivoCancelamentoId("");
     setMensalidadeMin(""); setMensalidadeMax("");
     setLucroMin(""); setLucroMax(""); setMargemMin(""); setMargemMax("");
@@ -431,7 +446,51 @@ export default function Clientes() {
               </div>
             </div>
 
-            {/* Row 3 - Estado/Cidade/Motivo/Mensalidade */}
+            {/* Row 3 - New lookup filters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Área de Atuação</label>
+                <Select value={areaAtuacaoId} onValueChange={setAreaAtuacaoId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todas" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__null__">Nulo</SelectItem>
+                    {lookups.areasAtuacao.data?.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Segmento</label>
+                <Select value={segmentoId} onValueChange={setSegmentoId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__null__">Nulo</SelectItem>
+                    {lookups.segmentos.data?.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Funcionário</label>
+                <Select value={funcionarioId} onValueChange={setFuncionarioId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__null__">Nulo</SelectItem>
+                    {lookups.funcionarios.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
+                <Select value={fornecedorId} onValueChange={setFornecedorId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__null__">Nulo</SelectItem>
+                    {lookups.fornecedores.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Row 4 - Estado/Cidade/Motivo/Mensalidade */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Estado</label>
@@ -466,7 +525,7 @@ export default function Clientes() {
               <RangeInput label="Mensalidade R$" min={mensalidadeMin} max={mensalidadeMax} onMinChange={setMensalidadeMin} onMaxChange={setMensalidadeMax} prefix="R$" />
             </div>
 
-            {/* Row 4 - Numeric ranges */}
+            {/* Row 5 - Numeric ranges */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={setLucroMin} onMaxChange={setLucroMax} prefix="R$" />
               <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={setMargemMin} onMaxChange={setMargemMax} prefix="%" />
