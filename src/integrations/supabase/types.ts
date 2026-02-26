@@ -1547,6 +1547,7 @@ export type Database = {
           created_at: string | null
           custo_fixo_percentual: number | null
           custo_operacao: number | null
+          data_ativacao: string | null
           data_cadastro: string | null
           data_cancelamento: string | null
           data_venda: string | null
@@ -1597,6 +1598,7 @@ export type Database = {
           created_at?: string | null
           custo_fixo_percentual?: number | null
           custo_operacao?: number | null
+          data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_venda?: string | null
@@ -1647,6 +1649,7 @@ export type Database = {
           created_at?: string | null
           custo_fixo_percentual?: number | null
           custo_operacao?: number | null
+          data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_venda?: string | null

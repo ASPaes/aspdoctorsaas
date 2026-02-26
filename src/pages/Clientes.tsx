@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X } from "lucide-react";
 
-type SortField = "codigo_sequencial" | "razao_social" | "nome_fantasia" | "cnpj" | "produto_id" | "mensalidade" | "cancelado";
+type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
 type SortDir = "asc" | "desc";
 
 interface DateRange {
@@ -420,7 +420,7 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
       let q = supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" }) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -836,11 +836,11 @@ export default function Clientes() {
             <TableRow>
               {([
                 ["codigo_sequencial", "Cód. Seq."],
-                ["razao_social", "Razão Social"],
-                ["nome_fantasia", "Nome Fantasia"],
+                ["razao_social", "Razão Social / Fantasia"],
                 ["cnpj", "CNPJ"],
                 ["produto_id", "Produto"],
                 ["mensalidade", "Mensalidade"],
+                ["data_ativacao", "Dt. Ativação"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
                 <TableHead key={field}>
@@ -857,14 +857,14 @@ export default function Clientes() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 8 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : !clientes?.length ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -872,11 +872,14 @@ export default function Clientes() {
               clientes.map((c) => (
                 <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/clientes/${c.id}`)}>
                   <TableCell className="font-mono text-xs">{c.codigo_sequencial ?? "—"}</TableCell>
-                  <TableCell className="font-medium">{c.razao_social || "—"}</TableCell>
-                  <TableCell>{c.nome_fantasia || "—"}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{c.razao_social || "—"}</div>
+                    {c.nome_fantasia && <div className="text-xs text-muted-foreground">{c.nome_fantasia}</div>}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{c.cnpj || "—"}</TableCell>
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
                   <TableCell>{c.mensalidade != null ? `R$ ${Number(c.mensalidade).toFixed(2)}` : "—"}</TableCell>
+                  <TableCell className="text-xs">{c.data_ativacao ? format(parseISO(c.data_ativacao), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                       c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
