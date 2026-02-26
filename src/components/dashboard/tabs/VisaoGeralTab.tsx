@@ -24,7 +24,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
     <div className="space-y-6">
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
         <KPICardEnhanced label="Faturamento Total (MRR)" value={fmt(metrics.faturamentoTotal)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Soma das mensalidades + movimentos de clientes ativos" />
-        <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" />
+        <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Total de clientes com status ativo (não cancelados)" />
         <KPICardEnhanced label="Ticket Médio" value={fmtFull(metrics.ticketMedio)} icon={<Target className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR ÷ Clientes Ativos" />
         <KPICardEnhanced label="ARR" value={fmt(metrics.arr)} icon={<BarChart3 className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR × 12" />
       </div>
@@ -32,7 +32,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
       {metrics.faturamentoPorUnidade.length > 0 && (
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-' + Math.min(metrics.faturamentoPorUnidade.length, 4)}`}>
           {metrics.faturamentoPorUnidade.map(u => (
-            <KPICardEnhanced key={u.id} label={`MRR ${u.nome}`} value={fmt(u.mrr)} size={tvMode ? 'lg' : 'md'} variant="primary" subtitle={`${metrics.faturamentoTotal > 0 ? ((u.mrr / metrics.faturamentoTotal) * 100).toFixed(1) : 0}% do total`} />
+            <KPICardEnhanced key={u.id} label={`MRR ${u.nome}`} value={fmt(u.mrr)} size={tvMode ? 'lg' : 'md'} variant="primary" subtitle={`${metrics.faturamentoTotal > 0 ? ((u.mrr / metrics.faturamentoTotal) * 100).toFixed(1) : 0}% do total`} formula={`Soma do MRR dos clientes da unidade ${u.nome}`} />
           ))}
         </div>
       )}
@@ -45,8 +45,8 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
         <KPICardEnhanced label="NRR" value={fmtPct(metrics.nrr)} size={tvMode ? 'lg' : 'md'} variant={metrics.nrr >= 1 ? 'success' : 'warning'} formula="(MRR início + expansão - contração - churn) ÷ MRR início" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
         <KPICardEnhanced label="GRR" value={fmtPct(metrics.grr)} size={tvMode ? 'lg' : 'md'} variant={metrics.grr >= 0.9 ? 'success' : 'warning'} formula="(MRR início - churn - downsell) ÷ MRR início" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-        <KPICardEnhanced label="Concentração Top 10" value={fmtPct(metrics.concentracaoTop10)} size={tvMode ? 'lg' : 'md'} variant={metrics.concentracaoTop10 > 0.5 ? 'warning' : 'default'} formula="MRR Top 10 ÷ MRR Total" icon={<BarChart3 className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-        <KPICardEnhanced label="Quick Ratio" value={metrics.quickRatio === Infinity ? '∞' : metrics.quickRatio.toFixed(2)} size={tvMode ? 'lg' : 'md'} variant={metrics.quickRatio >= 4 ? 'success' : metrics.quickRatio >= 1 ? 'warning' : 'destructive'} formula="(New MRR + Expansion) ÷ (Churn + Contraction)" subtitle={metrics.quickRatio >= 4 ? 'Excelente (≥4)' : metrics.quickRatio >= 1 ? 'Atenção' : 'Crítico'} icon={<Zap className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
+        <KPICardEnhanced label="Concentração Top 10" value={fmtPct(metrics.concentracaoTop10)} size={tvMode ? 'lg' : 'md'} variant={metrics.concentracaoTop10 > 0.5 ? 'warning' : 'default'} formula="MRR dos 10 maiores clientes ÷ MRR Total" icon={<BarChart3 className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
+        <KPICardEnhanced label="Quick Ratio" value={metrics.quickRatio === Infinity ? '∞' : metrics.quickRatio.toFixed(2)} size={tvMode ? 'lg' : 'md'} variant={metrics.quickRatio >= 4 ? 'success' : metrics.quickRatio >= 1 ? 'warning' : 'destructive'} formula="(New MRR + Expansion) ÷ (Churn + Contraction). ≥4 = excelente" subtitle={metrics.quickRatio >= 4 ? 'Excelente (≥4)' : metrics.quickRatio >= 1 ? 'Atenção' : 'Crítico'} icon={<Zap className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
       </div>
 
       <div className="space-y-4">
@@ -55,11 +55,11 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
           <button onClick={() => refetchCert()} className="text-muted-foreground hover:text-foreground transition-colors"><RefreshCw className={`${tvMode ? 'h-5 w-5' : 'h-4 w-4'} ${certLoading ? 'animate-spin' : ''}`} /></button>
         </div>
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
-          <KPICardEnhanced label="Vendas no Período" value={certA1?.vendasQtd?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<ShieldCheck className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-          <KPICardEnhanced label="Faturamento A1" value={fmt(certA1?.faturamento || 0)} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<DollarSign className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-          <KPICardEnhanced label="Oportunidades (Janela)" value={certA1?.oportunidadesJanela?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="default" icon={<Target className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" />
-          <KPICardEnhanced label="Vencendo em 30 dias" value={certA1?.oportunidadesVencendo?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="warning" icon={<Clock className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" />
-          <KPICardEnhanced label="Vencidos até 20 dias" value={certA1?.oportunidadesVencidas?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant={certA1?.oportunidadesVencidas && certA1.oportunidadesVencidas > 0 ? 'destructive' : 'default'} icon={<AlertTriangle className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" />
+          <KPICardEnhanced label="Vendas no Período" value={certA1?.vendasQtd?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<ShieldCheck className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Qtde de vendas de certificado A1 com data de venda informada no período" />
+          <KPICardEnhanced label="Faturamento A1" value={fmt(certA1?.faturamento || 0)} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<DollarSign className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Soma dos valores de venda dos certificados A1 no período" />
+          <KPICardEnhanced label="Oportunidades (Janela)" value={certA1?.oportunidadesJanela?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="default" icon={<Target className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes com cert vencendo entre -20 e +30 dias de hoje" />
+          <KPICardEnhanced label="Vencendo em 30 dias" value={certA1?.oportunidadesVencendo?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="warning" icon={<Clock className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes ativos com certificado vencendo nos próximos 30 dias" />
+          <KPICardEnhanced label="Vencidos até 20 dias" value={certA1?.oportunidadesVencidas?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant={certA1?.oportunidadesVencidas && certA1.oportunidadesVencidas > 0 ? 'destructive' : 'default'} icon={<AlertTriangle className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes ativos com certificado vencido há até 20 dias" />
         </div>
       </div>
     </div>

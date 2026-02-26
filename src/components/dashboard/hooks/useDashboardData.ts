@@ -290,7 +290,7 @@ export function useDashboardData(filters: DashboardFilters) {
       // All clients for time series (no period filter)
       const { data: allClientes } = await supabase
         .from('clientes')
-        .select('id, mensalidade, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id');
+        .select('id, mensalidade, valor_ativacao, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id');
 
       const mrrEvolution: typeof timeSeries.mrrEvolution = [];
       const faturamentoEvolution: typeof timeSeries.faturamentoEvolution = [];
@@ -309,7 +309,18 @@ export function useDashboardData(filters: DashboardFilters) {
         });
         const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
         mrrEvolution.push({ month: m.month, monthFull: m.monthFull, value: mrrMes });
-        faturamentoEvolution.push({ month: m.month, monthFull: m.monthFull, value: mrrMes });
+
+        // Faturamento = MRR + ativações dos novos clientes cadastrados naquele mês
+        const novosNoMes = (allClientes || []).filter(c => {
+          if (!c.data_cadastro) return false;
+          const dc = format(new Date(c.data_cadastro), 'yyyy-MM');
+          if (dc !== m.yearMonth) return false;
+          if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
+          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          return true;
+        });
+        const ativacoesMes = novosNoMes.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
+        faturamentoEvolution.push({ month: m.month, monthFull: m.monthFull, value: mrrMes + ativacoesMes });
 
         const canceladosNoMes = (allClientes || []).filter(c => {
           if (!c.data_cancelamento) return false;
