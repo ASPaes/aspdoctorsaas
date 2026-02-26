@@ -1813,6 +1813,14 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       unaccent: { Args: { "": string }; Returns: string }
+      validate_invite_token: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          role: string
+          tenant_id: string
+        }[]
+      }
     }
     Enums: {
       cs_avulsa_status: "previsto" | "confirmado" | "realizado" | "perdido"
