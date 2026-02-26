@@ -66,8 +66,8 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
     <div className="space-y-1">
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <div className="flex gap-1">
-        <Input type="number" placeholder={prefix ? `${prefix} Min` : "Min"} value={min} onChange={(e) => onMinChange(e.target.value)} className="h-8 text-xs" />
-        <Input type="number" placeholder={prefix ? `${prefix} Max` : "Max"} value={max} onChange={(e) => onMaxChange(e.target.value)} className="h-8 text-xs" />
+        <Input type="text" inputMode="decimal" placeholder={prefix ? `${prefix} Min` : "Min"} value={min} onChange={(e) => onMinChange(e.target.value)} className="h-8 text-xs" />
+        <Input type="text" inputMode="decimal" placeholder={prefix ? `${prefix} Max` : "Max"} value={max} onChange={(e) => onMaxChange(e.target.value)} className="h-8 text-xs" />
       </div>
     </div>
   );
@@ -151,28 +151,89 @@ export default function Clientes() {
       || periodoCancelamento.from || periodoCancelamento.to
       || periodoVenda.from || periodoVenda.to
       || periodoAtivacao.from || periodoAtivacao.to;
-    const hasValueFilter = mensalidadeMin || mensalidadeMax;
+
+    const hasValueFilter = [mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax]
+      .some((v) => v.trim() !== "");
 
     if (!hasDateFilter && !hasValueFilter) return q;
 
-    let cq = supabase.from("clientes").select("id");
+    const parseFilterNumber = (value: string): number | null => {
+      const raw = value.trim();
+      if (!raw) return null;
+      let normalized = raw;
+      if (normalized.includes(",") && normalized.includes(".")) normalized = normalized.replace(/\./g, "").replace(",", ".");
+      else if (normalized.includes(",")) normalized = normalized.replace(",", ".");
+      const num = Number(normalized);
+      return Number.isFinite(num) ? num : null;
+    };
+
+    const mensalidadeMinNum = parseFilterNumber(mensalidadeMin);
+    const mensalidadeMaxNum = parseFilterNumber(mensalidadeMax);
+    const lucroMinNum = parseFilterNumber(lucroMin);
+    const lucroMaxNum = parseFilterNumber(lucroMax);
+    const margemMinNum = parseFilterNumber(margemMin);
+    const margemMaxNum = parseFilterNumber(margemMax);
+
+    const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+    const computeLucroReal = (row: any) => {
+      const mensalidade = Number(row.mensalidade ?? 0);
+      if (!(mensalidade > 0)) return 0;
+      const custo = Number(row.custo_operacao ?? 0);
+      const imposto = Number(row.imposto_percentual ?? 0);
+      const fixo = Number(row.custo_fixo_percentual ?? 0);
+      return round2((mensalidade - custo) - round2(mensalidade * imposto) - round2(mensalidade * fixo));
+    };
+
+    const computeMargemBruta = (row: any) => {
+      const mensalidade = Number(row.mensalidade ?? 0);
+      if (!(mensalidade > 0)) return 0;
+      const custo = Number(row.custo_operacao ?? 0);
+      return round2(((mensalidade - custo) / mensalidade) * 100);
+    };
+
+    let baseQ = supabase
+      .from("clientes")
+      .select("id, data_cadastro, data_cancelamento, data_venda, data_ativacao, mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual") as any;
 
     const applyDateRange = (field: string, range: DateRange) => {
-      if (range.from) cq = cq.gte(field, format(range.from, "yyyy-MM-dd"));
-      if (range.to) cq = cq.lte(field, format(range.to, "yyyy-MM-dd"));
+      if (range.from) baseQ = baseQ.gte(field, format(range.from, "yyyy-MM-dd"));
+      if (range.to) baseQ = baseQ.lte(field, format(range.to, "yyyy-MM-dd"));
     };
     applyDateRange("data_cadastro", periodoCadastro);
     applyDateRange("data_cancelamento", periodoCancelamento);
     applyDateRange("data_venda", periodoVenda);
     applyDateRange("data_ativacao", periodoAtivacao);
 
-    if (mensalidadeMin) cq = cq.gte("mensalidade", Number(mensalidadeMin));
-    if (mensalidadeMax) cq = cq.lte("mensalidade", Number(mensalidadeMax));
+    if (mensalidadeMinNum !== null) baseQ = baseQ.gte("mensalidade", mensalidadeMinNum);
+    if (mensalidadeMaxNum !== null) baseQ = baseQ.lte("mensalidade", mensalidadeMaxNum);
 
-    const { data: rows, error } = await cq;
-    if (error) throw error;
+    const pageSize = 1000;
+    let from = 0;
+    const rows: any[] = [];
 
-    const ids = (rows ?? []).map((r: { id: string }) => r.id);
+    while (true) {
+      const { data, error } = await baseQ.range(from, from + pageSize - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      rows.push(...data);
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const filteredRows = rows.filter((row) => {
+      const lucroReal = computeLucroReal(row);
+      const margemBruta = computeMargemBruta(row);
+
+      if (lucroMinNum !== null && lucroReal < lucroMinNum) return false;
+      if (lucroMaxNum !== null && lucroReal > lucroMaxNum) return false;
+      if (margemMinNum !== null && margemBruta < margemMinNum) return false;
+      if (margemMaxNum !== null && margemBruta > margemMaxNum) return false;
+
+      return true;
+    });
+
+    const ids = filteredRows.map((r: { id: string }) => r.id);
     if (ids.length === 0) return q.eq("id", "00000000-0000-0000-0000-000000000000");
     return q.in("id", ids);
   };
@@ -224,10 +285,7 @@ export default function Clientes() {
       applyLookup("funcionario_id", funcionarioId);
       applyLookup("fornecedor_id", fornecedorId);
 
-      if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));
-      if (lucroMax) q = q.lte("lucro_real", Number(lucroMax));
-      if (margemMin) q = q.gte("margem_bruta_percent", Number(margemMin));
-      if (margemMax) q = q.lte("margem_bruta_percent", Number(margemMax));
+      // Lucro e margem já são aplicados em applyClientesSubFilters (base clientes)
 
       const { count, error } = await q;
       if (error) throw error;
@@ -278,10 +336,7 @@ export default function Clientes() {
       applyLookupFilter("funcionario_id", funcionarioId);
       applyLookupFilter("fornecedor_id", fornecedorId);
 
-      if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));
-      if (lucroMax) q = q.lte("lucro_real", Number(lucroMax));
-      if (margemMin) q = q.gte("margem_bruta_percent", Number(margemMin));
-      if (margemMax) q = q.lte("margem_bruta_percent", Number(margemMax));
+      // Lucro e margem já são aplicados em applyClientesSubFilters (base clientes)
 
       q = q.order(sortField, { ascending: sortDir === "asc" });
 
