@@ -10,54 +10,18 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, CalendarIcon, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X } from "lucide-react";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
 type SortDir = "asc" | "desc";
 
-interface DateRange {
-  from?: Date;
-  to?: Date;
-}
 
-function DateRangePicker({ label, value, onChange }: { label: string; value: DateRange; onChange: (v: DateRange) => void }) {
-  return (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <div className="flex gap-1">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("flex-1 justify-start text-left text-xs h-8", !value.from && "text-muted-foreground")}>
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {value.from ? format(value.from, "dd/MM/yy") : "De"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={value.from} onSelect={(d) => onChange({ ...value, from: d })} initialFocus className="p-3 pointer-events-auto" locale={ptBR} />
-          </PopoverContent>
-        </Popover>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("flex-1 justify-start text-left text-xs h-8", !value.to && "text-muted-foreground")}>
-              <CalendarIcon className="mr-1 h-3 w-3" />
-              {value.to ? format(value.to, "dd/MM/yy") : "Até"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={value.to} onSelect={(d) => onChange({ ...value, to: d })} initialFocus className="p-3 pointer-events-auto" locale={ptBR} />
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
-  );
-}
 
 function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
   label: string; min: string; max: string; onMinChange: (v: string) => void; onMaxChange: (v: string) => void; prefix?: string;
