@@ -1,63 +1,48 @@
 
 
-## Plan: Modern Date Range Picker for Filters
+## Plan: Persistent Filters, In-Form Navigation, and State Preservation
 
-### Current State
-The `DateRangePicker` component (lines 30-59 in `Clientes.tsx`) uses two separate Popover+Calendar combos — one for "De" and one for "Até". This requires two clicks, two calendar opens, and feels disconnected.
-
-### Proposed Design
-Replace with a **single-popover date range picker** using `react-day-picker`'s built-in `mode="range"` feature. The user clicks one button that shows a **dual-month calendar** where they click start date, then end date in a single interaction.
-
-**Visual layout:**
-```text
-┌──────────────────────────────────────────┐
-│  📅  01/01/26 → 31/01/26           ✕    │  ← single trigger button
-└──────────────────────────────────────────┘
-         ↓ click opens popover
-┌──────────────────────────────────────────┐
-│  Presets          │                      │
-│  ───────────      │                      │
-│  Hoje             │  ◄ Janeiro 2026 ►    │
-│  Últimos 7 dias   │  ┌─┬─┬─┬─┬─┬─┬─┐   │
-│  Últimos 30 dias  │  │ │ │ │1│2│3│4│   │
-│  Este mês         │  │5│6│7│8│9│…│…│   │
-│  Mês passado      │  └─┴─┴─┴─┴─┴─┴─┘   │
-│  Este trimestre   │                      │
-│  Este ano         │  ◄ Fevereiro 2026 ►  │
-│                   │  ┌─┬─┬─┬─┬─┬─┬─┐   │
-│                   │  │ │ │ │ │ │ │1│   │
-│                   │  │…│…│…│…│…│…│…│   │
-│                   │  └─┴─┴─┴─┴─┴─┴─┘   │
-└──────────────────────────────────────────┘
-```
-
-**Key features:**
-- Single button trigger showing "De → Até" or placeholder text
-- Small "✕" to clear the range without opening
-- Dual-month calendar with `mode="range"` for visual range highlighting
-- Left sidebar with quick preset buttons (Hoje, Últimos 7d, 30d, Este mês, Mês passado, Trimestre, Ano)
-- Portuguese locale (`ptBR`)
+### Problem Summary
+1. Filters reset when navigating away and back
+2. No way to navigate between client records from within the edit form
+3. Clicking a client row always navigates in the same tab (no Cmd+Click support)
+4. React Query refetches on every mount, losing scroll/page position
 
 ### Implementation Steps
 
-1. **Create `src/components/ui/date-range-picker.tsx`** — new reusable component:
-   - Props: `label`, `value: { from?: Date; to?: Date }`, `onChange`, `className`
-   - Single `Popover` with a wider `PopoverContent`
-   - Left panel: preset buttons using `startOfMonth`, `endOfMonth`, `subDays`, etc. from `date-fns`
-   - Right panel: `<Calendar mode="range" numberOfMonths={2} selected={...} onSelect={...} />`
-   - Trigger button: icon + formatted range or placeholder
-   - Clear button (X) on the trigger when range is set
+#### 1. Create a shared filter store with `sessionStorage` persistence
+- Create `src/hooks/useClientesFilters.ts` — a custom hook using `useState` + `sessionStorage`
+- Store all filter values (search, status, dates, selects, ranges, sort, page, filtersOpen) as a single JSON object in `sessionStorage` under key `clientes-filters`
+- On init: read from `sessionStorage`; on every change: write back
+- This solves items 1 and 4 — filters survive navigation
 
-2. **Update `src/pages/Clientes.tsx`**:
-   - Remove the inline `DateRangePicker` function (lines 30-59)
-   - Import the new component
-   - Replace all 4 usages (lines 681-684) with the new component
-   - Adapt the `DateRange` type to align with `react-day-picker`'s `DateRange` type (`{ from?: Date; to?: Date }`)
+#### 2. Persist filtered client IDs for in-form navigation
+- When the Clientes list loads data, store the ordered array of client IDs in `sessionStorage` under key `clientes-nav-ids`
+- In `ClienteForm.tsx`, read this array and find the current client's position
+- Add "Previous" / "Next" buttons (with `ChevronLeft`/`ChevronRight` icons) in the form header, navigating to `/clientes/{prevId}` and `/clientes/{nextId}`
+- Show position indicator like "3 / 47"
+- Disable buttons at boundaries
 
-### Technical Details
-- Uses `react-day-picker` `mode="range"` which is already installed (v8)
-- `numberOfMonths={2}` shows two months side by side
-- Presets use `date-fns` functions already available: `startOfMonth`, `endOfMonth`, `subDays`, `startOfYear`, `startOfQuarter`
-- PopoverContent width: ~`w-auto min-w-[540px]` to fit preset sidebar + dual calendar
-- On mobile (`sm` breakpoint): stack vertically, single month
+#### 3. Enable Cmd+Click (open in new tab)
+- In `Clientes.tsx`, change the table row click handler from `onClick={() => navigate(...)}` to use an `<a>` tag or handle the click event to check for `metaKey`/`ctrlKey`:
+  ```tsx
+  onClick={(e) => {
+    if (e.metaKey || e.ctrlKey) {
+      window.open(`/clientes/${c.id}`, '_blank');
+    } else {
+      navigate(`/clientes/${c.id}`);
+    }
+  }}
+  ```
+- Also wrap the row content in a way that right-click "Open in new tab" works (wrap row in `<Link>` or add `href`)
+
+#### 4. Prevent unnecessary refetches
+- The `QueryClient` already has `staleTime: 5min` and `refetchOnWindowFocus: false`
+- Ensure the `queryKey` in Clientes uses the persisted filter state so React Query cache matches on return
+- The key fix is item 1 (persisted filters) — without it, filters reset to defaults which creates a new queryKey, triggering a refetch
+
+### Files to Create/Edit
+- **Create** `src/hooks/useClientesFilters.ts` — persistent filter state hook
+- **Edit** `src/pages/Clientes.tsx` — use the new hook instead of individual `useState`; store nav IDs; handle Cmd+Click
+- **Edit** `src/pages/ClienteForm.tsx` — add prev/next navigation buttons reading from sessionStorage
 
