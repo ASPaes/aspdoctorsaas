@@ -145,20 +145,36 @@ export default function Clientes() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filterKey]);
 
-  const applyAtivacaoDateFilter = async (q: any) => {
-    if (!periodoAtivacao.from && !periodoAtivacao.to) return q;
+  // Helper: aplica filtros de datas e valores via tabela clientes (sub-query por IDs)
+  const applyClientesSubFilters = async (q: any) => {
+    const hasDateFilter = periodoCadastro.from || periodoCadastro.to
+      || periodoCancelamento.from || periodoCancelamento.to
+      || periodoVenda.from || periodoVenda.to
+      || periodoAtivacao.from || periodoAtivacao.to;
+    const hasValueFilter = mensalidadeMin || mensalidadeMax;
 
-    let ativacaoQ = supabase.from("clientes").select("id");
-    if (periodoAtivacao.from) ativacaoQ = ativacaoQ.gte("data_ativacao", format(periodoAtivacao.from, "yyyy-MM-dd"));
-    if (periodoAtivacao.to) ativacaoQ = ativacaoQ.lte("data_ativacao", format(periodoAtivacao.to, "yyyy-MM-dd"));
+    if (!hasDateFilter && !hasValueFilter) return q;
 
-    const { data: ativacaoRows, error: ativacaoError } = await ativacaoQ;
-    if (ativacaoError) throw ativacaoError;
+    let cq = supabase.from("clientes").select("id");
 
-    const ativacaoIds = (ativacaoRows ?? []).map((row: { id: string }) => row.id);
-    if (ativacaoIds.length === 0) return q.eq("id", "00000000-0000-0000-0000-000000000000");
+    const applyDateRange = (field: string, range: DateRange) => {
+      if (range.from) cq = cq.gte(field, format(range.from, "yyyy-MM-dd"));
+      if (range.to) cq = cq.lte(field, format(range.to, "yyyy-MM-dd"));
+    };
+    applyDateRange("data_cadastro", periodoCadastro);
+    applyDateRange("data_cancelamento", periodoCancelamento);
+    applyDateRange("data_venda", periodoVenda);
+    applyDateRange("data_ativacao", periodoAtivacao);
 
-    return q.in("id", ativacaoIds);
+    if (mensalidadeMin) cq = cq.gte("mensalidade", Number(mensalidadeMin));
+    if (mensalidadeMax) cq = cq.lte("mensalidade", Number(mensalidadeMax));
+
+    const { data: rows, error } = await cq;
+    if (error) throw error;
+
+    const ids = (rows ?? []).map((r: { id: string }) => r.id);
+    if (ids.length === 0) return q.eq("id", "00000000-0000-0000-0000-000000000000");
+    return q.in("id", ids);
   };
 
   // Query "Novos no Mês" respeitando os filtros ativos
@@ -176,7 +192,6 @@ export default function Clientes() {
         .gte("data_venda", firstDay)
         .lte("data_venda", lastDay);
 
-      // Aplicar os mesmos filtros da listagem
       if (debouncedSearch) {
         const s = `%${debouncedSearch}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
@@ -192,15 +207,7 @@ export default function Clientes() {
       if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
       else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
 
-      const applyDateRange = (field: string, range: DateRange) => {
-        if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
-        if (range.to) q = q.lte(field, format(range.to, "yyyy-MM-dd"));
-      };
-      applyDateRange("data_cadastro", periodoCadastro);
-      applyDateRange("data_cancelamento", periodoCancelamento);
-      applyDateRange("data_venda", periodoVenda);
-
-      q = await applyAtivacaoDateFilter(q);
+      q = await applyClientesSubFilters(q);
 
       const applyLookup = (field: string, val: string) => {
         if (val === "__null__") q = q.is(field, null);
@@ -217,8 +224,6 @@ export default function Clientes() {
       applyLookup("funcionario_id", funcionarioId);
       applyLookup("fornecedor_id", fornecedorId);
 
-      if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
-      if (mensalidadeMax) q = q.lte("mensalidade", Number(mensalidadeMax));
       if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));
       if (lucroMax) q = q.lte("lucro_real", Number(lucroMax));
       if (margemMin) q = q.gte("margem_bruta_percent", Number(margemMin));
@@ -236,11 +241,9 @@ export default function Clientes() {
       const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
       let q = supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" }) as any;
 
-      // Status
       if (status === "ativos") q = q.eq("cancelado", false);
       else if (status === "cancelados") q = q.eq("cancelado", true);
 
-      // Text search
       if (debouncedSearch) {
         const s = `%${debouncedSearch}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
@@ -251,31 +254,19 @@ export default function Clientes() {
         }
       }
 
-      // Quick unidade base
       if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
       else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
 
-      // Advanced recurrence
       if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
       else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
 
-      // Date ranges
-      const applyDateRange = (field: string, range: DateRange) => {
-        if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
-        if (range.to) q = q.lte(field, format(range.to, "yyyy-MM-dd"));
-      };
-      applyDateRange("data_cadastro", periodoCadastro);
-      applyDateRange("data_cancelamento", periodoCancelamento);
-      applyDateRange("data_venda", periodoVenda);
+      // Datas e mensalidade via sub-query na tabela clientes
+      q = await applyClientesSubFilters(q);
 
-      q = await applyAtivacaoDateFilter(q);
-
-      // Lookup filters helper
       const applyLookupFilter = (field: string, val: string) => {
         if (val === "__null__") q = q.is(field, null);
         else if (val) q = q.eq(field, Number(val));
       };
-
       applyLookupFilter("modelo_contrato_id", modeloContratoId);
       applyLookupFilter("produto_id", produtoId);
       applyLookupFilter("origem_venda_id", origemVendaId);
@@ -286,17 +277,14 @@ export default function Clientes() {
       applyLookupFilter("segmento_id", segmentoId);
       applyLookupFilter("funcionario_id", funcionarioId);
       applyLookupFilter("fornecedor_id", fornecedorId);
-      if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
-      if (mensalidadeMax) q = q.lte("mensalidade", Number(mensalidadeMax));
+
       if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));
       if (lucroMax) q = q.lte("lucro_real", Number(lucroMax));
       if (margemMin) q = q.gte("margem_bruta_percent", Number(margemMin));
       if (margemMax) q = q.lte("margem_bruta_percent", Number(margemMax));
 
-      // Sort
       q = q.order(sortField, { ascending: sortDir === "asc" });
 
-      // Pagination
       const from = page * PAGE_SIZE;
       q = q.range(from, from + PAGE_SIZE - 1);
 
