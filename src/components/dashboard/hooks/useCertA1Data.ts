@@ -17,8 +17,8 @@ export function useCertA1Data(periodoInicio: Date | null, periodoFim: Date | nul
   return useQuery({
     queryKey: ['cert-a1-metrics', periodoInicioStr, periodoFimStr],
     queryFn: async (): Promise<CertA1Metrics> => {
-      // 1. Vendas no período
-      let vendasQuery = supabase.from('certificado_a1_vendas').select('valor_venda');
+      // 1. Vendas no período — contar apenas registros com data_venda preenchida
+      let vendasQuery = supabase.from('certificado_a1_vendas').select('valor_venda, data_venda').not('data_venda', 'is', null);
       if (periodoInicioStr && periodoFimStr) {
         vendasQuery = vendasQuery.gte('data_venda', periodoInicioStr).lte('data_venda', periodoFimStr);
       }

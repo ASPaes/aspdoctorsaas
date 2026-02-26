@@ -17,23 +17,23 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode }: Props) {
   return (
     <div className="space-y-6">
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="Crescimento R$" value={fmt(metrics.crescimentoReais)} icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.crescimentoReais >= 0 ? 'success' : 'destructive'} trend={metrics.crescimentoReais >= 0 ? 'up' : 'down'} trendValue="no período" formula="MRR fim - MRR início" />
-        <KPICardEnhanced label="Crescimento %" value={fmtPct(metrics.crescimentoPercent)} size={s} variant={metrics.crescimentoPercent >= 0 ? 'success' : 'destructive'} formula="Crescimento R$ ÷ MRR início" />
-        <KPICardEnhanced label="Net New MRR" value={fmt(metrics.netNewMrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.netNewMrr >= 0 ? 'success' : 'destructive'} formula="New + Upsell + Cross-sell − Downsell − Churn" />
-        <KPICardEnhanced label="Margem Contribuição Média" value={fmtPct(metrics.margemContribuicao)} icon={<Calculator className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" />
+        <KPICardEnhanced label="Crescimento R$" value={fmt(metrics.crescimentoReais)} icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.crescimentoReais >= 0 ? 'success' : 'destructive'} trend={metrics.crescimentoReais >= 0 ? 'up' : 'down'} trendValue="no período" formula="MRR atual − MRR no início do período" />
+        <KPICardEnhanced label="Crescimento %" value={fmtPct(metrics.crescimentoPercent)} size={s} variant={metrics.crescimentoPercent >= 0 ? 'success' : 'destructive'} formula="Crescimento R$ ÷ MRR início do período" />
+        <KPICardEnhanced label="Net New MRR" value={fmt(metrics.netNewMrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.netNewMrr >= 0 ? 'success' : 'destructive'} formula="New MRR + Upsell + Cross-sell − Downsell − Churn MRR" />
+        <KPICardEnhanced label="Margem Contribuição Média" value={fmtPct(metrics.margemContribuicao)} icon={<Calculator className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Média da margem de contribuição dos clientes ativos" />
       </div>
 
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="LTV (meses)" value={metrics.ltvMeses > 0 ? metrics.ltvMeses.toFixed(1) : 'N/A'} icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" />
-        <KPICardEnhanced label="LTV (R$)" value={metrics.ltvReais > 0 ? fmt(metrics.ltvReais) : 'N/A'} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Ticket Médio × LTV meses" />
-        <KPICardEnhanced label="CAC" value={metrics.cac > 0 ? fmt(metrics.cac) : 'N/A'} size={s} variant="dark" formula="Total despesas CAC ÷ Novos clientes" />
-        <KPICardEnhanced label="LTV/CAC" value={metrics.ltvCac > 0 ? metrics.ltvCac.toFixed(2) + 'x' : 'N/A'} icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.ltvCac >= 3 ? 'success' : metrics.ltvCac >= 1 ? 'warning' : 'destructive'} subtitle={metrics.ltvCac >= 3 ? 'Saudável (≥3x)' : metrics.ltvCac >= 1 ? 'Atenção (1-3x)' : 'Crítico (<1x)'} />
+        <KPICardEnhanced label="LTV (meses)" value={metrics.ltvMeses > 0 ? metrics.ltvMeses.toFixed(1) : 'N/A'} icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Média de permanência em meses de todos os clientes (ativos + cancelados)" />
+        <KPICardEnhanced label="LTV (R$)" value={metrics.ltvReais > 0 ? fmt(metrics.ltvReais) : 'N/A'} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Ticket Médio × LTV em meses" />
+        <KPICardEnhanced label="CAC" value={metrics.cac > 0 ? fmt(metrics.cac) : 'N/A'} size={s} variant="dark" formula="Total de despesas CAC ativas no período ÷ Novos clientes" />
+        <KPICardEnhanced label="LTV/CAC" value={metrics.ltvCac > 0 ? metrics.ltvCac.toFixed(2) + 'x' : 'N/A'} icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.ltvCac >= 3 ? 'success' : metrics.ltvCac >= 1 ? 'warning' : 'destructive'} subtitle={metrics.ltvCac >= 3 ? 'Saudável (≥3x)' : metrics.ltvCac >= 1 ? 'Atenção (1-3x)' : 'Crítico (<1x)'} formula="LTV em R$ ÷ CAC. Ideal ≥ 3x" />
       </div>
 
       <NetNewMrrBreakdown newMrr={metrics.newMrr} upsellMrr={metrics.upsellMrr} crossSellMrr={metrics.crossSellMrr} downsellMrr={metrics.downsellMrr} mrrCancelado={metrics.mrrCancelado} netNewMrr={metrics.netNewMrr} tvMode={tvMode} />
 
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
-        <KPICardEnhanced label="CAC Payback (meses)" value={metrics.cacPayback > 0 && metrics.cacPayback < 100 ? metrics.cacPayback.toFixed(1) : 'N/A'} icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.cacPayback > 0 && metrics.cacPayback <= 12 ? 'success' : 'warning'} formula="CAC ÷ Lucro Bruto mensal médio" />
+        <KPICardEnhanced label="CAC Payback (meses)" value={metrics.cacPayback > 0 && metrics.cacPayback < 100 ? metrics.cacPayback.toFixed(1) : 'N/A'} icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={metrics.cacPayback > 0 && metrics.cacPayback <= 12 ? 'success' : 'warning'} formula="CAC ÷ Lucro Bruto mensal médio por cliente. Ideal ≤ 12 meses" />
         <Card>
           <CardHeader className="pb-2"><CardTitle className={`flex items-center gap-2 ${tvMode ? 'text-xl' : 'text-base'}`}><Users className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-primary`} />MRR por Funcionário</CardTitle></CardHeader>
           <CardContent>
