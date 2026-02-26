@@ -145,19 +145,60 @@ export default function Clientes() {
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [filterKey]);
 
-  // Query separada para "Novos no Mês"
+  // Query "Novos no Mês" respeitando os filtros ativos
   const { data: novosNoMes } = useQuery({
-    queryKey: ["clientes_novos_mes"],
+    queryKey: ["clientes_novos_mes", filterKey],
     queryFn: async () => {
       const now = new Date();
       const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
       const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
-      const { count, error } = await supabase
-        .from("clientes")
-        .select("id", { count: "exact", head: true })
-        .eq("cancelado", false)
+      let q = supabase
+        .from("vw_clientes_financeiro")
+        .select("id", { count: "exact", head: true }) as any;
+
+      q = q.eq("cancelado", false)
         .gte("data_venda", firstDay)
         .lte("data_venda", lastDay);
+
+      // Aplicar os mesmos filtros da listagem
+      if (debouncedSearch) {
+        const s = `%${debouncedSearch}%`;
+        const isNumeric = /^\d+$/.test(debouncedSearch.trim());
+        if (isNumeric) {
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
+        } else {
+          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+        }
+      }
+      if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
+      else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
+
+      const applyLookup = (field: string, val: string) => {
+        if (val === "__null__") q = q.is(field, null);
+        else if (val) q = q.eq(field, Number(val));
+      };
+      applyLookup("modelo_contrato_id", modeloContratoId);
+      applyLookup("produto_id", produtoId);
+      applyLookup("origem_venda_id", origemVendaId);
+      applyLookup("estado_id", estadoId);
+      applyLookup("cidade_id", cidadeId);
+      applyLookup("motivo_cancelamento_id", motivoCancelamentoId);
+      applyLookup("area_atuacao_id", areaAtuacaoId);
+      applyLookup("segmento_id", segmentoId);
+      applyLookup("funcionario_id", funcionarioId);
+      applyLookup("fornecedor_id", fornecedorId);
+
+      if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
+      else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
+
+      if (mensalidadeMin) q = q.gte("mensalidade", Number(mensalidadeMin));
+      if (mensalidadeMax) q = q.lte("mensalidade", Number(mensalidadeMax));
+      if (lucroMin) q = q.gte("lucro_real", Number(lucroMin));
+      if (lucroMax) q = q.lte("lucro_real", Number(lucroMax));
+      if (margemMin) q = q.gte("margem_bruta_percent", Number(margemMin));
+      if (margemMax) q = q.lte("margem_bruta_percent", Number(margemMax));
+
+      const { count, error } = await q;
       if (error) throw error;
       return count ?? 0;
     },
