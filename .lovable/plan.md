@@ -1,30 +1,36 @@
 
 
-## Plan: Add "Nulo" (Null) filter option to lookup-based Select filters
+## Plan: Fix filters and add active filter badges
 
-### Scope
-Add a "Nulo" option to every Select filter that references an auxiliary/lookup table, allowing users to find clients where that field is NULL. Date filters and numeric range filters are excluded per the user's request.
+### Problem 1: Filters can't be cleared individually
+All advanced Select filters (Recorrência, Modelo Contrato, Produto, Origem Venda, Área Atuação, Segmento, Funcionário, Fornecedor, Estado, Cidade, Motivo Cancelamento) are missing a "Todos/Todas" reset option. Once a value is selected, there's no way to go back — Radix Select requires a matching `SelectItem` for the current value. The `value=""` has no corresponding item.
 
-### Affected filters (8 total)
-1. **Unidade Base** (quick filter) — `unidade_base_id`
-2. **Recorrência** — `recorrencia`
-3. **Modelo de Contrato** — `modelo_contrato_id`
-4. **Produto** — `produto_id`
-5. **Origem da Venda** — `origem_venda_id`
-6. **Estado** — `estado_id`
-7. **Cidade** — `cidade_id`
-8. **Motivo Cancelamento** — `motivo_cancelamento_id`
+### Problem 2: Estado filter display bug
+When `estadoId === -1` (Nulo), the Select `value` is `"-1"` but the only matching item is `"__null__"`. This mismatch breaks display.
+
+### Fix 1: Add "Todos/Todas" `SelectItem` to all filter Selects
+Apply the same `__all__` pattern used in `unidadeBaseQuick`:
+- Each Select gets `value={stateVar || "__all__"}` and `onValueChange={(v) => setState(v === "__all__" ? "" : v)}`
+- Add `<SelectItem value="__all__">Todos</SelectItem>` as first option in each
+- For Estado: unify to use string state instead of `number | null`, use `"__all__"` / `"__null__"` / id string
+
+### Fix 2: Active filter badges
+Add a row of small badges (chips) next to "Limpar filtros" showing each active filter with an X button to remove individually. These badges should be visible even when the advanced filters panel is collapsed.
+
+**Badge definitions** (one per filter, shown only when active):
+- Unidade Base, Recorrência, Modelo Contrato, Produto, Origem Venda, Área Atuação, Segmento, Funcionário, Fornecedor, Estado, Cidade, Motivo Cancelamento
+- Date ranges (Cadastro, Cancelamento, Venda, Ativação)
+- Numeric ranges (Mensalidade, Lucro, Margem)
+
+Each badge shows the filter label + selected value name, and clicking X resets that single filter.
 
 ### Implementation (single file: `src/pages/Clientes.tsx`)
 
-1. **Add a `__null__` sentinel value** as a `<SelectItem>` labeled "Nulo" in each of the 8 Select components listed above, alongside the existing "Todos/Todas" option.
+1. **Convert `estadoId` from `number | null` to `string`** — use `""` (all), `"__null__"` (null filter), or `"123"` (id). Update query builder accordingly.
 
-2. **Update the query builder** to apply `.is(field, null)` when the filter value is `"__null__"` instead of `.eq(field, value)`. Affects lines ~178 and ~194-199 where lookup filters are applied.
+2. **Add `__all__` SelectItem** to all 11 Select filters in the advanced section, and update their `value`/`onValueChange` to handle the `__all__` ↔ `""` mapping.
 
-3. **Update `clearFilters`** — no change needed since clearing resets to `""` which skips both null and value filters.
+3. **Build `activeFilters` array** via `useMemo` — each entry has `{ key, label, value, onClear }`. Resolve display names from lookup data (e.g., produto name from `produtoMap`).
 
-### Example behavior
-- `""` (default) → no filter applied (shows all)
-- `"__null__"` → `.is('produto_id', null)` — shows only clients with no product
-- `"5"` → `.eq('produto_id', 5)` — shows only clients with product id 5
+4. **Render badges** in a flex-wrap row between the collapsible trigger and the collapsible content, visible regardless of panel state. Use small `Badge` or `Button` components with an X icon.
 
