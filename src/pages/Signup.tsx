@@ -24,13 +24,9 @@ export default function Signup() {
   useEffect(() => {
     if (!inviteToken) return;
     (async () => {
-      const { data, error } = await supabase
-        .from("invites")
-        .select("email, role, tenant_id")
-        .eq("token", inviteToken)
-        .is("used_at", null)
-        .gte("expires_at", new Date().toISOString())
-        .maybeSingle();
+      const { data: rows, error } = await supabase
+        .rpc("validate_invite_token", { p_token: inviteToken });
+      const data = rows && rows.length > 0 ? rows[0] : null;
       setInviteLoading(false);
       if (error || !data) {
         toast.error("Convite inválido ou expirado.");
