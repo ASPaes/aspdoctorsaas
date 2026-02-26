@@ -460,6 +460,183 @@ export type Database = {
           },
         ]
       }
+      clientes_csv_map: {
+        Row: {
+          area_atuacao_nome: string | null
+          cert_a1_ultima_venda_em: string | null
+          cert_a1_vencimento: string | null
+          cidade_nome: string | null
+          cliente_codigo: string | null
+          cnpj: string | null
+          consultor_nome: string | null
+          custo: number | null
+          data_ativacao: string | null
+          data_cadastro: string | null
+          data_cancelamento: string | null
+          data_fim: string | null
+          data_venda: string | null
+          email: string | null
+          estado_sigla: string | null
+          fone: string | null
+          fornecedor_nome: string | null
+          id_cliente: number | null
+          imposto_percentual: number | null
+          imposto_valor: number | null
+          link_fornecedor: string | null
+          lucro_bruto: number | null
+          lucro_real: number | null
+          margem: number | null
+          markup: number | null
+          matriz_codigo: string | null
+          mensalidade: number | null
+          motivo_cancelamento: string | null
+          motivo_cancelamento_ref_nome: string | null
+          nome_fantasia: string | null
+          obs_cliente: string | null
+          obs_motivo_cancelamento: string | null
+          obs_negociacao: string | null
+          origem_venda_nome: string | null
+          produto_nome: string | null
+          razao_social: string | null
+          recorrencia: string | null
+          repasse: number | null
+          segmento: string | null
+          status: string | null
+          status_contrato: string | null
+          tempo_permanencia_meses: number | null
+          unidade_base: string | null
+          valor_ativacao: number | null
+          vertical: string | null
+        }
+        Insert: {
+          area_atuacao_nome?: string | null
+          cert_a1_ultima_venda_em?: string | null
+          cert_a1_vencimento?: string | null
+          cidade_nome?: string | null
+          cliente_codigo?: string | null
+          cnpj?: string | null
+          consultor_nome?: string | null
+          custo?: number | null
+          data_ativacao?: string | null
+          data_cadastro?: string | null
+          data_cancelamento?: string | null
+          data_fim?: string | null
+          data_venda?: string | null
+          email?: string | null
+          estado_sigla?: string | null
+          fone?: string | null
+          fornecedor_nome?: string | null
+          id_cliente?: number | null
+          imposto_percentual?: number | null
+          imposto_valor?: number | null
+          link_fornecedor?: string | null
+          lucro_bruto?: number | null
+          lucro_real?: number | null
+          margem?: number | null
+          markup?: number | null
+          matriz_codigo?: string | null
+          mensalidade?: number | null
+          motivo_cancelamento?: string | null
+          motivo_cancelamento_ref_nome?: string | null
+          nome_fantasia?: string | null
+          obs_cliente?: string | null
+          obs_motivo_cancelamento?: string | null
+          obs_negociacao?: string | null
+          origem_venda_nome?: string | null
+          produto_nome?: string | null
+          razao_social?: string | null
+          recorrencia?: string | null
+          repasse?: number | null
+          segmento?: string | null
+          status?: string | null
+          status_contrato?: string | null
+          tempo_permanencia_meses?: number | null
+          unidade_base?: string | null
+          valor_ativacao?: number | null
+          vertical?: string | null
+        }
+        Update: {
+          area_atuacao_nome?: string | null
+          cert_a1_ultima_venda_em?: string | null
+          cert_a1_vencimento?: string | null
+          cidade_nome?: string | null
+          cliente_codigo?: string | null
+          cnpj?: string | null
+          consultor_nome?: string | null
+          custo?: number | null
+          data_ativacao?: string | null
+          data_cadastro?: string | null
+          data_cancelamento?: string | null
+          data_fim?: string | null
+          data_venda?: string | null
+          email?: string | null
+          estado_sigla?: string | null
+          fone?: string | null
+          fornecedor_nome?: string | null
+          id_cliente?: number | null
+          imposto_percentual?: number | null
+          imposto_valor?: number | null
+          link_fornecedor?: string | null
+          lucro_bruto?: number | null
+          lucro_real?: number | null
+          margem?: number | null
+          markup?: number | null
+          matriz_codigo?: string | null
+          mensalidade?: number | null
+          motivo_cancelamento?: string | null
+          motivo_cancelamento_ref_nome?: string | null
+          nome_fantasia?: string | null
+          obs_cliente?: string | null
+          obs_motivo_cancelamento?: string | null
+          obs_negociacao?: string | null
+          origem_venda_nome?: string | null
+          produto_nome?: string | null
+          razao_social?: string | null
+          recorrencia?: string | null
+          repasse?: number | null
+          segmento?: string | null
+          status?: string | null
+          status_contrato?: string | null
+          tempo_permanencia_meses?: number | null
+          unidade_base?: string | null
+          valor_ativacao?: number | null
+          vertical?: string | null
+        }
+        Relationships: []
+      }
+      clientes_match_log: {
+        Row: {
+          cliente_id: string | null
+          cliente_razao_social: string | null
+          criado_em: string
+          csv_razao_social: string | null
+          detalhe: string | null
+          score_best: number | null
+          score_second: number | null
+          status: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_razao_social?: string | null
+          criado_em?: string
+          csv_razao_social?: string | null
+          detalhe?: string | null
+          score_best?: number | null
+          score_second?: number | null
+          status?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_razao_social?: string | null
+          criado_em?: string
+          csv_razao_social?: string | null
+          detalhe?: string | null
+          score_best?: number | null
+          score_second?: number | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       clientes_old_import: {
         Row: {
           area_atuacao: string | null
@@ -1618,7 +1795,11 @@ export type Database = {
       }
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
+      norm_txt: { Args: { t: string }; Returns: string }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       cs_avulsa_status: "previsto" | "confirmado" | "realizado" | "perdido"
