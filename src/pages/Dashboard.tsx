@@ -11,6 +11,7 @@ import { CancelamentosTab } from '@/components/dashboard/tabs/CancelamentosTab';
 import { VendasTab } from '@/components/dashboard/tabs/VendasTab';
 import { DistribuicaoTab } from '@/components/dashboard/tabs/DistribuicaoTab';
 import { CSTab } from '@/components/dashboard/tabs/CSTab';
+import { CohortTab } from '@/components/dashboard/tabs/CohortTab';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Dashboard() {
@@ -68,6 +69,7 @@ export default function Dashboard() {
             <TabsTrigger value="vendas">Vendas</TabsTrigger>
             <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
             <TabsTrigger value="cs">Customer Success</TabsTrigger>
+            <TabsTrigger value="cohort">Cohort</TabsTrigger>
           </TabsList>
 
           <TabsContent value="visao-geral">
@@ -87,6 +89,9 @@ export default function Dashboard() {
           </TabsContent>
           <TabsContent value="cs">
             <CSTab tvMode={tvMode} />
+          </TabsContent>
+          <TabsContent value="cohort">
+            <CohortTab tvMode={tvMode} />
           </TabsContent>
         </Tabs>
       )}
