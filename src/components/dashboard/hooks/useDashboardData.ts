@@ -158,9 +158,19 @@ export function useDashboardData(filters: DashboardFilters) {
         .is('estornado_por', null)
         .is('estorno_de', null);
 
-      const clienteIdSet = new Set((clientesAtivos || []).map(c => c.id));
+      // Build set of ALL clients matching current filters (ativos + cancelados no período)
+      // to correctly filter movimentos by fornecedor/unidade
+      const allClientesFiltered = new Set([
+        ...(clientesRaw || []).map(c => c.id),
+        ...(cancelamentos || []).map(c => c.id),
+        ...(novosClientes || []).map(c => c.id),
+      ]);
+
+      const needsClientFilter = !!(filters.fornecedorId || filters.unidadeBaseId);
 
       movimentosPeriodo?.forEach(m => {
+        // Skip movements from clients outside the filter scope
+        if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
         if (m.tipo === 'upsell') upsellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'cross_sell') crossSellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'downsell') downsellMrr += Math.abs(Number(m.valor_delta) || 0);
@@ -176,6 +186,7 @@ export function useDashboardData(filters: DashboardFilters) {
 
       let churnReversao = 0;
       movimentosInativados?.forEach(m => {
+        if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
         if (m.tipo === 'upsell' || m.tipo === 'cross_sell') {
           churnReversao += Math.abs(Number(m.valor_delta) || 0);
         }
@@ -282,15 +293,21 @@ export function useDashboardData(filters: DashboardFilters) {
       // Previous month movimentos for upsell/cross-sell delta
       const { data: prevMovimentos } = await supabase
         .from('movimentos_mrr')
-        .select('tipo, valor_delta')
+        .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', prevMonthStart)
         .lte('data_movimento', prevMonthEnd)
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null);
 
+      // Build prev month client set for filtering
+      const prevClientesFiltered = new Set((prevNovos || []).map(c => c.id));
+      // Also need prev month active clients for proper filtering
       let prevUpsellMrr = 0, prevCrossSellMrr = 0;
       prevMovimentos?.forEach(m => {
+        // For prev month, filter by same fornecedor/unidade logic using allClientesFiltered
+        // (which includes all clients matching the filters)
+        if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
         if (m.tipo === 'upsell') prevUpsellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'cross_sell') prevCrossSellMrr += Number(m.valor_delta) || 0;
       });
