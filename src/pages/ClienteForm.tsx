@@ -219,6 +219,32 @@ export default function ClienteForm() {
 
   const onSubmit = (values: ClienteFormValues) => mutation.mutate(values);
 
+  const onInvalid = (errors: any) => {
+    const firstKey = Object.keys(errors)[0];
+    const msg = errors[firstKey]?.message || "Verifique os campos obrigatórios";
+    toast({ title: "Erro de validação", description: `Campo "${firstKey}": ${msg}`, variant: "destructive" });
+  };
+
+  // Enter key moves to next field instead of submitting the form
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      if (tagName === "textarea" || tagName === "button") return;
+      e.preventDefault();
+      const formEl = e.currentTarget;
+      const focusable = Array.from(
+        formEl.querySelectorAll<HTMLElement>(
+          'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])'
+        )
+      );
+      const idx = focusable.indexOf(target);
+      if (idx >= 0 && idx < focusable.length - 1) {
+        focusable[idx + 1].focus();
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -262,7 +288,7 @@ export default function ClienteForm() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Card: Dados Cadastrais */}
           <Card>
             <CardHeader>
