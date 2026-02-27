@@ -28,8 +28,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData }: Props) {
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
         <KPICardEnhanced label="MC% Ponderada" value={mc != null ? fmtPct(mc.mc_percent_ponderada) : '—'} icon={<Percent className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant={mc && mc.mc_percent_ponderada >= 0.3 ? 'success' : mc && mc.mc_percent_ponderada >= 0.1 ? 'warning' : 'destructive'} formula="MC Total ÷ MRR Total × 100. Percentual ponderado pela receita total, não média simples de % por cliente." />
         <KPICardEnhanced label="MC Média/Cliente (R$)" value={mc != null ? fmt(mc.mc_media_por_cliente) : '—'} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MC Total ÷ Clientes Ativos. Margem de contribuição média por cliente em Reais." />
-        <KPICardEnhanced label="LTV (meses)" value={metrics.ltvMeses > 0 ? metrics.ltvMeses.toFixed(1) : 'N/A'} icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Média de permanência em meses de todos os clientes (ativos + cancelados)" />
-        <KPICardEnhanced label="LTV (R$)" value={metrics.ltvReais > 0 ? fmt(metrics.ltvReais) : 'N/A'} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Ticket Médio × LTV em meses" />
+        <KPICardEnhanced label="LTV (meses)" value={metrics.ltvMeses > 0 ? metrics.ltvMeses.toFixed(1) : 'N/A'} icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="1 ÷ Churn Rate mensal. Usa a mesma fórmula do gráfico de evolução." />
+        <KPICardEnhanced label="LTV (R$)" value={metrics.ltvReais > 0 ? fmt(metrics.ltvReais) : 'N/A'} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Ticket Médio × LTV em meses. Receita esperada por cliente ao longo da vida." />
       </div>
 
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
@@ -65,8 +65,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData }: Props) {
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <LineChartCard title="Evolução LTV (meses)" data={timeSeries.ltvMesesEvolution} formatValue={v => v.toFixed(1)} tvMode={tvMode} color="hsl(var(--chart-3))" />
-        <LineChartCard title="Evolução LTV/CAC" data={timeSeries.ltvCacEvolution} formatValue={v => v.toFixed(2) + 'x'} tvMode={tvMode} color="hsl(var(--chart-5))" />
+        <LineChartCard title="Evolução LTV (meses) — 1 ÷ Churn mensal (média 3m)" data={timeSeries.ltvMesesEvolution} formatValue={v => v.toFixed(1) + ' meses'} tvMode={tvMode} color="hsl(var(--chart-3))" />
+        <LineChartCard title="Evolução LTV/CAC (x)" data={timeSeries.ltvCacEvolution} formatValue={v => v.toFixed(2) + 'x'} tvMode={tvMode} color="hsl(var(--chart-5))" />
       </div>
     </div>
   );
