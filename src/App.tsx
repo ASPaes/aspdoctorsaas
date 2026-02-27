@@ -66,10 +66,10 @@ const App = () => (
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/clientes/novo" element={<ClienteForm />} />
               <Route path="/clientes/:id" element={<ClienteForm />} />
-              <Route path="/cadastros" element={<Cadastros />} />
+              <Route path="/cadastros" element={<Navigate to="/configuracoes?tab=cadastros" replace />} />
               <Route path="/certificados-a1" element={<CertificadosA1 />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
-              <Route path="/settings/users" element={<SettingsUsers />} />
+              <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<CustomerSuccess />} />
 
               {/* Super Admin routes */}
