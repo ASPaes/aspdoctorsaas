@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { startOfMonth, endOfMonth } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DashboardFilters, getPresetDates } from '@/components/dashboard/DashboardFilters';
+import { DashboardFilters } from '@/components/dashboard/DashboardFilters';
 import { useDashboardData } from '@/components/dashboard/hooks/useDashboardData';
 import { useMargemContribuicaoDashboard } from '@/components/dashboard/hooks/useMargemContribuicaoDashboard';
 import { useLookups } from '@/hooks/useLookups';
+import { useDashboardFilters } from '@/hooks/useDashboardFilters';
 import type { DashboardFilters as FiltersType } from '@/components/dashboard/types';
 import { VisaoGeralTab } from '@/components/dashboard/tabs/VisaoGeralTab';
 import { CrescimentoTab } from '@/components/dashboard/tabs/CrescimentoTab';
@@ -16,14 +16,7 @@ import { CohortTab } from '@/components/dashboard/tabs/CohortTab';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Dashboard() {
-  const now = new Date();
-  const [filters, setFilters] = useState<FiltersType>({
-    fornecedorId: null,
-    periodoInicio: startOfMonth(now),
-    periodoFim: endOfMonth(now),
-    showAllData: false,
-    unidadeBaseId: null,
-  });
+  const { filters, setFilters } = useDashboardFilters();
   const [tvMode, setTvMode] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
 

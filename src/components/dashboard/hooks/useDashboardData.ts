@@ -34,18 +34,26 @@ export function useDashboardData(filters: DashboardFilters) {
       const periodoInicioStr = format(periodoInicio, 'yyyy-MM-dd');
       const periodoFimStr = format(periodoFim, 'yyyy-MM-dd');
 
-      // 1. Clientes ativos — use vw_clientes_financeiro for financial fields
+      // 1. Clientes ativos no fim do período — snapshot temporal
+      // Busca todos os clientes cadastrados até o fim do período, depois filtra em JS
+      // para considerar apenas aqueles que NÃO estavam cancelados na data final.
       let clientesQuery = supabase
         .from('vw_clientes_financeiro')
         .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
-        .eq('cancelado', false);
+        .lte('data_cadastro', periodoFimStr);
 
       if (filters.unidadeBaseId) clientesQuery = clientesQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) clientesQuery = clientesQuery.eq('fornecedor_id', filters.fornecedorId);
 
-      const { data: clientesAtivos } = await clientesQuery;
-      const clientesCount = clientesAtivos?.length || 0;
-      const mrr = clientesAtivos?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
+      const { data: clientesRaw } = await clientesQuery;
+      // Cliente é "ativo no fim do período" se: não cancelado, OU cancelado DEPOIS do fim do período
+      const clientesAtivos = (clientesRaw || []).filter(c => {
+        if (!c.data_cancelamento) return true; // never cancelled
+        // Was cancelled — only count as active if cancellation is after period end
+        return new Date(c.data_cancelamento) > new Date(periodoFimStr);
+      });
+      const clientesCount = clientesAtivos.length;
+      const mrr = clientesAtivos.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
       // 2. Novos clientes no período
       let novosQuery = supabase
@@ -86,17 +94,19 @@ export function useDashboardData(filters: DashboardFilters) {
       const cancelamentosEarly = earlyChurn.length;
       const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
-      // 4. Clientes início do período
+      // 4. Clientes início do período (snapshot temporal)
       let clientesInicioQuery = supabase
         .from('clientes')
-        .select('id, mensalidade', { count: 'exact' })
-        .lt('data_cadastro', periodoInicioStr)
-        .eq('cancelado', false);
-
+        .select('id, mensalidade, data_cancelamento')
+        .lt('data_cadastro', periodoInicioStr);
       if (filters.unidadeBaseId) clientesInicioQuery = clientesInicioQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) clientesInicioQuery = clientesInicioQuery.eq('fornecedor_id', filters.fornecedorId);
-
-      const { data: clientesInicio, count: clientesInicioCount } = await clientesInicioQuery;
+      const { data: clientesInicioFull } = await clientesInicioQuery;
+      const clientesInicioAtivos = (clientesInicioFull || []).filter(c => {
+        if (!c.data_cancelamento) return true;
+        return new Date(c.data_cancelamento) >= new Date(periodoInicioStr);
+      });
+      const clientesInicioCount = clientesInicioAtivos.length;
 
       // Movimentos antes do período
       const { data: movimentosInicioRaw } = await supabase
@@ -112,9 +122,9 @@ export function useDashboardData(filters: DashboardFilters) {
         movimentosInicioMap[m.cliente_id] = (movimentosInicioMap[m.cliente_id] || 0) + (Number(m.valor_delta) || 0);
       });
 
-      const mrrInicio = clientesInicio?.reduce((sum, c) => {
+      const mrrInicio = clientesInicioAtivos.reduce((sum, c) => {
         return sum + (Number(c.mensalidade) || 0) + (movimentosInicioMap[c.id] || 0);
-      }, 0) || 0;
+      }, 0);
 
       // 5. LTV — usar 1 / churn mensal (padrão SaaS), consistente com gráfico
       const now = new Date();

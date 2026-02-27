@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import type { DashboardFilters } from '../types';
 
@@ -25,20 +26,28 @@ const defaultData: MargemContribuicaoData = {
 };
 
 export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
+  const periodoFimStr = filters.periodoFim ? format(filters.periodoFim, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+
   return useQuery({
-    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId],
+    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId, periodoFimStr],
     queryFn: async (): Promise<MargemContribuicaoData> => {
       let query = supabase
         .from('vw_clientes_financeiro')
-        .select('mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual')
-        .eq('cancelado', false);
+        .select('mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual, data_cadastro, data_cancelamento, cancelado')
+        .lte('data_cadastro', periodoFimStr);
 
       if (filters.unidadeBaseId) query = query.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) query = query.eq('fornecedor_id', filters.fornecedorId);
 
-      const { data, error } = await query;
+      const { data: raw, error } = await query;
       if (error) throw error;
-      if (!data || data.length === 0) return defaultData;
+      if (!raw || raw.length === 0) return defaultData;
+
+      // Filter to clients active at end of period
+      const data = raw.filter(c => {
+        if (!c.data_cancelamento) return true;
+        return new Date(c.data_cancelamento) > new Date(periodoFimStr);
+      });
 
       let receita_mrr = 0;
       let cogs_total = 0;
