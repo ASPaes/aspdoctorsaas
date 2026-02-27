@@ -9,6 +9,7 @@ const defaultMetrics: KPIMetrics = {
   crescimentoReais: 0, crescimentoPercent: 0, ltvMeses: 0, ltvReais: 0, cac: 0, ltvCac: 0,
   cancelamentosQtd: 0, mrrCancelado: 0, cancelamentosEarly: 0, mrrCanceladoEarly: 0, earlyChurnRate: 0, churnCarteiraPercent: 0,
   novosClientes: 0, newMrr: 0, totalImplantacao: 0,
+  prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
   netNewMrr: 0, nrr: 0, grr: 0, cacPayback: 0, margemContribuicao: 0, concentracaoTop10: 0, receitaAtivacao: 0,
   upsellMrr: 0, crossSellMrr: 0, downsellMrr: 0, mrrAjustado: 0,
   funcionariosRanking: [], quickRatio: 0, revenuePerFuncionario: 0,
@@ -260,6 +261,40 @@ export function useDashboardData(filters: DashboardFilters) {
       }
       const funcionariosRanking = Object.values(mrrPorFunc).filter(f => f.nome).sort((a, b) => b.mrr - a.mrr);
 
+      // === Previous month vendas (for deltas) ===
+      const prevMonthStart = format(startOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
+      const prevMonthEnd = format(endOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
+
+      let prevNovosQuery = supabase
+        .from('clientes')
+        .select('id, mensalidade, valor_ativacao')
+        .gte('data_cadastro', prevMonthStart)
+        .lte('data_cadastro', prevMonthEnd)
+        .eq('cancelado', false);
+      if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
+      if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
+      const { data: prevNovos } = await prevNovosQuery;
+
+      const prevNovosClientes = prevNovos?.length ?? null;
+      const prevNewMrr = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) : null;
+      const prevTotalImplantacao = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0) : null;
+
+      // Previous month movimentos for upsell/cross-sell delta
+      const { data: prevMovimentos } = await supabase
+        .from('movimentos_mrr')
+        .select('tipo, valor_delta')
+        .gte('data_movimento', prevMonthStart)
+        .lte('data_movimento', prevMonthEnd)
+        .eq('status', 'ativo')
+        .is('estornado_por', null)
+        .is('estorno_de', null);
+
+      let prevUpsellMrr = 0, prevCrossSellMrr = 0;
+      prevMovimentos?.forEach(m => {
+        if (m.tipo === 'upsell') prevUpsellMrr += Number(m.valor_delta) || 0;
+        else if (m.tipo === 'cross_sell') prevCrossSellMrr += Number(m.valor_delta) || 0;
+      });
+
       setMetrics({
         faturamentoTotal: mrrTotalAtual, faturamentoPorUnidade, clientesAtivos: clientesCount,
         mrr: mrrTotalAtual, ticketMedio: ticketMedioAjustado, arr: mrrTotalAtual * 12,
@@ -267,6 +302,8 @@ export function useDashboardData(filters: DashboardFilters) {
         cancelamentosQtd, mrrCancelado: churnMrrTotal, cancelamentosEarly, mrrCanceladoEarly, earlyChurnRate,
         churnCarteiraPercent: (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0,
         novosClientes: novosCount, newMrr, totalImplantacao,
+        prevNovosClientes, prevNewMrr, prevTotalImplantacao,
+        prevUpsellMrr: prevUpsellMrr || null, prevCrossSellMrr: prevCrossSellMrr || null,
         netNewMrr, nrr, grr, cacPayback, margemContribuicao, concentracaoTop10,
         receitaAtivacao: totalImplantacao,
         upsellMrr, crossSellMrr, downsellMrr, mrrAjustado: mrrTotalAtual,
