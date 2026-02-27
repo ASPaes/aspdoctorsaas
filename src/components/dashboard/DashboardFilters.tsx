@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, Filter, RefreshCw, Maximize2, Minimize2, CalendarRange } from 'lucide-react';
+import { Filter, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import type { DashboardFilters as FiltersType } from './types';
 
 export type PeriodPreset = 'personalizado' | 'mes_atual' | 'ultimos_3_meses' | 'ultimos_6_meses' | 'ultimos_12_meses';
@@ -49,67 +49,36 @@ export function DashboardFilters({
   filters, onFiltersChange, fornecedores, unidadesBase, loading, onRefresh,
   tvMode, onTvModeToggle, autoRefreshInterval, onAutoRefreshChange,
 }: DashboardFiltersProps) {
-  const [selectedPreset, setSelectedPreset] = useState<PeriodPreset>('mes_atual');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const dateRange: DateRange = { from: filters.periodoInicio, to: filters.periodoFim };
 
-  const handlePresetChange = (preset: PeriodPreset) => {
-    setSelectedPreset(preset);
-    if (preset === 'personalizado') return;
-    const { start, end } = getPresetDates(preset);
-    onFiltersChange({ ...filters, showAllData: false, periodoInicio: start, periodoFim: end });
-  };
-
-  const handleDateApply = () => {
-    if (dateFrom && dateTo) {
-      setSelectedPreset('personalizado');
-      onFiltersChange({ ...filters, showAllData: false, periodoInicio: new Date(dateFrom), periodoFim: new Date(dateTo) });
+  const handleDateRangeChange = (range: DateRange) => {
+    if (range.from) {
+      onFiltersChange({
+        ...filters,
+        showAllData: false,
+        periodoInicio: range.from,
+        periodoFim: range.to || range.from,
+      });
     }
   };
 
-  const formatDateRange = () => {
-    if (!filters.periodoInicio) return 'Selecione';
-    if (!filters.periodoFim) return format(filters.periodoInicio, 'dd/MM/yyyy', { locale: ptBR });
-    return `${format(filters.periodoInicio, 'dd/MM/yyyy', { locale: ptBR })} - ${format(filters.periodoFim, 'dd/MM/yyyy', { locale: ptBR })}`;
-  };
-
   return (
-    <div className={`flex flex-wrap items-center gap-3 ${tvMode ? 'p-4' : ''}`}>
+    <div className={`flex flex-wrap items-end gap-3 ${tvMode ? 'p-4' : ''}`}>
       <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Select value={filters.fornecedorId?.toString() || 'all'} onValueChange={v => onFiltersChange({ ...filters, fornecedorId: v === 'all' ? null : Number(v) })}>
-          <SelectTrigger className={cn('w-[180px]', tvMode && 'h-12 text-lg')}><SelectValue placeholder="Fornecedor" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Fornecedores</SelectItem>
-            {fornecedores.map(f => <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Filter className="h-4 w-4 text-muted-foreground mt-5" />
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
+          <Select value={filters.fornecedorId?.toString() || 'all'} onValueChange={v => onFiltersChange({ ...filters, fornecedorId: v === 'all' ? null : Number(v) })}>
+            <SelectTrigger className={cn('w-[180px]', tvMode && 'h-12 text-lg')}><SelectValue placeholder="Fornecedor" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Fornecedores</SelectItem>
+              {fornecedores.map(f => <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-        <Select value={selectedPreset} onValueChange={v => handlePresetChange(v as PeriodPreset)}>
-          <SelectTrigger className={cn('w-[160px]', tvMode && 'h-12 text-lg')}><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {Object.entries(presetLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {selectedPreset === 'personalizado' ? (
-        <div className="flex items-center gap-2">
-          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-[140px]" />
-          <span className="text-muted-foreground">—</span>
-          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-[140px]" />
-          <Button variant="outline" size="sm" onClick={handleDateApply}>Aplicar</Button>
-        </div>
-      ) : (
-        <div className={cn('flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/50 text-muted-foreground', tvMode ? 'h-12 text-lg min-w-[280px]' : 'min-w-[240px] h-10')}>
-          <CalendarRange className="h-4 w-4" />
-          <span>{formatDateRange()}</span>
-        </div>
-      )}
-
+      <DateRangePicker label="Período" value={dateRange} onChange={handleDateRangeChange} className="w-64" />
       <Select value={filters.unidadeBaseId?.toString() || 'geral'} onValueChange={v => onFiltersChange({ ...filters, unidadeBaseId: v === 'geral' ? null : Number(v) })}>
         <SelectTrigger className={cn('w-[140px]', tvMode && 'h-12 text-lg')}><SelectValue /></SelectTrigger>
         <SelectContent>
