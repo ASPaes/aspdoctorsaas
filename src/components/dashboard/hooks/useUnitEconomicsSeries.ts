@@ -8,35 +8,40 @@ const LTV_CAP = 120;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 export interface MonthlyUnitEconomics {
-  month: string;       // "MMM"
-  monthFull: string;   // "MMM yyyy"
-  yearMonth: string;   // "yyyy-MM"
+  month: string;
+  monthFull: string;
+  yearMonth: string;
   // Raw
   base_inicio: number;
   cancelados: number;
   ativos_fim: number;
+  novos_clientes: number;
   mrr_snapshot: number;
   mc_total: number;
   mc_percent: number | null;
-  ticket_medio: number | null;
+  arpa: number | null;
+  // Ativação (separada)
+  ativacao_media: number | null;
+  ativacao_total: number;
   // Churn
   churn_M: number | null;
   // LTV meses
   ltv_M: number | null;
   ltv_3M: number | null;
   ltv_6M: number | null;
-  // LTV R$
-  ltv_rs_M: number | null;
-  ltv_rs_3M: number | null;
-  ltv_rs_6M: number | null;
+  // LTV R$ (recorrente com margem)
+  ltv_rec_margem_M: number | null;
+  ltv_rec_margem_3M: number | null;
+  ltv_rec_margem_6M: number | null;
   // CAC
-  cac_M: number;
-  cac_3M: number;
-  cac_6M: number;
-  // LTV/CAC
-  ltv_cac_M: number | null;
-  ltv_cac_3M: number | null;
-  ltv_cac_6M: number | null;
+  cac_burn_M: number;
+  cac_por_logo_M: number | null;
+  // LTV/CAC recorrente (usa CAC por logo)
+  ltv_cac_rec_M: number | null;
+  ltv_cac_rec_3M: number | null;
+  ltv_cac_rec_6M: number | null;
+  // CAC Payback
+  cac_payback_M: number | null;
 }
 
 export interface UnitEconomicsResult {
@@ -46,13 +51,11 @@ export interface UnitEconomicsResult {
 
 export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 12) {
   return useQuery<UnitEconomicsResult>({
-    queryKey: ['unit-economics-series', filters.unidadeBaseId, filters.fornecedorId, rangeMonths],
+    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths],
     queryFn: async () => {
       const now = new Date();
+      const totalMonthsNeeded = rangeMonths + 5; // warmup for 6M window
 
-      // Build month references (oldest first)
-      // We need extra months before the range for 6M rolling windows
-      const totalMonthsNeeded = rangeMonths + 5; // 5 extra for 6M window warmup
       const allMonthRefs = Array.from({ length: totalMonthsNeeded }).map((_, i) => {
         const d = subMonths(now, totalMonthsNeeded - 1 - i);
         return {
@@ -66,10 +69,10 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
         };
       });
 
-      // === QUERY A: All clients (for monthly aggregation) ===
+      // === QUERY A: All clients ===
       const { data: allClientes } = await supabase
         .from('clientes')
-        .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id');
+        .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
 
       // === QUERY B: CAC despesas ===
       const { data: cacDespesas } = await supabase
@@ -89,25 +92,28 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
         return true;
       });
 
-      // Compute raw per-month data for all months (including warmup)
-      const rawMonths: {
+      // Raw per-month
+      interface RawMonth {
         base_inicio: number;
         cancelados: number;
         ativos_fim: number;
+        novos_clientes: number;
         mrr_snapshot: number;
         mc_total: number;
-        cac_M: number;
+        cac_burn: number;
+        ativacao_total: number;
+        ativacao_count: number;
         yearMonth: string;
-      }[] = [];
+      }
+
+      const rawMonths: RawMonth[] = [];
 
       allMonthRefs.forEach(m => {
         const startDate = m.startDate;
         const endDate = m.endDate;
-        const startStr = m.start;
         const endStr = m.end;
 
-        // base_inicio: active on 1st day of month
-        // active if: data_venda <= startDate AND (data_cancelamento IS NULL OR data_cancelamento > startDate)
+        // base_inicio: active on 1st day
         const baseInicio = clients.filter(c => {
           if (!c.data_venda) return false;
           if (new Date(c.data_venda) > startDate) return false;
@@ -115,11 +121,18 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
           return true;
         });
 
-        // cancelados: data_cancelamento within month
+        // cancelados within month
         const cancelados = clients.filter(c => {
           if (!c.data_cancelamento) return false;
           const dc = new Date(c.data_cancelamento);
           return dc >= startDate && dc <= endDate;
+        });
+
+        // novos clientes: data_venda within month
+        const novos = clients.filter(c => {
+          if (!c.data_venda) return false;
+          const dv = new Date(c.data_venda);
+          return dv >= startDate && dv <= endDate;
         });
 
         // ativos_fim: active at end of month
@@ -132,7 +145,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
 
         const mrrSnapshot = ativosFim.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0);
 
-        // MC total for active clients at end of month
+        // MC total
         let mcTotal = 0;
         ativosFim.forEach(c => {
           const mens = Number(c.mensalidade) || 0;
@@ -142,15 +155,25 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
           mcTotal += mens - cogs - imp - fix;
         });
 
-        // CAC for this month (by vigência)
-        const monthRef = m.start; // yyyy-MM-dd (1st day)
-        let cacM = 0;
+        // Ativação dos novos (separada do ARPA)
+        let ativTotal = 0;
+        let ativCount = 0;
+        novos.forEach(c => {
+          const va = Number(c.valor_ativacao) || 0;
+          if (va > 0) {
+            ativTotal += va;
+            ativCount++;
+          }
+        });
+
+        // CAC burn
+        let cacBurn = 0;
         despesas.forEach(d => {
           const mesInicial = d.mes_inicial;
           const mesFinal = d.mes_final;
           if (mesInicial && mesInicial <= endStr) {
-            if (!mesFinal || mesFinal >= startStr) {
-              cacM += Number(d.valor_alocado) || 0;
+            if (!mesFinal || mesFinal >= m.start) {
+              cacBurn += Number(d.valor_alocado) || 0;
             }
           }
         });
@@ -159,15 +182,18 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
           base_inicio: baseInicio.length,
           cancelados: cancelados.length,
           ativos_fim: ativosFim.length,
+          novos_clientes: novos.length,
           mrr_snapshot: mrrSnapshot,
           mc_total: mcTotal,
-          cac_M: cacM,
+          cac_burn: cacBurn,
+          ativacao_total: ativTotal,
+          ativacao_count: ativCount,
           yearMonth: m.yearMonth,
         });
       });
 
-      // Now compute derived metrics for the display range (last `rangeMonths`)
-      const warmup = totalMonthsNeeded - rangeMonths; // 5
+      // Derived metrics
+      const warmup = totalMonthsNeeded - rangeMonths;
       const series: MonthlyUnitEconomics[] = [];
 
       for (let i = warmup; i < totalMonthsNeeded; i++) {
@@ -177,23 +203,54 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
         // Churn M
         const churnM = raw.base_inicio > 0 ? raw.cancelados / raw.base_inicio : null;
 
-        // LTV M
+        // LTV M (meses)
         let ltvM: number | null = null;
         if (churnM === null) ltvM = null;
         else if (churnM === 0) ltvM = LTV_CAP;
         else ltvM = round2(1 / churnM);
 
-        // Window aggregation helper
+        // ARPA (sem ativação)
+        const arpa = raw.ativos_fim > 0 ? round2(raw.mrr_snapshot / raw.ativos_fim) : null;
+
+        // MC% ponderada
+        const mcPercent = raw.mrr_snapshot > 0 ? round2(raw.mc_total / raw.mrr_snapshot) : null;
+
+        // LTV recorrente (margem) = ARPA × MC% × LTV_meses
+        let ltvRecMargemM: number | null = null;
+        if (arpa !== null && mcPercent !== null && ltvM !== null) {
+          ltvRecMargemM = round2(arpa * mcPercent * ltvM);
+        }
+
+        // CAC por logo
+        const cacPorLogoM = raw.novos_clientes > 0 ? round2(raw.cac_burn / raw.novos_clientes) : null;
+
+        // LTV/CAC recorrente (usa CAC por logo)
+        let ltvCacRecM: number | null = null;
+        if (ltvRecMargemM !== null && cacPorLogoM !== null && cacPorLogoM > 0) {
+          ltvCacRecM = round2(ltvRecMargemM / cacPorLogoM);
+        }
+
+        // Ativação média
+        const ativacaoMedia = raw.novos_clientes > 0 ? round2(raw.ativacao_total / raw.novos_clientes) : null;
+
+        // CAC Payback: CAC por logo / (ARPA × MC%)
+        let cacPaybackM: number | null = null;
+        if (cacPorLogoM !== null && arpa !== null && mcPercent !== null && arpa * mcPercent > 0) {
+          cacPaybackM = round2(cacPorLogoM / (arpa * mcPercent));
+        }
+
+        // Window aggregation for 3M and 6M
         const windowCalc = (windowSize: number) => {
           const start = i - windowSize + 1;
-          if (start < 0) return { ltv: null as number | null, ltvRs: null as number | null, cac: 0, ltvCac: null as number | null };
+          if (start < 0) return { ltv: null as number | null, ltvRecMargem: null as number | null, ltvCacRec: null as number | null };
 
           let totalCancelados = 0;
           let totalBaseInicio = 0;
           let totalMrr = 0;
           let totalClientes = 0;
           let totalMc = 0;
-          let totalCac = 0;
+          let totalCacBurn = 0;
+          let totalNovos = 0;
 
           for (let j = start; j <= i; j++) {
             const r = rawMonths[j];
@@ -202,53 +259,41 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
             totalMrr += r.mrr_snapshot;
             totalClientes += r.ativos_fim;
             totalMc += r.mc_total;
-            totalCac += r.cac_M;
+            totalCacBurn += r.cac_burn;
+            totalNovos += r.novos_clientes;
           }
 
+          // Churn window
           const churnW = totalBaseInicio > 0 ? totalCancelados / totalBaseInicio : null;
           let ltvW: number | null = null;
           if (churnW === null) ltvW = null;
           else if (churnW === 0) ltvW = LTV_CAP;
           else ltvW = round2(1 / churnW);
 
-          const ticketW = totalClientes > 0 ? totalMrr / totalClientes : null;
+          // ARPA and MC% window
+          const arpaW = totalClientes > 0 ? totalMrr / totalClientes : null;
           const mcPctW = totalMrr > 0 ? totalMc / totalMrr : null;
 
-          let ltvRsW: number | null = null;
-          if (ltvW !== null && ticketW !== null && mcPctW !== null) {
-            ltvRsW = round2(ticketW * ltvW * mcPctW);
+          // LTV recorrente margem window
+          let ltvRecMargemW: number | null = null;
+          if (ltvW !== null && arpaW !== null && mcPctW !== null) {
+            ltvRecMargemW = round2(arpaW * mcPctW * ltvW);
           }
 
-          let ltvCacW: number | null = null;
-          if (ltvRsW !== null && totalCac > 0) {
-            ltvCacW = round2(ltvRsW / totalCac);
+          // CAC por logo window
+          const cacPorLogoW = totalNovos > 0 ? totalCacBurn / totalNovos : null;
+
+          // LTV/CAC recorrente window
+          let ltvCacRecW: number | null = null;
+          if (ltvRecMargemW !== null && cacPorLogoW !== null && cacPorLogoW > 0) {
+            ltvCacRecW = round2(ltvRecMargemW / cacPorLogoW);
           }
 
-          return { ltv: ltvW, ltvRs: ltvRsW, cac: totalCac, ltvCac: ltvCacW };
+          return { ltv: ltvW, ltvRecMargem: ltvRecMargemW, ltvCacRec: ltvCacRecW };
         };
 
-        // 1M
-        const w1 = windowCalc(1);
-        // 3M
         const w3 = windowCalc(3);
-        // 6M
         const w6 = windowCalc(6);
-
-        // Ticket and MC for current month (for card display)
-        const ticketMedio = raw.ativos_fim > 0 ? raw.mrr_snapshot / raw.ativos_fim : null;
-        const mcPercent = raw.mrr_snapshot > 0 ? raw.mc_total / raw.mrr_snapshot : null;
-
-        // LTV R$ for 1M
-        let ltvRsM: number | null = null;
-        if (ltvM !== null && ticketMedio !== null && mcPercent !== null) {
-          ltvRsM = round2(ticketMedio * ltvM * mcPercent);
-        }
-
-        // LTV/CAC for 1M
-        let ltvCacM: number | null = null;
-        if (ltvRsM !== null && raw.cac_M > 0) {
-          ltvCacM = round2(ltvRsM / raw.cac_M);
-        }
 
         series.push({
           month: ref.month,
@@ -257,28 +302,30 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
           base_inicio: raw.base_inicio,
           cancelados: raw.cancelados,
           ativos_fim: raw.ativos_fim,
+          novos_clientes: raw.novos_clientes,
           mrr_snapshot: round2(raw.mrr_snapshot),
           mc_total: round2(raw.mc_total),
-          mc_percent: mcPercent !== null ? round2(mcPercent) : null,
-          ticket_medio: ticketMedio !== null ? round2(ticketMedio) : null,
+          mc_percent: mcPercent,
+          arpa,
+          ativacao_media: ativacaoMedia,
+          ativacao_total: round2(raw.ativacao_total),
           churn_M: churnM !== null ? round2(churnM) : null,
           ltv_M: ltvM,
           ltv_3M: w3.ltv,
           ltv_6M: w6.ltv,
-          ltv_rs_M: ltvRsM,
-          ltv_rs_3M: w3.ltvRs,
-          ltv_rs_6M: w6.ltvRs,
-          cac_M: round2(raw.cac_M),
-          cac_3M: round2(w3.cac),
-          cac_6M: round2(w6.cac),
-          ltv_cac_M: ltvCacM,
-          ltv_cac_3M: w3.ltvCac,
-          ltv_cac_6M: w6.ltvCac,
+          ltv_rec_margem_M: ltvRecMargemM,
+          ltv_rec_margem_3M: w3.ltvRecMargem,
+          ltv_rec_margem_6M: w6.ltvRecMargem,
+          cac_burn_M: round2(raw.cac_burn),
+          cac_por_logo_M: cacPorLogoM,
+          ltv_cac_rec_M: ltvCacRecM,
+          ltv_cac_rec_3M: w3.ltvCacRec,
+          ltv_cac_rec_6M: w6.ltvCacRec,
+          cac_payback_M: cacPaybackM,
         });
       }
 
       const current = series.length > 0 ? series[series.length - 1] : null;
-
       return { series, current };
     },
     staleTime: 5 * 60 * 1000,

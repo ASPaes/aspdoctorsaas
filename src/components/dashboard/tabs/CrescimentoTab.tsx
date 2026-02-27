@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, Clock, DollarSign, Divide, Calculator, Users, Percent, BarChart3, Shield, ChevronDown, Bug } from 'lucide-react';
+import { TrendingUp, Clock, DollarSign, Calculator, Users, Percent, BarChart3, Shield, ChevronDown, Bug, UserPlus, Flame, Divide, Zap } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { NetNewMrrBreakdown } from '../cards/NetNewMrrBreakdown';
@@ -31,21 +31,6 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const current = ueData?.current;
   const series = ueData?.series || [];
 
-  // Chart data
-  const ltvChartData = series.map(m => ({
-    monthFull: m.monthFull,
-    ltv_M: m.ltv_M,
-    ltv_3M: m.ltv_3M,
-    ltv_6M: m.ltv_6M,
-  }));
-
-  const ltvCacChartData = series.map(m => ({
-    monthFull: m.monthFull,
-    ltv_cac_M: m.ltv_cac_M,
-    ltv_cac_3M: m.ltv_cac_3M,
-    ltv_cac_6M: m.ltv_cac_6M,
-  }));
-
   const fmtLtvVal = (v: number | null | undefined): string => {
     if (v === null || v === undefined) return '—';
     return v.toFixed(1);
@@ -56,7 +41,27 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
     return v.toFixed(2) + 'x';
   };
 
-  // Debug panel state
+  // Chart data
+  const ltvChartData = series.map(m => ({
+    monthFull: m.monthFull,
+    ltv_M: m.ltv_M,
+    ltv_3M: m.ltv_3M,
+    ltv_6M: m.ltv_6M,
+  }));
+
+  const ltvCacChartData = series.map(m => ({
+    monthFull: m.monthFull,
+    ltv_cac_rec_M: m.ltv_cac_rec_M,
+    ltv_cac_rec_3M: m.ltv_cac_rec_3M,
+    ltv_cac_rec_6M: m.ltv_cac_rec_6M,
+  }));
+
+  const cacChartData = series.map(m => ({
+    monthFull: m.monthFull,
+    cac_burn: m.cac_burn_M,
+    cac_por_logo: m.cac_por_logo_M,
+  }));
+
   const [debugOpen, setDebugOpen] = useState(false);
 
   return (
@@ -79,7 +84,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant="primary"
             subtitle="Foto atual da receita recorrente"
-            formula="Soma das mensalidades de todos os clientes ativos (cancelado=false). Retrato instantâneo, não considera movimentos do período."
+            formula="Soma das mensalidades de todos os clientes ativos. Retrato instantâneo."
           />
           <KPICardEnhanced
             label="Net New MRR (no período)"
@@ -88,7 +93,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant={metrics.netNewMrr >= 0 ? 'success' : 'destructive'}
             subtitle="Variação líquida no período"
-            formula="New MRR (novos clientes por data_venda) + Upsell + Cross-sell − Downsell − Churn MRR. Diferente do MRR Snapshot, que é a foto atual."
+            formula="New MRR + Upsell + Cross-sell − Downsell − Churn MRR."
           />
         </div>
 
@@ -139,7 +144,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Calculator className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
             variant="dark"
-            formula="Receita (MRR) − COGS − Impostos − Custos Fixos alocados. Margem de contribuição total da carteira ativa."
+            formula="Receita (MRR) − COGS − Impostos − Custos Fixos alocados."
           />
           <KPICardEnhanced
             label="MC% Ponderada"
@@ -147,7 +152,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Percent className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
             variant={mc && mc.mc_percent_ponderada >= 0.3 ? 'success' : mc && mc.mc_percent_ponderada >= 0.1 ? 'warning' : 'destructive'}
-            formula="MC Total ÷ MRR Total × 100. Percentual ponderado pela receita total, não média simples de % por cliente."
+            formula="MC Total ÷ MRR Total. Ponderada pela receita, não média simples."
           />
           <KPICardEnhanced
             label="MC Média / Cliente (R$)"
@@ -155,106 +160,125 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
             variant="dark"
-            formula="MC Total ÷ Clientes Ativos. Margem de contribuição média por cliente em Reais."
+            formula="MC Total ÷ Clientes Ativos."
           />
         </div>
       </section>
 
-      {/* ═══════ SEÇÃO 3 — Retenção e Unit Economics ═══════ */}
+      {/* ═══════ SEÇÃO 3 — Retenção e Unit Economics (modelo SaaS) ═══════ */}
       <section className="space-y-4">
         <SectionHeader
           title="Retenção e Unit Economics"
-          description="LTV, CAC e payback com visões mensal, 3M e 6M"
+          description="CAC burn vs por logo, LTV recorrente com margem, LTV/CAC padrão SaaS"
           icon={<Shield className={`${tvMode ? 'h-6 w-6' : 'h-5 w-5'} text-primary`} />}
           tvMode={tvMode}
         />
 
-        {/* LTV (meses) — 3 cards */}
-        <div className={`grid gap-4 ${tvMode ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
+        {/* Linha 1: CAC e Aquisição */}
+        <div className={`grid gap-4 ${tvMode ? 'grid-cols-4' : 'grid-cols-2 sm:grid-cols-4'}`}>
           <KPICardEnhanced
-            label="LTV (mês)"
+            label="CAC Burn (mês)"
+            value={current?.cac_burn_M ? fmt(current.cac_burn_M) : '—'}
+            icon={<Flame className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant="dark"
+            formula="Soma valor_alocado de despesas CAC vigentes no mês (mes_inicial ≤ M ≤ mes_final). Inclui despesas gerais."
+          />
+          <KPICardEnhanced
+            label="Novos Clientes (mês)"
+            value={current?.novos_clientes != null ? current.novos_clientes.toString() : '—'}
+            icon={<UserPlus className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant="dark"
+            formula="Clientes com data_venda dentro do mês."
+          />
+          <KPICardEnhanced
+            label="CAC por Logo"
+            value={current?.cac_por_logo_M != null ? fmt(current.cac_por_logo_M) : '—'}
+            icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant="dark"
+            subtitle="Custo unitário de aquisição"
+            formula="CAC Burn ÷ Novos Clientes do mês. Se novos=0, exibe '—'."
+          />
+          <KPICardEnhanced
+            label="Ativação Média (novos)"
+            value={current?.ativacao_media != null ? fmt(current.ativacao_media) : '—'}
+            icon={<Zap className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant="dark"
+            subtitle="Setup fee, fora do ARPA"
+            formula="Média de valor_ativacao dos novos clientes do mês. NÃO entra no ticket/ARPA."
+          />
+        </div>
+
+        {/* Linha 2: LTV e métricas recorrentes */}
+        <div className={`grid gap-4 ${tvMode ? 'grid-cols-4' : 'grid-cols-2 sm:grid-cols-4'}`}>
+          <KPICardEnhanced
+            label="ARPA (mês)"
+            value={current?.arpa != null ? fmt(current.arpa) : '—'}
+            icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant="dark"
+            subtitle="Sem ativação"
+            formula="MRR Snapshot ÷ Clientes Ativos. Não inclui valor de ativação (setup fee)."
+          />
+          <KPICardEnhanced
+            label="LTV (meses)"
             value={fmtLtvVal(current?.ltv_M)}
             icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
             subtitle={current?.ltv_M === 120 ? 'Teto aplicado (churn=0)' : undefined}
-            formula="1 ÷ Churn Rate do mês. Teto: 120 meses quando churn=0."
+            formula="1 ÷ Churn Rate mensal. Teto: 120 meses quando churn=0."
           />
           <KPICardEnhanced
-            label="LTV (3M)"
-            value={fmtLtvVal(current?.ltv_3M)}
-            icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
-            size={tvMode ? 'tv' : 'md'}
-            variant="dark"
-            subtitle="Janela 3 meses"
-            formula="1 ÷ (cancelados 3M ÷ base_inicio 3M). Churn agregado, não média de LTV."
-          />
-          <KPICardEnhanced
-            label="LTV (6M)"
-            value={fmtLtvVal(current?.ltv_6M)}
-            icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
-            size={tvMode ? 'tv' : 'md'}
-            variant="dark"
-            subtitle="Janela 6 meses"
-            formula="1 ÷ (cancelados 6M ÷ base_inicio 6M). Churn agregado, não média de LTV."
-          />
-        </div>
-
-        {/* LTV/CAC — 3 cards */}
-        <div className={`grid gap-4 ${tvMode ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
-          <KPICardEnhanced
-            label="LTV/CAC (mês)"
-            value={fmtLtvCacVal(current?.ltv_cac_M)}
-            icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
-            size={tvMode ? 'tv' : 'md'}
-            variant={current?.ltv_cac_M != null && current.ltv_cac_M >= 3 ? 'success' : current?.ltv_cac_M != null && current.ltv_cac_M >= 1 ? 'warning' : 'destructive'}
-            subtitle={current?.ltv_cac_M != null && current.ltv_cac_M >= 3 ? 'Saudável (≥3x)' : current?.ltv_cac_M != null && current.ltv_cac_M >= 1 ? 'Atenção (1-3x)' : 'Crítico (<1x)'}
-            formula="LTV R$ (mês) ÷ CAC (mês). Razão em 'x', nunca em %."
-          />
-          <KPICardEnhanced
-            label="LTV/CAC (3M)"
-            value={fmtLtvCacVal(current?.ltv_cac_3M)}
-            icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
-            size={tvMode ? 'tv' : 'md'}
-            variant={current?.ltv_cac_3M != null && current.ltv_cac_3M >= 3 ? 'success' : current?.ltv_cac_3M != null && current.ltv_cac_3M >= 1 ? 'warning' : 'destructive'}
-            subtitle="Janela 3 meses"
-            formula="LTV R$ (3M) ÷ CAC (3M). Usa churn e MC agregados da janela."
-          />
-          <KPICardEnhanced
-            label="LTV/CAC (6M)"
-            value={fmtLtvCacVal(current?.ltv_cac_6M)}
-            icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
-            size={tvMode ? 'tv' : 'md'}
-            variant={current?.ltv_cac_6M != null && current.ltv_cac_6M >= 3 ? 'success' : current?.ltv_cac_6M != null && current.ltv_cac_6M >= 1 ? 'warning' : 'destructive'}
-            subtitle="Janela 6 meses"
-            formula="LTV R$ (6M) ÷ CAC (6M). Usa churn e MC agregados da janela."
-          />
-        </div>
-
-        {/* CAC + Payback */}
-        <div className={`grid gap-4 ${tvMode ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
-          <KPICardEnhanced
-            label="CAC (mês)"
-            value={current?.cac_M ? fmt(current.cac_M) : '—'}
-            size={tvMode ? 'tv' : 'md'}
-            variant="dark"
-            formula="Soma valor_alocado das despesas CAC vigentes no mês (mes_inicial..mes_final). Inclui despesas gerais (unidade=null)."
-          />
-          <KPICardEnhanced
-            label="LTV R$ (mês)"
-            value={current?.ltv_rs_M != null ? fmt(current.ltv_rs_M) : '—'}
+            label="LTV Recorrente (R$)"
+            value={current?.ltv_rec_margem_M != null ? fmt(current.ltv_rec_margem_M) : '—'}
             icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
-            formula="Ticket Médio × LTV (meses) × MC%. Receita líquida esperada por cliente."
+            subtitle="Com margem (MC%)"
+            formula="ARPA × MC% Ponderada × LTV (meses). Receita líquida esperada por cliente."
           />
           <KPICardEnhanced
+            label="LTV/CAC Recorrente"
+            value={fmtLtvCacVal(current?.ltv_cac_rec_M)}
+            icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant={current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 3 ? 'success' : current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 1 ? 'warning' : 'destructive'}
+            subtitle={current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 3 ? 'Saudável (≥3x)' : current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 1 ? 'Atenção (1-3x)' : 'Crítico (<1x)'}
+            formula="LTV Recorrente (R$) ÷ CAC por Logo. Usa CAC unitário, nunca burn total. Razão em 'x'."
+          />
+        </div>
+
+        {/* Linha 3: CAC Payback + janelas 3M/6M */}
+        <div className={`grid gap-4 ${tvMode ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
+          <KPICardEnhanced
             label="CAC Payback (meses)"
-            value={metrics.cacPayback > 0 && metrics.cacPayback < 100 ? metrics.cacPayback.toFixed(1) : 'N/A'}
+            value={current?.cac_payback_M != null && current.cac_payback_M < 999 ? current.cac_payback_M.toFixed(1) : '—'}
             icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
-            variant={metrics.cacPayback > 0 && metrics.cacPayback <= 12 ? 'success' : 'warning'}
-            formula="CAC ÷ Lucro Bruto mensal médio por cliente. Ideal ≤ 12 meses."
+            variant={current?.cac_payback_M != null && current.cac_payback_M <= 12 ? 'success' : 'warning'}
+            formula="CAC por Logo ÷ (ARPA × MC%). Meses para recuperar o investimento. Ideal ≤ 12."
+          />
+          <KPICardEnhanced
+            label="LTV/CAC (3M)"
+            value={fmtLtvCacVal(current?.ltv_cac_rec_3M)}
+            icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant={current?.ltv_cac_rec_3M != null && current.ltv_cac_rec_3M >= 3 ? 'success' : current?.ltv_cac_rec_3M != null && current.ltv_cac_rec_3M >= 1 ? 'warning' : 'destructive'}
+            subtitle="Janela 3 meses"
+            formula="LTV Rec. (3M) ÷ CAC por Logo (3M). Churn, ARPA e MC% agregados na janela."
+          />
+          <KPICardEnhanced
+            label="LTV/CAC (6M)"
+            value={fmtLtvCacVal(current?.ltv_cac_rec_6M)}
+            icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
+            size={tvMode ? 'tv' : 'md'}
+            variant={current?.ltv_cac_rec_6M != null && current.ltv_cac_rec_6M >= 3 ? 'success' : current?.ltv_cac_rec_6M != null && current.ltv_cac_rec_6M >= 1 ? 'warning' : 'destructive'}
+            subtitle="Janela 6 meses"
+            formula="LTV Rec. (6M) ÷ CAC por Logo (6M). Churn, ARPA e MC% agregados na janela."
           />
         </div>
       </section>
@@ -296,7 +320,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           </CardContent>
         </Card>
 
-        {/* Gráficos multi-linha em 2 colunas */}
+        {/* Gráficos */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
           <MultiLineChartCard
             title="Evolução LTV (meses)"
@@ -310,25 +334,36 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             tvMode={tvMode}
           />
           <MultiLineChartCard
-            title="Evolução LTV/CAC (x)"
+            title="Evolução LTV/CAC Recorrente (x)"
             data={ltvCacChartData}
             lines={[
-              { dataKey: 'ltv_cac_M', label: 'Mensal', color: 'hsl(var(--chart-2))' },
-              { dataKey: 'ltv_cac_3M', label: 'Média 3M', color: 'hsl(var(--chart-4))', strokeDasharray: '5 5' },
-              { dataKey: 'ltv_cac_6M', label: 'Média 6M', color: 'hsl(var(--chart-5))', strokeDasharray: '10 5' },
+              { dataKey: 'ltv_cac_rec_M', label: 'Mensal', color: 'hsl(var(--chart-2))' },
+              { dataKey: 'ltv_cac_rec_3M', label: 'Média 3M', color: 'hsl(var(--chart-4))', strokeDasharray: '5 5' },
+              { dataKey: 'ltv_cac_rec_6M', label: 'Média 6M', color: 'hsl(var(--chart-5))', strokeDasharray: '10 5' },
             ]}
             formatValue={v => v.toFixed(2) + 'x'}
             tvMode={tvMode}
           />
         </div>
+
+        <MultiLineChartCard
+          title="Evolução CAC: Burn vs Por Logo (R$)"
+          data={cacChartData}
+          lines={[
+            { dataKey: 'cac_burn', label: 'CAC Burn', color: 'hsl(var(--chart-1))' },
+            { dataKey: 'cac_por_logo', label: 'CAC por Logo', color: 'hsl(var(--chart-2))', strokeDasharray: '5 5' },
+          ]}
+          formatValue={v => fmt(v)}
+          tvMode={tvMode}
+        />
       </section>
 
-      {/* ═══════ DEBUG PANEL ═══════ */}
+      {/* ═══════ DEBUG / AUDITORIA ═══════ */}
       <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
         <CollapsibleTrigger asChild>
           <button className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
             <Bug className="h-3.5 w-3.5" />
-            <span>Dados de Auditoria (Unit Economics)</span>
+            <span>Dados de Auditoria (Unit Economics SaaS)</span>
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${debugOpen ? 'rotate-180' : ''}`} />
           </button>
         </CollapsibleTrigger>
@@ -341,15 +376,18 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-left py-1 px-2 font-semibold text-muted-foreground">Mês</th>
-                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">Base Início</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">Base</th>
                         <th className="text-right py-1 px-2 font-semibold text-muted-foreground">Cancel.</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">Novos</th>
                         <th className="text-right py-1 px-2 font-semibold text-muted-foreground">Churn%</th>
-                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">LTV M</th>
-                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">LTV 3M</th>
-                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">LTV 6M</th>
-                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">CAC</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">ARPA</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">MC%</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">LTV m</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">CAC burn</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">CAC/logo</th>
                         <th className="text-right py-1 px-2 font-semibold text-muted-foreground">LTV R$</th>
                         <th className="text-right py-1 px-2 font-semibold text-muted-foreground">LTV/CAC</th>
+                        <th className="text-right py-1 px-2 font-semibold text-muted-foreground">Payback</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -358,13 +396,16 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
                           <td className="py-1 px-2 font-medium">{m.monthFull}</td>
                           <td className="text-right py-1 px-2">{m.base_inicio}</td>
                           <td className="text-right py-1 px-2">{m.cancelados}</td>
+                          <td className="text-right py-1 px-2">{m.novos_clientes}</td>
                           <td className="text-right py-1 px-2">{m.churn_M !== null ? (m.churn_M * 100).toFixed(2) + '%' : '—'}</td>
+                          <td className="text-right py-1 px-2">{m.arpa != null ? fmt(m.arpa) : '—'}</td>
+                          <td className="text-right py-1 px-2">{m.mc_percent != null ? (m.mc_percent * 100).toFixed(1) + '%' : '—'}</td>
                           <td className="text-right py-1 px-2">{fmtLtvVal(m.ltv_M)}</td>
-                          <td className="text-right py-1 px-2">{fmtLtvVal(m.ltv_3M)}</td>
-                          <td className="text-right py-1 px-2">{fmtLtvVal(m.ltv_6M)}</td>
-                          <td className="text-right py-1 px-2">{fmt(m.cac_M)}</td>
-                          <td className="text-right py-1 px-2">{m.ltv_rs_M !== null ? fmt(m.ltv_rs_M) : '—'}</td>
-                          <td className="text-right py-1 px-2">{fmtLtvCacVal(m.ltv_cac_M)}</td>
+                          <td className="text-right py-1 px-2">{fmt(m.cac_burn_M)}</td>
+                          <td className="text-right py-1 px-2">{m.cac_por_logo_M != null ? fmt(m.cac_por_logo_M) : '—'}</td>
+                          <td className="text-right py-1 px-2">{m.ltv_rec_margem_M != null ? fmt(m.ltv_rec_margem_M) : '—'}</td>
+                          <td className="text-right py-1 px-2">{fmtLtvCacVal(m.ltv_cac_rec_M)}</td>
+                          <td className="text-right py-1 px-2">{m.cac_payback_M != null ? m.cac_payback_M.toFixed(1) : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
