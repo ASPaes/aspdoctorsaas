@@ -361,7 +361,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
       )}
 
       {/* ==================== HEATMAP TABLE ==================== */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
             Retenção por Coorte (Logo Retention)
