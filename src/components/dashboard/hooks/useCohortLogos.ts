@@ -50,7 +50,7 @@ function normalizeMonth(input: string): string {
 }
 
 export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosResult {
-  const maxAge = Math.min(params.maxAgeMonths ?? 12, 12);
+  const maxAge = Math.min(params.maxAgeMonths ?? 12, 36);
   const from = params.fromCohortMonth
     ? normalizeMonth(params.fromCohortMonth)
     : format(subMonths(new Date(), 12), 'yyyy-MM-dd');
