@@ -132,19 +132,17 @@ export default function ClienteForm() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vw_clientes_financeiro")
-        .select("mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual, cancelado");
+        .select("mensalidade, custo_operacao, cancelado");
       if (error) throw error;
       const ativos = (data ?? []).filter(c => !c.cancelado);
-      let receita = 0, cogs = 0, impostos = 0, fixos = 0;
+      let receita = 0, cogs = 0;
       ativos.forEach(c => {
         const m = Number(c.mensalidade) || 0;
         receita += m;
         cogs += Number(c.custo_operacao) || 0;
-        impostos += m * (Number(c.imposto_percentual) || 0);
-        fixos += m * (Number(c.custo_fixo_percentual) || 0);
       });
-      const mc = receita - cogs - impostos - fixos;
-      return receita > 0 ? mc / receita : 0; // decimal, e.g. 0.35
+      const mc = receita - cogs;
+      return receita > 0 ? mc / receita : 0; // decimal, e.g. 0.65
     },
     enabled: !isEditing,
     staleTime: 10 * 60 * 1000,
@@ -165,24 +163,20 @@ export default function ClienteForm() {
 
   // Auto-fill custo_operacao based on MC% ponderada when mensalidade changes (new client only)
   const mensalidadeWatch = form.watch("mensalidade");
-  const impostoWatch = form.watch("imposto_percentual");
-  const custoFixoWatch = form.watch("custo_fixo_percentual");
   useEffect(() => {
     if (isEditing) return;
     const mcPct = mcPonderadaQuery.data;
     if (mcPct === undefined || mcPct === null) return;
     const m = mensalidadeWatch ?? 0;
     if (m <= 0) return;
-    const impDec = (impostoWatch ?? 0) / 100;
-    const fixDec = (custoFixoWatch ?? 0) / 100;
-    // COGS = MRR × (1 - MC% - Imposto% - CustoFixo%)
-    const suggestedCogs = Math.max(0, Math.round(m * (1 - mcPct - impDec - fixDec) * 100) / 100);
+    // COGS = MRR × (1 - MC%)
+    const suggestedCogs = Math.max(0, Math.round(m * (1 - mcPct) * 100) / 100);
     // Only auto-fill if custo_operacao hasn't been manually set
     const current = form.getValues("custo_operacao");
     if (current === null || current === undefined || current === 0) {
       form.setValue("custo_operacao", suggestedCogs);
     }
-  }, [isEditing, mensalidadeWatch, impostoWatch, custoFixoWatch, mcPonderadaQuery.data]);
+  }, [isEditing, mensalidadeWatch, mcPonderadaQuery.data]);
 
   // Load existing client for editing
   const clienteQuery = useQuery({

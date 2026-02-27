@@ -149,14 +149,12 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
 
         const mrrSnapshot = ativosFim.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0);
 
-        // MC total
+        // MC total = MRR - COGS only
         let mcTotal = 0;
         ativosFim.forEach(c => {
           const mens = Number(c.mensalidade) || 0;
           const cogs = Number(c.custo_operacao) || 0;
-          const imp = mens * (Number(c.imposto_percentual) || 0);
-          const fix = mens * (Number(c.custo_fixo_percentual) || 0);
-          mcTotal += mens - cogs - imp - fix;
+          mcTotal += mens - cogs;
         });
 
         // Ativação dos novos (separada do ARPA)
