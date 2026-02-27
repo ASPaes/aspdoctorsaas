@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { TrendingUp, Clock, DollarSign, Calculator, Users, Percent, BarChart3, Shield, ChevronDown, Bug, UserPlus, Flame, Divide, Zap } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
+import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { NetNewMrrBreakdown } from '../cards/NetNewMrrBreakdown';
 import { SectionHeader } from '../SectionHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import type { KPIMetrics, TimeSeriesData } from '../types';
@@ -13,6 +15,25 @@ import type { DashboardFilters } from '../types';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`;
+
+// Delta helper: computes % change and returns trend props for KPICardEnhanced
+function computeDelta(
+  current: number | null | undefined,
+  previous: number | null | undefined,
+  invertColors = false
+): { trend?: 'up' | 'down'; trendValue?: string } {
+  if (current == null || previous == null || previous === 0) {
+    return { trend: undefined, trendValue: '— vs mês anterior' };
+  }
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  const direction = pct >= 0 ? 'up' : 'down';
+  const visualTrend = invertColors ? (direction === 'up' ? 'down' : 'up') : direction;
+  const sign = pct >= 0 ? '+' : '';
+  return {
+    trend: visualTrend as 'up' | 'down',
+    trendValue: `${pct >= 0 ? '▲' : '▼'} ${sign}${pct.toFixed(1)}% vs mês anterior`,
+  };
+}
 
 interface Props {
   metrics: KPIMetrics;
@@ -31,6 +52,15 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const current = ueData?.current;
   const series = ueData?.series || [];
 
+  // Previous month from UE series for deltas
+  const prevUE = series.length >= 2 ? series[series.length - 2] : null;
+  const curUE = current;
+
+  // Previous month from mrrEvolution for top KPIs
+  const mrrEvo = timeSeries.mrrEvolution || [];
+  const prevMrrPoint = mrrEvo.length >= 2 ? mrrEvo[mrrEvo.length - 2] : null;
+  const curMrrPoint = mrrEvo.length >= 1 ? mrrEvo[mrrEvo.length - 1] : null;
+
   const fmtLtvVal = (v: number | null | undefined): string => {
     if (v === null || v === undefined) return '—';
     return v.toFixed(1);
@@ -40,6 +70,74 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
     if (v === null || v === undefined) return '—';
     return v.toFixed(2) + 'x';
   };
+
+  // Deltas for top 4 KPIs
+  const mrrDelta = computeDelta(
+    curMrrPoint?.value as number | undefined,
+    prevMrrPoint?.value as number | undefined
+  );
+
+  // For Net New MRR, use UE series (mrr_snapshot diff approximation)
+  // Actually use the mrrEvolution values to derive net new per month
+  const netNewCur = metrics.netNewMrr;
+  // No easy previous net new from existing data, so use MRR delta approach
+  const netNewDelta = (() => {
+    if (mrrEvo.length >= 3) {
+      const prev2 = mrrEvo[mrrEvo.length - 3]?.value as number | undefined;
+      const prev1 = mrrEvo[mrrEvo.length - 2]?.value as number | undefined;
+      const cur = mrrEvo[mrrEvo.length - 1]?.value as number | undefined;
+      if (prev2 != null && prev1 != null && cur != null) {
+        const netNewPrev = prev1 - prev2;
+        const netNewCurCalc = cur - prev1;
+        if (netNewPrev !== 0) {
+          const pct = ((netNewCurCalc - netNewPrev) / Math.abs(netNewPrev)) * 100;
+          const sign = pct >= 0 ? '+' : '';
+          return {
+            trend: (pct >= 0 ? 'up' : 'down') as 'up' | 'down',
+            trendValue: `${pct >= 0 ? '▲' : '▼'} ${sign}${pct.toFixed(1)}% vs mês anterior`,
+          };
+        }
+      }
+    }
+    return { trend: undefined, trendValue: '— vs mês anterior' } as { trend?: 'up' | 'down'; trendValue: string };
+  })();
+
+  const crescReaisDelta = computeDelta(
+    metrics.crescimentoReais,
+    prevMrrPoint ? (curMrrPoint?.value as number) - (prevMrrPoint?.value as number) : undefined
+  );
+
+  const crescPctDelta = (() => {
+    // Use MRR evolution to compute growth % for prev month
+    if (mrrEvo.length >= 3) {
+      const prev2Val = mrrEvo[mrrEvo.length - 3]?.value as number;
+      const prev1Val = mrrEvo[mrrEvo.length - 2]?.value as number;
+      const curVal = mrrEvo[mrrEvo.length - 1]?.value as number;
+      const prevGrowthPct = prev2Val > 0 ? (prev1Val - prev2Val) / prev2Val : 0;
+      const curGrowthPct = prev1Val > 0 ? (curVal - prev1Val) / prev1Val : 0;
+      return computeDelta(curGrowthPct, prevGrowthPct);
+    }
+    return { trend: undefined, trendValue: '— vs mês anterior' } as { trend?: 'up' | 'down'; trendValue: string };
+  })();
+
+  // Deltas for Margin section (from UE series)
+  const mcTotalDelta = computeDelta(curUE?.mc_total, prevUE?.mc_total);
+  const mcPctDelta = computeDelta(curUE?.mc_percent, prevUE?.mc_percent);
+  const mcMediaDelta = (() => {
+    if (curUE && prevUE && curUE.ativos_fim > 0 && prevUE.ativos_fim > 0) {
+      const curMedia = curUE.mc_total / curUE.ativos_fim;
+      const prevMedia = prevUE.mc_total / prevUE.ativos_fim;
+      return computeDelta(curMedia, prevMedia);
+    }
+    return { trend: undefined, trendValue: '— vs mês anterior' } as { trend?: 'up' | 'down'; trendValue: string };
+  })();
+
+  // Deltas for Unit Economics (from UE series)
+  const ltvMDelta = computeDelta(curUE?.ltv_M, prevUE?.ltv_M);
+  const ltvRecDelta = computeDelta(curUE?.ltv_rec_margem_M, prevUE?.ltv_rec_margem_M);
+  const cacDelta = computeDelta(curUE?.cac_por_logo_M, prevUE?.cac_por_logo_M, true); // inverted
+  const ltvCacDelta = computeDelta(curUE?.ltv_cac_rec_M, prevUE?.ltv_cac_rec_M);
+  const paybackDelta = computeDelta(curUE?.cac_payback_M, prevUE?.cac_payback_M, true); // inverted
 
   // Chart data
   const ltvChartData = series.map(m => ({
@@ -85,6 +183,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             variant="primary"
             subtitle="Foto atual da receita recorrente"
             formula="Soma das mensalidades de todos os clientes ativos. Retrato instantâneo."
+            trend={mrrDelta.trend}
+            trendValue={mrrDelta.trendValue}
           />
           <KPICardEnhanced
             label="Net New MRR (no período)"
@@ -94,6 +194,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             variant={metrics.netNewMrr >= 0 ? 'success' : 'destructive'}
             subtitle="Variação líquida no período"
             formula="New MRR + Upsell + Cross-sell − Downsell − Churn MRR."
+            trend={netNewDelta.trend}
+            trendValue={netNewDelta.trendValue}
           />
         </div>
 
@@ -104,9 +206,9 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant={metrics.crescimentoReais >= 0 ? 'success' : 'destructive'}
-            trend={metrics.crescimentoReais >= 0 ? 'up' : 'down'}
-            trendValue="no período"
             formula="MRR atual − MRR no início do período"
+            trend={crescReaisDelta.trend}
+            trendValue={crescReaisDelta.trendValue}
           />
           <KPICardEnhanced
             label="Crescimento %"
@@ -114,6 +216,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant={metrics.crescimentoPercent >= 0 ? 'success' : 'destructive'}
             formula="Crescimento R$ ÷ MRR início do período"
+            trend={crescPctDelta.trend}
+            trendValue={crescPctDelta.trendValue}
           />
         </div>
 
@@ -145,6 +249,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant="dark"
             formula="Receita (MRR) − COGS − Impostos − Custos Fixos alocados."
+            trend={mcTotalDelta.trend}
+            trendValue={mcTotalDelta.trendValue}
           />
           <KPICardEnhanced
             label="MC% Ponderada"
@@ -153,6 +259,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant={mc && mc.mc_percent_ponderada >= 0.3 ? 'success' : mc && mc.mc_percent_ponderada >= 0.1 ? 'warning' : 'destructive'}
             formula="MC Total ÷ MRR Total. Ponderada pela receita, não média simples."
+            trend={mcPctDelta.trend}
+            trendValue={mcPctDelta.trendValue}
           />
           <KPICardEnhanced
             label="MC Média / Cliente (R$)"
@@ -161,6 +269,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant="dark"
             formula="MC Total ÷ Clientes Ativos."
+            trend={mcMediaDelta.trend}
+            trendValue={mcMediaDelta.trendValue}
           />
         </div>
       </section>
@@ -200,6 +310,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             variant="dark"
             subtitle="Custo unitário de aquisição"
             formula="CAC Burn ÷ Novos Clientes do mês. Se novos=0, exibe '—'."
+            trend={cacDelta.trend}
+            trendValue={cacDelta.trendValue}
           />
           <KPICardEnhanced
             label="Ativação Média (novos)"
@@ -231,6 +343,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             variant="dark"
             subtitle={current?.ltv_M === 120 ? 'Teto aplicado (churn=0)' : undefined}
             formula="1 ÷ Churn Rate mensal. Teto: 120 meses quando churn=0."
+            trend={ltvMDelta.trend}
+            trendValue={ltvMDelta.trendValue}
           />
           <KPICardEnhanced
             label="LTV Recorrente (R$)"
@@ -240,6 +354,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             variant="dark"
             subtitle="Com margem (MC%)"
             formula="ARPA × MC% Ponderada × LTV (meses). Receita líquida esperada por cliente."
+            trend={ltvRecDelta.trend}
+            trendValue={ltvRecDelta.trendValue}
           />
           <KPICardEnhanced
             label="LTV/CAC Recorrente"
@@ -247,8 +363,16 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Divide className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant={current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 3 ? 'success' : current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 1 ? 'warning' : 'destructive'}
-            subtitle={current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 3 ? 'Saudável (≥3x)' : current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 1 ? 'Atenção (1-3x)' : 'Crítico (<1x)'}
+            subtitle={
+              current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 3
+                ? '✅ Saudável (benchmark: >3x)'
+                : current?.ltv_cac_rec_M != null && current.ltv_cac_rec_M >= 1
+                ? '⚠️ Atenção (benchmark: >3x)'
+                : '🔴 Crítico (benchmark: >3x)'
+            }
             formula="LTV Recorrente (R$) ÷ CAC por Logo. Usa CAC unitário, nunca burn total. Razão em 'x'."
+            trend={ltvCacDelta.trend}
+            trendValue={ltvCacDelta.trendValue}
           />
         </div>
 
@@ -261,6 +385,8 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant={current?.cac_payback_M != null && current.cac_payback_M <= 12 ? 'success' : 'warning'}
             formula="CAC por Logo ÷ (ARPA × MC%). Meses para recuperar o investimento. Ideal ≤ 12."
+            trend={paybackDelta.trend}
+            trendValue={paybackDelta.trendValue}
           />
           <KPICardEnhanced
             label="LTV/CAC (3M)"
@@ -302,12 +428,14 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           </CardHeader>
           <CardContent>
             {ranking.length > 0 ? (
-              <div className="space-y-2">
+              <div className="divide-y divide-border">
                 {ranking.slice(0, 5).map((f, i) => (
-                  <div key={f.nome} className="flex items-center justify-between py-1 border-b border-border last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-muted-foreground w-5">{i + 1}.</span>
-                      <span className="text-sm">{f.nome}</span>
+                  <div key={f.nome} className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border-primary/30 text-primary">
+                        {i + 1}
+                      </Badge>
+                      <span className="text-sm font-medium">{f.nome}</span>
                       <span className="text-xs text-muted-foreground">({f.clientes} clientes)</span>
                     </div>
                     <span className="font-bold text-primary text-sm">{fmt(f.mrr)}</span>
@@ -320,9 +448,9 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           </CardContent>
         </Card>
 
-        {/* Gráficos */}
+        {/* Gráficos com hover sincronizado */}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-          <MultiLineChartCard
+          <SyncedMultiLineChartCard
             title="Evolução LTV (meses)"
             data={ltvChartData}
             lines={[
@@ -332,8 +460,9 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             ]}
             formatValue={v => v.toFixed(1) + ' meses'}
             tvMode={tvMode}
+            syncId="crescimento-ltv-sync"
           />
-          <MultiLineChartCard
+          <SyncedMultiLineChartCard
             title="Evolução LTV/CAC Recorrente (x)"
             data={ltvCacChartData}
             lines={[
@@ -343,6 +472,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             ]}
             formatValue={v => v.toFixed(2) + 'x'}
             tvMode={tvMode}
+            syncId="crescimento-ltv-sync"
           />
         </div>
 
