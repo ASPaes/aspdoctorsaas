@@ -1,4 +1,4 @@
-import { Users, DollarSign, TrendingUp, Target, BarChart3, Percent, ShieldCheck, AlertTriangle, Clock, RefreshCw, Zap } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, Target, BarChart3, Percent, ShieldCheck, AlertTriangle, Clock, RefreshCw, Zap, UserX } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
 import { useCertA1Data } from '../hooks/useCertA1Data';
@@ -54,9 +54,10 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
           <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Certificados A1</h3>
           <button onClick={() => refetchCert()} className="text-muted-foreground hover:text-foreground transition-colors"><RefreshCw className={`${tvMode ? 'h-5 w-5' : 'h-4 w-4'} ${certLoading ? 'animate-spin' : ''}`} /></button>
         </div>
-        <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
-          <KPICardEnhanced label="Vendas no Período" value={certA1?.vendasQtd?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<ShieldCheck className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Qtde de vendas de certificado A1 com data de venda informada no período" />
-          <KPICardEnhanced label="Faturamento A1" value={fmt(certA1?.faturamento || 0)} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<DollarSign className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Soma dos valores de venda dos certificados A1 no período" />
+        <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'}`}>
+          <KPICardEnhanced label="Vendas no Período" value={certA1?.vendasQtd?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<ShieldCheck className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Qtde de vendas de certificado A1 com status 'ganho' no período" />
+          <KPICardEnhanced label="Perdido p/ Terceiro" value={certA1?.perdidoTerceiroQtd?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant={certA1?.perdidoTerceiroQtd && certA1.perdidoTerceiroQtd > 0 ? 'destructive' : 'default'} icon={<UserX className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Qtde de certificados renovados com terceiro (perdidos) no período" />
+          <KPICardEnhanced label="Faturamento A1" value={fmt(certA1?.faturamento || 0)} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<DollarSign className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Soma dos valores de venda dos certificados A1 com status 'ganho' no período" />
           <KPICardEnhanced label="Oportunidades (Janela)" value={certA1?.oportunidadesJanela?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="default" icon={<Target className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes com cert vencendo entre -20 e +30 dias de hoje" />
           <KPICardEnhanced label="Vencendo em 30 dias" value={certA1?.oportunidadesVencendo?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="warning" icon={<Clock className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes ativos com certificado vencendo nos próximos 30 dias" />
           <KPICardEnhanced label="Vencidos até 20 dias" value={certA1?.oportunidadesVencidas?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant={certA1?.oportunidadesVencidas && certA1.oportunidadesVencidas > 0 ? 'destructive' : 'default'} icon={<AlertTriangle className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes ativos com certificado vencido há até 20 dias" />
