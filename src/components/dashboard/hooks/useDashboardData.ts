@@ -127,7 +127,7 @@ export function useDashboardData(filters: DashboardFilters) {
       }, 0);
 
       // 5. LTV — usar 1 / churn mensal (padrão SaaS), consistente com gráfico
-      const now = new Date();
+      const now = periodoFim || new Date();
       // Churn rate mensal = cancelados no período / ativos no início do período
       const churnMensal = (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0;
       const ltvMeses = churnMensal > 0 ? (1 / churnMensal) : 0;
