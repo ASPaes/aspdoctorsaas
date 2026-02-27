@@ -62,6 +62,46 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
       const mc_percent_ponderada = receita_mrr > 0 ? mc_total / receita_mrr : 0;
       const mc_media_por_cliente = clientes_ativos > 0 ? mc_total / clientes_ativos : 0;
 
+      // Debug: validate calculations
+      if (import.meta.env.DEV) {
+        const check = receita_mrr - cogs_total - impostos_total - fixos_total;
+        const diff = Math.abs(check - mc_total);
+        console.group('[MC Debug] Margem de Contribuição');
+        console.table({
+          'Receita (MRR)': round2(receita_mrr),
+          'COGS': round2(cogs_total),
+          'Impostos (R$)': round2(impostos_total),
+          'Fixos (R$)': round2(fixos_total),
+          'MC Total (R$)': round2(mc_total),
+          'Validação (Rec-COGS-Imp-Fix)': round2(check),
+          'Diff (deve ser 0)': round2(diff),
+          'MC% Ponderada': `${round2(mc_percent_ponderada * 100)}%`,
+          'Clientes Ativos': clientes_ativos,
+          'MC Média/Cliente (R$)': round2(mc_media_por_cliente),
+        });
+
+        // Sample clients for debug
+        const samples = data.slice(0, 5).map(c => {
+          const m = Number(c.mensalidade) || 0;
+          const cogs = Number(c.custo_operacao) || 0;
+          const imp = m * (Number(c.imposto_percentual) || 0);
+          const fix = m * (Number(c.custo_fixo_percentual) || 0);
+          return {
+            mensalidade: m,
+            custo_operacao: cogs,
+            impostos: round2(imp),
+            fixos: round2(fix),
+            mc_cliente: round2(m - cogs - imp - fix),
+          };
+        });
+        console.log('Amostra clientes:', samples);
+
+        if (mc_percent_ponderada > 1 || mc_percent_ponderada < -1) {
+          console.warn(`⚠️ MC% fora do range esperado: ${round2(mc_percent_ponderada * 100)}%`);
+        }
+        console.groupEnd();
+      }
+
       // Clamp mc_percent to avoid absurd values
       const clampedPercent = Math.max(-1, Math.min(1, mc_percent_ponderada));
 
