@@ -31,6 +31,8 @@ export interface UseCohortLogosResult {
   ageColumns: number[];
   /** Map<cohort YYYY-MM, Map<age_months, retention_percent>> */
   matrix: Map<string, Map<number, number>>;
+  /** Map<cohort YYYY-MM, Map<age_months, retained_count>> */
+  retainedMatrix: Map<string, Map<number, number>>;
   /** Curve data for the last 3 mature cohorts (for LineChart) */
   curveData: CohortCurvePoint[];
   /** Labels for the last 3 mature cohorts (e.g. "jan/25") */
@@ -79,6 +81,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       cohorts: [],
       ageColumns: [],
       matrix: new Map(),
+      retainedMatrix: new Map(),
       curveData: [],
       curveLabels: [],
       curveIsFallback: false,
@@ -89,6 +92,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
     const cohortsMap = new Map<string, number>();
     const agesSet = new Set<number>();
     const matrix = new Map<string, Map<number, number>>();
+    const retainedMatrix = new Map<string, Map<number, number>>();
     const cohortMaxAge = new Map<string, number>();
 
     for (const row of rawData) {
@@ -96,11 +100,14 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       const age = Number(row.age_months);
       const size = Number(row.cohort_size);
       const pct = Number(row.retention_percent);
+      const ret = Number(row.retained ?? 0);
 
       if (!cohortsMap.has(cm)) cohortsMap.set(cm, size);
       agesSet.add(age);
       if (!matrix.has(cm)) matrix.set(cm, new Map());
       matrix.get(cm)!.set(age, pct);
+      if (!retainedMatrix.has(cm)) retainedMatrix.set(cm, new Map());
+      retainedMatrix.get(cm)!.set(age, ret);
       cohortMaxAge.set(cm, Math.max(cohortMaxAge.get(cm) ?? 0, age));
     }
 
@@ -152,6 +159,6 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       return point;
     });
 
-    return { isLoading, cohorts, ageColumns, matrix, curveData, curveLabels, curveIsFallback };
+    return { isLoading, cohorts, ageColumns, matrix, retainedMatrix, curveData, curveLabels, curveIsFallback };
   }, [rawData, isLoading]);
 }
