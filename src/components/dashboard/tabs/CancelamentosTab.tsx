@@ -128,28 +128,28 @@ export function CancelamentosTab({ metrics, timeSeries, distributions, tvMode }:
           icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-red-500`} />}
           size={s} variant="destructive"
           trend={deltaQtd.trend} trendValue={deltaQtd.trendValue}
-          formula="Total de clientes que cancelaram no período selecionado"
+          helpKey="cancelamentos_qtd"
         />
         <KPICardEnhanced
           label="MRR Cancelado" value={fmt(currMrrCancelado)}
           icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-red-500`} />}
           size={s} variant="destructive"
           trend={deltaMrr.trend} trendValue={deltaMrr.trendValue}
-          formula="Soma das mensalidades dos clientes cancelados + reversões de movimentos"
+          helpKey="mrr_cancelado"
         />
         <KPICardEnhanced
           label="Churn Rate (Carteira)" value={fmtPct(currChurnCarteira)}
           icon={<TrendingDown className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-red-500`} />}
           size={s} variant="destructive"
           trend={deltaChurnCarteira.trend} trendValue={deltaChurnCarteira.trendValue}
-          formula="Cancelamentos ÷ (Clientes Ativos + Cancelados). % de clientes perdidos"
+          helpKey="churn_rate_carteira"
         />
         <KPICardEnhanced
           label="Churn Rate (Receita)" value={fmtPct(currChurnReceita)}
           icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-red-500`} />}
           size={s} variant="destructive"
           trend={deltaChurnReceita.trend} trendValue={deltaChurnReceita.trendValue}
-          formula="MRR Cancelado ÷ (MRR Atual + MRR Cancelado). % de receita perdida"
+          helpKey="churn_rate_receita"
         />
       </div>
 

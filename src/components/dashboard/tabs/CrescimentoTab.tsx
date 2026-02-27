@@ -182,7 +182,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant="primary"
             subtitle="Foto atual da receita recorrente"
-            formula="Soma das mensalidades de todos os clientes ativos. Retrato instantâneo."
+            helpKey="mrr_snapshot"
             trend={mrrDelta.trend}
             trendValue={mrrDelta.trendValue}
           />
@@ -193,7 +193,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={s}
             variant={metrics.netNewMrr >= 0 ? 'success' : 'destructive'}
             subtitle="Variação líquida no período"
-            formula="New MRR + Upsell + Cross-sell − Downsell − Churn MRR."
+            helpKey="net_new_mrr"
             trend={netNewDelta.trend}
             trendValue={netNewDelta.trendValue}
           />
@@ -206,7 +206,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant={metrics.crescimentoReais >= 0 ? 'success' : 'destructive'}
-            formula="MRR atual − MRR no início do período"
+            helpKey="crescimento_reais"
             trend={crescReaisDelta.trend}
             trendValue={crescReaisDelta.trendValue}
           />
@@ -215,7 +215,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             value={fmtPct(metrics.crescimentoPercent)}
             size={tvMode ? 'tv' : 'md'}
             variant={metrics.crescimentoPercent >= 0 ? 'success' : 'destructive'}
-            formula="Crescimento R$ ÷ MRR início do período"
+            helpKey="crescimento_percent"
             trend={crescPctDelta.trend}
             trendValue={crescPctDelta.trendValue}
           />
@@ -248,7 +248,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Calculator className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
             variant="dark"
-            formula="Receita (MRR) − COGS − Impostos − Custos Fixos alocados."
+            helpKey="mc_total"
             trend={mcTotalDelta.trend}
             trendValue={mcTotalDelta.trendValue}
           />
@@ -258,7 +258,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Percent className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
             variant={mc && mc.mc_percent_ponderada >= 0.3 ? 'success' : mc && mc.mc_percent_ponderada >= 0.1 ? 'warning' : 'destructive'}
-            formula="MC Total ÷ MRR Total. Ponderada pela receita, não média simples."
+            helpKey="mc_percent_ponderada"
             trend={mcPctDelta.trend}
             trendValue={mcPctDelta.trendValue}
           />
@@ -268,7 +268,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
             variant="dark"
-            formula="MC Total ÷ Clientes Ativos."
+            helpKey="mc_media_cliente"
             trend={mcMediaDelta.trend}
             trendValue={mcMediaDelta.trendValue}
           />
@@ -292,7 +292,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Flame className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
-            formula="Soma valor_alocado de despesas CAC vigentes no mês (mes_inicial ≤ M ≤ mes_final). Inclui despesas gerais."
+            helpKey="cac_burn"
           />
           <KPICardEnhanced
             label="Novos Clientes (mês)"
@@ -300,7 +300,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<UserPlus className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
-            formula="Clientes com data_venda dentro do mês."
+            helpKey="novos_clientes_mes"
           />
           <KPICardEnhanced
             label="CAC por Logo"
@@ -309,7 +309,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
             subtitle="Custo unitário de aquisição"
-            formula="CAC Burn ÷ Novos Clientes do mês. Se novos=0, exibe '—'."
+            helpKey="cac_por_logo"
             trend={cacDelta.trend}
             trendValue={cacDelta.trendValue}
           />
@@ -320,7 +320,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
             subtitle="Setup fee, fora do ARPA"
-            formula="Média de valor_ativacao dos novos clientes do mês. NÃO entra no ticket/ARPA."
+            helpKey="ativacao_media_novos"
           />
         </div>
 
@@ -333,7 +333,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
             subtitle="Sem ativação"
-            formula="MRR Snapshot ÷ Clientes Ativos. Não inclui valor de ativação (setup fee)."
+            helpKey="arpa"
           />
           <KPICardEnhanced
             label="LTV (meses)"
@@ -342,7 +342,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
             subtitle={current?.ltv_M === 120 ? 'Teto aplicado (churn=0)' : undefined}
-            formula="1 ÷ Churn Rate mensal. Teto: 120 meses quando churn=0."
+            helpKey="ltv_meses"
             trend={ltvMDelta.trend}
             trendValue={ltvMDelta.trendValue}
           />
@@ -353,7 +353,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant="dark"
             subtitle="Com margem (MC%)"
-            formula="ARPA × MC% Ponderada × LTV (meses). Receita líquida esperada por cliente."
+            helpKey="ltv_recorrente_margem"
             trend={ltvRecDelta.trend}
             trendValue={ltvRecDelta.trendValue}
           />
@@ -370,7 +370,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
                 ? '⚠️ Atenção (benchmark: >3x)'
                 : '🔴 Crítico (benchmark: >3x)'
             }
-            formula="LTV Recorrente (R$) ÷ CAC por Logo. Usa CAC unitário, nunca burn total. Razão em 'x'."
+            helpKey="ltv_cac_recorrente"
             trend={ltvCacDelta.trend}
             trendValue={ltvCacDelta.trendValue}
           />

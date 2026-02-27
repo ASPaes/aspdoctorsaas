@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus, HelpCircle } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { KpiHelpPopover } from '../KpiHelpPopover';
 
 interface KPICardEnhancedProps {
   label: string;
@@ -12,13 +12,16 @@ interface KPICardEnhancedProps {
   variant?: 'default' | 'dark' | 'primary' | 'success' | 'warning' | 'destructive';
   size?: 'sm' | 'md' | 'lg' | 'tv';
   className?: string;
+  /** @deprecated Use helpKey instead. Kept for backwards compat — shown in popover as formula. */
   formula?: string;
+  /** Key from kpiHelp dictionary for rich contextual help */
+  helpKey?: string;
   subtitle?: string;
 }
 
 export function KPICardEnhanced({
   label, value, trend, trendValue, icon, variant = 'dark',
-  size = 'md', className, formula, subtitle,
+  size = 'md', className, formula, helpKey, subtitle,
 }: KPICardEnhancedProps) {
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
   const trendColor = trend === 'up' ? 'text-green-600 dark:text-green-400' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
@@ -36,16 +39,16 @@ export function KPICardEnhanced({
   const valueSizes = { sm: 'text-xl', md: 'text-2xl', lg: 'text-3xl', tv: 'text-5xl' };
   const labelSizes = { sm: 'text-xs', md: 'text-xs', lg: 'text-sm', tv: 'text-lg' };
 
+  // Show help popover if helpKey or formula is provided
+  const showHelp = helpKey || formula;
+
   return (
     <div className={cn('rounded-xl transition-all duration-200 hover:scale-[1.01]', variantStyles[variant], sizeStyles[size], className)}>
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>{label}</span>
-          {formula && (
-            <Tooltip>
-              <TooltipTrigger><HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-muted-foreground" /></TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs"><p className="text-xs font-mono">{formula}</p></TooltipContent>
-            </Tooltip>
+          {showHelp && (
+            <KpiHelpPopover kpiKey={helpKey} formula={!helpKey ? formula : undefined} />
           )}
         </div>
         {icon && <div className={cn('p-2 rounded-lg', variant === 'dark' ? 'bg-primary/10' : 'bg-accent')}>{icon}</div>}
