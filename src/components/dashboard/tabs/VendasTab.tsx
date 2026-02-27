@@ -25,8 +25,8 @@ export function VendasTab({ metrics, distributions, tvMode }: Props) {
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <PieChartCard title="Vendas por Origem" data={distributions.porOrigemVenda} tvMode={tvMode} height={tvMode ? 450 : 350} />
-        <BarChartCard title="Top 10 Fornecedores (Qtde Clientes)" data={distributions.porFornecedor} tvMode={tvMode} height={tvMode ? 450 : 350} />
+        <PieChartCard title="Vendas por Origem (no período)" data={distributions.porOrigemVendaNovos || distributions.porOrigemVenda} tvMode={tvMode} height={tvMode ? 450 : 350} />
+        <BarChartCard title="Vendas por Fornecedor (no período)" data={distributions.porFornecedorNovos || distributions.porFornecedor} tvMode={tvMode} height={tvMode ? 450 : 350} />
       </div>
     </div>
   );

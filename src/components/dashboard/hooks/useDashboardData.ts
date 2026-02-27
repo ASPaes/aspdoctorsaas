@@ -58,7 +58,7 @@ export function useDashboardData(filters: DashboardFilters) {
       // 2. Novos clientes no período
       let novosQuery = supabase
         .from('clientes')
-        .select('id, mensalidade, valor_ativacao, data_cadastro, unidade_base_id, fornecedor_id, funcionario_id')
+        .select('id, mensalidade, valor_ativacao, data_cadastro, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id')
         .gte('data_cadastro', periodoInicioStr)
         .lte('data_cadastro', periodoFimStr)
         .eq('cancelado', false);
@@ -435,6 +435,10 @@ export function useDashboardData(filters: DashboardFilters) {
       const porOrigemVenda = buildDistribution(activeClients, 'origem_venda_id', origemMap);
       const porMotivoCancelamento = buildDistribution(cancelamentos || [], 'motivo_cancelamento_id', motivoMap);
 
+      // Vendas: distribuições baseadas nos novos clientes do período
+      const porOrigemVendaNovos = buildDistribution(novosClientes || [], 'origem_venda_id', origemMap);
+      const porFornecedorNovos = buildDistribution(novosClientes || [], 'fornecedor_id', fornecedorMap);
+
       // Top cidades by estado for map drill-down
       const topCidadesByEstado: Record<string, { nome: string; qtd: number }[]> = {};
       activeClients.forEach(c => {
@@ -479,6 +483,7 @@ export function useDashboardData(filters: DashboardFilters) {
         porCidade, porEstado: porEstadoSigla, porFornecedor, porMotivoCancelamento,
         porOrigemVenda, porSegmento, porAreaAtuacao, topCidadesByEstado,
         segmentoByEstado, areaAtuacaoByEstado, fornecedorByEstado,
+        porOrigemVendaNovos, porFornecedorNovos,
       });
     } catch (err) {
       console.error('Dashboard data error:', err);
