@@ -50,10 +50,14 @@ export interface UnitEconomicsResult {
 }
 
 export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 12) {
+  // Use the period end date as reference point (instead of always "now")
+  const refDate = filters.periodoFim || new Date();
+  const refDateStr = format(refDate, 'yyyy-MM-dd');
+
   return useQuery<UnitEconomicsResult>({
-    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths],
+    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths, refDateStr],
     queryFn: async () => {
-      const now = new Date();
+      const now = refDate;
       const totalMonthsNeeded = rangeMonths + 5; // warmup for 6M window
 
       const allMonthRefs = Array.from({ length: totalMonthsNeeded }).map((_, i) => {
