@@ -209,8 +209,9 @@ export default function ClienteForm() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente", id] });
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
-      navigate("/clientes");
+      if (!isEditing) navigate("/clientes");
     },
     onError: (error) => {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
