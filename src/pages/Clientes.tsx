@@ -16,7 +16,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity } from "lucide-react";
+import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
 type SortDir = "asc" | "desc";
@@ -496,6 +498,20 @@ export default function Clientes() {
         </Button>
       </div>
 
+      <Tabs defaultValue="clientes">
+        <TabsList>
+          <TabsTrigger value="clientes">
+            <Users className="h-4 w-4 mr-1" />
+            Clientes
+          </TabsTrigger>
+          <TabsTrigger value="movimentos">
+            <Activity className="h-4 w-4 mr-1" />
+            Movimentos MRR
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="clientes" className="space-y-4 mt-4">
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
@@ -834,6 +850,12 @@ export default function Clientes() {
           </div>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="movimentos" className="mt-4">
+          <MovimentosMrrTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
