@@ -95,4 +95,7 @@ export interface DistributionData {
   segmentoByEstado?: Record<string, DistributionDataPoint[]>;
   areaAtuacaoByEstado?: Record<string, DistributionDataPoint[]>;
   fornecedorByEstado?: Record<string, DistributionDataPoint[]>;
+  // Vendas: distribuições baseadas nos novos clientes do período
+  porOrigemVendaNovos?: DistributionDataPoint[];
+  porFornecedorNovos?: DistributionDataPoint[];
 }

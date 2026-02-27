@@ -158,12 +158,15 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         monitoramento: backlog.filter((t) => t.tipo === 'risco_churn' && t.status === 'em_monitoramento').length,
       };
 
-      // Indicações
+      // Indicações — filtradas pelo período selecionado
       const ticketsIndicacao = allTickets.filter((t) => t.tipo === 'indicacao');
+      const ticketsIndicacaoNoPeriodo = ticketsIndicacao.filter((t) =>
+        isWithinInterval(parseISO(t.criado_em), interval)
+      );
       const pipelineIndicacao: Record<CSIndicacaoStatus, number> = {
         recebida: 0, contatada: 0, qualificada: 0, enviada_ao_comercial: 0, fechou: 0, nao_fechou: 0,
       };
-      ticketsIndicacao.forEach((t) => { if (t.indicacao_status) pipelineIndicacao[t.indicacao_status]++; });
+      ticketsIndicacaoNoPeriodo.forEach((t) => { if (t.indicacao_status) pipelineIndicacao[t.indicacao_status]++; });
 
       const indicacoesNoPeriodo = ticketsIndicacao.filter((t) => isWithinInterval(parseISO(t.criado_em), interval));
       const indicacoesByOwner: Record<number, number> = {};
