@@ -57,7 +57,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
 
   const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
 
-  const { isLoading, cohorts, ageColumns, matrix, curveData, curveLabels } = useCohortLogos({
+  const { isLoading, cohorts, ageColumns, matrix, curveData, curveLabels, curveIsFallback } = useCohortLogos({
     fromCohortMonth: fromMonth,
     maxAgeMonths: Number(ageWindow),
   });
@@ -162,10 +162,13 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
       {curveData.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
-              Curva de Retenção — Últimas 3 Coortes
-              <InfoTooltip text="Comparação da curva de retenção (% de clientes ativos) das 3 coortes mais recentes ao longo dos meses." />
+          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
+              Curva de Retenção — 3 Coortes Maduras
+              <InfoTooltip text="Comparação da curva de retenção (% de clientes ativos) das 3 coortes mais maduras (com pelo menos 3 meses de dados e ≥10 clientes) ao longo dos meses." />
             </CardTitle>
+            {curveIsFallback && (
+              <p className="text-xs text-muted-foreground mt-1">⚠ Não há 3 coortes com ≥3 meses e ≥10 clientes. Exibindo coortes recentes com ≥1 mês.</p>
+            )}
           </CardHeader>
           <CardContent>
             <div style={{ height: tvMode ? 420 : 300 }}>
