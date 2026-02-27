@@ -110,10 +110,22 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
     const last3 = cohorts.slice(0, 3).reverse();
     const curveLabels = last3.map(c => c.month);
 
-    const curveData: CohortCurvePoint[] = ageColumns.map(age => {
+    // Find the max age that has actual data among the 3 cohorts
+    let maxAgeWithData = 0;
+    last3.forEach(c => {
+      const cohortAges = matrix.get(c.month);
+      if (cohortAges) {
+        cohortAges.forEach((_, age) => { if (age > maxAgeWithData) maxAgeWithData = age; });
+      }
+    });
+
+    const curveAges = ageColumns.filter(a => a <= maxAgeWithData);
+
+    const curveData: CohortCurvePoint[] = curveAges.map(age => {
       const point: CohortCurvePoint = { age: `M${age}`, ageNum: age };
       last3.forEach((c, i) => {
-        point[`cohort_${i}`] = matrix.get(c.month)?.get(age) ?? 0;
+        const val = matrix.get(c.month)?.get(age);
+        point[`cohort_${i}`] = val !== undefined ? val : null as any;
       });
       return point;
     });

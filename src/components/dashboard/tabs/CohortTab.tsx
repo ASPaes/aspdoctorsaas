@@ -176,14 +176,15 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
                   <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12 }}
-                    formatter={(value: number, name: string) => {
+                    formatter={(value: number | null, name: string) => {
                       const idx = Number(name.replace('cohort_', ''));
+                      if (value == null) return ['—', last3Labels[idx] || name];
                       return [`${Number(value).toFixed(1)}%`, last3Labels[idx] || name];
                     }}
                   />
                   <Legend formatter={(value: string) => { const idx = Number(value.replace('cohort_', '')); return last3Labels[idx] || value; }} />
                   {last3Labels.map((_, i) => (
-                    <Line key={i} type="monotone" dataKey={`cohort_${i}`} stroke={CURVE_COLORS[i]} strokeWidth={tvMode ? 3 : 2} dot={{ fill: CURVE_COLORS[i], strokeWidth: 0, r: tvMode ? 5 : 3 }} activeDot={{ r: tvMode ? 8 : 6 }} />
+                    <Line key={i} type="monotone" dataKey={`cohort_${i}`} stroke={CURVE_COLORS[i]} strokeWidth={tvMode ? 3 : 2} dot={{ fill: CURVE_COLORS[i], strokeWidth: 0, r: tvMode ? 5 : 3 }} activeDot={{ r: tvMode ? 8 : 6 }} connectNulls={false} />
                   ))}
                 </LineChart>
               </ResponsiveContainer>
