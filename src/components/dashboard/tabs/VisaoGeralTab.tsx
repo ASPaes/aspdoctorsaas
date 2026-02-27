@@ -23,7 +23,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
   return (
     <div className="space-y-6">
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="Faturamento Total (MRR)" value={fmt(metrics.faturamentoTotal)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Soma das mensalidades + movimentos de clientes ativos" />
+        <KPICardEnhanced label="MRR Atual (Snapshot)" value={fmt(metrics.mrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" subtitle="Foto atual da receita recorrente" formula="Soma das mensalidades de todos os clientes ativos (cancelado=false). Retrato instantâneo, não considera movimentos do período." />
         <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Total de clientes com status ativo (não cancelados)" />
         <KPICardEnhanced label="Ticket Médio" value={fmtFull(metrics.ticketMedio)} icon={<Target className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR ÷ Clientes Ativos" />
         <KPICardEnhanced label="ARR" value={fmt(metrics.arr)} icon={<BarChart3 className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR × 12" />
