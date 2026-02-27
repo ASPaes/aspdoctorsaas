@@ -3,6 +3,7 @@ import { startOfMonth, endOfMonth } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DashboardFilters, getPresetDates } from '@/components/dashboard/DashboardFilters';
 import { useDashboardData } from '@/components/dashboard/hooks/useDashboardData';
+import { useMargemContribuicaoDashboard } from '@/components/dashboard/hooks/useMargemContribuicaoDashboard';
 import { useLookups } from '@/hooks/useLookups';
 import type { DashboardFilters as FiltersType } from '@/components/dashboard/types';
 import { VisaoGeralTab } from '@/components/dashboard/tabs/VisaoGeralTab';
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
 
   const { loading, metrics, timeSeries, distributions, refetch } = useDashboardData(filters);
+  const { data: mcData } = useMargemContribuicaoDashboard(filters);
   const { fornecedores, unidadesBase } = useLookups();
 
   // Auto-refresh
@@ -76,7 +78,7 @@ export default function Dashboard() {
             <VisaoGeralTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
           </TabsContent>
           <TabsContent value="crescimento">
-            <CrescimentoTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} />
+            <CrescimentoTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} mcData={mcData} />
           </TabsContent>
           <TabsContent value="cancelamentos">
             <CancelamentosTab metrics={metrics} timeSeries={timeSeries} distributions={distributions} tvMode={tvMode} />
