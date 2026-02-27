@@ -31,10 +31,12 @@ export interface UseCohortLogosResult {
   ageColumns: number[];
   /** Map<cohort YYYY-MM, Map<age_months, retention_percent>> */
   matrix: Map<string, Map<number, number>>;
-  /** Curve data for the last 3 cohorts (for LineChart) */
+  /** Curve data for the last 3 mature cohorts (for LineChart) */
   curveData: CohortCurvePoint[];
-  /** Labels for the last 3 cohorts (e.g. "jan/25") */
+  /** Labels for the last 3 mature cohorts (e.g. "jan/25") */
   curveLabels: string[];
+  /** True when no cohorts with age>=3 were found, using fallback age>=1 */
+  curveIsFallback: boolean;
 }
 
 function normalizeMonth(input: string): string {
@@ -79,6 +81,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       matrix: new Map(),
       curveData: [],
       curveLabels: [],
+      curveIsFallback: false,
     };
     if (!rawData || rawData.length === 0) return empty;
 
@@ -86,6 +89,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
     const cohortsMap = new Map<string, number>();
     const agesSet = new Set<number>();
     const matrix = new Map<string, Map<number, number>>();
+    const cohortMaxAge = new Map<string, number>();
 
     for (const row of rawData) {
       const cm = String(row.cohort_month ?? '').slice(0, 7); // YYYY-MM
@@ -97,6 +101,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       agesSet.add(age);
       if (!matrix.has(cm)) matrix.set(cm, new Map());
       matrix.get(cm)!.set(age, pct);
+      cohortMaxAge.set(cm, Math.max(cohortMaxAge.get(cm) ?? 0, age));
     }
 
     // Cohorts ordered descending
@@ -106,11 +111,28 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
 
     const ageColumns = Array.from(agesSet).sort((a, b) => a - b);
 
-    // Last 3 cohorts (ascending for chart legend order)
-    const last3 = cohorts.slice(0, 3).reverse();
+    // Select last 3 "mature" cohorts for the curve chart
+    // Primary: max_age >= 3 AND size >= 10, ordered desc by month
+    // Fallback: max_age >= 1, any size
+    const MIN_SIZE = 10;
+    let matureCohorts = cohorts.filter(
+      c => (cohortMaxAge.get(c.month) ?? 0) >= 3 && c.size >= MIN_SIZE
+    ).slice(0, 3);
+    let curveIsFallback = false;
+
+    if (matureCohorts.length < 3) {
+      // Fallback: at least age >= 1
+      matureCohorts = cohorts.filter(
+        c => (cohortMaxAge.get(c.month) ?? 0) >= 1
+      ).slice(0, 3);
+      curveIsFallback = true;
+    }
+
+    // Ascending for chart legend order
+    const last3 = [...matureCohorts].reverse();
     const curveLabels = last3.map(c => c.month);
 
-    // Find the max age that has actual data among the 3 cohorts
+    // Find the max age that has actual data among the selected cohorts
     let maxAgeWithData = 0;
     last3.forEach(c => {
       const cohortAges = matrix.get(c.month);
@@ -130,6 +152,6 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       return point;
     });
 
-    return { isLoading, cohorts, ageColumns, matrix, curveData, curveLabels };
+    return { isLoading, cohorts, ageColumns, matrix, curveData, curveLabels, curveIsFallback };
   }, [rawData, isLoading]);
 }
