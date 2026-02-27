@@ -296,9 +296,27 @@ export function useDashboardData(filters: DashboardFilters) {
       const faturamentoEvolution: typeof timeSeries.faturamentoEvolution = [];
       const churnQtdEvolution: typeof timeSeries.churnQtdEvolution = [];
       const churnMrrEvolution: typeof timeSeries.churnMrrEvolution = [];
+      const ltvMesesEvolution: typeof timeSeries.ltvMesesEvolution = [];
+      const ltvCacEvolution: typeof timeSeries.ltvCacEvolution = [];
+
+      // Track trailing churn for rolling average (3 months)
+      const trailingChurnRates: number[] = [];
+      let lastLtvMeses = ltvMeses; // fallback
 
       months.forEach(m => {
+        const startDate = new Date(m.start);
         const endDate = new Date(m.end);
+
+        // Clients active at START of month (for churn rate denominator)
+        const activosInicioMes = (allClientes || []).filter(c => {
+          if (!c.data_cadastro) return false;
+          if (new Date(c.data_cadastro) >= startDate) return false;
+          if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) < startDate) return false;
+          if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
+          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          return true;
+        });
+
         const activosNoMes = (allClientes || []).filter(c => {
           if (!c.data_cadastro) return false;
           if (new Date(c.data_cadastro) > endDate) return false;
@@ -332,11 +350,23 @@ export function useDashboardData(filters: DashboardFilters) {
         });
         churnQtdEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.length });
         churnMrrEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) });
-      });
 
-      // LTV & LTV/CAC evolution (simplified)
-      const ltvMesesEvolution = months.map(m => ({ month: m.month, monthFull: m.monthFull, value: ltvMeses }));
-      const ltvCacEvolution = months.map(m => ({ month: m.month, monthFull: m.monthFull, value: ltvCac }));
+        // LTV per month: rolling 3-month churn rate → 1/churnRate
+        const churnRateMes = activosInicioMes.length > 0 ? canceladosNoMes.length / activosInicioMes.length : 0;
+        trailingChurnRates.push(churnRateMes);
+        const windowSize = Math.min(3, trailingChurnRates.length);
+        const rollingChurn = trailingChurnRates.slice(-windowSize).reduce((s, v) => s + v, 0) / windowSize;
+
+        const ltvMesesMes = rollingChurn > 0 ? (1 / rollingChurn) : lastLtvMeses;
+        if (rollingChurn > 0) lastLtvMeses = ltvMesesMes;
+
+        const ticketMedioMes = activosNoMes.length > 0 ? mrrMes / activosNoMes.length : 0;
+        const ltvReaisMes = ticketMedioMes * ltvMesesMes;
+        const ltvCacMes = cac > 0 ? ltvReaisMes / cac : 0;
+
+        ltvMesesEvolution.push({ month: m.month, monthFull: m.monthFull, value: Math.round(ltvMesesMes * 100) / 100 });
+        ltvCacEvolution.push({ month: m.month, monthFull: m.monthFull, value: Math.round(ltvCacMes * 100) / 100 });
+      });
 
       setTimeSeries({ mrrEvolution, faturamentoEvolution, churnQtdEvolution, churnMrrEvolution, ltvMesesEvolution, ltvCacEvolution });
 
