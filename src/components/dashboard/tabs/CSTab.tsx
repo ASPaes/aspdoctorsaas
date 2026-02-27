@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
 import { useCSDashboardData, type CSDashboardFilters } from '@/components/cs/hooks/useCSDashboardData';
 import { useFuncionariosAtivos } from '@/components/cs/hooks/useCSTickets';
-import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import { CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_INDICACAO_STATUS_LABELS, CS_TICKET_TIPO_LABELS, type CSTicketPrioridade, type CSTicketStatus } from '@/components/cs/types';
 import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -40,24 +39,24 @@ function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = f
   );
 }
 
-interface CSTabProps { tvMode?: boolean; }
+interface CSTabProps {
+  tvMode?: boolean;
+  periodoInicio?: Date | null;
+  periodoFim?: Date | null;
+}
 
-export function CSTab({ tvMode = false }: CSTabProps) {
+export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps) {
   const navigate = useNavigate();
   const { data: funcionarios } = useFuncionariosAtivos();
   const [selectedOwner, setSelectedOwner] = useState<string>('__all__');
-  const [periodo, setPeriodo] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: new Date(),
-  });
 
-  const periodoInicio = periodo.from || startOfMonth(new Date());
-  const periodoFim = periodo.to || new Date();
+  const pInicio = periodoInicio || startOfMonth(new Date());
+  const pFim = periodoFim || new Date();
 
   const filters: CSDashboardFilters = useMemo(() => ({
-    periodoInicio, periodoFim,
+    periodoInicio: pInicio, periodoFim: pFim,
     ownerId: selectedOwner === '__all__' ? undefined : Number(selectedOwner),
-  }), [periodoInicio, periodoFim, selectedOwner]);
+  }), [pInicio, pFim, selectedOwner]);
 
   const { data, isLoading } = useCSDashboardData(filters);
 
@@ -93,7 +92,6 @@ export function CSTab({ tvMode = false }: CSTabProps) {
     <div className="space-y-6">
       <Card><CardContent className="pt-4">
         <div className="flex flex-wrap items-end gap-3">
-          <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} className="w-64" />
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Responsável</label>
             <Select value={selectedOwner} onValueChange={setSelectedOwner}>
