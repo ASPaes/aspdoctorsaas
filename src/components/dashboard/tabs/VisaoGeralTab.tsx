@@ -71,10 +71,10 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
     <div className="space-y-6">
       {/* Top 4 KPIs with delta */}
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="MRR Atual (Snapshot)" value={fmt(metrics.mrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" subtitle="Foto atual da receita recorrente" formula="Soma das mensalidades de todos os clientes ativos (cancelado=false). Retrato instantâneo, não considera movimentos do período." trend={deltas.mrr?.trend} trendValue={deltas.mrr?.trendValue} />
-        <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Total de clientes com status ativo (não cancelados)" trend={deltas.clientes?.trend} trendValue={deltas.clientes?.trendValue} />
-        <KPICardEnhanced label="Ticket Médio" value={fmtFull(metrics.ticketMedio)} icon={<Target className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR ÷ Clientes Ativos" trend={deltas.ticket?.trend} trendValue={deltas.ticket?.trendValue} />
-        <KPICardEnhanced label="ARR" value={fmt(metrics.arr)} icon={<BarChart3 className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR × 12" trend={deltas.arr?.trend} trendValue={deltas.arr?.trendValue} />
+        <KPICardEnhanced label="MRR Atual (Snapshot)" value={fmt(metrics.mrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" subtitle="Foto atual da receita recorrente" helpKey="mrr_snapshot" trend={deltas.mrr?.trend} trendValue={deltas.mrr?.trendValue} />
+        <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" helpKey="clientes_ativos" trend={deltas.clientes?.trend} trendValue={deltas.clientes?.trendValue} />
+        <KPICardEnhanced label="Ticket Médio" value={fmtFull(metrics.ticketMedio)} icon={<Target className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" helpKey="ticket_medio" trend={deltas.ticket?.trend} trendValue={deltas.ticket?.trendValue} />
+        <KPICardEnhanced label="ARR" value={fmt(metrics.arr)} icon={<BarChart3 className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" helpKey="arr" trend={deltas.arr?.trend} trendValue={deltas.arr?.trendValue} />
       </div>
 
       {/* Charts: MRR (multi-line with units) + Faturamento side by side */}
@@ -92,10 +92,10 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
 
       {/* Retention metrics */}
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="NRR" value={fmtPct(metrics.nrr)} size={tvMode ? 'lg' : 'md'} variant={metrics.nrr >= 1 ? 'success' : 'warning'} formula="(MRR início + expansão - contração - churn) ÷ MRR início" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-        <KPICardEnhanced label="GRR" value={fmtPct(metrics.grr)} size={tvMode ? 'lg' : 'md'} variant={metrics.grr >= 0.9 ? 'success' : 'warning'} formula="(MRR início - churn - downsell) ÷ MRR início" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-        <KPICardEnhanced label="Concentração Top 10" value={fmtPct(metrics.concentracaoTop10)} size={tvMode ? 'lg' : 'md'} variant={metrics.concentracaoTop10 > 0.5 ? 'warning' : 'default'} formula="MRR dos 10 maiores clientes ÷ MRR Total" icon={<BarChart3 className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
-        <KPICardEnhanced label="Quick Ratio" value={metrics.quickRatio === Infinity ? '∞' : metrics.quickRatio.toFixed(2)} size={tvMode ? 'lg' : 'md'} variant={metrics.quickRatio >= 4 ? 'success' : metrics.quickRatio >= 1 ? 'warning' : 'destructive'} formula="(New MRR + Expansion) ÷ (Churn + Contraction). ≥4 = excelente" subtitle={metrics.quickRatio >= 4 ? 'Excelente (≥4)' : metrics.quickRatio >= 1 ? 'Atenção' : 'Crítico'} icon={<Zap className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
+        <KPICardEnhanced label="NRR" value={fmtPct(metrics.nrr)} size={tvMode ? 'lg' : 'md'} variant={metrics.nrr >= 1 ? 'success' : 'warning'} helpKey="nrr" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
+        <KPICardEnhanced label="GRR" value={fmtPct(metrics.grr)} size={tvMode ? 'lg' : 'md'} variant={metrics.grr >= 0.9 ? 'success' : 'warning'} helpKey="grr" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
+        <KPICardEnhanced label="Concentração Top 10" value={fmtPct(metrics.concentracaoTop10)} size={tvMode ? 'lg' : 'md'} variant={metrics.concentracaoTop10 > 0.5 ? 'warning' : 'default'} helpKey="concentracao_top10" icon={<BarChart3 className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
+        <KPICardEnhanced label="Quick Ratio" value={metrics.quickRatio === Infinity ? '∞' : metrics.quickRatio.toFixed(2)} size={tvMode ? 'lg' : 'md'} variant={metrics.quickRatio >= 4 ? 'success' : metrics.quickRatio >= 1 ? 'warning' : 'destructive'} helpKey="quick_ratio" subtitle={metrics.quickRatio >= 4 ? 'Excelente (≥4)' : metrics.quickRatio >= 1 ? 'Atenção' : 'Crítico'} icon={<Zap className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
       </div>
 
       {/* Certificados A1 */}
