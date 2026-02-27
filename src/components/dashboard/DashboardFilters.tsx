@@ -102,11 +102,11 @@ export function DashboardFilters({
         </Select>
       </div>
 
-      <div className="flex items-center gap-1.5 pb-0.5">
-        <Button variant="outline" size="icon" onClick={onRefresh} disabled={loading} className="h-8 w-8">
+      <div className="flex items-center gap-1.5">
+        <Button variant="outline" size="icon" onClick={onRefresh} disabled={loading} className="h-9 w-9">
           <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
         </Button>
-        <Button variant={tvMode ? 'default' : 'outline'} size="icon" onClick={onTvModeToggle} className="h-8 w-8">
+        <Button variant={tvMode ? 'default' : 'outline'} size="icon" onClick={onTvModeToggle} className="h-9 w-9">
           {tvMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
       </div>
