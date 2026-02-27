@@ -443,9 +443,32 @@ export function useDashboardData(filters: DashboardFilters) {
       // Convert estado distribution to use sigla for map compatibility
       const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap);
 
+      // Per-state breakdowns for segmento, area_atuacao, fornecedor
+      const buildByEstado = (fkField: string, nameMap: Record<number, string>) => {
+        const result: Record<string, DistributionDataPoint[]> = {};
+        const grouped: Record<string, any[]> = {};
+        activeClients.forEach(c => {
+          if (c.estado_id) {
+            const sigla = estadoSiglaMap[c.estado_id];
+            if (sigla) {
+              if (!grouped[sigla]) grouped[sigla] = [];
+              grouped[sigla].push(c);
+            }
+          }
+        });
+        Object.entries(grouped).forEach(([sigla, clients]) => {
+          result[sigla] = buildDistribution(clients, fkField, nameMap);
+        });
+        return result;
+      };
+      const segmentoByEstado = buildByEstado('segmento_id', segmentoMap);
+      const areaAtuacaoByEstado = buildByEstado('area_atuacao_id', areaMap);
+      const fornecedorByEstado = buildByEstado('fornecedor_id', fornecedorMap);
+
       setDistributions({
         porCidade, porEstado: porEstadoSigla, porFornecedor, porMotivoCancelamento,
         porOrigemVenda, porSegmento, porAreaAtuacao, topCidadesByEstado,
+        segmentoByEstado, areaAtuacaoByEstado, fornecedorByEstado,
       });
     } catch (err) {
       console.error('Dashboard data error:', err);
