@@ -139,7 +139,7 @@ export function CSTab({ tvMode = false }: CSTabProps) {
         <Card><CardHeader className="pb-2"><CardTitle className="text-base">Pipeline de Indicações</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={pipelineData} layout="vertical"><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis type="number" tick={{ fontSize: 11 }} /><YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} /><Bar dataKey="value" radius={[0, 4, 4, 0]}>{pipelineData.map((e, i) => <Cell key={i} fill={e.fill} />)}</Bar></BarChart>
+              <BarChart data={pipelineData} layout="vertical"><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis type="number" tick={{ fontSize: 11 }} /><YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} /><Bar dataKey="value" radius={[0, 4, 4, 0]}>{pipelineData.map((e, i) => <Cell key={i} fill={e.fill} />)}</Bar></BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -147,15 +147,15 @@ export function CSTab({ tvMode = false }: CSTabProps) {
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <Card><CardHeader className="pb-2"><CardTitle className="text-base">Backlog por Status</CardTitle></CardHeader>
-          <CardContent><ResponsiveContainer width="100%" height={250}><BarChart data={backlogStatusData} layout="vertical"><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis type="number" tick={{ fontSize: 11 }} /><YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} /><Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></CardContent>
+          <CardContent><ResponsiveContainer width="100%" height={250}><BarChart data={backlogStatusData} layout="vertical"><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis type="number" tick={{ fontSize: 11 }} /><YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} /><Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></CardContent>
         </Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-base">Backlog por Prioridade</CardTitle></CardHeader>
-          <CardContent><ResponsiveContainer width="100%" height={250}><BarChart data={backlogPrioData}><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} /><Bar dataKey="value" radius={[4, 4, 0, 0]}>{backlogPrioData.map((e, i) => <Cell key={i} fill={e.fill} />)}</Bar></BarChart></ResponsiveContainer></CardContent>
+          <CardContent><ResponsiveContainer width="100%" height={250}><BarChart data={backlogPrioData}><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis dataKey="name" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} /><Bar dataKey="value" radius={[4, 4, 0, 0]}>{backlogPrioData.map((e, i) => <Cell key={i} fill={e.fill} />)}</Bar></BarChart></ResponsiveContainer></CardContent>
         </Card>
       </div>
 
       <Card><CardHeader className="pb-2"><CardTitle className="text-base">Evolução: Tickets Concluídos (Últimos 12 Meses)</CardTitle></CardHeader>
-        <CardContent><ResponsiveContainer width="100%" height={200}><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis dataKey="monthFull" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} /><Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }} /></LineChart></ResponsiveContainer></CardContent>
+        <CardContent><ResponsiveContainer width="100%" height={200}><LineChart data={evolutionData}><CartesianGrid strokeDasharray="3 3" className="stroke-border/50" /><XAxis dataKey="monthFull" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} /><Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }} /></LineChart></ResponsiveContainer></CardContent>
       </Card>
 
       <Card>

@@ -53,7 +53,7 @@ export function BarChartCard({ title, data, formatValue = v => v.toString(), tvM
                   <YAxis tick={{ fontSize: tvMode ? 14 : 11 }} tickFormatter={formatValue} className="fill-muted-foreground" />
                 </>
               )}
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} formatter={(value: number, _: string, props: any) => [`${formatValue(value)} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]} />
+              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} formatter={(value: number, _: string, props: any) => [`${formatValue(value)} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={tvMode ? 40 : 30}>
                 {processedData.map((_, i) => <Cell key={i} fill={color || COLORS[i % COLORS.length]} />)}
               </Bar>

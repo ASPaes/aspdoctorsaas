@@ -178,8 +178,7 @@ export function CertA1Dashboard() {
                 <XAxis type="number" allowDecimals={false} className="text-xs fill-muted-foreground" />
                 <YAxis type="category" dataKey="nome" width={140} className="text-xs fill-muted-foreground" tick={{ fontSize: 12 }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
                 />
                 <Bar dataKey="qtd" name="Vendas" radius={[0, 4, 4, 0]} className="fill-primary" />
               </BarChart>

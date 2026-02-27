@@ -48,7 +48,7 @@ export function PieChartCard({ title, data, tvMode = false, className, height = 
               <Pie data={processedData} cx="50%" cy="50%" labelLine={false} label={({ percent }) => percent < 0.05 ? null : `${(percent * 100).toFixed(0)}%`} outerRadius={tvMode ? 120 : 80} innerRadius={tvMode ? 60 : 40} dataKey="value" paddingAngle={2}>
                 {processedData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="hsl(var(--background))" strokeWidth={2} />)}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }} formatter={(value: number, _: string, props: any) => [`${value} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]} />
+              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} formatter={(value: number, _: string, props: any) => [`${value} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]} />
               {showLegend && <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: tvMode ? 14 : 11 }} formatter={(value) => {
                 const item = processedData.find(d => d.name === value);
                 return <span className="text-foreground">{value.length > 20 ? value.substring(0, 20) + '...' : value}{item && ` (${item.value})`}</span>;

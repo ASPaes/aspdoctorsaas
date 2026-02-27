@@ -178,7 +178,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
                   <XAxis dataKey="age" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
                   <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
                   <Tooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12 }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12, color: 'hsl(var(--foreground))' }}
                     formatter={(value: number | null, name: string) => {
                       const idx = Number(name.replace('cohort_', ''));
                       if (value == null) return ['—', last3Labels[idx] || name];

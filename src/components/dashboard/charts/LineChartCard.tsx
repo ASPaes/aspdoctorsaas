@@ -36,7 +36,7 @@ export function LineChartCard({ title, data, dataKey = 'value', formatValue = v 
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
               <XAxis dataKey="monthFull" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
               <YAxis tick={{ fontSize: tvMode ? 14 : 11 }} tickFormatter={formatValue} className="fill-muted-foreground" />
-              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12 }} formatter={(value: number) => [formatValue(value), title]} />
+              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: tvMode ? 16 : 12, color: 'hsl(var(--foreground))' }} formatter={(value: number) => [formatValue(value), title]} />
               <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={tvMode ? 3 : 2} dot={{ fill: color, strokeWidth: 0, r: tvMode ? 5 : 3 }} activeDot={{ r: tvMode ? 8 : 6 }} />
             </LineChart>
           </ResponsiveContainer>
