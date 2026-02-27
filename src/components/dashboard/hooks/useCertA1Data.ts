@@ -5,6 +5,7 @@ import { format, addDays, subDays } from 'date-fns';
 interface CertA1Metrics {
   vendasQtd: number;
   faturamento: number;
+  perdidoTerceiroQtd: number;
   oportunidadesJanela: number;
   oportunidadesVencendo: number;
   oportunidadesVencidas: number;
@@ -17,14 +18,18 @@ export function useCertA1Data(periodoInicio: Date | null, periodoFim: Date | nul
   return useQuery({
     queryKey: ['cert-a1-metrics', periodoInicioStr, periodoFimStr],
     queryFn: async (): Promise<CertA1Metrics> => {
-      // 1. Vendas no período — contar apenas registros com data_venda preenchida
-      let vendasQuery = supabase.from('certificado_a1_vendas').select('valor_venda, data_venda').not('data_venda', 'is', null);
+      // 1. Vendas no período — buscar registros com data_venda preenchida
+      let vendasQuery = supabase.from('certificado_a1_vendas').select('valor_venda, data_venda, status').not('data_venda', 'is', null);
       if (periodoInicioStr && periodoFimStr) {
         vendasQuery = vendasQuery.gte('data_venda', periodoInicioStr).lte('data_venda', periodoFimStr);
       }
       const { data: vendas } = await vendasQuery;
-      const vendasQtd = vendas?.length || 0;
-      const faturamento = vendas?.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0) || 0;
+      // Somente "ganho" para vendas e faturamento
+      const ganhos = vendas?.filter(v => v.status === 'ganho') || [];
+      const vendasQtd = ganhos.length;
+      const faturamento = ganhos.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0);
+      // Perdidos para terceiro
+      const perdidoTerceiroQtd = vendas?.filter(v => v.status === 'perdido_terceiro').length || 0;
 
       // 2. Oportunidades rolling (based on TODAY)
       const today = new Date();
@@ -44,7 +49,7 @@ export function useCertA1Data(periodoInicio: Date | null, periodoFim: Date | nul
       const oportunidadesVencendo = certClientes?.filter(c => c.cert_a1_vencimento! >= todayStr && c.cert_a1_vencimento! <= plus30Str).length || 0;
       const oportunidadesVencidas = certClientes?.filter(c => c.cert_a1_vencimento! >= minus20Str && c.cert_a1_vencimento! < todayStr).length || 0;
 
-      return { vendasQtd, faturamento, oportunidadesJanela, oportunidadesVencendo, oportunidadesVencidas };
+      return { vendasQtd, faturamento, perdidoTerceiroQtd, oportunidadesJanela, oportunidadesVencendo, oportunidadesVencidas };
     },
     staleTime: 5 * 60 * 1000,
   });
