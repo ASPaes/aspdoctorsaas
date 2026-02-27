@@ -116,23 +116,11 @@ export function useDashboardData(filters: DashboardFilters) {
         return sum + (Number(c.mensalidade) || 0) + (movimentosInicioMap[c.id] || 0);
       }, 0) || 0;
 
-      // 5. LTV
+      // 5. LTV — usar 1 / churn mensal (padrão SaaS), consistente com gráfico
       const now = new Date();
-      let totalMesesPermanencia = 0;
-      let clientesComDados = 0;
-      clientesAtivos?.forEach(c => {
-        if (c.data_cadastro) {
-          totalMesesPermanencia += Math.max(1, Math.floor(differenceInDays(now, new Date(c.data_cadastro)) / 30));
-          clientesComDados++;
-        }
-      });
-      cancelamentos?.forEach(c => {
-        if (c.data_cadastro && c.data_cancelamento) {
-          totalMesesPermanencia += Math.max(1, Math.floor(differenceInDays(new Date(c.data_cancelamento), new Date(c.data_cadastro)) / 30));
-          clientesComDados++;
-        }
-      });
-      const ltvMeses = clientesComDados > 0 ? totalMesesPermanencia / clientesComDados : 0;
+      // Churn rate mensal = cancelados no período / ativos no início do período
+      const churnMensal = (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0;
+      const ltvMeses = churnMensal > 0 ? (1 / churnMensal) : 0;
       const earlyChurnRate = novosCount > 0 ? cancelamentosEarly / novosCount : 0;
 
       // 6. CAC
