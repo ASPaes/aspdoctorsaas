@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,8 +76,11 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
     maxAgeMonths: Number(ageWindow),
   });
 
-  // Default selected cohorts = the 3 mature ones from the hook
+  // Reset selected cohorts when filters change
   const [selectedCohorts, setSelectedCohorts] = useState<string[] | null>(null);
+  useEffect(() => {
+    setSelectedCohorts(null);
+  }, [ageWindow, cohortRange]);
   const activeCohorts = selectedCohorts ?? defaultLabels;
 
   // ========== SUMMARY CARDS DATA ==========
@@ -369,7 +372,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
           <table className="text-xs border-collapse" style={{ minWidth: `${120 + 60 + ageColumns.length * 56 + 56}px` }}>
             <thead>
               <tr>
-                <th className="text-left p-2 font-medium text-muted-foreground border-b border-border/40 sticky left-0 bg-card z-10">Coorte</th>
+                <th className="text-left p-2 font-medium text-muted-foreground border-b border-border/40 sticky left-0 bg-card z-20 min-w-[72px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">Coorte</th>
                 <th className="text-center p-2 font-medium text-muted-foreground border-b border-border/40">Clientes</th>
                 {ageColumns.map(age => (
                   <th key={age} className="text-center p-2 font-medium text-muted-foreground border-b border-border/40 min-w-[52px]">M{age}</th>
@@ -390,7 +393,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
                     onMouseEnter={() => setHoveredRow(cohort.month)}
                     onMouseLeave={() => setHoveredRow(null)}
                   >
-                    <td className="p-2 font-medium whitespace-nowrap sticky left-0 bg-card z-10">{formatCohortLabel(cohort.month)}</td>
+                    <td className="p-2 font-medium whitespace-nowrap sticky left-0 bg-card z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatCohortLabel(cohort.month)}</td>
                     <td className="p-2 text-center font-semibold text-muted-foreground">{cohort.size}</td>
                     {ageColumns.map(age => {
                       const val = matrix.get(cohort.month)?.get(age);
