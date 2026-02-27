@@ -26,33 +26,36 @@ const clienteSchema = z.object({
   data_cadastro: z.string().nullable(),
   razao_social: z.string().nullable(),
   nome_fantasia: z.string().nullable(),
-  cnpj: z.string().nullable(),
-  email: z.string().email("Email inválido").nullable().or(z.literal("")),
+  cnpj: z.string().nullable().refine(v => !!v && v.replace(/\D/g, "").length >= 14, { message: "CNPJ obrigatório" }),
+  email: z.preprocess(
+    (v) => (typeof v === "string" ? v.toLowerCase().trim() : v),
+    z.string().min(1, "E-mail obrigatório").email("E-mail inválido")
+  ),
   telefone_contato: z.string().nullable(),
-  telefone_whatsapp: z.string().nullable(),
+  telefone_whatsapp: z.string().nullable().refine(v => !!v && v.replace(/\D/g, "").length >= 10, { message: "WhatsApp obrigatório" }),
   estado_id: z.number().nullable(),
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
   segmento_id: z.number().nullable(),
-  modelo_contrato_id: z.number().nullable(),
+  modelo_contrato_id: z.number().nullable().refine(v => v !== null, { message: "Modelo de Contrato obrigatório" }),
   observacao_cliente: z.string().nullable(),
-  data_venda: z.string().nullable(),
-  funcionario_id: z.number().nullable(),
-  origem_venda_id: z.number().nullable(),
-  recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"]).nullable(),
-  produto_id: z.number().nullable(),
+  data_venda: z.string().nullable().refine(v => !!v, { message: "Data da Venda obrigatória" }),
+  funcionario_id: z.number().nullable().refine(v => v !== null, { message: "Funcionário obrigatório" }),
+  origem_venda_id: z.number().nullable().refine(v => v !== null, { message: "Origem da Venda obrigatória" }),
+  recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
+  produto_id: z.number().nullable().refine(v => v !== null, { message: "Produto obrigatório" }),
   observacao_negociacao: z.string().nullable(),
   data_ativacao: z.string().nullable(),
-  fornecedor_id: z.number().nullable(),
+  fornecedor_id: z.number().nullable().refine(v => v !== null, { message: "Fornecedor obrigatório" }),
   codigo_fornecedor: z.string().nullable(),
   link_portal_fornecedor: z.string().nullable(),
-  valor_ativacao: z.number().min(0, "Deve ser >= 0").nullable(),
-  forma_pagamento_ativacao_id: z.number().nullable(),
-  mensalidade: z.number().min(0, "Deve ser >= 0").nullable(),
-  forma_pagamento_mensalidade_id: z.number().nullable(),
-  custo_operacao: z.number().min(0, "Deve ser >= 0").nullable(),
-  imposto_percentual: z.number().min(0).max(100).nullable(),
-  custo_fixo_percentual: z.number().min(0).max(100).nullable(),
+  valor_ativacao: z.number({ invalid_type_error: "Valor Ativação obrigatório" }).min(0, "Deve ser >= 0"),
+  forma_pagamento_ativacao_id: z.number().nullable().refine(v => v !== null, { message: "Forma Pgto Ativação obrigatória" }),
+  mensalidade: z.number({ invalid_type_error: "Mensalidade obrigatória" }).min(0, "Deve ser >= 0"),
+  forma_pagamento_mensalidade_id: z.number().nullable().refine(v => v !== null, { message: "Forma Pgto Mensalidade obrigatória" }),
+  custo_operacao: z.number({ invalid_type_error: "Custo Operação obrigatório" }).min(0, "Deve ser >= 0"),
+  imposto_percentual: z.number({ invalid_type_error: "Imposto obrigatório" }).min(0).max(100),
+  custo_fixo_percentual: z.number({ invalid_type_error: "Custo Fixo obrigatório" }).min(0).max(100),
   cancelado: z.boolean(),
   data_cancelamento: z.string().nullable(),
   motivo_cancelamento_id: z.number().nullable(),
@@ -101,15 +104,15 @@ export default function ClienteForm() {
     resolver: zodResolver(clienteSchema),
     defaultValues: {
       data_cadastro: new Date().toISOString().split("T")[0],
-      razao_social: null, nome_fantasia: null, cnpj: null, email: null,
+      razao_social: null, nome_fantasia: null, cnpj: null, email: "",
       telefone_contato: null, telefone_whatsapp: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
-      data_venda: null, funcionario_id: null, origem_venda_id: null, recorrencia: null,
+      data_venda: null, funcionario_id: null, origem_venda_id: null, recorrencia: undefined as any,
       produto_id: null, observacao_negociacao: null,
       data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
-      valor_ativacao: null,
-      forma_pagamento_ativacao_id: null, mensalidade: null, forma_pagamento_mensalidade_id: null,
-      custo_operacao: null, imposto_percentual: null, custo_fixo_percentual: null,
+      valor_ativacao: null as any,
+      forma_pagamento_ativacao_id: null, mensalidade: null as any, forma_pagamento_mensalidade_id: null,
+      custo_operacao: null as any, imposto_percentual: null as any, custo_fixo_percentual: null as any,
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
@@ -123,18 +126,63 @@ export default function ClienteForm() {
   const cancelado = form.watch("cancelado");
   const lookups = useLookups(estadoId);
 
+  // Fetch MC% ponderada for auto-filling custo_operacao on new clients
+  const mcPonderadaQuery = useQuery({
+    queryKey: ["mc-ponderada-global"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vw_clientes_financeiro")
+        .select("mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual, cancelado");
+      if (error) throw error;
+      const ativos = (data ?? []).filter(c => !c.cancelado);
+      let receita = 0, cogs = 0, impostos = 0, fixos = 0;
+      ativos.forEach(c => {
+        const m = Number(c.mensalidade) || 0;
+        receita += m;
+        cogs += Number(c.custo_operacao) || 0;
+        impostos += m * (Number(c.imposto_percentual) || 0);
+        fixos += m * (Number(c.custo_fixo_percentual) || 0);
+      });
+      const mc = receita - cogs - impostos - fixos;
+      return receita > 0 ? mc / receita : 0; // decimal, e.g. 0.35
+    },
+    enabled: !isEditing,
+    staleTime: 10 * 60 * 1000,
+  });
+
   // Load config defaults for new clients
   useEffect(() => {
     if (!isEditing && lookups.configuracoes.data) {
       const cfg = lookups.configuracoes.data;
-      if (form.getValues("imposto_percentual") === null) {
+      if (form.getValues("imposto_percentual") === null || form.getValues("imposto_percentual") === undefined) {
         form.setValue("imposto_percentual", Number(cfg.imposto_percentual) * 100);
       }
-      if (form.getValues("custo_fixo_percentual") === null) {
+      if (form.getValues("custo_fixo_percentual") === null || form.getValues("custo_fixo_percentual") === undefined) {
         form.setValue("custo_fixo_percentual", Number(cfg.custo_fixo_percentual) * 100);
       }
     }
   }, [isEditing, lookups.configuracoes.data]);
+
+  // Auto-fill custo_operacao based on MC% ponderada when mensalidade changes (new client only)
+  const mensalidadeWatch = form.watch("mensalidade");
+  const impostoWatch = form.watch("imposto_percentual");
+  const custoFixoWatch = form.watch("custo_fixo_percentual");
+  useEffect(() => {
+    if (isEditing) return;
+    const mcPct = mcPonderadaQuery.data;
+    if (mcPct === undefined || mcPct === null) return;
+    const m = mensalidadeWatch ?? 0;
+    if (m <= 0) return;
+    const impDec = (impostoWatch ?? 0) / 100;
+    const fixDec = (custoFixoWatch ?? 0) / 100;
+    // COGS = MRR × (1 - MC% - Imposto% - CustoFixo%)
+    const suggestedCogs = Math.max(0, Math.round(m * (1 - mcPct - impDec - fixDec) * 100) / 100);
+    // Only auto-fill if custo_operacao hasn't been manually set
+    const current = form.getValues("custo_operacao");
+    if (current === null || current === undefined || current === 0) {
+      form.setValue("custo_operacao", suggestedCogs);
+    }
+  }, [isEditing, mensalidadeWatch, impostoWatch, custoFixoWatch, mcPonderadaQuery.data]);
 
   // Load existing client for editing
   const clienteQuery = useQuery({
@@ -152,24 +200,24 @@ export default function ClienteForm() {
       const c = clienteQuery.data;
       form.reset({
         data_cadastro: c.data_cadastro, razao_social: c.razao_social, nome_fantasia: c.nome_fantasia,
-        cnpj: c.cnpj, email: c.email, telefone_contato: c.telefone_contato,
+        cnpj: c.cnpj, email: c.email ?? "", telefone_contato: c.telefone_contato,
         telefone_whatsapp: c.telefone_whatsapp, estado_id: c.estado_id, cidade_id: c.cidade_id,
         area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
         observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
         funcionario_id: c.funcionario_id, origem_venda_id: (c as any).origem_venda_id ?? null,
-        recorrencia: c.recorrencia, produto_id: c.produto_id,
+        recorrencia: c.recorrencia as any, produto_id: c.produto_id,
         observacao_negociacao: c.observacao_negociacao,
         data_ativacao: (c as any).data_ativacao ?? null,
         fornecedor_id: (c as any).fornecedor_id ?? null,
         codigo_fornecedor: (c as any).codigo_fornecedor ?? null,
         link_portal_fornecedor: (c as any).link_portal_fornecedor ?? null,
-        valor_ativacao: c.valor_ativacao ? Number(c.valor_ativacao) : null,
+        valor_ativacao: c.valor_ativacao ? Number(c.valor_ativacao) : (null as any),
         forma_pagamento_ativacao_id: c.forma_pagamento_ativacao_id,
-        mensalidade: c.mensalidade ? Number(c.mensalidade) : null,
+        mensalidade: c.mensalidade ? Number(c.mensalidade) : (null as any),
         forma_pagamento_mensalidade_id: c.forma_pagamento_mensalidade_id,
-        custo_operacao: c.custo_operacao ? Number(c.custo_operacao) : null,
-        imposto_percentual: c.imposto_percentual ? Number(c.imposto_percentual) * 100 : null,
-        custo_fixo_percentual: c.custo_fixo_percentual ? Number(c.custo_fixo_percentual) * 100 : null,
+        custo_operacao: c.custo_operacao ? Number(c.custo_operacao) : (null as any),
+        imposto_percentual: c.imposto_percentual ? Number(c.imposto_percentual) * 100 : (null as any),
+        custo_fixo_percentual: c.custo_fixo_percentual ? Number(c.custo_fixo_percentual) * 100 : (null as any),
         cancelado: c.cancelado, data_cancelamento: c.data_cancelamento,
         motivo_cancelamento_id: c.motivo_cancelamento_id,
         observacao_cancelamento: c.observacao_cancelamento,
@@ -194,7 +242,7 @@ export default function ClienteForm() {
     mutationFn: async (values: ClienteFormValues) => {
       const payload: any = {
         ...values,
-        email: values.email || null,
+        email: values.email?.trim().toLowerCase() || null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
         custo_fixo_percentual: values.custo_fixo_percentual != null ? values.custo_fixo_percentual / 100 : null,
       };

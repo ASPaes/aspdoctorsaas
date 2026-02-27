@@ -84,7 +84,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <FormField control={form.control} name="valor_ativacao" render={({ field }) => (
             <FormItem>
-              <FormLabel>Valor Ativação</FormLabel>
+              <FormLabel>Valor Ativação *</FormLabel>
               <FormControl>
                 <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" />
               </FormControl>
@@ -94,7 +94,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="forma_pagamento_ativacao_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Forma Pgto Ativação</FormLabel>
+              <FormLabel>Forma Pgto Ativação *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -109,7 +109,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="mensalidade" render={({ field }) => (
             <FormItem>
-              <FormLabel>Mensalidade / MRR</FormLabel>
+              <FormLabel>Mensalidade / MRR *</FormLabel>
               <FormControl>
                 <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" />
               </FormControl>
@@ -119,7 +119,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="forma_pagamento_mensalidade_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Forma Pgto Mensalidade</FormLabel>
+              <FormLabel>Forma Pgto Mensalidade *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -134,7 +134,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="custo_operacao" render={({ field }) => (
             <FormItem>
-              <FormLabel>Custo Operação</FormLabel>
+              <FormLabel>Custo Operação *</FormLabel>
               <FormControl>
                 <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" />
               </FormControl>
@@ -144,7 +144,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="imposto_percentual" render={({ field }) => (
             <FormItem>
-              <FormLabel>Imposto %</FormLabel>
+              <FormLabel>Imposto % *</FormLabel>
               <FormControl>
                 <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" decimals={2} suffix="%" />
               </FormControl>
@@ -154,7 +154,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="custo_fixo_percentual" render={({ field }) => (
             <FormItem>
-              <FormLabel>Custo Fixo %</FormLabel>
+              <FormLabel>Custo Fixo % *</FormLabel>
               <FormControl>
                 <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" decimals={2} suffix="%" />
               </FormControl>
