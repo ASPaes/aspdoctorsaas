@@ -62,16 +62,13 @@ function formatCohortLabel(month: string): string {
   catch { return month; }
 }
 
-export function CohortTab({ tvMode = false, periodoInicio, periodoFim }: CohortTabProps) {
+export function CohortTab({ tvMode = false }: CohortTabProps) {
   const [ageWindow, setAgeWindow] = useState<string>('12');
+  const [cohortRange, setCohortRange] = useState<string>('12');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
 
-  const fromMonth = periodoInicio
-    ? format(periodoInicio, 'yyyy-MM')
-    : format(subMonths(new Date(), 12), 'yyyy-MM');
-  const toMonth = periodoFim
-    ? format(periodoFim, 'yyyy-MM')
-    : format(new Date(), 'yyyy-MM');
+  const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
+  const toMonth = format(new Date(), 'yyyy-MM');
 
   const { isLoading, cohorts, ageColumns, matrix, retainedMatrix, curveData: _cd, curveLabels: defaultLabels, curveIsFallback } = useCohortLogos({
     fromCohortMonth: fromMonth,
@@ -272,6 +269,19 @@ export function CohortTab({ tvMode = false, periodoInicio, periodoFim }: CohortT
             <SelectContent>
               <SelectItem value="6">M0 – M6</SelectItem>
               <SelectItem value="12">M0 – M12</SelectItem>
+              <SelectItem value="24">M0 – M24</SelectItem>
+              <SelectItem value="36">M0 – M36</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Período de coortes</label>
+          <Select value={cohortRange} onValueChange={setCohortRange}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="12">Últimos 12 meses</SelectItem>
+              <SelectItem value="24">Últimos 24 meses</SelectItem>
+              <SelectItem value="36">Últimos 36 meses</SelectItem>
             </SelectContent>
           </Select>
         </div>
