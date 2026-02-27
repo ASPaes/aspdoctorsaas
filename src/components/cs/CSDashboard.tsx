@@ -10,11 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useFuncionariosAtivos } from './hooks/useCSTickets';
 import { useCSDashboardData, type CSDashboardFilters } from './hooks/useCSDashboardData';
+import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
   CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_INDICACAO_STATUS_LABELS, CS_TICKET_TIPO_LABELS,
   type CSTicket, type CSTicketPrioridade,
 } from './types';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, Calendar, RefreshCw, Building2, User } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User } from 'lucide-react';
 
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -52,17 +53,13 @@ type PeriodPreset = 'mes_atual' | 'ultimos_3_meses' | 'ultimos_6_meses' | 'ultim
 export function CSDashboard({ onViewTicket }: CSDashboardProps) {
   const { data: funcionarios } = useFuncionariosAtivos();
   const [selectedOwner, setSelectedOwner] = useState<string>('__all__');
-  const [periodo, setPeriodo] = useState<PeriodPreset>('mes_atual');
+  const [periodo, setPeriodo] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
 
-  const { periodoInicio, periodoFim } = useMemo(() => {
-    const now = new Date();
-    switch (periodo) {
-      case 'ultimos_3_meses': return { periodoInicio: startOfMonth(subMonths(now, 2)), periodoFim: endOfMonth(now) };
-      case 'ultimos_6_meses': return { periodoInicio: startOfMonth(subMonths(now, 5)), periodoFim: endOfMonth(now) };
-      case 'ultimos_12_meses': return { periodoInicio: startOfMonth(subMonths(now, 11)), periodoFim: endOfMonth(now) };
-      default: return { periodoInicio: startOfMonth(now), periodoFim: endOfMonth(now) };
-    }
-  }, [periodo]);
+  const periodoInicio = periodo.from || startOfMonth(new Date());
+  const periodoFim = periodo.to || new Date();
 
   const filters: CSDashboardFilters = useMemo(() => ({
     periodoInicio, periodoFim,
@@ -86,21 +83,10 @@ export function CSDashboard({ onViewTicket }: CSDashboardProps) {
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodPreset)}>
-                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mes_atual">Mês Atual</SelectItem>
-                  <SelectItem value="ultimos_3_meses">Últimos 3 meses</SelectItem>
-                  <SelectItem value="ultimos_6_meses">Últimos 6 meses</SelectItem>
-                  <SelectItem value="ultimos_12_meses">Últimos 12 meses</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-wrap items-end gap-3">
+            <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} className="w-64" />
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Responsável</label>
               <Select value={selectedOwner} onValueChange={setSelectedOwner}>
                 <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
