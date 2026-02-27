@@ -92,10 +92,10 @@ export function CSTab({ tvMode = false }: CSTabProps) {
   return (
     <div className="space-y-6">
       <Card><CardContent className="pt-4">
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-wrap items-end gap-3">
           <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} className="w-64" />
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Responsável</label>
             <Select value={selectedOwner} onValueChange={setSelectedOwner}>
               <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -105,7 +105,9 @@ export function CSTab({ tvMode = false }: CSTabProps) {
             </Select>
           </div>
           <div className="flex-1" />
-          <Button variant="outline" size="sm" onClick={() => navigate('/customer-success')}><List className="h-4 w-4 mr-2" />CS Completo</Button>
+          <div className="pb-0.5">
+            <Button variant="outline" size="sm" onClick={() => navigate('/customer-success')}><List className="h-4 w-4 mr-2" />CS Completo</Button>
+          </div>
         </div>
       </CardContent></Card>
 
