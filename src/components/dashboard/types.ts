@@ -92,4 +92,7 @@ export interface DistributionData {
   porSegmento: DistributionDataPoint[];
   porAreaAtuacao: DistributionDataPoint[];
   topCidadesByEstado?: Record<string, { nome: string; qtd: number }[]>;
+  segmentoByEstado?: Record<string, DistributionDataPoint[]>;
+  areaAtuacaoByEstado?: Record<string, DistributionDataPoint[]>;
+  fornecedorByEstado?: Record<string, DistributionDataPoint[]>;
 }

@@ -82,8 +82,8 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
             <TooltipProvider delayDuration={0}>
               <ComposableMap
                 projection="geoMercator"
-                projectionConfig={{ scale: tvMode ? 750 : 580, center: [-54, -15] }}
-                className={cn('w-full mx-auto', tvMode ? 'h-[540px] max-w-[500px]' : 'h-[440px] max-w-[420px]')}
+                projectionConfig={{ scale: tvMode ? 1500 : 1160, center: [-54, -15] }}
+                className={cn('w-full mx-auto', tvMode ? 'h-[900px] max-w-[900px]' : 'h-[750px] max-w-[750px]')}
               >
                 <Geographies geography={GEO_URL}>
                   {({ geographies }) =>

@@ -3,10 +3,7 @@ import { BarChartCard } from '../charts/BarChartCard';
 import { PieChartCard } from '../charts/PieChartCard';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { DistributionData, DistributionDataPoint } from '../types';
 
 const SIGLA_TO_NAME: Record<string, string> = {
@@ -20,56 +17,59 @@ const SIGLA_TO_NAME: Record<string, string> = {
 
 interface Props { distributions: DistributionData; tvMode: boolean; }
 
-/** Group items with value < minCount into "Outros" */
-function groupOutros(data: DistributionDataPoint[], minCount: number): DistributionDataPoint[] {
-  const big: DistributionDataPoint[] = [];
-  let outrosValue = 0;
-  let outrosPercent = 0;
-  data.forEach(d => {
-    if (d.value < minCount) { outrosValue += d.value; outrosPercent += d.percent; }
-    else big.push(d);
-  });
-  const result = big.sort((a, b) => b.value - a.value);
-  if (outrosValue > 0) result.push({ name: 'Outros', value: outrosValue, percent: outrosPercent });
-  return result;
+/** Top N + group rest into "Outros" */
+function topN(data: DistributionDataPoint[], n: number): DistributionDataPoint[] {
+  const sorted = [...data].sort((a, b) => b.value - a.value);
+  const top = sorted.slice(0, n);
+  const rest = sorted.slice(n);
+  if (rest.length > 0) {
+    const outrosValue = rest.reduce((s, d) => s + d.value, 0);
+    const outrosPercent = rest.reduce((s, d) => s + d.percent, 0);
+    top.push({ name: 'Outros', value: outrosValue, percent: outrosPercent });
+  }
+  return top;
 }
 
-/** Generate monochromatic green palette based on data length */
 function greenPalette(count: number): string[] {
-  const lightnessValues = [34, 40, 48, 55, 62, 68, 74, 80, 85, 90];
-  return Array.from({ length: count }, (_, i) => `hsl(145 53% ${lightnessValues[Math.min(i, lightnessValues.length - 1)]}%)`);
+  const l = [34, 40, 48, 55, 62, 68, 74, 80, 85, 90];
+  return Array.from({ length: count }, (_, i) => `hsl(145 53% ${l[Math.min(i, l.length - 1)]}%)`);
 }
 
 export function DistribuicaoTab({ distributions, tvMode }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [includeHiper, setIncludeHiper] = useState(true);
 
-  // Filter cities by selected state
+  // Cities filtered by state
   const filteredCidades = useMemo(() => {
     if (!selectedState || !distributions.topCidadesByEstado) return distributions.porCidade;
     const cities = distributions.topCidadesByEstado[selectedState];
-    if (!cities) return [];
+    if (!cities || cities.length === 0) return [];
     const total = cities.reduce((s, c) => s + c.qtd, 0) || 1;
     return cities.slice(0, 10).map(c => ({ name: c.nome, value: c.qtd, percent: c.qtd / total }));
   }, [selectedState, distributions]);
 
-  // Filter segmento/area by state — we don't have per-state breakdowns in distributions,
-  // so when a state is selected, show as-is (data comes pre-filtered from the hook).
-  // The groupOutros logic applies regardless.
-  const segmentoData = useMemo(() => groupOutros(distributions.porSegmento, 10), [distributions.porSegmento]);
-  const areaData = useMemo(() => groupOutros(distributions.porAreaAtuacao, 10), [distributions.porAreaAtuacao]);
+  // Segmento — top 5, filtered by state
+  const segmentoData = useMemo(() => {
+    const src = selectedState && distributions.segmentoByEstado?.[selectedState]
+      ? distributions.segmentoByEstado[selectedState]
+      : distributions.porSegmento;
+    return topN(src, 5);
+  }, [selectedState, distributions]);
 
-  // Fornecedores with Hiper toggle
+  // Área de atuação — top 5, filtered by state
+  const areaData = useMemo(() => {
+    const src = selectedState && distributions.areaAtuacaoByEstado?.[selectedState]
+      ? distributions.areaAtuacaoByEstado[selectedState]
+      : distributions.porAreaAtuacao;
+    return topN(src, 5);
+  }, [selectedState, distributions]);
+
+  // Fornecedores filtered by state, all included
   const fornecedorData = useMemo(() => {
-    let data = distributions.porFornecedor;
-    if (!includeHiper) {
-      data = data.filter(d => !d.name.toLowerCase().includes('hiper'));
-      // recalc percent
-      const total = data.reduce((s, d) => s + d.value, 0) || 1;
-      data = data.map(d => ({ ...d, percent: d.value / total }));
-    }
-    return data;
-  }, [distributions.porFornecedor, includeHiper]);
+    const src = selectedState && distributions.fornecedorByEstado?.[selectedState]
+      ? distributions.fornecedorByEstado[selectedState]
+      : distributions.porFornecedor;
+    return src;
+  }, [selectedState, distributions]);
 
   const segmentoPalette = useMemo(() => greenPalette(segmentoData.length), [segmentoData.length]);
   const areaPalette = useMemo(() => greenPalette(areaData.length), [areaData.length]);
@@ -89,7 +89,7 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
         </div>
       )}
 
-      {/* 1. Choropleth Map */}
+      {/* Choropleth Map */}
       <BrazilChoroplethMap
         title="Distribuição Geográfica por Estado"
         data={distributions.porEstado}
@@ -99,7 +99,7 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
         onSelectState={setSelectedState}
       />
 
-      {/* 2. Top 10 Cidades — monochromatic */}
+      {/* Top 10 Cidades */}
       <BarChartCard
         title={selectedState ? `Top 10 Cidades — ${SIGLA_TO_NAME[selectedState] || selectedState}` : 'Top 10 Cidades (Qtde Clientes)'}
         data={filteredCidades}
@@ -108,17 +108,17 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
         color="hsl(145 53% 34%)"
       />
 
-      {/* 3. Donuts — monochromatic green with Outros grouping */}
+      {/* Donuts — top 5 + Outros */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         <PieChartCard
-          title="% Carteira por Segmento"
+          title={selectedState ? `% Carteira por Segmento — ${SIGLA_TO_NAME[selectedState]}` : '% Carteira por Segmento'}
           data={segmentoData}
           tvMode={tvMode}
           height={tvMode ? 450 : 350}
           colors={segmentoPalette}
         />
         <PieChartCard
-          title="% Carteira por Área de Atuação"
+          title={selectedState ? `% Carteira por Área de Atuação — ${SIGLA_TO_NAME[selectedState]}` : '% Carteira por Área de Atuação'}
           data={areaData}
           tvMode={tvMode}
           height={tvMode ? 450 : 350}
@@ -126,23 +126,15 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
         />
       </div>
 
-      {/* 4. Fornecedores with Hiper toggle */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-3 px-1">
-          <Switch id="hiper-toggle" checked={!includeHiper} onCheckedChange={(v) => setIncludeHiper(!v)} />
-          <Label htmlFor="hiper-toggle" className="text-sm cursor-pointer">
-            {includeHiper ? 'Incluir Hiper Software' : 'Excluir Hiper Software'}
-          </Label>
-        </div>
-        <BarChartCard
-          title={includeHiper ? 'Top 10 Fornecedores (Qtde Clientes)' : 'Top Fornecedores — excluindo Hiper Software'}
-          data={fornecedorData}
-          tvMode={tvMode}
-          height={tvMode ? 450 : 350}
-          horizontal={false}
-          color="hsl(145 53% 34%)"
-        />
-      </div>
+      {/* Fornecedores — sem toggle, sempre todos */}
+      <BarChartCard
+        title={selectedState ? `Top 10 Fornecedores — ${SIGLA_TO_NAME[selectedState]}` : 'Top 10 Fornecedores (Qtde Clientes)'}
+        data={fornecedorData}
+        tvMode={tvMode}
+        height={tvMode ? 450 : 350}
+        horizontal={false}
+        color="hsl(145 53% 34%)"
+      />
     </div>
   );
 }
