@@ -18,6 +18,8 @@ interface CohortTabProps {
   tvMode?: boolean;
   periodoInicio?: Date | null;
   periodoFim?: Date | null;
+  fornecedorId?: number | null;
+  unidadeBaseId?: number | null;
 }
 
 function InfoTooltip({ text }: { text: string }) {
@@ -62,7 +64,7 @@ function formatCohortLabel(month: string): string {
   catch { return month; }
 }
 
-export function CohortTab({ tvMode = false }: CohortTabProps) {
+export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: CohortTabProps) {
   const [ageWindow, setAgeWindow] = useState<string>('12');
   const [cohortRange, setCohortRange] = useState<string>('12');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
@@ -70,10 +72,14 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
   const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
   const toMonth = format(new Date(), 'yyyy-MM');
 
+  const maxAge = Number(ageWindow);
+
   const { isLoading, cohorts, ageColumns, matrix, retainedMatrix, curveData: _cd, curveLabels: defaultLabels, curveIsFallback } = useCohortLogos({
     fromCohortMonth: fromMonth,
     toCohortMonth: toMonth,
-    maxAgeMonths: Number(ageWindow),
+    maxAgeMonths: maxAge,
+    fornecedorId,
+    unidadeBaseId,
   });
 
   // Reset selected cohorts when filters change
@@ -167,8 +173,10 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
       const ages = matrix.get(cm);
       if (ages) ages.forEach((_, age) => { if (age > maxAgeWithData) maxAgeWithData = age; });
     });
+    // Respect the age window selection
+    const effectiveMaxAge = Math.min(maxAgeWithData, maxAge);
 
-    const curveAges = ageColumns.filter(a => a <= maxAgeWithData);
+    const curveAges = ageColumns.filter(a => a <= effectiveMaxAge);
     const data = curveAges.map(age => {
       const point: Record<string, any> = { age: `M${age}`, ageNum: age };
       activeCohorts.forEach((cm, i) => {
@@ -184,7 +192,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
     });
 
     return { dynamicCurveData: data, dynamicLabels: labels };
-  }, [activeCohorts, matrix, retainedMatrix, ageColumns, cohorts]);
+  }, [activeCohorts, matrix, retainedMatrix, ageColumns, cohorts, maxAge]);
 
   // Toggle cohort selection
   const toggleCohort = (month: string) => {

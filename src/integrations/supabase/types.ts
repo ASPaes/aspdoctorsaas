@@ -1502,6 +1502,23 @@ export type Database = {
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
+      fn_cohort_logos: {
+        Args: {
+          p_fornecedor_id?: number
+          p_from_month?: string
+          p_max_age?: number
+          p_to_month?: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          age_months: number
+          cohort_month: string
+          cohort_size: number
+          retained: number
+          retention_percent: number
+          tenant_id: string
+        }[]
+      }
       get_tenant_users_with_email: {
         Args: { p_tenant_id: string }
         Returns: {
