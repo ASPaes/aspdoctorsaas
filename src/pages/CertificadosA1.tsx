@@ -7,6 +7,8 @@ import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from 
 import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CertA1Dashboard } from "@/components/certificados/CertA1Dashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -243,6 +245,18 @@ export default function CertificadosA1() {
         <h1 className="text-2xl font-bold">Certificados A1</h1>
         <p className="mt-1 text-muted-foreground">Gestão de certificados digitais A1</p>
       </div>
+
+      <Tabs defaultValue="lista">
+        <TabsList>
+          <TabsTrigger value="lista">Lista</TabsTrigger>
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="mt-4">
+          <CertA1Dashboard />
+        </TabsContent>
+
+        <TabsContent value="lista" className="mt-4 space-y-4">
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -491,6 +505,8 @@ export default function CertificadosA1() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
