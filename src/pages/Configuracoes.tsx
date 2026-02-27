@@ -13,6 +13,9 @@ import { Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
+import CadastrosTab from "@/components/configuracoes/CadastrosTab";
+import UsuariosTab from "@/components/configuracoes/UsuariosTab";
+import { useSearchParams } from "react-router-dom";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -24,6 +27,8 @@ type FormValues = z.infer<typeof schema>;
 export default function Configuracoes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "percentuais";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -84,13 +89,15 @@ export default function Configuracoes() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="mt-1 text-muted-foreground">Ajuste os percentuais globais e despesas do sistema.</p>
+        <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares e usuários.</p>
       </div>
 
-      <Tabs defaultValue="percentuais">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="percentuais">Percentuais</TabsTrigger>
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
+          <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+          <TabsTrigger value="usuarios">Usuários</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
@@ -135,6 +142,14 @@ export default function Configuracoes() {
 
         <TabsContent value="cac">
           <CacDespesasTab />
+        </TabsContent>
+
+        <TabsContent value="cadastros">
+          <CadastrosTab />
+        </TabsContent>
+
+        <TabsContent value="usuarios">
+          <UsuariosTab />
         </TabsContent>
       </Tabs>
     </div>

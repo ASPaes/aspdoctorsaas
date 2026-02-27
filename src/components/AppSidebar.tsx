@@ -22,9 +22,7 @@ const navItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
-  { title: "Cadastros", url: "/cadastros", icon: ClipboardList },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
-  { title: "Usuários", url: "/settings/users", icon: UserCog },
 ];
 
 export function AppSidebar() {
