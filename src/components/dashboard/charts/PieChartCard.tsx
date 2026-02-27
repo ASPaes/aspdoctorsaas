@@ -16,9 +16,10 @@ interface PieChartCardProps {
   className?: string;
   height?: number;
   showLegend?: boolean;
+  colors?: string[];
 }
 
-export function PieChartCard({ title, data, tvMode = false, className, height = 300, showLegend = true }: PieChartCardProps) {
+export function PieChartCard({ title, data, tvMode = false, className, height = 300, showLegend = true, colors }: PieChartCardProps) {
   const chartHeight = tvMode ? height * 1.3 : height;
 
   if (!data || data.length === 0) {
@@ -46,7 +47,7 @@ export function PieChartCard({ title, data, tvMode = false, className, height = 
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={processedData} cx="50%" cy="50%" labelLine={false} label={({ percent }) => percent < 0.05 ? null : `${(percent * 100).toFixed(0)}%`} outerRadius={tvMode ? 120 : 80} innerRadius={tvMode ? 60 : 40} dataKey="value" paddingAngle={2}>
-                {processedData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="hsl(var(--background))" strokeWidth={2} />)}
+                {processedData.map((_, i) => <Cell key={i} fill={(colors || COLORS)[i % (colors || COLORS).length]} stroke="hsl(var(--background))" strokeWidth={2} />)}
               </Pie>
               <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }} formatter={(value: number, _: string, props: any) => [`${value} (${(props.payload.percent * 100).toFixed(1)}%)`, props.payload.name]} />
               {showLegend && <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: tvMode ? 14 : 11 }} formatter={(value) => {
