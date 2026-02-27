@@ -366,7 +366,7 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="text-xs border-collapse" style={{ minWidth: `${120 + 60 + ageColumns.length * 56 + 56}px` }}>
             <thead>
               <tr>
                 <th className="text-left p-2 font-medium text-muted-foreground border-b border-border/40 sticky left-0 bg-card z-10">Coorte</th>
