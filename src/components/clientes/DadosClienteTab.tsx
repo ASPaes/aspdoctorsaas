@@ -251,7 +251,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
         <FormField control={form.control} name="cnpj" render={({ field }) => (
           <FormItem>
-            <FormLabel>CNPJ</FormLabel>
+            <FormLabel>CNPJ *</FormLabel>
             <FormControl>
               <div className="relative">
                 <Input
@@ -324,8 +324,15 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <div className="sm:col-span-2">
           <FormField control={form.control} name="email" render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl><Input type="email" {...field} value={field.value ?? ""} /></FormControl>
+              <FormLabel>Email *</FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  {...field}
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value.toLowerCase())}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )} />
@@ -348,7 +355,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         {/* Linha 4: Telefone WhatsApp [+btn] | Área Atuação | Segmento */}
         <FormField control={form.control} name="telefone_whatsapp" render={({ field }) => (
           <FormItem>
-            <FormLabel>Telefone WhatsApp</FormLabel>
+            <FormLabel>Telefone WhatsApp *</FormLabel>
             <div className="flex gap-2">
               <FormControl>
                 <Input

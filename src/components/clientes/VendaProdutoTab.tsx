@@ -35,7 +35,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
           {/* Linha 1: Data Venda | Origem Venda | Modelo de Contrato */}
           <FormField control={form.control} name="data_venda" render={({ field }) => (
             <FormItem>
-              <FormLabel>Data da Venda</FormLabel>
+              <FormLabel>Data da Venda *</FormLabel>
               <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -43,7 +43,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
 
           <FormField control={form.control} name="origem_venda_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Origem da Venda</FormLabel>
+              <FormLabel>Origem da Venda *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -58,7 +58,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
 
           <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Modelo de Contrato</FormLabel>
+              <FormLabel>Modelo de Contrato *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -74,7 +74,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
           {/* Linha 2: Recorrência | Funcionário */}
           <FormField control={form.control} name="recorrencia" render={({ field }) => (
             <FormItem>
-              <FormLabel>Recorrência</FormLabel>
+              <FormLabel>Recorrência *</FormLabel>
               <Select value={field.value ?? ""} onValueChange={(v) => field.onChange(v || null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -89,7 +89,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
 
           <FormField control={form.control} name="funcionario_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Funcionário (Consultor)</FormLabel>
+              <FormLabel>Funcionário (Consultor) *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -119,7 +119,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
 
           <FormField control={form.control} name="fornecedor_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Fornecedor</FormLabel>
+              <FormLabel>Fornecedor *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -166,7 +166,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
 
           <FormField control={form.control} name="produto_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Produto</FormLabel>
+              <FormLabel>Produto *</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
