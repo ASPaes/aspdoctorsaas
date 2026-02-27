@@ -12,6 +12,8 @@ import { useCohortLogos } from '../hooks/useCohortLogos';
 
 interface CohortTabProps {
   tvMode?: boolean;
+  periodoInicio?: Date | null;
+  periodoFim?: Date | null;
 }
 
 function InfoTooltip({ text }: { text: string }) {
@@ -51,14 +53,20 @@ function formatCohortLabel(month: string): string {
   catch { return month; }
 }
 
-export function CohortTab({ tvMode = false }: CohortTabProps) {
-  const [cohortRange, setCohortRange] = useState<string>('12');
+export function CohortTab({ tvMode = false, periodoInicio, periodoFim }: CohortTabProps) {
   const [ageWindow, setAgeWindow] = useState<string>('12');
 
-  const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
+  // Derive cohort range from dashboard period
+  const fromMonth = periodoInicio
+    ? format(periodoInicio, 'yyyy-MM')
+    : format(subMonths(new Date(), 12), 'yyyy-MM');
+  const toMonth = periodoFim
+    ? format(periodoFim, 'yyyy-MM')
+    : format(new Date(), 'yyyy-MM');
 
   const { isLoading, cohorts, ageColumns, matrix, curveData, curveLabels, curveIsFallback } = useCohortLogos({
     fromCohortMonth: fromMonth,
+    toCohortMonth: toMonth,
     maxAgeMonths: Number(ageWindow),
   });
 
@@ -96,17 +104,6 @@ export function CohortTab({ tvMode = false }: CohortTabProps) {
     <div className="space-y-4 mt-4">
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Intervalo de coortes</label>
-          <Select value={cohortRange} onValueChange={setCohortRange}>
-            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="6">Últimos 6 meses</SelectItem>
-              <SelectItem value="12">Últimos 12 meses</SelectItem>
-              <SelectItem value="18">Últimos 18 meses</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Janela de meses</label>
           <Select value={ageWindow} onValueChange={setAgeWindow}>

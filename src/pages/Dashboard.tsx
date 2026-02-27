@@ -83,10 +83,10 @@ export default function Dashboard() {
             <DistribuicaoTab distributions={distributions} tvMode={tvMode} />
           </TabsContent>
           <TabsContent value="cs">
-            <CSTab tvMode={tvMode} />
+            <CSTab tvMode={tvMode} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
           </TabsContent>
           <TabsContent value="cohort">
-            <CohortTab tvMode={tvMode} />
+            <CohortTab tvMode={tvMode} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
           </TabsContent>
         </Tabs>
       )}
