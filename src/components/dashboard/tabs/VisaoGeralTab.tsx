@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Users, DollarSign, TrendingUp, Target, BarChart3, Percent, ShieldCheck, AlertTriangle, Clock, RefreshCw, Zap, UserX } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
+import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { useCertA1Data } from '../hooks/useCertA1Data';
 import type { KPIMetrics, TimeSeriesData } from '../types';
 
@@ -16,32 +18,79 @@ const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', c
 const fmtFull = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
+function computeDelta(current: number, previous: number | null): { trend: 'up' | 'down' | 'neutral'; trendValue: string } | null {
+  if (previous === null || previous === 0) return null;
+  const pct = ((current - previous) / previous) * 100;
+  if (pct === 0) return { trend: 'neutral', trendValue: '0% vs mês anterior' };
+  const sign = pct > 0 ? '+' : '';
+  return {
+    trend: pct > 0 ? 'up' : 'down',
+    trendValue: `${sign}${pct.toFixed(1)}% vs mês anterior`,
+  };
+}
+
 export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, periodoFim }: VisaoGeralTabProps) {
   const s = tvMode ? 'tv' : 'lg';
   const { data: certA1, isLoading: certLoading, refetch: refetchCert } = useCertA1Data(periodoInicio || null, periodoFim || null);
 
+  // Compute deltas from timeSeries (last vs second-to-last month)
+  const deltas = useMemo(() => {
+    const evo = timeSeries.mrrEvolution;
+    if (evo.length < 2) return { mrr: null, clientes: null, ticket: null, arr: null };
+    const prev = evo[evo.length - 2] as any;
+    const prevMrr = prev.value as number;
+    const prevClientes = prev.clientesAtivos as number | undefined;
+    const prevTicket = prev.ticketMedio as number | undefined;
+    return {
+      mrr: computeDelta(metrics.mrr, prevMrr),
+      clientes: prevClientes ? computeDelta(metrics.clientesAtivos, prevClientes) : null,
+      ticket: prevTicket ? computeDelta(metrics.ticketMedio, prevTicket) : null,
+      arr: computeDelta(metrics.arr, prevMrr * 12),
+    };
+  }, [timeSeries.mrrEvolution, metrics.mrr, metrics.clientesAtivos, metrics.ticketMedio, metrics.arr]);
+
+  // Build MRR chart lines from per-unit data
+  const { mrrLines, mrrChartData } = useMemo(() => {
+    const units = metrics.faturamentoPorUnidade;
+    const lines = [
+      { dataKey: 'value', label: 'MRR Total', color: 'hsl(var(--primary))' },
+    ];
+    units.forEach((u, i) => {
+      const colors = ['hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+      lines.push({
+        dataKey: `mrr_${u.id}`,
+        label: `MRR ${u.nome}`,
+        color: colors[i % colors.length],
+        strokeDasharray: '5 3',
+      } as any);
+    });
+    return { mrrLines: lines, mrrChartData: timeSeries.mrrEvolution };
+  }, [timeSeries.mrrEvolution, metrics.faturamentoPorUnidade]);
+
   return (
     <div className="space-y-6">
+      {/* Top 4 KPIs with delta */}
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="MRR Atual (Snapshot)" value={fmt(metrics.mrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" subtitle="Foto atual da receita recorrente" formula="Soma das mensalidades de todos os clientes ativos (cancelado=false). Retrato instantâneo, não considera movimentos do período." />
-        <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Total de clientes com status ativo (não cancelados)" />
-        <KPICardEnhanced label="Ticket Médio" value={fmtFull(metrics.ticketMedio)} icon={<Target className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR ÷ Clientes Ativos" />
-        <KPICardEnhanced label="ARR" value={fmt(metrics.arr)} icon={<BarChart3 className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR × 12" />
+        <KPICardEnhanced label="MRR Atual (Snapshot)" value={fmt(metrics.mrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" subtitle="Foto atual da receita recorrente" formula="Soma das mensalidades de todos os clientes ativos (cancelado=false). Retrato instantâneo, não considera movimentos do período." trend={deltas.mrr?.trend} trendValue={deltas.mrr?.trendValue} />
+        <KPICardEnhanced label="Clientes Ativos" value={metrics.clientesAtivos.toLocaleString('pt-BR')} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="Total de clientes com status ativo (não cancelados)" trend={deltas.clientes?.trend} trendValue={deltas.clientes?.trendValue} />
+        <KPICardEnhanced label="Ticket Médio" value={fmtFull(metrics.ticketMedio)} icon={<Target className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR ÷ Clientes Ativos" trend={deltas.ticket?.trend} trendValue={deltas.ticket?.trendValue} />
+        <KPICardEnhanced label="ARR" value={fmt(metrics.arr)} icon={<BarChart3 className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" formula="MRR × 12" trend={deltas.arr?.trend} trendValue={deltas.arr?.trendValue} />
       </div>
 
-      {metrics.faturamentoPorUnidade.length > 0 && (
-        <div className={`grid gap-4 ${tvMode ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-' + Math.min(metrics.faturamentoPorUnidade.length, 4)}`}>
-          {metrics.faturamentoPorUnidade.map(u => (
-            <KPICardEnhanced key={u.id} label={`MRR ${u.nome}`} value={fmt(u.mrr)} size={tvMode ? 'lg' : 'md'} variant="primary" subtitle={`${metrics.faturamentoTotal > 0 ? ((u.mrr / metrics.faturamentoTotal) * 100).toFixed(1) : 0}% do total`} formula={`Soma do MRR dos clientes da unidade ${u.nome}`} />
-          ))}
-        </div>
-      )}
-
+      {/* Charts: MRR (multi-line with units) + Faturamento side by side */}
       <div className={`grid gap-6 grid-cols-1 lg:grid-cols-2`}>
-        <LineChartCard title="Evolução do MRR (12 meses)" data={timeSeries.mrrEvolution} formatValue={fmt} tvMode={tvMode} />
-        <LineChartCard title="Evolução do Faturamento (12 meses)" data={timeSeries.faturamentoEvolution} formatValue={fmt} tvMode={tvMode} />
+        <MultiLineChartCard
+          title="Evolução do MRR (12 meses)"
+          data={mrrChartData}
+          lines={mrrLines}
+          formatValue={fmt}
+          tvMode={tvMode}
+          height={340}
+        />
+        <LineChartCard title="Evolução do Faturamento (12 meses)" data={timeSeries.faturamentoEvolution} formatValue={fmt} tvMode={tvMode} height={340} />
       </div>
 
+      {/* Retention metrics */}
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
         <KPICardEnhanced label="NRR" value={fmtPct(metrics.nrr)} size={tvMode ? 'lg' : 'md'} variant={metrics.nrr >= 1 ? 'success' : 'warning'} formula="(MRR início + expansão - contração - churn) ÷ MRR início" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
         <KPICardEnhanced label="GRR" value={fmtPct(metrics.grr)} size={tvMode ? 'lg' : 'md'} variant={metrics.grr >= 0.9 ? 'success' : 'warning'} formula="(MRR início - churn - downsell) ÷ MRR início" icon={<Percent className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
@@ -49,6 +98,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
         <KPICardEnhanced label="Quick Ratio" value={metrics.quickRatio === Infinity ? '∞' : metrics.quickRatio.toFixed(2)} size={tvMode ? 'lg' : 'md'} variant={metrics.quickRatio >= 4 ? 'success' : metrics.quickRatio >= 1 ? 'warning' : 'destructive'} formula="(New MRR + Expansion) ÷ (Churn + Contraction). ≥4 = excelente" subtitle={metrics.quickRatio >= 4 ? 'Excelente (≥4)' : metrics.quickRatio >= 1 ? 'Atenção' : 'Crítico'} icon={<Zap className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} />
       </div>
 
+      {/* Certificados A1 */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Certificados A1</h3>
@@ -59,8 +109,26 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, periodoInicio, peri
           <KPICardEnhanced label="Perdido p/ Terceiro" value={certA1?.perdidoTerceiroQtd?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant={certA1?.perdidoTerceiroQtd && certA1.perdidoTerceiroQtd > 0 ? 'destructive' : 'default'} icon={<UserX className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Qtde de certificados renovados com terceiro (perdidos) no período" />
           <KPICardEnhanced label="Faturamento A1" value={fmt(certA1?.faturamento || 0)} size={tvMode ? 'lg' : 'md'} variant="primary" icon={<DollarSign className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} formula="Soma dos valores de venda dos certificados A1 com status 'ganho' no período" />
           <KPICardEnhanced label="Oportunidades (Janela)" value={certA1?.oportunidadesJanela?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="default" icon={<Target className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes com cert vencendo entre -20 e +30 dias de hoje" />
-          <KPICardEnhanced label="Vencendo em 30 dias" value={certA1?.oportunidadesVencendo?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant="warning" icon={<Clock className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes ativos com certificado vencendo nos próximos 30 dias" />
-          <KPICardEnhanced label="Vencidos até 20 dias" value={certA1?.oportunidadesVencidas?.toLocaleString('pt-BR') || '0'} size={tvMode ? 'lg' : 'md'} variant={certA1?.oportunidadesVencidas && certA1.oportunidadesVencidas > 0 ? 'destructive' : 'default'} icon={<AlertTriangle className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />} subtitle="Baseado em hoje" formula="Clientes ativos com certificado vencido há até 20 dias" />
+          <KPICardEnhanced
+            label="Vencendo em 30 dias"
+            value={certA1?.oportunidadesVencendo?.toLocaleString('pt-BR') || '0'}
+            size={tvMode ? 'lg' : 'md'}
+            variant="warning"
+            icon={<Clock className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />}
+            subtitle="Baseado em hoje"
+            formula="Clientes ativos com certificado vencendo nos próximos 30 dias"
+            className="ring-2 ring-warning/40"
+          />
+          <KPICardEnhanced
+            label="Vencidos até 20 dias"
+            value={certA1?.oportunidadesVencidas?.toLocaleString('pt-BR') || '0'}
+            size={tvMode ? 'lg' : 'md'}
+            variant={certA1?.oportunidadesVencidas && certA1.oportunidadesVencidas > 0 ? 'destructive' : 'default'}
+            icon={<AlertTriangle className={`${tvMode ? 'h-6 w-6' : 'h-4 w-4'} text-current`} />}
+            subtitle="Baseado em hoje"
+            formula="Clientes ativos com certificado vencido há até 20 dias"
+            className={certA1?.oportunidadesVencidas && certA1.oportunidadesVencidas > 0 ? 'ring-2 ring-red-500/40' : ''}
+          />
         </div>
       </div>
     </div>
