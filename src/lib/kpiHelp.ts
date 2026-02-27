@@ -66,16 +66,16 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   mc_total: {
     title: "MC Total (R$)",
-    definition: "Margem de contribuição total — quanto sobra da receita após pagar custos operacionais, impostos e custos fixos alocados.",
+    definition: "Margem de contribuição total — quanto sobra da receita após pagar o custo operacional (COGS).",
     why_it_matters: "Se MC é positiva, cada cliente contribui para o lucro. Se negativa, a operação perde dinheiro a cada venda.",
-    formula: "MRR − COGS − Impostos (R$) − Custos Fixos (R$)",
+    formula: "MRR − COGS",
   },
   mc_percent_ponderada: {
     title: "MC% Ponderada",
     definition: "Margem de contribuição como percentual da receita, ponderada pelo valor de cada cliente.",
-    why_it_matters: "Indica a eficiência financeira da operação. Meta saudável: acima de 30%. Abaixo de 10% é crítico.",
+    why_it_matters: "Indica a eficiência financeira da operação. Meta saudável: acima de 60%. Abaixo de 30% é crítico.",
     formula: "MC Total ÷ MRR Total",
-    example: "MC R$ 15.000 ÷ MRR R$ 50.000 = 30%",
+    example: "MC R$ 100.000 ÷ MRR R$ 150.000 = 66,7%",
   },
   mc_media_cliente: {
     title: "MC Média / Cliente",
@@ -111,9 +111,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   ltv_recorrente_margem: {
     title: "LTV Recorrente (R$)",
-    definition: "Receita líquida total esperada de um cliente ao longo de sua vida, considerando a margem de contribuição.",
+    definition: "Receita líquida total esperada de um cliente ao longo de sua vida, considerando a margem de contribuição (MRR - COGS).",
     why_it_matters: "É o valor real que o cliente traz. Deve ser pelo menos 3x o CAC para o negócio ser saudável.",
-    formula: "ARPA × MC% Ponderada × LTV (meses)",
+    formula: "ARPA × MC% × LTV (meses)",
   },
   ltv_cac_recorrente: {
     title: "LTV/CAC Recorrente",
@@ -185,7 +185,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   cac_payback: {
     title: "CAC Payback (meses)",
-    definition: "Tempo necessário para recuperar o investimento feito para adquirir um cliente.",
+    definition: "Tempo necessário para recuperar o investimento feito para adquirir um cliente, considerando a margem (MRR - COGS).",
     why_it_matters: "Ideal ≤ 12 meses. Acima disso, o capital fica preso por muito tempo.",
     formula: "CAC por Logo ÷ (ARPA × MC%)",
   },
