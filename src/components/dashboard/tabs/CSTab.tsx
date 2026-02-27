@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
 import { useCSDashboardData, type CSDashboardFilters } from '@/components/cs/hooks/useCSDashboardData';
 import { useFuncionariosAtivos } from '@/components/cs/hooks/useCSTickets';
-import { getPresetDates, presetLabels, type PeriodPreset } from '@/components/dashboard/DashboardFilters';
+import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import { CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_INDICACAO_STATUS_LABELS, CS_TICKET_TIPO_LABELS, type CSTicketPrioridade, type CSTicketStatus } from '@/components/cs/types';
-import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, Calendar, List, ExternalLink } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const CHART_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -46,12 +46,13 @@ export function CSTab({ tvMode = false }: CSTabProps) {
   const navigate = useNavigate();
   const { data: funcionarios } = useFuncionariosAtivos();
   const [selectedOwner, setSelectedOwner] = useState<string>('__all__');
-  const [periodo, setPeriodo] = useState<PeriodPreset>('mes_atual');
+  const [periodo, setPeriodo] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: new Date(),
+  });
 
-  const { periodoInicio, periodoFim } = useMemo(() => {
-    const { start, end } = getPresetDates(periodo);
-    return { periodoInicio: start, periodoFim: end };
-  }, [periodo]);
+  const periodoInicio = periodo.from || startOfMonth(new Date());
+  const periodoFim = periodo.to || new Date();
 
   const filters: CSDashboardFilters = useMemo(() => ({
     periodoInicio, periodoFim,
@@ -91,14 +92,8 @@ export function CSTab({ tvMode = false }: CSTabProps) {
   return (
     <div className="space-y-6">
       <Card><CardContent className="pt-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select value={periodo} onValueChange={v => setPeriodo(v as PeriodPreset)}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>{Object.entries(presetLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+        <div className="flex flex-wrap items-end gap-4">
+          <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} className="w-64" />
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedOwner} onValueChange={setSelectedOwner}>
