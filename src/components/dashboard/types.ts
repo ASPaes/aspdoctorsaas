@@ -38,6 +38,13 @@ export interface KPIMetrics {
   newMrr: number;
   totalImplantacao: number;
 
+  // Vendas — mês anterior (para delta)
+  prevNovosClientes: number | null;
+  prevNewMrr: number | null;
+  prevTotalImplantacao: number | null;
+  prevUpsellMrr: number | null;
+  prevCrossSellMrr: number | null;
+
   // Unit Economics
   netNewMrr: number;
   nrr: number;
