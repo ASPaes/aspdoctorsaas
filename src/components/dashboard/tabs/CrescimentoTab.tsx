@@ -384,7 +384,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             icon={<Clock className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={tvMode ? 'tv' : 'md'}
             variant={current?.cac_payback_M != null && current.cac_payback_M <= 12 ? 'success' : 'warning'}
-            formula="CAC por Logo ÷ (ARPA × MC%). Meses para recuperar o investimento. Ideal ≤ 12."
+            helpKey="cac_payback"
             trend={paybackDelta.trend}
             trendValue={paybackDelta.trendValue}
           />
@@ -395,7 +395,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant={current?.ltv_cac_rec_3M != null && current.ltv_cac_rec_3M >= 3 ? 'success' : current?.ltv_cac_rec_3M != null && current.ltv_cac_rec_3M >= 1 ? 'warning' : 'destructive'}
             subtitle="Janela 3 meses"
-            formula="LTV Rec. (3M) ÷ CAC por Logo (3M). Churn, ARPA e MC% agregados na janela."
+            helpKey="ltv_cac_3m"
           />
           <KPICardEnhanced
             label="LTV/CAC (6M)"
@@ -404,7 +404,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             size={tvMode ? 'tv' : 'md'}
             variant={current?.ltv_cac_rec_6M != null && current.ltv_cac_rec_6M >= 3 ? 'success' : current?.ltv_cac_rec_6M != null && current.ltv_cac_rec_6M >= 1 ? 'warning' : 'destructive'}
             subtitle="Janela 6 meses"
-            formula="LTV Rec. (6M) ÷ CAC por Logo (6M). Churn, ARPA e MC% agregados na janela."
+            helpKey="ltv_cac_6m"
           />
         </div>
       </section>

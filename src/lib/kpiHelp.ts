@@ -225,6 +225,20 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Ajuda a entender se o pricing de setup está compatível com o custo de onboarding.",
     formula: "Receita de Ativação ÷ Novos Clientes",
   },
+  ltv_cac_3m: {
+    title: "LTV/CAC (Janela 3M)",
+    definition: "Razão LTV/CAC calculada com médias dos últimos 3 meses de churn, ARPA e MC%.",
+    why_it_matters: "Suaviza flutuações mensais e dá uma visão mais estável da eficiência de aquisição.",
+    formula: "LTV Rec. (3M) ÷ CAC por Logo (3M)",
+    example: "Se LTV 3M = R$ 12.000 e CAC 3M = R$ 3.000 → 4.0x",
+  },
+  ltv_cac_6m: {
+    title: "LTV/CAC (Janela 6M)",
+    definition: "Razão LTV/CAC calculada com médias dos últimos 6 meses de churn, ARPA e MC%.",
+    why_it_matters: "Visão de médio prazo, ideal para decisões estratégicas de investimento em aquisição.",
+    formula: "LTV Rec. (6M) ÷ CAC por Logo (6M)",
+    example: "Se LTV 6M = R$ 15.000 e CAC 6M = R$ 4.000 → 3.75x",
+  },
 };
 
 export default kpiHelp;
