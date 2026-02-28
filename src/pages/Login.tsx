@@ -40,10 +40,10 @@ export default function Login() {
           className="pointer-events-none absolute inset-0 hidden md:block"
           style={{
             background:
-              "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(142 71% 45% / 0.05) 0%, transparent 70%)",
+            "radial-gradient(ellipse 60% 50% at 50% 50%, hsl(142 71% 45% / 0.05) 0%, transparent 70%)"
           }}
-          aria-hidden="true"
-        />
+          aria-hidden="true" />
+
 
         <Card className="w-full max-w-[440px] border-border/60 bg-card/95 shadow-xl backdrop-blur-sm">
           <CardHeader className="space-y-4 pb-2 text-center">
@@ -54,8 +54,8 @@ export default function Login() {
               <h1 className="text-xl font-bold tracking-tight text-foreground">
                 Bem-vindo ao DoctorSaaS
               </h1>
-              <p className="text-sm font-light italic text-muted-foreground">
-                Business Analytics • Measured Success.
+              <p className="text-sm font-light italic text-muted-foreground">Business Analytics
+Measured Success
               </p>
             </div>
           </CardHeader>
@@ -71,8 +71,8 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu@email.com"
                   required
-                  autoComplete="email"
-                />
+                  autoComplete="email" />
+
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
@@ -83,8 +83,8 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  autoComplete="current-password"
-                />
+                  autoComplete="current-password" />
+
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -95,16 +95,16 @@ export default function Login() {
             <div className="mt-4 flex flex-col items-center gap-2 text-sm">
               <Link
                 to="/forgot-password"
-                className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-              >
+                className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+
                 Esqueci minha senha
               </Link>
               <span className="text-muted-foreground">
                 Não tem conta?{" "}
                 <Link
                   to="/signup"
-                  className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                >
+                  className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+
                   Cadastre-se
                 </Link>
               </span>
@@ -115,6 +115,6 @@ export default function Login() {
 
       {/* Right — decorative area (visible md+) */}
       <div className="hidden md:block md:flex-1" aria-hidden="true" />
-    </div>
-  );
+    </div>);
+
 }
