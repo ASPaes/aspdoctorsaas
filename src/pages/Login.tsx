@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -33,10 +33,8 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-3 pb-2">
           <div className="mx-auto">
-            <Logo size="xl" />
+            <Logo variant="icon" size="lg" showBranding />
           </div>
-          <CardTitle className="text-xl">Entrar</CardTitle>
-          <CardDescription>Acesse sua conta para continuar</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
