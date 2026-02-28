@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, UserCog, LayoutDashboard } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const navItems = [
@@ -41,7 +40,11 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
-        <Logo size={collapsed ? "sm" : "md"} />
+        {collapsed ? (
+          <Logo variant="icon" size="sm" />
+        ) : (
+          <Logo variant="horizontal-dark" size="md" />
+        )}
       </div>
 
       <SidebarContent>

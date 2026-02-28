@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
-import { Loader2 } from "lucide-react";
+
 
 // Lazy-loaded pages for code splitting
 const Login = lazy(() => import("@/pages/Login"));
@@ -28,9 +28,11 @@ const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 
+import { Logo } from "@/components/Logo";
+
 const PageLoader = () => (
-  <div className="flex min-h-[50vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  <div className="flex min-h-screen items-center justify-center bg-background">
+    <Logo variant="icon" size="splash" />
   </div>
 );
 
