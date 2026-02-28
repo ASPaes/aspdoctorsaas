@@ -1,0 +1,100 @@
+.tech-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+
+  /* Layer 1 — depth gradient */
+  background:
+    radial-gradient(ellipse 80% 60% at 70% 40%, hsl(142 71% 45% / 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 50% at 30% 70%, hsl(199 89% 48% / 0.03) 0%, transparent 60%),
+    linear-gradient(160deg, hsl(220 27% 4%) 0%, hsl(222 47% 6%) 40%, hsl(220 27% 8%) 100%);
+}
+
+/* Layer 2 — subtle grid */
+.tech-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* vertical lines */
+    repeating-linear-gradient(
+      90deg,
+      hsl(215 25% 60% / 0.04) 0px,
+      hsl(215 25% 60% / 0.04) 1px,
+      transparent 1px,
+      transparent 60px
+    ),
+    /* horizontal lines */
+    repeating-linear-gradient(
+      0deg,
+      hsl(215 25% 60% / 0.04) 0px,
+      hsl(215 25% 60% / 0.04) 1px,
+      transparent 1px,
+      transparent 60px
+    );
+  mask-image: radial-gradient(ellipse 90% 80% at 65% 50%, black 20%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 65% 50%, black 20%, transparent 80%);
+}
+
+/* Layer 3 — circuit traces + nodes */
+.tech-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* horizontal traces */
+    linear-gradient(0deg, transparent 49.5%, hsl(142 71% 45% / 0.06) 49.5%, hsl(142 71% 45% / 0.06) 50.5%, transparent 50.5%),
+    /* vertical traces */
+    linear-gradient(90deg, transparent 49.5%, hsl(142 71% 45% / 0.06) 49.5%, hsl(142 71% 45% / 0.06) 50.5%, transparent 50.5%),
+    /* node 1 — top right */
+    radial-gradient(circle 3px at 75% 20%, hsl(142 71% 45% / 0.35) 0%, transparent 100%),
+    /* node 2 — center right */
+    radial-gradient(circle 2px at 82% 55%, hsl(142 71% 45% / 0.25) 0%, transparent 100%),
+    /* node 3 — bottom right */
+    radial-gradient(circle 4px at 65% 78%, hsl(142 71% 45% / 0.20) 0%, transparent 100%),
+    /* node 4 — far right */
+    radial-gradient(circle 2px at 90% 35%, hsl(199 89% 48% / 0.20) 0%, transparent 100%),
+    /* node 5 */
+    radial-gradient(circle 3px at 70% 45%, hsl(142 71% 45% / 0.15) 0%, transparent 100%),
+    /* glow halos */
+    radial-gradient(circle 40px at 75% 20%, hsl(142 71% 45% / 0.06) 0%, transparent 100%),
+    radial-gradient(circle 30px at 65% 78%, hsl(142 71% 45% / 0.04) 0%, transparent 100%);
+  background-size:
+    120px 120px,
+    120px 120px,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  mask-image: radial-gradient(ellipse 100% 100% at 70% 50%, black 10%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 70% 50%, black 10%, transparent 75%);
+  animation: tech-pulse 8s ease-in-out infinite alternate;
+}
+
+@keyframes tech-pulse {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tech-bg::after {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+/* On mobile, tone everything down */
+@media (max-width: 767px) {
+  .tech-bg::before {
+    opacity: 0.4;
+  }
+  .tech-bg::after {
+    opacity: 0.3;
+    animation: none;
+  }
+}
