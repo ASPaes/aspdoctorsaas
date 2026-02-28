@@ -14,8 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Alan Sans", "ui-sans-serif", "sans-serif", "system-ui"],
-        serif: ["Source Serif 4", "serif"],
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
@@ -79,9 +78,13 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "12px",    /* Cards */
+        md: "10px",    /* Logo/icon squircle */
+        sm: "8px",     /* Buttons & inputs */
+      },
+      boxShadow: {
+        "green-glow": "var(--shadow-green-glow)",
+        "card": "var(--shadow-card)",
       },
       keyframes: {
         "accordion-down": {
