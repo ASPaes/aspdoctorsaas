@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -62,7 +62,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
   const { data: funcionarios } = useFuncionariosAtivos();
   const createTicket = useCreateCSTicket();
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<TicketFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState, formState: { errors, isSubmitting } } = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       tipo: 'relacionamento_90d', prioridade: 'media', impacto_categoria: 'relacionamento',
@@ -73,6 +73,15 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
 
   const selectedClienteId = watch('cliente_id');
   const selectedTipo = watch('tipo');
+  const formIsDirty = formState.isDirty;
+
+  // Protect against accidental refresh while form has data
+  useEffect(() => {
+    if (!formIsDirty || !open) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [formIsDirty, open]);
 
   useEffect(() => {
     if (isInterno || clienteId) return;

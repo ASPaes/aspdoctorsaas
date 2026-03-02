@@ -8,11 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLookups } from "@/hooks/useLookups";
 import { getNavIds } from "@/hooks/useClientesFilters";
+import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { Form, FormField, FormControl } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
@@ -126,17 +129,14 @@ export default function ClienteForm() {
   const cancelado = form.watch("cancelado");
   const lookups = useLookups(estadoId);
 
-  // Unsaved changes: beforeunload guard
+  // Draft persistence
+  const { draftStatus, hasPendingDraft, restoreDraft, dismissDraft, clearDraft } = useFormDraftPersistence(form, {
+    keyParts: ["cliente", id || "new"],
+  });
+
+  // Unsaved changes guard
   const isDirty = form.formState.isDirty;
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
+  const { isBlocked, confirmLeave, cancelLeave, guardedNavigate } = useUnsavedChangesGuard(isDirty);
 
   // Fetch MC% ponderada for auto-filling custo_operacao on new clients
   const mcPonderadaQuery = useQuery({
@@ -262,6 +262,7 @@ export default function ClienteForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
+      clearDraft();
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
       if (!isEditing) navigate("/clientes");
     },
@@ -300,15 +301,34 @@ export default function ClienteForm() {
 
   return (
     <div className="space-y-6">
+      {/* Unsaved changes dialog */}
+      <UnsavedChangesDialog open={isBlocked} onConfirm={confirmLeave} onCancel={cancelLeave} />
+
+      {/* Draft restore banner */}
+      {hasPendingDraft && (
+        <div className="flex items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <span className="text-amber-700 dark:text-amber-400">Existe um rascunho não salvo deste formulário.</span>
+          <Button type="button" variant="outline" size="sm" onClick={restoreDraft}>Restaurar rascunho</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={dismissDraft}>Descartar</Button>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/clientes")}>
+          <Button variant="ghost" size="icon" onClick={() => guardedNavigate("/clientes")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{isEditing ? "Editar Cliente" : "Novo Cliente"}</h1>
-            <p className="text-sm text-muted-foreground">Preencha os dados do cliente e contrato</p>
+            <p className="text-sm text-muted-foreground">
+              Preencha os dados do cliente e contrato
+              {isDirty && draftStatus === "saved" && (
+                <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
+                  <Save className="inline h-3 w-3 mr-0.5" />Rascunho salvo
+                </span>
+              )}
+            </p>
           </div>
 
           {/* Prev/Next navigation */}
@@ -450,7 +470,7 @@ export default function ClienteForm() {
 
           {/* Botões de ação */}
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => navigate("/clientes")}>
+            <Button type="button" variant="outline" onClick={() => guardedNavigate("/clientes")}>
               Cancelar
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
