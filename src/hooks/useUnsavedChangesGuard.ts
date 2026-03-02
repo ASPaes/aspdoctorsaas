@@ -1,13 +1,18 @@
-import { useEffect, useCallback, useState } from "react";
-import { useBlocker } from "react-router-dom";
+import { useEffect, useCallback, useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 /**
  * Guards against accidental navigation/reload when the form has unsaved changes.
  * - Registers beforeunload to catch browser refresh/close.
- * - Uses react-router's useBlocker to catch in-app navigation.
+ * - Wraps navigate to intercept in-app navigation.
  * Returns state and handlers for the confirmation dialog.
  */
 export function useUnsavedChangesGuard(isDirty: boolean) {
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
   // Browser-level protection (refresh/close tab)
   useEffect(() => {
     if (!isDirty) return;
@@ -19,29 +24,56 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
-  // React Router in-app navigation blocking
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      isDirty && currentLocation.pathname !== nextLocation.pathname
+  // Intercept browser back/forward
+  useEffect(() => {
+    if (!isDirty) return;
+
+    // Push a dummy state so we can intercept popstate
+    const handlePopState = (e: PopStateEvent) => {
+      if (isDirtyRef.current) {
+        // Push state back to prevent navigation
+        window.history.pushState(null, "", window.location.href);
+        setPendingPath("__back__");
+      }
+    };
+
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isDirty]);
+
+  const isBlocked = pendingPath !== null;
+
+  const guardedNavigate = useCallback(
+    (to: string) => {
+      if (isDirtyRef.current) {
+        setPendingPath(to);
+      } else {
+        navigate(to);
+      }
+    },
+    [navigate]
   );
 
-  const isBlocked = blocker.state === "blocked";
-
   const confirmLeave = useCallback(() => {
-    if (blocker.state === "blocked") {
-      blocker.proceed();
+    const path = pendingPath;
+    setPendingPath(null);
+    if (path === "__back__") {
+      // Go back (allow the popstate)
+      window.history.go(-2);
+    } else if (path) {
+      navigate(path);
     }
-  }, [blocker]);
+  }, [pendingPath, navigate]);
 
   const cancelLeave = useCallback(() => {
-    if (blocker.state === "blocked") {
-      blocker.reset();
-    }
-  }, [blocker]);
+    setPendingPath(null);
+  }, []);
 
   return {
     isBlocked,
     confirmLeave,
     cancelLeave,
+    guardedNavigate,
   };
 }
