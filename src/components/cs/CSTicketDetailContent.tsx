@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
@@ -17,7 +19,7 @@ import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS,
   type CSTicket, type CSTicketStatus, type CSTicketPrioridade,
 } from './types';
-import { Loader2, Calendar, User, Building2, DollarSign, Clock, Save, AlertTriangle, CheckCircle, ArrowUpDown, Play, Trash2 } from 'lucide-react';
+import { Loader2, Calendar, User, Building2, DollarSign, Clock, Save, AlertTriangle, CheckCircle, ArrowUpDown, Play, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CSTicketDetailContentProps {
@@ -51,6 +53,7 @@ const RESULTADO_OPTIONS = [
 ];
 
 export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailContentProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: ticketData, isLoading } = useCSTicket(ticket?.id || null);
   const { data: funcionarios } = useFuncionariosAtivos();
@@ -68,11 +71,18 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
     owner_id: ticket?.owner_id || 0,
     proxima_acao: ticket?.proxima_acao || '',
     proximo_followup_em: ticket?.proximo_followup_em || '',
+    mrr_recuperado: ticket?.mrr_recuperado ?? null as number | null,
+    contato_externo_nome: ticket?.contato_externo_nome || '',
+    oport_valor_previsto_ativacao: ticket?.oport_valor_previsto_ativacao ?? null as number | null,
+    oport_valor_previsto_mrr: ticket?.oport_valor_previsto_mrr ?? null as number | null,
+    oport_data_prevista: ticket?.oport_data_prevista || '',
   });
 
   const [fechamentoData, setFechamentoData] = useState({
     acao_tomada: '', resultado: '', satisfacao: '', continuar_monitorando: false,
     proxima_acao_monitoramento: '', data_monitoramento: '',
+    mrr_recuperado: null as number | null,
+    oport_resultado: '' as string,
   });
 
   const [reassignData, setReassignData] = useState({ para_id: 0, motivo: '' });
@@ -88,6 +98,11 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
         owner_id: currentTicket.owner_id || 0,
         proxima_acao: currentTicket.proxima_acao,
         proximo_followup_em: currentTicket.proximo_followup_em,
+        mrr_recuperado: currentTicket.mrr_recuperado ?? null,
+        contato_externo_nome: currentTicket.contato_externo_nome || '',
+        oport_valor_previsto_ativacao: currentTicket.oport_valor_previsto_ativacao ?? null,
+        oport_valor_previsto_mrr: currentTicket.oport_valor_previsto_mrr ?? null,
+        oport_data_prevista: currentTicket.oport_data_prevista || '',
       });
     }
   }, [currentTicket]);
@@ -130,19 +145,56 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   };
 
   const handleConcluir = async () => {
-    if (!currentTicket || !fechamentoData.acao_tomada || !fechamentoData.resultado) {
+    if (!currentTicket) return;
+
+    // Oportunidade flow
+    if (currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && currentTicket.contato_externo_nome)) {
+      if (!fechamentoData.oport_resultado) {
+        toast.error('Selecione se foi Ganho ou Perdido');
+        return;
+      }
+      await updateTicket.mutateAsync({
+        id: currentTicket.id,
+        status: 'concluido',
+        concluido_em: new Date().toISOString(),
+        oport_resultado: fechamentoData.oport_resultado,
+      });
+      await addUpdate.mutateAsync({
+        conteudo: `Ticket concluído como ${fechamentoData.oport_resultado === 'ganho' ? 'GANHO' : 'PERDIDO'}.${fechamentoData.acao_tomada ? ` Ação: ${fechamentoData.acao_tomada}.` : ''}`,
+        tipo: 'registro_acao',
+      });
+      setShowConcluirDialog(false);
+      if (fechamentoData.oport_resultado === 'ganho' && currentTicket.cliente_id) {
+        toast.success('Oportunidade ganha! Abra os Movimentos MRR para registrar.', { duration: 5000 });
+      }
+      return;
+    }
+
+    // Risco churn flow — update mrr_recuperado on conclusion
+    if (currentTicket.tipo === 'risco_churn' && fechamentoData.mrr_recuperado !== null) {
+      // Will be included in the update below
+    }
+
+    if (!fechamentoData.acao_tomada || !fechamentoData.resultado) {
       toast.error('Preencha a ação tomada e o resultado'); return;
     }
     if (fechamentoData.continuar_monitorando) {
       if (!fechamentoData.proxima_acao_monitoramento || !fechamentoData.data_monitoramento) { toast.error('Para monitoramento, preencha próxima ação e data'); return; }
-      await updateTicket.mutateAsync({ id: currentTicket.id, status: 'em_monitoramento', proxima_acao: fechamentoData.proxima_acao_monitoramento, proximo_followup_em: fechamentoData.data_monitoramento });
+      await updateTicket.mutateAsync({
+        id: currentTicket.id, status: 'em_monitoramento', proxima_acao: fechamentoData.proxima_acao_monitoramento,
+        proximo_followup_em: fechamentoData.data_monitoramento,
+        ...(currentTicket.tipo === 'risco_churn' && fechamentoData.mrr_recuperado !== null ? { mrr_recuperado: fechamentoData.mrr_recuperado } : {}),
+      });
       await addUpdate.mutateAsync({ conteudo: `Movido para monitoramento. Ação: ${fechamentoData.acao_tomada}. Resultado: ${fechamentoData.resultado}.`, tipo: 'mudanca_status' });
     } else {
-      await updateTicket.mutateAsync({ id: currentTicket.id, status: 'concluido', concluido_em: new Date().toISOString() });
+      await updateTicket.mutateAsync({
+        id: currentTicket.id, status: 'concluido', concluido_em: new Date().toISOString(),
+        ...(currentTicket.tipo === 'risco_churn' && fechamentoData.mrr_recuperado !== null ? { mrr_recuperado: fechamentoData.mrr_recuperado } : {}),
+      });
       await addUpdate.mutateAsync({ conteudo: `Ticket concluído. Ação: ${fechamentoData.acao_tomada}. Resultado: ${fechamentoData.resultado}.`, tipo: 'registro_acao' });
     }
     setShowConcluirDialog(false);
-    setFechamentoData({ acao_tomada: '', resultado: '', satisfacao: '', continuar_monitorando: false, proxima_acao_monitoramento: '', data_monitoramento: '' });
+    setFechamentoData({ acao_tomada: '', resultado: '', satisfacao: '', continuar_monitorando: false, proxima_acao_monitoramento: '', data_monitoramento: '', mrr_recuperado: null, oport_resultado: '' });
   };
 
   const handleSave = async () => {
@@ -155,6 +207,13 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
       id: currentTicket.id, status: editData.status, prioridade: editData.prioridade, escalado: editData.escalado,
       proxima_acao: editData.proxima_acao, proximo_followup_em: editData.proximo_followup_em,
       ...(editData.status === 'concluido' && currentTicket.status !== 'concluido' ? { concluido_em: new Date().toISOString() } : {}),
+      ...(currentTicket.tipo === 'risco_churn' ? { mrr_recuperado: editData.mrr_recuperado } : {}),
+      ...(currentTicket.tipo === 'interno_processo' ? { contato_externo_nome: editData.contato_externo_nome || null } : {}),
+      ...((currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && editData.contato_externo_nome)) ? {
+        oport_valor_previsto_ativacao: editData.oport_valor_previsto_ativacao,
+        oport_valor_previsto_mrr: editData.oport_valor_previsto_mrr,
+        oport_data_prevista: editData.oport_data_prevista || null,
+      } : {}),
     });
     if (changes.length > 0) await addUpdate.mutateAsync({ conteudo: changes.join('. '), tipo: changes.some(c => c.includes('Status')) ? 'mudanca_status' : 'mudanca_prioridade' });
     onClose();
@@ -168,6 +227,8 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   if (isLoading) return <div className="flex items-center justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   if (!currentTicket) return null;
 
+  const isOportunidade = currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && !!currentTicket.contato_externo_nome);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -177,6 +238,7 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             <Badge variant="outline">{CS_TICKET_TIPO_LABELS[currentTicket.tipo]}</Badge>
             {currentTicket.escalado && <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Escalado</Badge>}
             {!currentTicket.primeira_acao_em && <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Aguardando 1ª ação</Badge>}
+            {currentTicket.oport_resultado && <Badge className={currentTicket.oport_resultado === 'ganho' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'}>{currentTicket.oport_resultado === 'ganho' ? 'Ganho' : 'Perdido'}</Badge>}
           </div>
           <h3 className="text-lg font-semibold truncate">{currentTicket.assunto}</h3>
           <p className="text-sm text-muted-foreground">{currentTicket.descricao_curta}</p>
@@ -197,7 +259,13 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
           </div>
         </div>
       ) : (
-        <div className="bg-muted/50 rounded-lg p-3"><div className="flex items-center gap-2 text-sm text-muted-foreground"><User className="h-4 w-4" /><span className="italic">Ticket Interno</span></div></div>
+        <div className="bg-muted/50 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <User className="h-4 w-4" />
+            <span className="italic">Ticket Interno</span>
+            {currentTicket.contato_externo_nome && <span className="text-foreground font-medium ml-2">— Contato: {currentTicket.contato_externo_nome}</span>}
+          </div>
+        </div>
       )}
 
       {/* Quick Actions */}
@@ -207,6 +275,16 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
           <Button size="sm" variant="outline" onClick={() => setShowReassignDialog(true)}><ArrowUpDown className="h-4 w-4 mr-1" />Reatribuir</Button>
           <Button size="sm" variant="default" onClick={() => setShowConcluirDialog(true)}><CheckCircle className="h-4 w-4 mr-1" />Concluir</Button>
           <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}><Trash2 className="h-4 w-4 mr-1" />Excluir</Button>
+        </div>
+      )}
+
+      {/* Ganho — botão para Movimentos MRR */}
+      {currentTicket.oport_resultado === 'ganho' && currentTicket.cliente_id && (
+        <div className="p-3 border rounded-lg bg-green-500/5 border-green-500/20">
+          <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Oportunidade ganha! Registre o movimento financeiro.</p>
+          <Button size="sm" variant="outline" onClick={() => navigate(`/clientes/${currentTicket.cliente_id}`)}>
+            <ExternalLink className="h-4 w-4 mr-1" />Abrir Movimentos MRR do Cliente
+          </Button>
         </div>
       )}
 
@@ -237,8 +315,52 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
               <div className="flex items-center gap-2"><Switch checked={editData.escalado} onCheckedChange={(c) => setEditData({ ...editData, escalado: c })} /><Label>Escalado</Label></div>
             </div>
           </div>
+
+          {/* MRR Recuperado editável para risco_churn */}
+          {currentTicket.tipo === 'risco_churn' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 border rounded-lg">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-xs">MRR em Risco</Label>
+                <p className="text-lg font-semibold text-destructive">{formatCurrency(currentTicket.mrr_em_risco)}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>MRR Recuperado (R$)</Label>
+                <NumericInput value={editData.mrr_recuperado} onChange={(v) => setEditData({ ...editData, mrr_recuperado: v })} />
+              </div>
+            </div>
+          )}
+
+          {/* Contato externo para interno_processo */}
+          {currentTicket.tipo === 'interno_processo' && (
+            <div className="space-y-2">
+              <Label>Nome do Contato Externo</Label>
+              <Input value={editData.contato_externo_nome} onChange={(e) => setEditData({ ...editData, contato_externo_nome: e.target.value })} placeholder="Nome do contato externo (oportunidade externa)" />
+            </div>
+          )}
+
+          {/* Oportunidade fields */}
+          {(currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && editData.contato_externo_nome)) && (
+            <div className="space-y-4 p-3 border rounded-lg">
+              <h4 className="font-medium text-sm">Oportunidade de Venda</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Vlr Previsto Ativação (R$)</Label>
+                  <NumericInput value={editData.oport_valor_previsto_ativacao} onChange={(v) => setEditData({ ...editData, oport_valor_previsto_ativacao: v })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Vlr Previsto MRR (R$)</Label>
+                  <NumericInput value={editData.oport_valor_previsto_mrr} onChange={(v) => setEditData({ ...editData, oport_valor_previsto_mrr: v })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Prevista</Label>
+                  <Input type="date" value={editData.oport_data_prevista} onChange={(e) => setEditData({ ...editData, oport_data_prevista: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label>Próxima Ação</Label>
+            <Label>{currentTicket.tipo === 'clube_comunidade' ? 'Ação Agendada/Realizada' : 'Próxima Ação'}</Label>
             <Textarea value={editData.proxima_acao} onChange={(e) => setEditData({ ...editData, proxima_acao: e.target.value })} rows={2} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
@@ -250,12 +372,40 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
         </div>
       ) : (
         <div className="space-y-4">
-          {(currentTicket.mrr_em_risco || currentTicket.mrr_recuperado) && (
+          {/* MRR section for risco_churn */}
+          {currentTicket.tipo === 'risco_churn' && (currentTicket.mrr_em_risco || currentTicket.mrr_recuperado) && (
             <div className="grid grid-cols-2 gap-4 p-3 border rounded-lg">
               {currentTicket.mrr_em_risco ? <div><Label className="text-muted-foreground text-xs">MRR em Risco</Label><p className="text-lg font-semibold text-destructive">{formatCurrency(currentTicket.mrr_em_risco)}</p></div> : null}
-              {currentTicket.mrr_recuperado ? <div><Label className="text-muted-foreground text-xs">MRR Recuperado</Label><p className="text-lg font-semibold text-primary">{formatCurrency(currentTicket.mrr_recuperado)}</p></div> : null}
+              <div><Label className="text-muted-foreground text-xs">MRR Recuperado</Label><p className="text-lg font-semibold text-primary">{formatCurrency(currentTicket.mrr_recuperado)}</p></div>
             </div>
           )}
+
+          {/* Oportunidade view */}
+          {isOportunidade && (
+            <div className="p-3 border rounded-lg space-y-2">
+              <h4 className="font-medium text-sm">Oportunidade de Venda</h4>
+              {currentTicket.contato_externo_nome && <p className="text-sm"><span className="text-muted-foreground">Contato Externo:</span> {currentTicket.contato_externo_nome}</p>}
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div><Label className="text-muted-foreground text-xs">Vlr Previsto Ativação</Label><p className="font-semibold">{formatCurrency(currentTicket.oport_valor_previsto_ativacao)}</p></div>
+                <div><Label className="text-muted-foreground text-xs">Vlr Previsto MRR</Label><p className="font-semibold">{formatCurrency(currentTicket.oport_valor_previsto_mrr)}</p></div>
+                <div><Label className="text-muted-foreground text-xs">Data Prevista</Label><p className="font-semibold">{currentTicket.oport_data_prevista ? format(new Date(currentTicket.oport_data_prevista), 'dd/MM/yyyy') : '-'}</p></div>
+              </div>
+              {currentTicket.oport_resultado && (
+                <Badge className={currentTicket.oport_resultado === 'ganho' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  {currentTicket.oport_resultado === 'ganho' ? '✓ Ganho' : '✗ Perdido'}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Contato externo (sem oportunidade) */}
+          {currentTicket.tipo === 'interno_processo' && currentTicket.contato_externo_nome && !isOportunidade && (
+            <div className="p-3 border rounded-lg">
+              <Label className="text-muted-foreground text-xs">Contato Externo</Label>
+              <p className="font-medium">{currentTicket.contato_externo_nome}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="space-y-1"><Label className="text-muted-foreground text-xs">Owner</Label><p>{currentTicket.owner?.nome || '-'}</p></div>
             <div className="space-y-1"><Label className="text-muted-foreground text-xs">Criado por</Label><p>{currentTicket.criado_por?.nome || '-'}</p></div>
@@ -264,7 +414,7 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             <div className="space-y-1"><Label className="text-muted-foreground text-xs">Impacto</Label><p>{CS_TICKET_IMPACTO_LABELS[currentTicket.impacto_categoria]}</p></div>
             {currentTicket.primeira_acao_em && <div className="space-y-1"><Label className="text-muted-foreground text-xs">1ª Ação em</Label><p>{format(new Date(currentTicket.primeira_acao_em), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p></div>}
           </div>
-          <div className="space-y-1"><Label className="text-muted-foreground text-xs">Próxima Ação</Label><p className="p-2 bg-muted/50 rounded-md text-sm">{currentTicket.proxima_acao}</p></div>
+          <div className="space-y-1"><Label className="text-muted-foreground text-xs">{currentTicket.tipo === 'clube_comunidade' ? 'Ação Agendada/Realizada' : 'Próxima Ação'}</Label><p className="p-2 bg-muted/50 rounded-md text-sm">{currentTicket.proxima_acao}</p></div>
         </div>
       )}
 
@@ -273,29 +423,65 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader><AlertDialogTitle>Concluir Ticket</AlertDialogTitle><AlertDialogDescription>Preencha os campos de fechamento.</AlertDialogDescription></AlertDialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Ação Tomada *</Label><Textarea value={fechamentoData.acao_tomada} onChange={(e) => setFechamentoData({ ...fechamentoData, acao_tomada: e.target.value })} placeholder="Descreva a ação realizada..." rows={2} /></div>
-            <div className="space-y-2"><Label>Resultado *</Label>
-              <Select value={fechamentoData.resultado} onValueChange={(v) => setFechamentoData({ ...fechamentoData, resultado: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione o resultado" /></SelectTrigger>
-                <SelectContent>{RESULTADO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2"><Label>Satisfação Percebida</Label>
-              <Select value={fechamentoData.satisfacao} onValueChange={(v) => setFechamentoData({ ...fechamentoData, satisfacao: v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent><SelectItem value="satisfeito">Satisfeito</SelectItem><SelectItem value="neutro">Neutro</SelectItem><SelectItem value="insatisfeito">Insatisfeito</SelectItem></SelectContent>
-              </Select>
-            </div>
-            <Separator />
-            <div className="flex items-center gap-2"><Switch checked={fechamentoData.continuar_monitorando} onCheckedChange={(c) => setFechamentoData({ ...fechamentoData, continuar_monitorando: c })} /><Label>Manter em Monitoramento</Label></div>
-            {fechamentoData.continuar_monitorando && (
+
+            {/* Oportunidade conclusion */}
+            {isOportunidade && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Resultado da Oportunidade *</Label>
+                  <Select value={fechamentoData.oport_resultado} onValueChange={(v) => setFechamentoData({ ...fechamentoData, oport_resultado: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o resultado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ganho">✓ Ganho</SelectItem>
+                      <SelectItem value="perdido">✗ Perdido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2"><Label>Observação</Label><Textarea value={fechamentoData.acao_tomada} onChange={(e) => setFechamentoData({ ...fechamentoData, acao_tomada: e.target.value })} placeholder="Detalhes sobre o resultado..." rows={2} /></div>
+              </div>
+            )}
+
+            {/* Standard conclusion (non-oportunidade) */}
+            {!isOportunidade && (
               <>
-                <div className="space-y-2"><Label>Próximo Passo *</Label><Input value={fechamentoData.proxima_acao_monitoramento} onChange={(e) => setFechamentoData({ ...fechamentoData, proxima_acao_monitoramento: e.target.value })} placeholder="O que fazer no monitoramento..." /></div>
-                <div className="space-y-2"><Label>Data do Monitoramento *</Label><Input type="date" value={fechamentoData.data_monitoramento} onChange={(e) => setFechamentoData({ ...fechamentoData, data_monitoramento: e.target.value })} /></div>
+                {/* MRR Recuperado for risco_churn */}
+                {currentTicket.tipo === 'risco_churn' && (
+                  <div className="space-y-2">
+                    <Label>MRR Recuperado (R$)</Label>
+                    <NumericInput value={fechamentoData.mrr_recuperado} onChange={(v) => setFechamentoData({ ...fechamentoData, mrr_recuperado: v })} />
+                    {currentTicket.mrr_em_risco && <p className="text-xs text-muted-foreground">MRR em risco: {formatCurrency(currentTicket.mrr_em_risco)}</p>}
+                  </div>
+                )}
+                <div className="space-y-2"><Label>Ação Tomada *</Label><Textarea value={fechamentoData.acao_tomada} onChange={(e) => setFechamentoData({ ...fechamentoData, acao_tomada: e.target.value })} placeholder="Descreva a ação realizada..." rows={2} /></div>
+                <div className="space-y-2"><Label>Resultado *</Label>
+                  <Select value={fechamentoData.resultado} onValueChange={(v) => setFechamentoData({ ...fechamentoData, resultado: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o resultado" /></SelectTrigger>
+                    <SelectContent>{RESULTADO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2"><Label>Satisfação Percebida</Label>
+                  <Select value={fechamentoData.satisfacao} onValueChange={(v) => setFechamentoData({ ...fechamentoData, satisfacao: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent><SelectItem value="satisfeito">Satisfeito</SelectItem><SelectItem value="neutro">Neutro</SelectItem><SelectItem value="insatisfeito">Insatisfeito</SelectItem></SelectContent>
+                  </Select>
+                </div>
+                <Separator />
+                <div className="flex items-center gap-2"><Switch checked={fechamentoData.continuar_monitorando} onCheckedChange={(c) => setFechamentoData({ ...fechamentoData, continuar_monitorando: c })} /><Label>Manter em Monitoramento</Label></div>
+                {fechamentoData.continuar_monitorando && (
+                  <>
+                    <div className="space-y-2"><Label>Próximo Passo *</Label><Input value={fechamentoData.proxima_acao_monitoramento} onChange={(e) => setFechamentoData({ ...fechamentoData, proxima_acao_monitoramento: e.target.value })} placeholder="O que fazer no monitoramento..." /></div>
+                    <div className="space-y-2"><Label>Data do Monitoramento *</Label><Input type="date" value={fechamentoData.data_monitoramento} onChange={(e) => setFechamentoData({ ...fechamentoData, data_monitoramento: e.target.value })} /></div>
+                  </>
+                )}
               </>
             )}
           </div>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleConcluir}>{fechamentoData.continuar_monitorando ? 'Monitorar' : 'Concluir'}</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConcluir}>
+              {isOportunidade ? (fechamentoData.oport_resultado === 'ganho' ? 'Marcar como Ganho' : fechamentoData.oport_resultado === 'perdido' ? 'Marcar como Perdido' : 'Confirmar') : (fechamentoData.continuar_monitorando ? 'Monitorar' : 'Concluir')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

@@ -34,6 +34,7 @@ export interface CSDashboardData {
   indicacoesPorOwner: { owner_id: number; nome: string; count: number }[];
   topPrioridades: CSTicket[];
   allTickets: CSTicket[];
+  ticketsIndicacaoDetalhados: CSTicket[];
 }
 
 function calculateMedian(values: number[]): number {
@@ -201,6 +202,7 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         percentHigiene, reaberturas, clientesEmRisco,
         ticketsRiscoPorPrioridade, percentRiscoComPlano, mrrEmRisco, mrrRecuperado, resultadoRisco,
         pipelineIndicacao, indicacoesPorOwner, topPrioridades, allTickets,
+        ticketsIndicacaoDetalhados: ticketsIndicacaoNoPeriodo,
       };
     },
   });
