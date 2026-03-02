@@ -135,7 +135,7 @@ export default function ClienteForm() {
     useFormDraftPersistence(form, {
       keyParts: ["cliente", id ?? "new"],
     });
-  const { isBlocked, confirmLeave, cancelLeave } = useUnsavedChangesGuard(form.formState.isDirty);
+  const { isBlocked, confirmLeave, cancelLeave, guardedNavigate } = useUnsavedChangesGuard(form.formState.isDirty);
 
   // Fetch MC% ponderada for auto-filling custo_operacao on new clients
   const mcPonderadaQuery = useQuery({
