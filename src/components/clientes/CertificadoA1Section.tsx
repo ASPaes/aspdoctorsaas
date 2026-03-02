@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addMonths, differenceInDays, parseISO } from "date-fns";
@@ -47,7 +47,6 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [perdidoTerceiro, setPerdidoTerceiro] = useState(false);
-  const [formDirty, setFormDirty] = useState(false);
 
   const [dataVenda, setDataVenda] = useState(new Date().toISOString().split("T")[0]);
   const [valorVenda, setValorVenda] = useState("");
@@ -55,22 +54,6 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
   const [observacao, setObservacao] = useState("");
   const [dataBaseRenovacao, setDataBaseRenovacao] = useState("");
   const [motivoPerda, setMotivoPerda] = useState("");
-
-  // beforeunload guard when modal has unsaved data
-  useEffect(() => {
-    if (!modalOpen || !formDirty) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [modalOpen, formDirty]);
-
-  // Track dirty state
-  useEffect(() => {
-    if (modalOpen) {
-      const hasData = !!valorVenda || !!observacao || !!dataBaseRenovacao || !!motivoPerda || !!vendedorId;
-      setFormDirty(hasData);
-    }
-  }, [modalOpen, valorVenda, observacao, dataBaseRenovacao, motivoPerda, vendedorId]);
 
   const status = getCertStatus(vencimento);
   const vendedorNome = useMemo(
@@ -136,7 +119,6 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
     setObservacao("");
     setDataBaseRenovacao("");
     setMotivoPerda("");
-    setFormDirty(false);
   };
 
   return (

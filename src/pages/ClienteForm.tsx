@@ -20,10 +20,6 @@ import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
-import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
-import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
-import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
-import { useToast as useToastSonner } from "@/hooks/use-toast";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
@@ -130,12 +126,17 @@ export default function ClienteForm() {
   const cancelado = form.watch("cancelado");
   const lookups = useLookups(estadoId);
 
-  // Draft persistence & unsaved changes guard
-  const { draftStatus, hasPendingDraft, restoreDraft, dismissDraft, clearDraft } =
-    useFormDraftPersistence(form, {
-      keyParts: ["cliente", id ?? "new"],
-    });
-  const { isBlocked, confirmLeave, cancelLeave, guardedNavigate } = useUnsavedChangesGuard(form.formState.isDirty);
+  // Unsaved changes: beforeunload guard
+  const isDirty = form.formState.isDirty;
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   // Fetch MC% ponderada for auto-filling custo_operacao on new clients
   const mcPonderadaQuery = useQuery({
@@ -153,7 +154,7 @@ export default function ClienteForm() {
         cogs += Number(c.custo_operacao) || 0;
       });
       const mc = receita - cogs;
-      return receita > 0 ? mc / receita : 0; // decimal, e.g. 0.65
+      return receita > 0 ? mc / receita : 0;
     },
     enabled: !isEditing,
     staleTime: 10 * 60 * 1000,
@@ -180,9 +181,7 @@ export default function ClienteForm() {
     if (mcPct === undefined || mcPct === null) return;
     const m = mensalidadeWatch ?? 0;
     if (m <= 0) return;
-    // COGS = MRR × (1 - MC%)
     const suggestedCogs = Math.max(0, Math.round(m * (1 - mcPct) * 100) / 100);
-    // Only auto-fill if custo_operacao hasn't been manually set
     const current = form.getValues("custo_operacao");
     if (current === null || current === undefined || current === 0) {
       form.setValue("custo_operacao", suggestedCogs);
@@ -261,7 +260,6 @@ export default function ClienteForm() {
       }
     },
     onSuccess: () => {
-      clearDraft();
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
@@ -302,20 +300,6 @@ export default function ClienteForm() {
 
   return (
     <div className="space-y-6">
-      {/* Unsaved changes dialog */}
-      <UnsavedChangesDialog open={isBlocked} onConfirm={confirmLeave} onCancel={cancelLeave} />
-
-      {/* Draft restore banner */}
-      {hasPendingDraft && (
-        <div className="flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-          <span className="text-sm">Existe um rascunho não salvo. Deseja restaurar?</span>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={dismissDraft}>Descartar</Button>
-            <Button type="button" size="sm" onClick={restoreDraft}>Restaurar rascunho</Button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
@@ -465,20 +449,14 @@ export default function ClienteForm() {
           </Card>
 
           {/* Botões de ação */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              {draftStatus === "saved" && "Rascunho salvo"}
-              {draftStatus === "saving" && "Salvando rascunho..."}
-            </span>
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={() => navigate("/clientes")}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Salvar Cliente
-              </Button>
-            </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => navigate("/clientes")}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Salvar Cliente
+            </Button>
           </div>
         </form>
       </Form>
