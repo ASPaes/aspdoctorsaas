@@ -55,7 +55,7 @@ export function CSDashboard({ onViewTicket }: CSDashboardProps) {
   const [selectedOwner, setSelectedOwner] = useState<string>('__all__');
   const [periodo, setPeriodo] = useState<DateRange>({
     from: startOfMonth(new Date()),
-    to: new Date(),
+    to: endOfMonth(new Date()),
   });
 
   const periodoInicio = periodo.from || startOfMonth(new Date());

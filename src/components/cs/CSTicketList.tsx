@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useCSTickets } from './hooks/useCSTickets';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useCSTickets, useDeleteCSTicket } from './hooks/useCSTickets';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS,
   type CSTicketStatus, type CSTicketPrioridade, type CSTicketTipo, type CSTicket,
 } from './types';
-import { Search, MoreHorizontal, Eye, Edit, Filter, X, AlertTriangle, Building2, User } from 'lucide-react';
+import { Search, MoreHorizontal, Eye, Edit, Filter, X, AlertTriangle, Building2, User, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface CSTicketListProps {
@@ -43,6 +44,8 @@ export function CSTicketList({ onViewTicket, onEditTicket }: CSTicketListProps) 
   const [prioridadeFilter, setPrioridadeFilter] = useState<CSTicketPrioridade | 'all'>('all');
   const [tipoFilter, setTipoFilter] = useState<CSTicketTipo | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteTicketId, setDeleteTicketId] = useState<string | null>(null);
+  const deleteTicket = useDeleteCSTicket();
 
   const { data: tickets, isLoading } = useCSTickets({
     search: search || undefined,
@@ -130,9 +133,11 @@ export function CSTicketList({ onViewTicket, onEditTicket }: CSTicketListProps) 
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewTicket(ticket); }}><Eye className="h-4 w-4 mr-2" />Visualizar</DropdownMenuItem>
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditTicket(ticket); }}><Edit className="h-4 w-4 mr-2" />Editar</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTicketId(ticket.id); }}><Trash2 className="h-4 w-4 mr-2" />Excluir</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -141,6 +146,19 @@ export function CSTicketList({ onViewTicket, onEditTicket }: CSTicketListProps) 
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!deleteTicketId} onOpenChange={(open) => !open && setDeleteTicketId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir ticket</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza que deseja excluir este ticket? Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { if (deleteTicketId) { deleteTicket.mutate(deleteTicketId); setDeleteTicketId(null); } }}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

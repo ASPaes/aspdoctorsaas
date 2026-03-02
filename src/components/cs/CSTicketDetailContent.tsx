@@ -12,12 +12,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
-import { useCSTicket, useUpdateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
+import { useCSTicket, useUpdateCSTicket, useFuncionariosAtivos, useDeleteCSTicket } from './hooks/useCSTickets';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS,
   type CSTicket, type CSTicketStatus, type CSTicketPrioridade,
 } from './types';
-import { Loader2, Calendar, User, Building2, DollarSign, Clock, Save, AlertTriangle, CheckCircle, ArrowUpDown, Play } from 'lucide-react';
+import { Loader2, Calendar, User, Building2, DollarSign, Clock, Save, AlertTriangle, CheckCircle, ArrowUpDown, Play, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CSTicketDetailContentProps {
@@ -55,9 +55,11 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   const { data: ticketData, isLoading } = useCSTicket(ticket?.id || null);
   const { data: funcionarios } = useFuncionariosAtivos();
   const updateTicket = useUpdateCSTicket();
+  const deleteTicket = useDeleteCSTicket();
 
   const [showConcluirDialog, setShowConcluirDialog] = useState(false);
   const [showReassignDialog, setShowReassignDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [editData, setEditData] = useState({
     status: ticket?.status || 'aberto' as CSTicketStatus,
@@ -200,10 +202,11 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
 
       {/* Quick Actions */}
       {currentTicket.status !== 'concluido' && currentTicket.status !== 'cancelado' && (
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
           {!currentTicket.primeira_acao_em && <Button size="sm" onClick={handleRegistrarPrimeiraAcao}><Play className="h-4 w-4 mr-1" />Registrar 1ª Ação</Button>}
           <Button size="sm" variant="outline" onClick={() => setShowReassignDialog(true)}><ArrowUpDown className="h-4 w-4 mr-1" />Reatribuir</Button>
           <Button size="sm" variant="default" onClick={() => setShowConcluirDialog(true)}><CheckCircle className="h-4 w-4 mr-1" />Concluir</Button>
+          <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}><Trash2 className="h-4 w-4 mr-1" />Excluir</Button>
         </div>
       )}
 
@@ -314,6 +317,20 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             <AlertDialogAction onClick={() => reassignTicket.mutate()} disabled={!reassignData.para_id || !reassignData.motivo || reassignTicket.isPending}>
               {reassignTicket.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Reatribuir'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir ticket</AlertDialogTitle>
+            <AlertDialogDescription>Tem certeza que deseja excluir este ticket? Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { deleteTicket.mutate(currentTicket.id, { onSuccess: () => onClose() }); }}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
