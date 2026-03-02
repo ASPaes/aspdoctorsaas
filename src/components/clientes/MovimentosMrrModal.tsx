@@ -133,6 +133,14 @@ export function MovimentosMrrModal({
     }
   }, [open, clienteId]);
 
+  // Protect against accidental refresh while add form is open
+  useEffect(() => {
+    if (!showAddForm || !open) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [showAddForm, open]);
+
   // Calculations
   const movimentosAtivos = movimentos.filter(m => m.status === 'ativo' && !m.estornado_por && !m.estorno_de && m.tipo !== 'venda_avulsa');
   const vendasAvulsasAtivas = movimentos.filter(m => m.status === 'ativo' && m.tipo === 'venda_avulsa');
