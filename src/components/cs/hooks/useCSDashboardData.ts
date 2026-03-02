@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, parseISO, isWithinInterval } from 'date-fns';
+import { differenceInHours, parseISO, isWithinInterval, endOfDay } from 'date-fns';
 import type { CSTicket, CSTicketStatus, CSTicketPrioridade, CSIndicacaoStatus } from '../types';
 
 export interface CSDashboardFilters {
@@ -69,7 +69,7 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
       if (error) throw error;
 
       const allTickets = (allTicketsRaw || []) as unknown as CSTicket[];
-      const interval = { start: filters.periodoInicio, end: filters.periodoFim };
+      const interval = { start: filters.periodoInicio, end: endOfDay(filters.periodoFim) };
 
       const ticketsNoPeriodo = allTickets.filter((t) =>
         isWithinInterval(parseISO(t.criado_em), interval)
