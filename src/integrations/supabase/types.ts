@@ -664,6 +664,7 @@ export type Database = {
           avulsa_valor_realizado: number | null
           cliente_id: string | null
           concluido_em: string | null
+          contato_externo_nome: string | null
           criado_em: string
           criado_por_id: number | null
           criado_por_uid: string | null
@@ -682,6 +683,10 @@ export type Database = {
             | null
           mrr_em_risco: number | null
           mrr_recuperado: number | null
+          oport_data_prevista: string | null
+          oport_resultado: string | null
+          oport_valor_previsto_ativacao: number | null
+          oport_valor_previsto_mrr: number | null
           owner_id: number | null
           owner_uid: string | null
           primeira_acao_em: string | null
@@ -709,6 +714,7 @@ export type Database = {
           avulsa_valor_realizado?: number | null
           cliente_id?: string | null
           concluido_em?: string | null
+          contato_externo_nome?: string | null
           criado_em?: string
           criado_por_id?: number | null
           criado_por_uid?: string | null
@@ -727,6 +733,10 @@ export type Database = {
             | null
           mrr_em_risco?: number | null
           mrr_recuperado?: number | null
+          oport_data_prevista?: string | null
+          oport_resultado?: string | null
+          oport_valor_previsto_ativacao?: number | null
+          oport_valor_previsto_mrr?: number | null
           owner_id?: number | null
           owner_uid?: string | null
           primeira_acao_em?: string | null
@@ -754,6 +764,7 @@ export type Database = {
           avulsa_valor_realizado?: number | null
           cliente_id?: string | null
           concluido_em?: string | null
+          contato_externo_nome?: string | null
           criado_em?: string
           criado_por_id?: number | null
           criado_por_uid?: string | null
@@ -772,6 +783,10 @@ export type Database = {
             | null
           mrr_em_risco?: number | null
           mrr_recuperado?: number | null
+          oport_data_prevista?: string | null
+          oport_resultado?: string | null
+          oport_valor_previsto_ativacao?: number | null
+          oport_valor_previsto_mrr?: number | null
           owner_id?: number | null
           owner_uid?: string | null
           primeira_acao_em?: string | null

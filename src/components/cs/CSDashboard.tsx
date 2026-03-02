@@ -179,6 +179,42 @@ export function CSDashboard({ onViewTicket }: CSDashboardProps) {
               </CardContent>
             </Card>
           )}
+          {/* Lista detalhada de indicações */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Lista de Indicações no Período</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome Indicado</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead>Cidade</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Cliente que Indicou</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.ticketsIndicacaoDetalhados.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma indicação no período</TableCell></TableRow>
+                  ) : (
+                    data.ticketsIndicacaoDetalhados.map(t => (
+                      <TableRow key={t.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewTicket?.(t)}>
+                        <TableCell className="font-medium">{t.indicacao_nome || '-'}</TableCell>
+                        <TableCell>{t.indicacao_contato || '-'}</TableCell>
+                        <TableCell>{t.indicacao_cidade || '-'}</TableCell>
+                        <TableCell>{t.indicacao_status ? <Badge variant="outline" className="text-xs">{CS_INDICACAO_STATUS_LABELS[t.indicacao_status]}</Badge> : '-'}</TableCell>
+                        <TableCell>{t.cliente?.nome_fantasia || t.cliente?.razao_social || <span className="italic text-muted-foreground">Interno</span>}</TableCell>
+                        <TableCell>{t.owner?.nome || '-'}</TableCell>
+                        <TableCell className="text-sm">{format(new Date(t.criado_em), 'dd/MM/yy', { locale: ptBR })}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

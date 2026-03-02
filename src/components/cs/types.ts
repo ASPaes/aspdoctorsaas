@@ -73,6 +73,11 @@ export interface CSTicket {
   indicacao_contato: string | null;
   indicacao_cidade: string | null;
   indicacao_status: CSIndicacaoStatus | null;
+  contato_externo_nome: string | null;
+  oport_valor_previsto_ativacao: number | null;
+  oport_valor_previsto_mrr: number | null;
+  oport_data_prevista: string | null;
+  oport_resultado: string | null;
   criado_em: string;
   atualizado_em: string;
   // Joined fields

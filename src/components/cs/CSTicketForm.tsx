@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
@@ -35,6 +36,10 @@ const ticketSchema = z.object({
   indicacao_contato: z.string().nullable().optional(),
   indicacao_cidade: z.string().nullable().optional(),
   indicacao_status: z.enum(['recebida', 'contatada', 'qualificada', 'enviada_ao_comercial', 'fechou', 'nao_fechou']).nullable().optional(),
+  contato_externo_nome: z.string().nullable().optional(),
+  oport_valor_previsto_ativacao: z.number().nullable().optional(),
+  oport_valor_previsto_mrr: z.number().nullable().optional(),
+  oport_data_prevista: z.string().nullable().optional(),
 });
 
 type TicketFormData = z.infer<typeof ticketSchema>;
@@ -58,6 +63,8 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
   const [searchCliente, setSearchCliente] = useState('');
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [isInterno, setIsInterno] = useState(!clienteId);
+  const [oportunidadeAtivacao, setOportunidadeAtivacao] = useState<number | null>(null);
+  const [oportunidadeMrr, setOportunidadeMrr] = useState<number | null>(null);
 
   const { data: funcionarios } = useFuncionariosAtivos();
   const createTicket = useCreateCSTicket();
@@ -106,6 +113,8 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
         proximo_followup_em: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
       });
       setIsInterno(!clienteId);
+      setOportunidadeAtivacao(null);
+      setOportunidadeMrr(null);
       if (clienteId && clienteNome) setClientes([{ id: clienteId, razao_social: clienteNome, nome_fantasia: null }]);
     }
   }, [open, clienteId, clienteNome, defaultOwnerId, reset]);
@@ -126,17 +135,23 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
       proxima_acao: data.proxima_acao,
       proximo_followup_em: data.proximo_followup_em,
       impacto_categoria: data.impacto_categoria as CSTicketImpacto,
-      mrr_em_risco: data.mrr_em_risco,
+      mrr_em_risco: data.tipo === 'oportunidade' ? undefined : data.mrr_em_risco,
       prob_churn_percent: data.prob_churn_percent,
       prob_sucesso_percent: data.prob_sucesso_percent,
       indicacao_nome: data.indicacao_nome,
       indicacao_contato: data.indicacao_contato,
       indicacao_cidade: data.indicacao_cidade,
       indicacao_status: data.indicacao_status as CSIndicacaoStatus | null,
+      contato_externo_nome: data.tipo === 'interno_processo' ? (data.contato_externo_nome || null) : null,
+      oport_valor_previsto_ativacao: (data.tipo === 'oportunidade' || (data.tipo === 'interno_processo' && data.contato_externo_nome)) ? oportunidadeAtivacao : null,
+      oport_valor_previsto_mrr: (data.tipo === 'oportunidade' || (data.tipo === 'interno_processo' && data.contato_externo_nome)) ? oportunidadeMrr : null,
+      oport_data_prevista: (data.tipo === 'oportunidade' || (data.tipo === 'interno_processo' && data.contato_externo_nome)) ? (data.oport_data_prevista || null) : null,
     });
     onOpenChange(false);
     reset();
   };
+
+  const contatoExterno = watch('contato_externo_nome');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -216,7 +231,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
           <div className="space-y-4">
             <h4 className="font-medium">Campos Operacionais</h4>
             <div className="space-y-2">
-              <Label htmlFor="proxima_acao">Próxima Ação *</Label>
+              <Label htmlFor="proxima_acao">{selectedTipo === 'clube_comunidade' ? 'Ação Agendada/Realizada *' : 'Próxima Ação *'}</Label>
               <Input id="proxima_acao" {...register('proxima_acao')} placeholder="Ex: Ligar para cliente..." />
               {errors.proxima_acao && <p className="text-sm text-destructive">{errors.proxima_acao.message}</p>}
             </div>
@@ -226,7 +241,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
                 <Input id="proximo_followup_em" type="date" {...register('proximo_followup_em')} />
                 {errors.proximo_followup_em && <p className="text-sm text-destructive">{errors.proximo_followup_em.message}</p>}
               </div>
-              {(selectedTipo === 'risco_churn' || selectedTipo === 'oportunidade') && (
+              {selectedTipo === 'risco_churn' && (
                 <div className="space-y-2">
                   <Label htmlFor="mrr_em_risco">MRR em Risco (R$)</Label>
                   <Input id="mrr_em_risco" type="number" step="0.01" {...register('mrr_em_risco', { valueAsNumber: true })} placeholder="0,00" />
@@ -234,6 +249,42 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
               )}
             </div>
           </div>
+
+          {/* Contato Externo for interno_processo */}
+          {selectedTipo === 'interno_processo' && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <Label>Nome do Contato Externo</Label>
+                <Input {...register('contato_externo_nome')} placeholder="Nome do contato (preencha para oportunidade externa)" />
+                <p className="text-xs text-muted-foreground">Se preenchido, os campos de oportunidade de venda serão exibidos abaixo.</p>
+              </div>
+            </>
+          )}
+
+          {/* Oportunidade de Venda */}
+          {(selectedTipo === 'oportunidade' || (selectedTipo === 'interno_processo' && contatoExterno)) && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <h4 className="font-medium">Oportunidade de Venda</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Vlr Previsto Ativação (R$)</Label>
+                    <NumericInput value={oportunidadeAtivacao} onChange={setOportunidadeAtivacao} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Vlr Previsto MRR (R$)</Label>
+                    <NumericInput value={oportunidadeMrr} onChange={setOportunidadeMrr} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data Prevista</Label>
+                    <Input type="date" {...register('oport_data_prevista')} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {selectedTipo === 'indicacao' && (
             <>
