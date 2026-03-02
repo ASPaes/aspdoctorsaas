@@ -17,7 +17,6 @@ import {
   type CSTicketTipo, type CSTicketPrioridade, type CSTicketImpacto, type CSIndicacaoStatus,
 } from './types';
 import { Loader2 } from 'lucide-react';
-import { useFormDraftPersistence } from '@/hooks/useFormDraftPersistence';
 
 const ticketSchema = z.object({
   cliente_id: z.string().optional(),
@@ -63,7 +62,7 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
   const { data: funcionarios } = useFuncionariosAtivos();
   const createTicket = useCreateCSTicket();
 
-  const form = useForm<TicketFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       tipo: 'relacionamento_90d', prioridade: 'media', impacto_categoria: 'relacionamento',
@@ -71,20 +70,6 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
       proximo_followup_em: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
     },
   });
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting, isDirty } } = form;
-
-  const { clearDraft } = useFormDraftPersistence(form, {
-    keyParts: ['cs-ticket', 'new'],
-    enabled: open,
-  });
-
-  // beforeunload guard for modal
-  useEffect(() => {
-    if (!open || !isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [open, isDirty]);
 
   const selectedClienteId = watch('cliente_id');
   const selectedTipo = watch('tipo');
@@ -140,7 +125,6 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
       indicacao_cidade: data.indicacao_cidade,
       indicacao_status: data.indicacao_status as CSIndicacaoStatus | null,
     });
-    clearDraft();
     onOpenChange(false);
     reset();
   };
