@@ -133,6 +133,15 @@ export function MovimentosMrrModal({
     }
   }, [open, clienteId]);
 
+  // beforeunload guard when add form is open
+  const isFormDirty = showAddForm && (!!valorDelta || !!custoDelta || !!valorVendaAvulsa || !!descricao || !!funcionarioId);
+  useEffect(() => {
+    if (!isFormDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isFormDirty]);
+
   // Calculations
   const movimentosAtivos = movimentos.filter(m => m.status === 'ativo' && !m.estornado_por && !m.estorno_de && m.tipo !== 'venda_avulsa');
   const vendasAvulsasAtivas = movimentos.filter(m => m.status === 'ativo' && m.tipo === 'venda_avulsa');
