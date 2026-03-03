@@ -2,12 +2,14 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
-import { format, addDays, subDays } from "date-fns";
+import { format, addDays, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { DateRangePicker, DateRange } from "@/components/ui/date-range-picker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import {
   ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion,
   DollarSign, UserX, TrendingUp, BarChart3, List,
@@ -18,8 +20,23 @@ import {
 
 const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+const STATUS_OPTIONS = [
+  { value: "todos", label: "Todos" },
+  { value: "ganho", label: "Ganho" },
+  { value: "perdido_terceiro", label: "Perdido p/ Terceiro" },
+  { value: "pendente", label: "Pendente" },
+];
+
 export function CertA1Dashboard() {
-  const [periodo, setPeriodo] = useState<DateRange>({ from: undefined, to: undefined });
+  // Default: mês corrente
+  const now = new Date();
+  const [periodo, setPeriodo] = useState<DateRange>({
+    from: startOfMonth(now),
+    to: endOfMonth(now),
+  });
+  const [statusFilter, setStatusFilter] = useState("ganho");
+  const [vendedorFilter, setVendedorFilter] = useState("todos");
+
   const funcionarios = useLookups().funcionarios.data ?? [];
 
   const periodoInicioStr = periodo.from ? format(periodo.from, "yyyy-MM-dd") : null;
@@ -87,7 +104,7 @@ export function CertA1Dashboard() {
         .eq("cancelado", false)
         .is("cert_a1_vencimento", null) as any;
 
-      // Detail list for table
+      // Detail list for table (all statuses - filtering done client-side)
       const vendasDetalhe = (vendas ?? []).map(v => ({
         id: v.id,
         clienteNome: clientesMap[v.cliente_id]?.razao_social || "—",
@@ -113,6 +130,16 @@ export function CertA1Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Apply client-side filters on the detail table
+  const vendasFiltradas = useMemo(() => {
+    if (!metrics?.vendasDetalhe) return [];
+    return metrics.vendasDetalhe.filter(v => {
+      if (statusFilter !== "todos" && v.status !== statusFilter) return false;
+      if (vendedorFilter !== "todos" && String(v.vendedorId) !== vendedorFilter) return false;
+      return true;
+    });
+  }, [metrics?.vendasDetalhe, statusFilter, vendedorFilter]);
+
   const chartData = useMemo(() => {
     if (!metrics?.vendasPorFunc) return [];
     return Object.entries(metrics.vendasPorFunc)
@@ -123,13 +150,52 @@ export function CertA1Dashboard() {
       .sort((a, b) => b.qtd - a.qtd);
   }, [metrics?.vendasPorFunc, funcionarios]);
 
+  // Vendedores que aparecem nas vendas do período (para o filtro)
+  const vendedoresNoFiltro = useMemo(() => {
+    if (!metrics?.vendasDetalhe) return [];
+    const ids = [...new Set(metrics.vendasDetalhe.map(v => v.vendedorId).filter(Boolean))];
+    return ids.map(id => ({
+      id: String(id),
+      nome: funcionarios.find(f => f.id === id)?.nome || `ID ${id}`,
+    })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [metrics?.vendasDetalhe, funcionarios]);
+
   const val = (v: number | undefined) => (isLoading ? "—" : String(v ?? 0));
 
   return (
     <div className="space-y-4">
-      {/* Filtro de período */}
-      <div className="max-w-xs">
-        <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} />
+      {/* Filtros */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="max-w-xs">
+          <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-muted-foreground">Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-medium text-muted-foreground">Vendedor</Label>
+          <Select value={vendedorFilter} onValueChange={setVendedorFilter}>
+            <SelectTrigger className="h-9 w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              {vendedoresNoFiltro.map(v => (
+                <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -217,12 +283,12 @@ export function CertA1Dashboard() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <List className="h-4 w-4 text-muted-foreground" />
-            Vendas Detalhadas ({metrics?.vendasDetalhe?.length ?? 0})
+            Vendas Detalhadas ({vendasFiltradas.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!metrics?.vendasDetalhe?.length ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma venda no período selecionado.</p>
+          {vendasFiltradas.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma venda encontrada com os filtros selecionados.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -235,7 +301,7 @@ export function CertA1Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {metrics.vendasDetalhe.map((v) => {
+                {vendasFiltradas.map((v) => {
                   const vendedorNome = v.vendedorId
                     ? funcionarios.find((f) => f.id === v.vendedorId)?.nome || `ID ${v.vendedorId}`
                     : "—";
