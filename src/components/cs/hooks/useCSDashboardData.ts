@@ -32,9 +32,22 @@ export interface CSDashboardData {
   resultadoRisco: { retido: number; naoRetido: number; monitoramento: number };
   pipelineIndicacao: Record<CSIndicacaoStatus, number>;
   indicacoesPorOwner: { owner_id: number; nome: string; count: number }[];
+  indicacoesGanhas: number;
+  indicacoesPerdidas: number;
+  indicacoesConversaoPercent: number;
   topPrioridades: CSTicket[];
   allTickets: CSTicket[];
   ticketsIndicacaoDetalhados: CSTicket[];
+  // Oportunidades
+  oportunidadesAbertas: number;
+  oportunidadesGanhas: number;
+  oportunidadesPerdidas: number;
+  oportunidadesConversaoPercent: number;
+  oportunidadesValorPrevistoAtivacao: number;
+  oportunidadesValorPrevistoMrr: number;
+  oportunidadesValorGanhoAtivacao: number;
+  oportunidadesValorGanhoMrr: number;
+  oportunidadesAbertasLista: CSTicket[];
 }
 
 function calculateMedian(values: number[]): number {
@@ -184,6 +197,25 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         count,
       }));
 
+      // Indicações — conversão
+      const indicacoesGanhas = ticketsIndicacaoNoPeriodo.filter((t) => t.indicacao_status === 'fechou').length;
+      const indicacoesPerdidas = ticketsIndicacaoNoPeriodo.filter((t) => t.indicacao_status === 'nao_fechou').length;
+      const indicacoesConversaoPercent = (indicacoesGanhas + indicacoesPerdidas) > 0
+        ? (indicacoesGanhas / (indicacoesGanhas + indicacoesPerdidas)) * 100 : 0;
+
+      // Oportunidades
+      const oportunidadesBacklog = backlog.filter((t) => t.tipo === 'oportunidade');
+      const oportunidadesFechadasNoPeriodo = ticketsFechadosNoPeriodo.filter((t) => t.tipo === 'oportunidade');
+      const oportunidadesGanhas = oportunidadesFechadasNoPeriodo.filter((t) => t.oport_resultado === 'ganho').length;
+      const oportunidadesPerdidas = oportunidadesFechadasNoPeriodo.filter((t) => t.oport_resultado === 'perdido').length;
+      const oportunidadesConversaoPercent = (oportunidadesGanhas + oportunidadesPerdidas) > 0
+        ? (oportunidadesGanhas / (oportunidadesGanhas + oportunidadesPerdidas)) * 100 : 0;
+      const oportunidadesValorPrevistoAtivacao = oportunidadesBacklog.reduce((s, t) => s + (t.oport_valor_previsto_ativacao || 0), 0);
+      const oportunidadesValorPrevistoMrr = oportunidadesBacklog.reduce((s, t) => s + (t.oport_valor_previsto_mrr || 0), 0);
+      const oportunidadesGanhasLista = oportunidadesFechadasNoPeriodo.filter((t) => t.oport_resultado === 'ganho');
+      const oportunidadesValorGanhoAtivacao = oportunidadesGanhasLista.reduce((s, t) => s + (t.oport_valor_previsto_ativacao || 0), 0);
+      const oportunidadesValorGanhoMrr = oportunidadesGanhasLista.reduce((s, t) => s + (t.oport_valor_previsto_mrr || 0), 0);
+
       const topPrioridades = backlog
         .filter((t) => t.prioridade === 'urgente' || t.prioridade === 'alta')
         .sort((a, b) => {
@@ -201,8 +233,15 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         tempoAteAcaoMedia, tempoAteAcaoMediana, tempoAteConclusaoMedia, tempoAteConclusaoMediana,
         percentHigiene, reaberturas, clientesEmRisco,
         ticketsRiscoPorPrioridade, percentRiscoComPlano, mrrEmRisco, mrrRecuperado, resultadoRisco,
-        pipelineIndicacao, indicacoesPorOwner, topPrioridades, allTickets,
+        pipelineIndicacao, indicacoesPorOwner,
+        indicacoesGanhas, indicacoesPerdidas, indicacoesConversaoPercent,
+        topPrioridades, allTickets,
         ticketsIndicacaoDetalhados: ticketsIndicacaoNoPeriodo,
+        oportunidadesAbertas: oportunidadesBacklog.length,
+        oportunidadesGanhas, oportunidadesPerdidas, oportunidadesConversaoPercent,
+        oportunidadesValorPrevistoAtivacao, oportunidadesValorPrevistoMrr,
+        oportunidadesValorGanhoAtivacao, oportunidadesValorGanhoMrr,
+        oportunidadesAbertasLista: oportunidadesBacklog,
       };
     },
   });
