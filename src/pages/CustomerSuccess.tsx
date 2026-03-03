@@ -44,6 +44,7 @@ export default function CustomerSuccess() {
   const [showDetail, setShowDetail] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<CSGlobalFilters>(defaultFilters);
+  const [activeTab, setActiveTab] = useState('painel');
 
   const { data: funcionarios } = useFuncionariosAtivos();
 
@@ -178,7 +179,7 @@ export default function CustomerSuccess() {
         )}
       </div>
 
-      <Tabs defaultValue="painel" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="painel" className="gap-1.5"><LayoutDashboard className="h-4 w-4" />Painel</TabsTrigger>
           <TabsTrigger value="kanban" className="gap-1.5"><Kanban className="h-4 w-4" />Kanban</TabsTrigger>
