@@ -18,7 +18,7 @@ import {
   CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_INDICACAO_STATUS_LABELS, CS_TICKET_TIPO_LABELS,
   type CSTicketPrioridade, type CSTicketStatus, type CSIndicacaoStatus,
 } from '@/components/cs/types';
-import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List, TrendingUp, TrendingDown } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List, TrendingUp, TrendingDown, ShieldCheck, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 /* ── helpers ────────────────────────────────────────────────────── */
@@ -398,7 +398,69 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
         </Card>
       </div>
 
-      {/* ═══ 6) EVOLUÇÃO TICKETS CONCLUÍDOS ═══ */}
+      {/* ═══ 6) COBERTURA 90D ═══ */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-muted-foreground flex items-center gap-2 text-sm"><ShieldCheck className="h-4 w-4" />COBERTURA DE RELACIONAMENTO 90D</h3>
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+          <KPICard
+            title="Clientes Ativos" value={data.cobertura90d.totalAtivos}
+            icon={<Users className={cn(iconSize, 'text-primary')} />} tvMode={tvMode}
+          />
+          <KPICard
+            title="% Cobertura 90D" value={fmtPct(data.cobertura90d.percentCoberto)}
+            subtitle={`${data.cobertura90d.cobertos} de ${data.cobertura90d.totalAtivos}`}
+            icon={<ShieldCheck className={cn(iconSize, 'text-green-500')} />}
+            variant={data.cobertura90d.percentCoberto >= 80 ? 'success' : data.cobertura90d.percentCoberto >= 50 ? 'warning' : 'danger'}
+            tvMode={tvMode}
+          />
+          <KPICard
+            title="Descobertos" value={data.cobertura90d.descobertos}
+            subtitle="sem contato 90d"
+            icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />}
+            variant={data.cobertura90d.descobertos > 0 ? 'danger' : 'success'}
+            tvMode={tvMode}
+          />
+        </div>
+        {data.cobertura90d.clientesDescobertos.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Top 10 — Clientes Sem Cobertura</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Mensalidade</TableHead>
+                    <TableHead>Último Contato</TableHead>
+                    <TableHead>Dias s/ Contato</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.cobertura90d.clientesDescobertos.slice(0, 10).map(c => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.nome_fantasia || c.razao_social || '—'}</TableCell>
+                      <TableCell>{c.mensalidade != null ? fmtCur(c.mensalidade) : '—'}</TableCell>
+                      <TableCell>{c.ultimoContato ? format(new Date(c.ultimoContato), 'dd/MM/yyyy') : <span className="text-red-600 dark:text-red-400 font-medium">Nunca</span>}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={c.diasSemContato === null || c.diasSemContato > 180 ? 'border-red-500 text-red-500' : c.diasSemContato > 90 ? 'border-orange-500 text-orange-500' : ''}>
+                          {c.diasSemContato != null ? `${c.diasSemContato}d` : '∞'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/clientes/${c.id}`)}>
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* ═══ 7) EVOLUÇÃO TICKETS CONCLUÍDOS ═══ */}
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Evolução: Tickets Concluídos (12 meses)</CardTitle></CardHeader>
         <CardContent>

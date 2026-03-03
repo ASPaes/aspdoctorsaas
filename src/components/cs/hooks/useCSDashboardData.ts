@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInHours, parseISO, isWithinInterval, endOfDay } from 'date-fns';
+import { differenceInHours, differenceInDays, parseISO, isWithinInterval, endOfDay, subDays } from 'date-fns';
 import type { CSTicket, CSTicketStatus, CSTicketPrioridade, CSIndicacaoStatus } from '../types';
 
 export interface CSDashboardFilters {
@@ -48,6 +48,21 @@ export interface CSDashboardData {
   oportunidadesValorGanhoAtivacao: number;
   oportunidadesValorGanhoMrr: number;
   oportunidadesAbertasLista: CSTicket[];
+  // Cobertura 90D
+  cobertura90d: {
+    totalAtivos: number;
+    cobertos: number;
+    descobertos: number;
+    percentCoberto: number;
+    clientesDescobertos: {
+      id: string;
+      razao_social: string | null;
+      nome_fantasia: string | null;
+      mensalidade: number | null;
+      ultimoContato: string | null;
+      diasSemContato: number | null;
+    }[];
+  };
 }
 
 function calculateMedian(values: number[]): number {
@@ -79,8 +94,22 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         ticketsQuery = ticketsQuery.eq('owner_id', filters.ownerId);
       }
 
-      const { data: allTicketsRaw, error } = await ticketsQuery;
-      if (error) throw error;
+      // Parallel queries: tickets + active clients + last contact per client
+      const clientesAtivosQuery = supabase
+        .from('clientes')
+        .select('id, razao_social, nome_fantasia, mensalidade')
+        .eq('cancelado', false);
+
+      const [ticketsResult, clientesResult] = await Promise.all([
+        ticketsQuery,
+        clientesAtivosQuery,
+      ]);
+
+      if (ticketsResult.error) throw ticketsResult.error;
+      if (clientesResult.error) throw clientesResult.error;
+
+      const allTicketsRaw = ticketsResult.data || [];
+      const clientesAtivos = clientesResult.data || [];
 
       const allTickets = (allTicketsRaw || []) as unknown as CSTicket[];
       const interval = { start: filters.periodoInicio, end: endOfDay(filters.periodoFim) };
@@ -225,6 +254,52 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         })
         .slice(0, 10);
 
+      // ── Cobertura 90D ──
+      const limite90d = subDays(now, 90);
+      const tiposCob = ['relacionamento_90d', 'adocao_engajamento'];
+
+      // Clients covered: have at least 1 ticket of these types created in last 90 days
+      const clientesCobertosSet = new Set<string>();
+      allTickets.forEach((t) => {
+        if (t.cliente_id && tiposCob.includes(t.tipo) && parseISO(t.criado_em) >= limite90d) {
+          clientesCobertosSet.add(t.cliente_id);
+        }
+      });
+
+      // Last contact per client (any ticket type)
+      const ultimoContatoMap = new Map<string, string>();
+      allTickets.forEach((t) => {
+        if (!t.cliente_id) return;
+        const current = ultimoContatoMap.get(t.cliente_id);
+        if (!current || t.criado_em > current) {
+          ultimoContatoMap.set(t.cliente_id, t.criado_em);
+        }
+      });
+
+      const totalAtivos = clientesAtivos.length;
+      const clientesDescobertos = clientesAtivos
+        .filter((c) => !clientesCobertosSet.has(c.id))
+        .map((c) => {
+          const uc = ultimoContatoMap.get(c.id) || null;
+          return {
+            id: c.id,
+            razao_social: c.razao_social,
+            nome_fantasia: c.nome_fantasia,
+            mensalidade: c.mensalidade,
+            ultimoContato: uc,
+            diasSemContato: uc ? differenceInDays(now, parseISO(uc)) : null,
+          };
+        })
+        .sort((a, b) => {
+          if (a.diasSemContato === null && b.diasSemContato === null) return 0;
+          if (a.diasSemContato === null) return -1; // null = never contacted → top
+          if (b.diasSemContato === null) return 1;
+          return b.diasSemContato - a.diasSemContato;
+        });
+
+      const cobertos = totalAtivos - clientesDescobertos.length;
+      const percentCoberto = totalAtivos > 0 ? (cobertos / totalAtivos) * 100 : 100;
+
       return {
         ticketsAbertos: ticketsNoPeriodo.length,
         ticketsFechados: ticketsFechadosNoPeriodo.length,
@@ -242,6 +317,13 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         oportunidadesValorPrevistoAtivacao, oportunidadesValorPrevistoMrr,
         oportunidadesValorGanhoAtivacao, oportunidadesValorGanhoMrr,
         oportunidadesAbertasLista: oportunidadesBacklog,
+        cobertura90d: {
+          totalAtivos,
+          cobertos,
+          descobertos: clientesDescobertos.length,
+          percentCoberto,
+          clientesDescobertos,
+        },
       };
     },
   });
