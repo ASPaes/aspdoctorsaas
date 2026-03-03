@@ -36,6 +36,7 @@ function detectDuplicates<T extends { id: string; clienteId: string; dataVenda: 
   for (let i = 0; i < vendas.length; i++) {
     for (let j = i + 1; j < vendas.length; j++) {
       const a = vendas[i], b = vendas[j];
+      if (!a.createdAt || !b.createdAt) continue;
       if (a.clienteId === b.clienteId && a.dataVenda === b.dataVenda && a.status === b.status) {
         const diff = Math.abs(differenceInMinutes(parseISO(a.createdAt), parseISO(b.createdAt)));
         if (diff < 5) {
