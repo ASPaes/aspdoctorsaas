@@ -1,52 +1,31 @@
 
 
-## Plano: Cobertura de Relacionamento 90D no Dashboard CS
+## Plano: Melhorias na aba Cobertura 90D
 
-### Problema
-Hoje o sistema registra tickets do tipo `relacionamento_90d`, mas nao existe nenhum indicador que mostre qual percentual da base ativa esta sendo coberta, nem uma lista dos clientes descobertos ordenada por tempo sem contato.
+### Alteracoes
 
-### O que sera construido
+**1. Hook `useCSDashboardData.ts`**
+- Adicionar `data_cadastro`, `cnpj` e `fornecedor_id` na query de clientes ativos: `select('id, razao_social, nome_fantasia, mensalidade, data_cadastro, cnpj, fornecedor_id')`
+- Fazer query paralela de `fornecedores` (id, nome) para montar um mapa id→nome
+- Incluir esses campos no tipo e no retorno de `clientesDescobertos`: `data_cadastro`, `cnpj`, `fornecedor_nome`
 
-**1. Novos dados no hook `useCSDashboardData`**
+**2. Componente `CSDashboard.tsx` — aba Cobertura 90D**
 
-Cruzar a lista de clientes ativos (`cancelado = false`) com os tickets do tipo `relacionamento_90d` (e opcionalmente `adocao_engajamento`) que foram criados ou estao abertos nos ultimos 90 dias. Calcular:
+Adicionar acima da tabela:
+- **Campo de busca** (Input com icone Search) que filtra por razao_social, nome_fantasia, cnpj e id do cliente (busca case-insensitive, client-side sobre os dados ja carregados)
+- **Filtro de data de cadastro** (DateRangePicker) que filtra `clientesDescobertos` por `data_cadastro` dentro do intervalo selecionado
+- **Ordenacao clicavel** nos headers da tabela: Cliente, Mensalidade, Data Cadastro, Fornecedor, Ultimo Contato, Dias s/ Contato — clique alterna asc/desc
 
-- `cobertura90d.totalAtivos` — total de clientes ativos
-- `cobertura90d.cobertos` — clientes que possuem pelo menos 1 ticket desses tipos criado nos ultimos 90 dias
-- `cobertura90d.descobertos` — clientes sem nenhum ticket
-- `cobertura90d.percentCoberto` — percentual de cobertura
-- `cobertura90d.clientesDescobertos` — lista dos clientes descobertos, com campos: `id`, `razao_social`, `nome_fantasia`, `mensalidade`, `ultimoContato` (data do ticket mais recente de qualquer tipo, ou null), ordenados do mais antigo para o mais recente (clientes sem nenhum contato ficam no topo)
+Colunas adicionais na tabela:
+- **Data Cadastro** (formatada dd/MM/yyyy)
+- **Fornecedor** (nome do fornecedor ou "—")
 
-Para obter os clientes ativos, uma query separada a `clientes` filtrando `cancelado = false`. Para o ultimo contato, buscar o `MAX(criado_em)` dos tickets vinculados a cada cliente.
-
-**2. Nova aba "Cobertura 90D" no CSDashboard**
-
-Adicionada como 5a aba no componente `CSDashboard.tsx` (pagina CS) e como nova secao no `CSTab.tsx` (Dashboard principal):
-
-- **3 KPI Cards:**
-  - Clientes Ativos (total)
-  - % Cobertura 90D (com variante success/warning/danger)
-  - Descobertos (quantidade, com variante danger se > 0)
-
-- **Tabela "Clientes Sem Cobertura"** ordenada por "Dias sem contato" (decrescente):
-  - Cliente (razao social / nome fantasia)
-  - Mensalidade (R$)
-  - Ultimo Contato (data ou "Nunca")
-  - Dias sem contato
-  - Botao para abrir o perfil do cliente
+Toda a logica de busca, filtro por data e ordenacao sera feita com `useState` + `useMemo` local no componente, sem alterar o hook de dados.
 
 **3. Arquivos modificados**
 
-| Arquivo | Alteracao |
+| Arquivo | O que muda |
 |---|---|
-| `src/components/cs/hooks/useCSDashboardData.ts` | Nova query de clientes ativos + cruzamento com tickets 90d. Novos campos na interface `CSDashboardData`. |
-| `src/components/cs/CSDashboard.tsx` | Nova aba "Cobertura 90D" com KPIs e tabela de descobertos. |
-| `src/components/dashboard/tabs/CSTab.tsx` | Nova secao "COBERTURA 90D" com KPIs resumidos e top 10 descobertos. |
-
-### Detalhes tecnicos
-
-- A query de clientes ativos sera feita em paralelo com a query de tickets ja existente dentro do mesmo `queryFn`, usando `Promise.all`.
-- Para o "ultimo contato", sera feita uma query agrupada: `SELECT cliente_id, MAX(criado_em) FROM cs_tickets GROUP BY cliente_id` — isso evita trazer todos os tickets de volta.
-- O calculo de "dias sem contato" sera `differenceInDays(now, ultimoContato)`.
-- Nenhuma alteracao de banco de dados e necessaria — tudo e derivado das tabelas `clientes` e `cs_tickets` existentes.
+| `src/components/cs/hooks/useCSDashboardData.ts` | Query inclui `data_cadastro, cnpj, fornecedor_id`; query paralela de fornecedores; tipo atualizado |
+| `src/components/cs/CSDashboard.tsx` | Busca, filtro data cadastro, ordenacao, colunas extras na tabela |
 
