@@ -53,6 +53,7 @@ interface CSDashboardProps {
 
 export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboardProps) {
   const navigate = useNavigate();
+  const [dashTab, setDashTab] = useState('operacao');
   const periodoInicio = globalFilters.periodo.from || startOfMonth(new Date());
   const periodoFim = globalFilters.periodo.to || endOfMonth(new Date());
 
@@ -159,7 +160,7 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="operacao" className="space-y-4">
+      <Tabs value={dashTab} onValueChange={setDashTab} className="space-y-4">
          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="operacao">Operação</TabsTrigger>
           <TabsTrigger value="retencao">Retenção</TabsTrigger>
