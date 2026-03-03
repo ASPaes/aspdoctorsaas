@@ -158,6 +158,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
 
   if (isLoading) return <div className="grid gap-4 grid-cols-2 md:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
   if (!data) return null;
+  const cob = data.cobertura90d ?? { totalAtivos: 0, cobertos: 0, descobertos: 0, percentCoberto: 100, clientesDescobertos: [] };
 
   const fmtCur = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtPct = (v: number) => `${v.toFixed(1)}%`;
@@ -403,25 +404,25 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
         <h3 className="font-semibold text-muted-foreground flex items-center gap-2 text-sm"><ShieldCheck className="h-4 w-4" />COBERTURA DE RELACIONAMENTO 90D</h3>
         <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
           <KPICard
-            title="Clientes Ativos" value={data.cobertura90d.totalAtivos}
+            title="Clientes Ativos" value={cob.totalAtivos}
             icon={<Users className={cn(iconSize, 'text-primary')} />} tvMode={tvMode}
           />
           <KPICard
-            title="% Cobertura 90D" value={fmtPct(data.cobertura90d.percentCoberto)}
-            subtitle={`${data.cobertura90d.cobertos} de ${data.cobertura90d.totalAtivos}`}
+            title="% Cobertura 90D" value={fmtPct(cob.percentCoberto)}
+            subtitle={`${cob.cobertos} de ${cob.totalAtivos}`}
             icon={<ShieldCheck className={cn(iconSize, 'text-green-500')} />}
-            variant={data.cobertura90d.percentCoberto >= 80 ? 'success' : data.cobertura90d.percentCoberto >= 50 ? 'warning' : 'danger'}
+            variant={cob.percentCoberto >= 80 ? 'success' : cob.percentCoberto >= 50 ? 'warning' : 'danger'}
             tvMode={tvMode}
           />
           <KPICard
-            title="Descobertos" value={data.cobertura90d.descobertos}
+            title="Descobertos" value={cob.descobertos}
             subtitle="sem contato 90d"
             icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />}
-            variant={data.cobertura90d.descobertos > 0 ? 'danger' : 'success'}
+            variant={cob.descobertos > 0 ? 'danger' : 'success'}
             tvMode={tvMode}
           />
         </div>
-        {data.cobertura90d.clientesDescobertos.length > 0 && (
+        {cob.clientesDescobertos.length > 0 && (
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-base">Top 10 — Clientes Sem Cobertura</CardTitle></CardHeader>
             <CardContent>
@@ -436,7 +437,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.cobertura90d.clientesDescobertos.slice(0, 10).map(c => (
+                  {cob.clientesDescobertos.slice(0, 10).map(c => (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">{c.nome_fantasia || c.razao_social || '—'}</TableCell>
                       <TableCell>{c.mensalidade != null ? fmtCur(c.mensalidade) : '—'}</TableCell>

@@ -64,6 +64,7 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
   if (isLoading) return <div className="space-y-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div></div>;
   if (!data) return null;
+  const cob = data.cobertura90d ?? { totalAtivos: 0, cobertos: 0, descobertos: 0, percentCoberto: 100, clientesDescobertos: [] };
 
   const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatPercent = (v: number) => `${v.toFixed(1)}%`;
@@ -248,21 +249,21 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
         </TabsContent>
 
         <TabsContent value="cobertura90d" className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard title="Clientes Ativos" value={data.cobertura90d.totalAtivos} icon={<Users className="h-5 w-5 text-primary" />} />
+           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <KPICard title="Clientes Ativos" value={cob.totalAtivos} icon={<Users className="h-5 w-5 text-primary" />} />
             <KPICard
               title="% Cobertura 90D"
-              value={formatPercent(data.cobertura90d.percentCoberto)}
-              subtitle={`${data.cobertura90d.cobertos} de ${data.cobertura90d.totalAtivos}`}
+              value={formatPercent(cob.percentCoberto)}
+              subtitle={`${cob.cobertos} de ${cob.totalAtivos}`}
               icon={<ShieldCheck className="h-5 w-5 text-green-500" />}
-              variant={data.cobertura90d.percentCoberto >= 80 ? 'success' : data.cobertura90d.percentCoberto >= 50 ? 'warning' : 'danger'}
+              variant={cob.percentCoberto >= 80 ? 'success' : cob.percentCoberto >= 50 ? 'warning' : 'danger'}
             />
             <KPICard
               title="Descobertos"
-              value={data.cobertura90d.descobertos}
+              value={cob.descobertos}
               subtitle="sem contato 90d"
               icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
-              variant={data.cobertura90d.descobertos > 0 ? 'danger' : 'success'}
+              variant={cob.descobertos > 0 ? 'danger' : 'success'}
             />
           </div>
           <Card>
@@ -279,10 +280,10 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.cobertura90d.clientesDescobertos.length === 0 ? (
+                  {cob.clientesDescobertos.length === 0 ? (
                     <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Todos os clientes cobertos 🎉</TableCell></TableRow>
                   ) : (
-                    data.cobertura90d.clientesDescobertos.map(c => (
+                    cob.clientesDescobertos.map(c => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.nome_fantasia || c.razao_social || '—'}</TableCell>
                         <TableCell>{c.mensalidade != null ? formatCurrency(c.mensalidade) : '—'}</TableCell>
