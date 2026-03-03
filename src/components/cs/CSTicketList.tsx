@@ -3,22 +3,22 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useCSTickets, useDeleteCSTicket } from './hooks/useCSTickets';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS,
-  type CSTicketStatus, type CSTicketPrioridade, type CSTicketTipo, type CSTicket,
+  type CSTicketStatus, type CSTicketPrioridade, type CSTicket,
 } from './types';
-import { Search, MoreHorizontal, Eye, Edit, Filter, X, AlertTriangle, Building2, User, Trash2 } from 'lucide-react';
+import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
+import { MoreHorizontal, Eye, Edit, AlertTriangle, Building2, User, Trash2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface CSTicketListProps {
   onViewTicket: (ticket: CSTicket) => void;
   onEditTicket: (ticket: CSTicket) => void;
+  filters: CSGlobalFilters;
 }
 
 const STATUS_COLORS: Record<CSTicketStatus, string> = {
@@ -38,65 +38,20 @@ const PRIORIDADE_COLORS: Record<CSTicketPrioridade, string> = {
   urgente: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
 
-export function CSTicketList({ onViewTicket, onEditTicket }: CSTicketListProps) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<CSTicketStatus | 'all'>('all');
-  const [prioridadeFilter, setPrioridadeFilter] = useState<CSTicketPrioridade | 'all'>('all');
-  const [tipoFilter, setTipoFilter] = useState<CSTicketTipo | 'all'>('all');
-  const [showFilters, setShowFilters] = useState(false);
+export function CSTicketList({ onViewTicket, onEditTicket, filters }: CSTicketListProps) {
   const [deleteTicketId, setDeleteTicketId] = useState<string | null>(null);
   const deleteTicket = useDeleteCSTicket();
 
   const { data: tickets, isLoading } = useCSTickets({
-    search: search || undefined,
-    status: statusFilter !== 'all' ? [statusFilter] : undefined,
-    prioridade: prioridadeFilter !== 'all' ? [prioridadeFilter] : undefined,
-    tipo: tipoFilter !== 'all' ? [tipoFilter] : undefined,
+    search: filters.search || undefined,
+    status: filters.status !== 'all' ? [filters.status] : undefined,
+    prioridade: filters.prioridade !== 'all' ? [filters.prioridade] : undefined,
+    tipo: filters.tipo !== 'all' ? [filters.tipo] : undefined,
+    owner_id: filters.ownerId !== '__all__' ? Number(filters.ownerId) : undefined,
   });
-
-  const clearFilters = () => { setSearch(''); setStatusFilter('all'); setPrioridadeFilter('all'); setTipoFilter('all'); };
-  const hasActiveFilters = search || statusFilter !== 'all' || prioridadeFilter !== 'all' || tipoFilter !== 'all';
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por assunto ou descrição..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
-        </div>
-        <Button variant={showFilters ? 'secondary' : 'outline'} onClick={() => setShowFilters(!showFilters)}>
-          <Filter className="h-4 w-4 mr-2" />Filtros
-          {hasActiveFilters && <Badge variant="secondary" className="ml-2">{[search, statusFilter !== 'all', prioridadeFilter !== 'all', tipoFilter !== 'all'].filter(Boolean).length}</Badge>}
-        </Button>
-        {hasActiveFilters && <Button variant="ghost" onClick={clearFilters}><X className="h-4 w-4 mr-2" />Limpar</Button>}
-      </div>
-
-      {showFilters && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/50">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Status</label>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">Todos</SelectItem>{Object.entries(CS_TICKET_STATUS_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Prioridade</label>
-            <Select value={prioridadeFilter} onValueChange={(v) => setPrioridadeFilter(v as any)}>
-              <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">Todas</SelectItem>{Object.entries(CS_TICKET_PRIORIDADE_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Tipo</label>
-            <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as any)}>
-              <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent><SelectItem value="all">Todos</SelectItem>{Object.entries(CS_TICKET_TIPO_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>

@@ -1,20 +1,18 @@
-import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { useMemo } from 'react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useFuncionariosAtivos } from './hooks/useCSTickets';
 import { useCSDashboardData, type CSDashboardFilters } from './hooks/useCSDashboardData';
-import { DateRangePicker, DateRange } from '@/components/ui/date-range-picker';
 import {
   CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_INDICACAO_STATUS_LABELS, CS_TICKET_TIPO_LABELS,
   type CSTicket, type CSTicketPrioridade,
 } from './types';
+import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
 import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User } from 'lucide-react';
 
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
@@ -46,27 +44,20 @@ function KPICard({ title, value, subtitle, icon, variant = 'default' }: { title:
 
 interface CSDashboardProps {
   onViewTicket?: (ticket: CSTicket) => void;
+  filters: CSGlobalFilters;
 }
 
-type PeriodPreset = 'mes_atual' | 'ultimos_3_meses' | 'ultimos_6_meses' | 'ultimos_12_meses';
+export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboardProps) {
+  const periodoInicio = globalFilters.periodo.from || startOfMonth(new Date());
+  const periodoFim = globalFilters.periodo.to || endOfMonth(new Date());
 
-export function CSDashboard({ onViewTicket }: CSDashboardProps) {
-  const { data: funcionarios } = useFuncionariosAtivos();
-  const [selectedOwner, setSelectedOwner] = useState<string>('__all__');
-  const [periodo, setPeriodo] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  const dashFilters: CSDashboardFilters = useMemo(() => ({
+    periodoInicio,
+    periodoFim,
+    ownerId: globalFilters.ownerId !== '__all__' ? Number(globalFilters.ownerId) : undefined,
+  }), [periodoInicio, periodoFim, globalFilters.ownerId]);
 
-  const periodoInicio = periodo.from || startOfMonth(new Date());
-  const periodoFim = periodo.to || new Date();
-
-  const filters: CSDashboardFilters = useMemo(() => ({
-    periodoInicio, periodoFim,
-    ownerId: selectedOwner === '__all__' ? undefined : Number(selectedOwner),
-  }), [periodoInicio, periodoFim, selectedOwner]);
-
-  const { data, isLoading } = useCSDashboardData(filters);
+  const { data, isLoading } = useCSDashboardData(dashFilters);
 
   if (isLoading) return <div className="space-y-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div></div>;
   if (!data) return null;
@@ -81,24 +72,6 @@ export function CSDashboard({ onViewTicket }: CSDashboardProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <DateRangePicker label="Período" value={periodo} onChange={setPeriodo} className="w-64" />
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Responsável</label>
-              <Select value={selectedOwner} onValueChange={setSelectedOwner}>
-                <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  {funcionarios?.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <Tabs defaultValue="operacao" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
           <TabsTrigger value="operacao">Operação</TabsTrigger>
@@ -179,7 +152,6 @@ export function CSDashboard({ onViewTicket }: CSDashboardProps) {
               </CardContent>
             </Card>
           )}
-          {/* Lista detalhada de indicações */}
           <Card>
             <CardHeader><CardTitle className="text-base">Lista de Indicações no Período</CardTitle></CardHeader>
             <CardContent>
