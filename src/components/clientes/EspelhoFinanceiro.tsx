@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, Percent, BarChart3, Calculator, ArrowUpDown, Zap, HelpCircle, Minus, Equal } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Percent, BarChart3, Calculator, ArrowUpDown, Zap, Minus, Equal } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import type { EspelhoResult } from "@/hooks/useEspelhoFinanceiro";
 
 function fmt(value: number | null) {
@@ -19,39 +19,21 @@ function fmtX(value: number | null) {
   return `${value.toFixed(2)}x`;
 }
 
-/* ── Tooltip data ── */
+/* ── KPI key mapping for each step ── */
 
-interface TooltipInfo { formula: string; objetivo: string }
-
-const tooltips: Record<string, TooltipInfo> = {
-  "Receita (MRR Atual)":        { formula: "MRR Base + Movimentos", objetivo: "Faturamento recorrente mensal efetivo" },
-  "(-) Custo Operação (COGS)":  { formula: "Custo Base + Custo Movimentos", objetivo: "Custo variável pago ao fornecedor" },
-  "Receita após COGS":          { formula: "MRR Atual − COGS Atual", objetivo: "Quanto sobra após pagar o custo de operação" },
-  "(-) Impostos":               { formula: "MRR Atual × Imposto%", objetivo: "Valor estimado de impostos sobre o faturamento" },
-  "Margem de Contribuição":     { formula: "MRR Atual − COGS − Impostos", objetivo: "Quanto cada cliente contribui para cobrir despesas fixas" },
-  "MC %":                       { formula: "(MC / MRR Atual) × 100", objetivo: "Percentual de contribuição sobre a receita" },
-  "(-) Custos Fixos":           { formula: "MRR Atual × Custo Fixo%", objetivo: "Despesas fixas alocadas proporcionalmente" },
-  "Lucro Real":                 { formula: "MC − Custos Fixos", objetivo: "Resultado líquido final da operação" },
-  "Lucro Real %":               { formula: "(Lucro Real / MRR Atual) × 100", objetivo: "Rentabilidade líquida percentual" },
-  "Markup COGS":                { formula: "((MRR / COGS) − 1) × 100", objetivo: "Percentual de acréscimo sobre o custo" },
-  "Fator Preço":                { formula: "MRR Atual / COGS Atual", objetivo: "Quantas vezes o preço cobre o custo" },
+const STEP_KPI_KEYS: Record<string, string> = {
+  "Receita (MRR Atual)": "ef_receita_mrr",
+  "(-) Custo Operação (COGS)": "ef_cogs",
+  "Receita após COGS": "ef_receita_apos_cogs",
+  "(-) Impostos": "ef_impostos",
+  "Margem de Contribuição": "ef_margem_contribuicao",
+  "MC %": "ef_mc_percent",
+  "(-) Custos Fixos": "ef_custos_fixos",
+  "Markup COGS": "ef_markup_cogs",
+  "Fator Preço": "ef_fator_preco",
+  "Lucro Real": "ef_lucro_real",
+  "Lucro Real %": "ef_lucro_real_percent",
 };
-
-function InfoTooltip({ label }: { label: string }) {
-  const info = tooltips[label];
-  if (!info) return null;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <HelpCircle className="h-3 w-3 opacity-40 hover:opacity-80 cursor-help transition-opacity" />
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[220px] text-xs">
-        <p className="font-semibold mb-0.5">{info.formula}</p>
-        <p className="opacity-80">{info.objetivo}</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
 
 /* ── Color helpers ── */
 
@@ -89,7 +71,7 @@ function StepCard({ label, value, raw, icon: Icon, isDeduction = false, large = 
         <div className="flex items-center justify-between mb-1">
           <Icon className="h-3.5 w-3.5 opacity-60" />
           <div className="flex items-center gap-1">
-            <InfoTooltip label={label} />
+            {STEP_KPI_KEYS[label] && <KpiHelpPopover kpiKey={STEP_KPI_KEYS[label]} />}
             {raw !== null && !isNaN(raw) && !isDeduction && (
               raw > 0
                 ? <TrendingUp className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
@@ -138,7 +120,7 @@ export default function EspelhoFinanceiro({
   const lucroPositivo = lucroReal !== null && !isNaN(lucroReal) && lucroReal > 0;
 
   return (
-    <TooltipProvider delayDuration={200}>
+    <div className="space-y-4">
       <div className="space-y-4">
 
         {/* ═══════ A) COMPOSIÇÃO MRR ═══════ */}
@@ -297,7 +279,7 @@ export default function EspelhoFinanceiro({
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-sm font-medium opacity-70">Lucro Real</p>
-                <InfoTooltip label="Lucro Real" />
+                <KpiHelpPopover kpiKey="ef_lucro_real" />
               </div>
               <div className="flex items-baseline gap-3">
                 <p className={`text-2xl font-bold ${lucroPositivo ? "text-green-700 dark:text-green-400" : "text-primary"}`}>
@@ -317,6 +299,6 @@ export default function EspelhoFinanceiro({
           </CardContent>
         </Card>
       </div>
-    </TooltipProvider>
+    </div>
   );
 }
