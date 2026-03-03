@@ -16,8 +16,8 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useCSTicket, useUpdateCSTicket, useFuncionariosAtivos, useDeleteCSTicket } from './hooks/useCSTickets';
 import {
-  CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS,
-  type CSTicket, type CSTicketStatus, type CSTicketPrioridade,
+  CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS, CS_INDICACAO_STATUS_LABELS,
+  type CSTicket, type CSTicketStatus, type CSTicketPrioridade, type CSTicketTipo, type CSTicketImpacto, type CSIndicacaoStatus,
 } from './types';
 import { Loader2, Calendar, User, Building2, DollarSign, Clock, Save, AlertTriangle, CheckCircle, ArrowUpDown, Play, Trash2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -65,17 +65,26 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [editData, setEditData] = useState({
+    tipo: ticket?.tipo || 'relacionamento_90d' as CSTicketTipo,
+    assunto: ticket?.assunto || '',
+    descricao_curta: ticket?.descricao_curta || '',
     status: ticket?.status || 'aberto' as CSTicketStatus,
     prioridade: ticket?.prioridade || 'media' as CSTicketPrioridade,
+    impacto_categoria: ticket?.impacto_categoria || 'relacionamento' as CSTicketImpacto,
     escalado: ticket?.escalado || false,
     owner_id: ticket?.owner_id || 0,
     proxima_acao: ticket?.proxima_acao || '',
     proximo_followup_em: ticket?.proximo_followup_em || '',
+    mrr_em_risco: ticket?.mrr_em_risco ?? null as number | null,
     mrr_recuperado: ticket?.mrr_recuperado ?? null as number | null,
     contato_externo_nome: ticket?.contato_externo_nome || '',
     oport_valor_previsto_ativacao: ticket?.oport_valor_previsto_ativacao ?? null as number | null,
     oport_valor_previsto_mrr: ticket?.oport_valor_previsto_mrr ?? null as number | null,
     oport_data_prevista: ticket?.oport_data_prevista || '',
+    indicacao_nome: ticket?.indicacao_nome || '',
+    indicacao_contato: ticket?.indicacao_contato || '',
+    indicacao_cidade: ticket?.indicacao_cidade || '',
+    indicacao_status: ticket?.indicacao_status || null as CSIndicacaoStatus | null,
   });
 
   const [fechamentoData, setFechamentoData] = useState({
@@ -92,17 +101,26 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   useEffect(() => {
     if (currentTicket) {
       setEditData({
+        tipo: currentTicket.tipo,
+        assunto: currentTicket.assunto,
+        descricao_curta: currentTicket.descricao_curta,
         status: currentTicket.status,
         prioridade: currentTicket.prioridade,
+        impacto_categoria: currentTicket.impacto_categoria,
         escalado: currentTicket.escalado,
         owner_id: currentTicket.owner_id || 0,
         proxima_acao: currentTicket.proxima_acao,
         proximo_followup_em: currentTicket.proximo_followup_em,
+        mrr_em_risco: currentTicket.mrr_em_risco ?? null,
         mrr_recuperado: currentTicket.mrr_recuperado ?? null,
         contato_externo_nome: currentTicket.contato_externo_nome || '',
         oport_valor_previsto_ativacao: currentTicket.oport_valor_previsto_ativacao ?? null,
         oport_valor_previsto_mrr: currentTicket.oport_valor_previsto_mrr ?? null,
         oport_data_prevista: currentTicket.oport_data_prevista || '',
+        indicacao_nome: currentTicket.indicacao_nome || '',
+        indicacao_contato: currentTicket.indicacao_contato || '',
+        indicacao_cidade: currentTicket.indicacao_cidade || '',
+        indicacao_status: currentTicket.indicacao_status || null,
       });
     }
   }, [currentTicket]);
@@ -200,19 +218,41 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   const handleSave = async () => {
     if (!currentTicket) return;
     const changes: string[] = [];
+    if (editData.tipo !== currentTicket.tipo) changes.push(`Tipo: ${CS_TICKET_TIPO_LABELS[currentTicket.tipo]} → ${CS_TICKET_TIPO_LABELS[editData.tipo]}`);
     if (editData.status !== currentTicket.status) changes.push(`Status: ${CS_TICKET_STATUS_LABELS[currentTicket.status]} → ${CS_TICKET_STATUS_LABELS[editData.status]}`);
     if (editData.prioridade !== currentTicket.prioridade) changes.push(`Prioridade: ${CS_TICKET_PRIORIDADE_LABELS[currentTicket.prioridade]} → ${CS_TICKET_PRIORIDADE_LABELS[editData.prioridade]}`);
 
+    const editTipo = editData.tipo;
+    const isEditOportunidade = editTipo === 'oportunidade' || (editTipo === 'interno_processo' && !!editData.contato_externo_nome);
+
     await updateTicket.mutateAsync({
-      id: currentTicket.id, status: editData.status, prioridade: editData.prioridade, escalado: editData.escalado,
-      proxima_acao: editData.proxima_acao, proximo_followup_em: editData.proximo_followup_em,
+      id: currentTicket.id,
+      tipo: editData.tipo,
+      assunto: editData.assunto,
+      descricao_curta: editData.descricao_curta,
+      status: editData.status,
+      prioridade: editData.prioridade,
+      impacto_categoria: editData.impacto_categoria,
+      escalado: editData.escalado,
+      proxima_acao: editData.proxima_acao,
+      proximo_followup_em: editData.proximo_followup_em,
       ...(editData.status === 'concluido' && currentTicket.status !== 'concluido' ? { concluido_em: new Date().toISOString() } : {}),
-      ...(currentTicket.tipo === 'risco_churn' ? { mrr_recuperado: editData.mrr_recuperado } : {}),
-      ...(currentTicket.tipo === 'interno_processo' ? { contato_externo_nome: editData.contato_externo_nome || null } : {}),
-      ...((currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && editData.contato_externo_nome)) ? {
+      // Risco churn fields
+      ...(editTipo === 'risco_churn' ? { mrr_em_risco: editData.mrr_em_risco, mrr_recuperado: editData.mrr_recuperado } : {}),
+      // Interno/processo contato externo
+      ...(editTipo === 'interno_processo' ? { contato_externo_nome: editData.contato_externo_nome || null } : { contato_externo_nome: null }),
+      // Oportunidade fields
+      ...(isEditOportunidade ? {
         oport_valor_previsto_ativacao: editData.oport_valor_previsto_ativacao,
         oport_valor_previsto_mrr: editData.oport_valor_previsto_mrr,
         oport_data_prevista: editData.oport_data_prevista || null,
+      } : {}),
+      // Indicação fields
+      ...(editTipo === 'indicacao' ? {
+        indicacao_nome: editData.indicacao_nome || null,
+        indicacao_contato: editData.indicacao_contato || null,
+        indicacao_cidade: editData.indicacao_cidade || null,
+        indicacao_status: editData.indicacao_status,
       } : {}),
     });
     if (changes.length > 0) await addUpdate.mutateAsync({ conteudo: changes.join('. '), tipo: changes.some(c => c.includes('Status')) ? 'mudanca_status' : 'mudanca_prioridade' });
@@ -292,6 +332,34 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
 
       {mode === 'edit' ? (
         <div className="space-y-4">
+          {/* Tipo + Assunto + Descrição */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={editData.tipo} onValueChange={(v) => setEditData({ ...editData, tipo: v as CSTicketTipo })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(CS_TICKET_TIPO_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Impacto</Label>
+              <Select value={editData.impacto_categoria} onValueChange={(v) => setEditData({ ...editData, impacto_categoria: v as CSTicketImpacto })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(CS_TICKET_IMPACTO_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Assunto</Label>
+            <Input value={editData.assunto} onChange={(e) => setEditData({ ...editData, assunto: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label>Descrição Curta</Label>
+            <Textarea value={editData.descricao_curta} onChange={(e) => setEditData({ ...editData, descricao_curta: e.target.value })} rows={2} />
+          </div>
+
+          <Separator />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Status</Label>
@@ -308,6 +376,13 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
               </Select>
             </div>
             <div className="space-y-2">
+              <Label>Responsável</Label>
+              <Select value={editData.owner_id ? String(editData.owner_id) : ''} onValueChange={(v) => setEditData({ ...editData, owner_id: Number(v) })}>
+                <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                <SelectContent>{funcionarios?.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}{f.cargo ? ` (${f.cargo})` : ''}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Próximo Follow-up</Label>
               <Input type="date" value={editData.proximo_followup_em} onChange={(e) => setEditData({ ...editData, proximo_followup_em: e.target.value })} />
             </div>
@@ -316,12 +391,12 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             </div>
           </div>
 
-          {/* MRR Recuperado editável para risco_churn */}
-          {currentTicket.tipo === 'risco_churn' && (
+          {/* MRR fields for risco_churn */}
+          {editData.tipo === 'risco_churn' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 border rounded-lg">
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-xs">MRR em Risco</Label>
-                <p className="text-lg font-semibold text-destructive">{formatCurrency(currentTicket.mrr_em_risco)}</p>
+                <Label>MRR em Risco (R$)</Label>
+                <NumericInput value={editData.mrr_em_risco} onChange={(v) => setEditData({ ...editData, mrr_em_risco: v })} />
               </div>
               <div className="space-y-2">
                 <Label>MRR Recuperado (R$)</Label>
@@ -331,7 +406,7 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
           )}
 
           {/* Contato externo para interno_processo */}
-          {currentTicket.tipo === 'interno_processo' && (
+          {editData.tipo === 'interno_processo' && (
             <div className="space-y-2">
               <Label>Nome do Contato Externo</Label>
               <Input value={editData.contato_externo_nome} onChange={(e) => setEditData({ ...editData, contato_externo_nome: e.target.value })} placeholder="Nome do contato externo (oportunidade externa)" />
@@ -339,7 +414,7 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
           )}
 
           {/* Oportunidade fields */}
-          {(currentTicket.tipo === 'oportunidade' || (currentTicket.tipo === 'interno_processo' && editData.contato_externo_nome)) && (
+          {(editData.tipo === 'oportunidade' || (editData.tipo === 'interno_processo' && editData.contato_externo_nome)) && (
             <div className="space-y-4 p-3 border rounded-lg">
               <h4 className="font-medium text-sm">Oportunidade de Venda</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -359,8 +434,36 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             </div>
           )}
 
+          {/* Indicação fields */}
+          {editData.tipo === 'indicacao' && (
+            <div className="space-y-4 p-3 border rounded-lg">
+              <h4 className="font-medium text-sm">Dados da Indicação</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nome do Indicado</Label>
+                  <Input value={editData.indicacao_nome} onChange={(e) => setEditData({ ...editData, indicacao_nome: e.target.value })} placeholder="Nome da empresa/pessoa" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contato</Label>
+                  <Input value={editData.indicacao_contato} onChange={(e) => setEditData({ ...editData, indicacao_contato: e.target.value })} placeholder="Telefone ou email" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cidade</Label>
+                  <Input value={editData.indicacao_cidade} onChange={(e) => setEditData({ ...editData, indicacao_cidade: e.target.value })} placeholder="Cidade" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status da Indicação</Label>
+                  <Select value={editData.indicacao_status || ''} onValueChange={(v) => setEditData({ ...editData, indicacao_status: v as CSIndicacaoStatus })}>
+                    <SelectTrigger><SelectValue placeholder="Selecionar status" /></SelectTrigger>
+                    <SelectContent>{Object.entries(CS_INDICACAO_STATUS_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label>{currentTicket.tipo === 'clube_comunidade' ? 'Ação Agendada/Realizada' : 'Próxima Ação'}</Label>
+            <Label>{editData.tipo === 'clube_comunidade' ? 'Ação Agendada/Realizada' : 'Próxima Ação'}</Label>
             <Textarea value={editData.proxima_acao} onChange={(e) => setEditData({ ...editData, proxima_acao: e.target.value })} rows={2} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
