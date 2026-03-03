@@ -417,10 +417,8 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <a href={`/clientes/${c.id}`} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
+                          <Button variant="ghost" size="sm" onClick={() => window.open(`/clientes/${c.id}`, '_blank')}>
+                            <ExternalLink className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>
