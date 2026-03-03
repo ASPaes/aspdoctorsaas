@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, differenceInDays, parseISO } from "date-fns";
-import { ShieldCheck, Plus } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { format, differenceInDays, differenceInMinutes, parseISO } from "date-fns";
+import { ShieldCheck, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import CertA1VendaModal from "./CertA1VendaModal";
 
 interface Props {
@@ -39,8 +42,29 @@ const badgeClasses: Record<string, string> = {
 
 const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+function detectDuplicates(vendas: any[]): Set<string> {
+  const dupeIds = new Set<string>();
+  for (let i = 0; i < vendas.length; i++) {
+    for (let j = i + 1; j < vendas.length; j++) {
+      const a = vendas[i], b = vendas[j];
+      if (a.data_venda === b.data_venda && a.status === b.status) {
+        const diff = Math.abs(differenceInMinutes(parseISO(a.created_at), parseISO(b.created_at)));
+        if (diff < 5) {
+          dupeIds.add(a.id);
+          dupeIds.add(b.id);
+        }
+      }
+    }
+  }
+  return dupeIds;
+}
+
 export default function CertificadoA1Section({ clienteId, vencimento, ultimaVendaEm, ultimoVendedorId, onVencimentoChange, onVendaRegistrada, funcionarios }: Props) {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const status = getCertStatus(vencimento);
   const vendedorNome = useMemo(
@@ -56,11 +80,28 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
         .select("*")
         .eq("cliente_id", clienteId)
         .order("data_venda", { ascending: false })
-        .limit(5);
+        .limit(20);
       if (error) throw error;
       return data as any[];
     },
     enabled: !!clienteId,
+  });
+
+  const dupeIds = useMemo(() => detectDuplicates(vendas ?? []), [vendas]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("certificado_a1_vendas").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Registro excluído.");
+      queryClient.invalidateQueries({ queryKey: ["cert_a1_vendas", clienteId] });
+      queryClient.invalidateQueries({ queryKey: ["cert-a1-dashboard"] });
+      setDeleteId(null);
+      onVendaRegistrada();
+    },
+    onError: (e: any) => toast.error("Erro ao excluir: " + e.message),
   });
 
   return (
@@ -130,24 +171,42 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
                         <TableHead className="text-xs">Vendedor</TableHead>
                         <TableHead className="text-xs">Status</TableHead>
                         <TableHead className="text-xs">Obs.</TableHead>
+                        {isAdmin && <TableHead className="text-xs w-[50px]">Ações</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {vendas.map((v: any) => (
-                        <TableRow key={v.id}>
-                          <TableCell className="text-xs">{format(parseISO(v.data_venda), "dd/MM/yyyy")}</TableCell>
-                          <TableCell className="text-xs">{v.valor_venda ? formatBRL.format(Number(v.valor_venda)) : "—"}</TableCell>
-                          <TableCell className="text-xs">{funcionarios.find((f) => f.id === v.vendedor_id)?.nome ?? "—"}</TableCell>
-                          <TableCell className="text-xs">
-                            {v.status === "perdido_terceiro" ? (
-                              <Badge variant="outline" className={badgeClasses.warning}>Perdido p/ terceiro</Badge>
-                            ) : (
-                              <Badge variant="outline" className={badgeClasses.success}>Ganho</Badge>
+                      {vendas.map((v: any) => {
+                        const isDupe = dupeIds.has(v.id);
+                        return (
+                          <TableRow key={v.id}>
+                            <TableCell className="text-xs">{format(parseISO(v.data_venda), "dd/MM/yyyy")}</TableCell>
+                            <TableCell className="text-xs">{v.valor_venda ? formatBRL.format(Number(v.valor_venda)) : "—"}</TableCell>
+                            <TableCell className="text-xs">{funcionarios.find((f) => f.id === v.vendedor_id)?.nome ?? "—"}</TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex items-center gap-1">
+                                {v.status === "perdido_terceiro" ? (
+                                  <Badge variant="outline" className={badgeClasses.warning}>Perdido p/ terceiro</Badge>
+                                ) : (
+                                  <Badge variant="outline" className={badgeClasses.success}>Ganho</Badge>
+                                )}
+                                {isDupe && (
+                                  <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px]">
+                                    Possível duplicidade
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs max-w-[150px] truncate">{v.observacao || v.motivo_perda || "—"}</TableCell>
+                            {isAdmin && (
+                              <TableCell>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(v.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TableCell>
                             )}
-                          </TableCell>
-                          <TableCell className="text-xs max-w-[150px] truncate">{v.observacao || v.motivo_perda || "—"}</TableCell>
-                        </TableRow>
-                      ))}
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}
@@ -166,6 +225,27 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
           onVendaRegistrada={onVendaRegistrada}
         />
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro de venda?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O registro será permanentemente removido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
