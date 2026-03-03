@@ -61,6 +61,9 @@ export interface CSDashboardData {
       mensalidade: number | null;
       ultimoContato: string | null;
       diasSemContato: number | null;
+      data_cadastro: string | null;
+      cnpj: string | null;
+      fornecedor_nome: string | null;
     }[];
   };
 }
@@ -97,19 +100,26 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
       // Parallel queries: tickets + active clients + last contact per client
       const clientesAtivosQuery = supabase
         .from('clientes')
-        .select('id, razao_social, nome_fantasia, mensalidade')
+        .select('id, razao_social, nome_fantasia, mensalidade, data_cadastro, cnpj, fornecedor_id')
         .eq('cancelado', false);
 
-      const [ticketsResult, clientesResult] = await Promise.all([
+      const fornecedoresQuery = supabase
+        .from('fornecedores')
+        .select('id, nome');
+
+      const [ticketsResult, clientesResult, fornecedoresResult] = await Promise.all([
         ticketsQuery,
         clientesAtivosQuery,
+        fornecedoresQuery,
       ]);
 
       if (ticketsResult.error) throw ticketsResult.error;
       if (clientesResult.error) throw clientesResult.error;
+      if (fornecedoresResult.error) throw fornecedoresResult.error;
 
       const allTicketsRaw = ticketsResult.data || [];
       const clientesAtivos = clientesResult.data || [];
+      const fornecedoresMap = new Map((fornecedoresResult.data || []).map((f: any) => [f.id, f.nome]));
 
       const allTickets = (allTicketsRaw || []) as unknown as CSTicket[];
       const interval = { start: filters.periodoInicio, end: endOfDay(filters.periodoFim) };
@@ -288,11 +298,14 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
             mensalidade: c.mensalidade,
             ultimoContato: uc,
             diasSemContato: uc ? differenceInDays(now, parseISO(uc)) : null,
+            data_cadastro: c.data_cadastro || null,
+            cnpj: c.cnpj || null,
+            fornecedor_nome: c.fornecedor_id ? (fornecedoresMap.get(c.fornecedor_id) || null) : null,
           };
         })
         .sort((a, b) => {
           if (a.diasSemContato === null && b.diasSemContato === null) return 0;
-          if (a.diasSemContato === null) return -1; // null = never contacted → top
+          if (a.diasSemContato === null) return -1;
           if (b.diasSemContato === null) return 1;
           return b.diasSemContato - a.diasSemContato;
         });

@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
+import { useMemo, useState } from 'react';
+import { format, startOfMonth, endOfMonth, differenceInDays, parseISO, isWithinInterval, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useCSDashboardData, type CSDashboardFilters } from './hooks/useCSDashboardData';
 import {
@@ -13,7 +15,7 @@ import {
   type CSTicket, type CSTicketPrioridade,
 } from './types';
 import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User, ShieldCheck, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User, ShieldCheck, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
@@ -62,9 +64,90 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
   const { data, isLoading } = useCSDashboardData(dashFilters);
 
+  // Cobertura 90D local state
+  const [cobSearch, setCobSearch] = useState('');
+  const [cobCadastroRange, setCobCadastroRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [cobSortKey, setCobSortKey] = useState<string>('diasSemContato');
+  const [cobSortDir, setCobSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const cob = data?.cobertura90d ?? { totalAtivos: 0, cobertos: 0, descobertos: 0, percentCoberto: 100, clientesDescobertos: [] };
+
+  const cobFiltered = useMemo(() => {
+    let list = cob.clientesDescobertos;
+
+    if (cobSearch.trim()) {
+      const q = cobSearch.trim().toLowerCase();
+      list = list.filter(c =>
+        (c.razao_social || '').toLowerCase().includes(q) ||
+        (c.nome_fantasia || '').toLowerCase().includes(q) ||
+        (c.cnpj || '').toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q)
+      );
+    }
+
+    if (cobCadastroRange.from) {
+      const rangeStart = cobCadastroRange.from;
+      const rangeEnd = cobCadastroRange.to ? endOfDay(cobCadastroRange.to) : endOfDay(cobCadastroRange.from);
+      list = list.filter(c => {
+        if (!c.data_cadastro) return false;
+        const d = parseISO(c.data_cadastro);
+        return isWithinInterval(d, { start: rangeStart, end: rangeEnd });
+      });
+    }
+
+    const sorted = [...list].sort((a, b) => {
+      const dir = cobSortDir === 'asc' ? 1 : -1;
+      switch (cobSortKey) {
+        case 'cliente': {
+          const na = (a.nome_fantasia || a.razao_social || '').toLowerCase();
+          const nb = (b.nome_fantasia || b.razao_social || '').toLowerCase();
+          return na.localeCompare(nb) * dir;
+        }
+        case 'mensalidade':
+          return ((a.mensalidade || 0) - (b.mensalidade || 0)) * dir;
+        case 'data_cadastro': {
+          const da = a.data_cadastro || '';
+          const db = b.data_cadastro || '';
+          return da.localeCompare(db) * dir;
+        }
+        case 'fornecedor': {
+          const fa = (a.fornecedor_nome || '').toLowerCase();
+          const fb = (b.fornecedor_nome || '').toLowerCase();
+          return fa.localeCompare(fb) * dir;
+        }
+        case 'ultimoContato': {
+          const ua = a.ultimoContato || '';
+          const ub = b.ultimoContato || '';
+          return ua.localeCompare(ub) * dir;
+        }
+        case 'diasSemContato':
+        default: {
+          const da2 = a.diasSemContato ?? 99999;
+          const db2 = b.diasSemContato ?? 99999;
+          return (da2 - db2) * dir;
+        }
+      }
+    });
+
+    return sorted;
+  }, [cob.clientesDescobertos, cobSearch, cobCadastroRange, cobSortKey, cobSortDir]);
+
+  const toggleSort = (key: string) => {
+    if (cobSortKey === key) {
+      setCobSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setCobSortKey(key);
+      setCobSortDir('desc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (cobSortKey !== col) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return cobSortDir === 'asc' ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
   if (isLoading) return <div className="space-y-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div></div>;
   if (!data) return null;
-  const cob = data.cobertura90d ?? { totalAtivos: 0, cobertos: 0, descobertos: 0, percentCoberto: 100, clientesDescobertos: [] };
 
   const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatPercent = (v: number) => `${v.toFixed(1)}%`;
@@ -267,26 +350,66 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
             />
           </div>
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Clientes Sem Cobertura</CardTitle></CardHeader>
-            <CardContent>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Clientes Sem Cobertura</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3 items-end">
+                <div className="space-y-1 flex-1">
+                  <label className="text-xs font-medium text-muted-foreground">Buscar</label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Razão Social, Nome Fantasia, CNPJ ou ID"
+                      value={cobSearch}
+                      onChange={e => setCobSearch(e.target.value)}
+                      className="pl-8 h-9 text-xs"
+                    />
+                  </div>
+                </div>
+                <DateRangePicker
+                  label="Data de Cadastro"
+                  value={cobCadastroRange}
+                  onChange={setCobCadastroRange}
+                  className="min-w-[220px]"
+                />
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Mensalidade</TableHead>
-                    <TableHead>Último Contato</TableHead>
-                    <TableHead>Dias s/ Contato</TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('cliente')}>
+                      <span className="flex items-center">Cliente<SortIcon col="cliente" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('mensalidade')}>
+                      <span className="flex items-center">Mensalidade<SortIcon col="mensalidade" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('data_cadastro')}>
+                      <span className="flex items-center">Cadastro<SortIcon col="data_cadastro" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('fornecedor')}>
+                      <span className="flex items-center">Fornecedor<SortIcon col="fornecedor" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('ultimoContato')}>
+                      <span className="flex items-center">Último Contato<SortIcon col="ultimoContato" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('diasSemContato')}>
+                      <span className="flex items-center">Dias s/ Contato<SortIcon col="diasSemContato" /></span>
+                    </TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cob.clientesDescobertos.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Todos os clientes cobertos 🎉</TableCell></TableRow>
+                  {cobFiltered.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                      {cob.clientesDescobertos.length === 0 ? 'Todos os clientes cobertos 🎉' : 'Nenhum resultado para os filtros aplicados'}
+                    </TableCell></TableRow>
                   ) : (
-                    cob.clientesDescobertos.map(c => (
+                    cobFiltered.map(c => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.nome_fantasia || c.razao_social || '—'}</TableCell>
                         <TableCell>{c.mensalidade != null ? formatCurrency(c.mensalidade) : '—'}</TableCell>
+                        <TableCell className="text-sm">{c.data_cadastro ? format(parseISO(c.data_cadastro), 'dd/MM/yyyy') : '—'}</TableCell>
+                        <TableCell className="text-sm">{c.fornecedor_nome || '—'}</TableCell>
                         <TableCell>{c.ultimoContato ? format(new Date(c.ultimoContato), 'dd/MM/yyyy') : <span className="text-destructive font-medium">Nunca</span>}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={c.diasSemContato === null || c.diasSemContato > 180 ? 'border-destructive text-destructive' : c.diasSemContato > 90 ? 'border-orange-500 text-orange-500' : ''}>
