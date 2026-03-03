@@ -211,19 +211,24 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         monitoramento: backlog.filter((t) => t.tipo === 'risco_churn' && t.status === 'em_monitoramento').length,
       };
 
-      // Indicações — filtradas pelo período selecionado
+      // Indicações — baseadas em movimentos (atualizado_em) dentro do período
       const ticketsIndicacao = allTickets.filter((t) => t.tipo === 'indicacao');
-      const ticketsIndicacaoNoPeriodo = ticketsIndicacao.filter((t) =>
-        isWithinInterval(parseISO(t.criado_em), interval)
+
+      // Tickets de indicação que tiveram movimentação no período (criados OU atualizados)
+      const ticketsIndicacaoMovimentados = ticketsIndicacao.filter((t) =>
+        isWithinInterval(parseISO(t.criado_em), interval) ||
+        isWithinInterval(parseISO(t.atualizado_em), interval)
       );
+
+      // Pipeline: conta o status atual de todos os tickets movimentados no período
       const pipelineIndicacao: Record<CSIndicacaoStatus, number> = {
         recebida: 0, contatada: 0, qualificada: 0, enviada_ao_comercial: 0, fechou: 0, nao_fechou: 0,
       };
-      ticketsIndicacaoNoPeriodo.forEach((t) => { if (t.indicacao_status) pipelineIndicacao[t.indicacao_status]++; });
+      ticketsIndicacaoMovimentados.forEach((t) => { if (t.indicacao_status) pipelineIndicacao[t.indicacao_status]++; });
 
-      const indicacoesNoPeriodo = ticketsIndicacao.filter((t) => isWithinInterval(parseISO(t.criado_em), interval));
+      // Indicações por owner (movimentados no período)
       const indicacoesByOwner: Record<number, number> = {};
-      indicacoesNoPeriodo.forEach((t) => {
+      ticketsIndicacaoMovimentados.forEach((t) => {
         if (t.owner_id) indicacoesByOwner[t.owner_id] = (indicacoesByOwner[t.owner_id] || 0) + 1;
       });
 
@@ -236,9 +241,9 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         count,
       }));
 
-      // Indicações — conversão
-      const indicacoesGanhas = ticketsIndicacaoNoPeriodo.filter((t) => t.indicacao_status === 'fechou').length;
-      const indicacoesPerdidas = ticketsIndicacaoNoPeriodo.filter((t) => t.indicacao_status === 'nao_fechou').length;
+      // Indicações — conversão baseada em atualizado_em no período
+      const indicacoesGanhas = ticketsIndicacaoMovimentados.filter((t) => t.indicacao_status === 'fechou').length;
+      const indicacoesPerdidas = ticketsIndicacaoMovimentados.filter((t) => t.indicacao_status === 'nao_fechou').length;
       const indicacoesConversaoPercent = (indicacoesGanhas + indicacoesPerdidas) > 0
         ? (indicacoesGanhas / (indicacoesGanhas + indicacoesPerdidas)) * 100 : 0;
 
@@ -324,7 +329,7 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         pipelineIndicacao, indicacoesPorOwner,
         indicacoesGanhas, indicacoesPerdidas, indicacoesConversaoPercent,
         topPrioridades, allTickets,
-        ticketsIndicacaoDetalhados: ticketsIndicacaoNoPeriodo,
+        ticketsIndicacaoDetalhados: ticketsIndicacaoMovimentados,
         oportunidadesAbertas: oportunidadesBacklog.length,
         oportunidadesGanhas, oportunidadesPerdidas, oportunidadesConversaoPercent,
         oportunidadesValorPrevistoAtivacao, oportunidadesValorPrevistoMrr,
