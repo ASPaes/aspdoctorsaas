@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -88,6 +89,9 @@ export function MovimentosMrrModal({
   custoBase,
   funcionarios,
 }: MovimentosMrrModalProps) {
+  const { user, profile } = useAuth();
+  const draftKey = `draft:mov_mrr:${profile?.tenant_id ?? "t"}:${user?.id ?? "u"}:new:${clienteId}`;
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [movimentos, setMovimentos] = useState<MovimentoMrr[]>([]);
@@ -102,6 +106,12 @@ export function MovimentosMrrModal({
   const [origemVenda, setOrigemVenda] = useState('');
   const [descricao, setDescricao] = useState('');
   const [funcionarioId, setFuncionarioId] = useState<string>('');
+
+  // Draft state
+  const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formIsDirty = useRef(false);
 
   const [deactivateConfirm, setDeactivateConfirm] = useState<{ open: boolean; movimento: MovimentoMrr | null }>({
     open: false,
@@ -130,6 +140,14 @@ export function MovimentosMrrModal({
   useEffect(() => {
     if (open && clienteId) {
       fetchMovimentos();
+      // Check for existing draft
+      try {
+        const raw = localStorage.getItem(draftKey);
+        if (raw) {
+          setShowDraftPrompt(true);
+          setShowAddForm(true);
+        }
+      } catch { /* ignore */ }
     }
   }, [open, clienteId]);
 
@@ -140,6 +158,60 @@ export function MovimentosMrrModal({
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [showAddForm, open]);
+
+  // Debounce-save draft while add form is open and dirty
+  const formSnapshot = JSON.stringify({ tipo, dataMovimento, valorDelta, custoDelta, valorVendaAvulsa, origemVenda, descricao, funcionarioId });
+  useEffect(() => {
+    if (!open || !showAddForm || !formIsDirty.current) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    setDraftStatus("saving");
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, formSnapshot);
+        setDraftStatus("saved");
+      } catch {
+        setDraftStatus("idle");
+      }
+    }, 600);
+    return () => { if (draftTimerRef.current) clearTimeout(draftTimerRef.current); };
+  }, [formSnapshot, open, showAddForm, draftKey]);
+
+  const restoreDraft = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.tipo) setTipo(d.tipo);
+        if (d.dataMovimento) setDataMovimento(d.dataMovimento);
+        if (d.valorDelta !== undefined) setValorDelta(d.valorDelta);
+        if (d.custoDelta !== undefined) setCustoDelta(d.custoDelta);
+        if (d.valorVendaAvulsa !== undefined) setValorVendaAvulsa(d.valorVendaAvulsa);
+        if (d.origemVenda !== undefined) setOrigemVenda(d.origemVenda);
+        if (d.descricao !== undefined) setDescricao(d.descricao);
+        if (d.funcionarioId !== undefined) setFuncionarioId(d.funcionarioId);
+        formIsDirty.current = true;
+      }
+    } catch { /* ignore */ }
+    setShowDraftPrompt(false);
+  }, [draftKey]);
+
+  const dismissDraft = useCallback(() => {
+    try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+    setShowDraftPrompt(false);
+    formIsDirty.current = false;
+  }, [draftKey]);
+
+  const clearDraft = useCallback(() => {
+    try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+    setDraftStatus("idle");
+    formIsDirty.current = false;
+  }, [draftKey]);
+
+  // Mark dirty on any field change (wrapper)
+  const setField = useCallback(<T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: T) => {
+    setter(value);
+    formIsDirty.current = true;
+  }, []);
 
   // Calculations
   const movimentosAtivos = movimentos.filter(m => m.status === 'ativo' && !m.estornado_por && !m.estorno_de && m.tipo !== 'venda_avulsa');
@@ -175,6 +247,9 @@ export function MovimentosMrrModal({
     setDescricao('');
     setFuncionarioId('');
     setShowAddForm(false);
+    formIsDirty.current = false;
+    setDraftStatus("idle");
+    setShowDraftPrompt(false);
   };
 
   const handleSubmit = async () => {
@@ -233,6 +308,7 @@ export function MovimentosMrrModal({
       if (error) throw error;
 
       toast.success('Movimento registrado com sucesso');
+      clearDraft();
       resetForm();
       fetchMovimentos();
     } catch (error: any) {
@@ -403,13 +479,37 @@ export function MovimentosMrrModal({
           {showAddForm && (
             <Card className="mb-4">
               <CardHeader className="py-3">
-                <CardTitle className="text-base">Novo Movimento</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Novo Movimento</CardTitle>
+                  {draftStatus === "saved" && formIsDirty.current && (
+                    <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
+                      Rascunho salvo
+                    </Badge>
+                  )}
+                  {draftStatus === "saving" && (
+                    <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
+                      Salvando…
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
+              {showDraftPrompt ? (
+                <CardContent className="space-y-4">
+                  <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+                    <p className="font-medium text-amber-700 dark:text-amber-400">Rascunho não salvo encontrado.</p>
+                    <p className="text-muted-foreground mt-1">Deseja restaurar os dados preenchidos anteriormente?</p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" size="sm" onClick={dismissDraft}>Descartar</Button>
+                    <Button size="sm" onClick={restoreDraft}>Restaurar</Button>
+                  </div>
+                </CardContent>
+              ) : (
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Tipo *</Label>
-                    <Select value={tipo} onValueChange={(v: any) => setTipo(v)}>
+                    <Select value={tipo} onValueChange={(v: any) => { setTipo(v); formIsDirty.current = true; }}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -439,14 +539,14 @@ export function MovimentosMrrModal({
                   </div>
                   <div className="space-y-2">
                     <Label>Data *</Label>
-                    <Input type="date" value={dataMovimento} onChange={(e) => setDataMovimento(e.target.value)} />
+                    <Input type="date" value={dataMovimento} onChange={(e) => { setDataMovimento(e.target.value); formIsDirty.current = true; }} />
                   </div>
                 </div>
 
                 {/* Funcionário select */}
                 <div className="space-y-2">
                   <Label>Funcionário Responsável *</Label>
-                  <Select value={funcionarioId} onValueChange={setFuncionarioId}>
+                  <Select value={funcionarioId} onValueChange={(v) => { setFuncionarioId(v); formIsDirty.current = true; }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o funcionário" />
                     </SelectTrigger>
@@ -462,40 +562,40 @@ export function MovimentosMrrModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Valor da Venda Avulsa (R$) *</Label>
-                      <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorVendaAvulsa} onChange={(e) => setValorVendaAvulsa(e.target.value)} />
+                      <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorVendaAvulsa} onChange={(e) => { setValorVendaAvulsa(e.target.value); formIsDirty.current = true; }} />
                       <p className="text-xs text-muted-foreground">Este valor será contabilizado na Meta de Ativação (R$) do mês</p>
                     </div>
                     <div className="space-y-2">
                       <Label>Origem</Label>
-                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => setOrigemVenda(e.target.value)} />
+                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => { setOrigemVenda(e.target.value); formIsDirty.current = true; }} />
                     </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Valor MRR (R$) *</Label>
-                      <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorDelta} onChange={(e) => setValorDelta(e.target.value)} />
+                      <Input type="number" step="0.01" min="0.01" placeholder="Ex: 500.00" value={valorDelta} onChange={(e) => { setValorDelta(e.target.value); formIsDirty.current = true; }} />
                       <p className="text-xs text-muted-foreground">
                         {tipo === 'downsell' ? 'Valor será subtraído do MRR' : 'Valor será somado ao MRR'}
                       </p>
                     </div>
                     <div className="space-y-2">
                       <Label>Custo (R$)</Label>
-                      <Input type="number" step="0.01" min="0" placeholder="Ex: 200.00" value={custoDelta} onChange={(e) => setCustoDelta(e.target.value)} />
+                      <Input type="number" step="0.01" min="0" placeholder="Ex: 200.00" value={custoDelta} onChange={(e) => { setCustoDelta(e.target.value); formIsDirty.current = true; }} />
                       <p className="text-xs text-muted-foreground">
                         {tipo === 'downsell' ? 'Custo será subtraído' : 'Custo adicional do movimento'}
                       </p>
                     </div>
                     <div className="space-y-2">
                       <Label>Origem</Label>
-                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => setOrigemVenda(e.target.value)} />
+                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => { setOrigemVenda(e.target.value); formIsDirty.current = true; }} />
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-2">
                   <Label>Descrição</Label>
-                  <Textarea placeholder="Detalhes do movimento..." value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} />
+                  <Textarea placeholder="Detalhes do movimento..." value={descricao} onChange={(e) => { setDescricao(e.target.value); formIsDirty.current = true; }} rows={2} />
                 </div>
 
                 <div className="flex gap-2">
@@ -506,6 +606,7 @@ export function MovimentosMrrModal({
                   <Button variant="outline" onClick={resetForm}>Cancelar</Button>
                 </div>
               </CardContent>
+              )}
             </Card>
           )}
 
