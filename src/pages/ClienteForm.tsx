@@ -165,10 +165,10 @@ export default function ClienteForm() {
     if (!isEditing && lookups.configuracoes.data) {
       const cfg = lookups.configuracoes.data;
       if (form.getValues("imposto_percentual") === null || form.getValues("imposto_percentual") === undefined) {
-        form.setValue("imposto_percentual", Number(cfg.imposto_percentual) * 100);
+        form.setValue("imposto_percentual", Number(cfg.imposto_percentual) * 100, { shouldDirty: false });
       }
       if (form.getValues("custo_fixo_percentual") === null || form.getValues("custo_fixo_percentual") === undefined) {
-        form.setValue("custo_fixo_percentual", Number(cfg.custo_fixo_percentual) * 100);
+        form.setValue("custo_fixo_percentual", Number(cfg.custo_fixo_percentual) * 100, { shouldDirty: false });
       }
     }
   }, [isEditing, lookups.configuracoes.data]);
@@ -184,7 +184,7 @@ export default function ClienteForm() {
     const suggestedCogs = Math.max(0, Math.round(m * (1 - mcPct) * 100) / 100);
     const current = form.getValues("custo_operacao");
     if (current === null || current === undefined || current === 0) {
-      form.setValue("custo_operacao", suggestedCogs);
+      form.setValue("custo_operacao", suggestedCogs, { shouldDirty: false });
     }
   }, [isEditing, mensalidadeWatch, mcPonderadaQuery.data]);
 
@@ -249,6 +249,8 @@ export default function ClienteForm() {
       numero: (c as any).numero ?? null,
       bairro: (c as any).bairro ?? null,
     });
+    // Clear any stale draft after loading DB data — user hasn't edited yet
+    clearDraft();
   }, [clienteQuery.data]);
 
   const mutation = useMutation({
