@@ -18,6 +18,7 @@ import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
 import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User, ShieldCheck, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { KpiHelpPopover } from '@/components/dashboard/KpiHelpPopover';
 
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -28,14 +29,17 @@ const PRIORIDADE_COLORS: Record<CSTicketPrioridade, string> = {
   urgente: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
 };
 
-function KPICard({ title, value, subtitle, icon, variant = 'default' }: { title: string; value: string | number; subtitle?: string; icon: React.ReactNode; variant?: 'default' | 'success' | 'warning' | 'danger' }) {
+function KPICard({ title, value, subtitle, icon, variant = 'default', kpiKey }: { title: string; value: string | number; subtitle?: string; icon: React.ReactNode; variant?: 'default' | 'success' | 'warning' | 'danger'; kpiKey?: string }) {
   const bgColors = { default: 'bg-card', success: 'bg-green-500/5 border-green-500/20', warning: 'bg-orange-500/5 border-orange-500/20', danger: 'bg-destructive/5 border-destructive/20' };
   return (
     <Card className={bgColors[variant]}>
       <CardContent className="pt-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+              {title}
+              {kpiKey && <KpiHelpPopover kpiKey={kpiKey} />}
+            </p>
             <p className="text-2xl font-bold">{value}</p>
             {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
           </div>
@@ -171,16 +175,16 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
         <TabsContent value="operacao" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard title="Tickets Abertos" value={data.ticketsAbertos} subtitle="no período" icon={<BarChart3 className="h-5 w-5 text-primary" />} />
-            <KPICard title="Tickets Fechados" value={data.ticketsFechados} subtitle="no período" icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" />
-            <KPICard title="Vencidos SLA" value={data.vencidosSlaAcao.length + data.vencidosSlaConclusao.length} subtitle="ação + conclusão" icon={<AlertTriangle className="h-5 w-5 text-destructive" />} variant="danger" />
-            <KPICard title="Reaberturas" value={data.reaberturas} icon={<RefreshCw className="h-5 w-5 text-orange-500" />} variant={data.reaberturas > 0 ? 'warning' : 'default'} />
+            <KPICard title="Tickets Abertos" value={data.ticketsAbertos} subtitle="no período" icon={<BarChart3 className="h-5 w-5 text-primary" />} kpiKey="cs_tickets_abertos" />
+            <KPICard title="Tickets Fechados" value={data.ticketsFechados} subtitle="no período" icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_tickets_fechados" />
+            <KPICard title="Vencidos SLA" value={data.vencidosSlaAcao.length + data.vencidosSlaConclusao.length} subtitle="ação + conclusão" icon={<AlertTriangle className="h-5 w-5 text-destructive" />} variant="danger" kpiKey="cs_vencidos_sla" />
+            <KPICard title="Reaberturas" value={data.reaberturas} icon={<RefreshCw className="h-5 w-5 text-orange-500" />} variant={data.reaberturas > 0 ? 'warning' : 'default'} kpiKey="cs_reaberturas" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard title="Tempo 1ª Ação (Média)" value={formatHours(data.tempoAteAcaoMedia)} icon={<Clock className="h-5 w-5 text-primary" />} />
-            <KPICard title="Tempo 1ª Ação (Mediana)" value={formatHours(data.tempoAteAcaoMediana)} icon={<Clock className="h-5 w-5 text-primary" />} />
-            <KPICard title="Tempo Conclusão (Média)" value={formatHours(data.tempoAteConclusaoMedia)} icon={<Clock className="h-5 w-5 text-primary" />} />
-            <KPICard title="% Higiene" value={formatPercent(data.percentHigiene)} subtitle="próxima ação + data" icon={<Target className="h-5 w-5 text-green-500" />} variant={data.percentHigiene >= 80 ? 'success' : data.percentHigiene >= 50 ? 'warning' : 'danger'} />
+            <KPICard title="Tempo 1ª Ação (Média)" value={formatHours(data.tempoAteAcaoMedia)} icon={<Clock className="h-5 w-5 text-primary" />} kpiKey="cs_tempo_1a_acao_media" />
+            <KPICard title="Tempo 1ª Ação (Mediana)" value={formatHours(data.tempoAteAcaoMediana)} icon={<Clock className="h-5 w-5 text-primary" />} kpiKey="cs_tempo_1a_acao_mediana" />
+            <KPICard title="Tempo Conclusão (Média)" value={formatHours(data.tempoAteConclusaoMedia)} icon={<Clock className="h-5 w-5 text-primary" />} kpiKey="cs_tempo_conclusao_media" />
+            <KPICard title="% Higiene" value={formatPercent(data.percentHigiene)} subtitle="próxima ação + data" icon={<Target className="h-5 w-5 text-green-500" />} variant={data.percentHigiene >= 80 ? 'success' : data.percentHigiene >= 50 ? 'warning' : 'danger'} kpiKey="cs_percent_higiene" />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card><CardHeader><CardTitle className="text-base">Backlog por Status</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={250}><BarChart data={backlogStatusData} layout="vertical"><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={120} fontSize={12} /><Tooltip /><Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></CardContent></Card>
@@ -210,10 +214,10 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
         <TabsContent value="retencao" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard title="Clientes em Risco" value={data.clientesEmRisco} icon={<AlertTriangle className="h-5 w-5 text-destructive" />} variant="danger" />
-            <KPICard title="MRR em Risco" value={formatCurrency(data.mrrEmRisco)} icon={<DollarSign className="h-5 w-5 text-destructive" />} variant="danger" />
-            <KPICard title="MRR Recuperado" value={formatCurrency(data.mrrRecuperado)} subtitle="no período" icon={<TrendingUp className="h-5 w-5 text-green-500" />} variant="success" />
-            <KPICard title="% Com Plano" value={formatPercent(data.percentRiscoComPlano)} subtitle="tickets risco" icon={<Target className="h-5 w-5 text-primary" />} variant={data.percentRiscoComPlano >= 80 ? 'success' : 'warning'} />
+            <KPICard title="Clientes em Risco" value={data.clientesEmRisco} icon={<AlertTriangle className="h-5 w-5 text-destructive" />} variant="danger" kpiKey="cs_clientes_em_risco" />
+            <KPICard title="MRR em Risco" value={formatCurrency(data.mrrEmRisco)} icon={<DollarSign className="h-5 w-5 text-destructive" />} variant="danger" kpiKey="cs_mrr_em_risco" />
+            <KPICard title="MRR Recuperado" value={formatCurrency(data.mrrRecuperado)} subtitle="no período" icon={<TrendingUp className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_mrr_recuperado" />
+            <KPICard title="% Com Plano" value={formatPercent(data.percentRiscoComPlano)} subtitle="tickets risco" icon={<Target className="h-5 w-5 text-primary" />} variant={data.percentRiscoComPlano >= 80 ? 'success' : 'warning'} kpiKey="cs_percent_risco_com_plano" />
           </div>
           <Card>
             <CardHeader><CardTitle className="text-base">Resultado dos Riscos</CardTitle></CardHeader>
@@ -227,9 +231,9 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
         <TabsContent value="indicacoes" className="space-y-6">
           <div className="grid grid-cols-3 gap-4">
-            <KPICard title="Ganhas" value={data.indicacoesGanhas} icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" />
-            <KPICard title="Perdidas" value={data.indicacoesPerdidas} icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" />
-            <KPICard title="% Conversão" value={formatPercent(data.indicacoesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.indicacoesConversaoPercent >= 50 ? 'success' : data.indicacoesConversaoPercent >= 25 ? 'warning' : 'danger'} />
+            <KPICard title="Ganhas" value={data.indicacoesGanhas} icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_indicacoes_ganhas" />
+            <KPICard title="Perdidas" value={data.indicacoesPerdidas} icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" kpiKey="cs_indicacoes_perdidas" />
+            <KPICard title="% Conversão" value={formatPercent(data.indicacoesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.indicacoesConversaoPercent >= 50 ? 'success' : data.indicacoesConversaoPercent >= 25 ? 'warning' : 'danger'} kpiKey="cs_indicacoes_conversao" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {Object.entries(data.pipelineIndicacao).map(([status, count]) => (
@@ -286,16 +290,16 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
         <TabsContent value="oportunidades" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard title="Abertas" value={data.oportunidadesAbertas} subtitle="backlog" icon={<BarChart3 className="h-5 w-5 text-primary" />} />
-            <KPICard title="Ganhas" value={data.oportunidadesGanhas} subtitle="no período" icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" />
-            <KPICard title="Perdidas" value={data.oportunidadesPerdidas} subtitle="no período" icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" />
-            <KPICard title="% Conversão" value={formatPercent(data.oportunidadesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.oportunidadesConversaoPercent >= 50 ? 'success' : data.oportunidadesConversaoPercent >= 25 ? 'warning' : 'danger'} />
+            <KPICard title="Abertas" value={data.oportunidadesAbertas} subtitle="backlog" icon={<BarChart3 className="h-5 w-5 text-primary" />} kpiKey="cs_oportunidades_abertas" />
+            <KPICard title="Ganhas" value={data.oportunidadesGanhas} subtitle="no período" icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_oportunidades_ganhas" />
+            <KPICard title="Perdidas" value={data.oportunidadesPerdidas} subtitle="no período" icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" kpiKey="cs_oportunidades_perdidas" />
+            <KPICard title="% Conversão" value={formatPercent(data.oportunidadesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.oportunidadesConversaoPercent >= 50 ? 'success' : data.oportunidadesConversaoPercent >= 25 ? 'warning' : 'danger'} kpiKey="cs_oportunidades_conversao" />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KPICard title="Previsão Ativação" value={formatCurrency(data.oportunidadesValorPrevistoAtivacao)} subtitle="backlog" icon={<DollarSign className="h-5 w-5 text-primary" />} />
-            <KPICard title="Previsão MRR" value={formatCurrency(data.oportunidadesValorPrevistoMrr)} subtitle="backlog" icon={<DollarSign className="h-5 w-5 text-primary" />} />
-            <KPICard title="Ganho Ativação" value={formatCurrency(data.oportunidadesValorGanhoAtivacao)} subtitle="no período" icon={<DollarSign className="h-5 w-5 text-green-500" />} variant="success" />
-            <KPICard title="Ganho MRR" value={formatCurrency(data.oportunidadesValorGanhoMrr)} subtitle="no período" icon={<DollarSign className="h-5 w-5 text-green-500" />} variant="success" />
+            <KPICard title="Previsão Ativação" value={formatCurrency(data.oportunidadesValorPrevistoAtivacao)} subtitle="backlog" icon={<DollarSign className="h-5 w-5 text-primary" />} kpiKey="cs_previsao_ativacao" />
+            <KPICard title="Previsão MRR" value={formatCurrency(data.oportunidadesValorPrevistoMrr)} subtitle="backlog" icon={<DollarSign className="h-5 w-5 text-primary" />} kpiKey="cs_previsao_mrr" />
+            <KPICard title="Ganho Ativação" value={formatCurrency(data.oportunidadesValorGanhoAtivacao)} subtitle="no período" icon={<DollarSign className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_ganho_ativacao" />
+            <KPICard title="Ganho MRR" value={formatCurrency(data.oportunidadesValorGanhoMrr)} subtitle="no período" icon={<DollarSign className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_ganho_mrr" />
           </div>
           <Card>
             <CardHeader><CardTitle className="text-base">Oportunidades Abertas</CardTitle></CardHeader>
@@ -334,13 +338,14 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
 
         <TabsContent value="cobertura90d" className="space-y-6">
            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <KPICard title="Clientes Ativos" value={cob.totalAtivos} icon={<Users className="h-5 w-5 text-primary" />} />
+            <KPICard title="Clientes Ativos" value={cob.totalAtivos} icon={<Users className="h-5 w-5 text-primary" />} kpiKey="clientes_ativos" />
             <KPICard
               title="% Cobertura 90D"
               value={formatPercent(cob.percentCoberto)}
               subtitle={`${cob.cobertos} de ${cob.totalAtivos}`}
               icon={<ShieldCheck className="h-5 w-5 text-green-500" />}
               variant={cob.percentCoberto >= 80 ? 'success' : cob.percentCoberto >= 50 ? 'warning' : 'danger'}
+              kpiKey="cs_cobertura_90d"
             />
             <KPICard
               title="Descobertos"
@@ -348,6 +353,7 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
               subtitle="sem contato 90d"
               icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
               variant={cob.descobertos > 0 ? 'danger' : 'success'}
+              kpiKey="cs_descobertos"
             />
           </div>
           <Card>
