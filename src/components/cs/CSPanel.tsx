@@ -11,10 +11,12 @@ import {
   type CSTicket,
   type CSTicketPrioridade,
 } from './types';
+import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
 import { AlertTriangle, Clock, Users, Eye, Building2, User, FileWarning } from 'lucide-react';
 
 interface CSPanelProps {
   onViewTicket: (ticket: CSTicket) => void;
+  filters: CSGlobalFilters;
 }
 
 const PRIORIDADE_COLORS: Record<CSTicketPrioridade, string> = {
@@ -97,9 +99,16 @@ function PanelBlock({ title, icon, tickets, onViewTicket, variant = 'default', e
   );
 }
 
-export function CSPanel({ onViewTicket }: CSPanelProps) {
+export function CSPanel({ onViewTicket, filters }: CSPanelProps) {
+  // Panel always shows active tickets, intersected with global filters
   const { data: tickets, isLoading } = useCSTickets({
-    status: ['aberto', 'em_andamento', 'aguardando_cliente', 'aguardando_interno', 'em_monitoramento'],
+    status: filters.status !== 'all'
+      ? (['aberto', 'em_andamento', 'aguardando_cliente', 'aguardando_interno', 'em_monitoramento'].includes(filters.status) ? [filters.status] : [])
+      : ['aberto', 'em_andamento', 'aguardando_cliente', 'aguardando_interno', 'em_monitoramento'],
+    search: filters.search || undefined,
+    prioridade: filters.prioridade !== 'all' ? [filters.prioridade] : undefined,
+    tipo: filters.tipo !== 'all' ? [filters.tipo] : undefined,
+    owner_id: filters.ownerId !== '__all__' ? Number(filters.ownerId) : undefined,
   });
 
   const in3Days = addDays(startOfToday(), 3);

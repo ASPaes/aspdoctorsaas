@@ -8,18 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useCSTickets, useUpdateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
+import { useCSTickets, useUpdateCSTicket } from './hooks/useCSTickets';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS,
   type CSTicket, type CSTicketStatus, type CSTicketPrioridade,
 } from './types';
-import { Building2, User, AlertTriangle, Calendar, MoreVertical, Eye, Edit, ArrowRight, Filter, GripVertical } from 'lucide-react';
+import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
+import { Building2, User, AlertTriangle, Calendar, MoreVertical, Eye, Edit, ArrowRight, GripVertical } from 'lucide-react';
 
 interface CSKanbanProps {
   onViewTicket: (ticket: CSTicket) => void;
   onEditTicket: (ticket: CSTicket) => void;
+  filters: CSGlobalFilters;
 }
 
 const KANBAN_COLUMNS: CSTicketStatus[] = ['aberto', 'em_andamento', 'aguardando_cliente', 'aguardando_interno', 'em_monitoramento', 'concluido'];
@@ -89,25 +90,27 @@ function KanbanCard({ ticket, index, onView, onEdit, onChangeStatus }: { ticket:
   );
 }
 
-export function CSKanban({ onViewTicket, onEditTicket }: CSKanbanProps) {
-  const [ownerFilter, setOwnerFilter] = useState<string>('__all__');
-  const [prioridadeFilter, setPrioridadeFilter] = useState<string>('__all__');
+export function CSKanban({ onViewTicket, onEditTicket, filters }: CSKanbanProps) {
   const [showConcluidos, setShowConcluidos] = useState(false);
 
   const queryClient = useQueryClient();
-  const { data: funcionarios } = useFuncionariosAtivos();
-  const { data: tickets, isLoading } = useCSTickets();
+  const { data: tickets, isLoading } = useCSTickets({
+    search: filters.search || undefined,
+    prioridade: filters.prioridade !== 'all' ? [filters.prioridade] : undefined,
+    tipo: filters.tipo !== 'all' ? [filters.tipo] : undefined,
+    owner_id: filters.ownerId !== '__all__' ? Number(filters.ownerId) : undefined,
+  });
   const updateTicket = useUpdateCSTicket();
 
   const filteredTickets = useMemo(() => {
     if (!tickets) return [];
     return tickets.filter(ticket => {
-      if (ownerFilter !== '__all__' && String(ticket.owner_id) !== ownerFilter) return false;
-      if (prioridadeFilter !== '__all__' && ticket.prioridade !== prioridadeFilter) return false;
+      // Status filter from global: if set, only show matching (but kanban shows columns, so intersect)
+      if (filters.status !== 'all' && ticket.status !== filters.status) return false;
       if (!showConcluidos && (ticket.status === 'concluido' || ticket.status === 'cancelado')) return false;
       return true;
     });
-  }, [tickets, ownerFilter, prioridadeFilter, showConcluidos]);
+  }, [tickets, filters.status, showConcluidos]);
 
   const ticketsByStatus = useMemo(() => {
     const grouped: Record<CSTicketStatus, CSTicket[]> = { aberto: [], em_andamento: [], aguardando_cliente: [], aguardando_interno: [], em_monitoramento: [], concluido: [], cancelado: [] };
@@ -119,7 +122,6 @@ export function CSKanban({ onViewTicket, onEditTicket }: CSKanbanProps) {
     const ticket = tickets?.find(t => t.id === ticketId);
     const previousStatus = oldStatus || ticket?.status;
 
-    // Optimistic update
     queryClient.setQueryData(['cs-tickets', undefined], (old: CSTicket[] | undefined) => {
       if (!old) return old;
       return old.map(t => t.id === ticketId ? { ...t, status: newStatus } : t);
@@ -136,8 +138,6 @@ export function CSKanban({ onViewTicket, onEditTicket }: CSKanbanProps) {
 
     try {
       await updateTicket.mutateAsync(updates as any);
-
-      // Registrar na timeline
       if (previousStatus && previousStatus !== newStatus) {
         await supabase.from('cs_ticket_updates').insert({
           ticket_id: ticketId,
@@ -168,22 +168,7 @@ export function CSKanban({ onViewTicket, onEditTicket }: CSKanbanProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 items-center">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Owner" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todos owners</SelectItem>
-            {funcionarios?.map(f => (<SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>))}
-          </SelectContent>
-        </Select>
-        <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Prioridade" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todas</SelectItem>
-            {Object.entries(CS_TICKET_PRIORIDADE_LABELS).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-center">
         <Button variant={showConcluidos ? 'secondary' : 'outline'} size="sm" onClick={() => setShowConcluidos(!showConcluidos)}>
           {showConcluidos ? 'Ocultar Concluídos' : 'Mostrar Concluídos'}
         </Button>
