@@ -11,7 +11,8 @@ import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts';
-import type { KPIMetrics, DistributionData, DistributionDataPoint } from '../types';
+import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem } from '../types';
+import { NovosClientesTable } from '../tables/NovosClientesTable';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
@@ -54,9 +55,9 @@ function computeDelta(
   };
 }
 
-interface Props { metrics: KPIMetrics; distributions: DistributionData; tvMode: boolean; }
+interface Props { metrics: KPIMetrics; distributions: DistributionData; tvMode: boolean; novosClientesList: NovoClienteListItem[]; }
 
-export function VendasTab({ metrics, distributions, tvMode }: Props) {
+export function VendasTab({ metrics, distributions, tvMode, novosClientesList }: Props) {
   const s = tvMode ? 'tv' : 'lg';
   const [excludeHiper, setExcludeHiper] = useState(false);
   const [outrosExpanded, setOutrosExpanded] = useState(false);
@@ -242,6 +243,9 @@ export function VendasTab({ metrics, distributions, tvMode }: Props) {
           </Card>
         </div>
       </div>
+
+      {/* Tabela de novos clientes */}
+      <NovosClientesTable items={novosClientesList} tvMode={tvMode} />
     </div>
   );
 }
