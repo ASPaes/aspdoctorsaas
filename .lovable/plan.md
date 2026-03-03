@@ -1,56 +1,45 @@
 
 
-## Plano: Tabelas de Clientes Cancelados e Novos nas abas do Dashboard
+## Plano: Exclusão de duplicata, proteção contra double-submit e badge "Possível duplicidade"
 
-### Objetivo
-Adicionar uma tabela detalhada na aba **Cancelamentos** com a lista de clientes cancelados no período, e outra na aba **Vendas** com a lista de novos clientes, ambas abaixo dos gráficos já existentes.
+### 1. Excluir o registro duplicado
 
----
+Apenas uma duplicata encontrada: cliente 449 (COSTELACO), registro `e0b2257b` (o segundo, criado 38s depois). Será excluído via DELETE.
 
-### Alterações necessárias
+### 2. Proteção contra double-submit no modal de venda
 
-#### 1. `src/components/dashboard/hooks/useDashboardData.ts`
-- Expandir a query de **cancelamentos** (linha 78) para incluir: `razao_social, nome_fantasia, data_ativacao`
-- Expandir a query de **novos clientes** (linha 62) para incluir: `razao_social, nome_fantasia, data_venda`
-- Expor as listas `canceladosList` e `novosClientesList` no retorno do hook, enriquecidas com nomes de lookup (motivo cancelamento, funcionário/vendedor)
-- Adicionar tipos para essas listas no retorno
+**`src/components/clientes/CertA1VendaModal.tsx`**
+- O botão "Registrar" já tem `disabled={mutation.isPending}`, mas o `mutate()` pode ser chamado novamente antes do state atualizar. Trocar para usar um ref `isSubmitting` que é setado imediatamente no `onClick`, antes do `mutate()`.
 
-#### 2. `src/components/dashboard/tabs/CancelamentosTab.tsx`
-Adicionar ao final da aba (após os gráficos existentes) um card com tabela:
+### 3. Badge "Possível duplicidade" na tabela detalhada do Dashboard
 
-| Nome | Dias Ativo | Data Cancel. | Motivo | Vlr Mensal |
-|------|-----------|-------------|--------|-----------|
+**`src/components/certificados/CertA1Dashboard.tsx`**
+- No `queryFn`, buscar também o campo `created_at` de cada venda.
+- No mapeamento de `vendasDetalhe`, incluir `clienteId` e `createdAt`.
+- Após montar a lista, marcar registros como `possivelDuplicidade = true` quando existir outro registro do **mesmo cliente**, **mesma data_venda**, **mesmo status** e diferença de `created_at` menor que 5 minutos.
+- Na tabela, exibir um badge amarelo "Possível duplicidade" ao lado do status quando flagrado.
 
-- **Nome**: razao_social (com nome_fantasia em texto menor)
-- **Dias Ativo**: diferença entre data_cancelamento e data_ativacao (ou data_cadastro)
-- **Data Cancel.**: formatada dd/MM/yyyy
-- **Motivo**: nome do motivo via lookup
-- **Vlr Mensal**: mensalidade formatada como moeda
-- Ordenada por data de cancelamento (mais recente primeiro)
+### 4. Botão de excluir venda (admin only)
 
-#### 3. `src/components/dashboard/tabs/VendasTab.tsx`
-Adicionar ao final da aba um card com tabela:
+**`src/components/certificados/CertA1Dashboard.tsx`**
+- Adicionar coluna "Ações" na tabela detalhada.
+- Botão de lixeira (Trash2 icon) visível apenas para usuários com `role === 'admin'` (obtido via `useAuth()`).
+- Ao clicar, abrir um `AlertDialog` de confirmação.
+- Ao confirmar, executar `supabase.from('certificado_a1_vendas').delete().eq('id', vendaId)` e invalidar queries.
 
-| Nome | Data Venda | Vendedor | Vlr Ativação | Vlr MRR |
-|------|-----------|---------|-------------|---------|
+**`src/components/clientes/CertificadoA1Section.tsx`**
+- Mesma lógica: adicionar coluna de ações com botão de excluir no histórico de vendas do cliente, também restrito a admin.
 
-- **Nome**: razao_social (com nome_fantasia em texto menor)
-- **Data Venda**: data_cadastro formatada
-- **Vendedor**: nome do funcionário via lookup
-- **Vlr Ativação**: valor_ativacao formatada
-- **Vlr MRR**: mensalidade formatada
-- Ordenada por data de venda (mais recente primeiro)
+### 5. Badge de duplicidade também no histórico do cliente
 
-#### 4. `src/components/dashboard/types.ts`
-Adicionar interfaces `CanceladoListItem` e `NovoClienteListItem` para tipagem das listas.
+**`src/components/clientes/CertificadoA1Section.tsx`**
+- Aplicar a mesma lógica de detecção de duplicidade (mesmo cliente, mesma data, created_at < 5 min de diferença) e exibir badge amarelo.
 
 ---
 
-### Dados adicionais úteis
-- Na tabela de cancelados: badge colorido para **Early Churn** (≤90 dias)
-- Na tabela de vendas: coluna **Origem** (origem_venda) como informação complementar
-- Ambas tabelas com contagem total no título do card
-
-### Sem breaking changes
-Todas as alterações são aditivas — nenhuma funcionalidade existente será removida ou modificada.
+### Resumo de arquivos alterados
+- **DELETE** no banco: registro `e0b2257b`
+- `src/components/clientes/CertA1VendaModal.tsx` — proteção double-submit
+- `src/components/certificados/CertA1Dashboard.tsx` — badge duplicidade + botão excluir (admin)
+- `src/components/clientes/CertificadoA1Section.tsx` — badge duplicidade + botão excluir (admin)
 
