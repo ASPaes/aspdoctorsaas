@@ -2,7 +2,8 @@ import { TrendingDown, Users, DollarSign, AlertTriangle } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { KPIMetrics, TimeSeriesData, DistributionData } from '../types';
+import { CanceladosTable } from '../tables/CanceladosTable';
+import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem } from '../types';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   Legend, ResponsiveContainer, Cell,
@@ -19,6 +20,7 @@ interface Props {
   timeSeries: TimeSeriesData;
   distributions: DistributionData;
   tvMode: boolean;
+  canceladosList: CanceladoListItem[];
 }
 
 /* ---------- helpers for delta vs previous month (inverted) ---------- */
@@ -64,7 +66,7 @@ function CombinedTooltip({ active, payload, label }: any) {
 }
 
 /* ---------- component ---------- */
-export function CancelamentosTab({ metrics, timeSeries, distributions, tvMode }: Props) {
+export function CancelamentosTab({ metrics, timeSeries, distributions, tvMode, canceladosList }: Props) {
   const s = tvMode ? 'tv' : 'lg';
 
   // Previous month values from time series (index 10 = prev, 11 = current in 12-month array)
@@ -275,6 +277,9 @@ export function CancelamentosTab({ metrics, timeSeries, distributions, tvMode }:
           </CardContent>
         </Card>
       </div>
+
+      {/* ===== LINHA 5: Tabela de clientes cancelados ===== */}
+      <CanceladosTable items={canceladosList} tvMode={tvMode} />
     </div>
   );
 }

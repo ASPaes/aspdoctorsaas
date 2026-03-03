@@ -106,3 +106,25 @@ export interface DistributionData {
   porOrigemVendaNovos?: DistributionDataPoint[];
   porFornecedorNovos?: DistributionDataPoint[];
 }
+
+export interface CanceladoListItem {
+  id: string;
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  diasAtivo: number | null;
+  dataCancelamento: string;
+  motivo: string;
+  mensalidade: number;
+  earlyChurn: boolean;
+}
+
+export interface NovoClienteListItem {
+  id: string;
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  dataVenda: string;
+  vendedor: string;
+  origem: string;
+  valorAtivacao: number;
+  mensalidade: number;
+}

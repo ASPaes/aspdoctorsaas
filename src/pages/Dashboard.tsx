@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [tvMode, setTvMode] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
 
-  const { loading, metrics, timeSeries, distributions, refetch } = useDashboardData(filters);
+  const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, refetch } = useDashboardData(filters);
   const { data: mcData } = useMargemContribuicaoDashboard(filters);
   const { fornecedores, unidadesBase } = useLookups();
 
@@ -74,10 +74,10 @@ export default function Dashboard() {
             <CrescimentoTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} mcData={mcData} filters={filters} />
           </TabsContent>
           <TabsContent value="cancelamentos">
-            <CancelamentosTab metrics={metrics} timeSeries={timeSeries} distributions={distributions} tvMode={tvMode} />
+            <CancelamentosTab metrics={metrics} timeSeries={timeSeries} distributions={distributions} tvMode={tvMode} canceladosList={canceladosList} />
           </TabsContent>
           <TabsContent value="vendas">
-            <VendasTab metrics={metrics} distributions={distributions} tvMode={tvMode} />
+            <VendasTab metrics={metrics} distributions={distributions} tvMode={tvMode} novosClientesList={novosClientesList} />
           </TabsContent>
           <TabsContent value="distribuicao">
             <DistribuicaoTab distributions={distributions} tvMode={tvMode} />

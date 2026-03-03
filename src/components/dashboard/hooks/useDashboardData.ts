@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint } from '../types';
+import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem } from '../types';
 
 const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
@@ -18,6 +18,8 @@ const defaultMetrics: KPIMetrics = {
 export function useDashboardData(filters: DashboardFilters) {
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<KPIMetrics>(defaultMetrics);
+  const [canceladosList, setCanceladosList] = useState<CanceladoListItem[]>([]);
+  const [novosClientesList, setNovosClientesList] = useState<NovoClienteListItem[]>([]);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesData>({
     mrrEvolution: [], faturamentoEvolution: [], churnQtdEvolution: [], churnMrrEvolution: [],
     ltvMesesEvolution: [], ltvCacEvolution: [],
@@ -59,7 +61,7 @@ export function useDashboardData(filters: DashboardFilters) {
       // 2. Novos clientes no período
       let novosQuery = supabase
         .from('clientes')
-        .select('id, mensalidade, valor_ativacao, data_cadastro, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id')
+        .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
         .gte('data_cadastro', periodoInicioStr)
         .lte('data_cadastro', periodoFimStr)
         .eq('cancelado', false);
@@ -75,7 +77,7 @@ export function useDashboardData(filters: DashboardFilters) {
       // 3. Cancelamentos no período
       let cancelamentosQuery = supabase
         .from('clientes')
-        .select('id, mensalidade, data_cadastro, data_cancelamento, motivo_cancelamento_id, unidade_base_id, fornecedor_id')
+        .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, data_venda, motivo_cancelamento_id, unidade_base_id, fornecedor_id, razao_social, nome_fantasia')
         .not('data_cancelamento', 'is', null)
         .gte('data_cancelamento', periodoInicioStr)
         .lte('data_cancelamento', periodoFimStr);
@@ -539,6 +541,47 @@ export function useDashboardData(filters: DashboardFilters) {
         segmentoByEstado, areaAtuacaoByEstado, fornecedorByEstado,
         porOrigemVendaNovos, porFornecedorNovos,
       });
+
+      // === BUILD LIST ITEMS ===
+      const funcMap: Record<number, string> = {};
+      const { data: allFuncionarios } = await supabase.from('funcionarios').select('id, nome');
+      allFuncionarios?.forEach(f => { funcMap[f.id] = f.nome; });
+
+      // Cancelados list
+      const canceladosListItems: CanceladoListItem[] = (cancelamentos || [])
+        .map(c => {
+          const dataRef = c.data_ativacao || c.data_venda || c.data_cadastro;
+          const diasAtivo = dataRef && c.data_cancelamento
+            ? differenceInDays(new Date(c.data_cancelamento), new Date(dataRef))
+            : null;
+          return {
+            id: c.id,
+            razaoSocial: c.razao_social || '(sem nome)',
+            nomeFantasia: c.nome_fantasia || null,
+            diasAtivo,
+            dataCancelamento: c.data_cancelamento!,
+            motivo: c.motivo_cancelamento_id ? (motivoMap[c.motivo_cancelamento_id] || '—') : '—',
+            mensalidade: Number(c.mensalidade) || 0,
+            earlyChurn: diasAtivo !== null && diasAtivo <= 90,
+          };
+        })
+        .sort((a, b) => new Date(b.dataCancelamento).getTime() - new Date(a.dataCancelamento).getTime());
+      setCanceladosList(canceladosListItems);
+
+      // Novos clientes list
+      const novosListItems: NovoClienteListItem[] = (novosClientes || [])
+        .map(c => ({
+          id: c.id,
+          razaoSocial: c.razao_social || '(sem nome)',
+          nomeFantasia: c.nome_fantasia || null,
+          dataVenda: c.data_venda || c.data_cadastro || '',
+          vendedor: c.funcionario_id ? (funcMap[c.funcionario_id] || '—') : '—',
+          origem: c.origem_venda_id ? (origemMap[c.origem_venda_id] || '—') : '—',
+          valorAtivacao: Number(c.valor_ativacao) || 0,
+          mensalidade: Number(c.mensalidade) || 0,
+        }))
+        .sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
+      setNovosClientesList(novosListItems);
     } catch (err) {
       console.error('Dashboard data error:', err);
     } finally {
@@ -548,5 +591,5 @@ export function useDashboardData(filters: DashboardFilters) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { loading, metrics, timeSeries, distributions, refetch: fetchData };
+  return { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, refetch: fetchData };
 }
