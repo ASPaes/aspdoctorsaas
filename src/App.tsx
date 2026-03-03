@@ -9,18 +9,20 @@ import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
 import { Loader2 } from "lucide-react";
 
-// Lazy-loaded pages for code splitting
-const Login = lazy(() => import("@/pages/Login"));
+// Eager-loaded: pages visited most frequently (no spinner on navigate)
+import Dashboard from "@/pages/Dashboard";
+import Clientes from "@/pages/Clientes";
+import ClienteForm from "@/pages/ClienteForm";
+import CustomerSuccess from "@/pages/CustomerSuccess";
+import Login from "@/pages/Login";
+
+// Lazy-loaded: less-visited pages
 const Signup = lazy(() => import("@/pages/Signup"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Clientes = lazy(() => import("@/pages/Clientes"));
-const ClienteForm = lazy(() => import("@/pages/ClienteForm"));
 const Cadastros = lazy(() => import("@/pages/Cadastros"));
 const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
-const CustomerSuccess = lazy(() => import("@/pages/CustomerSuccess"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
