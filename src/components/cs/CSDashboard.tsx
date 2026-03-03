@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,9 @@ import {
   type CSTicket, type CSTicketPrioridade,
 } from './types';
 import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -48,6 +50,7 @@ interface CSDashboardProps {
 }
 
 export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboardProps) {
+  const navigate = useNavigate();
   const periodoInicio = globalFilters.periodo.from || startOfMonth(new Date());
   const periodoFim = globalFilters.periodo.to || endOfMonth(new Date());
 
@@ -73,11 +76,12 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
   return (
     <div className="space-y-6">
       <Tabs defaultValue="operacao" className="space-y-4">
-         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+         <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="operacao">Operação</TabsTrigger>
           <TabsTrigger value="retencao">Retenção</TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="oportunidades">Oportunidades</TabsTrigger>
+          <TabsTrigger value="cobertura90d">Cobertura 90D</TabsTrigger>
         </TabsList>
 
         <TabsContent value="operacao" className="space-y-6">
@@ -234,6 +238,65 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
                         <TableCell>{formatCurrency(t.oport_valor_previsto_mrr || 0)}</TableCell>
                         <TableCell>{t.oport_data_prevista ? format(new Date(t.oport_data_prevista), 'dd/MM/yy', { locale: ptBR }) : '-'}</TableCell>
                         <TableCell>{t.owner?.nome || '-'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cobertura90d" className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <KPICard title="Clientes Ativos" value={data.cobertura90d.totalAtivos} icon={<Users className="h-5 w-5 text-primary" />} />
+            <KPICard
+              title="% Cobertura 90D"
+              value={formatPercent(data.cobertura90d.percentCoberto)}
+              subtitle={`${data.cobertura90d.cobertos} de ${data.cobertura90d.totalAtivos}`}
+              icon={<ShieldCheck className="h-5 w-5 text-green-500" />}
+              variant={data.cobertura90d.percentCoberto >= 80 ? 'success' : data.cobertura90d.percentCoberto >= 50 ? 'warning' : 'danger'}
+            />
+            <KPICard
+              title="Descobertos"
+              value={data.cobertura90d.descobertos}
+              subtitle="sem contato 90d"
+              icon={<AlertTriangle className="h-5 w-5 text-destructive" />}
+              variant={data.cobertura90d.descobertos > 0 ? 'danger' : 'success'}
+            />
+          </div>
+          <Card>
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" />Clientes Sem Cobertura</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Mensalidade</TableHead>
+                    <TableHead>Último Contato</TableHead>
+                    <TableHead>Dias s/ Contato</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.cobertura90d.clientesDescobertos.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Todos os clientes cobertos 🎉</TableCell></TableRow>
+                  ) : (
+                    data.cobertura90d.clientesDescobertos.map(c => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.nome_fantasia || c.razao_social || '—'}</TableCell>
+                        <TableCell>{c.mensalidade != null ? formatCurrency(c.mensalidade) : '—'}</TableCell>
+                        <TableCell>{c.ultimoContato ? format(new Date(c.ultimoContato), 'dd/MM/yyyy') : <span className="text-destructive font-medium">Nunca</span>}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={c.diasSemContato === null || c.diasSemContato > 180 ? 'border-destructive text-destructive' : c.diasSemContato > 90 ? 'border-orange-500 text-orange-500' : ''}>
+                            {c.diasSemContato != null ? `${c.diasSemContato}d` : '∞'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => navigate(`/clientes/${c.id}`)}>
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
