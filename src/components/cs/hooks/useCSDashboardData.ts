@@ -221,10 +221,14 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
       );
 
       // Pipeline: conta o status atual de todos os tickets movimentados no período
+      // Tickets sem indicacao_status são tratados como 'recebida' (estágio inicial)
       const pipelineIndicacao: Record<CSIndicacaoStatus, number> = {
         recebida: 0, contatada: 0, qualificada: 0, enviada_ao_comercial: 0, fechou: 0, nao_fechou: 0,
       };
-      ticketsIndicacaoMovimentados.forEach((t) => { if (t.indicacao_status) pipelineIndicacao[t.indicacao_status]++; });
+      ticketsIndicacaoMovimentados.forEach((t) => {
+        const status = t.indicacao_status || 'recebida';
+        pipelineIndicacao[status]++;
+      });
 
       // Indicações por owner (movimentados no período)
       const indicacoesByOwner: Record<number, number> = {};
