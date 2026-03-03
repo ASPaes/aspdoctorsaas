@@ -73,10 +73,11 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
   return (
     <div className="space-y-6">
       <Tabs defaultValue="operacao" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+         <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
           <TabsTrigger value="operacao">Operação</TabsTrigger>
           <TabsTrigger value="retencao">Retenção</TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
+          <TabsTrigger value="oportunidades">Oportunidades</TabsTrigger>
         </TabsList>
 
         <TabsContent value="operacao" className="space-y-6">
@@ -136,6 +137,11 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
         </TabsContent>
 
         <TabsContent value="indicacoes" className="space-y-6">
+          <div className="grid grid-cols-3 gap-4">
+            <KPICard title="Ganhas" value={data.indicacoesGanhas} icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" />
+            <KPICard title="Perdidas" value={data.indicacoesPerdidas} icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" />
+            <KPICard title="% Conversão" value={formatPercent(data.indicacoesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.indicacoesConversaoPercent >= 50 ? 'success' : data.indicacoesConversaoPercent >= 25 ? 'warning' : 'danger'} />
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {Object.entries(data.pipelineIndicacao).map(([status, count]) => (
               <KPICard key={status} title={CS_INDICACAO_STATUS_LABELS[status as keyof typeof CS_INDICACAO_STATUS_LABELS]} value={count} icon={<Users className="h-5 w-5 text-primary" />} />
@@ -180,6 +186,54 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
                         <TableCell>{t.cliente?.nome_fantasia || t.cliente?.razao_social || <span className="italic text-muted-foreground">Interno</span>}</TableCell>
                         <TableCell>{t.owner?.nome || '-'}</TableCell>
                         <TableCell className="text-sm">{format(new Date(t.criado_em), 'dd/MM/yy', { locale: ptBR })}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="oportunidades" className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KPICard title="Abertas" value={data.oportunidadesAbertas} subtitle="backlog" icon={<BarChart3 className="h-5 w-5 text-primary" />} />
+            <KPICard title="Ganhas" value={data.oportunidadesGanhas} subtitle="no período" icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" />
+            <KPICard title="Perdidas" value={data.oportunidadesPerdidas} subtitle="no período" icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" />
+            <KPICard title="% Conversão" value={formatPercent(data.oportunidadesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.oportunidadesConversaoPercent >= 50 ? 'success' : data.oportunidadesConversaoPercent >= 25 ? 'warning' : 'danger'} />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <KPICard title="Previsão Ativação" value={formatCurrency(data.oportunidadesValorPrevistoAtivacao)} subtitle="backlog" icon={<DollarSign className="h-5 w-5 text-primary" />} />
+            <KPICard title="Previsão MRR" value={formatCurrency(data.oportunidadesValorPrevistoMrr)} subtitle="backlog" icon={<DollarSign className="h-5 w-5 text-primary" />} />
+            <KPICard title="Ganho Ativação" value={formatCurrency(data.oportunidadesValorGanhoAtivacao)} subtitle="no período" icon={<DollarSign className="h-5 w-5 text-green-500" />} variant="success" />
+            <KPICard title="Ganho MRR" value={formatCurrency(data.oportunidadesValorGanhoMrr)} subtitle="no período" icon={<DollarSign className="h-5 w-5 text-green-500" />} variant="success" />
+          </div>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Oportunidades Abertas</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Assunto</TableHead>
+                    <TableHead>Prev. Ativação</TableHead>
+                    <TableHead>Prev. MRR</TableHead>
+                    <TableHead>Data Prevista</TableHead>
+                    <TableHead>Owner</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.oportunidadesAbertasLista.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma oportunidade aberta</TableCell></TableRow>
+                  ) : (
+                    data.oportunidadesAbertasLista.map(t => (
+                      <TableRow key={t.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewTicket?.(t)}>
+                        <TableCell className="font-medium">{t.cliente?.nome_fantasia || t.cliente?.razao_social || <span className="italic text-muted-foreground">Interno</span>}</TableCell>
+                        <TableCell>{t.assunto}</TableCell>
+                        <TableCell>{formatCurrency(t.oport_valor_previsto_ativacao || 0)}</TableCell>
+                        <TableCell>{formatCurrency(t.oport_valor_previsto_mrr || 0)}</TableCell>
+                        <TableCell>{t.oport_data_prevista ? format(new Date(t.oport_data_prevista), 'dd/MM/yy', { locale: ptBR }) : '-'}</TableCell>
+                        <TableCell>{t.owner?.nome || '-'}</TableCell>
                       </TableRow>
                     ))
                   )}
