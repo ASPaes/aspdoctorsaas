@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -189,6 +189,13 @@ export default function ClienteForm() {
   }, [isEditing, mensalidadeWatch, mcPonderadaQuery.data]);
 
   // Load existing client for editing
+  const clienteLoadedRef = useRef(false);
+
+  // Reset loaded ref when id changes (navigating between clients)
+  useEffect(() => {
+    clienteLoadedRef.current = false;
+  }, [id]);
+
   const clienteQuery = useQuery({
     queryKey: ["cliente", id],
     queryFn: async () => {
@@ -197,49 +204,51 @@ export default function ClienteForm() {
       return data;
     },
     enabled: isEditing,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
   });
 
   useEffect(() => {
-    if (clienteQuery.data) {
-      const c = clienteQuery.data;
-      form.reset({
-        data_cadastro: c.data_cadastro, razao_social: c.razao_social, nome_fantasia: c.nome_fantasia,
-        cnpj: c.cnpj, email: c.email ?? "", telefone_contato: c.telefone_contato,
-        telefone_whatsapp: c.telefone_whatsapp, estado_id: c.estado_id, cidade_id: c.cidade_id,
-        area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
-        observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
-        funcionario_id: c.funcionario_id, origem_venda_id: (c as any).origem_venda_id ?? null,
-        recorrencia: c.recorrencia as any, produto_id: c.produto_id,
-        observacao_negociacao: c.observacao_negociacao,
-        data_ativacao: (c as any).data_ativacao ?? null,
-        fornecedor_id: (c as any).fornecedor_id ?? null,
-        codigo_fornecedor: (c as any).codigo_fornecedor ?? null,
-        link_portal_fornecedor: (c as any).link_portal_fornecedor ?? null,
-        valor_ativacao: c.valor_ativacao ? Number(c.valor_ativacao) : (null as any),
-        forma_pagamento_ativacao_id: c.forma_pagamento_ativacao_id,
-        mensalidade: c.mensalidade ? Number(c.mensalidade) : (null as any),
-        forma_pagamento_mensalidade_id: c.forma_pagamento_mensalidade_id,
-        custo_operacao: c.custo_operacao ? Number(c.custo_operacao) : (null as any),
-        imposto_percentual: c.imposto_percentual ? Number(c.imposto_percentual) * 100 : (null as any),
-        custo_fixo_percentual: c.custo_fixo_percentual ? Number(c.custo_fixo_percentual) * 100 : (null as any),
-        cancelado: c.cancelado, data_cancelamento: c.data_cancelamento,
-        motivo_cancelamento_id: c.motivo_cancelamento_id,
-        observacao_cancelamento: c.observacao_cancelamento,
-        cert_a1_vencimento: (c as any).cert_a1_vencimento ?? null,
-        cert_a1_ultima_venda_em: (c as any).cert_a1_ultima_venda_em ?? null,
-        cert_a1_ultimo_vendedor_id: (c as any).cert_a1_ultimo_vendedor_id ?? null,
-        contato_nome: (c as any).contato_nome ?? null,
-        contato_cpf: (c as any).contato_cpf ?? null,
-        contato_fone: (c as any).contato_fone ?? null,
-        contato_aniversario: (c as any).contato_aniversario ?? null,
-        unidade_base_id: (c as any).unidade_base_id ?? null,
-        matriz_id: (c as any).matriz_id ?? null,
-        cep: (c as any).cep ?? null,
-        endereco: (c as any).endereco ?? null,
-        numero: (c as any).numero ?? null,
-        bairro: (c as any).bairro ?? null,
-      });
-    }
+    if (!clienteQuery.data || clienteLoadedRef.current) return;
+    clienteLoadedRef.current = true;
+    const c = clienteQuery.data;
+    form.reset({
+      data_cadastro: c.data_cadastro, razao_social: c.razao_social, nome_fantasia: c.nome_fantasia,
+      cnpj: c.cnpj, email: c.email ?? "", telefone_contato: c.telefone_contato,
+      telefone_whatsapp: c.telefone_whatsapp, estado_id: c.estado_id, cidade_id: c.cidade_id,
+      area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
+      observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
+      funcionario_id: c.funcionario_id, origem_venda_id: (c as any).origem_venda_id ?? null,
+      recorrencia: c.recorrencia as any, produto_id: c.produto_id,
+      observacao_negociacao: c.observacao_negociacao,
+      data_ativacao: (c as any).data_ativacao ?? null,
+      fornecedor_id: (c as any).fornecedor_id ?? null,
+      codigo_fornecedor: (c as any).codigo_fornecedor ?? null,
+      link_portal_fornecedor: (c as any).link_portal_fornecedor ?? null,
+      valor_ativacao: c.valor_ativacao ? Number(c.valor_ativacao) : (null as any),
+      forma_pagamento_ativacao_id: c.forma_pagamento_ativacao_id,
+      mensalidade: c.mensalidade ? Number(c.mensalidade) : (null as any),
+      forma_pagamento_mensalidade_id: c.forma_pagamento_mensalidade_id,
+      custo_operacao: c.custo_operacao ? Number(c.custo_operacao) : (null as any),
+      imposto_percentual: c.imposto_percentual ? Number(c.imposto_percentual) * 100 : (null as any),
+      custo_fixo_percentual: c.custo_fixo_percentual ? Number(c.custo_fixo_percentual) * 100 : (null as any),
+      cancelado: c.cancelado, data_cancelamento: c.data_cancelamento,
+      motivo_cancelamento_id: c.motivo_cancelamento_id,
+      observacao_cancelamento: c.observacao_cancelamento,
+      cert_a1_vencimento: (c as any).cert_a1_vencimento ?? null,
+      cert_a1_ultima_venda_em: (c as any).cert_a1_ultima_venda_em ?? null,
+      cert_a1_ultimo_vendedor_id: (c as any).cert_a1_ultimo_vendedor_id ?? null,
+      contato_nome: (c as any).contato_nome ?? null,
+      contato_cpf: (c as any).contato_cpf ?? null,
+      contato_fone: (c as any).contato_fone ?? null,
+      contato_aniversario: (c as any).contato_aniversario ?? null,
+      unidade_base_id: (c as any).unidade_base_id ?? null,
+      matriz_id: (c as any).matriz_id ?? null,
+      cep: (c as any).cep ?? null,
+      endereco: (c as any).endereco ?? null,
+      numero: (c as any).numero ?? null,
+      bairro: (c as any).bairro ?? null,
+    });
   }, [clienteQuery.data]);
 
   const mutation = useMutation({
@@ -260,6 +269,7 @@ export default function ClienteForm() {
       }
     },
     onSuccess: () => {
+      clienteLoadedRef.current = false;
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
       clearDraft();
