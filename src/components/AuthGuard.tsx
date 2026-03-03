@@ -29,7 +29,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, profileLoading, profile, provisioning, refreshProfile]);
 
-  if (isLoading || profileLoading || provisioning) {
+  // Only show full-screen loader on initial load (no profile yet).
+  // Once profile is loaded, keep children mounted during background refreshes
+  // to preserve page state (filters, tabs, etc.).
+  if (isLoading || provisioning || (profileLoading && !profile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
