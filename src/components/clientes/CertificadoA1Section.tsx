@@ -1,20 +1,16 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, addMonths, differenceInDays, parseISO } from "date-fns";
+import { format, differenceInDays, parseISO } from "date-fns";
 import { ShieldCheck, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "sonner";
+import CertA1VendaModal from "./CertA1VendaModal";
 
 interface Props {
   clienteId?: string;
@@ -44,16 +40,7 @@ const badgeClasses: Record<string, string> = {
 const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function CertificadoA1Section({ clienteId, vencimento, ultimaVendaEm, ultimoVendedorId, onVencimentoChange, onVendaRegistrada, funcionarios }: Props) {
-  const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
-  const [perdidoTerceiro, setPerdidoTerceiro] = useState(false);
-
-  const [dataVenda, setDataVenda] = useState(new Date().toISOString().split("T")[0]);
-  const [valorVenda, setValorVenda] = useState("");
-  const [vendedorId, setVendedorId] = useState("");
-  const [observacao, setObservacao] = useState("");
-  const [dataBaseRenovacao, setDataBaseRenovacao] = useState("");
-  const [motivoPerda, setMotivoPerda] = useState("");
 
   const status = getCertStatus(vencimento);
   const vendedorNome = useMemo(
@@ -75,51 +62,6 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
     },
     enabled: !!clienteId,
   });
-
-  const previewVencimento = useMemo(() => {
-    const baseDate = perdidoTerceiro ? dataBaseRenovacao : dataVenda;
-    if (!baseDate) return null;
-    return format(addMonths(parseISO(baseDate), 12), "dd/MM/yyyy");
-  }, [perdidoTerceiro, dataVenda, dataBaseRenovacao]);
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload: any = {
-        cliente_id: clienteId,
-        data_venda: dataVenda,
-        status: perdidoTerceiro ? "perdido_terceiro" : "ganho",
-      };
-      if (perdidoTerceiro) {
-        payload.data_base_renovacao = dataBaseRenovacao || null;
-        payload.motivo_perda = motivoPerda || null;
-        payload.vendedor_id = vendedorId ? Number(vendedorId) : null;
-      } else {
-        payload.valor_venda = valorVenda ? Number(valorVenda) : null;
-        payload.vendedor_id = vendedorId ? Number(vendedorId) : null;
-        payload.observacao = observacao || null;
-      }
-      const { error } = await supabase.from("certificado_a1_vendas" as any).insert(payload);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Venda de certificado registrada!");
-      queryClient.invalidateQueries({ queryKey: ["cert_a1_vendas", clienteId] });
-      setModalOpen(false);
-      resetModal();
-      onVendaRegistrada();
-    },
-    onError: (e: any) => toast.error("Erro ao registrar venda: " + e.message),
-  });
-
-  const resetModal = () => {
-    setPerdidoTerceiro(false);
-    setDataVenda(new Date().toISOString().split("T")[0]);
-    setValorVenda("");
-    setVendedorId("");
-    setObservacao("");
-    setDataBaseRenovacao("");
-    setMotivoPerda("");
-  };
 
   return (
     <>
@@ -215,78 +157,15 @@ export default function CertificadoA1Section({ clienteId, vencimento, ultimaVend
         </CardContent>
       </Card>
 
-      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) resetModal(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Registrar Venda de Certificado A1</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Checkbox id="perdido" checked={perdidoTerceiro} onCheckedChange={(v) => setPerdidoTerceiro(v === true)} />
-              <label htmlFor="perdido" className="text-sm">Já renovado com terceiro</label>
-            </div>
-
-            {perdidoTerceiro ? (
-              <>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Data base da renovação</label>
-                  <Input type="date" value={dataBaseRenovacao} onChange={(e) => setDataBaseRenovacao(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Registrado por</label>
-                  <Select value={vendedorId} onValueChange={setVendedorId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {funcionarios.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Motivo / Observação</label>
-                  <Textarea value={motivoPerda} onChange={(e) => setMotivoPerda(e.target.value)} rows={2} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Data da Venda</label>
-                  <Input type="date" value={dataVenda} onChange={(e) => setDataVenda(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Valor R$</label>
-                  <Input type="number" step="0.01" value={valorVenda} onChange={(e) => setValorVenda(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Vendedor</label>
-                  <Select value={vendedorId} onValueChange={setVendedorId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {funcionarios.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Observação</label>
-                  <Textarea value={observacao} onChange={(e) => setObservacao(e.target.value)} rows={2} />
-                </div>
-              </>
-            )}
-
-            {previewVencimento && (
-              <div className="rounded-md bg-muted p-3 text-sm">
-                <span className="text-muted-foreground">Novo vencimento: </span>
-                <span className="font-medium">{previewVencimento}</span>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-              {mutation.isPending ? "Salvando..." : "Registrar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {clienteId && (
+        <CertA1VendaModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          clienteId={clienteId}
+          funcionarios={funcionarios}
+          onVendaRegistrada={onVendaRegistrada}
+        />
+      )}
     </>
   );
 }
