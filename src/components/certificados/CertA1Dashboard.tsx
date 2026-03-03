@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLookups } from "@/hooks/useLookups";
-import { format, addDays, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, addDays, subDays, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
 import { DateRangePicker, DateRange } from "@/components/ui/date-range-picker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,13 +11,16 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
   ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion,
-  DollarSign, UserX, TrendingUp, BarChart3, List,
+  DollarSign, UserX, TrendingUp, BarChart3, List, Trash2,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { toast } from "sonner";
 
 const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -27,8 +31,28 @@ const STATUS_OPTIONS = [
   { value: "pendente", label: "Pendente" },
 ];
 
+function detectDuplicates<T extends { id: string; clienteId: string; dataVenda: string; status: string; createdAt: string }>(vendas: T[]): Set<string> {
+  const dupeIds = new Set<string>();
+  for (let i = 0; i < vendas.length; i++) {
+    for (let j = i + 1; j < vendas.length; j++) {
+      const a = vendas[i], b = vendas[j];
+      if (a.clienteId === b.clienteId && a.dataVenda === b.dataVenda && a.status === b.status) {
+        const diff = Math.abs(differenceInMinutes(parseISO(a.createdAt), parseISO(b.createdAt)));
+        if (diff < 5) {
+          dupeIds.add(a.id);
+          dupeIds.add(b.id);
+        }
+      }
+    }
+  }
+  return dupeIds;
+}
+
 export function CertA1Dashboard() {
-  // Default: mês corrente
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const queryClient = useQueryClient();
+
   const now = new Date();
   const [periodo, setPeriodo] = useState<DateRange>({
     from: startOfMonth(now),
@@ -36,6 +60,7 @@ export function CertA1Dashboard() {
   });
   const [statusFilter, setStatusFilter] = useState("ganho");
   const [vendedorFilter, setVendedorFilter] = useState("todos");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const funcionarios = useLookups().funcionarios.data ?? [];
 
@@ -45,17 +70,15 @@ export function CertA1Dashboard() {
   const { data: metrics, isLoading } = useQuery({
     queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr],
     queryFn: async () => {
-      // Vendas no período
       let vendasQuery = supabase
         .from("certificado_a1_vendas")
-        .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda")
+        .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
         .not("data_venda", "is", null);
       if (periodoInicioStr && periodoFimStr) {
         vendasQuery = vendasQuery.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
       }
       const { data: vendas } = await vendasQuery;
 
-      // Fetch client names for the sales
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
       let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null }> = {};
       if (clienteIds.length > 0) {
@@ -71,7 +94,6 @@ export function CertA1Dashboard() {
       const faturamento = ganhos.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0);
       const perdidoQtd = vendas?.filter((v) => v.status === "perdido_terceiro").length || 0;
 
-      // Vendas por funcionário (somente ganhos)
       const vendasPorFunc: Record<number, number> = {};
       ganhos.forEach((v) => {
         if (v.vendedor_id) {
@@ -79,7 +101,6 @@ export function CertA1Dashboard() {
         }
       });
 
-      // Oportunidades rolling
       const today = new Date();
       const todayStr = format(today, "yyyy-MM-dd");
       const minus20Str = format(subDays(today, 20), "yyyy-MM-dd");
@@ -97,22 +118,22 @@ export function CertA1Dashboard() {
       const vencendo30 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= todayStr && c.cert_a1_vencimento <= plus30Str).length || 0;
       const vencidos20 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= minus20Str && c.cert_a1_vencimento < todayStr).length || 0;
 
-      // Sem data
       const { count: semData } = await supabase
         .from("clientes")
         .select("id", { count: "exact", head: true })
         .eq("cancelado", false)
         .is("cert_a1_vencimento", null) as any;
 
-      // Detail list for table (all statuses - filtering done client-side)
       const vendasDetalhe = (vendas ?? []).map(v => ({
         id: v.id,
+        clienteId: v.cliente_id,
         clienteNome: clientesMap[v.cliente_id]?.razao_social || "—",
         clienteFantasia: clientesMap[v.cliente_id]?.nome_fantasia || null,
         dataVenda: v.data_venda,
         valor: Number(v.valor_venda) || 0,
         status: v.status,
         vendedorId: v.vendedor_id,
+        createdAt: v.created_at,
       })).sort((a, b) => (b.dataVenda > a.dataVenda ? 1 : -1));
 
       return {
@@ -130,7 +151,8 @@ export function CertA1Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Apply client-side filters on the detail table
+  const dupeIds = useMemo(() => detectDuplicates(metrics?.vendasDetalhe ?? []), [metrics?.vendasDetalhe]);
+
   const vendasFiltradas = useMemo(() => {
     if (!metrics?.vendasDetalhe) return [];
     return metrics.vendasDetalhe.filter(v => {
@@ -150,7 +172,6 @@ export function CertA1Dashboard() {
       .sort((a, b) => b.qtd - a.qtd);
   }, [metrics?.vendasPorFunc, funcionarios]);
 
-  // Vendedores que aparecem nas vendas do período (para o filtro)
   const vendedoresNoFiltro = useMemo(() => {
     if (!metrics?.vendasDetalhe) return [];
     const ids = [...new Set(metrics.vendasDetalhe.map(v => v.vendedorId).filter(Boolean))];
@@ -159,6 +180,19 @@ export function CertA1Dashboard() {
       nome: funcionarios.find(f => f.id === id)?.nome || `ID ${id}`,
     })).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [metrics?.vendasDetalhe, funcionarios]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("certificado_a1_vendas").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Registro excluído com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ["cert-a1-dashboard"] });
+      setDeleteId(null);
+    },
+    onError: (e: any) => toast.error("Erro ao excluir: " + e.message),
+  });
 
   const val = (v: number | undefined) => (isLoading ? "—" : String(v ?? 0));
 
@@ -200,55 +234,13 @@ export function CertA1Dashboard() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <KPICardEnhanced
-          label="Vendas no Período"
-          value={val(metrics?.vendasQtd)}
-          icon={<TrendingUp className="h-4 w-4 text-green-600" />}
-          variant="success"
-          size="sm"
-        />
-        <KPICardEnhanced
-          label="Perdidos"
-          value={val(metrics?.perdidoQtd)}
-          icon={<UserX className="h-4 w-4 text-destructive" />}
-          variant="destructive"
-          size="sm"
-        />
-        <KPICardEnhanced
-          label="Faturamento"
-          value={isLoading ? "—" : formatBRL.format(metrics?.faturamento ?? 0)}
-          icon={<DollarSign className="h-4 w-4 text-green-600" />}
-          variant="success"
-          size="sm"
-        />
-        <KPICardEnhanced
-          label="Oport. Janela"
-          value={val(metrics?.oportunidadesJanela)}
-          icon={<ShieldCheck className="h-4 w-4 text-primary" />}
-          variant="primary"
-          size="sm"
-        />
-        <KPICardEnhanced
-          label="Vencendo 30d"
-          value={val(metrics?.vencendo30)}
-          icon={<ShieldAlert className="h-4 w-4 text-amber-600" />}
-          variant="warning"
-          size="sm"
-        />
-        <KPICardEnhanced
-          label="Vencidos 20d"
-          value={val(metrics?.vencidos20)}
-          icon={<ShieldOff className="h-4 w-4 text-destructive" />}
-          variant="destructive"
-          size="sm"
-        />
-        <KPICardEnhanced
-          label="Sem Data"
-          value={val(metrics?.semData)}
-          icon={<ShieldQuestion className="h-4 w-4 text-muted-foreground" />}
-          variant="default"
-          size="sm"
-        />
+        <KPICardEnhanced label="Vendas no Período" value={val(metrics?.vendasQtd)} icon={<TrendingUp className="h-4 w-4 text-green-600" />} variant="success" size="sm" />
+        <KPICardEnhanced label="Perdidos" value={val(metrics?.perdidoQtd)} icon={<UserX className="h-4 w-4 text-destructive" />} variant="destructive" size="sm" />
+        <KPICardEnhanced label="Faturamento" value={isLoading ? "—" : formatBRL.format(metrics?.faturamento ?? 0)} icon={<DollarSign className="h-4 w-4 text-green-600" />} variant="success" size="sm" />
+        <KPICardEnhanced label="Oport. Janela" value={val(metrics?.oportunidadesJanela)} icon={<ShieldCheck className="h-4 w-4 text-primary" />} variant="primary" size="sm" />
+        <KPICardEnhanced label="Vencendo 30d" value={val(metrics?.vencendo30)} icon={<ShieldAlert className="h-4 w-4 text-amber-600" />} variant="warning" size="sm" />
+        <KPICardEnhanced label="Vencidos 20d" value={val(metrics?.vencidos20)} icon={<ShieldOff className="h-4 w-4 text-destructive" />} variant="destructive" size="sm" />
+        <KPICardEnhanced label="Sem Data" value={val(metrics?.semData)} icon={<ShieldQuestion className="h-4 w-4 text-muted-foreground" />} variant="default" size="sm" />
       </div>
 
       {/* Gráfico vendas por funcionário */}
@@ -268,9 +260,7 @@ export function CertA1Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis type="number" allowDecimals={false} className="text-xs fill-muted-foreground" />
                 <YAxis type="category" dataKey="nome" width={140} className="text-xs fill-muted-foreground" tick={{ fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, color: "hsl(var(--foreground))" }} />
                 <Bar dataKey="qtd" name="Vendas" radius={[0, 4, 4, 0]} className="fill-primary" />
               </BarChart>
             </ResponsiveContainer>
@@ -298,6 +288,7 @@ export function CertA1Dashboard() {
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  {isAdmin && <TableHead className="w-[60px]">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -311,6 +302,7 @@ export function CertA1Dashboard() {
                     pendente: "Pendente",
                   };
                   const statusVariant = v.status === "ganho" ? "default" : v.status === "perdido_terceiro" ? "destructive" : "secondary";
+                  const isDupe = dupeIds.has(v.id);
                   return (
                     <TableRow key={v.id}>
                       <TableCell>
@@ -324,9 +316,23 @@ export function CertA1Dashboard() {
                       <TableCell>{v.dataVenda ? format(new Date(v.dataVenda + "T00:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
                       <TableCell>{vendedorNome}</TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant as any}>{statusLabel[v.status] || v.status}</Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={statusVariant as any}>{statusLabel[v.status] || v.status}</Badge>
+                          {isDupe && (
+                            <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px]">
+                              Possível duplicidade
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">{formatBRL.format(v.valor)}</TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(v.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -335,6 +341,28 @@ export function CertA1Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro de venda?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O registro será permanentemente removido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

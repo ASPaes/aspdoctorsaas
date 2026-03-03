@@ -54,6 +54,7 @@ export default function CertA1VendaModal({ open, onOpenChange, clienteId, funcio
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDirty = useRef(false);
+  const isSubmitting = useRef(false);
 
   // Track if form has been touched
   const updateField = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
@@ -169,11 +170,15 @@ export default function CertA1VendaModal({ open, onOpenChange, clienteId, funcio
       queryClient.invalidateQueries({ queryKey: ["cert_a1_vendas", clienteId] });
       setForm({ ...INITIAL_FORM, dataVenda: new Date().toISOString().split("T")[0] });
       isDirty.current = false;
+      isSubmitting.current = false;
       setDraftStatus("idle");
       onOpenChange(false);
       onVendaRegistrada();
     },
-    onError: (e: any) => toast.error("Erro ao registrar venda: " + e.message),
+    onError: (e: any) => {
+      isSubmitting.current = false;
+      toast.error("Erro ao registrar venda: " + e.message);
+    },
   });
 
   return (
@@ -269,7 +274,7 @@ export default function CertA1VendaModal({ open, onOpenChange, clienteId, funcio
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-              <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              <Button onClick={() => { if (isSubmitting.current) return; isSubmitting.current = true; mutation.mutate(); }} disabled={mutation.isPending}>
                 {mutation.isPending ? "Salvando..." : "Registrar"}
               </Button>
             </DialogFooter>
