@@ -67,6 +67,45 @@ export default function Clientes() {
 
   const PAGE_SIZE = 50;
 
+  // Fetch all active MRR movement deltas grouped by cliente_id
+  const { data: mrrDeltasRaw } = useQuery({
+    queryKey: ["movimentos_mrr_deltas_lista", tid],
+    queryFn: async () => {
+      const pageSize = 1000;
+      const rows: { cliente_id: string; valor_delta: number }[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        let q = tf(supabase
+          .from("movimentos_mrr")
+          .select("cliente_id, valor_delta")
+          .eq("status", "ativo")
+          .is("estornado_por", null)
+          .is("estorno_de", null)
+          .neq("tipo", "venda_avulsa" as any)) as any;
+        q = q.range(offset, offset + pageSize - 1);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        rows.push(...data);
+        if (data.length < pageSize) break;
+      }
+      return rows;
+    },
+  });
+
+  // Build Map<cliente_id, soma_valor_delta>
+  const mrrDeltaMap = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!mrrDeltasRaw) return m;
+    for (const row of mrrDeltasRaw) {
+      m.set(row.cliente_id, (m.get(row.cliente_id) ?? 0) + Number(row.valor_delta));
+    }
+    return m;
+  }, [mrrDeltasRaw]);
+
+  const getMrrAtual = useCallback((row: any) => {
+    return (Number(row.mensalidade ?? 0)) + (mrrDeltaMap.get(row.id) ?? 0);
+  }, [mrrDeltaMap]);
+
   // Convert estadoId to number for useLookups
   const estadoIdNumeric = estadoId && estadoId !== "__null__" ? Number(estadoId) : null;
   const lookups = useLookups(estadoIdNumeric);
@@ -246,7 +285,9 @@ export default function Clientes() {
       const aVal = a[sortField];
       const bVal = b[sortField];
       let cmp = 0;
-      if (sortField === "mensalidade" || sortField === "codigo_sequencial") {
+      if (sortField === "mensalidade") {
+        cmp = getMrrAtual(a) - getMrrAtual(b);
+      } else if (sortField === "codigo_sequencial") {
         cmp = Number(aVal ?? Number.NEGATIVE_INFINITY) - Number(bVal ?? Number.NEGATIVE_INFINITY);
       } else if (sortField === "cancelado") {
         cmp = Number(Boolean(aVal)) - Number(Boolean(bVal));
@@ -410,12 +451,12 @@ export default function Clientes() {
   const kpis = useMemo(() => {
     const list = clientes;
     const qtdClientes = totalCount;
-    const comMensalidade = list.filter((c) => c.mensalidade != null && Number(c.mensalidade) > 0);
-    const ticketMedio = comMensalidade.length > 0
-      ? comMensalidade.reduce((acc, c) => acc + Number(c.mensalidade), 0) / comMensalidade.length
+    const comMrr = list.filter((c) => getMrrAtual(c) > 0);
+    const ticketMedio = comMrr.length > 0
+      ? comMrr.reduce((acc, c) => acc + getMrrAtual(c), 0) / comMrr.length
       : null;
     return { qtdClientes, ticketMedio, clientesNovosMes: novosNoMes ?? 0 };
-  }, [clientes, totalCount, novosNoMes]);
+  }, [clientes, totalCount, novosNoMes, getMrrAtual]);
 
   const formatCurrency = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
 
@@ -777,7 +818,7 @@ export default function Clientes() {
                 ["razao_social", "Razão Social / Fantasia"],
                 ["cnpj", "CNPJ"],
                 ["produto_id", "Produto"],
-                ["mensalidade", "Mensalidade"],
+                ["mensalidade", "MRR Atual"],
                 ["data_ativacao", "Dt. Ativação"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
@@ -820,7 +861,7 @@ export default function Clientes() {
                   </TableCell>
                   <TableCell className="font-mono text-xs">{c.cnpj || "—"}</TableCell>
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
-                  <TableCell>{c.mensalidade != null ? `R$ ${Number(c.mensalidade).toFixed(2)}` : "—"}</TableCell>
+                  <TableCell>{getMrrAtual(c) > 0 ? `R$ ${getMrrAtual(c).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-xs">{c.data_ativacao ? format(parseISO(c.data_ativacao), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
