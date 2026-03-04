@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
+import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
 import { Loader2 } from "lucide-react";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
@@ -63,7 +64,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Protected routes */}
-            <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+            <Route element={<AuthGuard><TenantFilterProvider><AppLayout /></TenantFilterProvider></AuthGuard>}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/clientes/novo" element={<ClienteForm />} />
