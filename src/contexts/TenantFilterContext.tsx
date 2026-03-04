@@ -29,6 +29,11 @@ export function TenantFilterProvider({ children }: { children: React.ReactNode }
   const queryClient = useQueryClient();
 
   const [selectedTenantId, setSelectedTenantIdRaw] = useState<string | null>(() => {
+    // Non-super-admins: defensively clear any stale tenant filter from a previous session
+    if (!isSuperAdmin) {
+      try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
+      return null;
+    }
     try {
       return sessionStorage.getItem(STORAGE_KEY) || null;
     } catch {
