@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { createTenantForNewUser } from "@/hooks/useProfile";
 import { Loader2 } from "lucide-react";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, profile, profileLoading, refreshProfile } = useAuth();
+  const { user, isLoading, profile, profileLoading } = useAuth();
   const navigate = useNavigate();
-  const [provisioning, setProvisioning] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -15,24 +14,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, user, navigate]);
 
-  // Self-serve onboarding: create tenant + profile on first access
+  // Redirect to onboarding if user has no profile (no tenant yet)
   useEffect(() => {
-    if (!user || isLoading || profileLoading || provisioning) return;
-    if (profile === null) {
-      setProvisioning(true);
-      const email = user.email ?? "";
-      const nomeTenant = email.split("@")[0] || "Minha Empresa";
-      createTenantForNewUser(nomeTenant)
-        .then(() => refreshProfile())
-        .catch((err) => console.error("Error provisioning tenant:", err))
-        .finally(() => setProvisioning(false));
+    if (!user || isLoading || profileLoading) return;
+    if (profile === null && location.pathname !== "/onboarding") {
+      navigate("/onboarding", { replace: true });
     }
-  }, [user, isLoading, profileLoading, profile, provisioning, refreshProfile]);
+  }, [user, isLoading, profileLoading, profile, navigate, location.pathname]);
 
-  // Only show full-screen loader on initial load (no profile yet).
-  // Once profile is loaded, keep children mounted during background refreshes
-  // to preserve page state (filters, tabs, etc.).
-  if (isLoading || provisioning || (profileLoading && !profile)) {
+  if (isLoading || (profileLoading && !profile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

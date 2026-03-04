@@ -25,6 +25,7 @@ const Cadastros = lazy(() => import("@/pages/Cadastros"));
 const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
@@ -62,6 +63,9 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+
+            {/* Onboarding (protected but outside AppLayout) */}
+            <Route path="/onboarding" element={<AuthGuard><Onboarding /></AuthGuard>} />
 
             {/* Protected routes */}
             <Route element={<AuthGuard><TenantFilterProvider><AppLayout /></TenantFilterProvider></AuthGuard>}>
