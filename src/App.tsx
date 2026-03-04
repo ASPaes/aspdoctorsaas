@@ -26,6 +26,8 @@ const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const AccessPending = lazy(() => import("@/pages/AccessPending"));
+const AccessBlocked = lazy(() => import("@/pages/AccessBlocked"));
 const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
@@ -64,8 +66,10 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Onboarding (protected but outside AppLayout) */}
+            {/* Onboarding & access status (protected but outside AppLayout) */}
             <Route path="/onboarding" element={<AuthGuard><Onboarding /></AuthGuard>} />
+            <Route path="/access-pending" element={<AuthGuard><AccessPending /></AuthGuard>} />
+            <Route path="/access-blocked" element={<AuthGuard><AccessBlocked /></AuthGuard>} />
 
             {/* Protected routes */}
             <Route element={<AuthGuard><TenantFilterProvider><AppLayout /></TenantFilterProvider></AuthGuard>}>
