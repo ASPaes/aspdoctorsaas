@@ -1,36 +1,30 @@
 
 
-## Diagnóstico: Clientes vazios para usuário regular (cs@aspsoftwares.com.br)
+## Objetivo
+Trocar a coluna "Mensalidade" na lista de clientes para "MRR Atual", exibindo `mensalidade_base + soma dos deltas de movimentos MRR ativos` (mesmo cálculo já usado no Espelho Financeiro).
 
-### Análise realizada
+## Abordagem: Frontend-only (sem alterar view/migration)
 
-Verifiquei em profundidade:
-- **RLS**: Política `clientes_tenant_rw` está correta — usa `current_tenant_id()` (SECURITY DEFINER) + `is_super_admin()`
-- **Dados**: Há **655 clientes ativos** e 158 cancelados para o tenant `a0000000-...0001` (ASP)
-- **View**: `vw_clientes_financeiro` tem `security_invoker=on` correto
-- **Profile do usuário**: `is_super_admin: false`, `status: ativo`, `tenant_id` correto
-- **Código**: Para não-super-admins, `effectiveTenantId` é `null` e o `tf` helper é um no-op — RLS deveria retornar os dados normalmente
+### Mudanças em `src/pages/Clientes.tsx`
 
-### Causa provável
+1. **Nova query paralela** — buscar movimentos MRR agrupados por `cliente_id`:
+   - Query em `movimentos_mrr` com filtros: `status = 'ativo'`, `estornado_por IS NULL`, `estorno_de IS NULL`, `tipo != 'venda_avulsa'`
+   - Agrupa no JS em um `Map<cliente_id, soma_valor_delta>`
 
-O problema mais provável é **contaminação de sessão**: quando o super admin loga, seleciona um tenant no filtro global, e depois o usuário `cs@` loga no mesmo navegador/aba, o `sessionStorage` mantém o valor `super-admin-tenant-filter`. Embora o código atual não use esse valor para não-super-admins no `effectiveTenantId`, o **cache do React Query pode estar servindo dados obsoletos** da sessão anterior (staleTime de 5 min, e o `queryClient` não é limpo no logout).
+2. **Mesclar no resultado** — para cada cliente na lista, calcular `mrr_atual = (mensalidade ?? 0) + (delta do map ?? 0)` e exibir na célula.
 
-### Plano de correção
+3. **Renomear header** — `"Mensalidade"` → `"MRR Atual"`.
 
-**1. Limpar sessionStorage do filtro de tenant no logout**
-Em `AuthContext.tsx`, no `signOut`, remover a chave `super-admin-tenant-filter` do sessionStorage e limpar o cache do queryClient.
+4. **KPI Ticket Médio** — atualizar para usar `mrr_atual` em vez de `mensalidade` base.
 
-**2. Limpar o cache do React Query no logout**
-Importar e chamar `queryClient.clear()` ao fazer signOut para garantir que nenhum dado da sessão anterior persista.
+5. **Sorting** — quando sortField = `"mensalidade"`, ordenar por `mrr_atual` calculado (no path client-side já funciona; no path server-side/view, o sort continua pela coluna `mensalidade` da view, que é uma limitação aceitável sem alterar a view).
 
-**3. Guard defensivo no TenantFilterContext**
-Para não-super-admins, forçar a remoção da chave do sessionStorage na inicialização, evitando qualquer possível interferência.
+6. **Filtro de Mensalidade** — o filtro de range `mensalidadeMin/Max` continuará filtrando pela `mensalidade` base no Supabase (limitação sem migration). O label do filtro será mantido como "Mensalidade R$" para distinguir.
 
-**4. Verificar se o código mais recente está no preview**
-As alterações feitas nas mensagens anteriores (adição do `tf` em `Clientes.tsx`) precisam estar deployadas no preview para funcionar.
+### Arquivos
+- `src/pages/Clientes.tsx` — única alteração
 
-### Arquivos a modificar
-
-- `src/contexts/AuthContext.tsx` — limpar sessionStorage e queryClient no signOut
-- `src/contexts/TenantFilterContext.tsx` — guard defensivo para não-super-admins
+### Sem impacto em
+- Dashboard, Espelho Financeiro, cálculos de lucro/margem
+- Nenhuma migration ou alteração de view
 
