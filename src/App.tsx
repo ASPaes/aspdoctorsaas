@@ -26,6 +26,8 @@ const Configuracoes = lazy(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazy(() => import("@/pages/CertificadosA1"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const AccessPending = lazy(() => import("@/pages/AccessPending"));
+const AccessBlocked = lazy(() => import("@/pages/AccessBlocked"));
 const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
