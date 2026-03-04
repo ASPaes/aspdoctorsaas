@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import type { User, Session } from "@supabase/supabase-js";
 import type { Profile } from "@/hooks/useProfile";
 
@@ -23,7 +22,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
-  const queryClient = useQueryClient();
 
   const loadProfile = useCallback(async (userId: string) => {
     setProfileLoading(true);
@@ -92,9 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     setProfile(null);
     try { sessionStorage.removeItem("super-admin-tenant-filter"); } catch {}
-    queryClient.clear();
     await supabase.auth.signOut();
-  }, [queryClient]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, session, profile, isLoading, profileLoading, signInWithPassword, signOut, refreshProfile }}>
