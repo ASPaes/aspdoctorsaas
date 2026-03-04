@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export interface TenantProfile {
   user_id: string;
@@ -34,13 +35,17 @@ export interface TenantInfo {
 }
 
 export function useTenantInfo() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { profile } = useAuth();
+  const tenantId = tid || profile?.tenant_id;
   return useQuery<TenantInfo | null>({
-    queryKey: ["tenant-info"],
+    queryKey: ["tenant-info", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tenants")
         .select("*")
-        .limit(1)
+        .eq("id", tenantId!)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -49,13 +54,15 @@ export function useTenantInfo() {
 }
 
 export function useTenantUsers() {
+  const { effectiveTenantId: tid } = useTenantFilter();
   const { profile } = useAuth();
+  const tenantId = tid || profile?.tenant_id;
   return useQuery<TenantProfile[]>({
-    queryKey: ["tenant-users", profile?.tenant_id],
-    enabled: !!profile?.tenant_id,
+    queryKey: ["tenant-users", tenantId],
+    enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .rpc("get_tenant_users_with_email", { p_tenant_id: profile!.tenant_id });
+        .rpc("get_tenant_users_with_email", { p_tenant_id: tenantId! });
       if (error) throw error;
       return (data ?? []) as TenantProfile[];
     },
@@ -63,16 +70,20 @@ export function useTenantUsers() {
 }
 
 export function useTenantInvites() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
   return useQuery<TenantInvite[]>({
-    queryKey: ["tenant-invites"],
+    queryKey: ["tenant-invites", tid],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invites")
-        .select("*")
-        .is("used_at", null)
-        .gte("expires_at", new Date().toISOString())
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const { data, error } = await tf(
+        supabase
+          .from("invites")
+          .select("*")
+          .is("used_at", null)
+          .gte("expires_at", new Date().toISOString())
+          .order("created_at", { ascending: false })
+          .limit(50)
+      );
       if (error) throw error;
       return data ?? [];
     },

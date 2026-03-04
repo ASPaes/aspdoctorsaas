@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,16 +35,19 @@ interface CrudTableProps {
 
 export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy }: CrudTableProps) {
   const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<Record<string, any> | null>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
 
   const { data: rows, isLoading } = useQuery({
-    queryKey: [queryKey],
+    queryKey: [queryKey, tid],
     queryFn: async () => {
       let q = (supabase.from(table as any) as any).select(selectQuery);
       if (orderBy) q = q.order(orderBy);
+      q = tf(q);
       const { data, error } = await q;
       if (error) throw error;
       return data as Record<string, any>[];

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -29,6 +30,8 @@ export default function Configuracoes() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const defaultTab = searchParams.get("tab") || "percentuais";
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -36,9 +39,9 @@ export default function Configuracoes() {
   });
 
   const { data: config, isLoading } = useQuery({
-    queryKey: ["configuracoes"],
+    queryKey: ["configuracoes", tid],
     queryFn: async () => {
-      const { data, error } = await supabase.from("configuracoes").select("*").limit(1).maybeSingle();
+      const { data, error } = await tf(supabase.from("configuracoes").select("*")).limit(1).maybeSingle();
       if (error) throw error;
       return data;
     },
