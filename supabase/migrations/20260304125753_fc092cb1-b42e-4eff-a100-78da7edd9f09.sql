@@ -1,0 +1,1 @@
+ALTER VIEW vw_clientes_financeiro SET (security_invoker = on);
