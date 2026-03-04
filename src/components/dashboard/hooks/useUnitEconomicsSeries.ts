@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters } from '../types';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 const LTV_CAP = 120;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -50,12 +51,14 @@ export interface UnitEconomicsResult {
 }
 
 export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 12) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   // Use the period end date as reference point (instead of always "now")
   const refDate = filters.periodoFim || new Date();
   const refDateStr = format(refDate, 'yyyy-MM-dd');
 
   return useQuery<UnitEconomicsResult>({
-    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths, refDateStr],
+    queryKey: ['unit-economics-saas', filters.unidadeBaseId, filters.fornecedorId, rangeMonths, refDateStr, tid],
     queryFn: async () => {
       const now = refDate;
       const totalMonthsNeeded = rangeMonths + 5; // warmup for 6M window
@@ -74,14 +77,14 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       });
 
       // === QUERY A: All clients ===
-      const { data: allClientes } = await supabase
+      const { data: allClientes } = await tf(supabase
         .from('clientes')
-        .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
+        .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao'));
 
       // === QUERY B: CAC despesas ===
-      const { data: cacDespesas } = await supabase
+      const { data: cacDespesas } = await tf(supabase
         .from('cac_despesas')
-        .select('valor_alocado, mes_inicial, mes_final, unidade_base_id');
+        .select('valor_alocado, mes_inicial, mes_final, unidade_base_id'));
 
       const clients = (allClientes || []).filter(c => {
         if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;

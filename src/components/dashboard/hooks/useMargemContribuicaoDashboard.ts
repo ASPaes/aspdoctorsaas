@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import type { DashboardFilters } from '../types';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface MargemContribuicaoData {
   receita_mrr: number;
@@ -26,16 +27,18 @@ const defaultData: MargemContribuicaoData = {
 };
 
 export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
+  const { effectiveTenantId: tid } = useTenantFilter();
   const periodoFimStr = filters.periodoFim ? format(filters.periodoFim, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId, periodoFimStr],
+    queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId, periodoFimStr, tid],
     queryFn: async (): Promise<MargemContribuicaoData> => {
       let query = supabase
         .from('vw_clientes_financeiro')
         .select('mensalidade, custo_operacao, data_cadastro, data_cancelamento, cancelado')
         .lte('data_cadastro', periodoFimStr);
 
+      if (tid) query = query.eq('tenant_id', tid);
       if (filters.unidadeBaseId) query = query.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) query = query.eq('fornecedor_id', filters.fornecedorId);
 
