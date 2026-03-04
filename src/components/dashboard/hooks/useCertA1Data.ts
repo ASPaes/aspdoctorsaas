@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addDays, subDays } from 'date-fns';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 interface CertA1Metrics {
   vendasQtd: number;
@@ -12,14 +13,16 @@ interface CertA1Metrics {
 }
 
 export function useCertA1Data(periodoInicio: Date | null, periodoFim: Date | null) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   const periodoInicioStr = periodoInicio ? format(periodoInicio, 'yyyy-MM-dd') : null;
   const periodoFimStr = periodoFim ? format(periodoFim, 'yyyy-MM-dd') : null;
 
   return useQuery({
-    queryKey: ['cert-a1-metrics', periodoInicioStr, periodoFimStr],
+    queryKey: ['cert-a1-metrics', periodoInicioStr, periodoFimStr, tid],
     queryFn: async (): Promise<CertA1Metrics> => {
       // 1. Vendas no período — buscar registros com data_venda preenchida
-      let vendasQuery = supabase.from('certificado_a1_vendas').select('valor_venda, data_venda, status').not('data_venda', 'is', null);
+      let vendasQuery = tf(supabase.from('certificado_a1_vendas').select('valor_venda, data_venda, status')).not('data_venda', 'is', null);
       if (periodoInicioStr && periodoFimStr) {
         vendasQuery = vendasQuery.gte('data_venda', periodoInicioStr).lte('data_venda', periodoFimStr);
       }
@@ -37,13 +40,13 @@ export function useCertA1Data(periodoInicio: Date | null, periodoFim: Date | nul
       const minus20Str = format(subDays(today, 20), 'yyyy-MM-dd');
       const plus30Str = format(addDays(today, 30), 'yyyy-MM-dd');
 
-      const { data: certClientes } = await supabase
+      const { data: certClientes } = await tf(supabase
         .from('clientes')
         .select('id, cert_a1_vencimento')
         .eq('cancelado', false)
         .not('cert_a1_vencimento', 'is', null)
         .gte('cert_a1_vencimento', minus20Str)
-        .lte('cert_a1_vencimento', plus30Str);
+        .lte('cert_a1_vencimento', plus30Str));
 
       const oportunidadesJanela = certClientes?.length || 0;
       const oportunidadesVencendo = certClientes?.filter(c => c.cert_a1_vencimento! >= todayStr && c.cert_a1_vencimento! <= plus30Str).length || 0;

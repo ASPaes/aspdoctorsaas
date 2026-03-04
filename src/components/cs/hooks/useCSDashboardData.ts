@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInDays, parseISO, isWithinInterval, endOfDay, subDays } from 'date-fns';
 import type { CSTicket, CSTicketStatus, CSTicketPrioridade, CSIndicacaoStatus } from '../types';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface CSDashboardFilters {
   periodoInicio: Date;
@@ -76,12 +77,14 @@ function calculateMedian(values: number[]): number {
 }
 
 export function useCSDashboardData(filters: CSDashboardFilters) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   return useQuery({
-    queryKey: ['cs-dashboard-data', filters.periodoInicio.toISOString(), filters.periodoFim.toISOString(), filters.ownerId],
+    queryKey: ['cs-dashboard-data', filters.periodoInicio.toISOString(), filters.periodoFim.toISOString(), filters.ownerId, tid],
     queryFn: async (): Promise<CSDashboardData> => {
       const now = new Date();
 
-      let ticketsQuery = supabase
+      let ticketsQuery = tf(supabase
         .from('cs_tickets')
         .select(`
           *,
@@ -91,21 +94,21 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
           owner:funcionarios!cs_tickets_owner_id_fkey (
             id, nome, cargo, ativo
           )
-        `);
+        `));
 
       if (filters.ownerId) {
         ticketsQuery = ticketsQuery.eq('owner_id', filters.ownerId);
       }
 
       // Parallel queries: tickets + active clients + last contact per client
-      const clientesAtivosQuery = supabase
+      const clientesAtivosQuery = tf(supabase
         .from('clientes')
         .select('id, razao_social, nome_fantasia, mensalidade, data_cadastro, cnpj, fornecedor_id')
-        .eq('cancelado', false);
+        .eq('cancelado', false));
 
-      const fornecedoresQuery = supabase
+      const fornecedoresQuery = tf(supabase
         .from('fornecedores')
-        .select('id, nome');
+        .select('id, nome'));
 
       const [ticketsResult, clientesResult, fornecedoresResult] = await Promise.all([
         ticketsQuery,
@@ -236,8 +239,8 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         if (t.owner_id) indicacoesByOwner[t.owner_id] = (indicacoesByOwner[t.owner_id] || 0) + 1;
       });
 
-      const { data: funcData } = await supabase.from('funcionarios').select('id, nome').eq('ativo', true);
-      const funcMap = new Map((funcData || []).map((f: any) => [f.id, f.nome]));
+      const { data: funcData } = await tf(supabase.from('funcionarios').select('id, nome')).eq('ativo', true);
+      const funcMap = new Map<number, string>((funcData || []).map((f: any) => [f.id, f.nome]));
 
       const indicacoesPorOwner = Object.entries(indicacoesByOwner).map(([id, count]) => ({
         owner_id: Number(id),

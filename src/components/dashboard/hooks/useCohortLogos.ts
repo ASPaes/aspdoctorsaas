@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subMonths } from 'date-fns';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface CohortLogosParams {
   fromCohortMonth?: string;
@@ -41,6 +42,7 @@ function normalizeMonth(input: string): string {
 }
 
 export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosResult {
+  const { effectiveTenantId: tid } = useTenantFilter();
   const maxAge = Math.min(params.maxAgeMonths ?? 12, 36);
   const from = params.fromCohortMonth
     ? normalizeMonth(params.fromCohortMonth)
@@ -52,7 +54,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
   const unidadeBaseId = params.unidadeBaseId ?? null;
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['cohort-logos', from, to, maxAge, fornecedorId, unidadeBaseId],
+    queryKey: ['cohort-logos', from, to, maxAge, fornecedorId, unidadeBaseId, tid],
     queryFn: async () => {
       const rpcParams: Record<string, any> = {
         p_from_month: from,
@@ -61,6 +63,7 @@ export function useCohortLogos(params: CohortLogosParams = {}): UseCohortLogosRe
       };
       if (fornecedorId != null) rpcParams.p_fornecedor_id = fornecedorId;
       if (unidadeBaseId != null) rpcParams.p_unidade_base_id = unidadeBaseId;
+      if (tid) rpcParams.p_tenant_id = tid;
 
       const { data, error } = await supabase.rpc('fn_cohort_logos', rpcParams);
       if (error) throw error;

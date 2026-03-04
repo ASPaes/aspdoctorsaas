@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem } from '../types';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
@@ -29,6 +30,9 @@ export function useDashboardData(filters: DashboardFilters) {
     porOrigemVenda: [], porSegmento: [], porAreaAtuacao: [],
   });
 
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -45,6 +49,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
         .lte('data_cadastro', periodoFimStr);
 
+      if (tid) clientesQuery = clientesQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) clientesQuery = clientesQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) clientesQuery = clientesQuery.eq('fornecedor_id', filters.fornecedorId);
 
@@ -66,6 +71,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .lte('data_cadastro', periodoFimStr)
         .eq('cancelado', false);
 
+      if (tid) novosQuery = novosQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) novosQuery = novosQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) novosQuery = novosQuery.eq('fornecedor_id', filters.fornecedorId);
 
@@ -82,6 +88,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .gte('data_cancelamento', periodoInicioStr)
         .lte('data_cancelamento', periodoFimStr);
 
+      if (tid) cancelamentosQuery = cancelamentosQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) cancelamentosQuery = cancelamentosQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) cancelamentosQuery = cancelamentosQuery.eq('fornecedor_id', filters.fornecedorId);
 
@@ -102,6 +109,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .from('clientes')
         .select('id, mensalidade, data_cancelamento')
         .lt('data_cadastro', periodoInicioStr);
+      if (tid) clientesInicioQuery = clientesInicioQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) clientesInicioQuery = clientesInicioQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) clientesInicioQuery = clientesInicioQuery.eq('fornecedor_id', filters.fornecedorId);
       const { data: clientesInicioFull } = await clientesInicioQuery;
@@ -112,13 +120,13 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesInicioCount = clientesInicioAtivos.length;
 
       // Movimentos antes do período
-      const { data: movimentosInicioRaw } = await supabase
+      const { data: movimentosInicioRaw } = await tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
-        .lt('data_movimento', periodoInicioStr);
+        .lt('data_movimento', periodoInicioStr));
 
       const movimentosInicioMap: Record<string, number> = {};
       movimentosInicioRaw?.forEach(m => {
@@ -137,11 +145,11 @@ export function useDashboardData(filters: DashboardFilters) {
       const earlyChurnRate = novosCount > 0 ? cancelamentosEarly / novosCount : 0;
 
       // 6. CAC
-      const { data: cacData } = await supabase
+      const { data: cacData } = await tf(supabase
         .from('cac_despesas')
         .select('valor_alocado, unidade_base_id')
         .lte('mes_inicial', periodoFimStr)
-        .eq('ativo', true);
+        .eq('ativo', true));
 
       const cacTotal = cacData
         ?.filter(d => !filters.unidadeBaseId || !d.unidade_base_id || d.unidade_base_id === filters.unidadeBaseId)
@@ -151,14 +159,14 @@ export function useDashboardData(filters: DashboardFilters) {
       // 7. Movimentos MRR
       let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0;
 
-      const { data: movimentosPeriodo } = await supabase
+      const { data: movimentosPeriodo } = await tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', periodoInicioStr)
         .lte('data_movimento', periodoFimStr)
         .eq('status', 'ativo')
         .is('estornado_por', null)
-        .is('estorno_de', null);
+        .is('estorno_de', null));
 
       // Build set of ALL clients matching current filters (ativos + cancelados no período)
       // to correctly filter movimentos by fornecedor/unidade
@@ -179,12 +187,12 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // Movimentos inativados no período (churn por reversão)
-      const { data: movimentosInativados } = await supabase
+      const { data: movimentosInativados } = await tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .eq('status', 'inativo')
         .gte('inativado_em', periodoInicioStr)
-        .lte('inativado_em', periodoFimStr + 'T23:59:59');
+        .lte('inativado_em', periodoFimStr + 'T23:59:59'));
 
       let churnReversao = 0;
       movimentosInativados?.forEach(m => {
@@ -195,13 +203,13 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // Todos movimentos ativos até fim do período
-      const { data: todosMovimentosAtivos } = await supabase
+      const { data: todosMovimentosAtivos } = await tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
-        .lte('data_movimento', periodoFimStr);
+        .lte('data_movimento', periodoFimStr));
 
       const movimentosPorCliente: Record<string, number> = {};
       todosMovimentosAtivos?.forEach(m => {
@@ -218,7 +226,7 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // MRR por Unidade Base (dynamic)
-      const { data: unidadesBase } = await supabase.from('unidades_base').select('id, nome').order('nome');
+      const { data: unidadesBase } = await tf(supabase.from('unidades_base').select('id, nome')).order('nome');
       const mrrPorUnidadeMap: Record<number, { nome: string; mrr: number }> = {};
       (unidadesBase || []).forEach(u => { mrrPorUnidadeMap[u.id] = { nome: u.nome, mrr: 0 }; });
       clientesComMrrAtual.forEach(c => {
@@ -255,7 +263,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const quickRatio = contractionMrr > 0 ? (newMrr + expansionMrr) / contractionMrr : newMrr + expansionMrr > 0 ? Infinity : 0;
 
       // Revenue per Funcionário
-      const { data: funcAtivos } = await supabase.from('funcionarios').select('id').eq('ativo', true);
+      const { data: funcAtivos } = await tf(supabase.from('funcionarios').select('id')).eq('ativo', true);
       const revenuePerFuncionario = (funcAtivos?.length || 0) > 0 ? mrrTotalAtual / (funcAtivos?.length || 1) : 0;
 
       // MRR por Funcionário
@@ -286,6 +294,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .eq('cancelado', false);
       if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
+      if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
       const { data: prevNovos } = await prevNovosQuery;
 
       const prevNovosClientes = prevNovos?.length ?? null;
@@ -293,14 +302,14 @@ export function useDashboardData(filters: DashboardFilters) {
       const prevTotalImplantacao = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0) : null;
 
       // Previous month movimentos for upsell/cross-sell delta
-      const { data: prevMovimentos } = await supabase
+      const { data: prevMovimentos } = await tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', prevMonthStart)
         .lte('data_movimento', prevMonthEnd)
         .eq('status', 'ativo')
         .is('estornado_por', null)
-        .is('estorno_de', null);
+        .is('estorno_de', null));
 
       // Build prev month client set for filtering
       const prevClientesFiltered = new Set((prevNovos || []).map(c => c.id));
@@ -342,9 +351,9 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // All clients for time series (no period filter)
-      const { data: allClientes } = await supabase
+      const { data: allClientes } = await tf(supabase
         .from('clientes')
-        .select('id, mensalidade, valor_ativacao, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id');
+        .select('id, mensalidade, valor_ativacao, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
 
       const mrrEvolution: typeof timeSeries.mrrEvolution = [];
       const faturamentoEvolution: typeof timeSeries.faturamentoEvolution = [];
@@ -443,14 +452,14 @@ export function useDashboardData(filters: DashboardFilters) {
       ] = await Promise.all([
         supabase.from('estados').select('id, sigla, nome'),
         supabase.from('cidades').select('id, nome, estado_id'),
-        supabase.from('segmentos').select('id, nome'),
-        supabase.from('areas_atuacao').select('id, nome'),
-        supabase.from('fornecedores').select('id, nome'),
-        supabase.from('motivos_cancelamento').select('id, descricao'),
-        supabase.from('origens_venda').select('id, nome'),
+        tf(supabase.from('segmentos').select('id, nome')),
+        tf(supabase.from('areas_atuacao').select('id, nome')),
+        tf(supabase.from('fornecedores').select('id, nome')),
+        tf(supabase.from('motivos_cancelamento').select('id, descricao')),
+        tf(supabase.from('origens_venda').select('id, nome')),
       ]);
 
-      const lookupMap = <T extends { id: number }>(items: T[] | null, key: keyof T) => {
+      const lookupMap = (items: any[] | null, key: string) => {
         const map: Record<number, string> = {};
         items?.forEach(i => { map[i.id] = String(i[key]); });
         return map;
@@ -459,12 +468,12 @@ export function useDashboardData(filters: DashboardFilters) {
       const estadoMap = lookupMap(estados, 'nome');
       const estadoSiglaMap = lookupMap(estados, 'sigla');
       const cidadeMap = lookupMap(cidades, 'nome');
-      const segmentoMap = lookupMap(segmentos, 'nome');
-      const areaMap = lookupMap(areasAtuacao, 'nome');
-      const fornecedorMap = lookupMap(fornecedores, 'nome');
+      const segmentoMap = lookupMap(segmentos as any, 'nome');
+      const areaMap = lookupMap(areasAtuacao as any, 'nome');
+      const fornecedorMap = lookupMap(fornecedores as any, 'nome');
       const motivoMap: Record<number, string> = {};
-      motivosCancelamento?.forEach(m => { motivoMap[m.id] = m.descricao; });
-      const origemMap = lookupMap(origensVenda, 'nome');
+      (motivosCancelamento as any)?.forEach((m: any) => { motivoMap[m.id] = m.descricao; });
+      const origemMap = lookupMap(origensVenda as any, 'nome');
 
       const buildDistribution = (items: any[], fkField: string, nameMap: Record<number, string>): DistributionDataPoint[] => {
         const counts: Record<string, number> = {};
@@ -544,7 +553,7 @@ export function useDashboardData(filters: DashboardFilters) {
 
       // === BUILD LIST ITEMS ===
       const funcMap: Record<number, string> = {};
-      const { data: allFuncionarios } = await supabase.from('funcionarios').select('id, nome');
+      const { data: allFuncionarios } = await tf(supabase.from('funcionarios').select('id, nome'));
       allFuncionarios?.forEach(f => { funcMap[f.id] = f.nome; });
 
       // Cancelados list
@@ -587,7 +596,7 @@ export function useDashboardData(filters: DashboardFilters) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, tid]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
