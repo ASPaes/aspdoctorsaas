@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import UsuariosTab from "@/components/configuracoes/UsuariosTab";
+import AprovacaoAcessosTab from "@/components/configuracoes/AprovacaoAcessosTab";
 import { useSearchParams } from "react-router-dom";
 
 const schema = z.object({
@@ -101,6 +102,7 @@ export default function Configuracoes() {
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+          <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
@@ -153,6 +155,10 @@ export default function Configuracoes() {
 
         <TabsContent value="usuarios">
           <UsuariosTab />
+        </TabsContent>
+
+        <TabsContent value="aprovacoes">
+          <AprovacaoAcessosTab />
         </TabsContent>
       </Tabs>
     </div>
