@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,8 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
 export default function Clientes() {
   const navigate = useNavigate();
   const { filters, updateFilter, clearAdvancedFilters } = useClientesFilters();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
   // Destructure for readability
   const {
@@ -73,11 +76,11 @@ export default function Clientes() {
     debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     estadoId, cidadeId, motivoCancelamentoId,
-    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir,
+    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid,
   }), [debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     estadoId, cidadeId, motivoCancelamentoId,
-    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir]);
+    mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid]);
 
   const parseFilterNumber = useCallback((value: string): number | null => {
     const raw = value.trim();
@@ -210,7 +213,7 @@ export default function Clientes() {
     const rows: any[] = [];
 
     for (let offset = 0; ; offset += pageSize) {
-      let q = supabase.from("clientes").select(selectFields) as any;
+      let q = tf(supabase.from("clientes").select(selectFields)) as any;
       q = applyCommonFiltersOnClientes(q, options);
       q = q.range(offset, offset + pageSize - 1);
 
@@ -268,9 +271,9 @@ export default function Clientes() {
       const now = new Date();
       const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
       const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
-      let q = supabase
+      let q = tf(supabase
         .from("vw_clientes_financeiro")
-        .select("id", { count: "exact", head: true }) as any;
+        .select("id", { count: "exact", head: true })) as any;
 
       q = q.eq("cancelado", false)
         .gte("data_venda", firstDay)
@@ -326,7 +329,7 @@ export default function Clientes() {
       }
 
       const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
-      let q = supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" }) as any;
+      let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
       else if (status === "cancelados") q = q.eq("cancelado", true);
