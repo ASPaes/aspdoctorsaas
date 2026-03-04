@@ -36,6 +36,7 @@ export interface CSDashboardData {
   indicacoesGanhas: number;
   indicacoesPerdidas: number;
   indicacoesConversaoPercent: number;
+  indicacoesTotalMovimentados: number;
   topPrioridades: CSTicket[];
   allTickets: CSTicket[];
   ticketsIndicacaoDetalhados: CSTicket[];
@@ -251,8 +252,9 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
       // Indicações — conversão baseada em atualizado_em no período
       const indicacoesGanhas = ticketsIndicacaoMovimentados.filter((t) => t.indicacao_status === 'fechou').length;
       const indicacoesPerdidas = ticketsIndicacaoMovimentados.filter((t) => t.indicacao_status === 'nao_fechou').length;
-      const indicacoesConversaoPercent = (indicacoesGanhas + indicacoesPerdidas) > 0
-        ? (indicacoesGanhas / (indicacoesGanhas + indicacoesPerdidas)) * 100 : 0;
+      const indicacoesTotalMovimentados = ticketsIndicacaoMovimentados.length;
+      const indicacoesConversaoPercent = indicacoesTotalMovimentados > 0
+        ? (indicacoesGanhas / indicacoesTotalMovimentados) * 100 : 0;
 
       // Oportunidades
       const oportunidadesBacklog = backlog.filter((t) => t.tipo === 'oportunidade');
@@ -334,7 +336,7 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
         percentHigiene, reaberturas, clientesEmRisco,
         ticketsRiscoPorPrioridade, percentRiscoComPlano, mrrEmRisco, mrrRecuperado, resultadoRisco,
         pipelineIndicacao, indicacoesPorOwner,
-        indicacoesGanhas, indicacoesPerdidas, indicacoesConversaoPercent,
+        indicacoesGanhas, indicacoesPerdidas, indicacoesConversaoPercent, indicacoesTotalMovimentados,
         topPrioridades, allTickets,
         ticketsIndicacaoDetalhados: ticketsIndicacaoMovimentados,
         oportunidadesAbertas: oportunidadesBacklog.length,
