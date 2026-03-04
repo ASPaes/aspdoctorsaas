@@ -1260,6 +1260,7 @@ export type Database = {
       }
       tenants: {
         Row: {
+          cnpj: string | null
           created_at: string
           id: string
           max_users: number
@@ -1269,6 +1270,7 @@ export type Database = {
           trial_ends_at: string | null
         }
         Insert: {
+          cnpj?: string | null
           created_at?: string
           id?: string
           max_users?: number
@@ -1278,6 +1280,7 @@ export type Database = {
           trial_ends_at?: string | null
         }
         Update: {
+          cnpj?: string | null
           created_at?: string
           id?: string
           max_users?: number
@@ -1582,7 +1585,17 @@ export type Database = {
       accept_invite: { Args: { p_token: string }; Returns: undefined }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
-      create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
+      create_tenant_for_new_user:
+        | { Args: { p_nome: string }; Returns: string }
+        | {
+            Args: {
+              p_allowed_domain?: string
+              p_cnpj?: string
+              p_nome: string
+              p_plano?: string
+            }
+            Returns: string
+          }
       current_tenant_id: { Args: never; Returns: string }
       email_domain: { Args: { email: string }; Returns: string }
       fn_cohort_logos:
