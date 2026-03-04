@@ -1,0 +1,2 @@
+SELECT setval(pg_get_serial_sequence('origens_venda', 'id'), GREATEST((SELECT MAX(id) FROM origens_venda), 1));
+SELECT setval(pg_get_serial_sequence('unidades_base', 'id'), GREATEST((SELECT MAX(id) FROM unidades_base), 1));
