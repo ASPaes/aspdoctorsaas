@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import Logo from "@/components/Logo";
+import { Logo } from "@/components/Logo";
 
 export default function Onboarding() {
   const { refreshProfile } = useAuth();
