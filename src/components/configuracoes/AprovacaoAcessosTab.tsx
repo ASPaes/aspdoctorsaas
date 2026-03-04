@@ -53,19 +53,26 @@ export default function AprovacaoAcessosTab() {
     queryKey: ["pending-approvals", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_tenant_users_with_email", {
+      // Query profiles directly to get access_status, invited_at, invited_by
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, role, access_status, invited_at, invited_by, created_at, tenant_id")
+        .eq("tenant_id", tenantId!)
+        .in("access_status", ["pending", "blocked"])
+        .order("access_status", { ascending: true }); // pending before blocked
+      if (error) throw error;
+
+      // Try to get emails via the RPC for display
+      const { data: usersWithEmail } = await supabase.rpc("get_tenant_users_with_email", {
         p_tenant_id: tenantId!,
       });
-      if (error) throw error;
-      // Filter to pending/blocked and sort pending first
-      return ((data ?? []) as any[])
-        .filter((u) => u.status === "ativo" || true) // include all, filter by access_status below
-        .map((u) => ({ ...u, access_status: u.access_status ?? "active" } as PendingProfile));
+      const emailMap = new Map((usersWithEmail ?? []).map((u: any) => [u.user_id, u.email]));
+
+      return (data ?? []).map((p) => ({
+        ...p,
+        email: emailMap.get(p.user_id) ?? p.user_id,
+      })) as PendingProfile[];
     },
-    select: (data) =>
-      data
-        .filter((u) => ["pending", "blocked"].includes(u.access_status))
-        .sort((a, b) => (a.access_status === "pending" ? -1 : 1) - (b.access_status === "pending" ? -1 : 1)),
   });
 
   const updateAccess = useMutation({
