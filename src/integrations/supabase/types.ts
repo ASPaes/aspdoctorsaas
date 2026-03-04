@@ -32,6 +32,36 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          target_user_id: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          target_user_id?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          target_user_id?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       cac_despesas: {
         Row: {
           ativo: boolean
@@ -1144,7 +1174,13 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_status: string
+          allowed_domain: string | null
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
+          invited_at: string | null
+          invited_by: string | null
           is_super_admin: boolean
           role: string
           status: string
@@ -1152,7 +1188,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          access_status?: string
+          allowed_domain?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
+          invited_at?: string | null
+          invited_by?: string | null
           is_super_admin?: boolean
           role?: string
           status?: string
@@ -1160,7 +1202,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          access_status?: string
+          allowed_domain?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
+          invited_at?: string | null
+          invited_by?: string | null
           is_super_admin?: boolean
           role?: string
           status?: string
@@ -1532,9 +1580,11 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_token: string }; Returns: undefined }
+      can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       create_tenant_for_new_user: { Args: { p_nome: string }; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
+      email_domain: { Args: { email: string }; Returns: string }
       fn_cohort_logos:
         | {
             Args: {
@@ -1583,6 +1633,7 @@ export type Database = {
         }[]
       }
       is_super_admin: { Args: never; Returns: boolean }
+      is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       norm_txt: { Args: { t: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
