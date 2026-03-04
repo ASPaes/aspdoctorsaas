@@ -64,6 +64,9 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
+            {/* Onboarding (protected but outside AppLayout) */}
+            <Route path="/onboarding" element={<AuthGuard><Onboarding /></AuthGuard>} />
+
             {/* Protected routes */}
             <Route element={<AuthGuard><TenantFilterProvider><AppLayout /></TenantFilterProvider></AuthGuard>}>
               <Route path="/dashboard" element={<Dashboard />} />
