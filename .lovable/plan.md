@@ -1,45 +1,36 @@
 
 
-## Plano: Exclusão de duplicata, proteção contra double-submit e badge "Possível duplicidade"
+## Diagnóstico: Clientes vazios para usuário regular (cs@aspsoftwares.com.br)
 
-### 1. Excluir o registro duplicado
+### Análise realizada
 
-Apenas uma duplicata encontrada: cliente 449 (COSTELACO), registro `e0b2257b` (o segundo, criado 38s depois). Será excluído via DELETE.
+Verifiquei em profundidade:
+- **RLS**: Política `clientes_tenant_rw` está correta — usa `current_tenant_id()` (SECURITY DEFINER) + `is_super_admin()`
+- **Dados**: Há **655 clientes ativos** e 158 cancelados para o tenant `a0000000-...0001` (ASP)
+- **View**: `vw_clientes_financeiro` tem `security_invoker=on` correto
+- **Profile do usuário**: `is_super_admin: false`, `status: ativo`, `tenant_id` correto
+- **Código**: Para não-super-admins, `effectiveTenantId` é `null` e o `tf` helper é um no-op — RLS deveria retornar os dados normalmente
 
-### 2. Proteção contra double-submit no modal de venda
+### Causa provável
 
-**`src/components/clientes/CertA1VendaModal.tsx`**
-- O botão "Registrar" já tem `disabled={mutation.isPending}`, mas o `mutate()` pode ser chamado novamente antes do state atualizar. Trocar para usar um ref `isSubmitting` que é setado imediatamente no `onClick`, antes do `mutate()`.
+O problema mais provável é **contaminação de sessão**: quando o super admin loga, seleciona um tenant no filtro global, e depois o usuário `cs@` loga no mesmo navegador/aba, o `sessionStorage` mantém o valor `super-admin-tenant-filter`. Embora o código atual não use esse valor para não-super-admins no `effectiveTenantId`, o **cache do React Query pode estar servindo dados obsoletos** da sessão anterior (staleTime de 5 min, e o `queryClient` não é limpo no logout).
 
-### 3. Badge "Possível duplicidade" na tabela detalhada do Dashboard
+### Plano de correção
 
-**`src/components/certificados/CertA1Dashboard.tsx`**
-- No `queryFn`, buscar também o campo `created_at` de cada venda.
-- No mapeamento de `vendasDetalhe`, incluir `clienteId` e `createdAt`.
-- Após montar a lista, marcar registros como `possivelDuplicidade = true` quando existir outro registro do **mesmo cliente**, **mesma data_venda**, **mesmo status** e diferença de `created_at` menor que 5 minutos.
-- Na tabela, exibir um badge amarelo "Possível duplicidade" ao lado do status quando flagrado.
+**1. Limpar sessionStorage do filtro de tenant no logout**
+Em `AuthContext.tsx`, no `signOut`, remover a chave `super-admin-tenant-filter` do sessionStorage e limpar o cache do queryClient.
 
-### 4. Botão de excluir venda (admin only)
+**2. Limpar o cache do React Query no logout**
+Importar e chamar `queryClient.clear()` ao fazer signOut para garantir que nenhum dado da sessão anterior persista.
 
-**`src/components/certificados/CertA1Dashboard.tsx`**
-- Adicionar coluna "Ações" na tabela detalhada.
-- Botão de lixeira (Trash2 icon) visível apenas para usuários com `role === 'admin'` (obtido via `useAuth()`).
-- Ao clicar, abrir um `AlertDialog` de confirmação.
-- Ao confirmar, executar `supabase.from('certificado_a1_vendas').delete().eq('id', vendaId)` e invalidar queries.
+**3. Guard defensivo no TenantFilterContext**
+Para não-super-admins, forçar a remoção da chave do sessionStorage na inicialização, evitando qualquer possível interferência.
 
-**`src/components/clientes/CertificadoA1Section.tsx`**
-- Mesma lógica: adicionar coluna de ações com botão de excluir no histórico de vendas do cliente, também restrito a admin.
+**4. Verificar se o código mais recente está no preview**
+As alterações feitas nas mensagens anteriores (adição do `tf` em `Clientes.tsx`) precisam estar deployadas no preview para funcionar.
 
-### 5. Badge de duplicidade também no histórico do cliente
+### Arquivos a modificar
 
-**`src/components/clientes/CertificadoA1Section.tsx`**
-- Aplicar a mesma lógica de detecção de duplicidade (mesmo cliente, mesma data, created_at < 5 min de diferença) e exibir badge amarelo.
-
----
-
-### Resumo de arquivos alterados
-- **DELETE** no banco: registro `e0b2257b`
-- `src/components/clientes/CertA1VendaModal.tsx` — proteção double-submit
-- `src/components/certificados/CertA1Dashboard.tsx` — badge duplicidade + botão excluir (admin)
-- `src/components/clientes/CertificadoA1Section.tsx` — badge duplicidade + botão excluir (admin)
+- `src/contexts/AuthContext.tsx` — limpar sessionStorage e queryClient no signOut
+- `src/contexts/TenantFilterContext.tsx` — guard defensivo para não-super-admins
 
