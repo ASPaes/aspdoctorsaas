@@ -35,9 +35,11 @@ export function TenantFilterProvider({ children }: { children: React.ReactNode }
       return null;
     }
     try {
-      return sessionStorage.getItem(STORAGE_KEY) || null;
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      // Default to admin's own tenant if nothing stored
+      return stored || profile?.tenant_id || null;
     } catch {
-      return null;
+      return profile?.tenant_id || null;
     }
   });
 
