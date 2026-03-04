@@ -104,7 +104,6 @@ export default function Configuracoes() {
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
         </TabsList>
-        </TabsList>
 
         <TabsContent value="percentuais">
           <Card className="max-w-lg">
