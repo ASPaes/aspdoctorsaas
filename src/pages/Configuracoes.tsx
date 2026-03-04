@@ -157,6 +157,10 @@ export default function Configuracoes() {
         <TabsContent value="usuarios">
           <UsuariosTab />
         </TabsContent>
+
+        <TabsContent value="aprovacoes">
+          <AprovacaoAcessosTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
