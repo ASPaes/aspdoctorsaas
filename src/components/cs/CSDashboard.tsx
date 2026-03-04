@@ -15,7 +15,7 @@ import {
   type CSTicket, type CSTicketPrioridade,
 } from './types';
 import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User, ShieldCheck, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, RefreshCw, Building2, User, ShieldCheck, ExternalLink, Search, ArrowUpDown, ArrowUp, ArrowDown, Ticket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { KpiHelpPopover } from '@/components/dashboard/KpiHelpPopover';
@@ -230,7 +230,8 @@ export function CSDashboard({ onViewTicket, filters: globalFilters }: CSDashboar
         </TabsContent>
 
         <TabsContent value="indicacoes" className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
+            <KPICard title="Abertas" value={data.indicacoesTotalMovimentados} icon={<Ticket className="h-5 w-5 text-primary" />} variant="default" kpiKey="cs_indicacoes_abertas" />
             <KPICard title="Ganhas" value={data.indicacoesGanhas} icon={<CheckCircle className="h-5 w-5 text-green-500" />} variant="success" kpiKey="cs_indicacoes_ganhas" />
             <KPICard title="Perdidas" value={data.indicacoesPerdidas} icon={<TrendingDown className="h-5 w-5 text-destructive" />} variant="danger" kpiKey="cs_indicacoes_perdidas" />
             <KPICard title="% Conversão" value={formatPercent(data.indicacoesConversaoPercent)} icon={<Target className="h-5 w-5 text-green-500" />} variant={data.indicacoesConversaoPercent >= 50 ? 'success' : data.indicacoesConversaoPercent >= 25 ? 'warning' : 'danger'} kpiKey="cs_indicacoes_conversao" />
