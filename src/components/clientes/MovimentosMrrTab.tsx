@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { useLookups } from "@/hooks/useLookups";
 import { cn } from "@/lib/utils";
@@ -44,9 +45,11 @@ export default function MovimentosMrrTab() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const lookups = useLookups();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
   const { data: movimentos, isLoading } = useQuery({
-    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter],
+    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, tid],
     queryFn: async () => {
       let q = supabase
         .from("movimentos_mrr")
@@ -55,6 +58,8 @@ export default function MovimentosMrrTab() {
         .is("estornado_por", null)
         .is("estorno_de", null)
         .order("data_movimento", { ascending: false });
+
+      q = tf(q);
 
       if (periodo.from) q = q.gte("data_movimento", format(periodo.from, "yyyy-MM-dd"));
       if (periodo.to) q = q.lte("data_movimento", format(periodo.to, "yyyy-MM-dd"));
