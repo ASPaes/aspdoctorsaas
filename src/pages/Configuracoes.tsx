@@ -102,6 +102,8 @@ export default function Configuracoes() {
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+          <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
+        </TabsList>
         </TabsList>
 
         <TabsContent value="percentuais">
