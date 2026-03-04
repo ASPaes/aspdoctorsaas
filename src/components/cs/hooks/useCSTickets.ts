@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import type {
   CSTicket,
   CSTicketTipo,
@@ -76,14 +77,17 @@ interface TicketsFilter {
 }
 
 export function useFuncionariosAtivos() {
+  const { effectiveTenantId: tid } = useTenantFilter();
   return useQuery({
-    queryKey: ['funcionarios-ativos'],
+    queryKey: ['funcionarios-ativos', tid],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('funcionarios')
         .select('*')
         .eq('ativo', true)
         .order('nome');
+      if (tid) q = q.eq('tenant_id', tid);
+      const { data, error } = await q;
       if (error) throw error;
       return data as Funcionario[];
     },
@@ -91,8 +95,9 @@ export function useFuncionariosAtivos() {
 }
 
 export function useCSTickets(filters?: TicketsFilter) {
+  const { effectiveTenantId: tid } = useTenantFilter();
   return useQuery({
-    queryKey: ['cs-tickets', filters],
+    queryKey: ['cs-tickets', filters, tid],
     queryFn: async () => {
       let query = supabase
         .from('cs_tickets')
@@ -131,6 +136,9 @@ export function useCSTickets(filters?: TicketsFilter) {
       if (filters?.search) {
         query = query.or(`assunto.ilike.%${filters.search}%,descricao_curta.ilike.%${filters.search}%`);
       }
+      if (tid) {
+        query = query.eq('tenant_id', tid);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -140,8 +148,9 @@ export function useCSTickets(filters?: TicketsFilter) {
 }
 
 export function useCSTicket(ticketId: string | null) {
+  const { effectiveTenantId: tid } = useTenantFilter();
   return useQuery({
-    queryKey: ['cs-ticket', ticketId],
+    queryKey: ['cs-ticket', ticketId, tid],
     queryFn: async () => {
       if (!ticketId) return null;
 

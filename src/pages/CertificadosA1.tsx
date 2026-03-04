@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -46,6 +47,8 @@ export default function CertificadosA1() {
   const queryClient = useQueryClient();
   const lookups = useLookups();
   const { filters, updateFilter } = useCertA1Filters();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
   const {
     searchText, quickFilter: quickFilterRaw, statusFilter, somenteGanho,
@@ -95,19 +98,19 @@ export default function CertificadosA1() {
   }, [quickFilter, vencimentoDe, vencimentoAte]);
 
   const { data: clientes, isLoading } = useQuery({
-    queryKey: ["cert_a1_lista", debouncedSearch, quickFilter, statusFilter, quickFilterDates, sortField, sortDir, somenteGanho],
+    queryKey: ["cert_a1_lista", debouncedSearch, quickFilter, statusFilter, quickFilterDates, sortField, sortDir, somenteGanho, tid],
     queryFn: async () => {
       // If "somente ganho" is active, fetch sold client IDs first
       let ganhoIds: string[] | null = null;
       if (somenteGanho) {
-        const { data: vendas } = await supabase.from("certificado_a1_vendas").select("cliente_id").eq("status", "ganho");
-        ganhoIds = [...new Set((vendas ?? []).map((v: any) => v.cliente_id))];
+        const { data: vendas } = await tf(supabase.from("certificado_a1_vendas").select("cliente_id").eq("status", "ganho"));
+        ganhoIds = [...new Set((vendas ?? []).map((v: any) => v.cliente_id))] as string[];
         if (ganhoIds.length === 0) return [];
       }
 
-      let q = supabase.from("clientes" as any)
+      let q = tf(supabase.from("clientes" as any)
         .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
-        .eq("cancelado", false) as any;
+        .eq("cancelado", false)) as any;
 
       if (ganhoIds) {
         q = q.in("id", ganhoIds);

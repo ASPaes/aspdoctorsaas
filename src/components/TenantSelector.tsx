@@ -34,9 +34,9 @@ export function TenantSelector() {
           ))}
         </SelectContent>
       </Select>
-      {selectedTenantId && (
+      {selectedTenantId && selectedName && (
         <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">
-          Simulando
+          Simulando: {selectedName}
         </Badge>
       )}
     </div>
