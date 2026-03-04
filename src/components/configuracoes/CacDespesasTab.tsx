@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
@@ -76,6 +77,8 @@ const emptyForm: FormState = {
 export default function CacDespesasTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -83,12 +86,11 @@ export default function CacDespesasTab() {
 
   // Lookup unidades_base
   const { data: unidades } = useQuery({
-    queryKey: ["unidades_base"],
+    queryKey: ["unidades_base", tid],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("unidades_base")
-        .select("id, nome")
-        .order("nome");
+      const { data, error } = await tf(
+        supabase.from("unidades_base").select("id, nome").order("nome")
+      );
       if (error) throw error;
       return data;
     },
@@ -96,12 +98,13 @@ export default function CacDespesasTab() {
 
   // Fetch despesas
   const { data: despesas, isLoading } = useQuery({
-    queryKey: ["cac_despesas"],
+    queryKey: ["cac_despesas", tid],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("cac_despesas" as any)
-        .select("*")
-        .order("mes_inicial", { ascending: false });
+      const { data, error } = await tf(
+        (supabase.from("cac_despesas" as any) as any)
+          .select("*")
+          .order("mes_inicial", { ascending: false })
+      );
       if (error) throw error;
       return data as unknown as Despesa[];
     },
