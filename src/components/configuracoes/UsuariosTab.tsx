@@ -41,8 +41,14 @@ export default function UsuariosTab() {
     createInvite.mutate(
       { email: inviteEmail.trim(), role: inviteRole, tenantId: tenant.id },
       {
-        onSuccess: () => {
-          toast.success("Convite enviado!");
+        onSuccess: (result) => {
+          if (result.accessStatus === "pending") {
+            toast.warning(
+              "Convite enviado. Usuário fora do domínio permitido — aguardará aprovação do admin para acessar os dados."
+            );
+          } else {
+            toast.success("Convite enviado e aprovado automaticamente (domínio permitido).");
+          }
           setInviteEmail("");
         },
         onError: (err: any) => toast.error(err.message),
