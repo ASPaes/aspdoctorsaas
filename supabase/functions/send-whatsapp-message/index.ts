@@ -132,8 +132,9 @@ Deno.serve(async (req) => {
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
-    // Upload base64 media to Supabase Storage for persistence
+    // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
+    let storageSignedUrl: string | null = null;
     if (body.mediaBase64 && body.messageType !== 'text') {
       try {
         const raw = body.mediaBase64.startsWith('data:')
@@ -154,18 +155,28 @@ Deno.serve(async (req) => {
           console.error('[send-whatsapp-message] Storage upload error:', uploadError);
         } else {
           persistentMediaPath = storagePath;
-          console.log('[send-whatsapp-message] Media uploaded to storage:', storagePath);
+          // Generate a signed URL so Evolution API can download the file
+          const { data: signedData } = await supabase.storage
+            .from('whatsapp-media')
+            .createSignedUrl(storagePath, 300); // 5 min expiry
+          if (signedData?.signedUrl) {
+            storageSignedUrl = signedData.signedUrl;
+          }
+          console.log('[send-whatsapp-message] Media uploaded to storage:', storagePath, 'signedUrl:', !!storageSignedUrl);
         }
       } catch (uploadErr) {
         console.error('[send-whatsapp-message] Failed to upload media:', uploadErr);
       }
     }
 
+    // Use signed URL from storage if available, otherwise fall back to base64/mediaUrl
+    const mediaOverride = storageSignedUrl || undefined;
     const { endpoint, requestBody } = buildEvolutionRequest(
       secrets.api_url,
       instanceIdentifier,
       destinationNumber,
-      body
+      body,
+      mediaOverride
     );
 
     const authHeaders = getEvolutionAuthHeaders(secrets.api_key, providerType);
