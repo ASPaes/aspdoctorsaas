@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Check, CheckCheck } from "lucide-react";
 import type { Message } from "../hooks/useWhatsAppMessages";
+import { MediaContent } from "./MediaContent";
 
 interface Props {
   msg: Message;
