@@ -165,10 +165,21 @@ Deno.serve(async (req) => {
       ? (body.content || '') 
       : (body.content || `Sent ${body.messageType}`);
 
+    const tenantId = conversation.tenant_id;
+    console.log('[send-whatsapp-message] tenant_id from conversation:', tenantId, 'conversation keys:', Object.keys(conversation));
+
+    if (!tenantId) {
+      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined from conversation:', JSON.stringify(conversation));
+      return new Response(
+        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { data: savedMessage, error: saveError } = await supabase
       .from('whatsapp_messages')
       .insert({
-        tenant_id: conversation.tenant_id,
+        tenant_id: tenantId,
         conversation_id: body.conversationId,
         message_id: messageId,
         remote_jid: contact.phone_number,
