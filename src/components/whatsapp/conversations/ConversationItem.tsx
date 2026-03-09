@@ -6,7 +6,6 @@ import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatRelativeTime } from "@/lib/formatDateWithTimezone";
-import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 
 interface Props {
   conversation: ConversationWithContact;
