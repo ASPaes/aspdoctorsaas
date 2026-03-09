@@ -121,7 +121,7 @@ export default function CertificadosA1() {
       }
 
       if (debouncedSearch) {
-        const s = `%${debouncedSearch}%`;
+        const s = `%${escapeLike(debouncedSearch)}%`;
         const trimmed = debouncedSearch.trim();
         const isNumeric = /^\d+$/.test(trimmed);
         if (isNumeric) {

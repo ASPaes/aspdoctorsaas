@@ -376,7 +376,7 @@ export default function Clientes() {
       else if (status === "cancelados") q = q.eq("cancelado", true);
 
       if (debouncedSearch) {
-        const s = `%${debouncedSearch}%`;
+        const s = `%${escapeLike(debouncedSearch)}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
         if (isNumeric) {
           q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
