@@ -42,6 +42,7 @@ export interface ConversationsFilters {
   unassigned?: boolean;
   page?: number;
   pageSize?: number;
+  includeIds?: string[];
 }
 
 export interface ConversationsResult {
