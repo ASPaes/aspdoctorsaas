@@ -79,20 +79,22 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1">
           <span className="text-sm font-medium truncate min-w-0 flex-1">{name}</span>
-          {timeStr && (
-            <span className={cn(
-              "text-xs whitespace-nowrap shrink-0",
-              hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
-            )}>
-              {timeStr}
-            </span>
-          )}
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
+            {timeStr && (
+              <span className={cn(
+                "text-xs whitespace-nowrap",
+                hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
+              )}>
+                {timeStr}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <div className="flex items-center gap-1 min-w-0 flex-1">
+        <div className="flex items-center gap-1 mt-0.5">
+          <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
             {conv.isLastMessageFromMe && (
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
@@ -101,7 +103,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
               {conv.last_message_preview || "Sem mensagens"}
             </p>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
             {hasUnread && (
               <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
