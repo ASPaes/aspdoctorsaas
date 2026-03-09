@@ -140,7 +140,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
                           #{c.codigo_sequencial} — {c.nome_fantasia || c.razao_social || "Sem nome"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {c.telefone_whatsapp || "Sem WhatsApp"} {c.cnpj ? `· ${c.cnpj}` : ""}
+                          {c.telefone_whatsapp || "Sem WhatsApp"} {c.cnpj ? `· ${maskCNPJ(c.cnpj)}` : ""}
                         </p>
                       </button>
                     ))}
