@@ -77,7 +77,7 @@ export function ChatArea({ conversation }: Props) {
     );
   }
 
-  const dateGroups = groupByDate(messages);
+  const dateGroups = groupByDateInline(messages, timezone);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
