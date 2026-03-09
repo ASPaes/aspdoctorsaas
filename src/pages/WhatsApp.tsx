@@ -50,20 +50,22 @@ export default function WhatsApp() {
         setSelected(data as unknown as ConversationWithContact);
       }
 
-      // Auto-add to cliente_contatos if not exists
-      const { data: existing } = await supabase
-        .from("cliente_contatos")
-        .select("id")
-        .eq("cliente_id", clienteId)
-        .ilike("fone", `%${phone.slice(-10)}%`)
-        .limit(1);
+      // Auto-add to cliente_contatos if clienteId provided
+      if (clienteId) {
+        const { data: existing } = await supabase
+          .from("cliente_contatos")
+          .select("id")
+          .eq("cliente_id", clienteId)
+          .ilike("fone", `%${phone.slice(-10)}%`)
+          .limit(1);
 
-      if (!existing || existing.length === 0) {
-        await supabase.from("cliente_contatos").insert({
-          cliente_id: clienteId,
-          nome: clienteName || contact.name || phone,
-          fone: phone,
-        } as any);
+        if (!existing || existing.length === 0) {
+          await supabase.from("cliente_contatos").insert({
+            cliente_id: clienteId,
+            nome: clienteName || contact.name || phone,
+            fone: phone,
+          } as any);
+        }
       }
     }).catch(() => {
       toast.error("Erro ao criar conversa");
