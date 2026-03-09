@@ -14,7 +14,7 @@ interface Props {
   instanceName?: string;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName }: Props) {
   const contact = conv.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
   const { sentiment } = useWhatsAppSentiment(conv.id);
