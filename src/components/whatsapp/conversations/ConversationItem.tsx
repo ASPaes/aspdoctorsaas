@@ -98,9 +98,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
           <div className="flex items-center gap-1 shrink-0 ml-2">
             {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
             {conv.unread_count > 0 && (
-              <Badge variant="default" className="h-5 min-w-5 px-1.5 text-[10px]">
+              <span className="flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
                 {conv.unread_count > 99 ? "99+" : conv.unread_count}
-              </Badge>
+              </span>
             )}
           </div>
         </div>
