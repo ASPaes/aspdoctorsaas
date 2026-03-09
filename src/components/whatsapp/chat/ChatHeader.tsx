@@ -123,6 +123,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         contactPhone={contact?.phone_number || ''}
         contactNotes={contact?.notes}
       />
+
+      <TransferDialog
+        open={isTransferOpen}
+        onOpenChange={setIsTransferOpen}
+        conversationId={conversation.id}
+        currentAssignee={conversation.assigned_to || null}
+      />
     </div>
   );
 }
