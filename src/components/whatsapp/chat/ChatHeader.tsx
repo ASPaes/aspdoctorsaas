@@ -63,7 +63,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
+        <QueueIndicator
+          conversationId={conversation.id}
+          assignedTo={conversation.assigned_to || null}
+          onTransferClick={() => setIsTransferOpen(true)}
+        />
         <SentimentCard sentiment={sentiment} />
 
         <Button variant="ghost" size="sm" onClick={analyze} disabled={isAnalyzing} title="Analisar sentimento">
