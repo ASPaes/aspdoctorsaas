@@ -126,8 +126,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
               )}
 
               {results.length > 0 && !selectedCliente && (
-                <ScrollArea className="max-h-48">
-                  <div className="space-y-1">
+                <ScrollArea className="h-[200px] border rounded-md">
+                  <div className="space-y-1 p-1">
                     {results.map((c) => (
                       <button
                         key={c.id}
