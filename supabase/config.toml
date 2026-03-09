@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.check-instances-status]
 verify_jwt = false
+
+[functions.test-evolution-connection]
+verify_jwt = false

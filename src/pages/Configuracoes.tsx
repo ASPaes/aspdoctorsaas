@@ -173,7 +173,7 @@ export default function Configuracoes() {
         </TabsContent>
 
         <TabsContent value="whatsapp">
-          <WhatsAppInstancesTab />
+          <WhatsAppSettingsContent />
         </TabsContent>
       </Tabs>
     </div>
