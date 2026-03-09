@@ -78,8 +78,8 @@ export default function WhatsAppRelatorio() {
             </SelectContent>
           </Select>
           <DateRangePicker
-            from={dateRange.from}
-            to={dateRange.to}
+            label="Período"
+            value={{ from: dateRange.from, to: dateRange.to }}
             onChange={(range) => {
               if (range?.from && range?.to) setDateRange({ from: range.from, to: range.to });
             }}

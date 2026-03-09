@@ -15,8 +15,8 @@ export default function WhatsAppContatos() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const { contacts, isLoading } = useWhatsAppContacts({ search });
-  const { data: details, isLoading: detailsLoading } = useContactDetails(selectedContactId);
+  const { data: contactsData, isLoading } = useWhatsAppContacts(undefined, search);
+  const contacts = contactsData?.contacts || [];
 
   return (
     <div className="flex h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">

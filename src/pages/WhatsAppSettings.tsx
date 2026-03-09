@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WhatsAppInstancesTab } from "@/components/configuracoes/WhatsAppInstancesTab";
+import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
