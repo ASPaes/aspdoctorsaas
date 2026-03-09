@@ -49,7 +49,7 @@ export function CSTicketDetail({ ticket, open, onOpenChange, mode }: CSTicketDet
       </div>
       <div className="flex-1 overflow-hidden">
         {isLoading ? <div className="flex items-center justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div> :
-          currentTicket ? (showMobileTimeline ? <CSTimelineEnhanced ticketId={currentTicket.id} isStickyMode /> :
+          currentTicket ? (showMobileTimeline ? <CSTimelineEnhanced ticketId={currentTicket.id} clientePhone={currentTicket.cliente?.telefone_whatsapp} isStickyMode /> :
             <ScrollArea className="h-full"><div className="p-4"><CSTicketDetailContent ticket={currentTicket} mode={mode} onClose={() => onOpenChange(false)} /></div></ScrollArea>
           ) : null}
       </div>
