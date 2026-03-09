@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CS_UPDATE_TIPO_LABELS, type CSTicketUpdate, type CSUpdateTipo } from './types';
-import { MessageSquare, ArrowUpDown, UserCheck, AlertTriangle, Sparkles, CheckCircle, Send, Loader2, Lock, Eye, ArrowDown, Filter, ChevronDown } from 'lucide-react';
+import { MessageSquare, ArrowUpDown, UserCheck, AlertTriangle, Sparkles, CheckCircle, Send, Loader2, Lock, Eye, ArrowDown, Filter, ChevronDown, MessageCircle } from 'lucide-react';
 
 interface CSTimelineEnhancedProps {
   ticketId: string;
