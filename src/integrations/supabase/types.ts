@@ -630,6 +630,7 @@ export type Database = {
       conversation_assignments: {
         Row: {
           assigned_by: string | null
+          assigned_from: string | null
           assigned_to: string | null
           conversation_id: string
           created_at: string
@@ -639,6 +640,7 @@ export type Database = {
         }
         Insert: {
           assigned_by?: string | null
+          assigned_from?: string | null
           assigned_to?: string | null
           conversation_id: string
           created_at?: string
@@ -648,6 +650,7 @@ export type Database = {
         }
         Update: {
           assigned_by?: string | null
+          assigned_from?: string | null
           assigned_to?: string | null
           conversation_id?: string
           created_at?: string
@@ -1475,6 +1478,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_pinned: boolean
           tenant_id: string
           updated_at: string
         }
@@ -1484,6 +1488,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_pinned?: boolean
           tenant_id: string
           updated_at?: string
         }
@@ -1493,6 +1498,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_pinned?: boolean
           tenant_id?: string
           updated_at?: string
         }
@@ -1515,26 +1521,41 @@ export type Database = {
       }
       whatsapp_conversation_summaries: {
         Row: {
+          action_items: string[] | null
           conversation_id: string
           created_at: string
           id: string
+          key_points: string[] | null
           message_count: number
+          period_end: string | null
+          period_start: string | null
+          sentiment_at_time: string | null
           summary: string
           tenant_id: string
         }
         Insert: {
+          action_items?: string[] | null
           conversation_id: string
           created_at?: string
           id?: string
+          key_points?: string[] | null
           message_count?: number
+          period_end?: string | null
+          period_start?: string | null
+          sentiment_at_time?: string | null
           summary: string
           tenant_id: string
         }
         Update: {
+          action_items?: string[] | null
           conversation_id?: string
           created_at?: string
           id?: string
+          key_points?: string[] | null
           message_count?: number
+          period_end?: string | null
+          period_start?: string | null
+          sentiment_at_time?: string | null
           summary?: string
           tenant_id?: string
         }
@@ -1731,11 +1752,13 @@ export type Database = {
           created_by: string | null
           id: string
           instance_id: string | null
+          is_active: boolean
           is_global: boolean
           shortcut: string | null
           tenant_id: string
           title: string
           updated_at: string
+          usage_count: number
         }
         Insert: {
           category?: string | null
@@ -1744,11 +1767,13 @@ export type Database = {
           created_by?: string | null
           id?: string
           instance_id?: string | null
+          is_active?: boolean
           is_global?: boolean
           shortcut?: string | null
           tenant_id: string
           title: string
           updated_at?: string
+          usage_count?: number
         }
         Update: {
           category?: string | null
@@ -1757,11 +1782,13 @@ export type Database = {
           created_by?: string | null
           id?: string
           instance_id?: string | null
+          is_active?: boolean
           is_global?: boolean
           shortcut?: string | null
           tenant_id?: string
           title?: string
           updated_at?: string
+          usage_count?: number
         }
         Relationships: [
           {
