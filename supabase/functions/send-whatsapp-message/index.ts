@@ -206,7 +206,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    await anonClient
+    // Use service role client to bypass RLS for conversation update
+    await supabase
       .from('whatsapp_conversations')
       .update({
         last_message_at: new Date().toISOString(),
