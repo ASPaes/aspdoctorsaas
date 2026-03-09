@@ -168,6 +168,7 @@ export default function UsuariosTab() {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  <TableCell>
                     <Select
                       value={u.role}
                       onValueChange={(v) => handleRoleChange(u.user_id, v)}
