@@ -245,7 +245,7 @@ export default function Clientes() {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
       "mensalidade", "data_ativacao", "cancelado", "data_venda", "unidade_base_id",
-      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp",
+      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato",
     ].join(",");
 
     const pageSize = 1000;
