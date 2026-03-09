@@ -27,9 +27,9 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
   }
 
   return (
-    <div className="flex-1 flex min-h-0">
+    <div className="h-full flex min-h-0 overflow-hidden">
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         <ChatHeader
           conversation={conversation}
           onToggleDetails={() => setShowDetails(!showDetails)}
