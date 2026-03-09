@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Send, Loader2, FileText, Music, Video } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+
 import type { MediaSendParams } from "./types";
 import { useToast } from "@/hooks/use-toast";
 
