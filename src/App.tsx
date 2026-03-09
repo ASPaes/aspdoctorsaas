@@ -84,6 +84,9 @@ const App = () => (
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<CustomerSuccess />} />
               <Route path="/whatsapp" element={<WhatsApp />} />
+              <Route path="/whatsapp/contatos" element={<WhatsAppContatos />} />
+              <Route path="/whatsapp/relatorio" element={<WhatsAppRelatorio />} />
+              <Route path="/whatsapp/settings" element={<WhatsAppSettings />} />
 
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>

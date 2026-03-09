@@ -17,6 +17,7 @@ export default function WhatsAppContatos() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const { data: contactsData, isLoading } = useWhatsAppContacts(undefined, search);
   const contacts = contactsData?.contacts || [];
+  const { data: details, isLoading: detailsLoading } = useContactDetails(selectedContactId);
 
   return (
     <div className="flex h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
