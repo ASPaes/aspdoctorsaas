@@ -145,6 +145,30 @@ export default function UsuariosTab() {
                   <TableCell className="text-sm">{u.email ?? u.user_id}</TableCell>
                   <TableCell>
                     <Select
+                      value={u.funcionario_id ? String(u.funcionario_id) : "none"}
+                      onValueChange={(v) => {
+                        const fid = v === "none" ? null : Number(v);
+                        updateFuncionario.mutate(
+                          { userId: u.user_id, funcionarioId: fid },
+                          {
+                            onSuccess: () => toast.success("Funcionário vinculado."),
+                            onError: (err: any) => toast.error(err.message),
+                          }
+                        );
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Nenhum —</SelectItem>
+                        {funcionarios.map((f) => (
+                          <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                    <Select
                       value={u.role}
                       onValueChange={(v) => handleRoleChange(u.user_id, v)}
                       disabled={u.user_id === profile?.user_id || u.is_super_admin}
