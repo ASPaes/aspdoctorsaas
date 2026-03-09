@@ -119,7 +119,16 @@ Deno.serve(async (req) => {
       ? instanceIdExternal
       : instanceName;
 
-    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'Provider:', providerType);
+    const tenantId = conversation.tenant_id;
+    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'Provider:', providerType, 'tenant:', tenantId);
+
+    if (!tenantId) {
+      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined from conversation:', JSON.stringify(conversation));
+      return new Response(
+        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
