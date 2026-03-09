@@ -159,7 +159,7 @@ export function useCSTicket(ticketId: string | null) {
         .select(`
           *,
           cliente:clientes!cs_tickets_cliente_id_fkey (
-            id, razao_social, nome_fantasia, mensalidade, cancelado
+            id, razao_social, nome_fantasia, mensalidade, cancelado, telefone_whatsapp
           ),
           owner:funcionarios!cs_tickets_owner_id_fkey (
             id, nome, cargo, ativo, email

@@ -87,6 +87,7 @@ export interface CSTicket {
     nome_fantasia: string | null;
     mensalidade: number | null;
     cancelado: boolean;
+    telefone_whatsapp: string | null;
   } | null;
   owner?: Funcionario | null;
   criado_por?: Funcionario | null;

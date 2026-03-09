@@ -329,6 +329,21 @@ export function CertA1Dashboard() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">{formatBRL.format(v.valor)}</TableCell>
+                      <TableCell>
+                        {v.telefoneWhatsapp ? (
+                          <a
+                            href={`https://api.whatsapp.com/send?phone=55${v.telefoneWhatsapp.replace(/\D/g, '')}`}
+                            target="_top"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950">
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       {isAdmin && (
                         <TableCell>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(v.id)}>

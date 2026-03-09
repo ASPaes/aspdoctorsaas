@@ -312,6 +312,17 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
       {currentTicket.status !== 'concluido' && currentTicket.status !== 'cancelado' && (
       <div className="flex flex-wrap gap-2">
           {!currentTicket.primeira_acao_em && <Button size="sm" onClick={handleRegistrarPrimeiraAcao}><Play className="h-4 w-4 mr-1" />Registrar 1ª Ação</Button>}
+          {currentTicket.cliente?.telefone_whatsapp && (
+            <Button size="sm" variant="outline" className="text-green-600 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-950" asChild>
+              <a
+                href={`https://api.whatsapp.com/send?phone=55${currentTicket.cliente.telefone_whatsapp.replace(/\D/g, '')}`}
+                target="_top"
+                rel="noopener noreferrer"
+              >
+                <MessageCircle className="h-4 w-4 mr-1" />WhatsApp
+              </a>
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => setShowReassignDialog(true)}><ArrowUpDown className="h-4 w-4 mr-1" />Reatribuir</Button>
           <Button size="sm" variant="default" onClick={() => setShowConcluirDialog(true)}><CheckCircle className="h-4 w-4 mr-1" />Concluir</Button>
           <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}><Trash2 className="h-4 w-4 mr-1" />Excluir</Button>
