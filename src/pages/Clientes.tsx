@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
@@ -245,7 +245,7 @@ export default function Clientes() {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
       "mensalidade", "data_ativacao", "cancelado", "data_venda", "unidade_base_id",
-      "custo_operacao", "imposto_percentual", "custo_fixo_percentual",
+      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp",
     ].join(",");
 
     const pageSize = 1000;
@@ -369,7 +369,7 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id, telefone_whatsapp";
       let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -829,6 +829,7 @@ export default function Clientes() {
                   </button>
                 </TableHead>
               ))}
+              <TableHead className="w-[40px]"></TableHead>
               <TableHead>Unidade Base</TableHead>
             </TableRow>
           </TableHeader>
@@ -869,6 +870,24 @@ export default function Clientes() {
                     )}>
                       {c.cancelado ? "Cancelado" : "Ativo"}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn("h-7 w-7", c.telefone_whatsapp ? "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" : "text-muted-foreground/40 cursor-default")}
+                      disabled={!c.telefone_whatsapp}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (c.telefone_whatsapp) {
+                          const phone = c.telefone_whatsapp.replace(/\D/g, '');
+                          const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
+                          navigate(`/whatsapp?phone=${phone}&clienteId=${c.id}&clienteName=${name}`);
+                        }
+                      }}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                   <TableCell>{c.unidade_base_id ? unidadeBaseMap.get(c.unidade_base_id) || "—" : "—"}</TableCell>
                 </TableRow>
