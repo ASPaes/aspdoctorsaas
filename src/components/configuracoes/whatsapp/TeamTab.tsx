@@ -8,6 +8,29 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageSquare, Users } from "lucide-react";
 
+interface Funcionario {
+  id: number;
+  nome: string;
+  cargo: string | null;
+}
+
+function useFuncionarios() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery<Funcionario[]>({
+    queryKey: ["funcionarios-lookup", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome, cargo")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Funcionario[];
+    },
+  });
+}
+
 function useConversationCounts() {
   const { effectiveTenantId: tid } = useTenantFilter();
   return useQuery({
@@ -34,8 +57,9 @@ function useConversationCounts() {
 export default function TeamTab() {
   const { data: users, isLoading: usersLoading } = useTenantUsers();
   const { data: counts, isLoading: countsLoading } = useConversationCounts();
+  const { data: funcionarios, isLoading: funcLoading } = useFuncionarios();
 
-  const isLoading = usersLoading || countsLoading;
+  const isLoading = usersLoading || countsLoading || funcLoading;
 
   if (isLoading) {
     return (
@@ -48,6 +72,7 @@ export default function TeamTab() {
     );
   }
 
+  const funcMap = new Map((funcionarios ?? []).map(f => [f.id, f]));
   const activeUsers = users?.filter(u => u.status === "ativo") ?? [];
 
   return (
@@ -67,7 +92,9 @@ export default function TeamTab() {
         ) : (
           <div className="divide-y divide-border">
             {activeUsers.map(user => {
-              const initials = (user.email ?? "?").substring(0, 2).toUpperCase();
+              const func = user.funcionario_id ? funcMap.get(user.funcionario_id) : null;
+              const displayName = func?.nome ?? user.email ?? user.user_id;
+              const initials = displayName.substring(0, 2).toUpperCase();
               const convCount = counts?.[user.user_id] ?? 0;
               return (
                 <div key={user.user_id} className="flex items-center gap-3 py-3">
@@ -75,16 +102,18 @@ export default function TeamTab() {
                     <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{user.email}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                    <p className="text-sm font-medium truncate">{displayName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {func?.cargo ?? user.role}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="gap-1 text-xs">
                       <MessageSquare className="h-3 w-3" />
                       {convCount}
                     </Badge>
-                    <Badge variant={user.status === "ativo" ? "default" : "secondary"} className="text-xs">
-                      {user.status === "ativo" ? "Ativo" : "Inativo"}
+                    <Badge variant="default" className="text-xs">
+                      Ativo
                     </Badge>
                   </div>
                 </div>

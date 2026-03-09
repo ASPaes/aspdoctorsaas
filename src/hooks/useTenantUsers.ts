@@ -119,6 +119,20 @@ export function useUpdateUserStatus() {
   });
 }
 
+export function useUpdateUserFuncionario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, funcionarioId }: { userId: string; funcionarioId: number | null }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ funcionario_id: funcionarioId } as any)
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
 export function useCreateInvite() {
   const qc = useQueryClient();
   const { profile } = useAuth();
