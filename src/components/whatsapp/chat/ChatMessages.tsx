@@ -67,5 +67,6 @@ export function ChatMessages({ conversationId, onReply }: Props) {
       )}
       <div ref={bottomRef} />
     </ScrollArea>
+    </div>
   );
 }
