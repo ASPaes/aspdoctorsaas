@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,15 +10,20 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import UsuariosTab from "@/components/configuracoes/UsuariosTab";
 import AprovacaoAcessosTab from "@/components/configuracoes/AprovacaoAcessosTab";
-import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
 import { useSearchParams } from "react-router-dom";
+import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
+import { InstanceSetupCollapsible } from "@/components/configuracoes/whatsapp/InstanceSetupCollapsible";
+import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList";
+import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstanceDialog";
+import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
+import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -26,6 +31,47 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+function WhatsAppSettingsContent() {
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [whatsappSubTab, setWhatsappSubTab] = useState("setup");
+
+  return (
+    <div className="space-y-4">
+      <Tabs value={whatsappSubTab} onValueChange={setWhatsappSubTab}>
+        <TabsList>
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="instancias">Instâncias</TabsTrigger>
+          <TabsTrigger value="macros">Macros</TabsTrigger>
+          <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="setup" className="mt-4">
+          <SetupGuideCollapsible />
+        </TabsContent>
+
+        <TabsContent value="instancias" className="mt-4 space-y-4">
+          <InstanceSetupCollapsible onOpenAddDialog={() => setAddDialogOpen(true)} />
+          <div className="flex justify-end">
+            <Button onClick={() => setAddDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />Nova Instância
+            </Button>
+          </div>
+          <InstancesList />
+          <AddInstanceDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+        </TabsContent>
+
+        <TabsContent value="macros" className="mt-4">
+          <MacrosManager />
+        </TabsContent>
+
+        <TabsContent value="atribuicao" className="mt-4">
+          <AssignmentRulesManager />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -164,7 +210,7 @@ export default function Configuracoes() {
         </TabsContent>
 
         <TabsContent value="whatsapp">
-          <WhatsAppInstancesTab />
+          <WhatsAppSettingsContent />
         </TabsContent>
       </Tabs>
     </div>
