@@ -47,25 +47,33 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
   useEffect(() => {
     if (!open) return;
 
-    // Auto-fill based on sentiment
-    const reason = sentiment?.cs_ticket_reason || "Alerta de sentimento IA";
-    setAssunto(`[WhatsApp] ${reason}`);
+    if (sentiment?.cs_ticket_reason) {
+      // Auto-fill based on sentiment
+      const reason = sentiment.cs_ticket_reason;
+      setAssunto(`[WhatsApp] ${reason}`);
 
-    const sentimentLabel = sentiment?.sentiment === "negative" ? "Negativo" : sentiment?.sentiment === "neutral" ? "Neutro" : "Positivo";
-    const confidence = sentiment?.confidence ? `${Math.round(sentiment.confidence * 100)}%` : "N/A";
-    const keywords = sentiment?.keywords?.join(", ") || "—";
-    const summary = sentiment?.summary || "—";
+      const sentimentLabel = sentiment?.sentiment === "negative" ? "Negativo" : sentiment?.sentiment === "neutral" ? "Neutro" : "Positivo";
+      const confidence = sentiment?.confidence ? `${Math.round(sentiment.confidence * 100)}%` : "N/A";
+      const keywords = sentiment?.keywords?.join(", ") || "—";
+      const summary = sentiment?.summary || "—";
 
-    setDescricao(
-      `📱 Conversa WhatsApp com: ${contactName}\n` +
-      `📊 Sentimento: ${sentimentLabel} (${confidence})\n` +
-      `💬 Resumo IA: ${summary}\n` +
-      `🔑 Palavras-chave: ${keywords}\n\n` +
-      `⚠️ Motivo do alerta: ${reason}`
-    );
+      setDescricao(
+        `📱 Conversa WhatsApp com: ${contactName}\n` +
+        `📊 Sentimento: ${sentimentLabel} (${confidence})\n` +
+        `💬 Resumo IA: ${summary}\n` +
+        `🔑 Palavras-chave: ${keywords}\n\n` +
+        `⚠️ Motivo do alerta: ${reason}`
+      );
 
-    setTipo(sentiment?.sentiment === "negative" ? "risco_churn" : "adocao_engajamento");
-    setPrioridade("alta");
+      setTipo(sentiment.sentiment === "negative" ? "risco_churn" : "adocao_engajamento");
+      setPrioridade("alta");
+    } else {
+      // Manual opening — minimal pre-fill
+      setAssunto(`[WhatsApp] ${contactName}`);
+      setDescricao(`📱 Conversa WhatsApp com: ${contactName}\n\n`);
+      setTipo("adocao_engajamento");
+      setPrioridade("media");
+    }
   }, [open, sentiment, contactName]);
 
   const handleSubmit = async () => {
@@ -118,12 +126,14 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Context */}
-          <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-xs space-y-1">
-            <p className="font-medium">Contexto da IA</p>
-            <p>Sentimento: <Badge variant="outline" className="text-[10px]">{sentiment?.sentiment}</Badge> ({sentiment?.confidence ? `${Math.round(sentiment.confidence * 100)}%` : "N/A"})</p>
-            {sentiment?.cs_ticket_reason && <p>Motivo: {sentiment.cs_ticket_reason}</p>}
-          </div>
+          {/* Context - only show if sentiment data exists */}
+          {sentiment?.sentiment && (
+            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-xs space-y-1">
+              <p className="font-medium">Contexto da IA</p>
+              <p>Sentimento: <Badge variant="outline" className="text-[10px]">{sentiment.sentiment}</Badge> ({sentiment?.confidence ? `${Math.round(sentiment.confidence * 100)}%` : "N/A"})</p>
+              {sentiment?.cs_ticket_reason && <p>Motivo: {sentiment.cs_ticket_reason}</p>}
+            </div>
+          )}
 
           {clienteId && (
             <div className="space-y-1">

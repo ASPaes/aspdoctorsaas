@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, RefreshCw, Pencil, Settings } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, RefreshCw, Pencil, Settings, Ticket } from "lucide-react";
 import { Link } from "react-router-dom";
+import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
@@ -30,6 +31,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { data: topicsData } = useConversationTopics(conversation.id);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
@@ -108,6 +110,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
                 <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
+                <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -132,6 +137,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           onOpenChange={setIsTransferOpen}
           conversationId={conversation.id}
           currentAssignee={conversation.assigned_to || null}
+        />
+
+        <CreateCSTicketFromChat
+          open={isManualTicketOpen}
+          onOpenChange={setIsManualTicketOpen}
+          conversation={conversation}
+          sentiment={sentimentData}
         />
       </div>
 
