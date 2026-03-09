@@ -118,6 +118,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
                 <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
               </DropdownMenuItem>
+              {hasMultipleInstances && (
+                <DropdownMenuItem onClick={() => setIsChangeInstanceOpen(true)}>
+                  <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
