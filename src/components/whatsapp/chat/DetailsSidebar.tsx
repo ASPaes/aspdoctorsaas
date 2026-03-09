@@ -90,7 +90,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   };
 
   return (
-    <div className="w-80 border-l border-border flex flex-col h-full bg-background shrink-0">
+    <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink">
       <div className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0">
         <h3 className="text-sm font-semibold">Detalhes</h3>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
