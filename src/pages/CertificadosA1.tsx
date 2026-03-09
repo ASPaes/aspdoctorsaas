@@ -400,6 +400,15 @@ export default function CertificadosA1() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        {c.telefone_whatsapp && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" onClick={() => {
+                            const phone = c.telefone_whatsapp!.replace(/\D/g, '');
+                            const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
+                            navigate(`/whatsapp?phone=${phone}&clienteId=${c.id}&clienteName=${name}`);
+                          }}>
+                            <MessageCircle className="h-3 w-3" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
                           setEditVencimentoCliente(c);
                           setEditVencimentoValue(c.cert_a1_vencimento || "");
