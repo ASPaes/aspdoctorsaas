@@ -6,7 +6,7 @@ import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, escapeLike } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -191,7 +191,7 @@ export default function Clientes() {
     }
 
     if (debouncedSearch) {
-      const s = `%${debouncedSearch}%`;
+      const s = `%${escapeLike(debouncedSearch)}%`;
       const isNumeric = /^\d+$/.test(debouncedSearch.trim());
       if (isNumeric) {
         q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
@@ -321,7 +321,7 @@ export default function Clientes() {
         .lte("data_venda", lastDay);
 
       if (debouncedSearch) {
-        const s = `%${debouncedSearch}%`;
+        const s = `%${escapeLike(debouncedSearch)}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
         if (isNumeric) {
           q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
@@ -376,7 +376,7 @@ export default function Clientes() {
       else if (status === "cancelados") q = q.eq("cancelado", true);
 
       if (debouncedSearch) {
-        const s = `%${debouncedSearch}%`;
+        const s = `%${escapeLike(debouncedSearch)}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
         if (isNumeric) {
           q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);

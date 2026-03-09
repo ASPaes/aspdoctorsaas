@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
+import { escapeLike } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
 import {
@@ -188,9 +189,10 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     if (searchCliente.length < 2) { setClientes([]); return; }
     setLoadingClientes(true);
     const debounce = setTimeout(async () => {
+      const escaped = escapeLike(searchCliente);
       const { data } = await supabase.from('clientes').select('id, razao_social, nome_fantasia')
         .eq('cancelado', false)
-        .or(`razao_social.ilike.%${searchCliente}%,nome_fantasia.ilike.%${searchCliente}%`)
+        .or(`razao_social.ilike.%${escaped}%,nome_fantasia.ilike.%${escaped}%`)
         .limit(10);
       if (data) setClientes(data);
       setLoadingClientes(false);

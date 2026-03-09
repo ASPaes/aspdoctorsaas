@@ -7,6 +7,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCreateConversation } from "@/components/whatsapp/hooks/useCreateConversation";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { supabase } from "@/integrations/supabase/client";
+import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function WhatsApp() {
@@ -67,7 +68,7 @@ export default function WhatsApp() {
           .from("cliente_contatos")
           .select("id")
           .eq("cliente_id", params.clienteId)
-          .ilike("fone", `%${params.phone.slice(-10)}%`)
+          .ilike("fone", `%${escapeLike(params.phone.slice(-10))}%`)
           .limit(1);
 
         if (!existing || existing.length === 0) {

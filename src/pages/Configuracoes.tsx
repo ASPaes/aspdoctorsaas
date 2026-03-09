@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -93,6 +94,10 @@ export default function Configuracoes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
+  // Auth context for role-based UI
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { imposto_percentual: 13.5, custo_fixo_percentual: 8 },
@@ -155,13 +160,13 @@ export default function Configuracoes() {
         <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares, usuários e WhatsApp.</p>
       </div>
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs defaultValue={isAdmin ? defaultTab : "percentuais"}>
         <TabsList>
           <TabsTrigger value="percentuais">Percentuais</TabsTrigger>
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
-          <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-          <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
+          {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
 
@@ -213,13 +218,17 @@ export default function Configuracoes() {
           <CadastrosTab />
         </TabsContent>
 
-        <TabsContent value="usuarios">
-          <UsuariosTab />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="usuarios">
+            <UsuariosTab />
+          </TabsContent>
+        )}
 
-        <TabsContent value="aprovacoes">
-          <AprovacaoAcessosTab />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="aprovacoes">
+            <AprovacaoAcessosTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="whatsapp">
           <WhatsAppSettingsContent />

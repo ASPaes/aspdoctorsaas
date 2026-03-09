@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { escapeLike } from '@/lib/utils';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export type ContactSortOption = 'last_interaction' | 'name_asc' | 'name_desc' | 'conversations';
@@ -41,7 +42,8 @@ export const useWhatsAppContacts = (
       if (tid) query = query.eq('tenant_id', tid);
       if (instanceId) query = query.eq('instance_id', instanceId);
       if (searchTerm && searchTerm.length > 0) {
-        query = query.or(`name.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`);
+        const escaped = escapeLike(searchTerm);
+        query = query.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);
       }
 
       // Count
@@ -49,7 +51,8 @@ export const useWhatsAppContacts = (
       if (tid) countQuery = countQuery.eq('tenant_id', tid);
       if (instanceId) countQuery = countQuery.eq('instance_id', instanceId);
       if (searchTerm && searchTerm.length > 0) {
-        countQuery = countQuery.or(`name.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`);
+        const escaped = escapeLike(searchTerm);
+        countQuery = countQuery.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);
       }
 
       const { count: totalCount } = await countQuery;
