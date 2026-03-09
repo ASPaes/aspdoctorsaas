@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { subDays, startOfDay, endOfDay, format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip as RechartsTooltip } from "recharts";
-import { whatsappReportExport } from "@/utils/whatsapp/whatsappReportExport";
+import { exportToCSV } from "@/utils/whatsapp/whatsappReportExport";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--muted-foreground))", "hsl(var(--accent))", "hsl(var(--destructive))"];
 const SENTIMENT_COLORS: Record<string, string> = { positive: "#22c55e", neutral: "#94a3b8", negative: "#ef4444" };
