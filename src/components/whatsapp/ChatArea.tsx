@@ -124,6 +124,7 @@ export function ChatArea({ conversation }: Props) {
         )}
         <div ref={bottomRef} />
       </ScrollArea>
+      </div>
 
       {/* Input */}
       <MessageInput conversationId={conversation.id} />
