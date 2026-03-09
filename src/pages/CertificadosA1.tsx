@@ -6,6 +6,7 @@ import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
+import { maskPhone } from "@/lib/masks";
 import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
