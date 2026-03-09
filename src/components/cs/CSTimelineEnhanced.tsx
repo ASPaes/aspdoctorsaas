@@ -69,6 +69,42 @@ export function CSTimelineEnhanced({ ticketId, clientePhone, isStickyMode = fals
 
   const allUpdates = data?.pages.flatMap(page => page.updates) || [];
 
+  // Fetch WhatsApp conversation summaries linked to this client's phone
+  const { data: whatsappSummaries } = useQuery({
+    queryKey: ['cs-ticket-whatsapp-summaries', clientePhone],
+    queryFn: async () => {
+      if (!clientePhone) return [];
+      const cleanPhone = clientePhone.replace(/\D/g, '');
+      if (!cleanPhone) return [];
+      // Find contacts matching the phone
+      const { data: contacts } = await supabase
+        .from('whatsapp_contacts')
+        .select('id')
+        .or(`phone_number.like.%${cleanPhone},phone_number.like.%55${cleanPhone}`);
+      if (!contacts?.length) return [];
+      const contactIds = contacts.map(c => c.id);
+      // Find conversations for those contacts
+      const { data: conversations } = await supabase
+        .from('whatsapp_conversations')
+        .select('id')
+        .in('contact_id', contactIds);
+      if (!conversations?.length) return [];
+      const convIds = conversations.map(c => c.id);
+      // Get summaries
+      const { data: summaries } = await supabase
+        .from('whatsapp_conversation_summaries')
+        .select('*')
+        .in('conversation_id', convIds)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      return (summaries ?? []) as Array<{
+        id: string; summary: string; key_points: string[] | null;
+        action_items: string[] | null; created_at: string; message_count: number;
+      }>;
+    },
+    enabled: !!clientePhone,
+  });
+
   const addUpdate = useMutation({
     mutationFn: async (d: { conteudo: string; tipo: CSUpdateTipo; privado: boolean }) => {
       const { error } = await supabase.from('cs_ticket_updates').insert({ ticket_id: ticketId, tipo: d.tipo, conteudo: d.conteudo, privado: d.privado } as any);
