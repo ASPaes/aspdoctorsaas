@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,10 +23,10 @@ interface Props {
   unidadesBase: { id: number; nome: string }[];
   clienteId?: string;
   codigoSequencial?: number | null;
+  onNavigate?: (to: string) => void;
 }
 
-export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial }: Props) {
-  const navigate = useNavigate();
+export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial, onNavigate }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
@@ -212,11 +211,11 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
 
   const handleOpenWhatsApp = useCallback(() => {
-    if (!whatsappDigits || !clienteId) return;
+    if (!whatsappDigits || !clienteId || !onNavigate) return;
     const normalizedPhone = normalizePhoneBR(whatsappDigits);
     const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
-    navigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
-  }, [whatsappDigits, clienteId, form, navigate]);
+    onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
+  }, [whatsappDigits, clienteId, form, onNavigate]);
 
   return (
     <div className="space-y-6">

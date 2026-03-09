@@ -437,6 +437,7 @@ export default function ClienteForm() {
                 unidadesBase={lookups.unidadesBase.data ?? []}
                 clienteId={id}
                 codigoSequencial={(clienteQuery.data as any)?.codigo_sequencial ?? null}
+                onNavigate={guardedNavigate}
               />
             </CardContent>
           </Card>
