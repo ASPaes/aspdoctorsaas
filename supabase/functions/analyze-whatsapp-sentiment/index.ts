@@ -56,7 +56,7 @@ serve(async (req) => {
 
     const { data: messages, error: messagesError } = await supabase
       .from('whatsapp_messages')
-      .select('content, timestamp')
+      .select('content, timestamp, audio_transcription, message_type')
       .eq('conversation_id', conversationId)
       .eq('is_from_me', false)
       .order('timestamp', { ascending: false })
@@ -92,7 +92,12 @@ serve(async (req) => {
 
     const orderedMessages = [...messages].reverse();
     const messagesText = orderedMessages
-      .map((msg, index) => `${index + 1}. [${new Date(msg.timestamp).toLocaleString('pt-BR')}]: "${msg.content}"`)
+      .map((msg: any, index: number) => {
+        const text = msg.message_type === 'audio' && msg.audio_transcription
+          ? `[Áudio transcrito]: "${msg.audio_transcription}"`
+          : `"${msg.content}"`;
+        return `${index + 1}. [${new Date(msg.timestamp).toLocaleString('pt-BR')}]: ${text}`;
+      })
       .join('\n');
 
     const prompt = `Analise o sentimento das últimas mensagens deste cliente de WhatsApp e avalie se é necessário abrir um ticket de Customer Success (CS).

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
@@ -14,6 +15,10 @@ export function MessageBubble({ msg, onReply }: Props) {
   const isMe = msg.is_from_me;
   const { timezone } = useChatTimezone();
   const time = formatTzTime(msg.timestamp, timezone);
+  const [showTranscription, setShowTranscription] = useState(false);
+
+  const hasTranscription = msg.message_type === 'audio' && msg.audio_transcription;
+  const isTranscribing = msg.message_type === 'audio' && msg.transcription_status === 'processing';
 
   const statusIcon = isMe && (
     msg.status === "read" || msg.status === "delivered" ? (
@@ -51,6 +56,36 @@ export function MessageBubble({ msg, onReply }: Props) {
           <MediaContent messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} />
         )}
         {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+
+        {/* Audio transcription */}
+        {hasTranscription && (
+          <div className="mt-1">
+            <button
+              onClick={() => setShowTranscription(!showTranscription)}
+              className={cn(
+                "flex items-center gap-1 text-[10px] font-medium opacity-70 hover:opacity-100 transition-opacity",
+                isMe ? "text-primary-foreground" : "text-foreground"
+              )}
+            >
+              {showTranscription ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              Transcrição
+            </button>
+            {showTranscription && (
+              <p className={cn(
+                "text-[11px] mt-0.5 whitespace-pre-wrap break-words italic opacity-80",
+                isMe ? "text-primary-foreground" : "text-foreground"
+              )}>
+                {msg.audio_transcription}
+              </p>
+            )}
+          </div>
+        )}
+        {isTranscribing && (
+          <p className={cn("text-[10px] mt-0.5 italic opacity-50", isMe ? "text-primary-foreground" : "text-foreground")}>
+            Transcrevendo áudio...
+          </p>
+        )}
+
         <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
           <span className="text-[10px] opacity-60">{time}</span>
           {statusIcon}
