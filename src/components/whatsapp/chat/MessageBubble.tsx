@@ -47,19 +47,8 @@ export function MessageBubble({ msg, onReply }: Props) {
           </div>
         )}
 
-        {msg.message_type === "image" && msg.media_url && (
-          <img src={msg.media_url} alt="Imagem" className="rounded max-w-full mb-1 max-h-64 object-contain" loading="lazy" />
-        )}
-        {msg.message_type === "audio" && msg.media_url && (
-          <audio controls className="max-w-full mb-1" preload="none"><source src={msg.media_url} /></audio>
-        )}
-        {msg.message_type === "video" && msg.media_url && (
-          <video controls className="rounded max-w-full mb-1 max-h-64" preload="none"><source src={msg.media_url} /></video>
-        )}
-        {msg.message_type === "document" && msg.media_url && (
-          <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="underline text-xs block mb-1">
-            📎 {(msg.metadata as any)?.fileName || "Documento"}
-          </a>
+        {msg.media_url && msg.message_type !== "text" && (
+          <MediaContent messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} />
         )}
         {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
         <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
