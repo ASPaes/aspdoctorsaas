@@ -134,6 +134,7 @@ export default function SettingsUsers() {
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
+                <TableHead>Funcionário</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
@@ -143,6 +144,31 @@ export default function SettingsUsers() {
               {users.map((u) => (
                 <TableRow key={u.user_id}>
                   <TableCell className="text-sm">{u.email ?? u.user_id}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={u.funcionario_id ? String(u.funcionario_id) : "none"}
+                      onValueChange={(v) => {
+                        const fid = v === "none" ? null : Number(v);
+                        updateFuncionario.mutate(
+                          { userId: u.user_id, funcionarioId: fid },
+                          {
+                            onSuccess: () => toast.success("Funcionário vinculado."),
+                            onError: (err: any) => toast.error(err.message),
+                          }
+                        );
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Nenhum —</SelectItem>
+                        {funcionarios.map((f) => (
+                          <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   <TableCell>
                     <Select
                       value={u.role}
