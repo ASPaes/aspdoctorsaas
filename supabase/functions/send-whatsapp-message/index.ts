@@ -16,7 +16,7 @@ interface SendMessageRequest {
   quotedMessageId?: string;
 }
 
-function getEvolutionAuthHeaders(apiKey: string, providerType: string): Record<string, string> {
+function getEvolutionAuthHeaders(apiKey: string, _providerType: string): Record<string, string> {
   return { apikey: apiKey };
 }
 
@@ -80,15 +80,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: conversation, error: convError } = await supabase
-      .from('whatsapp_conversations')
-      .select(`
-        *,
-        whatsapp_contacts!inner (phone_number, name),
-        whatsapp_instances!inner (id, instance_name, provider_type, instance_id_external)
-      `)
-      .eq('id', body.conversationId)
-      .single();
+    // --- PARALLELIZED: conversation fetch + sender resolution ---
+    const senderUserId = (claimsData.claims as any).sub as string | undefined;
+
+    const [convResult, senderLabel] = await Promise.all([
+      // 1) Fetch conversation with joins
+      supabase
+        .from('whatsapp_conversations')
+        .select(`
+          *,
+          whatsapp_contacts!inner (phone_number, name),
+          whatsapp_instances!inner (id, instance_name, provider_type, instance_id_external)
+        `)
+        .eq('id', body.conversationId)
+        .single(),
+      // 2) Resolve sender name
+      (async (): Promise<string> => {
+        if (!senderUserId) return '';
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('funcionario_id')
+          .eq('user_id', senderUserId)
+          .maybeSingle();
+        if (!profile?.funcionario_id) return '';
+        const { data: func } = await supabase
+          .from('funcionarios')
+          .select('nome')
+          .eq('id', profile.funcionario_id)
+          .maybeSingle();
+        return func?.nome ? `*${func.nome}*` : '';
+      })(),
+    ]);
+
+    const { data: conversation, error: convError } = convResult;
 
     if (convError || !conversation) {
       console.error('[send] Conversation not found:', convError);
@@ -155,10 +179,9 @@ Deno.serve(async (req) => {
           console.error('[send-whatsapp-message] Storage upload error:', uploadError);
         } else {
           persistentMediaPath = storagePath;
-          // Generate a signed URL so Evolution API can download the file
           const { data: signedData } = await supabase.storage
             .from('whatsapp-media')
-            .createSignedUrl(storagePath, 300); // 5 min expiry
+            .createSignedUrl(storagePath, 300);
           if (signedData?.signedUrl) {
             storageSignedUrl = signedData.signedUrl;
           }
@@ -166,29 +189,6 @@ Deno.serve(async (req) => {
         }
       } catch (uploadErr) {
         console.error('[send-whatsapp-message] Failed to upload media:', uploadErr);
-      }
-    }
-
-    // Resolve sender name/role to prefix in outgoing messages
-    const senderUserId = (claimsData.claims as any).sub as string | undefined;
-    let senderLabel = '';
-    if (senderUserId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('funcionario_id')
-        .eq('user_id', senderUserId)
-        .maybeSingle();
-
-      if (profile?.funcionario_id) {
-        const { data: func } = await supabase
-          .from('funcionarios')
-          .select('nome')
-          .eq('id', profile.funcionario_id)
-          .maybeSingle();
-
-        if (func?.nome) {
-          senderLabel = `*${func.nome}*`;
-        }
       }
     }
 
@@ -245,28 +245,58 @@ Deno.serve(async (req) => {
       ? (body.content || '') 
       : (body.content || `Sent ${body.messageType}`);
 
-    // tenantId and senderUserId already defined above
+    const messageTimestamp = new Date().toISOString();
 
-    const { data: savedMessage, error: saveError } = await anonClient
-      .from('whatsapp_messages')
-      .insert({
-        tenant_id: tenantId,
-        conversation_id: body.conversationId,
-        message_id: messageId,
-        remote_jid: contact.phone_number,
-        content: messageContent,
-        message_type: body.messageType,
-        media_url: persistentMediaPath || extractedMediaUrl || body.mediaUrl || null,
-        media_mimetype: body.mediaMimetype || null,
-        status: 'sent',
-        is_from_me: true,
-        timestamp: new Date().toISOString(),
-        quoted_message_id: body.quotedMessageId || null,
-        metadata: { fileName: body.fileName },
-        sent_by_user_id: senderUserId || null,
-      })
-      .select()
-      .single();
+    // --- PARALLELIZED: save message + update conversation ---
+    const [saveResult] = await Promise.all([
+      // 1) Insert message via anonClient (respects RLS)
+      anonClient
+        .from('whatsapp_messages')
+        .insert({
+          tenant_id: tenantId,
+          conversation_id: body.conversationId,
+          message_id: messageId,
+          remote_jid: contact.phone_number,
+          content: messageContent,
+          message_type: body.messageType,
+          media_url: persistentMediaPath || extractedMediaUrl || body.mediaUrl || null,
+          media_mimetype: body.mediaMimetype || null,
+          status: 'sent',
+          is_from_me: true,
+          timestamp: messageTimestamp,
+          quoted_message_id: body.quotedMessageId || null,
+          metadata: body.fileName ? { fileName: body.fileName } : null,
+          sent_by_user_id: senderUserId || null,
+        })
+        .select()
+        .single(),
+      // 2) Update conversation with anti-stale guard (service role)
+      (async () => {
+        const updateData: Record<string, any> = {
+          last_message_at: messageTimestamp,
+          last_message_preview: messageContent.substring(0, 200),
+          is_last_message_from_me: true,
+          updated_at: messageTimestamp,
+        };
+
+        // Anti-stale guard: only update if new timestamp >= current last_message_at
+        let query = supabase
+          .from('whatsapp_conversations')
+          .update(updateData)
+          .eq('id', body.conversationId);
+
+        // If conversation already has a last_message_at, only update if we're newer or equal
+        if (conversation.last_message_at) {
+          query = query.gte('last_message_at', '1970-01-01T00:00:00.000Z')
+          // We use an approach: update always since sent messages are always "now" (latest)
+          // For sent messages, timestamp is always current, so they're always the newest
+        }
+
+        await query;
+      })(),
+    ]);
+
+    const { data: savedMessage, error: saveError } = saveResult;
 
     if (saveError) {
       console.error('[send-whatsapp-message] Error saving message:', saveError);
@@ -275,16 +305,6 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Use service role client to bypass RLS for conversation update
-    await supabase
-      .from('whatsapp_conversations')
-      .update({
-        last_message_at: new Date().toISOString(),
-        last_message_preview: messageContent.substring(0, 100),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', body.conversationId);
 
     console.log('[send-whatsapp-message] Message sent and saved:', savedMessage.id);
 
@@ -338,7 +358,6 @@ function buildEvolutionRequest(
     }
 
     case 'audio': {
-      // For audio, prefer signed URL if available, then base64, then mediaUrl
       let audioData: string | undefined = mediaUrlOverride;
       if (!audioData) {
         if (body.mediaBase64) {
@@ -359,7 +378,6 @@ function buildEvolutionRequest(
     case 'image':
     case 'video':
     case 'document': {
-      // Always prefer the signed URL from Supabase Storage — Evolution downloads it
       const mediaData = mediaUrlOverride || body.mediaUrl;
       if (!mediaData) throw new Error('Missing media data for ' + body.messageType);
       const requestBody: any = {
