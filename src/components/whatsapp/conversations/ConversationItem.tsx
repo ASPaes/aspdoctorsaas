@@ -91,6 +91,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
             <p className="text-xs text-muted-foreground truncate">
+              {conv.isLastMessageFromMe && "Você: "}
               {conv.last_message_preview || "Sem mensagens"}
             </p>
           </div>
