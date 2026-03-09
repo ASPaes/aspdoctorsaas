@@ -123,6 +123,35 @@ Deno.serve(async (req) => {
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
+    // Upload base64 media to Supabase Storage for persistence
+    let persistentMediaPath: string | null = null;
+    if (body.mediaBase64 && body.messageType !== 'text') {
+      try {
+        const raw = body.mediaBase64.startsWith('data:')
+          ? body.mediaBase64.split(',')[1] || ''
+          : body.mediaBase64;
+        const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
+        const ext = getExtFromMime(body.mediaMimetype || 'application/octet-stream');
+        const storagePath = `${tenantId}/${body.conversationId}/${crypto.randomUUID()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('whatsapp-media')
+          .upload(storagePath, bytes, {
+            contentType: body.mediaMimetype || 'application/octet-stream',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error('[send-whatsapp-message] Storage upload error:', uploadError);
+        } else {
+          persistentMediaPath = storagePath;
+          console.log('[send-whatsapp-message] Media uploaded to storage:', storagePath);
+        }
+      } catch (uploadErr) {
+        console.error('[send-whatsapp-message] Failed to upload media:', uploadErr);
+      }
+    }
+
     const { endpoint, requestBody } = buildEvolutionRequest(
       secrets.api_url,
       instanceIdentifier,
