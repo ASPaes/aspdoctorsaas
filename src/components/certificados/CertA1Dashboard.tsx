@@ -290,6 +290,7 @@ export function CertA1Dashboard() {
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="w-[50px]">WhatsApp</TableHead>
                   {isAdmin && <TableHead className="w-[60px]">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
