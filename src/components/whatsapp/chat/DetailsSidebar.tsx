@@ -160,7 +160,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 className="text-xs min-h-[32px]"
                 rows={1}
               />
-              <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleAddNote} disabled={isAdding || !newNote.trim()}>
+              <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleAddNote} disabled={isCreating || !newNote.trim()}>
                 {isAdding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
               </Button>
             </div>
