@@ -25,7 +25,8 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const name = contact?.name || contact?.phone_number || "Desconhecido";
   const { notes, createNote, deleteNote, isCreating } = useConversationNotes(conversation.id);
   const { summaries, generateSummary, isGenerating } = useConversationSummaries(conversation.id);
-  const { sentiment } = useWhatsAppSentiment(conversation.id);
+  const { sentiment: sentimentRaw } = useWhatsAppSentiment(conversation.id);
+  const sentiment = sentimentRaw as any;
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
 
   const [newNote, setNewNote] = useState("");
