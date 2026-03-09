@@ -39,6 +39,9 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
 
+  const metadata = (conversation.metadata || {}) as Record<string, unknown>;
+  const isClienteLinked = !!(metadata?.cliente_id);
+
   const handleAddNote = () => {
     if (!newNote.trim()) return;
     createNote(newNote.trim());
