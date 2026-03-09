@@ -94,7 +94,7 @@ export default function Configuracoes() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares e usuários.</p>
+        <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares, usuários e WhatsApp.</p>
       </div>
 
       <Tabs defaultValue={defaultTab}>
