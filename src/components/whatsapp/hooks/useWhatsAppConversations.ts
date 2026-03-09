@@ -102,7 +102,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       const { data: conversationsData, error } = await query;
       if (error) throw error;
 
-      let result = (conversationsData ?? []) as unknown as ConversationWithContact[];
+      let result = ((conversationsData ?? []) as unknown as ConversationWithContact[]).map(conv => ({
+        ...conv,
+        unread_count: Number(conv.unread_count) || 0,
+        last_message_at: conv.last_message_at || null,
+      }));
 
       // Apply search filter (contact name, phone, or message content match)
       if (searchTerm) {
