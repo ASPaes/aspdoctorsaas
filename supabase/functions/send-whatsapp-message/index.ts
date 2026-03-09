@@ -203,16 +203,7 @@ Deno.serve(async (req) => {
       ? (body.content || '') 
       : (body.content || `Sent ${body.messageType}`);
 
-    const tenantId = conversation.tenant_id;
-    console.log('[send-whatsapp-message] tenant_id from conversation:', tenantId, 'conversation keys:', Object.keys(conversation));
-
-    if (!tenantId) {
-      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined from conversation:', JSON.stringify(conversation));
-      return new Response(
-        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // tenantId already defined above
 
     // Use anonClient (authenticated) so the set_tenant_id_on_insert trigger
     // can resolve current_tenant_id() via auth.uid()
