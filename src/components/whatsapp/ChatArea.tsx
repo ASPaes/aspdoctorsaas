@@ -14,11 +14,9 @@ interface Props {
   conversation: Conversation | null;
 }
 
-function MessageBubble({ msg }: { msg: Message }) {
+function MessageBubbleInline({ msg, timezone }: { msg: Message; timezone: string }) {
   const isMe = msg.is_from_me;
-  const time = (() => {
-    try { return format(new Date(msg.timestamp), "HH:mm"); } catch { return ""; }
-  })();
+  const time = formatTzTime(msg.timestamp, timezone);
 
   const statusIcon = isMe && (
     msg.status === "read" || msg.status === "delivered" ? (
