@@ -19,7 +19,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const { timezone } = useChatTimezone();
   const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
-  const hasUnread = (conv.unread_count ?? 0) > 0;
+  const hasUnread = Number(conv.unread_count) > 0;
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
