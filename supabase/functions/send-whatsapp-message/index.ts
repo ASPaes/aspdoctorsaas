@@ -168,6 +168,7 @@ Deno.serve(async (req) => {
     const { data: savedMessage, error: saveError } = await supabase
       .from('whatsapp_messages')
       .insert({
+        tenant_id: conversation.tenant_id,
         conversation_id: body.conversationId,
         message_id: messageId,
         remote_jid: contact.phone_number,
