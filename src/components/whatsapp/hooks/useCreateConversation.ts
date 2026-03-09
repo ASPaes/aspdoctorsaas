@@ -13,14 +13,16 @@ export const useCreateConversation = () => {
 
   return useMutation({
     mutationFn: async (params: CreateConversationParams) => {
-      const { data: contact, error: contactError } = await supabase
-        .from('whatsapp_contacts')
-        .upsert({
-          instance_id: params.instanceId,
-          phone_number: params.phoneNumber,
-          name: params.contactName,
-          profile_picture_url: params.profilePictureUrl,
-        }, { onConflict: 'instance_id,phone_number' })
+      const contactPayload = {
+        instance_id: params.instanceId,
+        phone_number: params.phoneNumber,
+        name: params.contactName,
+        profile_picture_url: params.profilePictureUrl,
+      };
+
+      const { data: contact, error: contactError } = await (supabase
+        .from('whatsapp_contacts') as any)
+        .upsert(contactPayload, { onConflict: 'instance_id,phone_number' })
         .select()
         .single();
 
@@ -35,8 +37,8 @@ export const useCreateConversation = () => {
 
       if (existingConv) return { conversation: existingConv, contact };
 
-      const { data: conversation, error: convError } = await supabase
-        .from('whatsapp_conversations')
+      const { data: conversation, error: convError } = await (supabase
+        .from('whatsapp_conversations') as any)
         .insert({ instance_id: params.instanceId, contact_id: contact.id, status: 'active', unread_count: 0 })
         .select()
         .single();
