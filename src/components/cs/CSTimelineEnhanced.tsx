@@ -39,7 +39,7 @@ const TIPO_COLORS: Record<CSUpdateTipo, string> = {
 
 const PAGE_SIZE = 50;
 
-export function CSTimelineEnhanced({ ticketId, isStickyMode = false }: CSTimelineEnhancedProps) {
+export function CSTimelineEnhanced({ ticketId, clientePhone, isStickyMode = false }: CSTimelineEnhancedProps) {
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState('');
   const [isPrivate, setIsPrivate] = useState(true);
