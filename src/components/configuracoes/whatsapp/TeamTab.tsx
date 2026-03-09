@@ -72,7 +72,7 @@ export default function TeamTab() {
     );
   }
 
-  const funcMap = new Map((funcionarios ?? []).map(f => [f.id, f]));
+  const funcMap = new Map(Array.isArray(funcionarios) ? funcionarios.map(f => [f.id, f]) : []);
   const activeUsers = users?.filter(u => u.status === "ativo") ?? [];
 
   return (
