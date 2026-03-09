@@ -44,14 +44,22 @@ export function useClienteSearch(searchTerm: string) {
         .limit(20);
 
       if (isNumeric && term.length <= 6) {
-        // Search by codigo_sequencial or phone
+        // Search by codigo_sequencial or phone (with and without 55 prefix)
         q = q.or(`codigo_sequencial.eq.${term},telefone_whatsapp.ilike.%${term}%`);
       } else if (isNumeric) {
-        // Likely a phone number
-        q = q.ilike('telefone_whatsapp', `%${term}%`);
+        // Phone number - search with and without 55 prefix
+        const withoutPrefix = term.startsWith('55') ? term.slice(2) : term;
+        const withPrefix = term.startsWith('55') ? term : `55${term}`;
+        q = q.or(`telefone_whatsapp.ilike.%${withoutPrefix}%,telefone_whatsapp.ilike.%${withPrefix}%`);
       } else {
-        // Search by name
-        q = q.or(`razao_social.ilike.%${term}%,nome_fantasia.ilike.%${term}%`);
+        // Search by name or CNPJ
+        const cleanTerm = term.replace(/[.\-\/]/g, '');
+        const isCnpjLike = /^\d{3,}$/.test(cleanTerm) && cleanTerm.length >= 3;
+        if (isCnpjLike) {
+          q = q.or(`razao_social.ilike.%${term}%,nome_fantasia.ilike.%${term}%,cnpj.ilike.%${cleanTerm}%`);
+        } else {
+          q = q.or(`razao_social.ilike.%${term}%,nome_fantasia.ilike.%${term}%`);
+        }
       }
 
       const { data, error } = await q;

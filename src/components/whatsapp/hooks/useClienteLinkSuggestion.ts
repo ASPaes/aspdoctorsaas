@@ -64,10 +64,10 @@ export function useClienteLinkSuggestion(
       const match = data.find((c) => {
         const cDigits = (c.telefone_whatsapp || '').replace(/\D/g, '');
         if (!cDigits) return false;
-        // Match last 8-9 digits (ignore country code variations)
-        const dShort = digits.slice(-9);
-        const cShort = cDigits.slice(-9);
-        return dShort === cShort;
+        // Compare last 10-11 digits to handle country code variations
+        const dCore = digits.replace(/^55/, '');
+        const cCore = cDigits.replace(/^55/, '');
+        return dCore.length >= 10 && dCore === cCore;
       });
 
       return match ? { id: match.id, razao_social: match.razao_social, nome_fantasia: match.nome_fantasia, codigo_sequencial: match.codigo_sequencial } : null;
