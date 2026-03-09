@@ -70,6 +70,20 @@ export function ChatMessages({ conversationId, onReply }: Props) {
   }, [messages.length]);
 
   if (isLoading) {
+    return (
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full px-4 py-2">
+          <div className="space-y-3 py-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className={cn("flex", i % 2 === 0 ? "justify-start" : "justify-end")}>
+                <Skeleton className={cn("h-10 rounded-lg", i % 2 === 0 ? "w-48" : "w-36")} />
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
