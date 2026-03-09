@@ -27,7 +27,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const { data: topicsData } = useConversationTopics(conversation.id);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
-
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
