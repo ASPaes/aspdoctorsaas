@@ -27,11 +27,19 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const formatTime = (ts: string | null) => {
     if (!ts) return "";
     try {
-      return new Intl.DateTimeFormat("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: timezone,
-      }).format(new Date(ts));
+      const date = new Date(ts);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const opts: Intl.DateTimeFormatOptions = { timeZone: timezone };
+
+      if (diffDays === 0) {
+        return new Intl.DateTimeFormat("pt-BR", { ...opts, hour: "2-digit", minute: "2-digit" }).format(date);
+      }
+      if (diffDays < 7) {
+        return new Intl.DateTimeFormat("pt-BR", { ...opts, weekday: "short" }).format(date);
+      }
+      return new Intl.DateTimeFormat("pt-BR", { ...opts, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
     } catch {
       return "";
     }
@@ -70,7 +78,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium truncate">{name}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+          <span className={cn(
+            "text-[10px] shrink-0 ml-2",
+            conv.unread_count > 0 ? "text-primary font-semibold" : "text-muted-foreground"
+          )}>
             {formatTime(conv.last_message_at)}
           </span>
         </div>
@@ -80,6 +91,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
             <p className="text-xs text-muted-foreground truncate">
+              {conv.isLastMessageFromMe && "Você: "}
               {conv.last_message_preview || "Sem mensagens"}
             </p>
           </div>

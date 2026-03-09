@@ -9,6 +9,7 @@ import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppIns
 import { supabase } from "@/integrations/supabase/client";
 import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 export default function WhatsApp() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
@@ -103,9 +104,16 @@ export default function WhatsApp() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
-      <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
-      <ChatAreaFull conversation={selected} />
+    <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
+      <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
+          <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={75}>
+          <ChatAreaFull conversation={selected} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }
