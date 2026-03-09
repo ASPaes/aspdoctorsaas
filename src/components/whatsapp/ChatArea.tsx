@@ -116,7 +116,7 @@ export function ChatArea({ conversation }: Props) {
                 </span>
               </div>
               {msgs.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} />
+                <MessageBubbleInline key={msg.id} msg={msg} timezone={timezone} />
               ))}
             </div>
           ))
