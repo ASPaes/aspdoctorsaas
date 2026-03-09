@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
+import MacrosTab from "@/components/whatsapp/settings/MacrosTab";
+import AssignmentTab from "@/components/whatsapp/settings/AssignmentTab";
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
@@ -35,22 +38,6 @@ export default function WhatsAppSettings() {
           <AssignmentTab />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function MacrosTab() {
-  return (
-    <div className="text-center py-12 text-muted-foreground">
-      <p className="text-sm">Gestão de macros será implementada na Sub-fase 2B.5</p>
-    </div>
-  );
-}
-
-function AssignmentTab() {
-  return (
-    <div className="text-center py-12 text-muted-foreground">
-      <p className="text-sm">Regras de atribuição serão implementadas na Sub-fase 2B.5</p>
     </div>
   );
 }
