@@ -62,8 +62,8 @@ export function useTenantUsers() {
     queryKey: ["tenant-users", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc("get_tenant_users_with_email", { p_tenant_id: tenantId! });
+      const { data, error } = await (supabase
+        .rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! });
       if (error) throw error;
       return (data ?? []) as TenantProfile[];
     },
