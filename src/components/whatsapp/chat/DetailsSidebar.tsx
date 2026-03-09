@@ -99,32 +99,36 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
-          {/* Contact Info */}
-          <div className="flex flex-col items-center text-center">
-            <Avatar className="h-16 w-16 mb-2">
+          {/* Contact Info — compact header */}
+          <div className="flex items-center gap-3">
+            <Avatar className="h-12 w-12 shrink-0">
               {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
-              <AvatarFallback>{name.substring(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="text-xs">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            {editingContact ? (
-              <div className="w-full space-y-2 mt-2">
-                <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome" className="text-sm" />
-                <Textarea value={contactNotes} onChange={(e) => setContactNotes(e.target.value)} placeholder="Observações" className="text-sm" rows={2} />
-                <div className="flex gap-2">
-                  <Button size="sm" className="flex-1" onClick={handleSaveContact} disabled={isUpdatingContact}>Salvar</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingContact(false)}>Cancelar</Button>
+            <div className="min-w-0 flex-1">
+              {editingContact ? (
+                <div className="space-y-1.5">
+                  <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome" className="text-xs h-7" />
+                  <Textarea value={contactNotes} onChange={(e) => setContactNotes(e.target.value)} placeholder="Observações" className="text-xs min-h-[28px]" rows={1} />
+                  <div className="flex gap-1.5">
+                    <Button size="sm" className="h-6 text-[10px] flex-1" onClick={handleSaveContact} disabled={isUpdatingContact}>Salvar</Button>
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setEditingContact(false)}>Cancelar</Button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm font-medium">{name}</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Phone className="h-3 w-3" /> {contact?.phone_number}
-                </p>
-                {contact?.notes && <p className="text-xs text-muted-foreground mt-1">{contact.notes}</p>}
-                <Button variant="ghost" size="sm" className="mt-1 text-xs" onClick={() => setEditingContact(true)}>
-                  Editar contato
-                </Button>
-              </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium truncate">{name}</p>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number}
+                  </p>
+                  {contact?.notes && <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{contact.notes}</p>}
+                </>
+              )}
+            </div>
+            {!editingContact && !isClienteLinked && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setEditingContact(true)} title="Editar contato">
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
 
