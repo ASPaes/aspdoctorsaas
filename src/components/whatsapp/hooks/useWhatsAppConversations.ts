@@ -76,7 +76,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           .from('whatsapp_messages' as any)
           .select('conversation_id')
           .ilike('content', `%${escaped}%`)
-          .limit(200);
+          .limit(100);
         if (msgMatches) {
           messageMatchIds = [...new Set((msgMatches as any[]).map((m: any) => m.conversation_id))];
         }
@@ -172,14 +172,32 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     },
   });
 
+  // Realtime: only invalidate when the specific conversation changes
   useEffect(() => {
     const channel = supabase
       .channel('conversations-changes')
       .on('postgres_changes', {
-        event: '*',
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'whatsapp_conversations'
+      }, (payload) => {
+        const updated = payload.new as any;
+        // Patch the specific conversation in cache instead of full refetch
+        queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+          if (!old?.conversations) return old;
+          const idx = old.conversations.findIndex((c: any) => c.id === updated.id);
+          if (idx === -1) return old; // new conversation — need full refetch
+          const patched = [...old.conversations];
+          patched[idx] = { ...patched[idx], ...updated };
+          return { ...old, conversations: patched };
+        });
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
         schema: 'public',
         table: 'whatsapp_conversations'
       }, () => {
+        // New conversation — invalidate to pick it up
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       })
       .subscribe();

@@ -83,7 +83,8 @@ export const useWhatsAppSend = () => {
       }
     },
     onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
+      // Only invalidate conversations list (for last_message_* reorder).
+      // Messages are updated via realtime subscription — no need to refetch here.
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     },
   });
