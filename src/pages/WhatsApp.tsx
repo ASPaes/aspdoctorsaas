@@ -109,7 +109,7 @@ export default function WhatsApp() {
         <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
           <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
         </ResizablePanel>
-        <ResizableHandle withHandle />
+        <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
         <ResizablePanel defaultSize={75}>
           <ChatAreaFull conversation={selected} />
         </ResizablePanel>
