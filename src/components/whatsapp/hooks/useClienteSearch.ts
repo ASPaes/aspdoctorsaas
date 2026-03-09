@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { escapeLike } from '@/lib/utils';
 
 export interface ClienteSearchResult {
   id: string;
