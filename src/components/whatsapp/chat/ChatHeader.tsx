@@ -16,6 +16,8 @@ import { EditContactModal } from "./EditContactModal";
 import { QueueIndicator } from "./QueueIndicator";
 import { TransferDialog } from "./TransferDialog";
 import { CSTicketAlert } from "./CSTicketAlert";
+import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
+import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 
 interface Props {
   conversation: ConversationWithContact;
