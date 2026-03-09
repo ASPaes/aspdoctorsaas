@@ -1,17 +1,20 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppMetrics, type WhatsAppMetricsFilters } from "@/components/whatsapp/hooks/useWhatsAppMetrics";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { Skeleton } from "@/components/ui/skeleton";
-import { subDays, startOfDay, endOfDay } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { subDays, startOfDay, endOfDay, format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip as RechartsTooltip } from "recharts";
+import { whatsappReportExport } from "@/utils/whatsapp/whatsappReportExport";
 
-const COLORS = ["hsl(var(--primary))", "hsl(var(--muted-foreground))", "hsl(var(--accent))"];
+const COLORS = ["hsl(var(--primary))", "hsl(var(--muted-foreground))", "hsl(var(--accent))", "hsl(var(--destructive))"];
+const SENTIMENT_COLORS: Record<string, string> = { positive: "#22c55e", neutral: "#94a3b8", negative: "#ef4444" };
 
 function MetricCard({ title, value, icon: Icon, subtitle, trend }: { title: string; value: string | number; icon: any; subtitle?: string; trend?: number }) {
   return (
@@ -55,6 +58,22 @@ export default function WhatsAppRelatorio() {
     ? ((metrics.total - metrics.previousPeriod.total) / metrics.previousPeriod.total) * 100
     : 0;
 
+  const handleExport = () => {
+    if (!metrics) return;
+    try {
+      whatsappReportExport(metrics as any, dateRange);
+    } catch {
+      // fallback: export as JSON
+      const blob = new Blob([JSON.stringify(metrics, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `relatorio-whatsapp-${format(new Date(), "yyyy-MM-dd")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -66,6 +85,9 @@ export default function WhatsAppRelatorio() {
           <h1 className="text-xl font-semibold">Relatório WhatsApp</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!metrics}>
+            <Download className="h-4 w-4 mr-1" /> Exportar
+          </Button>
           <Select value={instanceId || "all"} onValueChange={(v) => setInstanceId(v === "all" ? undefined : v)}>
             <SelectTrigger className="h-9 w-44">
               <SelectValue placeholder="Instância" />
@@ -89,7 +111,7 @@ export default function WhatsAppRelatorio() {
 
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+          {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       ) : metrics ? (
         <>
@@ -110,10 +132,11 @@ export default function WhatsAppRelatorio() {
           </div>
 
           {/* KPIs Row 3 */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard title="Tempo Médio Resposta" value={`${metrics.avgResponseTimeMinutes.toFixed(0)} min`} icon={Clock} />
             <MetricCard title="1ª Resposta" value={`${metrics.avgFirstResponseTimeMinutes.toFixed(0)} min`} icon={Clock} />
             <MetricCard title="Msgs/Conversa" value={metrics.avgMessagesPerConversation.toFixed(1)} icon={BarChart3} />
+            <MetricCard title="Engajamento" value={`${metrics.engagementRate.toFixed(0)}%`} icon={SmilePlus} subtitle="Recebidas / Enviadas" />
           </div>
 
           {/* Charts */}
@@ -125,8 +148,8 @@ export default function WhatsAppRelatorio() {
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={metrics.dailyTrend}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="date" className="text-[10px]" tick={{ fontSize: 10 }} />
-                    <YAxis className="text-[10px]" tick={{ fontSize: 10 }} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
                     <RechartsTooltip />
                     <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -166,6 +189,25 @@ export default function WhatsAppRelatorio() {
               </CardContent>
             </Card>
 
+            {/* Sentiment Distribution */}
+            {metrics.sentimentDistribution.length > 0 && (
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Distribuição de Sentimento</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie data={metrics.sentimentDistribution} dataKey="count" nameKey="sentiment" cx="50%" cy="50%" outerRadius={80} label={({ sentiment, percentage }) => `${sentiment} (${percentage.toFixed(0)}%)`}>
+                        {metrics.sentimentDistribution.map((entry, i) => (
+                          <Cell key={i} fill={SENTIMENT_COLORS[entry.sentiment] || COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Hourly Activity */}
             <Card>
               <CardHeader><CardTitle className="text-sm">Atividade por Hora</CardTitle></CardHeader>
@@ -198,6 +240,23 @@ export default function WhatsAppRelatorio() {
               </CardContent>
             </Card>
 
+            {/* Message Types */}
+            {metrics.messageTypeDistribution.length > 0 && (
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Tipos de Mensagem</CardTitle></CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie data={metrics.messageTypeDistribution} dataKey="count" nameKey="type" cx="50%" cy="50%" outerRadius={80} label={({ type, percentage }) => `${type} (${percentage.toFixed(0)}%)`}>
+                        {metrics.messageTypeDistribution.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <RechartsTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Topics */}
             {metrics.topicsDistribution.length > 0 && (
               <Card>
@@ -216,6 +275,57 @@ export default function WhatsAppRelatorio() {
               </Card>
             )}
           </div>
+
+          {/* Agent Performance Table */}
+          {metrics.agentPerformance.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Performance por Agente</CardTitle></CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2 text-xs text-muted-foreground">Agente</th>
+                        <th className="text-right p-2 text-xs text-muted-foreground">Conversas</th>
+                        <th className="text-right p-2 text-xs text-muted-foreground">Encerradas</th>
+                        <th className="text-right p-2 text-xs text-muted-foreground">Tempo Resp.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metrics.agentPerformance.map((a) => (
+                        <tr key={a.agentId} className="border-b last:border-0">
+                          <td className="p-2 font-medium">{a.agentName}</td>
+                          <td className="p-2 text-right">{a.totalConversations}</td>
+                          <td className="p-2 text-right">{a.closedConversations}</td>
+                          <td className="p-2 text-right">{a.avgResponseTimeMinutes.toFixed(0)} min</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Contacts */}
+          {metrics.topContacts.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Top Contatos por Volume</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {metrics.topContacts.slice(0, 10).map((c, i) => (
+                    <div key={c.contactId} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] w-6 h-6 rounded-full flex items-center justify-center">{i + 1}</Badge>
+                        <span className="text-sm">{c.contactName}</span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">{c.messageCount} msgs</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : null}
     </div>
