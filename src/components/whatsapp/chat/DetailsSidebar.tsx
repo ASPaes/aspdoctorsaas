@@ -14,6 +14,7 @@ import { useConversationTopics } from "../hooks/useConversationTopics";
 import { useCategorizeConversation } from "../hooks/useCategorizeConversation";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { TopicBadges } from "./TopicBadges";
+import { ClienteLinkCard } from "./ClienteLinkCard";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
 
@@ -123,6 +124,9 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               </>
             )}
           </div>
+
+          {/* Cliente Link */}
+          <ClienteLinkCard conversation={conversation} />
 
           {/* Tags */}
           {contact?.tags && contact.tags.length > 0 && (
