@@ -17,6 +17,7 @@ import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import UsuariosTab from "@/components/configuracoes/UsuariosTab";
 import AprovacaoAcessosTab from "@/components/configuracoes/AprovacaoAcessosTab";
+import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
 import { useSearchParams } from "react-router-dom";
 
 const schema = z.object({
@@ -93,7 +94,7 @@ export default function Configuracoes() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares e usuários.</p>
+        <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares, usuários e WhatsApp.</p>
       </div>
 
       <Tabs defaultValue={defaultTab}>
@@ -103,6 +104,7 @@ export default function Configuracoes() {
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
@@ -159,6 +161,10 @@ export default function Configuracoes() {
 
         <TabsContent value="aprovacoes">
           <AprovacaoAcessosTab />
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppInstancesTab />
         </TabsContent>
       </Tabs>
     </div>
