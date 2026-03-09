@@ -44,7 +44,7 @@ export function ChatMessages({ conversationId, onReply }: Props) {
     );
   }
 
-  const dateGroups = groupByDate(messages);
+  const dateGroups = groupByDate(messages, timezone);
 
   return (
     <ScrollArea className="flex-1 px-4 py-2">

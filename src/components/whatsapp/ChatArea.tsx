@@ -49,12 +49,10 @@ function MessageBubbleInline({ msg, timezone }: { msg: Message; timezone: string
   );
 }
 
-function groupByDate(messages: Message[]): { date: string; msgs: Message[] }[] {
+function groupByDateInline(messages: Message[], timezone: string): { date: string; msgs: Message[] }[] {
   const groups: Record<string, Message[]> = {};
   for (const msg of messages) {
-    const d = (() => {
-      try { return format(new Date(msg.timestamp), "dd/MM/yyyy"); } catch { return "—"; }
-    })();
+    const d = formatDateLabel(msg.timestamp, timezone);
     (groups[d] ??= []).push(msg);
   }
   return Object.entries(groups).map(([date, msgs]) => ({ date, msgs }));

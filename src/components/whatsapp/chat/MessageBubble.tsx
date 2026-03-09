@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import { Check, CheckCheck } from "lucide-react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
+import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 
 interface Props {
   msg: Message;
@@ -11,9 +12,8 @@ interface Props {
 
 export function MessageBubble({ msg, onReply }: Props) {
   const isMe = msg.is_from_me;
-  const time = (() => {
-    try { return format(new Date(msg.timestamp), "HH:mm"); } catch { return ""; }
-  })();
+  const { timezone } = useChatTimezone();
+  const time = formatTzTime(msg.timestamp, timezone);
 
   const statusIcon = isMe && (
     msg.status === "read" || msg.status === "delivered" ? (
