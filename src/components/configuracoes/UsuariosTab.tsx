@@ -8,7 +8,11 @@ import {
   useUpdateUserStatus,
   useCreateInvite,
   useCancelInvite,
+  useUpdateUserFuncionario,
 } from "@/hooks/useTenantUsers";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +32,22 @@ export default function UsuariosTab() {
   const updateStatus = useUpdateUserStatus();
   const createInvite = useCreateInvite();
   const cancelInvite = useCancelInvite();
+  const updateFuncionario = useUpdateUserFuncionario();
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  const { data: funcionarios = [] } = useQuery({
+    queryKey: ["funcionarios-for-users", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
@@ -113,6 +133,7 @@ export default function UsuariosTab() {
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
+                <TableHead>Funcionário</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
@@ -122,6 +143,31 @@ export default function UsuariosTab() {
               {users.map((u) => (
                 <TableRow key={u.user_id}>
                   <TableCell className="text-sm">{u.email ?? u.user_id}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={u.funcionario_id ? String(u.funcionario_id) : "none"}
+                      onValueChange={(v) => {
+                        const fid = v === "none" ? null : Number(v);
+                        updateFuncionario.mutate(
+                          { userId: u.user_id, funcionarioId: fid },
+                          {
+                            onSuccess: () => toast.success("Funcionário vinculado."),
+                            onError: (err: any) => toast.error(err.message),
+                          }
+                        );
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Nenhum —</SelectItem>
+                        {funcionarios.map((f) => (
+                          <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   <TableCell>
                     <Select
                       value={u.role}

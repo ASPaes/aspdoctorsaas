@@ -11,6 +11,7 @@ export interface TenantProfile {
   status: string;
   is_super_admin: boolean;
   created_at: string;
+  funcionario_id: number | null;
 }
 
 export interface TenantInvite {
@@ -61,8 +62,8 @@ export function useTenantUsers() {
     queryKey: ["tenant-users", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc("get_tenant_users_with_email", { p_tenant_id: tenantId! });
+      const { data, error } = await (supabase
+        .rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! });
       if (error) throw error;
       return (data ?? []) as TenantProfile[];
     },
@@ -111,6 +112,20 @@ export function useUpdateUserStatus() {
       const { error } = await supabase
         .from("profiles")
         .update({ status })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
+export function useUpdateUserFuncionario() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, funcionarioId }: { userId: string; funcionarioId: number | null }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ funcionario_id: funcionarioId } as any)
         .eq("user_id", userId);
       if (error) throw error;
     },

@@ -63,7 +63,7 @@ export default function AprovacaoAcessosTab() {
       if (error) throw error;
 
       // Try to get emails via the RPC for display
-      const { data: usersWithEmail } = await supabase.rpc("get_tenant_users_with_email", {
+      const { data: usersWithEmail } = await (supabase.rpc as any)("get_tenant_users_with_email", {
         p_tenant_id: tenantId!,
       });
       const emailMap = new Map((usersWithEmail ?? []).map((u: any) => [u.user_id, u.email]));

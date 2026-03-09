@@ -1284,6 +1284,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           created_at: string
+          funcionario_id: number | null
           invited_at: string | null
           invited_by: string | null
           is_super_admin: boolean
@@ -1298,6 +1299,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          funcionario_id?: number | null
           invited_at?: string | null
           invited_by?: string | null
           is_super_admin?: boolean
@@ -1312,6 +1314,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          funcionario_id?: number | null
           invited_at?: string | null
           invited_by?: string | null
           is_super_admin?: boolean
@@ -1321,6 +1324,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -2482,6 +2492,7 @@ export type Database = {
         Returns: {
           created_at: string
           email: string
+          funcionario_id: number
           is_super_admin: boolean
           role: string
           status: string
