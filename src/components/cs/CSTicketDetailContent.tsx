@@ -313,14 +313,12 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
       <div className="flex flex-wrap gap-2">
           {!currentTicket.primeira_acao_em && <Button size="sm" onClick={handleRegistrarPrimeiraAcao}><Play className="h-4 w-4 mr-1" />Registrar 1ª Ação</Button>}
           {currentTicket.cliente?.telefone_whatsapp && (
-            <Button size="sm" variant="outline" className="text-green-600 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-950" asChild>
-              <a
-                href={`https://api.whatsapp.com/send?phone=55${currentTicket.cliente.telefone_whatsapp.replace(/\D/g, '')}`}
-                target="_top"
-                rel="noopener noreferrer"
-              >
-                <MessageCircle className="h-4 w-4 mr-1" />WhatsApp
-              </a>
+            <Button size="sm" variant="outline" className="text-green-600 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-950" onClick={() => {
+              const phone = currentTicket.cliente!.telefone_whatsapp!.replace(/\D/g, '');
+              const name = encodeURIComponent(currentTicket.cliente!.nome_fantasia || currentTicket.cliente!.razao_social || '');
+              navigate(`/whatsapp?phone=${phone}&clienteId=${currentTicket.cliente_id}&clienteName=${name}`);
+            }}>
+              <MessageCircle className="h-4 w-4 mr-1" />WhatsApp
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => setShowReassignDialog(true)}><ArrowUpDown className="h-4 w-4 mr-1" />Reatribuir</Button>
