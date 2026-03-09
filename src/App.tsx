@@ -15,6 +15,7 @@ import Dashboard from "@/pages/Dashboard";
 import Clientes from "@/pages/Clientes";
 import ClienteForm from "@/pages/ClienteForm";
 import CustomerSuccess from "@/pages/CustomerSuccess";
+import WhatsApp from "@/pages/WhatsApp";
 import Login from "@/pages/Login";
 
 // Lazy-loaded: less-visited pages
@@ -82,6 +83,7 @@ const App = () => (
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<CustomerSuccess />} />
+              <Route path="/whatsapp" element={<WhatsApp />} />
 
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>
