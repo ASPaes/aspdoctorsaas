@@ -245,7 +245,7 @@ export default function Clientes() {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
       "mensalidade", "data_ativacao", "cancelado", "data_venda", "unidade_base_id",
-      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp",
+      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato",
     ].join(",");
 
     const pageSize = 1000;
@@ -369,7 +369,7 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id, telefone_whatsapp";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id, telefone_whatsapp, telefone_contato";
       let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -872,21 +872,26 @@ export default function Clientes() {
                     </span>
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn("h-7 w-7", c.telefone_whatsapp ? "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" : "text-muted-foreground/40 cursor-default")}
-                      disabled={!c.telefone_whatsapp}
-                      onClick={() => {
-                        if (c.telefone_whatsapp) {
-                          const phone = c.telefone_whatsapp.replace(/\D/g, '');
-                          const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
-                          navigate(`/whatsapp?phone=${phone}&clienteId=${c.id}&clienteName=${name}`);
-                        }
-                      }}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </Button>
+                    {(() => {
+                      const whatsPhone = c.telefone_whatsapp || c.telefone_contato;
+                      return (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn("h-7 w-7", whatsPhone ? "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" : "text-muted-foreground/40 cursor-default")}
+                          disabled={!whatsPhone}
+                          onClick={() => {
+                            if (whatsPhone) {
+                              const phone = whatsPhone.replace(/\D/g, '');
+                              const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
+                              navigate(`/whatsapp?phone=${phone}&clienteId=${c.id}&clienteName=${name}`);
+                            }
+                          }}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{c.unidade_base_id ? unidadeBaseMap.get(c.unidade_base_id) || "—" : "—"}</TableCell>
                 </TableRow>
