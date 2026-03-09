@@ -111,7 +111,7 @@ export default function CertificadosA1() {
       }
 
       let q = tf(supabase.from("clientes" as any)
-        .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
+        .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, telefone_whatsapp, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
         .eq("cancelado", false)) as any;
 
       if (ganhoIds) {
