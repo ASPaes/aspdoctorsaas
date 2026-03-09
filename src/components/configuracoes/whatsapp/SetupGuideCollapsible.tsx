@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { Rocket, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ChatTimezoneSelector } from "./ChatTimezoneSelector";
 
 export const SetupGuideCollapsible = () => {
   const {
