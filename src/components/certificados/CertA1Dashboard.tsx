@@ -81,13 +81,13 @@ export function CertA1Dashboard() {
       const { data: vendas } = await vendasQuery;
 
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
-      let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null }> = {};
+      let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null; telefone_whatsapp: string | null }> = {};
       if (clienteIds.length > 0) {
         const { data: clientes } = await supabase
           .from("clientes")
-          .select("id, razao_social, nome_fantasia")
+          .select("id, razao_social, nome_fantasia, telefone_whatsapp")
           .in("id", clienteIds);
-        (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia }; });
+        (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
       const ganhos = vendas?.filter((v) => v.status === "ganho") || [];
