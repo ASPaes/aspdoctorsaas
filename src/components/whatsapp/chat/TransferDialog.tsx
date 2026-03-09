@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +9,8 @@ import { Loader2 } from "lucide-react";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TransferDialogProps {
   open: boolean;
@@ -16,16 +19,39 @@ interface TransferDialogProps {
   currentAssignee: string | null;
 }
 
+function useFuncionariosLookup() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery({
+    queryKey: ["funcionarios-lookup", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return new Map((data ?? []).map(f => [f.id, f.nome]));
+    },
+  });
+}
+
 export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee }: TransferDialogProps) {
   const [selectedUser, setSelectedUser] = useState("");
   const [reason, setReason] = useState("");
   const { user } = useAuth();
   const { data: tenantUsers = [] } = useTenantUsers();
+  const { data: funcMap } = useFuncionariosLookup();
   const { transferConversation, isTransferring } = useConversationAssignment();
 
   const availableUsers = tenantUsers.filter(u =>
     u.user_id !== currentAssignee && u.status === "ativo"
   );
+
+  const getDisplayName = (u: typeof tenantUsers[0]) => {
+    const funcName = u.funcionario_id ? funcMap?.get(u.funcionario_id) : null;
+    return funcName ?? u.email;
+  };
 
   const handleTransfer = () => {
     if (!selectedUser) return;
@@ -51,7 +77,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
               <SelectContent>
                 {availableUsers.map((u) => (
                   <SelectItem key={u.user_id} value={u.user_id}>
-                    {u.email} {u.user_id === user?.id ? "(eu)" : ""}
+                    {getDisplayName(u)} {u.user_id === user?.id ? "(eu)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
