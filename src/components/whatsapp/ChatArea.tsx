@@ -94,7 +94,8 @@ export function ChatArea({ conversation }: Props) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4 py-2">
+      <div className="flex-1 min-h-0 overflow-hidden">
+      <ScrollArea className="h-full px-4 py-2">
         {isLoading ? (
           <div className="space-y-3 py-4">
             {Array.from({ length: 6 }).map((_, i) => (
