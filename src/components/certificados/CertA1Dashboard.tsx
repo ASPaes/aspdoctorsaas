@@ -130,6 +130,7 @@ export function CertA1Dashboard() {
         clienteId: v.cliente_id,
         clienteNome: clientesMap[v.cliente_id]?.razao_social || "—",
         clienteFantasia: clientesMap[v.cliente_id]?.nome_fantasia || null,
+        telefoneWhatsapp: clientesMap[v.cliente_id]?.telefone_whatsapp || null,
         dataVenda: v.data_venda,
         valor: Number(v.valor_venda) || 0,
         status: v.status,
