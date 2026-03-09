@@ -42,6 +42,7 @@ export interface ConversationsFilters {
   unassigned?: boolean;
   page?: number;
   pageSize?: number;
+  includeIds?: string[];
 }
 
 export interface ConversationsResult {
@@ -74,6 +75,14 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       if (filters?.status) query = query.eq('status', filters.status);
       if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
       if (filters?.unassigned) query = query.is('assigned_to', null);
+
+      // Hide conversations without messages, unless they are in includeIds
+      const includeIds = filters?.includeIds;
+      if (includeIds && includeIds.length > 0) {
+        query = query.or(`last_message_at.not.is.null,id.in.(${includeIds.join(',')})`);
+      } else {
+        query = query.not('last_message_at', 'is', null);
+      }
 
       const { data: conversationsData, error } = await query;
       if (error) throw error;

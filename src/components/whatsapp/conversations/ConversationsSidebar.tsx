@@ -3,8 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, MessageSquare, BarChart3, Users, Settings } from "lucide-react";
+import { Search, Plus, MessageSquare, BarChart3, Users, Settings, X } from "lucide-react";
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
+import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type SortBy } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
@@ -18,10 +19,23 @@ interface Props {
   onSelect: (conv: ConversationWithContact) => void;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  active: "Em Aberto",
+  closed: "Encerradas",
+  archived: "Arquivadas",
+};
+
+const SORT_LABELS: Record<string, string> = {
+  unread: "Não Lidas Primeiro",
+  waiting: "Aguardando Resposta",
+  oldest: "Mais Antigas",
+};
+
 export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const [search, setSearch] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
   const [activePill, setActivePill] = useState("all");
+  const [forcedConvId, setForcedConvId] = useState<string | null>(null);
   const [filters, setFilters] = useState<{ sortBy: SortBy; status: string | undefined; instanceId: string | undefined }>({
     sortBy: "recent",
     status: undefined,
@@ -29,6 +43,15 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   });
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { instances } = useWhatsAppInstances();
+
+  const instanceMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    instances.forEach((inst) => {
+      map[inst.id] = inst.display_name || inst.instance_name;
+    });
+    return map;
+  }, [instances]);
 
   const { conversations, isLoading, unreadCount, waitingCount } = useWhatsAppConversations({
     search: search.trim() || undefined,
@@ -36,6 +59,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     status: filters.status,
     assignedTo: activePill === "mine" ? user?.id : undefined,
     pageSize: 100,
+    includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
 
   const filtered = useMemo(() => {
@@ -79,17 +103,55 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         break;
       case "recent":
       default:
-        // Already sorted by last_message_at DESC from the query
         break;
     }
 
+    // Force newly created/selected conv to top
+    if (forcedConvId) {
+      const idx = result.findIndex(c => c.id === forcedConvId);
+      if (idx > 0) {
+        const [conv] = result.splice(idx, 1);
+        result.unshift(conv);
+      }
+    }
+
     return result;
-  }, [conversations, activePill, filters.sortBy]);
+  }, [conversations, activePill, filters.sortBy, forcedConvId]);
 
   const handleCreated = (convId: string) => {
+    setForcedConvId(convId);
     const conv = conversations.find(c => c.id === convId);
     if (conv) onSelect(conv);
   };
+
+  const handleSelect = (conv: ConversationWithContact) => {
+    setForcedConvId(conv.id);
+    onSelect(conv);
+  };
+
+  // Active filter badges
+  const activeFilterBadges: { key: string; label: string; onRemove: () => void }[] = [];
+  if (filters.status) {
+    activeFilterBadges.push({
+      key: "status",
+      label: STATUS_LABELS[filters.status] || filters.status,
+      onRemove: () => setFilters(f => ({ ...f, status: undefined })),
+    });
+  }
+  if (filters.instanceId) {
+    activeFilterBadges.push({
+      key: "instance",
+      label: instanceMap[filters.instanceId] || "Instância",
+      onRemove: () => setFilters(f => ({ ...f, instanceId: undefined })),
+    });
+  }
+  if (filters.sortBy !== "recent") {
+    activeFilterBadges.push({
+      key: "sort",
+      label: SORT_LABELS[filters.sortBy] || filters.sortBy,
+      onRemove: () => setFilters(f => ({ ...f, sortBy: "recent" })),
+    });
+  }
 
   return (
     <div className="flex flex-col h-full border-r border-border w-80 shrink-0">
@@ -150,6 +212,22 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         />
       </div>
 
+      {/* Active Filter Badges */}
+      {activeFilterBadges.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-3 pb-2">
+          {activeFilterBadges.map((badge) => (
+            <button
+              key={badge.key}
+              onClick={badge.onRemove}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-medium hover:bg-destructive/10 hover:text-destructive transition-colors"
+            >
+              {badge.label}
+              <X className="h-2.5 w-2.5" />
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* List */}
       <ScrollArea className="flex-1">
         {isLoading ? (
@@ -176,7 +254,8 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
                 key={conv.id}
                 conversation={conv}
                 isSelected={selectedId === conv.id}
-                onClick={() => onSelect(conv)}
+                onClick={() => handleSelect(conv)}
+                instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
               />
             ))}
           </div>

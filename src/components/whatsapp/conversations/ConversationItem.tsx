@@ -11,9 +11,10 @@ interface Props {
   conversation: ConversationWithContact;
   isSelected: boolean;
   onClick: () => void;
+  instanceName?: string;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName }: Props) {
   const contact = conv.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
   const { sentiment } = useWhatsAppSentiment(conv.id);
@@ -83,6 +84,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick }: Pr
             )}
           </div>
         </div>
+        {instanceName && (
+          <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{instanceName}</p>
+        )}
       </div>
     </button>
   );
