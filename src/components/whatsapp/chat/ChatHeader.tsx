@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { SentimentCard } from "./SentimentCard";
 import { TopicBadges } from "./TopicBadges";
 import { EditContactModal } from "./EditContactModal";
+import { QueueIndicator } from "./QueueIndicator";
+import { TransferDialog } from "./TransferDialog";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -25,7 +27,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const { data: topicsData } = useConversationTopics(conversation.id);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
-
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
@@ -61,7 +63,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         )}
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
+        <QueueIndicator
+          conversationId={conversation.id}
+          assignedTo={conversation.assigned_to || null}
+          onTransferClick={() => setIsTransferOpen(true)}
+        />
         <SentimentCard sentiment={sentiment} />
 
         <Button variant="ghost" size="sm" onClick={analyze} disabled={isAnalyzing} title="Analisar sentimento">
@@ -115,6 +122,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         contactName={contact?.name || ''}
         contactPhone={contact?.phone_number || ''}
         contactNotes={contact?.notes}
+      />
+
+      <TransferDialog
+        open={isTransferOpen}
+        onOpenChange={setIsTransferOpen}
+        conversationId={conversation.id}
+        currentAssignee={conversation.assigned_to || null}
       />
     </div>
   );
