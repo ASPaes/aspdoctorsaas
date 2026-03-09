@@ -20,3 +20,18 @@ verify_jwt = false
 
 [functions.test-evolution-connection]
 verify_jwt = false
+
+[functions.suggest-smart-replies]
+verify_jwt = false
+
+[functions.compose-whatsapp-message]
+verify_jwt = false
+
+[functions.analyze-whatsapp-sentiment]
+verify_jwt = false
+
+[functions.categorize-whatsapp-conversation]
+verify_jwt = false
+
+[functions.generate-conversation-summary]
+verify_jwt = false
