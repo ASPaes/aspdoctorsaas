@@ -23,10 +23,31 @@ interface Props {
   onReply?: (msg: Message) => void;
 }
 
+type TimelineItem =
+  | { type: 'message'; msg: Message }
+  | { type: 'transfer'; event: AssignmentEvent };
+
 export function ChatMessages({ conversationId, onReply }: Props) {
   const { messages, isLoading } = useWhatsAppMessages(conversationId);
+  const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Merge messages and assignment events into a single timeline
+  const timelineItems = useMemo(() => {
+    const items: TimelineItem[] = messages.map(msg => ({ type: 'message' as const, msg }));
+    if (assignments) {
+      for (const event of assignments) {
+        items.push({ type: 'transfer' as const, event });
+      }
+    }
+    items.sort((a, b) => {
+      const tA = a.type === 'message' ? a.msg.timestamp : a.event.created_at;
+      const tB = b.type === 'message' ? b.msg.timestamp : b.event.created_at;
+      return new Date(tA).getTime() - new Date(tB).getTime();
+    });
+    return items;
+  }, [messages, assignments]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
