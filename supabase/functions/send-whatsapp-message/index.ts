@@ -176,7 +176,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: savedMessage, error: saveError } = await supabase
+    // Use anonClient (authenticated) so the set_tenant_id_on_insert trigger
+    // can resolve current_tenant_id() via auth.uid()
+    const { data: savedMessage, error: saveError } = await anonClient
       .from('whatsapp_messages')
       .insert({
         tenant_id: tenantId,
