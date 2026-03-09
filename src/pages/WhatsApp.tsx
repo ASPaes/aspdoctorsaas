@@ -15,7 +15,7 @@ export default function WhatsApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
-  const processedRef = useRef(false);
+  const processedPhoneRef = useRef<string | null>(null);
 
   // Auto-create/find conversation from URL params (coming from ClienteForm)
   useEffect(() => {
