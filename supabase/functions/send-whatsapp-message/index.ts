@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
         remote_jid: contact.phone_number,
         content: messageContent,
         message_type: body.messageType,
-        media_url: extractedMediaUrl || body.mediaUrl || null,
+        media_url: persistentMediaPath || extractedMediaUrl || body.mediaUrl || null,
         media_mimetype: body.mediaMimetype || null,
         status: 'sent',
         is_from_me: true,
