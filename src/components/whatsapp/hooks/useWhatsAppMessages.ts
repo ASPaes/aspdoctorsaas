@@ -89,19 +89,51 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     }
   }, [conversationId]);
 
-  // Realtime subscription for new and edited messages
+  // Realtime subscription — append/update messages in cache instead of full refetch
   useEffect(() => {
     if (!conversationId) return;
 
     const channel = supabase
       .channel(`messages-rt-${conversationId}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'whatsapp_messages',
         filter: `conversation_id=eq.${conversationId}`
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
+      }, (payload) => {
+        const newMsg = payload.new as any;
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', conversationId],
+          (old: any[] | undefined) => {
+            if (!old) return [newMsg];
+            // Avoid duplicates (optimistic update may have added a temp entry)
+            const exists = old.some((m) => m.id === newMsg.id || m.message_id === newMsg.message_id);
+            if (exists) {
+              // Replace the matching entry (e.g. temp → real)
+              return old.map((m) =>
+                (m.message_id === newMsg.message_id || (m.id.startsWith('temp-') && m.conversation_id === newMsg.conversation_id && m.content === newMsg.content))
+                  ? newMsg
+                  : m
+              );
+            }
+            return [...old, newMsg];
+          }
+        );
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'whatsapp_messages',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        const updated = payload.new as any;
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', conversationId],
+          (old: any[] | undefined) => {
+            if (!old) return old;
+            return old.map((m) => m.id === updated.id ? updated : m);
+          }
+        );
       })
       .subscribe();
 
