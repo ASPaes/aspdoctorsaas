@@ -22,6 +22,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
   const hasUnread = unreadCount > 0;
 
+  console.log(`[ConvItem DEBUG] ${name} | unread_raw=${JSON.stringify(conv.unread_count)} type=${typeof conv.unread_count} | parsed=${unreadCount} hasUnread=${hasUnread} | last_msg=${conv.last_message_at}`);
+
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
   const formatTime = (ts: string | null) => {
