@@ -335,12 +335,8 @@ export default function ClienteForm() {
             <h1 className="text-2xl font-bold">{isEditing ? "Editar Cliente" : "Novo Cliente"}</h1>
             <p className="text-sm text-muted-foreground">
               Preencha os dados do cliente e contrato
-              {isDirty && draftStatus === "saved" && (
-                <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
-                  <Save className="inline h-3 w-3 mr-0.5" />Rascunho salvo
-                </span>
-              )}
             </p>
+            {isEditing && <MissingFieldsIndicator form={form} />}
           </div>
 
           {/* Prev/Next navigation */}
