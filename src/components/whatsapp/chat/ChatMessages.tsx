@@ -16,8 +16,14 @@ function groupByDate(messages: Message[], timezone: string): { date: string; msg
   return Object.entries(groups).map(([date, msgs]) => ({ date, msgs }));
 }
 
+interface Props {
+  conversationId: string;
+  onReply?: (msg: Message) => void;
+}
+
 export function ChatMessages({ conversationId, onReply }: Props) {
   const { messages, isLoading } = useWhatsAppMessages(conversationId);
+  const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
