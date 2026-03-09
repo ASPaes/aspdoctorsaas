@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,10 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CS_UPDATE_TIPO_LABELS, type CSTicketUpdate, type CSUpdateTipo } from './types';
-import { MessageSquare, ArrowUpDown, UserCheck, AlertTriangle, Sparkles, CheckCircle, Send, Loader2, Lock, Eye, ArrowDown, Filter, ChevronDown } from 'lucide-react';
+import { MessageSquare, ArrowUpDown, UserCheck, AlertTriangle, Sparkles, CheckCircle, Send, Loader2, Lock, Eye, ArrowDown, Filter, ChevronDown, MessageCircle } from 'lucide-react';
 
 interface CSTimelineEnhancedProps {
   ticketId: string;
+  clientePhone?: string | null;
   isStickyMode?: boolean;
 }
 
@@ -38,7 +40,7 @@ const TIPO_COLORS: Record<CSUpdateTipo, string> = {
 
 const PAGE_SIZE = 50;
 
-export function CSTimelineEnhanced({ ticketId, isStickyMode = false }: CSTimelineEnhancedProps) {
+export function CSTimelineEnhanced({ ticketId, clientePhone, isStickyMode = false }: CSTimelineEnhancedProps) {
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState('');
   const [isPrivate, setIsPrivate] = useState(true);
@@ -67,6 +69,42 @@ export function CSTimelineEnhanced({ ticketId, isStickyMode = false }: CSTimelin
   });
 
   const allUpdates = data?.pages.flatMap(page => page.updates) || [];
+
+  // Fetch WhatsApp conversation summaries linked to this client's phone
+  const { data: whatsappSummaries } = useQuery({
+    queryKey: ['cs-ticket-whatsapp-summaries', clientePhone],
+    queryFn: async () => {
+      if (!clientePhone) return [];
+      const cleanPhone = clientePhone.replace(/\D/g, '');
+      if (!cleanPhone) return [];
+      // Find contacts matching the phone
+      const { data: contacts } = await supabase
+        .from('whatsapp_contacts')
+        .select('id')
+        .or(`phone_number.like.%${cleanPhone},phone_number.like.%55${cleanPhone}`);
+      if (!contacts?.length) return [];
+      const contactIds = contacts.map(c => c.id);
+      // Find conversations for those contacts
+      const { data: conversations } = await supabase
+        .from('whatsapp_conversations')
+        .select('id')
+        .in('contact_id', contactIds);
+      if (!conversations?.length) return [];
+      const convIds = conversations.map(c => c.id);
+      // Get summaries
+      const { data: summaries } = await supabase
+        .from('whatsapp_conversation_summaries')
+        .select('*')
+        .in('conversation_id', convIds)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      return (summaries ?? []) as Array<{
+        id: string; summary: string; key_points: string[] | null;
+        action_items: string[] | null; created_at: string; message_count: number;
+      }>;
+    },
+    enabled: !!clientePhone,
+  });
 
   const addUpdate = useMutation({
     mutationFn: async (d: { conteudo: string; tipo: CSUpdateTipo; privado: boolean }) => {
@@ -112,6 +150,37 @@ export function CSTimelineEnhanced({ ticketId, isStickyMode = false }: CSTimelin
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-1">
+          {/* WhatsApp Summaries Section */}
+          {whatsappSummaries && whatsappSummaries.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-green-600 mb-2">
+                <MessageCircle className="h-3.5 w-3.5" />
+                Resumos WhatsApp ({whatsappSummaries.length})
+              </div>
+              {whatsappSummaries.map((s) => (
+                <div key={s.id} className="relative flex gap-3 pb-3">
+                  <div className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">
+                    <MessageCircle className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0 pt-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Badge variant="outline" className="text-[10px] px-1.5 h-5 border-green-500/30 text-green-600">Resumo WhatsApp</Badge>
+                      <span className="text-[10px] text-muted-foreground">{s.message_count} msgs</span>
+                      <span className="text-[10px] text-muted-foreground ml-auto">{format(new Date(s.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{s.summary}</p>
+                    {s.key_points && s.key_points.length > 0 && (
+                      <ul className="mt-1 text-[11px] text-muted-foreground list-disc list-inside">
+                        {s.key_points.slice(0, 3).map((p, i) => <li key={i}>{p}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <Separator className="my-2" />
+            </div>
+          )}
+
           {allUpdates.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atualização registrada</p>
           ) : (

@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
   ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion,
-  DollarSign, UserX, TrendingUp, BarChart3, List, Trash2,
+  DollarSign, UserX, TrendingUp, BarChart3, List, Trash2, MessageCircle,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -81,13 +81,13 @@ export function CertA1Dashboard() {
       const { data: vendas } = await vendasQuery;
 
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
-      let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null }> = {};
+      let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null; telefone_whatsapp: string | null }> = {};
       if (clienteIds.length > 0) {
         const { data: clientes } = await supabase
           .from("clientes")
-          .select("id, razao_social, nome_fantasia")
+          .select("id, razao_social, nome_fantasia, telefone_whatsapp")
           .in("id", clienteIds);
-        (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia }; });
+        (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
       const ganhos = vendas?.filter((v) => v.status === "ganho") || [];
@@ -130,6 +130,7 @@ export function CertA1Dashboard() {
         clienteId: v.cliente_id,
         clienteNome: clientesMap[v.cliente_id]?.razao_social || "—",
         clienteFantasia: clientesMap[v.cliente_id]?.nome_fantasia || null,
+        telefoneWhatsapp: clientesMap[v.cliente_id]?.telefone_whatsapp || null,
         dataVenda: v.data_venda,
         valor: Number(v.valor_venda) || 0,
         status: v.status,
@@ -289,6 +290,7 @@ export function CertA1Dashboard() {
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="w-[50px]">WhatsApp</TableHead>
                   {isAdmin && <TableHead className="w-[60px]">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -327,6 +329,21 @@ export function CertA1Dashboard() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">{formatBRL.format(v.valor)}</TableCell>
+                      <TableCell>
+                        {v.telefoneWhatsapp ? (
+                          <a
+                            href={`https://api.whatsapp.com/send?phone=55${v.telefoneWhatsapp.replace(/\D/g, '')}`}
+                            target="_top"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950">
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       {isAdmin && (
                         <TableCell>
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(v.id)}>
