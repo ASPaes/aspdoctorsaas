@@ -175,9 +175,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
                 <div>
                   <Label className="text-xs font-medium text-muted-foreground">Telefone (cliente sem WhatsApp cadastrado)</Label>
                   <Input
-                    placeholder="5511999999999"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+55 (11) 99999-9999"
+                    value={maskPhoneBR(phone)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   />
                 </div>
               )}
