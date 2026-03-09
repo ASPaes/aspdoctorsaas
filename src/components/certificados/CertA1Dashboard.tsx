@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
   ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion,
-  DollarSign, UserX, TrendingUp, BarChart3, List, Trash2,
+  DollarSign, UserX, TrendingUp, BarChart3, List, Trash2, MessageCircle,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
