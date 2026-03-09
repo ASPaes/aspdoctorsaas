@@ -6,7 +6,7 @@ import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, escapeLike } from "@/lib/utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
