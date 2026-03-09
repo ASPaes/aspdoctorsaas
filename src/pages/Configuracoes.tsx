@@ -93,6 +93,10 @@ export default function Configuracoes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
+  // Auth context for role-based UI
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { imposto_percentual: 13.5, custo_fixo_percentual: 8 },
