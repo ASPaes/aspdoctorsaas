@@ -126,12 +126,14 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Context */}
-          <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-xs space-y-1">
-            <p className="font-medium">Contexto da IA</p>
-            <p>Sentimento: <Badge variant="outline" className="text-[10px]">{sentiment?.sentiment}</Badge> ({sentiment?.confidence ? `${Math.round(sentiment.confidence * 100)}%` : "N/A"})</p>
-            {sentiment?.cs_ticket_reason && <p>Motivo: {sentiment.cs_ticket_reason}</p>}
-          </div>
+          {/* Context - only show if sentiment data exists */}
+          {sentiment?.sentiment && (
+            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-xs space-y-1">
+              <p className="font-medium">Contexto da IA</p>
+              <p>Sentimento: <Badge variant="outline" className="text-[10px]">{sentiment.sentiment}</Badge> ({sentiment?.confidence ? `${Math.round(sentiment.confidence * 100)}%` : "N/A"})</p>
+              {sentiment?.cs_ticket_reason && <p>Motivo: {sentiment.cs_ticket_reason}</p>}
+            </div>
+          )}
 
           {clienteId && (
             <div className="space-y-1">
