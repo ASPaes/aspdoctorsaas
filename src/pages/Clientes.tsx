@@ -871,6 +871,24 @@ export default function Clientes() {
                       {c.cancelado ? "Cancelado" : "Ativo"}
                     </span>
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn("h-7 w-7", c.telefone_whatsapp ? "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" : "text-muted-foreground/40 cursor-default")}
+                      disabled={!c.telefone_whatsapp}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (c.telefone_whatsapp) {
+                          const phone = c.telefone_whatsapp.replace(/\D/g, '');
+                          const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
+                          navigate(`/whatsapp?phone=${phone}&clienteId=${c.id}&clienteName=${name}`);
+                        }
+                      }}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                   <TableCell>{c.unidade_base_id ? unidadeBaseMap.get(c.unidade_base_id) || "—" : "—"}</TableCell>
                 </TableRow>
               ))
