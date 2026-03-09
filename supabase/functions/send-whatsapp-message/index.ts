@@ -312,10 +312,22 @@ function buildEvolutionRequest(
     case 'image':
     case 'video':
     case 'document': {
+      let mediaData: string | undefined;
+      if (body.mediaBase64) {
+        // Evolution API needs a proper data URI for base64 media
+        if (body.mediaBase64.startsWith('data:')) {
+          mediaData = body.mediaBase64;
+        } else {
+          const mime = body.mediaMimetype || 'application/octet-stream';
+          mediaData = `data:${mime};base64,${body.mediaBase64}`;
+        }
+      } else {
+        mediaData = body.mediaUrl;
+      }
       const requestBody: any = {
         number,
         mediatype: body.messageType,
-        media: body.mediaBase64 || body.mediaUrl,
+        media: mediaData,
       };
       if (body.content) requestBody.caption = body.content;
       if (body.messageType === 'document' && body.fileName) requestBody.fileName = body.fileName;
