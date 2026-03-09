@@ -24,6 +24,8 @@ import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList
 import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstanceDialog";
 import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
+import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
+import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
