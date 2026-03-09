@@ -26,7 +26,15 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const formatTime = (ts: string | null) => {
     if (!ts) return "";
-    return formatRelativeTime(ts, timezone);
+    try {
+      return new Intl.DateTimeFormat("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: timezone,
+      }).format(new Date(ts));
+    } catch {
+      return "";
+    }
   };
 
   const statusColor =
