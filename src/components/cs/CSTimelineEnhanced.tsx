@@ -149,6 +149,37 @@ export function CSTimelineEnhanced({ ticketId, clientePhone, isStickyMode = fals
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-1">
+          {/* WhatsApp Summaries Section */}
+          {whatsappSummaries && whatsappSummaries.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-green-600 mb-2">
+                <MessageCircle className="h-3.5 w-3.5" />
+                Resumos WhatsApp ({whatsappSummaries.length})
+              </div>
+              {whatsappSummaries.map((s) => (
+                <div key={s.id} className="relative flex gap-3 pb-3">
+                  <div className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">
+                    <MessageCircle className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0 pt-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Badge variant="outline" className="text-[10px] px-1.5 h-5 border-green-500/30 text-green-600">Resumo WhatsApp</Badge>
+                      <span className="text-[10px] text-muted-foreground">{s.message_count} msgs</span>
+                      <span className="text-[10px] text-muted-foreground ml-auto">{format(new Date(s.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{s.summary}</p>
+                    {s.key_points && s.key_points.length > 0 && (
+                      <ul className="mt-1 text-[11px] text-muted-foreground list-disc list-inside">
+                        {s.key_points.slice(0, 3).map((p, i) => <li key={i}>{p}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <Separator className="my-2" />
+            </div>
+          )}
+
           {allUpdates.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atualização registrada</p>
           ) : (
