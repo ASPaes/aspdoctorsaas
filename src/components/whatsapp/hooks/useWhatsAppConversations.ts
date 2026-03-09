@@ -104,6 +104,18 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
       let result = (conversationsData ?? []) as unknown as ConversationWithContact[];
 
+      // Apply search filter (contact name, phone, or message content match)
+      if (searchTerm) {
+        const s = searchTerm.toLowerCase();
+        result = result.filter((c) => {
+          const nameMatch = (c.contact?.name ?? '').toLowerCase().includes(s);
+          const phoneMatch = (c.contact?.phone_number ?? '').includes(s);
+          const previewMatch = (c.last_message_preview ?? '').toLowerCase().includes(s);
+          const msgMatch = messageMatchIds.includes(c.id);
+          return nameMatch || phoneMatch || previewMatch || msgMatch;
+        });
+      }
+
       // Count query
       let countQuery = supabase
         .from('whatsapp_conversations')
