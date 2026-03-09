@@ -3,10 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, MessageSquare, Filter, BarChart3, Users, Settings } from "lucide-react";
+import { Search, Plus, MessageSquare, BarChart3, Users, Settings } from "lucide-react";
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { ConversationItem } from "./ConversationItem";
-import { ConversationFilters } from "./ConversationFilters";
+import { ConversationFiltersPopover, type SortBy } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
 import { NewConversationModal } from "./NewConversationModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,31 +20,71 @@ interface Props {
 
 export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [activePill, setActivePill] = useState("all");
-  const [instanceId, setInstanceId] = useState<string | undefined>();
-  const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [filters, setFilters] = useState<{ sortBy: SortBy; status: string | undefined; instanceId: string | undefined }>({
+    sortBy: "recent",
+    status: undefined,
+    instanceId: undefined,
+  });
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const { conversations, isLoading, unreadCount, waitingCount } = useWhatsAppConversations({
     search: search.trim() || undefined,
-    instanceId,
-    status: statusFilter,
+    instanceId: filters.instanceId,
+    status: filters.status,
     assignedTo: activePill === "mine" ? user?.id : undefined,
     pageSize: 100,
   });
 
   const filtered = useMemo(() => {
-    let result = conversations;
+    let result = [...conversations];
+
+    // Quick pill filters
     if (activePill === "unread") {
       result = result.filter(c => c.unread_count > 0);
     } else if (activePill === "waiting") {
       result = result.filter(c => c.isLastMessageFromMe === false);
     }
+
+    // Sort
+    switch (filters.sortBy) {
+      case "oldest":
+        result.sort((a, b) => {
+          const aTime = a.last_message_at || a.created_at;
+          const bTime = b.last_message_at || b.created_at;
+          return new Date(aTime).getTime() - new Date(bTime).getTime();
+        });
+        break;
+      case "unread":
+        result.sort((a, b) => {
+          if (a.unread_count > 0 && b.unread_count === 0) return -1;
+          if (a.unread_count === 0 && b.unread_count > 0) return 1;
+          const aTime = a.last_message_at || a.created_at;
+          const bTime = b.last_message_at || b.created_at;
+          return new Date(bTime).getTime() - new Date(aTime).getTime();
+        });
+        break;
+      case "waiting":
+        result.sort((a, b) => {
+          const aWaiting = a.isLastMessageFromMe === false;
+          const bWaiting = b.isLastMessageFromMe === false;
+          if (aWaiting && !bWaiting) return -1;
+          if (!aWaiting && bWaiting) return 1;
+          const aTime = a.last_message_at || a.created_at;
+          const bTime = b.last_message_at || b.created_at;
+          return new Date(bTime).getTime() - new Date(aTime).getTime();
+        });
+        break;
+      case "recent":
+      default:
+        // Already sorted by last_message_at DESC from the query
+        break;
+    }
+
     return result;
-  }, [conversations, activePill]);
+  }, [conversations, activePill, filters.sortBy]);
 
   const handleCreated = (convId: string) => {
     const conv = conversations.find(c => c.id === convId);
@@ -82,9 +122,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
               </TooltipTrigger>
               <TooltipContent>Configurações</TooltipContent>
             </Tooltip>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="h-4 w-4" />
-            </Button>
+            <ConversationFiltersPopover filters={filters} onChange={setFilters} />
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>
               <Plus className="h-4 w-4" />
             </Button>
@@ -111,16 +149,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           waitingCount={waitingCount}
         />
       </div>
-
-      {/* Filters */}
-      {showFilters && (
-        <ConversationFilters
-          instanceId={instanceId}
-          onInstanceChange={setInstanceId}
-          status={statusFilter}
-          onStatusChange={setStatusFilter}
-        />
-      )}
 
       {/* List */}
       <ScrollArea className="flex-1">
