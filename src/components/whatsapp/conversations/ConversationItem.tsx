@@ -104,10 +104,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
             {conv.isLastMessageFromMe && (
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
-            <p className="text-xs text-muted-foreground truncate min-w-0">
-              {conv.isLastMessageFromMe && "Você: "}
-              {conv.last_message_preview || "Sem mensagens"}
-            </p>
+            <span className="text-xs text-muted-foreground">
+              {previewText}
+            </span>
           </div>
           {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground shrink-0" />}
           {hasUnread && (
