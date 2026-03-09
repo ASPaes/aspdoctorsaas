@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, UseFormReturn } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -79,6 +79,55 @@ const clienteSchema = z.object({
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
+
+// Helper component to show missing required fields
+function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValues> }) {
+  const values = form.watch();
+  
+  const fieldLabels: Record<string, string> = {
+    cnpj: "CNPJ",
+    email: "E-mail",
+    telefone_whatsapp: "WhatsApp",
+    data_venda: "Data Venda",
+    funcionario_id: "Funcionário",
+    origem_venda_id: "Origem",
+    recorrencia: "Recorrência",
+    produto_id: "Produto",
+    fornecedor_id: "Fornecedor",
+    modelo_contrato_id: "Modelo Contrato",
+    forma_pagamento_ativacao_id: "Forma Pgto Ativação",
+    forma_pagamento_mensalidade_id: "Forma Pgto Mensalidade",
+  };
+
+  const missingFields: string[] = [];
+
+  // Check required fields
+  if (!values.cnpj || values.cnpj.replace(/\D/g, "").length < 14) missingFields.push(fieldLabels.cnpj);
+  if (!values.email) missingFields.push(fieldLabels.email);
+  if (!values.telefone_whatsapp || values.telefone_whatsapp.replace(/\D/g, "").length < 10) missingFields.push(fieldLabels.telefone_whatsapp);
+  if (!values.data_venda) missingFields.push(fieldLabels.data_venda);
+  if (!values.funcionario_id) missingFields.push(fieldLabels.funcionario_id);
+  if (!values.origem_venda_id) missingFields.push(fieldLabels.origem_venda_id);
+  if (!values.recorrencia) missingFields.push(fieldLabels.recorrencia);
+  if (!values.produto_id) missingFields.push(fieldLabels.produto_id);
+  if (!values.fornecedor_id) missingFields.push(fieldLabels.fornecedor_id);
+  if (!values.modelo_contrato_id) missingFields.push(fieldLabels.modelo_contrato_id);
+  if (!values.forma_pagamento_ativacao_id) missingFields.push(fieldLabels.forma_pagamento_ativacao_id);
+  if (!values.forma_pagamento_mensalidade_id) missingFields.push(fieldLabels.forma_pagamento_mensalidade_id);
+  if (values.valor_ativacao === null || values.valor_ativacao === undefined) missingFields.push("Valor Ativação");
+  if (values.mensalidade === null || values.mensalidade === undefined) missingFields.push("Mensalidade");
+  if (values.custo_operacao === null || values.custo_operacao === undefined) missingFields.push("Custo Operação");
+  if (values.imposto_percentual === null || values.imposto_percentual === undefined) missingFields.push("Imposto");
+  if (values.custo_fixo_percentual === null || values.custo_fixo_percentual === undefined) missingFields.push("Custo Fixo");
+
+  if (missingFields.length === 0) return null;
+
+  return (
+    <p className="text-xs text-muted-foreground mt-1">
+      Campos obrigatórios pendentes: <span className="text-destructive font-medium">{missingFields.join(", ")}</span>
+    </p>
+  );
+}
 
 export default function ClienteForm() {
   const { id } = useParams();
@@ -335,12 +384,8 @@ export default function ClienteForm() {
             <h1 className="text-2xl font-bold">{isEditing ? "Editar Cliente" : "Novo Cliente"}</h1>
             <p className="text-sm text-muted-foreground">
               Preencha os dados do cliente e contrato
-              {isDirty && draftStatus === "saved" && (
-                <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
-                  <Save className="inline h-3 w-3 mr-0.5" />Rascunho salvo
-                </span>
-              )}
             </p>
+            {isEditing && <MissingFieldsIndicator form={form} />}
           </div>
 
           {/* Prev/Next navigation */}
