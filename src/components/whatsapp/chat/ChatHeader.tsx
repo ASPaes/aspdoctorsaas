@@ -155,6 +155,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           conversation={conversation}
           sentiment={sentimentData}
         />
+
+        <ChangeInstanceDialog
+          open={isChangeInstanceOpen}
+          onOpenChange={setIsChangeInstanceOpen}
+          conversation={conversation}
+        />
       </div>
 
       {/* CS Ticket Alert Banner */}
