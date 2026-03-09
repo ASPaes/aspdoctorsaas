@@ -15,7 +15,7 @@ export function useSecuritySettings() {
 
       if (error) throw error;
 
-      const rows = (data ?? []) as { key: string; value: string | null }[];
+      const rows = ((data ?? []) as unknown) as { key: string; value: string | null }[];
       const restrictEnabled = rows.find((c) => c.key === "restrict_signup_by_domain")?.value === "true";
       const requireApproval = rows.find((c) => c.key === "require_account_approval")?.value === "true";
       const domainsString = rows.find((c) => c.key === "allowed_email_domains")?.value || "";
