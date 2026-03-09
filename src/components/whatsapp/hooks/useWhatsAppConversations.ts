@@ -64,6 +64,21 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
     queryFn: async () => {
+      const searchTerm = filters?.search?.trim();
+
+      // If searching by message content (3+ chars), find matching conversation IDs first
+      let messageMatchIds: string[] = [];
+      if (searchTerm && searchTerm.length >= 3) {
+        const { data: msgMatches } = await supabase
+          .from('whatsapp_messages' as any)
+          .select('conversation_id')
+          .ilike('content', `%${searchTerm}%`)
+          .limit(200);
+        if (msgMatches) {
+          messageMatchIds = [...new Set((msgMatches as any[]).map((m: any) => m.conversation_id))];
+        }
+      }
+
       let query = supabase
         .from('whatsapp_conversations')
         .select(`*, contact:whatsapp_contacts(*)`)
