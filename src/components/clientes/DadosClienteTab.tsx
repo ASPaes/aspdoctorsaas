@@ -371,17 +371,23 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
                   onChange={(e) => field.onChange(maskPhone(e.target.value))}
                 />
               </FormControl>
-              {whatsappHref && (
-                <Button type="button" variant="outline" size="icon" className="shrink-0" asChild>
-                  <a
-                    href={whatsappHref}
-                    target={whatsappTarget}
-                    rel="noopener noreferrer"
-                    aria-label="Abrir conversa no WhatsApp"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </a>
-                </Button>
+              {canOpenWhatsApp && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={handleOpenWhatsApp}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Abrir conversa no chat</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
             <FormMessage />
