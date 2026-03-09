@@ -245,32 +245,7 @@ Deno.serve(async (req) => {
       ? (body.content || '') 
       : (body.content || `Sent ${body.messageType}`);
 
-    // tenantId already defined above
-
-    // Extract sender user_id from JWT claims
-    const senderUserId = (claimsData.claims as any).sub as string | undefined;
-
-    // Resolve sender name/role to prefix in outgoing messages
-    let senderLabel = '';
-    if (senderUserId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('funcionario_id')
-        .eq('user_id', senderUserId)
-        .maybeSingle();
-
-      if (profile?.funcionario_id) {
-        const { data: func } = await supabase
-          .from('funcionarios')
-          .select('nome, cargo')
-          .eq('id', profile.funcionario_id)
-          .maybeSingle();
-
-        if (func?.nome) {
-          senderLabel = func.cargo ? `*${func.nome} · ${func.cargo}*` : `*${func.nome}*`;
-        }
-      }
-    }
+    // tenantId and senderUserId already defined above
 
     const { data: savedMessage, error: saveError } = await anonClient
       .from('whatsapp_messages')
