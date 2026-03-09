@@ -84,6 +84,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
             )}
           </div>
         </div>
+        {instanceName && (
+          <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{instanceName}</p>
+        )}
       </div>
     </button>
   );
