@@ -4,7 +4,6 @@ import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
-import { formatRelativeTime } from "@/lib/formatDateWithTimezone";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -20,6 +19,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const { timezone } = useChatTimezone();
   const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
+  const hasUnread = (conv.unread_count ?? 0) > 0;
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
@@ -27,6 +27,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
     if (!ts) return "";
     try {
       const date = new Date(ts);
+      if (isNaN(date.getTime())) return "";
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -49,6 +50,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
     conv.status === "closed" ? "bg-muted-foreground" :
     "bg-yellow-500";
 
+  const timeStr = formatTime(conv.last_message_at);
+
   return (
     <button
       onClick={onClick}
@@ -58,8 +61,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         needsCSTicket && "ring-1 ring-destructive/40"
       )}
     >
-      <div className="relative">
-        <Avatar className="h-10 w-10 shrink-0">
+      <div className="relative shrink-0">
+        <Avatar className="h-10 w-10">
           {contact?.profile_picture_url && (
             <AvatarImage src={contact.profile_picture_url} />
           )}
@@ -74,17 +77,19 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium truncate">{name}</span>
-          <span className={cn(
-            "text-[10px] shrink-0 ml-2",
-            conv.unread_count > 0 ? "text-primary font-semibold" : "text-muted-foreground"
-          )}>
-            {formatTime(conv.last_message_at)}
-          </span>
+          {timeStr && (
+            <span className={cn(
+              "text-xs whitespace-nowrap shrink-0",
+              hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
+            )}>
+              {timeStr}
+            </span>
+          )}
         </div>
-        <div className="flex items-center justify-between mt-0.5">
+        <div className="flex items-center justify-between gap-2 mt-0.5">
           <div className="flex items-center gap-1 min-w-0 flex-1">
             {conv.isLastMessageFromMe && (
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -94,10 +99,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
               {conv.last_message_preview || "Sem mensagens"}
             </p>
           </div>
-          <div className="flex items-center gap-1 shrink-0 ml-2">
+          <div className="flex items-center gap-1 shrink-0">
             {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
-            {conv.unread_count > 0 && (
-              <span className="flex items-center justify-center h-5 min-w-5 px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
+            {hasUnread && (
+              <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
                 {conv.unread_count > 99 ? "99+" : conv.unread_count}
               </span>
             )}
