@@ -40,11 +40,21 @@ export function useClienteLinkSuggestion(
       const digits = phoneNumber.replace(/\D/g, '');
       if (digits.length < 10) return null;
 
-      // Try exact match on digits
+      // Get current user's tenant via RLS
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (!profile?.tenant_id) return null;
+
+      // Try exact match on digits within same tenant
       const { data } = await supabase
         .from('clientes')
         .select('id, razao_social, nome_fantasia, codigo_sequencial, telefone_whatsapp')
         .eq('cancelado', false)
+        .eq('tenant_id', profile.tenant_id)
         .not('telefone_whatsapp', 'is', null)
         .limit(50);
 
