@@ -110,6 +110,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
                 <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
+                <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -134,6 +137,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           onOpenChange={setIsTransferOpen}
           conversationId={conversation.id}
           currentAssignee={conversation.assigned_to || null}
+        />
+
+        <CreateCSTicketFromChat
+          open={isManualTicketOpen}
+          onOpenChange={setIsManualTicketOpen}
+          conversation={conversation}
+          sentiment={sentimentData}
         />
       </div>
 
