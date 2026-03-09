@@ -70,6 +70,14 @@ function WhatsAppSettingsContent() {
         <TabsContent value="atribuicao" className="mt-4">
           <AssignmentRulesManager />
         </TabsContent>
+
+        <TabsContent value="equipe" className="mt-4">
+          <TeamTab />
+        </TabsContent>
+
+        <TabsContent value="seguranca" className="mt-4">
+          <SecuritySettingsTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
