@@ -162,6 +162,10 @@ export default function Configuracoes() {
         <TabsContent value="aprovacoes">
           <AprovacaoAcessosTab />
         </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppInstancesTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
