@@ -61,9 +61,9 @@ export default function WhatsAppRelatorio() {
   const handleExport = () => {
     if (!metrics) return;
     try {
-      whatsappReportExport(metrics as any, dateRange);
+      const rows = metrics.dailyTrend.map(d => ({ data: d.date, conversas: d.count }));
+      exportToCSV(rows, `relatorio-whatsapp-${format(new Date(), "yyyy-MM-dd")}.csv`);
     } catch {
-      // fallback: export as JSON
       const blob = new Blob([JSON.stringify(metrics, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
