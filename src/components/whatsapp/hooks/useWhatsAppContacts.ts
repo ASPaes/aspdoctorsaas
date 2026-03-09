@@ -41,7 +41,8 @@ export const useWhatsAppContacts = (
       if (tid) query = query.eq('tenant_id', tid);
       if (instanceId) query = query.eq('instance_id', instanceId);
       if (searchTerm && searchTerm.length > 0) {
-        query = query.or(`name.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`);
+        const escaped = escapeLike(searchTerm);
+        query = query.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);
       }
 
       // Count
