@@ -132,8 +132,9 @@ Deno.serve(async (req) => {
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
-    // Upload base64 media to Supabase Storage for persistence
+    // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
+    let storageSignedUrl: string | null = null;
     if (body.mediaBase64 && body.messageType !== 'text') {
       try {
         const raw = body.mediaBase64.startsWith('data:')
@@ -154,18 +155,28 @@ Deno.serve(async (req) => {
           console.error('[send-whatsapp-message] Storage upload error:', uploadError);
         } else {
           persistentMediaPath = storagePath;
-          console.log('[send-whatsapp-message] Media uploaded to storage:', storagePath);
+          // Generate a signed URL so Evolution API can download the file
+          const { data: signedData } = await supabase.storage
+            .from('whatsapp-media')
+            .createSignedUrl(storagePath, 300); // 5 min expiry
+          if (signedData?.signedUrl) {
+            storageSignedUrl = signedData.signedUrl;
+          }
+          console.log('[send-whatsapp-message] Media uploaded to storage:', storagePath, 'signedUrl:', !!storageSignedUrl);
         }
       } catch (uploadErr) {
         console.error('[send-whatsapp-message] Failed to upload media:', uploadErr);
       }
     }
 
+    // Use signed URL from storage if available, otherwise fall back to base64/mediaUrl
+    const mediaOverride = storageSignedUrl || undefined;
     const { endpoint, requestBody } = buildEvolutionRequest(
       secrets.api_url,
       instanceIdentifier,
       destinationNumber,
-      body
+      body,
+      mediaOverride
     );
 
     const authHeaders = getEvolutionAuthHeaders(secrets.api_key, providerType);
@@ -270,7 +281,8 @@ function buildEvolutionRequest(
   apiUrl: string,
   instanceName: string,
   number: string,
-  body: SendMessageRequest
+  body: SendMessageRequest,
+  mediaUrlOverride?: string
 ): { endpoint: string; requestBody: any } {
   let baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
   baseUrl = baseUrl.replace(/\/manager$/, '');
@@ -285,13 +297,16 @@ function buildEvolutionRequest(
     }
 
     case 'audio': {
-      let audioData: string | undefined;
-      if (body.mediaBase64) {
-        audioData = body.mediaBase64.startsWith('data:')
-          ? body.mediaBase64.split(',')[1] || ''
-          : body.mediaBase64;
-      } else if (body.mediaUrl) {
-        audioData = body.mediaUrl;
+      // For audio, prefer signed URL if available, then base64, then mediaUrl
+      let audioData: string | undefined = mediaUrlOverride;
+      if (!audioData) {
+        if (body.mediaBase64) {
+          audioData = body.mediaBase64.startsWith('data:')
+            ? body.mediaBase64.split(',')[1] || ''
+            : body.mediaBase64;
+        } else if (body.mediaUrl) {
+          audioData = body.mediaUrl;
+        }
       }
       if (!audioData) throw new Error('Missing audio data');
       return {
@@ -303,18 +318,9 @@ function buildEvolutionRequest(
     case 'image':
     case 'video':
     case 'document': {
-      let mediaData: string | undefined;
-      if (body.mediaBase64) {
-        // Evolution API needs a proper data URI for base64 media
-        if (body.mediaBase64.startsWith('data:')) {
-          mediaData = body.mediaBase64;
-        } else {
-          const mime = body.mediaMimetype || 'application/octet-stream';
-          mediaData = `data:${mime};base64,${body.mediaBase64}`;
-        }
-      } else {
-        mediaData = body.mediaUrl;
-      }
+      // Always prefer the signed URL from Supabase Storage — Evolution downloads it
+      const mediaData = mediaUrlOverride || body.mediaUrl;
+      if (!mediaData) throw new Error('Missing media data for ' + body.messageType);
       const requestBody: any = {
         number,
         mediatype: body.messageType,
