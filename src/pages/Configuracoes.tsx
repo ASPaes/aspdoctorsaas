@@ -17,6 +17,7 @@ import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import UsuariosTab from "@/components/configuracoes/UsuariosTab";
 import AprovacaoAcessosTab from "@/components/configuracoes/AprovacaoAcessosTab";
+import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
 import { useSearchParams } from "react-router-dom";
 
 const schema = z.object({
