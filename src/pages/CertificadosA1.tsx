@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Plus } from "lucide-react";
+import { Search, ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Plus, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type QuickFilter = "todos" | "janela" | "vence30" | "vencido20" | "personalizado";
