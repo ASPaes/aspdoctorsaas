@@ -119,7 +119,16 @@ Deno.serve(async (req) => {
       ? instanceIdExternal
       : instanceName;
 
-    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'Provider:', providerType);
+    const tenantId = conversation.tenant_id;
+    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'Provider:', providerType, 'tenant:', tenantId);
+
+    if (!tenantId) {
+      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined from conversation:', JSON.stringify(conversation));
+      return new Response(
+        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
@@ -194,16 +203,7 @@ Deno.serve(async (req) => {
       ? (body.content || '') 
       : (body.content || `Sent ${body.messageType}`);
 
-    const tenantId = conversation.tenant_id;
-    console.log('[send-whatsapp-message] tenant_id from conversation:', tenantId, 'conversation keys:', Object.keys(conversation));
-
-    if (!tenantId) {
-      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined from conversation:', JSON.stringify(conversation));
-      return new Response(
-        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // tenantId already defined above
 
     // Use anonClient (authenticated) so the set_tenant_id_on_insert trigger
     // can resolve current_tenant_id() via auth.uid()
@@ -303,10 +303,22 @@ function buildEvolutionRequest(
     case 'image':
     case 'video':
     case 'document': {
+      let mediaData: string | undefined;
+      if (body.mediaBase64) {
+        // Evolution API needs a proper data URI for base64 media
+        if (body.mediaBase64.startsWith('data:')) {
+          mediaData = body.mediaBase64;
+        } else {
+          const mime = body.mediaMimetype || 'application/octet-stream';
+          mediaData = `data:${mime};base64,${body.mediaBase64}`;
+        }
+      } else {
+        mediaData = body.mediaUrl;
+      }
       const requestBody: any = {
         number,
         mediatype: body.messageType,
-        media: body.mediaBase64 || body.mediaUrl,
+        media: mediaData,
       };
       if (body.content) requestBody.caption = body.content;
       if (body.messageType === 'document' && body.fileName) requestBody.fileName = body.fileName;
