@@ -125,6 +125,9 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             )}
           </div>
 
+          {/* Cliente Link */}
+          <ClienteLinkCard conversation={conversation} />
+
           {/* Tags */}
           {contact?.tags && contact.tags.length > 0 && (
             <div>
