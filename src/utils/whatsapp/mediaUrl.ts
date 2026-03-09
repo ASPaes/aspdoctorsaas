@@ -11,6 +11,8 @@ const PUBLIC_MEDIA_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/whatsapp-m
 export async function resolveMediaUrl(mediaUrl: string): Promise<string> {
   if (!mediaUrl) return "";
 
+  // Data URLs (optimistic preview) — pass through
+  if (mediaUrl.startsWith("data:")) return mediaUrl;
   // If it's a full HTTP URL (legacy public URL or external), extract the path
   let filePath = mediaUrl;
   if (mediaUrl.startsWith("http")) {
