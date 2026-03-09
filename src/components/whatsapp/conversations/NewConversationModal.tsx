@@ -11,6 +11,7 @@ import { useCreateConversation } from "../hooks/useCreateConversation";
 import { useClienteSearch, type ClienteSearchResult } from "../hooks/useClienteSearch";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { maskCNPJ, maskPhoneBR, normalizePhoneBR } from "@/lib/masks";
 
 interface Props {
   open: boolean;
