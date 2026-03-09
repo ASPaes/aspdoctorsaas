@@ -43,6 +43,15 @@ export function MessageBubble({ msg, onReply }: Props) {
             : "bg-muted text-foreground rounded-bl-sm"
         )}
       >
+        {isMe && msg.sender_name && (
+          <p className={cn(
+            "text-[10px] font-semibold mb-0.5",
+            isMe ? "text-primary-foreground/80" : "text-foreground/80"
+          )}>
+            {msg.sender_name}{msg.sender_role ? ` · ${msg.sender_role}` : ''}
+          </p>
+        )}
+
         {msg.quoted_message_id && (
           <div className={cn(
             "text-[10px] px-2 py-1 rounded mb-1 border-l-2",

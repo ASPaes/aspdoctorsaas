@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_messages ADD COLUMN sent_by_user_id UUID REFERENCES auth.users(id);
