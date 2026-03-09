@@ -67,7 +67,13 @@ serve(async (req) => {
 
     const messagesText = messages
       .reverse()
-      .map((m) => `[${m.is_from_me ? 'Atendente' : 'Cliente'}]: ${m.content}`)
+      .map((m: any) => {
+        const role = m.is_from_me ? 'Atendente' : 'Cliente';
+        const text = m.message_type === 'audio' && m.audio_transcription
+          ? `[Áudio transcrito]: "${m.audio_transcription}"`
+          : m.content;
+        return `[${role}]: ${text}`;
+      })
       .join('\n');
 
     const contactName = (conversation?.contact as any)?.name || 'Cliente';
