@@ -1879,6 +1879,7 @@ export type Database = {
           original_content: string | null
           quoted_message_id: string | null
           remote_jid: string | null
+          sent_by_user_id: string | null
           status: string
           tenant_id: string
           timestamp: string
@@ -1900,6 +1901,7 @@ export type Database = {
           original_content?: string | null
           quoted_message_id?: string | null
           remote_jid?: string | null
+          sent_by_user_id?: string | null
           status?: string
           tenant_id: string
           timestamp?: string
@@ -1921,6 +1923,7 @@ export type Database = {
           original_content?: string | null
           quoted_message_id?: string | null
           remote_jid?: string | null
+          sent_by_user_id?: string | null
           status?: string
           tenant_id?: string
           timestamp?: string
