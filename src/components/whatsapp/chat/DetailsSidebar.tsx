@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { X, Pin, Plus, Loader2, Phone, Mail, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles } from "lucide-react";
+import { X, Pin, Plus, Loader2, Phone, Mail, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil } from "lucide-react";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { useConversationSummaries } from "../hooks/useConversationSummaries";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
