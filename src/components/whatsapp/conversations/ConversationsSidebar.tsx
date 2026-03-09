@@ -106,12 +106,15 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         break;
     }
 
-    // Force newly created/selected conv to top
+    // Force newly created conv to top (only for new chats without messages yet)
     if (forcedConvId) {
-      const idx = result.findIndex(c => c.id === forcedConvId);
-      if (idx > 0) {
-        const [conv] = result.splice(idx, 1);
-        result.unshift(conv);
+      const forcedConv = result.find(c => c.id === forcedConvId);
+      if (forcedConv && !forcedConv.last_message_at) {
+        const idx = result.indexOf(forcedConv);
+        if (idx > 0) {
+          result.splice(idx, 1);
+          result.unshift(forcedConv);
+        }
       }
     }
 
@@ -125,7 +128,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   };
 
   const handleSelect = (conv: ConversationWithContact) => {
-    setForcedConvId(conv.id);
     onSelect(conv);
   };
 
