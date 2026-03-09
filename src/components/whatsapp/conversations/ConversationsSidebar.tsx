@@ -156,7 +156,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full border-r border-border w-80 shrink-0">
+    <div className="flex flex-col h-full border-r border-border">
       {/* Header */}
       <div className="p-3 border-b border-border space-y-2">
         <div className="flex items-center justify-between">

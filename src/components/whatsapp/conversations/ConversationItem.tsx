@@ -27,11 +27,19 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const formatTime = (ts: string | null) => {
     if (!ts) return "";
     try {
-      return new Intl.DateTimeFormat("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: timezone,
-      }).format(new Date(ts));
+      const date = new Date(ts);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const opts: Intl.DateTimeFormatOptions = { timeZone: timezone };
+
+      if (diffDays === 0) {
+        return new Intl.DateTimeFormat("pt-BR", { ...opts, hour: "2-digit", minute: "2-digit" }).format(date);
+      }
+      if (diffDays < 7) {
+        return new Intl.DateTimeFormat("pt-BR", { ...opts, weekday: "short" }).format(date);
+      }
+      return new Intl.DateTimeFormat("pt-BR", { ...opts, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
     } catch {
       return "";
     }
