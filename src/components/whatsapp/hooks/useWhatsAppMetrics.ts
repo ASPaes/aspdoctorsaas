@@ -146,7 +146,7 @@ export const useWhatsAppMetrics = (filters: WhatsAppMetricsFilters) => {
       const sentCounts = (sentimentData as any[] || []).reduce((acc: Record<string, number>, i: any) => {
         acc[i.sentiment] = (acc[i.sentiment] || 0) + 1; return acc;
       }, {});
-      const totalSent = Object.values(sentCounts).reduce((s: number, c) => s + (c as number), 0);
+      const totalSent = Object.values(sentCounts).reduce((s: number, c) => s + (c as number), 0) as number;
       const sentimentDistribution = Object.entries(sentCounts).map(([sentiment, count]) => ({
         sentiment, count: count as number, percentage: totalSent > 0 ? ((count as number) / totalSent) * 100 : 0,
       }));
