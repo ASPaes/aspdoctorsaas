@@ -6,6 +6,7 @@ interface CreateConversationParams {
   phoneNumber: string;
   contactName: string;
   profilePictureUrl?: string;
+  clienteId?: string;
 }
 
 export const useCreateConversation = () => {
