@@ -317,3 +317,14 @@ function buildEvolutionRequest(
       throw new Error(`Unsupported message type: ${body.messageType}`);
   }
 }
+
+function getExtFromMime(mime: string): string {
+  const map: Record<string, string> = {
+    'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'mp4', 'audio/webm': 'webm',
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+    'video/mp4': 'mp4', 'video/webm': 'webm',
+    'application/pdf': 'pdf', 'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  };
+  return map[mime] || 'bin';
+}
