@@ -81,7 +81,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium truncate">{name}</span>
+          <span className="text-sm font-medium truncate min-w-0 flex-1">{name}</span>
           {timeStr && (
             <span className={cn(
               "text-xs whitespace-nowrap shrink-0",
