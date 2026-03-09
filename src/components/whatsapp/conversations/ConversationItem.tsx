@@ -78,7 +78,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium truncate">{name}</span>
-          <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+          <span className={cn(
+            "text-[10px] shrink-0 ml-2",
+            conv.unread_count > 0 ? "text-primary font-semibold" : "text-muted-foreground"
+          )}>
             {formatTime(conv.last_message_at)}
           </span>
         </div>
