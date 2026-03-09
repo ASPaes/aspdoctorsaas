@@ -602,6 +602,7 @@ export type Database = {
       }
       configuracoes: {
         Row: {
+          chat_timezone: string
           created_at: string
           custo_fixo_percentual: number
           id: number
@@ -610,6 +611,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
           id?: number
@@ -618,6 +620,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
           id?: number
