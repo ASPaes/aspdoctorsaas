@@ -15,31 +15,43 @@ export default function WhatsApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
-  const processedPhoneRef = useRef<string | null>(null);
 
-  // Auto-create/find conversation from URL params (coming from ClienteForm)
-  useEffect(() => {
+  // Capture URL params once on mount and clear them immediately
+  const pendingParamsRef = useRef<{ phone: string; clienteId: string | null; clienteName: string | null } | null>(null);
+  const didCaptureRef = useRef(false);
+
+  if (!didCaptureRef.current) {
     const phone = searchParams.get("phone");
-    const clienteId = searchParams.get("clienteId");
-    const clienteName = searchParams.get("clienteName");
+    if (phone) {
+      pendingParamsRef.current = {
+        phone,
+        clienteId: searchParams.get("clienteId"),
+        clienteName: searchParams.get("clienteName"),
+      };
+    }
+    didCaptureRef.current = true;
+  }
 
-    if (!phone || processedPhoneRef.current === phone) return;
+  // Process captured params once instances are available
+  useEffect(() => {
+    const params = pendingParamsRef.current;
+    if (!params) return;
     if (!instances || instances.length === 0) return;
 
-    processedPhoneRef.current = phone;
+    // Consume — only run once
+    pendingParamsRef.current = null;
 
-    // Clear params immediately
+    // Clear URL params
     setSearchParams({}, { replace: true });
 
     const instanceId = instances[0].id;
 
     createConversation.mutateAsync({
       instanceId,
-      phoneNumber: phone,
-      contactName: clienteName || phone,
-      clienteId,
+      phoneNumber: params.phone,
+      contactName: params.clienteName || params.phone,
+      clienteId: params.clienteId ?? undefined,
     }).then(async ({ conversation, contact }) => {
-      // Fetch full conversation with contact for selection
       const { data } = await supabase
         .from("whatsapp_conversations")
         .select("*, contact:whatsapp_contacts(*)")
@@ -50,27 +62,26 @@ export default function WhatsApp() {
         setSelected(data as unknown as ConversationWithContact);
       }
 
-      // Auto-add to cliente_contatos if clienteId provided
-      if (clienteId) {
+      if (params.clienteId) {
         const { data: existing } = await supabase
           .from("cliente_contatos")
           .select("id")
-          .eq("cliente_id", clienteId)
-          .ilike("fone", `%${phone.slice(-10)}%`)
+          .eq("cliente_id", params.clienteId)
+          .ilike("fone", `%${params.phone.slice(-10)}%`)
           .limit(1);
 
         if (!existing || existing.length === 0) {
           await supabase.from("cliente_contatos").insert({
-            cliente_id: clienteId,
-            nome: clienteName || contact.name || phone,
-            fone: phone,
+            cliente_id: params.clienteId,
+            nome: params.clienteName || contact.name || params.phone,
+            fone: params.phone,
           } as any);
         }
       }
     }).catch(() => {
       toast.error("Erro ao criar conversa");
     });
-  }, [searchParams, instances]);
+  }, [instances]);
 
   // Mobile: show either sidebar or chat
   if (isMobile) {
