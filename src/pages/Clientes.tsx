@@ -829,6 +829,7 @@ export default function Clientes() {
                   </button>
                 </TableHead>
               ))}
+              <TableHead className="w-[40px]"></TableHead>
               <TableHead>Unidade Base</TableHead>
             </TableRow>
           </TableHeader>
