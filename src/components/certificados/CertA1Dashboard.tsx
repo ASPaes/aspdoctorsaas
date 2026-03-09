@@ -333,15 +333,13 @@ export function CertA1Dashboard() {
                       <TableCell className="text-right font-medium">{formatBRL.format(v.valor)}</TableCell>
                       <TableCell>
                         {v.telefoneWhatsapp ? (
-                          <a
-                            href={`https://api.whatsapp.com/send?phone=55${v.telefoneWhatsapp.replace(/\D/g, '')}`}
-                            target="_top"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950">
-                              <MessageCircle className="h-4 w-4" />
-                            </Button>
-                          </a>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" onClick={() => {
+                            const phone = v.telefoneWhatsapp!.replace(/\D/g, '');
+                            const name = encodeURIComponent(v.clienteNome);
+                            navigate(`/whatsapp?phone=${phone}&clienteId=${v.clienteId}&clienteName=${name}`);
+                          }}>
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
