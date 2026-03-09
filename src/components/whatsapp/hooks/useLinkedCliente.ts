@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenantFilter, applyTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface LinkedCliente {
   id: string;
@@ -27,8 +28,10 @@ export interface LinkedCliente {
 }
 
 export const useLinkedCliente = (contactId: string | null, phoneNumber: string | null) => {
+  const { effectiveTenantId } = useTenantFilter();
+
   return useQuery({
-    queryKey: ['linked-cliente', contactId, phoneNumber],
+    queryKey: ['linked-cliente', contactId, phoneNumber, effectiveTenantId],
     queryFn: async (): Promise<LinkedCliente | null> => {
       if (!contactId && !phoneNumber) return null;
 
@@ -36,11 +39,15 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
       let clienteId: string | null = null;
 
       if (contactId) {
-        const { data: conversations } = await supabase
-          .from('whatsapp_conversations')
-          .select('metadata')
-          .eq('contact_id', contactId)
-          .not('metadata', 'is', null);
+        const convQuery = applyTenantFilter(
+          supabase
+            .from('whatsapp_conversations')
+            .select('metadata')
+            .eq('contact_id', contactId)
+            .not('metadata', 'is', null),
+          effectiveTenantId
+        );
+        const { data: conversations } = await convQuery;
 
         for (const conv of conversations || []) {
           const meta = typeof conv.metadata === 'string' ? JSON.parse(conv.metadata) : conv.metadata;
@@ -55,11 +62,14 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
       if (!clienteId && phoneNumber) {
         const digits = phoneNumber.replace(/\D/g, '');
         if (digits.length >= 10) {
-          // Try matching telefone_whatsapp
-          const { data: clientes } = await supabase
-            .from('clientes')
-            .select('id, telefone_whatsapp')
-            .eq('cancelado', false);
+          const clientesQuery = applyTenantFilter(
+            supabase
+              .from('clientes')
+              .select('id, telefone_whatsapp')
+              .eq('cancelado', false),
+            effectiveTenantId
+          );
+          const { data: clientes } = await clientesQuery;
 
           for (const c of clientes || []) {
             const cDigits = (c.telefone_whatsapp || '').replace(/\D/g, '');
@@ -73,21 +83,29 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
 
       if (!clienteId) return null;
 
-      // 3. Fetch client with lookups
-      const { data: cliente } = await supabase
-        .from('clientes')
-        .select(`
-          id, cnpj, razao_social, nome_fantasia, email,
-          data_cadastro, data_ativacao, telefone_whatsapp,
-          area_atuacao_id, segmento_id, unidade_base_id,
-          fornecedor_id, produto_id, cidade_id, estado_id
-        `)
-        .eq('id', clienteId)
-        .single();
+      // 3. Fetch client with lookups (RLS already scopes by tenant)
+      const clienteQuery = applyTenantFilter(
+        supabase
+          .from('clientes')
+          .select(`
+            id, cnpj, razao_social, nome_fantasia, email,
+            data_cadastro, data_ativacao, telefone_whatsapp,
+            area_atuacao_id, segmento_id, unidade_base_id,
+            fornecedor_id, produto_id, cidade_id, estado_id
+          `)
+          .eq('id', clienteId),
+        effectiveTenantId
+      );
+      const { data: cliente } = await clienteQuery.single();
 
       if (!cliente) return null;
 
-      // 4. Fetch lookups in parallel
+      // 4. Fetch lookups in parallel (RLS handles tenant scoping on catalog tables)
+      const contatosQuery = applyTenantFilter(
+        supabase.from('cliente_contatos').select('id, nome, fone, email, cargo').eq('cliente_id', clienteId),
+        effectiveTenantId
+      );
+
       const [areaRes, segRes, unidRes, fornRes, prodRes, cidRes, estRes, contatosRes] = await Promise.all([
         cliente.area_atuacao_id ? supabase.from('areas_atuacao').select('nome').eq('id', cliente.area_atuacao_id).single() : { data: null },
         cliente.segmento_id ? supabase.from('segmentos').select('nome').eq('id', cliente.segmento_id).single() : { data: null },
@@ -96,7 +114,7 @@ export const useLinkedCliente = (contactId: string | null, phoneNumber: string |
         cliente.produto_id ? supabase.from('produtos').select('nome').eq('id', cliente.produto_id).single() : { data: null },
         cliente.cidade_id ? supabase.from('cidades').select('nome').eq('id', cliente.cidade_id).single() : { data: null },
         cliente.estado_id ? supabase.from('estados').select('sigla').eq('id', cliente.estado_id).single() : { data: null },
-        supabase.from('cliente_contatos').select('id, nome, fone, email, cargo').eq('cliente_id', clienteId),
+        contatosQuery,
       ]);
 
       const dataAtivacao = cliente.data_ativacao || cliente.data_cadastro;
