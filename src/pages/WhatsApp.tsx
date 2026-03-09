@@ -15,7 +15,7 @@ export default function WhatsApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
-  const processedRef = useRef(false);
+  const processedPhoneRef = useRef<string | null>(null);
 
   // Auto-create/find conversation from URL params (coming from ClienteForm)
   useEffect(() => {
@@ -23,10 +23,10 @@ export default function WhatsApp() {
     const clienteId = searchParams.get("clienteId");
     const clienteName = searchParams.get("clienteName");
 
-    if (!phone || !clienteId || processedRef.current) return;
+    if (!phone || processedPhoneRef.current === phone) return;
     if (!instances || instances.length === 0) return;
 
-    processedRef.current = true;
+    processedPhoneRef.current = phone;
 
     // Clear params immediately
     setSearchParams({}, { replace: true });
@@ -50,20 +50,22 @@ export default function WhatsApp() {
         setSelected(data as unknown as ConversationWithContact);
       }
 
-      // Auto-add to cliente_contatos if not exists
-      const { data: existing } = await supabase
-        .from("cliente_contatos")
-        .select("id")
-        .eq("cliente_id", clienteId)
-        .ilike("fone", `%${phone.slice(-10)}%`)
-        .limit(1);
+      // Auto-add to cliente_contatos if clienteId provided
+      if (clienteId) {
+        const { data: existing } = await supabase
+          .from("cliente_contatos")
+          .select("id")
+          .eq("cliente_id", clienteId)
+          .ilike("fone", `%${phone.slice(-10)}%`)
+          .limit(1);
 
-      if (!existing || existing.length === 0) {
-        await supabase.from("cliente_contatos").insert({
-          cliente_id: clienteId,
-          nome: clienteName || contact.name || phone,
-          fone: phone,
-        } as any);
+        if (!existing || existing.length === 0) {
+          await supabase.from("cliente_contatos").insert({
+            cliente_id: clienteId,
+            nome: clienteName || contact.name || phone,
+            fone: phone,
+          } as any);
+        }
       }
     }).catch(() => {
       toast.error("Erro ao criar conversa");
