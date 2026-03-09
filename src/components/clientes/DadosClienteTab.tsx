@@ -211,11 +211,11 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
 
   const handleOpenWhatsApp = useCallback(() => {
-    if (!whatsappDigits || !clienteId) return;
+    if (!whatsappDigits || !clienteId || !onNavigate) return;
     const normalizedPhone = normalizePhoneBR(whatsappDigits);
     const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
-    navigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
-  }, [whatsappDigits, clienteId, form, navigate]);
+    onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
+  }, [whatsappDigits, clienteId, form, onNavigate]);
 
   return (
     <div className="space-y-6">
