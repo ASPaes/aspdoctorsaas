@@ -31,6 +31,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { data: topicsData } = useConversationTopics(conversation.id);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
