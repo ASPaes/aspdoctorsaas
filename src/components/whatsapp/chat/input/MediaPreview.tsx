@@ -32,21 +32,27 @@ export const MediaPreview = ({ file, onSend, onClose }: MediaPreviewProps) => {
   const handleSend = async () => {
     setIsUploading(true);
     try {
-      const fileName = `${Date.now()}-${sanitizeFileName(file.name)}`;
-      const { error: uploadError } = await supabase.storage.from('whatsapp-media').upload(fileName, file, { contentType: file.type });
-      if (uploadError) throw uploadError;
-
-      // Create signed URL (bucket is private)
-      const { data: signedData, error: signedError } = await supabase.storage.from('whatsapp-media').createSignedUrl(fileName, 3600);
-      if (signedError || !signedData?.signedUrl) throw signedError || new Error('Failed to create signed URL');
+      // Read file as base64 and send to edge function which handles storage + Evolution
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const base64Data = await base64Promise;
       const messageType = getMessageType(file.type);
 
-      // Store the file path (not full URL) for later signed URL generation
-      onSend({ messageType, content: caption || undefined, mediaUrl: fileName, mediaMimetype: file.type, fileName: file.name });
+      onSend({
+        messageType,
+        content: caption || undefined,
+        mediaBase64: base64Data,
+        mediaMimetype: file.type,
+        fileName: file.name,
+      });
       onClose();
     } catch (error) {
       console.error('Upload error:', error);
-      toast({ title: "Erro ao enviar arquivo", description: "Não foi possível fazer upload do arquivo.", variant: "destructive" });
+      toast({ title: "Erro ao enviar arquivo", description: "Não foi possível processar o arquivo.", variant: "destructive" });
     } finally {
       setIsUploading(false);
     }
