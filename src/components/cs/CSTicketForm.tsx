@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
+import { escapeLike } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
 import {
