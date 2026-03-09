@@ -76,7 +76,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           .from('whatsapp_messages' as any)
           .select('conversation_id')
           .ilike('content', `%${escaped}%`)
-          .limit(200);
+          .limit(100);
         if (msgMatches) {
           messageMatchIds = [...new Set((msgMatches as any[]).map((m: any) => m.conversation_id))];
         }

@@ -13,7 +13,7 @@ export const useWhatsAppMessageSearch = (searchQuery: string) => {
         .select('conversation_id, content, timestamp')
         .ilike('content', `%${escaped}%`)
         .order('timestamp', { ascending: false })
-        .limit(200);
+        .limit(100);
       if (error) throw error;
       const uniqueConversationIds = [...new Set((data as any[]).map((msg: any) => msg.conversation_id))];
       return uniqueConversationIds;
