@@ -1,11 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
-import { formatDateLabel } from "@/lib/formatDateWithTimezone";
+import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
+import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
+import { ArrowRightLeft } from "lucide-react";
 
 function groupByDate(messages: Message[], timezone: string): { date: string; msgs: Message[] }[] {
   const groups: Record<string, Message[]> = {};
