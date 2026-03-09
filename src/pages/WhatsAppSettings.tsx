@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
 import MacrosTab from "@/components/whatsapp/settings/MacrosTab";
 import AssignmentTab from "@/components/whatsapp/settings/AssignmentTab";
+import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
+import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
