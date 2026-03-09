@@ -28,12 +28,21 @@ export const useWhatsAppSend = () => {
       await queryClient.cancelQueries({ queryKey: ['whatsapp', 'messages', newMessage.conversationId] });
       const previousMessages = queryClient.getQueryData(['whatsapp', 'messages', newMessage.conversationId]);
 
+      // Generate a local preview URL for base64 media
+      let optimisticMediaUrl = newMessage.mediaUrl ?? null;
+      if (!optimisticMediaUrl && newMessage.mediaBase64) {
+        const base64Data = newMessage.mediaBase64.startsWith('data:')
+          ? newMessage.mediaBase64
+          : `data:${newMessage.mediaMimetype || 'application/octet-stream'};base64,${newMessage.mediaBase64}`;
+        optimisticMediaUrl = base64Data;
+      }
+
       const optimisticMessage: Partial<Message> = {
         id: 'temp-' + Date.now(),
         conversation_id: newMessage.conversationId,
         content: newMessage.content || '',
         message_type: newMessage.messageType,
-        media_url: newMessage.mediaUrl ?? null,
+        media_url: optimisticMediaUrl,
         media_mimetype: newMessage.mediaMimetype ?? null,
         status: 'sending',
         is_from_me: true,

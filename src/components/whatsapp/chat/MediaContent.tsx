@@ -19,7 +19,7 @@ export function MediaContent({ messageType, mediaUrl, metadata }: MediaContentPr
     case "image":
       return <img src={signedUrl} alt="Imagem" className="rounded max-w-full mb-1 max-h-64 object-contain" loading="lazy" />;
     case "audio":
-      return <audio controls className="max-w-full mb-1" preload="none"><source src={signedUrl} /></audio>;
+      return <audio controls className="max-w-full mb-1" preload="metadata"><source src={signedUrl} /></audio>;
     case "video":
       return <video controls className="rounded max-w-full mb-1 max-h-64" preload="none"><source src={signedUrl} /></video>;
     case "document":
