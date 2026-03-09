@@ -8,7 +8,11 @@ import {
   useUpdateUserStatus,
   useCreateInvite,
   useCancelInvite,
+  useUpdateUserFuncionario,
 } from "@/hooks/useTenantUsers";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
