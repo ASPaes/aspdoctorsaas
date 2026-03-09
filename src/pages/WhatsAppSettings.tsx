@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WhatsAppInstancesTab from "@/components/configuracoes/WhatsAppInstancesTab";
 import MacrosTab from "@/components/whatsapp/settings/MacrosTab";
 import AssignmentTab from "@/components/whatsapp/settings/AssignmentTab";
+import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
+import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ export default function WhatsAppSettings() {
           <TabsTrigger value="instances">Instâncias</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="assignment">Atribuição</TabsTrigger>
+          <TabsTrigger value="team">Equipe</TabsTrigger>
+          <TabsTrigger value="security">Segurança</TabsTrigger>
         </TabsList>
 
         <TabsContent value="instances" className="mt-4">
@@ -36,6 +40,14 @@ export default function WhatsAppSettings() {
 
         <TabsContent value="assignment" className="mt-4">
           <AssignmentTab />
+        </TabsContent>
+
+        <TabsContent value="team" className="mt-4">
+          <TeamTab />
+        </TabsContent>
+
+        <TabsContent value="security" className="mt-4">
+          <SecuritySettingsTab />
         </TabsContent>
       </Tabs>
     </div>

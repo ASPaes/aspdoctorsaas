@@ -24,6 +24,8 @@ import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList
 import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstanceDialog";
 import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
+import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
+import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -44,6 +46,8 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
+          <TabsTrigger value="equipe">Equipe</TabsTrigger>
+          <TabsTrigger value="seguranca">Segurança</TabsTrigger>
         </TabsList>
 
         <TabsContent value="setup" className="mt-4">
@@ -67,6 +71,14 @@ function WhatsAppSettingsContent() {
 
         <TabsContent value="atribuicao" className="mt-4">
           <AssignmentRulesManager />
+        </TabsContent>
+
+        <TabsContent value="equipe" className="mt-4">
+          <TeamTab />
+        </TabsContent>
+
+        <TabsContent value="seguranca" className="mt-4">
+          <SecuritySettingsTab />
         </TabsContent>
       </Tabs>
     </div>
