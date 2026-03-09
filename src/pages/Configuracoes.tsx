@@ -160,13 +160,13 @@ export default function Configuracoes() {
         <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares, usuários e WhatsApp.</p>
       </div>
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs defaultValue={isAdmin ? defaultTab : "percentuais"}>
         <TabsList>
           <TabsTrigger value="percentuais">Percentuais</TabsTrigger>
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
-          <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-          <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
+          {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
 
@@ -218,13 +218,17 @@ export default function Configuracoes() {
           <CadastrosTab />
         </TabsContent>
 
-        <TabsContent value="usuarios">
-          <UsuariosTab />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="usuarios">
+            <UsuariosTab />
+          </TabsContent>
+        )}
 
-        <TabsContent value="aprovacoes">
-          <AprovacaoAcessosTab />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="aprovacoes">
+            <AprovacaoAcessosTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="whatsapp">
           <WhatsAppSettingsContent />
