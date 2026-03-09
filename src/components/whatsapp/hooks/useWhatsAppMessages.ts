@@ -100,30 +100,14 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     if (!conversationId) return;
 
     const channel = supabase
-      .channel(`messages-${conversationId}`)
+      .channel(`messages-rt-${conversationId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'whatsapp_messages',
         filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-        queryClient.setQueryData(['whatsapp', 'messages', conversationId], (old: Message[] = []) => {
-          const exists = old.some(msg => msg.id === (payload.new as any).id);
-          if (exists) return old;
-          return [...old, payload.new as unknown as Message];
-        });
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'whatsapp_messages',
-        filter: `conversation_id=eq.${conversationId}`
-      }, (payload) => {
-        queryClient.setQueryData(['whatsapp', 'messages', conversationId], (old: Message[] = []) => {
-          return old.map(msg =>
-            msg.id === (payload.new as any).id ? { ...msg, ...(payload.new as unknown as Message) } : msg
-          );
-        });
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
       })
       .subscribe();
 
