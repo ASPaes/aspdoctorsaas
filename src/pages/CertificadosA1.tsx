@@ -46,6 +46,7 @@ const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: 
 
 export default function CertificadosA1() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const lookups = useLookups();
   const { filters, updateFilter } = useCertA1Filters();
   const { effectiveTenantId: tid } = useTenantFilter();
