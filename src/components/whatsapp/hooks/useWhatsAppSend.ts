@@ -49,6 +49,23 @@ export const useWhatsAppSend = () => {
         optimisticMessage as Message,
       ]);
 
+      // Optimistically update conversation's last_message_at for instant reorder
+      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+        if (!old?.conversations) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map((c: any) =>
+            c.id === newMessage.conversationId
+              ? {
+                  ...c,
+                  last_message_at: new Date().toISOString(),
+                  last_message_preview: newMessage.content?.substring(0, 100) || `Sent ${newMessage.messageType}`,
+                }
+              : c
+          ),
+        };
+      });
+
       return { previousMessages };
     },
     onError: (_err, newMessage, context) => {
