@@ -696,7 +696,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const quotedMessageId = message.extendedTextMessage?.contextInfo?.stanzaId || null;
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
-    const { error: messageError } = await supabase
+    const { data: savedMsg, error: messageError } = await supabase
       .from('whatsapp_messages')
       .insert({
         conversation_id: conversationId,
@@ -711,7 +711,9 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         quoted_message_id: quotedMessageId,
         timestamp,
         tenant_id: tenantId,
-      });
+      })
+      .select('id')
+      .single();
 
     if (messageError) {
       console.error('[evolution-webhook] Error saving message:', messageError);
@@ -719,6 +721,17 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     }
 
     console.log('[evolution-webhook] Message saved successfully');
+
+    // Fire-and-forget: trigger audio transcription
+    if (messageType === 'audio' && savedMsg?.id && mediaUrl) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      console.log('[evolution-webhook] Triggering audio transcription for:', savedMsg.id);
+      fetch(`${supabaseUrl}/functions/v1/transcribe-whatsapp-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
+        body: JSON.stringify({ messageId: savedMsg.id }),
+      }).catch(err => console.error('[evolution-webhook] Transcription trigger error:', err));
+    }
 
     const updateData: any = {
       last_message_at: timestamp,

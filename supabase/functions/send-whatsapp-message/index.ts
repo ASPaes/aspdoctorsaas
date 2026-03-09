@@ -258,6 +258,17 @@ Deno.serve(async (req) => {
 
     console.log('[send-whatsapp-message] Message sent and saved:', savedMessage.id);
 
+    // Fire-and-forget: trigger audio transcription for sent audio messages
+    if (body.messageType === 'audio' && savedMessage?.id) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      console.log('[send-whatsapp-message] Triggering audio transcription for:', savedMessage.id);
+      fetch(`${supabaseUrl}/functions/v1/transcribe-whatsapp-audio`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
+        body: JSON.stringify({ messageId: savedMessage.id }),
+      }).catch(err => console.error('[send-whatsapp-message] Transcription trigger error:', err));
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: savedMessage }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
