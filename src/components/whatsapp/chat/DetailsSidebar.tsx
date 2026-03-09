@@ -36,7 +36,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
   const handleAddNote = () => {
     if (!newNote.trim()) return;
-    addNote(newNote.trim());
+    createNote(newNote.trim());
     setNewNote("");
   };
 
