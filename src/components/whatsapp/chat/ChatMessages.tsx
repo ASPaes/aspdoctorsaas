@@ -2,28 +2,28 @@ import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import { MessageBubble } from "./MessageBubble";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
+import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { formatDateLabel } from "@/lib/formatDateWithTimezone";
+
+function groupByDate(messages: Message[], timezone: string): { date: string; msgs: Message[] }[] {
+  const groups: Record<string, Message[]> = {};
+  for (const msg of messages) {
+    const d = formatDateLabel(msg.timestamp, timezone);
+    (groups[d] ??= []).push(msg);
+  }
+  return Object.entries(groups).map(([date, msgs]) => ({ date, msgs }));
+}
 
 interface Props {
   conversationId: string;
   onReply?: (msg: Message) => void;
 }
 
-function groupByDate(messages: Message[]): { date: string; msgs: Message[] }[] {
-  const groups: Record<string, Message[]> = {};
-  for (const msg of messages) {
-    const d = (() => {
-      try { return format(new Date(msg.timestamp), "dd/MM/yyyy"); } catch { return "—"; }
-    })();
-    (groups[d] ??= []).push(msg);
-  }
-  return Object.entries(groups).map(([date, msgs]) => ({ date, msgs }));
-}
-
 export function ChatMessages({ conversationId, onReply }: Props) {
   const { messages, isLoading } = useWhatsAppMessages(conversationId);
+  const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export function ChatMessages({ conversationId, onReply }: Props) {
     );
   }
 
-  const dateGroups = groupByDate(messages);
+  const dateGroups = groupByDate(messages, timezone);
 
   return (
     <ScrollArea className="flex-1 px-4 py-2">

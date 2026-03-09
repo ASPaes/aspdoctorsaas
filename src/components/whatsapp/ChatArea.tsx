@@ -6,18 +6,17 @@ import { useMessages, type Message } from "./hooks/useMessages";
 import { MessageInput } from "./MessageInput";
 import { type Conversation } from "./hooks/useConversations";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import { MediaContent } from "./chat/MediaContent";
+import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { formatTime as formatTzTime, formatDateLabel } from "@/lib/formatDateWithTimezone";
 
 interface Props {
   conversation: Conversation | null;
 }
 
-function MessageBubble({ msg }: { msg: Message }) {
+function MessageBubbleInline({ msg, timezone }: { msg: Message; timezone: string }) {
   const isMe = msg.is_from_me;
-  const time = (() => {
-    try { return format(new Date(msg.timestamp), "HH:mm"); } catch { return ""; }
-  })();
+  const time = formatTzTime(msg.timestamp, timezone);
 
   const statusIcon = isMe && (
     msg.status === "read" || msg.status === "delivered" ? (
@@ -50,12 +49,10 @@ function MessageBubble({ msg }: { msg: Message }) {
   );
 }
 
-function groupByDate(messages: Message[]): { date: string; msgs: Message[] }[] {
+function groupByDateInline(messages: Message[], timezone: string): { date: string; msgs: Message[] }[] {
   const groups: Record<string, Message[]> = {};
   for (const msg of messages) {
-    const d = (() => {
-      try { return format(new Date(msg.timestamp), "dd/MM/yyyy"); } catch { return "—"; }
-    })();
+    const d = formatDateLabel(msg.timestamp, timezone);
     (groups[d] ??= []).push(msg);
   }
   return Object.entries(groups).map(([date, msgs]) => ({ date, msgs }));
@@ -63,6 +60,7 @@ function groupByDate(messages: Message[]): { date: string; msgs: Message[] }[] {
 
 export function ChatArea({ conversation }: Props) {
   const { data: messages = [], isLoading } = useMessages(conversation?.id ?? null);
+  const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,7 +77,7 @@ export function ChatArea({ conversation }: Props) {
     );
   }
 
-  const dateGroups = groupByDate(messages);
+  const dateGroups = groupByDateInline(messages, timezone);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -118,7 +116,7 @@ export function ChatArea({ conversation }: Props) {
                 </span>
               </div>
               {msgs.map((msg) => (
-                <MessageBubble key={msg.id} msg={msg} />
+                <MessageBubbleInline key={msg.id} msg={msg} timezone={timezone} />
               ))}
             </div>
           ))

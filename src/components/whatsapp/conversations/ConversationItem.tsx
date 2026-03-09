@@ -1,11 +1,11 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
+import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { formatRelativeTime } from "@/lib/formatDateWithTimezone";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -17,6 +17,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick }: Pr
   const contact = conv.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
   const { sentiment } = useWhatsAppSentiment(conv.id);
+  const { timezone } = useChatTimezone();
   const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
 
@@ -24,11 +25,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick }: Pr
 
   const formatTime = (ts: string | null) => {
     if (!ts) return "";
-    try {
-      return formatDistanceToNow(new Date(ts), { addSuffix: false, locale: ptBR });
-    } catch {
-      return "";
-    }
+    return formatRelativeTime(ts, timezone);
   };
 
   const statusColor =

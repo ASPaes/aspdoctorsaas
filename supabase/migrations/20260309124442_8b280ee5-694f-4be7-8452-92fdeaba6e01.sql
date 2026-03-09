@@ -1,0 +1,1 @@
+ALTER TABLE configuracoes ADD COLUMN chat_timezone text NOT NULL DEFAULT 'America/Sao_Paulo';
