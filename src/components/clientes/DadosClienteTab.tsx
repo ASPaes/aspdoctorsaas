@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
-import { maskCNPJ, maskPhone, maskCPF, maskCEP } from "@/lib/masks";
+import { maskCNPJ, maskPhone, maskCPF, maskCEP, normalizePhoneBR } from "@/lib/masks";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
