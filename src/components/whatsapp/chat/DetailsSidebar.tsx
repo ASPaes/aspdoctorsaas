@@ -23,7 +23,7 @@ interface Props {
 export function DetailsSidebar({ conversation, onClose }: Props) {
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
-  const { notes, addNote, deleteNote, isAdding } = useConversationNotes(conversation.id);
+  const { notes, createNote, deleteNote, isCreating } = useConversationNotes(conversation.id);
   const { summaries, generateSummary, isGenerating } = useConversationSummaries(conversation.id);
   const { sentiment } = useWhatsAppSentiment(conversation.id);
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
