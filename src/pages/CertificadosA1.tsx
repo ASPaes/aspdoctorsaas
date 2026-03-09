@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
@@ -19,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Plus } from "lucide-react";
+import { Search, ShieldCheck, ShieldAlert, ShieldOff, ShieldQuestion, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Plus, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type QuickFilter = "todos" | "janela" | "vence30" | "vencido20" | "personalizado";
@@ -45,6 +46,7 @@ const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: 
 
 export default function CertificadosA1() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const lookups = useLookups();
   const { filters, updateFilter } = useCertA1Filters();
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -109,7 +111,7 @@ export default function CertificadosA1() {
       }
 
       let q = tf(supabase.from("clientes" as any)
-        .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
+        .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, telefone_whatsapp, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
         .eq("cancelado", false)) as any;
 
       if (ganhoIds) {
@@ -398,6 +400,15 @@ export default function CertificadosA1() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        {c.telefone_whatsapp && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" onClick={() => {
+                            const phone = c.telefone_whatsapp!.replace(/\D/g, '');
+                            const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
+                            navigate(`/whatsapp?phone=${phone}&clienteId=${c.id}&clienteName=${name}`);
+                          }}>
+                            <MessageCircle className="h-3 w-3" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
                           setEditVencimentoCliente(c);
                           setEditVencimentoValue(c.cert_a1_vencimento || "");
