@@ -104,7 +104,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
             {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
             {hasUnread && (
               <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
-                {conv.unread_count > 99 ? "99+" : conv.unread_count}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </div>
