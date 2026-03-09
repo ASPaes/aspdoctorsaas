@@ -3,7 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Archive, CheckCheck, Clock } from "lucide-react";
+import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
+import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 
 interface Props {
@@ -15,6 +16,9 @@ interface Props {
 export function ConversationItem({ conversation: conv, isSelected, onClick }: Props) {
   const contact = conv.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
+  const { sentiment } = useWhatsAppSentiment(conv.id);
+  const sentimentData = sentiment as any;
+  const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
@@ -37,7 +41,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick }: Pr
       onClick={onClick}
       className={cn(
         "w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
-        isSelected && "bg-accent"
+        isSelected && "bg-accent",
+        needsCSTicket && "ring-1 ring-destructive/40"
       )}
     >
       <div className="relative">
@@ -48,6 +53,12 @@ export function ConversationItem({ conversation: conv, isSelected, onClick }: Pr
           <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
         </Avatar>
         <span className={cn("absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-background", statusColor)} />
+        {needsCSTicket && (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive/60" />
+            <AlertTriangle className="relative h-3.5 w-3.5 text-destructive" />
+          </span>
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
