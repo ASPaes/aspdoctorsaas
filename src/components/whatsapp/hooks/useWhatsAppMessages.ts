@@ -16,6 +16,8 @@ export interface Message {
   timestamp: string;
   quoted_message_id: string | null;
   metadata: Record<string, any> | null;
+  audio_transcription: string | null;
+  transcription_status: string | null;
 }
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
