@@ -22,7 +22,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
   const hasUnread = unreadCount > 0;
 
-  
+  const debugTimeStr = conv.last_message_at ? (() => { try { const d = new Date(conv.last_message_at); return new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(d); } catch { return "ERR"; } })() : "NULL";
+  console.log(`[ConvItem RENDER] ${name} | unread=${unreadCount} hasUnread=${hasUnread} | last_msg=${conv.last_message_at} | timezone=${timezone} | timeStr=${debugTimeStr}`);
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
