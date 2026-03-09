@@ -34,7 +34,7 @@ export function CSTicketDetail({ ticket, open, onOpenChange, mode }: CSTicketDet
         </div>
       </ScrollArea>
       <div className="w-[380px] shrink-0 border-l flex flex-col min-h-0">
-        {currentTicket && <CSTimelineEnhanced ticketId={currentTicket.id} isStickyMode />}
+        {currentTicket && <CSTimelineEnhanced ticketId={currentTicket.id} clientePhone={currentTicket.cliente?.telefone_whatsapp} isStickyMode />}
       </div>
     </div>
   );
