@@ -26,7 +26,7 @@ interface Props {
   onNavigate?: (to: string) => void;
 }
 
-export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial }: Props) {
+export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial, onNavigate }: Props) {
   const navigate = useNavigate();
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
