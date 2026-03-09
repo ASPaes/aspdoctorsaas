@@ -36,10 +36,13 @@ export const MediaPreview = ({ file, onSend, onClose }: MediaPreviewProps) => {
       const { error: uploadError } = await supabase.storage.from('whatsapp-media').upload(fileName, file, { contentType: file.type });
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName);
+      // Create signed URL (bucket is private)
+      const { data: signedData, error: signedError } = await supabase.storage.from('whatsapp-media').createSignedUrl(fileName, 3600);
+      if (signedError || !signedData?.signedUrl) throw signedError || new Error('Failed to create signed URL');
       const messageType = getMessageType(file.type);
 
-      onSend({ messageType, content: caption || undefined, mediaUrl: publicUrl, mediaMimetype: file.type, fileName: file.name });
+      // Store the file path (not full URL) for later signed URL generation
+      onSend({ messageType, content: caption || undefined, mediaUrl: fileName, mediaMimetype: file.type, fileName: file.name });
       onClose();
     } catch (error) {
       console.error('Upload error:', error);

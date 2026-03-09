@@ -145,12 +145,9 @@ async function downloadAndUploadMedia(
       return null;
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from('whatsapp-media')
-      .getPublicUrl(filePath);
-
-    console.log('[evolution-webhook] Media uploaded successfully:', publicUrlData.publicUrl);
-    return publicUrlData.publicUrl;
+    // Store just the file path (not the full public URL) since bucket is private
+    console.log('[evolution-webhook] Media uploaded successfully, path:', filePath);
+    return filePath;
   } catch (error) {
     console.error('[evolution-webhook] Error in downloadAndUploadMedia:', error);
     return null;
