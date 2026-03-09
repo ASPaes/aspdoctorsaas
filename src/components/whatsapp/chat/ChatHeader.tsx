@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { SentimentCard } from "./SentimentCard";
 import { TopicBadges } from "./TopicBadges";
 import { EditContactModal } from "./EditContactModal";
+import { QueueIndicator } from "./QueueIndicator";
+import { TransferDialog } from "./TransferDialog";
 
 interface Props {
   conversation: ConversationWithContact;
