@@ -84,7 +84,7 @@ export function useClienteLinkSuggestion(
 
   const unlinkMutation = useMutation({
     mutationFn: async () => {
-      const newMetadata = { ...(currentMetadata || {}) } as Record<string, unknown>;
+      const newMetadata = { ...(currentMetadata || {}) } as any;
       delete newMetadata.cliente_id;
       const { error } = await supabase
         .from('whatsapp_conversations')
