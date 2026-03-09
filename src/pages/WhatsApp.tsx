@@ -7,6 +7,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCreateConversation } from "@/components/whatsapp/hooks/useCreateConversation";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { supabase } from "@/integrations/supabase/client";
+import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 
 export default function WhatsApp() {
