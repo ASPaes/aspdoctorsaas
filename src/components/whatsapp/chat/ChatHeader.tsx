@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, RefreshCw, Pencil, Settings, Ticket } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, RefreshCw, Pencil, Settings, Ticket, ArrowLeftRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -16,6 +16,8 @@ import { EditContactModal } from "./EditContactModal";
 import { QueueIndicator } from "./QueueIndicator";
 import { TransferDialog } from "./TransferDialog";
 import { CSTicketAlert } from "./CSTicketAlert";
+import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
+import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -32,6 +34,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
+  const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
+  const { instances } = useWhatsAppInstances();
+  const hasMultipleInstances = instances.length > 1;
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
@@ -113,6 +118,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
                 <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
               </DropdownMenuItem>
+              {hasMultipleInstances && (
+                <DropdownMenuItem onClick={() => setIsChangeInstanceOpen(true)}>
+                  <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -144,6 +154,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           onOpenChange={setIsManualTicketOpen}
           conversation={conversation}
           sentiment={sentimentData}
+        />
+
+        <ChangeInstanceDialog
+          open={isChangeInstanceOpen}
+          onOpenChange={setIsChangeInstanceOpen}
+          conversation={conversation}
         />
       </div>
 
