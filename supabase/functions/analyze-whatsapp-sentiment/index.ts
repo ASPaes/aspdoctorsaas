@@ -76,17 +76,28 @@ serve(async (req) => {
       .map((msg, index) => `${index + 1}. [${new Date(msg.timestamp).toLocaleString('pt-BR')}]: "${msg.content}"`)
       .join('\n');
 
-    const prompt = `Analise o sentimento das últimas mensagens deste cliente de WhatsApp.
+    const prompt = `Analise o sentimento das últimas mensagens deste cliente de WhatsApp e avalie se é necessário abrir um ticket de Customer Success (CS).
 
 **Mensagens (mais antigas para mais recentes):**
 ${messagesText}
 
-**Critérios de Análise:**
+**Critérios de Análise de Sentimento:**
 - **positive**: Cliente satisfeito, agradecido, animado, elogios
 - **neutral**: Tom profissional, dúvidas técnicas, informações
 - **negative**: Frustrado, insatisfeito, reclamando, impaciente
 
-Analise o contexto geral e determine o sentimento predominante.`;
+**Critérios para abertura de Ticket CS (needs_cs_ticket = true):**
+- Cliente demonstra insatisfação persistente ou crescente
+- Menção a cancelamento, troca de fornecedor, ou saída
+- Reclamações sobre qualidade, preço ou atendimento
+- Pedidos não atendidos repetidamente
+- Tom agressivo ou ameaçador
+- Palavras-chave: "cancelar", "trocar", "insatisfeito", "péssimo", "nunca mais", "concorrente", "vou sair"
+- Cliente expressando frustração com prazos ou entregas
+
+Se o sentimento for positivo, needs_cs_ticket geralmente é false, a menos que haja um pedido importante não atendido.
+
+Analise o contexto geral e determine o sentimento predominante e se um ticket CS é necessário.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -101,16 +112,18 @@ Analise o contexto geral e determine o sentimento predominante.`;
           type: "function",
           function: {
             name: "analyze_sentiment",
-            description: "Analisa o sentimento das mensagens do cliente",
+            description: "Analisa o sentimento das mensagens do cliente e avalia necessidade de ticket CS",
             parameters: {
               type: "object",
               properties: {
                 sentiment: { type: "string", enum: ["positive", "neutral", "negative"] },
                 confidence: { type: "number", description: "Score de confiança entre 0.00 e 1.00" },
                 summary: { type: "string", description: "Resumo curto do sentimento (máx 100 caracteres)" },
-                keywords: { type: "array", items: { type: "string" }, description: "Palavras-chave do sentimento" }
+                keywords: { type: "array", items: { type: "string" }, description: "Palavras-chave do sentimento" },
+                needs_cs_ticket: { type: "boolean", description: "Se é necessário abrir um ticket de Customer Success" },
+                cs_ticket_reason: { type: "string", description: "Motivo para abertura do ticket CS (máx 200 caracteres). Obrigatório se needs_cs_ticket=true" }
               },
-              required: ["sentiment", "confidence", "summary"],
+              required: ["sentiment", "confidence", "summary", "needs_cs_ticket"],
               additionalProperties: false
             }
           }
@@ -158,6 +171,8 @@ Analise o contexto geral e determine o sentimento predominante.`;
         confidence: result.confidence,
         summary: result.summary?.substring(0, 100),
         keywords: result.keywords || [],
+        needs_cs_ticket: result.needs_cs_ticket || false,
+        cs_ticket_reason: result.needs_cs_ticket ? (result.cs_ticket_reason?.substring(0, 200) || null) : null,
       }, { onConflict: 'conversation_id' })
       .select()
       .single();
@@ -167,7 +182,7 @@ Analise o contexto geral e determine o sentimento predominante.`;
       return new Response(JSON.stringify({ success: false, error: 'Failed to save analysis' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log('[analyze-sentiment] Success:', analysis.id);
+    console.log(`[analyze-sentiment] Success: ${analysis.id}, needs_cs_ticket: ${result.needs_cs_ticket}`);
 
     return new Response(
       JSON.stringify({ success: true, analysis }),
