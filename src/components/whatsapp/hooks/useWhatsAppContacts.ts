@@ -50,7 +50,8 @@ export const useWhatsAppContacts = (
       if (tid) countQuery = countQuery.eq('tenant_id', tid);
       if (instanceId) countQuery = countQuery.eq('instance_id', instanceId);
       if (searchTerm && searchTerm.length > 0) {
-        countQuery = countQuery.or(`name.ilike.%${searchTerm}%,phone_number.ilike.%${searchTerm}%`);
+        const escaped = escapeLike(searchTerm);
+        countQuery = countQuery.or(`name.ilike.%${escaped}%,phone_number.ilike.%${escaped}%`);
       }
 
       const { count: totalCount } = await countQuery;
