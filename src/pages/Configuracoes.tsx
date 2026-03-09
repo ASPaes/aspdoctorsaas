@@ -104,6 +104,7 @@ export default function Configuracoes() {
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
