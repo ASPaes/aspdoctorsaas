@@ -218,6 +218,9 @@ Deno.serve(async (req) => {
 
     // Use anonClient (authenticated) so the set_tenant_id_on_insert trigger
     // can resolve current_tenant_id() via auth.uid()
+    // Extract sender user_id from JWT claims
+    const senderUserId = (claimsData.claims as any).sub as string | undefined;
+
     const { data: savedMessage, error: saveError } = await anonClient
       .from('whatsapp_messages')
       .insert({
@@ -234,6 +237,7 @@ Deno.serve(async (req) => {
         timestamp: new Date().toISOString(),
         quoted_message_id: body.quotedMessageId || null,
         metadata: { fileName: body.fileName },
+        sent_by_user_id: senderUserId || null,
       })
       .select()
       .single();

@@ -69,7 +69,21 @@ export function ChatMessages({ conversationId, onReply }: Props) {
     );
   }
 
-  const dateGroups = groupByDate(messages, timezone);
+  // Group timeline items by date
+  const dateGroups = useMemo(() => {
+    const groups: { date: string; items: TimelineItem[] }[] = [];
+    let currentDate = '';
+    for (const item of timelineItems) {
+      const ts = item.type === 'message' ? item.msg.timestamp : item.event.created_at;
+      const d = formatDateLabel(ts, timezone);
+      if (d !== currentDate) {
+        currentDate = d;
+        groups.push({ date: d, items: [] });
+      }
+      groups[groups.length - 1].items.push(item);
+    }
+    return groups;
+  }, [timelineItems, timezone]);
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
@@ -79,14 +93,25 @@ export function ChatMessages({ conversationId, onReply }: Props) {
           <p className="text-sm">Nenhuma mensagem ainda</p>
         </div>
       ) : (
-        dateGroups.map(({ date, msgs }) => (
+        dateGroups.map(({ date, items }) => (
           <div key={date}>
             <div className="flex justify-center my-3">
               <span className="text-[10px] bg-muted text-muted-foreground px-3 py-0.5 rounded-full">{date}</span>
             </div>
-            {msgs.map((msg) => (
-              <MessageBubble key={msg.id} msg={msg} onReply={onReply} />
-            ))}
+            {items.map((item) =>
+              item.type === 'message' ? (
+                <MessageBubble key={item.msg.id} msg={item.msg} onReply={onReply} />
+              ) : (
+                <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
+                    <ArrowRightLeft className="h-3 w-3" />
+                    Transferido para {item.event.agent_name || 'Agente'}
+                    {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
+                    <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
+                  </span>
+                </div>
+              )
+            )}
           </div>
         ))
       )}
