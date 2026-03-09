@@ -22,6 +22,14 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
   const hasUnread = unreadCount > 0;
 
+  const MAX_PREVIEW = 45;
+  const rawPreview = conv.isLastMessageFromMe
+    ? `Você: ${conv.last_message_preview || "Sem mensagens"}`
+    : (conv.last_message_preview || "Sem mensagens");
+  const previewText = rawPreview.length > MAX_PREVIEW
+    ? rawPreview.substring(0, MAX_PREVIEW) + "…"
+    : rawPreview;
+
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
@@ -96,10 +104,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
             {conv.isLastMessageFromMe && (
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
-            <p className="text-xs text-muted-foreground truncate min-w-0">
-              {conv.isLastMessageFromMe && "Você: "}
-              {conv.last_message_preview || "Sem mensagens"}
-            </p>
+            <span className="text-xs text-muted-foreground">
+              {previewText}
+            </span>
           </div>
           {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground shrink-0" />}
           {hasUnread && (
