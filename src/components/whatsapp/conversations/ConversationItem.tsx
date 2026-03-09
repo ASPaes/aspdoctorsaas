@@ -11,6 +11,7 @@ interface Props {
   conversation: ConversationWithContact;
   isSelected: boolean;
   onClick: () => void;
+  instanceName?: string;
 }
 
 export function ConversationItem({ conversation: conv, isSelected, onClick }: Props) {
