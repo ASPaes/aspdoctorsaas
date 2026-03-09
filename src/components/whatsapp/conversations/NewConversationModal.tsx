@@ -44,7 +44,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
       return;
     }
 
-    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanPhone = normalizePhoneBR(phone);
     createConversation.mutate(
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone },
       {
