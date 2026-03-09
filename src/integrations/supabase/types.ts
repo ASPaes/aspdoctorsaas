@@ -1984,8 +1984,11 @@ export type Database = {
           contact_id: string | null
           conversation_id: string
           created_at: string
+          cs_ticket_created_id: string | null
+          cs_ticket_reason: string | null
           id: string
           keywords: string[] | null
+          needs_cs_ticket: boolean
           sentiment: Database["public"]["Enums"]["sentiment_type"]
           summary: string | null
           tenant_id: string
@@ -1996,8 +1999,11 @@ export type Database = {
           contact_id?: string | null
           conversation_id: string
           created_at?: string
+          cs_ticket_created_id?: string | null
+          cs_ticket_reason?: string | null
           id?: string
           keywords?: string[] | null
+          needs_cs_ticket?: boolean
           sentiment?: Database["public"]["Enums"]["sentiment_type"]
           summary?: string | null
           tenant_id: string
@@ -2008,8 +2014,11 @@ export type Database = {
           contact_id?: string | null
           conversation_id?: string
           created_at?: string
+          cs_ticket_created_id?: string | null
+          cs_ticket_reason?: string | null
           id?: string
           keywords?: string[] | null
+          needs_cs_ticket?: boolean
           sentiment?: Database["public"]["Enums"]["sentiment_type"]
           summary?: string | null
           tenant_id?: string
@@ -2028,6 +2037,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: true
             referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_sentiment_analysis_cs_ticket_created_id_fkey"
+            columns: ["cs_ticket_created_id"]
+            isOneToOne: false
+            referencedRelation: "cs_tickets"
             referencedColumns: ["id"]
           },
           {
