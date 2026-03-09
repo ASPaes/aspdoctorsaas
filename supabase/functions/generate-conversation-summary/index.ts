@@ -45,7 +45,7 @@ serve(async (req) => {
 
     const { data: messages, error: messagesError } = await supabase
       .from('whatsapp_messages')
-      .select('content, timestamp, is_from_me')
+      .select('content, timestamp, is_from_me, audio_transcription, message_type')
       .eq('conversation_id', conversationId)
       .order('timestamp', { ascending: false })
       .limit(30);
