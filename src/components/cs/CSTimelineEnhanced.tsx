@@ -17,6 +17,7 @@ import { MessageSquare, ArrowUpDown, UserCheck, AlertTriangle, Sparkles, CheckCi
 
 interface CSTimelineEnhancedProps {
   ticketId: string;
+  clientePhone?: string | null;
   isStickyMode?: boolean;
 }
 
