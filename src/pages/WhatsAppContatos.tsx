@@ -31,6 +31,8 @@ export default function WhatsAppContatos() {
   const totalPages = contactsData?.totalPages || 1;
   const totalCount = contactsData?.totalCount || 0;
   const { data: details, isLoading: detailsLoading } = useContactDetails(selectedContactId);
+  const selectedContact = contacts.find((c: any) => c.id === selectedContactId);
+  const { data: linkedCliente } = useLinkedCliente(selectedContactId, selectedContact?.phone_number || null);
 
   const sentimentIcon = (s: string) => {
     if (s === "positive") return <ThumbsUp className="h-3 w-3 text-green-500" />;
