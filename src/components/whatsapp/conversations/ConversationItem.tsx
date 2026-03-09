@@ -19,7 +19,8 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const { timezone } = useChatTimezone();
   const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
-  const hasUnread = Number(conv.unread_count) > 0;
+  const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
+  const hasUnread = unreadCount > 0;
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
@@ -103,7 +104,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
             {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
             {hasUnread && (
               <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
-                {conv.unread_count > 99 ? "99+" : conv.unread_count}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </div>
