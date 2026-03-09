@@ -32,6 +32,9 @@ const AccessBlocked = lazy(() => import("@/pages/AccessBlocked"));
 const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
+const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
+const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
+const WhatsAppSettings = lazy(() => import("@/pages/WhatsAppSettings"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 
