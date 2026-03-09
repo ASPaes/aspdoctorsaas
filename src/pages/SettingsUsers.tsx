@@ -32,6 +32,22 @@ export default function SettingsUsers() {
   const updateStatus = useUpdateUserStatus();
   const createInvite = useCreateInvite();
   const cancelInvite = useCancelInvite();
+  const updateFuncionario = useUpdateUserFuncionario();
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  const { data: funcionarios = [] } = useQuery({
+    queryKey: ["funcionarios-for-settings-users", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
