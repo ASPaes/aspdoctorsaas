@@ -15,6 +15,7 @@ import Dashboard from "@/pages/Dashboard";
 import Clientes from "@/pages/Clientes";
 import ClienteForm from "@/pages/ClienteForm";
 import CustomerSuccess from "@/pages/CustomerSuccess";
+import WhatsApp from "@/pages/WhatsApp";
 import Login from "@/pages/Login";
 
 // Lazy-loaded: less-visited pages
