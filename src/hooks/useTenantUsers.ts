@@ -11,6 +11,7 @@ export interface TenantProfile {
   status: string;
   is_super_admin: boolean;
   created_at: string;
+  funcionario_id: number | null;
 }
 
 export interface TenantInvite {

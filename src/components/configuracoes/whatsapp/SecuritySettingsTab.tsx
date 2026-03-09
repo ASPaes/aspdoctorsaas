@@ -1,54 +1,170 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Shield, ExternalLink, Globe, UserCheck } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useSecuritySettings } from "@/hooks/useSecuritySettings";
+import { Shield, Trash2, Plus, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SecuritySettingsTab() {
-  const { profile } = useAuth();
-  const navigate = useNavigate();
-  const allowedDomain = (profile as any)?.allowed_domain ?? null;
+  const { settings, isLoading, toggleRestriction, addDomain, removeDomain } = useSecuritySettings();
+  const [newDomain, setNewDomain] = useState("");
 
-  return (
-    <div className="space-y-4">
+  const handleAddDomain = () => {
+    const domain = newDomain.trim();
+    if (!domain) {
+      toast.error("Digite um domínio válido");
+      return;
+    }
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    const cleanDomain = domain.replace(/^@/, "");
+    if (!domainRegex.test(cleanDomain)) {
+      toast.error("Formato de domínio inválido");
+      return;
+    }
+    addDomain.mutate(cleanDomain, {
+      onSuccess: () => setNewDomain(""),
+    });
+  };
+
+  if (isLoading) {
+    return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Domínio Permitido
-          </CardTitle>
-          <CardDescription>
-            Usuários com e-mail neste domínio são aprovados automaticamente ao aceitar um convite.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {allowedDomain ? (
-            <Badge variant="outline" className="text-sm px-3 py-1">@{allowedDomain}</Badge>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Nenhum domínio configurado. Todos os novos acessos precisarão de aprovação manual.
-            </p>
-          )}
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
         </CardContent>
       </Card>
+    );
+  }
 
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCheck className="h-5 w-5" />
-            Aprovação de Acessos
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <CardTitle>Segurança</CardTitle>
+          </div>
           <CardDescription>
-            Gerencie solicitações de acesso pendentes e usuários bloqueados.
+            Configure as políticas de segurança para cadastro de novos usuários
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={() => navigate("/configuracoes?tab=aprovacoes")}>
-            <Shield className="h-4 w-4 mr-2" />
-            Ir para Aprovação de Acessos
-            <ExternalLink className="h-3 w-3 ml-1" />
-          </Button>
+        <CardContent className="space-y-6">
+          {/* Toggle de aprovação de contas */}
+          <div className="flex items-center justify-between space-x-4 rounded-lg border p-4">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="require-approval" className="text-base font-medium">
+                Exigir Aprovação para Novas Contas
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Quando ativado, novos usuários precisarão de aprovação manual de um administrador para acessar o sistema
+              </p>
+            </div>
+            <Switch
+              id="require-approval"
+              checked={settings.requireApproval}
+              onCheckedChange={(checked) =>
+                toggleRestriction.mutate({ enabled: checked, key: "require_account_approval" })
+              }
+              disabled={toggleRestriction.isPending}
+            />
+          </div>
+
+          {/* Toggle de restrição de domínio */}
+          <div className="flex items-center justify-between space-x-4 rounded-lg border p-4">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="domain-restriction" className="text-base font-medium">
+                Restrição de Domínio de Email
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Quando ativado, apenas emails de domínios específicos poderão se cadastrar
+              </p>
+            </div>
+            <Switch
+              id="domain-restriction"
+              checked={settings.restrictEnabled}
+              onCheckedChange={(checked) =>
+                toggleRestriction.mutate({ enabled: checked, key: "restrict_signup_by_domain" })
+              }
+              disabled={toggleRestriction.isPending}
+            />
+          </div>
+
+          {/* Adicionar novo domínio */}
+          {settings.restrictEnabled && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-domain">Adicionar Domínio Permitido</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="new-domain"
+                    placeholder="empresa.com.br"
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddDomain();
+                      }
+                    }}
+                    disabled={addDomain.isPending}
+                  />
+                  <Button onClick={handleAddDomain} disabled={addDomain.isPending || !newDomain.trim()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Digite apenas o domínio (ex: empresa.com.br), sem @ ou espaços
+                </p>
+              </div>
+
+              {settings.allowedDomains.length > 0 ? (
+                <div className="space-y-2">
+                  <Label>Domínios Permitidos</Label>
+                  <div className="rounded-lg border divide-y">
+                    {settings.allowedDomains.map((domain) => (
+                      <div
+                        key={domain}
+                        className="flex items-center justify-between p-3 hover:bg-accent/50 transition-colors"
+                      >
+                        <span className="font-mono text-sm">@{domain}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeDomain.mutate(domain)}
+                          disabled={removeDomain.isPending}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Nenhum domínio configurado. Adicione pelo menos um domínio para ativar a restrição.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Importante:</strong> O primeiro usuário a se cadastrar (admin) sempre poderá
+              criar uma conta, independente do domínio. Esta restrição só será aplicada aos cadastros
+              subsequentes.
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     </div>
