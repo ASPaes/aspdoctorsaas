@@ -248,7 +248,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">Nenhuma análise disponível. Clique em "Analisar".</p>
-            )
+            )}
           </div>
 
           {/* Notes */}
