@@ -696,9 +696,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const quotedMessageId = message.extendedTextMessage?.contextInfo?.stanzaId || null;
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
+    // Dedupe insert: use upsert with onConflict to silently ignore duplicates
+    const isFromMe = key.fromMe || false;
     const { data: savedMsg, error: messageError } = await supabase
       .from('whatsapp_messages')
-      .insert({
+      .upsert({
         conversation_id: conversationId,
         remote_jid: key.remoteJid,
         message_id: key.id,
@@ -706,21 +708,29 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         message_type: messageType,
         media_url: mediaUrl,
         media_mimetype: mediaMimetype,
-        is_from_me: key.fromMe || false,
+        is_from_me: isFromMe,
         status: 'sent',
         quoted_message_id: quotedMessageId,
         timestamp,
         tenant_id: tenantId,
+      }, {
+        onConflict: 'tenant_id,message_id',
+        ignoreDuplicates: true,
       })
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (messageError) {
       console.error('[evolution-webhook] Error saving message:', messageError);
       return;
     }
 
-    console.log('[evolution-webhook] Message saved successfully');
+    // If savedMsg is null, it was a duplicate — still update conversation if needed
+    if (savedMsg) {
+      console.log('[evolution-webhook] Message saved successfully:', savedMsg.id);
+    } else {
+      console.log('[evolution-webhook] Duplicate message ignored:', key.id);
+    }
 
     // Fire-and-forget: trigger audio transcription
     if (messageType === 'audio' && savedMsg?.id && mediaUrl) {
@@ -733,33 +743,44 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       }).catch(err => console.error('[evolution-webhook] Transcription trigger error:', err));
     }
 
-    const updateData: any = {
-      last_message_at: timestamp,
-      last_message_preview: content.substring(0, 100),
-    };
+    // --- Anti-stale guard: fetch current last_message_at to decide update ---
+    const { data: currentConv } = await supabase
+      .from('whatsapp_conversations')
+      .select('last_message_at, unread_count')
+      .eq('id', conversationId)
+      .single();
 
-    if (!key.fromMe) {
-      const { data: currentConv } = await supabase
-        .from('whatsapp_conversations')
-        .select('unread_count')
-        .eq('id', conversationId)
-        .single();
+    const currentLastAt = currentConv?.last_message_at;
+    const isNewerOrEqual = !currentLastAt || timestamp >= currentLastAt;
 
+    const updateData: Record<string, any> = {};
+
+    // Only update last_message_* and is_last_message_from_me if this event is newer
+    if (isNewerOrEqual) {
+      updateData.last_message_at = timestamp;
+      updateData.last_message_preview = content.substring(0, 200);
+      updateData.is_last_message_from_me = isFromMe;
+    }
+
+    // Increment unread_count only for incoming messages (fromMe=false)
+    if (!isFromMe) {
       updateData.unread_count = (currentConv?.unread_count || 0) + 1;
     }
 
-    const { error: updateError } = await supabase
-      .from('whatsapp_conversations')
-      .update(updateData)
-      .eq('id', conversationId);
+    if (Object.keys(updateData).length > 0) {
+      const { error: updateError } = await supabase
+        .from('whatsapp_conversations')
+        .update(updateData)
+        .eq('id', conversationId);
 
-    if (updateError) {
-      console.error('[evolution-webhook] Error updating conversation:', updateError);
-    } else {
-      console.log('[evolution-webhook] Conversation updated successfully');
+      if (updateError) {
+        console.error('[evolution-webhook] Error updating conversation:', updateError);
+      } else {
+        console.log('[evolution-webhook] Conversation updated successfully');
+      }
     }
 
-    if (!key.fromMe) {
+    if (!isFromMe) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       checkAndTriggerAutoSentiment(supabase, conversationId, supabaseUrl);
       checkAndTriggerAutoCategorization(supabase, conversationId, supabaseUrl);

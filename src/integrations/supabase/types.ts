@@ -1597,6 +1597,7 @@ export type Database = {
           created_at: string
           id: string
           instance_id: string
+          is_last_message_from_me: boolean
           last_message_at: string | null
           last_message_preview: string | null
           metadata: Json | null
@@ -1613,6 +1614,7 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id: string
+          is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
@@ -1629,6 +1631,7 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id?: string
+          is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
