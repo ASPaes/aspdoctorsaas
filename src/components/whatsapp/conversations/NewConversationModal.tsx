@@ -11,6 +11,7 @@ import { useCreateConversation } from "../hooks/useCreateConversation";
 import { useClienteSearch, type ClienteSearchResult } from "../hooks/useClienteSearch";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { maskCNPJ, maskPhoneBR, normalizePhoneBR } from "@/lib/masks";
 
 interface Props {
   open: boolean;
@@ -43,7 +44,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
       return;
     }
 
-    const cleanPhone = phone.replace(/\D/g, "");
+    const cleanPhone = normalizePhoneBR(phone);
     createConversation.mutate(
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone },
       {
@@ -139,7 +140,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
                           #{c.codigo_sequencial} — {c.nome_fantasia || c.razao_social || "Sem nome"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {c.telefone_whatsapp || "Sem WhatsApp"} {c.cnpj ? `· ${c.cnpj}` : ""}
+                          {c.telefone_whatsapp || "Sem WhatsApp"} {c.cnpj ? `· ${maskCNPJ(c.cnpj)}` : ""}
                         </p>
                       </button>
                     ))}
@@ -174,9 +175,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
                 <div>
                   <Label className="text-xs font-medium text-muted-foreground">Telefone (cliente sem WhatsApp cadastrado)</Label>
                   <Input
-                    placeholder="5511999999999"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+55 (11) 99999-9999"
+                    value={maskPhoneBR(phone)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                   />
                 </div>
               )}
@@ -186,9 +187,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Telefone</Label>
                 <Input
-                  placeholder="5511999999999"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+55 (11) 99999-9999"
+                  value={maskPhoneBR(phone)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                 />
               </div>
               <div>
