@@ -2487,17 +2487,6 @@ export type Database = {
               tenant_id: string
             }[]
           }
-      get_tenant_users_with_email: {
-        Args: { p_tenant_id: string }
-        Returns: {
-          created_at: string
-          email: string
-          is_super_admin: boolean
-          role: string
-          status: string
-          user_id: string
-        }[]
-      }
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
