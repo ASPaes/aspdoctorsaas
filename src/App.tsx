@@ -83,6 +83,7 @@ const App = () => (
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<CustomerSuccess />} />
+              <Route path="/whatsapp" element={<WhatsApp />} />
 
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>
