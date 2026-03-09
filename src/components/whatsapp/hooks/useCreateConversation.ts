@@ -6,6 +6,7 @@ interface CreateConversationParams {
   phoneNumber: string;
   contactName: string;
   profilePictureUrl?: string;
+  clienteId?: string;
 }
 
 export const useCreateConversation = () => {
@@ -35,11 +36,21 @@ export const useCreateConversation = () => {
         .eq('contact_id', contact.id)
         .maybeSingle();
 
-      if (existingConv) return { conversation: existingConv, contact };
+      if (existingConv) {
+        // If clienteId provided and not yet linked, update metadata
+        if (params.clienteId && !(existingConv.metadata as any)?.cliente_id) {
+          await supabase
+            .from('whatsapp_conversations')
+            .update({ metadata: { ...(existingConv.metadata as any || {}), cliente_id: params.clienteId } })
+            .eq('id', existingConv.id);
+        }
+        return { conversation: existingConv, contact };
+      }
 
+      const metadata = params.clienteId ? { cliente_id: params.clienteId } : {};
       const { data: conversation, error: convError } = await (supabase
         .from('whatsapp_conversations') as any)
-        .insert({ instance_id: params.instanceId, contact_id: contact.id, status: 'active', unread_count: 0 })
+        .insert({ instance_id: params.instanceId, contact_id: contact.id, status: 'active', unread_count: 0, metadata })
         .select()
         .single();
 

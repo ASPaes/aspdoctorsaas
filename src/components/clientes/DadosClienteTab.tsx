@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
-import { maskCNPJ, maskPhone, maskCPF, maskCEP } from "@/lib/masks";
+import { maskCNPJ, maskPhone, maskCPF, maskCEP, normalizePhoneBR } from "@/lib/masks";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial }: Props) {
+  const navigate = useNavigate();
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
@@ -207,9 +209,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   }, [estados, form, toast]);
 
   const whatsappDigits = (whatsappValue ?? "").replace(/\D/g, "");
-  const whatsappHref = whatsappDigits ? `https://api.whatsapp.com/send?phone=55${whatsappDigits}` : null;
-  const whatsappTarget =
-    typeof window !== "undefined" && window.self !== window.top ? "_top" : "_blank";
+  const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
+
+  const handleOpenWhatsApp = useCallback(() => {
+    if (!whatsappDigits || !clienteId) return;
+    const normalizedPhone = normalizePhoneBR(whatsappDigits);
+    const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
+    navigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
+  }, [whatsappDigits, clienteId, form, navigate]);
 
   return (
     <div className="space-y-6">
@@ -364,17 +371,23 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
                   onChange={(e) => field.onChange(maskPhone(e.target.value))}
                 />
               </FormControl>
-              {whatsappHref && (
-                <Button type="button" variant="outline" size="icon" className="shrink-0" asChild>
-                  <a
-                    href={whatsappHref}
-                    target={whatsappTarget}
-                    rel="noopener noreferrer"
-                    aria-label="Abrir conversa no WhatsApp"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </a>
-                </Button>
+              {canOpenWhatsApp && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={handleOpenWhatsApp}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Abrir conversa no chat</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
             <FormMessage />
