@@ -22,7 +22,7 @@ const navItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
-  { title: "WhatsApp", url: "/whatsapp", icon: MessageCircle },
+  { title: "Suporte", url: "/whatsapp", icon: MessageCircle },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
