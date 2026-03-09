@@ -11,8 +11,9 @@ export function useChatTimezone() {
   const { data: timezone = DEFAULT_TZ, isLoading } = useQuery({
     queryKey: ["chat_timezone", tid],
     queryFn: async () => {
-      const q = supabase.from("configuracoes").select("chat_timezone").limit(1).maybeSingle();
-      const { data, error } = tid ? await q.eq("tenant_id", tid) : await q;
+      let q = supabase.from("configuracoes").select("chat_timezone");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q.limit(1).maybeSingle();
       if (error) throw error;
       return (data as any)?.chat_timezone ?? DEFAULT_TZ;
     },
