@@ -7,6 +7,7 @@ import { MessageInput } from "./MessageInput";
 import { type Conversation } from "./hooks/useConversations";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { MediaContent } from "./chat/MediaContent";
 
 interface Props {
   conversation: Conversation | null;
