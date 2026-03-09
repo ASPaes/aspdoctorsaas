@@ -281,7 +281,8 @@ function buildEvolutionRequest(
   apiUrl: string,
   instanceName: string,
   number: string,
-  body: SendMessageRequest
+  body: SendMessageRequest,
+  mediaUrlOverride?: string
 ): { endpoint: string; requestBody: any } {
   let baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
   baseUrl = baseUrl.replace(/\/manager$/, '');
@@ -296,13 +297,16 @@ function buildEvolutionRequest(
     }
 
     case 'audio': {
-      let audioData: string | undefined;
-      if (body.mediaBase64) {
-        audioData = body.mediaBase64.startsWith('data:')
-          ? body.mediaBase64.split(',')[1] || ''
-          : body.mediaBase64;
-      } else if (body.mediaUrl) {
-        audioData = body.mediaUrl;
+      // For audio, prefer signed URL if available, then base64, then mediaUrl
+      let audioData: string | undefined = mediaUrlOverride;
+      if (!audioData) {
+        if (body.mediaBase64) {
+          audioData = body.mediaBase64.startsWith('data:')
+            ? body.mediaBase64.split(',')[1] || ''
+            : body.mediaBase64;
+        } else if (body.mediaUrl) {
+          audioData = body.mediaUrl;
+        }
       }
       if (!audioData) throw new Error('Missing audio data');
       return {
@@ -314,18 +318,9 @@ function buildEvolutionRequest(
     case 'image':
     case 'video':
     case 'document': {
-      let mediaData: string | undefined;
-      if (body.mediaBase64) {
-        // Evolution API needs a proper data URI for base64 media
-        if (body.mediaBase64.startsWith('data:')) {
-          mediaData = body.mediaBase64;
-        } else {
-          const mime = body.mediaMimetype || 'application/octet-stream';
-          mediaData = `data:${mime};base64,${body.mediaBase64}`;
-        }
-      } else {
-        mediaData = body.mediaUrl;
-      }
+      // Always prefer the signed URL from Supabase Storage — Evolution downloads it
+      const mediaData = mediaUrlOverride || body.mediaUrl;
+      if (!mediaData) throw new Error('Missing media data for ' + body.messageType);
       const requestBody: any = {
         number,
         mediatype: body.messageType,
