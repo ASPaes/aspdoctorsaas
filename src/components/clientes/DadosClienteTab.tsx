@@ -23,6 +23,7 @@ interface Props {
   unidadesBase: { id: number; nome: string }[];
   clienteId?: string;
   codigoSequencial?: number | null;
+  onNavigate?: (to: string) => void;
 }
 
 export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial }: Props) {
