@@ -6,8 +6,9 @@ import { useMessages, type Message } from "./hooks/useMessages";
 import { MessageInput } from "./MessageInput";
 import { type Conversation } from "./hooks/useConversations";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import { MediaContent } from "./chat/MediaContent";
+import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { formatTime as formatTzTime, formatDateLabel } from "@/lib/formatDateWithTimezone";
 
 interface Props {
   conversation: Conversation | null;
