@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { escapeLike } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import type {

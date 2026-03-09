@@ -46,20 +46,20 @@ export function useClienteSearch(searchTerm: string) {
 
       if (isNumeric && term.length <= 6) {
         // Search by codigo_sequencial or phone (with and without 55 prefix)
-        q = q.or(`codigo_sequencial.eq.${term},telefone_whatsapp.ilike.%${term}%`);
+        q = q.or(`codigo_sequencial.eq.${term},telefone_whatsapp.ilike.%${escapeLike(term)}%`);
       } else if (isNumeric) {
         // Phone number - search with and without 55 prefix
         const withoutPrefix = term.startsWith('55') ? term.slice(2) : term;
         const withPrefix = term.startsWith('55') ? term : `55${term}`;
-        q = q.or(`telefone_whatsapp.ilike.%${withoutPrefix}%,telefone_whatsapp.ilike.%${withPrefix}%`);
+        q = q.or(`telefone_whatsapp.ilike.%${escapeLike(withoutPrefix)}%,telefone_whatsapp.ilike.%${escapeLike(withPrefix)}%`);
       } else {
         // Search by name or CNPJ
         const cleanTerm = term.replace(/[.\-\/]/g, '');
         const isCnpjLike = /^\d{3,}$/.test(cleanTerm) && cleanTerm.length >= 3;
         if (isCnpjLike) {
-          q = q.or(`razao_social.ilike.%${term}%,nome_fantasia.ilike.%${term}%,cnpj.ilike.%${cleanTerm}%`);
+          q = q.or(`razao_social.ilike.%${escapeLike(term)}%,nome_fantasia.ilike.%${escapeLike(term)}%,cnpj.ilike.%${escapeLike(cleanTerm)}%`);
         } else {
-          q = q.or(`razao_social.ilike.%${term}%,nome_fantasia.ilike.%${term}%`);
+          q = q.or(`razao_social.ilike.%${escapeLike(term)}%,nome_fantasia.ilike.%${escapeLike(term)}%`);
         }
       }
 
