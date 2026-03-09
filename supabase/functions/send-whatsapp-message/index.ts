@@ -182,12 +182,12 @@ Deno.serve(async (req) => {
       if (profile?.funcionario_id) {
         const { data: func } = await supabase
           .from('funcionarios')
-          .select('nome, cargo')
+          .select('nome')
           .eq('id', profile.funcionario_id)
           .maybeSingle();
 
         if (func?.nome) {
-          senderLabel = func.cargo ? `*${func.nome} · ${func.cargo}*` : `*${func.nome}*`;
+          senderLabel = `*${func.nome}*`;
         }
       }
     }
