@@ -871,14 +871,13 @@ export default function Clientes() {
                       {c.cancelado ? "Cancelado" : "Ativo"}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="icon"
                       className={cn("h-7 w-7", c.telefone_whatsapp ? "text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950" : "text-muted-foreground/40 cursor-default")}
                       disabled={!c.telefone_whatsapp}
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         if (c.telefone_whatsapp) {
                           const phone = c.telefone_whatsapp.replace(/\D/g, '');
                           const name = encodeURIComponent(c.nome_fantasia || c.razao_social || '');
