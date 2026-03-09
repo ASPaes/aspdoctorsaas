@@ -23,10 +23,10 @@ export default function WhatsApp() {
     const clienteId = searchParams.get("clienteId");
     const clienteName = searchParams.get("clienteName");
 
-    if (!phone || !clienteId || processedRef.current) return;
+    if (!phone || processedPhoneRef.current === phone) return;
     if (!instances || instances.length === 0) return;
 
-    processedRef.current = true;
+    processedPhoneRef.current = phone;
 
     // Clear params immediately
     setSearchParams({}, { replace: true });
