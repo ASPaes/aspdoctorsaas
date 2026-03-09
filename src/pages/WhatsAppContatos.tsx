@@ -200,7 +200,162 @@ export default function WhatsAppContatos() {
                 </CardContent></Card>
               </div>
 
-              {/* Sentiment History */}
+              {/* Linked Client Info */}
+              {linkedCliente && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Cliente Vinculado
+                      </CardTitle>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => navigate(`/clientes/${linkedCliente.id}`)}
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Abrir Cadastro
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Client name */}
+                    <div>
+                      <p className="font-semibold text-sm">{linkedCliente.razao_social || linkedCliente.nome_fantasia}</p>
+                      {linkedCliente.nome_fantasia && linkedCliente.razao_social && (
+                        <p className="text-xs text-muted-foreground">{linkedCliente.nome_fantasia}</p>
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    {/* Client details grid */}
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                      {linkedCliente.cnpj && (
+                        <div>
+                          <span className="text-muted-foreground">CNPJ</span>
+                          <p className="font-medium">{linkedCliente.cnpj}</p>
+                        </div>
+                      )}
+                      {linkedCliente.email && (
+                        <div>
+                          <span className="text-muted-foreground">E-mail</span>
+                          <p className="font-medium truncate">{linkedCliente.email}</p>
+                        </div>
+                      )}
+                      {linkedCliente.area_atuacao && (
+                        <div>
+                          <span className="text-muted-foreground">Área de Atuação</span>
+                          <p className="font-medium">{linkedCliente.area_atuacao}</p>
+                        </div>
+                      )}
+                      {linkedCliente.segmento && (
+                        <div>
+                          <span className="text-muted-foreground">Segmento</span>
+                          <p className="font-medium">{linkedCliente.segmento}</p>
+                        </div>
+                      )}
+                      {linkedCliente.data_cadastro && (
+                        <div>
+                          <span className="text-muted-foreground">Data de Cadastro</span>
+                          <p className="font-medium">{new Date(linkedCliente.data_cadastro + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                        </div>
+                      )}
+                      {linkedCliente.data_ativacao && (
+                        <div>
+                          <span className="text-muted-foreground">Cliente desde</span>
+                          <p className="font-medium">
+                            {formatDistanceToNow(new Date(linkedCliente.data_ativacao + "T12:00:00"), { addSuffix: false, locale: ptBR })}
+                          </p>
+                        </div>
+                      )}
+                      {(linkedCliente.cidade || linkedCliente.estado_sigla) && (
+                        <div>
+                          <span className="text-muted-foreground">Cidade / Estado</span>
+                          <p className="font-medium">
+                            {[linkedCliente.cidade, linkedCliente.estado_sigla].filter(Boolean).join(" / ")}
+                          </p>
+                        </div>
+                      )}
+                      {linkedCliente.unidade_base && (
+                        <div>
+                          <span className="text-muted-foreground">Unidade Base</span>
+                          <p className="font-medium">{linkedCliente.unidade_base}</p>
+                        </div>
+                      )}
+                      {linkedCliente.fornecedor && (
+                        <div>
+                          <span className="text-muted-foreground">Fornecedor</span>
+                          <p className="font-medium">{linkedCliente.fornecedor}</p>
+                        </div>
+                      )}
+                      {linkedCliente.produto && (
+                        <div>
+                          <span className="text-muted-foreground">Produto</span>
+                          <p className="font-medium">{linkedCliente.produto}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Client contacts */}
+                    {linkedCliente.contatos.length > 0 && (
+                      <>
+                        <Separator />
+                        <div>
+                          <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5" />
+                            Contatos do Cliente ({linkedCliente.contatos.length})
+                          </p>
+                          <div className="space-y-1.5">
+                            {linkedCliente.contatos.map((contato) => (
+                              <div
+                                key={contato.id}
+                                className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-medium">{contato.nome}</p>
+                                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                    {contato.cargo && <span>{contato.cargo}</span>}
+                                    {contato.fone && (
+                                      <span className="flex items-center gap-0.5">
+                                        <Phone className="h-2.5 w-2.5" />
+                                        {contato.fone}
+                                      </span>
+                                    )}
+                                    {contato.email && (
+                                      <span className="flex items-center gap-0.5">
+                                        <Mail className="h-2.5 w-2.5" />
+                                        {contato.email}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {contato.fone && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 shrink-0"
+                                    title="Enviar mensagem"
+                                    onClick={() => {
+                                      const phone = contato.fone!.replace(/\D/g, '');
+                                      navigate(`/whatsapp?phone=${phone}&clienteId=${linkedCliente.id}&clienteName=${encodeURIComponent(linkedCliente.razao_social || linkedCliente.nome_fantasia || '')}`);
+                                    }}
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               {details.sentimentHistory.length > 0 && (
                 <Card>
                   <CardHeader><CardTitle className="text-sm">Histórico de Sentimento</CardTitle></CardHeader>
