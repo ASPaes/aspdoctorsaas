@@ -2,3 +2,18 @@ project_id = "vbngjzovjhkmietztffo"
 
 [functions.populate-cidades]
 verify_jwt = false
+
+[functions.evolution-webhook]
+verify_jwt = false
+
+[functions.send-whatsapp-message]
+verify_jwt = false
+
+[functions.edit-whatsapp-message]
+verify_jwt = false
+
+[functions.test-instance-connection]
+verify_jwt = false
+
+[functions.check-instances-status]
+verify_jwt = false

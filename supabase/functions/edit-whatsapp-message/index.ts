@@ -1,0 +1,200 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface EditMessageRequest {
+  messageId: string;
+  conversationId: string;
+  newContent: string;
+}
+
+function getEvolutionAuthHeaders(apiKey: string, providerType: string): Record<string, string> {
+  return { apikey: apiKey };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Validate JWT
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Verify user
+    const anonClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const body: EditMessageRequest = await req.json();
+    console.log('[edit-whatsapp-message] Request received:', { 
+      messageId: body.messageId, 
+      conversationId: body.conversationId 
+    });
+
+    if (!body.messageId || !body.conversationId || !body.newContent) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'messageId, conversationId, and newContent are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: conversation, error: convError } = await supabase
+      .from('whatsapp_conversations')
+      .select(`
+        *,
+        whatsapp_contacts!inner (phone_number),
+        whatsapp_instances!inner (id, instance_name, provider_type)
+      `)
+      .eq('id', body.conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      return new Response(JSON.stringify({ success: false, error: 'Conversation not found' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { data: secrets, error: secretsError } = await supabase
+      .from('whatsapp_instance_secrets')
+      .select('api_url, api_key')
+      .eq('instance_id', (conversation as any).whatsapp_instances.id)
+      .single();
+
+    if (secretsError || !secrets) {
+      return new Response(JSON.stringify({ success: false, error: 'Instance secrets not found' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { data: message, error: msgError } = await supabase
+      .from('whatsapp_messages')
+      .select('*')
+      .eq('message_id', body.messageId)
+      .eq('conversation_id', body.conversationId)
+      .single();
+
+    if (msgError || !message) {
+      return new Response(JSON.stringify({ success: false, error: 'Mensagem não encontrada' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!message.is_from_me) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Você só pode editar suas próprias mensagens' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const messageTime = new Date(message.timestamp).getTime();
+    const now = Date.now();
+    const fifteenMinutes = 15 * 60 * 1000;
+
+    if (now - messageTime > fifteenMinutes) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Mensagens só podem ser editadas em até 15 minutos após o envio' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let baseUrl = secrets.api_url.endsWith('/') ? secrets.api_url.slice(0, -1) : secrets.api_url;
+    baseUrl = baseUrl.replace(/\/manager$/, '');
+
+    const endpoint = `${baseUrl}/chat/updateMessage/${(conversation as any).whatsapp_instances.instance_name}`;
+    const phoneNumber = message.remote_jid.replace(/@.*$/, '');
+    
+    const requestBody = {
+      number: phoneNumber,
+      text: body.newContent,
+      key: {
+        remoteJid: message.remote_jid,
+        fromMe: true,
+        id: body.messageId,
+      },
+    };
+
+    const providerType = (conversation as any).whatsapp_instances.provider_type || 'self_hosted';
+    const authHeaders = getEvolutionAuthHeaders(secrets.api_key, providerType);
+
+    const evolutionResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!evolutionResponse.ok) {
+      const errorText = await evolutionResponse.text();
+      console.error('[edit-whatsapp-message] Evolution API error:', errorText);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Falha ao editar mensagem no WhatsApp' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    await supabase
+      .from('whatsapp_message_edit_history')
+      .insert({
+        message_id: body.messageId,
+        conversation_id: body.conversationId,
+        previous_content: message.content,
+      });
+
+    const originalContent = message.original_content || message.content;
+    
+    const { data: updatedMessage, error: updateError } = await supabase
+      .from('whatsapp_messages')
+      .update({
+        content: body.newContent,
+        original_content: originalContent,
+        edited_at: new Date().toISOString(),
+      })
+      .eq('message_id', body.messageId)
+      .eq('conversation_id', body.conversationId)
+      .select()
+      .single();
+
+    if (updateError) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Erro ao atualizar mensagem no banco de dados' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('[edit-whatsapp-message] Message updated:', updatedMessage.id);
+
+    return new Response(
+      JSON.stringify({ success: true, message: updatedMessage }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('[edit-whatsapp-message] Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ success: false, error: 'Erro interno do servidor' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
