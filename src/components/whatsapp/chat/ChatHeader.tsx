@@ -14,6 +14,7 @@ import { TopicBadges } from "./TopicBadges";
 import { EditContactModal } from "./EditContactModal";
 import { QueueIndicator } from "./QueueIndicator";
 import { TransferDialog } from "./TransferDialog";
+import { CSTicketAlert } from "./CSTicketAlert";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -25,6 +26,7 @@ interface Props {
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose }: Props) {
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
+  const sentimentData = sentiment as any;
   const { data: topicsData } = useConversationTopics(conversation.id);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
@@ -35,101 +37,106 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const statusVariant = conversation.status === "active" ? "default" : "secondary";
 
   return (
-    <div className="h-auto min-h-[56px] border-b border-border flex items-center px-4 py-2 gap-3 shrink-0 bg-background">
-      {onClose && (
-        <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
-      )}
-
-      <Avatar className="h-9 w-9 shrink-0">
-        {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
-        <AvatarFallback className="text-xs">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
-      </Avatar>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium truncate">{name}</p>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
-            <Pencil className="h-3 w-3 text-muted-foreground" />
+    <div className="shrink-0">
+      <div className="h-auto min-h-[56px] border-b border-border flex items-center px-4 py-2 gap-3 bg-background">
+        {onClose && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={onClose}>
+            <X className="h-4 w-4" />
           </Button>
-          <Badge variant={statusVariant as any} className="text-[10px] h-4">{statusLabel}</Badge>
-        </div>
-        <p className="text-xs text-muted-foreground truncate">{contact?.phone_number}</p>
-        {topicsData?.topics && topicsData.topics.length > 0 && (
-          <div className="mt-0.5">
-            <TopicBadges topics={topicsData.topics} size="sm" showIcon={true} maxTopics={3} />
-          </div>
         )}
-      </div>
 
-      <div className="flex items-center gap-1.5">
-        <QueueIndicator
-          conversationId={conversation.id}
-          assignedTo={conversation.assigned_to || null}
-          onTransferClick={() => setIsTransferOpen(true)}
-        />
-        <SentimentCard sentiment={sentiment} />
+        <Avatar className="h-9 w-9 shrink-0">
+          {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
+          <AvatarFallback className="text-xs">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
+        </Avatar>
 
-        <Button variant="ghost" size="sm" onClick={analyze} disabled={isAnalyzing} title="Analisar sentimento">
-          <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-        </Button>
-
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggleDetails}>
-          <PanelRightOpen className="h-4 w-4" />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{name}</p>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
+              <Pencil className="h-3 w-3 text-muted-foreground" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {conversation.status === "active" && (
-              <>
-                <DropdownMenuItem onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}>
-                  <X className="h-4 w-4 mr-2" /> Encerrar conversa
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => archiveConversation(conversation.id)}>
-                  <Archive className="h-4 w-4 mr-2" /> Arquivar
-                </DropdownMenuItem>
-              </>
-            )}
-            {(conversation.status === "closed" || conversation.status === "archived") && (
-              <DropdownMenuItem onClick={() => reopenConversation(conversation.id)}>
-                <RotateCcw className="h-4 w-4 mr-2" /> Reabrir conversa
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
-              <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <Badge variant={statusVariant as any} className="text-[10px] h-4">{statusLabel}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground truncate">{contact?.phone_number}</p>
+          {topicsData?.topics && topicsData.topics.length > 0 && (
+            <div className="mt-0.5">
+              <TopicBadges topics={topicsData.topics} size="sm" showIcon={true} maxTopics={3} />
+            </div>
+          )}
+        </div>
 
-        <Link to="/whatsapp/settings">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Settings className="h-4 w-4" />
+        <div className="flex items-center gap-1.5">
+          <QueueIndicator
+            conversationId={conversation.id}
+            assignedTo={conversation.assigned_to || null}
+            onTransferClick={() => setIsTransferOpen(true)}
+          />
+          <SentimentCard sentiment={sentimentData} />
+
+          <Button variant="ghost" size="sm" onClick={analyze} disabled={isAnalyzing} title="Analisar sentimento">
+            <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
           </Button>
-        </Link>
+
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggleDetails}>
+            <PanelRightOpen className="h-4 w-4" />
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {conversation.status === "active" && (
+                <>
+                  <DropdownMenuItem onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}>
+                    <X className="h-4 w-4 mr-2" /> Encerrar conversa
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => archiveConversation(conversation.id)}>
+                    <Archive className="h-4 w-4 mr-2" /> Arquivar
+                  </DropdownMenuItem>
+                </>
+              )}
+              {(conversation.status === "closed" || conversation.status === "archived") && (
+                <DropdownMenuItem onClick={() => reopenConversation(conversation.id)}>
+                  <RotateCcw className="h-4 w-4 mr-2" /> Reabrir conversa
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
+                <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Link to="/whatsapp/settings">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+
+        <EditContactModal
+          open={isEditContactOpen}
+          onOpenChange={setIsEditContactOpen}
+          contactId={contact?.id || ''}
+          contactName={contact?.name || ''}
+          contactPhone={contact?.phone_number || ''}
+          contactNotes={contact?.notes}
+        />
+
+        <TransferDialog
+          open={isTransferOpen}
+          onOpenChange={setIsTransferOpen}
+          conversationId={conversation.id}
+          currentAssignee={conversation.assigned_to || null}
+        />
       </div>
 
-      <EditContactModal
-        open={isEditContactOpen}
-        onOpenChange={setIsEditContactOpen}
-        contactId={contact?.id || ''}
-        contactName={contact?.name || ''}
-        contactPhone={contact?.phone_number || ''}
-        contactNotes={contact?.notes}
-      />
-
-      <TransferDialog
-        open={isTransferOpen}
-        onOpenChange={setIsTransferOpen}
-        conversationId={conversation.id}
-        currentAssignee={conversation.assigned_to || null}
-      />
+      {/* CS Ticket Alert Banner */}
+      <CSTicketAlert sentiment={sentimentData} conversation={conversation} variant="banner" />
     </div>
   );
 }

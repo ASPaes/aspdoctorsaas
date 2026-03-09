@@ -227,17 +227,27 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 {sentiment.summary && (
                   <p className="text-xs text-muted-foreground bg-muted rounded-md p-2">{sentiment.summary}</p>
                 )}
-                {sentiment.keywords && sentiment.keywords.length > 0 && (
+            {sentiment.keywords && sentiment.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {sentiment.keywords.map((kw: string, i: number) => (
                       <Badge key={i} variant="outline" className="text-[10px]">{kw}</Badge>
                     ))}
                   </div>
                 )}
+                {/* CS Ticket Alert inline */}
+                {sentiment.needs_cs_ticket && !sentiment.cs_ticket_created_id && (
+                  <CSTicketAlert sentiment={sentiment} conversation={conversation} variant="inline" />
+                )}
+                {sentiment.cs_ticket_created_id && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-md p-2">
+                    <Ticket className="h-3 w-3" />
+                    Ticket CS já criado
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">Nenhuma análise disponível. Clique em "Analisar".</p>
-            )}
+            )
           </div>
 
           {/* Notes */}
