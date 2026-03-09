@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    await supabase
+    await anonClient
       .from('whatsapp_conversations')
       .update({
         last_message_at: new Date().toISOString(),
