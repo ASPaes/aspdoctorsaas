@@ -47,7 +47,8 @@ export function ChatMessages({ conversationId, onReply }: Props) {
   const dateGroups = groupByDate(messages, timezone);
 
   return (
-    <ScrollArea className="flex-1 px-4 py-2">
+    <div className="flex-1 min-h-0 overflow-hidden">
+    <ScrollArea className="h-full px-4 py-2">
       {messages.length === 0 ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <p className="text-sm">Nenhuma mensagem ainda</p>
