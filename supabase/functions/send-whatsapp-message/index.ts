@@ -216,10 +216,30 @@ Deno.serve(async (req) => {
 
     // tenantId already defined above
 
-    // Use anonClient (authenticated) so the set_tenant_id_on_insert trigger
-    // can resolve current_tenant_id() via auth.uid()
     // Extract sender user_id from JWT claims
     const senderUserId = (claimsData.claims as any).sub as string | undefined;
+
+    // Resolve sender name/role to prefix in outgoing messages
+    let senderLabel = '';
+    if (senderUserId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('funcionario_id')
+        .eq('user_id', senderUserId)
+        .maybeSingle();
+
+      if (profile?.funcionario_id) {
+        const { data: func } = await supabase
+          .from('funcionarios')
+          .select('nome, cargo')
+          .eq('id', profile.funcionario_id)
+          .maybeSingle();
+
+        if (func?.nome) {
+          senderLabel = func.cargo ? `*${func.nome} · ${func.cargo}*` : `*${func.nome}*`;
+        }
+      }
+    }
 
     const { data: savedMessage, error: saveError } = await anonClient
       .from('whatsapp_messages')
