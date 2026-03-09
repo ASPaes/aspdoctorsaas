@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { escapeLike } from '@/lib/utils';
 
 export interface ConversationWithContact {
   id: string;
@@ -18,6 +19,7 @@ export interface ConversationWithContact {
   updated_at: string;
   metadata: Record<string, any> | null;
   tenant_id: string;
+  is_last_message_from_me: boolean;
   contact: {
     id: string;
     name: string | null;
@@ -69,10 +71,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       // If searching by message content (3+ chars), find matching conversation IDs first
       let messageMatchIds: string[] = [];
       if (searchTerm && searchTerm.length >= 3) {
+        const escaped = escapeLike(searchTerm);
         const { data: msgMatches } = await supabase
           .from('whatsapp_messages' as any)
           .select('conversation_id')
-          .ilike('content', `%${searchTerm}%`)
+          .ilike('content', `%${escaped}%`)
           .limit(200);
         if (msgMatches) {
           messageMatchIds = [...new Set((msgMatches as any[]).map((m: any) => m.conversation_id))];
@@ -106,6 +109,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         ...conv,
         unread_count: parseInt(String((conv as any).unread_count ?? 0), 10) || 0,
         last_message_at: conv.last_message_at || null,
+        // Map denormalized column to UI field — NO extra query needed
+        isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
       // Apply search filter (contact name, phone, or message content match)
@@ -120,64 +125,49 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         });
       }
 
-      // Count query
-      let countQuery = supabase
-        .from('whatsapp_conversations')
-        .select('*', { count: 'exact', head: true });
-      if (tid) countQuery = countQuery.eq('tenant_id', tid);
-      if (filters?.instanceId) countQuery = countQuery.eq('instance_id', filters.instanceId);
-      if (filters?.status) countQuery = countQuery.eq('status', filters.status);
-      if (filters?.assignedTo) countQuery = countQuery.eq('assigned_to', filters.assignedTo);
-      if (filters?.unassigned) countQuery = countQuery.is('assigned_to', null);
+      // --- PARALLELIZED: count + unread + waiting in a single Promise.all ---
+      const buildBaseFilter = (q: any) => {
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters?.instanceId) q = q.eq('instance_id', filters.instanceId);
+        return q;
+      };
 
-      const { count: totalCount } = await countQuery;
+      const buildFullFilter = (q: any) => {
+        q = buildBaseFilter(q);
+        if (filters?.status) q = q.eq('status', filters.status);
+        if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+        if (filters?.unassigned) q = q.is('assigned_to', null);
+        return q;
+      };
 
-      // Unread count
-      let unreadQuery = supabase
-        .from('whatsapp_conversations')
-        .select('unread_count', { count: 'exact' })
-        .gt('unread_count', 0);
-      if (tid) unreadQuery = unreadQuery.eq('tenant_id', tid);
-      if (filters?.instanceId) unreadQuery = unreadQuery.eq('instance_id', filters.instanceId);
+      const [countResult, unreadResult, waitingResult] = await Promise.all([
+        // Total count
+        buildFullFilter(
+          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
+        ),
+        // Unread count
+        buildBaseFilter(
+          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
+            .gt('unread_count', 0)
+        ),
+        // Waiting count — uses denormalized is_last_message_from_me instead of scanning messages
+        buildBaseFilter(
+          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
+            .eq('status', 'active')
+            .eq('is_last_message_from_me', false)
+            .not('last_message_at', 'is', null)
+        ),
+      ]);
 
-      const { count: unreadCount } = await unreadQuery;
-
-      // Waiting count (last message from client)
-      const conversationIds = result.map(c => c.id);
-      let waitingCount = 0;
-
-      if (conversationIds.length > 0) {
-        const { data: lastMessages } = await supabase
-          .from('whatsapp_messages' as any)
-          .select('conversation_id, is_from_me, timestamp')
-          .in('conversation_id', conversationIds)
-          .order('timestamp', { ascending: false });
-
-        if (lastMessages) {
-          const lastMessageMap = new Map<string, boolean>();
-          (lastMessages as any[]).forEach((msg: any) => {
-            if (!lastMessageMap.has(msg.conversation_id)) {
-              lastMessageMap.set(msg.conversation_id, msg.is_from_me || false);
-            }
-          });
-
-          result = result.map(conv => ({
-            ...conv,
-            isLastMessageFromMe: lastMessageMap.get(conv.id),
-          }));
-
-          waitingCount = conversationIds.filter(id => lastMessageMap.get(id) === false).length;
-        }
-      }
-
-      const totalPages = Math.ceil((totalCount || 0) / pageSize);
+      const totalCount = countResult.count || 0;
+      const totalPages = Math.ceil(totalCount / pageSize);
 
       return {
         conversations: result,
-        totalCount: totalCount || 0,
+        totalCount,
         totalPages,
-        unreadCount: unreadCount || 0,
-        waitingCount,
+        unreadCount: unreadResult.count || 0,
+        waitingCount: waitingResult.count || 0,
       } as ConversationsResult;
     },
   });
