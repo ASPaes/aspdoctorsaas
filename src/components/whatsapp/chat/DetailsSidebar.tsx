@@ -38,6 +38,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
   const [newNote, setNewNote] = useState("");
   const [editingContact, setEditingContact] = useState(false);
+  const [sentimentDialogOpen, setSentimentDialogOpen] = useState(false);
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
 
