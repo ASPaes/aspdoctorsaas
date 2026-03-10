@@ -106,15 +106,29 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           ['whatsapp', 'messages', conversationId],
           (old: any[] | undefined) => {
             if (!old) return [newMsg];
-            // Avoid duplicates (optimistic update may have added a temp entry)
-            const exists = old.some((m) => m.id === newMsg.id || m.message_id === newMsg.message_id);
-            if (exists) {
-              // Replace the matching entry (e.g. temp → real)
-              return old.map((m) =>
-                (m.message_id === newMsg.message_id || (m.id.startsWith('temp-') && m.conversation_id === newMsg.conversation_id && m.content === newMsg.content))
-                  ? newMsg
-                  : m
-              );
+
+            // Check for exact id/message_id match OR a temp optimistic entry
+            const isTempMatch = (m: any) =>
+              m.id.startsWith?.('temp-') &&
+              m.is_from_me === true &&
+              m.conversation_id === newMsg.conversation_id;
+
+            const isExactMatch = (m: any) =>
+              m.id === newMsg.id ||
+              (newMsg.message_id && m.message_id === newMsg.message_id);
+
+            const hasMatch = old.some((m) => isExactMatch(m) || isTempMatch(m));
+
+            if (hasMatch) {
+              // Replace the first matching entry (temp → real, or exact update)
+              let replaced = false;
+              return old.map((m) => {
+                if (!replaced && (isExactMatch(m) || isTempMatch(m))) {
+                  replaced = true;
+                  return newMsg;
+                }
+                return m;
+              });
             }
             return [...old, newMsg];
           }
