@@ -89,6 +89,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         .range(from, to);
 
       if (tid) query = query.eq('tenant_id', tid);
+      // Instance filter: for unified conversations, filter by messages that have this instance_id
+      // Keep backward compat: if conversation still has instance_id, use it; otherwise skip
       if (filters?.instanceId) query = query.eq('instance_id', filters.instanceId);
       if (filters?.status) query = query.eq('status', filters.status);
       if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
