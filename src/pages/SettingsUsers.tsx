@@ -153,6 +153,7 @@ export default function SettingsUsers() {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
