@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.whatsapp-media-proxy]
 verify_jwt = false
+
+[functions.delete-whatsapp-message]
+verify_jwt = false
+
+[functions.forward-whatsapp-message]
+verify_jwt = false
