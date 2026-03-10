@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -102,7 +101,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const summaryIsLong = sentiment?.summary?.length > 120;
 
   return (
-    <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink-0">
+    <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink-0 overflow-hidden">
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0">
         <h3 className="text-sm font-semibold">Detalhes</h3>
@@ -111,8 +110,8 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="p-4 space-y-4 min-w-0">
           {/* ─── Contact Info ─── */}
           <div className="flex items-start gap-3 min-w-0">
             <Avatar className="h-12 w-12 shrink-0">
@@ -387,7 +386,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             </div>
           </CollapsibleSection>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
