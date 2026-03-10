@@ -386,7 +386,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             </div>
           </CollapsibleSection>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
