@@ -32,15 +32,52 @@ const SORT_LABELS: Record<string, string> = {
 };
 
 export function ConversationsSidebar({ selectedId, onSelect }: Props) {
-  const [search, setSearch] = useState("");
+  const STORAGE_KEY = "whatsapp-chat-filters";
+
+  const loadSaved = () => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  };
+
+  const saved = loadSaved();
+
+  const [search, setSearch] = useState(saved?.search ?? "");
   const [showNewModal, setShowNewModal] = useState(false);
-  const [activePill, setActivePill] = useState("all");
+  const [activePill, setActivePillRaw] = useState(saved?.activePill ?? "all");
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<{ sortBy: SortBy; status: string | undefined; instanceId: string | undefined }>({
-    sortBy: "recent",
-    status: undefined,
-    instanceId: undefined,
+  const [filters, setFiltersRaw] = useState<{ sortBy: SortBy; status: string | undefined; instanceId: string | undefined }>({
+    sortBy: saved?.sortBy ?? "recent",
+    status: saved?.status ?? undefined,
+    instanceId: saved?.instanceId ?? undefined,
   });
+
+  const persist = (patch: Record<string, any>) => {
+    try {
+      const current = loadSaved() || {};
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }));
+    } catch {}
+  };
+
+  const setActivePill = (v: string) => {
+    setActivePillRaw(v);
+    persist({ activePill: v });
+  };
+
+  const setFilters = (updater: typeof filters | ((prev: typeof filters) => typeof filters)) => {
+    setFiltersRaw((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      persist({ sortBy: next.sortBy, status: next.status, instanceId: next.instanceId });
+      return next;
+    });
+  };
+
+  const handleSearchChange = (v: string) => {
+    setSearch(v);
+    persist({ search: v });
+  };
   const navigate = useNavigate();
   const { user } = useAuth();
   const { instances } = useWhatsAppInstances();
@@ -198,7 +235,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           <Input
             placeholder="Buscar conversas..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-9"
           />
         </div>
