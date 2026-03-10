@@ -683,6 +683,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
     let mediaUrl: string | null = null;
     let mediaMimetype: string | null = null;
+    let mediaPath: string | null = null;
+    let mediaFilename: string | null = null;
+    let mediaExt: string | null = null;
+    let mediaSizeBytes: number | null = null;
+    let mediaKind: string | null = null;
 
     if (messageType !== 'text') {
       const mediaMessage = message[`${messageType}Message`];
@@ -698,6 +703,29 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             mediaMimetype,
             instanceData.provider_type || 'self_hosted'
           );
+
+          // Populate media metadata
+          if (mediaUrl) {
+            mediaPath = mediaUrl; // downloadAndUploadMedia returns the storage path
+            mediaKind = messageType === 'document' ? 'document'
+              : messageType === 'image' ? 'image'
+              : messageType === 'audio' ? 'audio'
+              : messageType === 'video' ? 'video'
+              : 'other';
+
+            // Extract filename from document or generate from path
+            mediaFilename = mediaMessage.fileName
+              || mediaMessage.filename
+              || (mediaPath ? mediaPath.split('/').pop() || null : null);
+
+            // Extract extension
+            if (mediaFilename && mediaFilename.includes('.')) {
+              mediaExt = mediaFilename.split('.').pop()?.toLowerCase() || null;
+            } else if (mediaMimetype) {
+              const sub = mediaMimetype.split('/')[1]?.split(';')[0]?.trim();
+              mediaExt = sub || null;
+            }
+          }
         }
       }
     }
@@ -706,7 +734,6 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
     // Dedupe insert: use upsert with onConflict to silently ignore duplicates
-    // CHANGED: include instance_id in the message
     const isFromMe = key.fromMe || false;
     const { data: savedMsg, error: messageError } = await supabase
       .from('whatsapp_messages')
@@ -718,6 +745,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         message_type: messageType,
         media_url: mediaUrl,
         media_mimetype: mediaMimetype,
+        media_path: mediaPath,
+        media_filename: mediaFilename,
+        media_ext: mediaExt,
+        media_size_bytes: mediaSizeBytes,
+        media_kind: mediaKind,
         is_from_me: isFromMe,
         status: 'sent',
         quoted_message_id: quotedMessageId,
