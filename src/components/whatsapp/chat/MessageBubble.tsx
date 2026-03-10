@@ -62,7 +62,7 @@ export function MessageBubble({ msg, onReply }: Props) {
         )}
 
         {msg.media_url && msg.message_type !== "text" && (
-          <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={(msg as any).media_filename} mediaExt={(msg as any).media_ext} mediaSizeBytes={(msg as any).media_size_bytes} mediaKind={(msg as any).media_kind} mediaMimetype={msg.media_mimetype} />
+          <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} />
         )}
         {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
 
