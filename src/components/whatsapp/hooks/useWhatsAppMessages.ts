@@ -22,6 +22,7 @@ export interface Message {
   sent_by_user_id: string | null;
   sender_name: string | null;
   sender_role: string | null;
+  instance_id: string | null;
 }
 
 // Lean select — only fields the UI needs
@@ -41,6 +42,7 @@ const MESSAGE_SELECT = [
   'audio_transcription',
   'transcription_status',
   'sent_by_user_id',
+  'instance_id',
 ].join(',');
 
 export const useWhatsAppMessages = (conversationId: string | null) => {

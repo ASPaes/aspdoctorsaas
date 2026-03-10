@@ -1431,7 +1431,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          instance_id: string
+          instance_id: string | null
           is_group: boolean
           name: string | null
           notes: string | null
@@ -1444,7 +1444,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          instance_id: string
+          instance_id?: string | null
           is_group?: boolean
           name?: string | null
           notes?: string | null
@@ -1457,7 +1457,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          instance_id?: string
+          instance_id?: string | null
           is_group?: boolean
           name?: string | null
           notes?: string | null
@@ -1596,7 +1596,7 @@ export type Database = {
           contact_id: string
           created_at: string
           id: string
-          instance_id: string
+          instance_id: string | null
           is_last_message_from_me: boolean
           last_message_at: string | null
           last_message_preview: string | null
@@ -1613,7 +1613,7 @@ export type Database = {
           contact_id: string
           created_at?: string
           id?: string
-          instance_id: string
+          instance_id?: string | null
           is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
@@ -1630,7 +1630,7 @@ export type Database = {
           contact_id?: string
           created_at?: string
           id?: string
-          instance_id?: string
+          instance_id?: string | null
           is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
@@ -1873,6 +1873,7 @@ export type Database = {
           created_at: string
           edited_at: string | null
           id: string
+          instance_id: string | null
           is_from_me: boolean
           media_mimetype: string | null
           media_url: string | null
@@ -1895,6 +1896,7 @@ export type Database = {
           created_at?: string
           edited_at?: string | null
           id?: string
+          instance_id?: string | null
           is_from_me?: boolean
           media_mimetype?: string | null
           media_url?: string | null
@@ -1917,6 +1919,7 @@ export type Database = {
           created_at?: string
           edited_at?: string | null
           id?: string
+          instance_id?: string | null
           is_from_me?: boolean
           media_mimetype?: string | null
           media_url?: string | null
@@ -1938,6 +1941,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
           {

@@ -14,6 +14,7 @@ interface SendMessageRequest {
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
+  instanceId?: string; // NEW: optional instance override for cross-instance conversations
 }
 
 function getEvolutionAuthHeaders(apiKey: string, _providerType: string): Record<string, string> {
@@ -56,7 +57,8 @@ Deno.serve(async (req) => {
     const body: SendMessageRequest = await req.json();
     console.log('[send-whatsapp-message] Request received:', { 
       conversationId: body.conversationId, 
-      messageType: body.messageType 
+      messageType: body.messageType,
+      instanceId: body.instanceId || '(auto)',
     });
 
     if (!body.conversationId || !body.messageType) {
@@ -84,14 +86,10 @@ Deno.serve(async (req) => {
     const senderUserId = (claimsData.claims as any).sub as string | undefined;
 
     const [convResult, senderLabel] = await Promise.all([
-      // 1) Fetch conversation with joins
+      // 1) Fetch conversation with contact info
       supabase
         .from('whatsapp_conversations')
-        .select(`
-          *,
-          whatsapp_contacts!inner (phone_number, name),
-          whatsapp_instances!inner (id, instance_name, provider_type, instance_id_external)
-        `)
+        .select(`*, whatsapp_contacts!inner (phone_number, name)`)
         .eq('id', body.conversationId)
         .single(),
       // 2) Resolve sender name
@@ -121,10 +119,73 @@ Deno.serve(async (req) => {
       });
     }
 
+    const tenantId = conversation.tenant_id;
+    const contact = (conversation as any).whatsapp_contacts;
+
+    if (!tenantId) {
+      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // CHANGED: Determine which instance to use for sending
+    // Priority: 1) explicit instanceId from request, 2) conversation's instance_id, 3) last received message's instance
+    let sendInstanceId = body.instanceId || conversation.instance_id;
+    
+    if (!sendInstanceId) {
+      // Fallback: find the instance of the last received message in this conversation
+      const { data: lastMsg } = await supabase
+        .from('whatsapp_messages')
+        .select('instance_id')
+        .eq('conversation_id', body.conversationId)
+        .eq('is_from_me', false)
+        .not('instance_id', 'is', null)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      sendInstanceId = lastMsg?.instance_id;
+    }
+
+    if (!sendInstanceId) {
+      // Last fallback: get any instance for this tenant
+      const { data: anyInstance } = await supabase
+        .from('whatsapp_instances')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'connected')
+        .limit(1)
+        .maybeSingle();
+      sendInstanceId = anyInstance?.id;
+    }
+
+    if (!sendInstanceId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'No instance available to send message' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch instance details
+    const { data: instanceData, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, instance_name, provider_type, instance_id_external')
+      .eq('id', sendInstanceId)
+      .single();
+
+    if (instanceError || !instanceData) {
+      console.error('[send] Instance not found:', sendInstanceId);
+      return new Response(JSON.stringify({ error: 'Instance not found' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const { data: secrets, error: secretsError } = await supabase
       .from('whatsapp_instance_secrets')
       .select('api_url, api_key')
-      .eq('instance_id', (conversation as any).whatsapp_instances.id)
+      .eq('instance_id', instanceData.id)
       .single();
 
     if (secretsError || !secrets) {
@@ -134,25 +195,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    const instanceName = (conversation as any).whatsapp_instances.instance_name;
-    const providerType = (conversation as any).whatsapp_instances.provider_type || 'self_hosted';
-    const instanceIdExternal = (conversation as any).whatsapp_instances.instance_id_external;
-    const contact = (conversation as any).whatsapp_contacts;
+    const instanceName = instanceData.instance_name;
+    const providerType = instanceData.provider_type || 'self_hosted';
+    const instanceIdExternal = instanceData.instance_id_external;
 
     const instanceIdentifier = providerType === 'cloud' && instanceIdExternal
       ? instanceIdExternal
       : instanceName;
 
-    const tenantId = conversation.tenant_id;
-    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'Provider:', providerType, 'tenant:', tenantId);
-
-    if (!tenantId) {
-      console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined from conversation:', JSON.stringify(conversation));
-      return new Response(
-        JSON.stringify({ success: false, error: 'Could not determine tenant_id' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceName, 'Provider:', providerType);
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
@@ -248,8 +299,8 @@ Deno.serve(async (req) => {
     const messageTimestamp = new Date().toISOString();
 
     // --- PARALLELIZED: save message + update conversation ---
+    // CHANGED: include instance_id in the saved message
     const [saveResult] = await Promise.all([
-      // 1) Insert message via anonClient (respects RLS)
       anonClient
         .from('whatsapp_messages')
         .insert({
@@ -267,10 +318,10 @@ Deno.serve(async (req) => {
           quoted_message_id: body.quotedMessageId || null,
           metadata: body.fileName ? { fileName: body.fileName } : null,
           sent_by_user_id: senderUserId || null,
+          instance_id: sendInstanceId,
         })
         .select()
         .single(),
-      // 2) Update conversation with anti-stale guard (service role)
       (async () => {
         const updateData: Record<string, any> = {
           last_message_at: messageTimestamp,
@@ -279,20 +330,10 @@ Deno.serve(async (req) => {
           updated_at: messageTimestamp,
         };
 
-        // Anti-stale guard: only update if new timestamp >= current last_message_at
-        let query = supabase
+        await supabase
           .from('whatsapp_conversations')
           .update(updateData)
           .eq('id', body.conversationId);
-
-        // If conversation already has a last_message_at, only update if we're newer or equal
-        if (conversation.last_message_at) {
-          query = query.gte('last_message_at', '1970-01-01T00:00:00.000Z')
-          // We use an approach: update always since sent messages are always "now" (latest)
-          // For sent messages, timestamp is always current, so they're always the newest
-        }
-
-        await query;
       })(),
     ]);
 
@@ -306,7 +347,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('[send-whatsapp-message] Message sent and saved:', savedMessage.id);
+    console.log('[send-whatsapp-message] Message sent and saved:', savedMessage.id, 'via instance:', sendInstanceId);
 
     // Fire-and-forget: trigger audio transcription for sent audio messages
     if (body.messageType === 'audio' && savedMessage?.id) {

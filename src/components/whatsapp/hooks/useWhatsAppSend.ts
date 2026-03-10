@@ -11,6 +11,7 @@ interface SendMessageParams {
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
+  instanceId?: string; // optional: choose which instance to send from
 }
 
 export const useWhatsAppSend = () => {
