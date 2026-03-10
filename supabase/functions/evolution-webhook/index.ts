@@ -145,7 +145,6 @@ async function downloadAndUploadMedia(
       return null;
     }
 
-    // Store just the file path (not the full public URL) since bucket is private
     console.log('[evolution-webhook] Media uploaded successfully, path:', filePath);
     return filePath;
   } catch (error) {
@@ -206,6 +205,9 @@ async function fetchAndUpdateProfilePicture(
   }
 }
 
+/**
+ * UNIFIED: Find or create contact by tenant_id + phone_number (cross-instance).
+ */
 async function findOrCreateContact(
   supabase: any,
   instanceId: string,
@@ -231,12 +233,13 @@ async function findOrCreateContact(
       phoneVariants.push(withNinth);
     }
 
-    console.log(`[evolution-webhook] Searching contacts with variants: ${phoneVariants.join(', ')}`);
+    console.log(`[evolution-webhook] Searching contacts by TENANT+phone variants: ${phoneVariants.join(', ')}`);
 
+    // CHANGED: search by tenant_id instead of instance_id
     const { data: existingContact } = await supabase
       .from('whatsapp_contacts')
       .select('id, name, phone_number')
-      .eq('instance_id', instanceId)
+      .eq('tenant_id', tenantId)
       .in('phone_number', phoneVariants)
       .maybeSingle();
 
@@ -273,6 +276,7 @@ async function findOrCreateContact(
 
     const contactName = isFromMe ? phoneNumber : (name || phoneNumber);
     
+    // instance_id is now nullable; set it as reference to first instance
     const { data: newContact, error } = await supabase
       .from('whatsapp_contacts')
       .insert({
@@ -367,6 +371,9 @@ async function applyAutoAssignment(
   }
 }
 
+/**
+ * UNIFIED: Find or create conversation by tenant_id + contact_id (cross-instance).
+ */
 async function findOrCreateConversation(
   supabase: any,
   instanceId: string,
@@ -374,10 +381,11 @@ async function findOrCreateConversation(
   tenantId: string
 ): Promise<string | null> {
   try {
+    // CHANGED: search by tenant_id + contact_id instead of instance_id + contact_id
     const { data: existingConversation, error: findError } = await supabase
       .from('whatsapp_conversations')
       .select('id')
-      .eq('instance_id', instanceId)
+      .eq('tenant_id', tenantId)
       .eq('contact_id', contactId)
       .maybeSingle();
 
@@ -386,10 +394,11 @@ async function findOrCreateConversation(
     }
 
     if (existingConversation) {
-      console.log('[evolution-webhook] Conversation found:', existingConversation.id);
+      console.log('[evolution-webhook] Conversation found (unified):', existingConversation.id);
       return existingConversation.id;
     }
 
+    // instance_id is kept for reference but conversation is tenant-scoped
     const { data: newConversation, error: createError } = await supabase
       .from('whatsapp_conversations')
       .insert({
@@ -697,6 +706,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
     // Dedupe insert: use upsert with onConflict to silently ignore duplicates
+    // CHANGED: include instance_id in the message
     const isFromMe = key.fromMe || false;
     const { data: savedMsg, error: messageError } = await supabase
       .from('whatsapp_messages')
@@ -713,6 +723,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         quoted_message_id: quotedMessageId,
         timestamp,
         tenant_id: tenantId,
+        instance_id: instanceData.id,
       }, {
         onConflict: 'tenant_id,message_id',
         ignoreDuplicates: true,
@@ -725,7 +736,6 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       return;
     }
 
-    // If savedMsg is null, it was a duplicate — still update conversation if needed
     if (savedMsg) {
       console.log('[evolution-webhook] Message saved successfully:', savedMsg.id);
     } else {
@@ -755,14 +765,12 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
     const updateData: Record<string, any> = {};
 
-    // Only update last_message_* and is_last_message_from_me if this event is newer
     if (isNewerOrEqual) {
       updateData.last_message_at = timestamp;
       updateData.last_message_preview = content.substring(0, 200);
       updateData.is_last_message_from_me = isFromMe;
     }
 
-    // Increment unread_count only for incoming messages (fromMe=false)
     if (!isFromMe) {
       updateData.unread_count = (currentConv?.unread_count || 0) + 1;
     }
@@ -832,7 +840,6 @@ async function processConnectionUpdate(payload: EvolutionWebhookPayload, supabas
     else if (state === 'connecting') status = 'connecting';
     else if (state === 'close' || state === 'closed') status = 'disconnected';
 
-    // Try by instance_name first, then by instance_id_external
     const { error } = await supabase
       .from('whatsapp_instances')
       .update({ status })
