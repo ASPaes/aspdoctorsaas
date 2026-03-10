@@ -37,7 +37,7 @@ function MessageBubbleInline({ msg, timezone }: { msg: Message; timezone: string
         )}
       >
         {msg.media_url && msg.message_type !== "text" && (
-          <MediaContent messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} />
+          <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={(msg as any).media_filename} mediaExt={(msg as any).media_ext} mediaSizeBytes={(msg as any).media_size_bytes} mediaKind={(msg as any).media_kind} mediaMimetype={msg.media_mimetype} />
         )}
         {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
         <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
