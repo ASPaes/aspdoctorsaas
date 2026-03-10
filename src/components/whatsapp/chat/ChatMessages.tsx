@@ -9,25 +9,31 @@ import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
 import { ArrowRightLeft } from "lucide-react";
 
-function groupByDate(messages: Message[], timezone: string): { date: string; msgs: Message[] }[] {
-  const groups: Record<string, Message[]> = {};
-  for (const msg of messages) {
-    const d = formatDateLabel(msg.timestamp, timezone);
-    (groups[d] ??= []).push(msg);
-  }
-  return Object.entries(groups).map(([date, msgs]) => ({ date, msgs }));
-}
-
 interface Props {
   conversationId: string;
   onReply?: (msg: Message) => void;
+  selectionMode?: boolean;
+  selectedMessages?: Set<string>;
+  onToggleSelect?: (msgId: string) => void;
+  onDeleteSingle?: (msgId: string) => void;
+  onForwardSingle?: (msgId: string) => void;
+  onEnterSelectionMode?: (msgId: string) => void;
 }
 
 type TimelineItem =
   | { type: 'message'; msg: Message }
   | { type: 'transfer'; event: AssignmentEvent };
 
-export function ChatMessages({ conversationId, onReply }: Props) {
+export function ChatMessages({
+  conversationId,
+  onReply,
+  selectionMode,
+  selectedMessages,
+  onToggleSelect,
+  onDeleteSingle,
+  onForwardSingle,
+  onEnterSelectionMode,
+}: Props) {
   const { messages, isLoading } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useChatTimezone();
@@ -100,7 +106,17 @@ export function ChatMessages({ conversationId, onReply }: Props) {
             </div>
             {items.map((item) =>
               item.type === 'message' ? (
-                <MessageBubble key={item.msg.id} msg={item.msg} onReply={onReply} />
+                <MessageBubble
+                  key={item.msg.id}
+                  msg={item.msg}
+                  onReply={onReply}
+                  selectionMode={selectionMode}
+                  isSelected={selectedMessages?.has(item.msg.id)}
+                  onToggleSelect={onToggleSelect}
+                  onDelete={onDeleteSingle}
+                  onForward={onForwardSingle}
+                  onEnterSelectionMode={onEnterSelectionMode}
+                />
               ) : (
                 <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
                   <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
