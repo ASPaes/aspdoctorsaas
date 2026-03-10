@@ -41,6 +41,7 @@ const MESSAGE_SELECT = [
   'audio_transcription',
   'transcription_status',
   'sent_by_user_id',
+  'instance_id',
 ].join(',');
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
