@@ -40,6 +40,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [newNote, setNewNote] = useState("");
   const [editingContact, setEditingContact] = useState(false);
   const [sentimentDialogOpen, setSentimentDialogOpen] = useState(false);
+  const [sentimentExpanded, setSentimentExpanded] = useState(false);
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
 
@@ -98,8 +99,10 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
     }
   };
 
+  const summaryIsLong = sentiment?.summary?.length > 120;
+
   return (
-    <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink">
+    <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink-0">
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0">
         <h3 className="text-sm font-semibold">Detalhes</h3>
@@ -110,13 +113,13 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          {/* Contact Info */}
-          <div className="flex items-start gap-3">
+          {/* ─── Contact Info ─── */}
+          <div className="flex items-start gap-3 min-w-0">
             <Avatar className="h-12 w-12 shrink-0">
               {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
               <AvatarFallback className="text-xs">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1">
+            <div className="flex-1 min-w-0">
               {editingContact ? (
                 <div className="space-y-1.5">
                   <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Nome" className="text-xs h-7" />
@@ -128,11 +131,15 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-medium break-all leading-tight" title={name}>{name}</p>
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <p className="text-sm font-medium truncate max-w-full" title={name}>{name}</p>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
                     <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number}
                   </p>
-                  {contact?.notes && <p className="text-[10px] text-muted-foreground mt-1 break-words whitespace-pre-wrap">{contact.notes}</p>}
+                  {contact?.notes && (
+                    <p className="text-[10px] text-muted-foreground mt-1 whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>
+                      {contact.notes}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -143,19 +150,19 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             )}
           </div>
 
-          {/* Cliente Link */}
+          {/* ─── Cliente Link ─── */}
           <ClienteLinkCard conversation={conversation} />
 
-          {/* Tags */}
+          {/* ─── Tags ─── */}
           {contact?.tags && contact.tags.length > 0 && (
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-1 mb-1.5">
-                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <span className="text-xs font-medium text-muted-foreground">Tags</span>
               </div>
               <div className="flex flex-wrap gap-1">
                 {contact.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                  <Badge key={tag} variant="secondary" className="text-[10px] max-w-full truncate">{tag}</Badge>
                 ))}
               </div>
             </div>
@@ -163,7 +170,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
           <Separator />
 
-          {/* Tópicos IA — Collapsible */}
+          {/* ─── Tópicos IA ─── */}
           <CollapsibleSection
             icon={<Sparkles className="h-3.5 w-3.5" />}
             title="Tópicos IA"
@@ -183,10 +190,10 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             }
           >
             {topicsData?.topics && topicsData.topics.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <TopicBadges topics={topicsData.topics} size="default" showIcon={false} maxTopics={10} />
                 {topicsData.primary_topic && (
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[10px] text-muted-foreground whitespace-normal break-words">
                     Principal: <span className="font-medium">{topicsData.primary_topic.replace(/_/g, ' ')}</span>
                   </p>
                 )}
@@ -203,7 +210,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
           <Separator />
 
-          {/* Sentimento IA — Collapsible */}
+          {/* ─── Sentimento IA ─── */}
           <CollapsibleSection
             icon={<MessageSquare className="h-3.5 w-3.5" />}
             title="Sentimento IA"
@@ -223,10 +230,10 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             }
           >
             {sentiment ? (
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 min-w-0">
                 {/* Emoji + label + confidence bar */}
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl leading-none">{getSentimentEmoji()}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl leading-none shrink-0">{getSentimentEmoji()}</span>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-semibold ${getSentimentColor()}`}>{getSentimentLabel()}</p>
                     {sentiment.confidence != null && (
@@ -235,28 +242,39 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                           value={Math.round(sentiment.confidence * 100)}
                           className={`h-1.5 flex-1 ${getSentimentProgressColor()}`}
                         />
-                        <span className="text-[10px] text-muted-foreground w-8 text-right">{Math.round(sentiment.confidence * 100)}%</span>
+                        <span className="text-[10px] text-muted-foreground w-8 text-right shrink-0">{Math.round(sentiment.confidence * 100)}%</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Summary — full text, scrollable if very long */}
+                {/* Summary — expandable inline */}
                 {sentiment.summary && (
-                  <div
-                    className="text-xs text-muted-foreground bg-muted rounded-md p-2.5 break-words whitespace-pre-wrap max-h-40 overflow-y-auto cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() => setSentimentDialogOpen(true)}
-                    title="Clique para expandir"
-                  >
-                    {sentiment.summary}
+                  <div className="min-w-0">
+                    <p
+                      className={`text-xs text-muted-foreground bg-muted rounded-md p-2.5 whitespace-normal break-words ${
+                        !sentimentExpanded && summaryIsLong ? "line-clamp-3" : ""
+                      }`}
+                      style={{ overflowWrap: 'anywhere' }}
+                    >
+                      {sentiment.summary}
+                    </p>
+                    {summaryIsLong && (
+                      <button
+                        className="text-[10px] text-primary hover:underline mt-1 font-medium"
+                        onClick={() => setSentimentExpanded(!sentimentExpanded)}
+                      >
+                        {sentimentExpanded ? "Ver menos" : "Ver mais"}
+                      </button>
+                    )}
                   </div>
                 )}
 
                 {/* Keywords */}
                 {sentiment.keywords && sentiment.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 min-w-0">
                     {sentiment.keywords.map((kw: string, i: number) => (
-                      <Badge key={i} variant="outline" className="text-[10px] whitespace-nowrap">{kw}</Badge>
+                      <Badge key={i} variant="outline" className="text-[10px] max-w-full truncate">{kw}</Badge>
                     ))}
                   </div>
                 )}
@@ -266,7 +284,12 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                   <CSTicketAlert sentiment={sentiment} conversation={conversation} variant="inline" />
                 )}
                 {sentiment.cs_ticket_reason && (
-                  <p className="text-[10px] text-destructive bg-destructive/10 rounded-md p-2 break-words whitespace-pre-wrap">{sentiment.cs_ticket_reason}</p>
+                  <p
+                    className="text-[10px] text-destructive bg-destructive/10 rounded-md p-2 whitespace-normal break-words"
+                    style={{ overflowWrap: 'anywhere' }}
+                  >
+                    {sentiment.cs_ticket_reason}
+                  </p>
                 )}
                 {sentiment.cs_ticket_created_id && (
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-md p-2">
@@ -280,54 +303,9 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             )}
           </CollapsibleSection>
 
-          {/* Sentiment Detail Dialog */}
-          {sentiment && (
-            <Dialog open={sentimentDialogOpen} onOpenChange={setSentimentDialogOpen}>
-              <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <span className="text-xl">{getSentimentEmoji()}</span>
-                    Análise de Sentimento — {getSentimentLabel()}
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {sentiment.confidence != null && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Confiança:</span>
-                      <Progress value={Math.round(sentiment.confidence * 100)} className={`h-2 flex-1 ${getSentimentProgressColor()}`} />
-                      <span className="text-xs font-medium">{Math.round(sentiment.confidence * 100)}%</span>
-                    </div>
-                  )}
-                  {sentiment.summary && (
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Resumo</p>
-                      <p className="text-sm bg-muted rounded-md p-3 whitespace-pre-wrap break-words">{sentiment.summary}</p>
-                    </div>
-                  )}
-                  {sentiment.keywords && sentiment.keywords.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Palavras-chave</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {sentiment.keywords.map((kw: string, i: number) => (
-                          <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {sentiment.cs_ticket_reason && (
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Motivo para ticket CS</p>
-                      <p className="text-sm bg-destructive/10 text-destructive rounded-md p-3 break-words whitespace-pre-wrap">{sentiment.cs_ticket_reason}</p>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-
           <Separator />
 
-          {/* Notes — Collapsible */}
+          {/* ─── Notes ─── */}
           <CollapsibleSection
             icon={<StickyNote className="h-3.5 w-3.5" />}
             title="Notas"
@@ -335,10 +313,10 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             open={notesOpen}
             onOpenChange={setNotesOpen}
           >
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               {notes.map((note) => (
-                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group break-words whitespace-pre-wrap">
-                  <p>{note.content}</p>
+                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group min-w-0">
+                  <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{note.content}</p>
                   <button
                     className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
                     onClick={() => deleteNote(note.id)}
@@ -364,7 +342,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
           <Separator />
 
-          {/* Summaries — Collapsible (collapsed by default) */}
+          {/* ─── Summaries ─── */}
           <CollapsibleSection
             icon={<FileText className="h-3.5 w-3.5" />}
             title="Resumos"
@@ -383,23 +361,23 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               </Button>
             }
           >
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               {summaries.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Nenhum resumo disponível</p>
               ) : (
                 summaries.map((s) => (
-                  <div key={s.id} className="bg-muted rounded-md p-2 text-xs space-y-1 break-words">
-                    <p className="whitespace-pre-wrap">{s.summary}</p>
+                  <div key={s.id} className="bg-muted rounded-md p-2 text-xs space-y-1 min-w-0">
+                    <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{s.summary}</p>
                     {s.key_points && s.key_points.length > 0 && (
                       <ul className="list-disc list-inside text-muted-foreground">
-                        {s.key_points.map((kp: string, i: number) => <li key={i}>{kp}</li>)}
+                        {s.key_points.map((kp: string, i: number) => <li key={i} className="break-words">{kp}</li>)}
                       </ul>
                     )}
                     {s.action_items && s.action_items.length > 0 && (
                       <div className="pt-1 border-t border-border mt-1">
                         <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Ações pendentes:</p>
                         <ul className="list-disc list-inside text-muted-foreground">
-                          {s.action_items.map((ai: string, i: number) => <li key={i}>{ai}</li>)}
+                          {s.action_items.map((ai: string, i: number) => <li key={i} className="break-words">{ai}</li>)}
                         </ul>
                       </div>
                     )}
@@ -434,20 +412,20 @@ function CollapsibleSection({
 }) {
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between min-w-0 gap-2">
         <CollapsibleTrigger asChild>
-          <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1">
-            <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${open ? "" : "-rotate-90"}`} />
+          <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1 min-w-0">
+            <ChevronDown className={`h-3 w-3 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`} />
             {icon}
-            <span>{title}</span>
+            <span className="truncate">{title}</span>
             {badge != null && (
-              <span className="ml-1 bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] leading-none font-semibold">{badge}</span>
+              <span className="ml-1 bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] leading-none font-semibold shrink-0">{badge}</span>
             )}
           </button>
         </CollapsibleTrigger>
         {action && <div className="shrink-0">{action}</div>}
       </div>
-      <CollapsibleContent className="mt-2">
+      <CollapsibleContent className="mt-2 min-w-0">
         {children}
       </CollapsibleContent>
     </Collapsible>
