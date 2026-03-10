@@ -14,25 +14,45 @@ export const useCreateConversation = () => {
 
   return useMutation({
     mutationFn: async (params: CreateConversationParams) => {
-      const contactPayload = {
-        instance_id: params.instanceId,
-        phone_number: params.phoneNumber,
-        name: params.contactName,
-        profile_picture_url: params.profilePictureUrl,
-      };
+      // Look up existing contact by tenant-scoped phone number
+      const { data: existingContact } = await supabase
+        .from('whatsapp_contacts')
+        .select('*')
+        .eq('phone_number', params.phoneNumber)
+        .maybeSingle();
 
-      const { data: contact, error: contactError } = await (supabase
-        .from('whatsapp_contacts') as any)
-        .upsert(contactPayload, { onConflict: 'instance_id,phone_number' })
-        .select()
-        .single();
-
-      if (contactError) throw contactError;
+      let contact: any;
+      if (existingContact) {
+        // Update name/picture if provided
+        const updates: any = {};
+        if (params.contactName && params.contactName !== existingContact.phone_number) {
+          updates.name = params.contactName;
+        }
+        if (params.profilePictureUrl) {
+          updates.profile_picture_url = params.profilePictureUrl;
+        }
+        if (Object.keys(updates).length > 0) {
+          await supabase.from('whatsapp_contacts').update(updates).eq('id', existingContact.id);
+        }
+        contact = existingContact;
+      } else {
+        const { data: newContact, error: contactError } = await (supabase
+          .from('whatsapp_contacts') as any)
+          .insert({
+            phone_number: params.phoneNumber,
+            name: params.contactName,
+            profile_picture_url: params.profilePictureUrl,
+            instance_id: params.instanceId,
+          })
+          .select()
+          .single();
+        if (contactError) throw contactError;
+        contact = newContact;
+      }
 
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('*')
-        .eq('instance_id', params.instanceId)
         .eq('contact_id', contact.id)
         .maybeSingle();
 
