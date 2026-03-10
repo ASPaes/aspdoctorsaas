@@ -1883,6 +1883,8 @@ export type Database = {
           original_content: string | null
           quoted_message_id: string | null
           remote_jid: string | null
+          sender_name: string | null
+          sender_role: string | null
           sent_by_user_id: string | null
           status: string
           tenant_id: string
@@ -1906,6 +1908,8 @@ export type Database = {
           original_content?: string | null
           quoted_message_id?: string | null
           remote_jid?: string | null
+          sender_name?: string | null
+          sender_role?: string | null
           sent_by_user_id?: string | null
           status?: string
           tenant_id: string
@@ -1929,6 +1933,8 @@ export type Database = {
           original_content?: string | null
           quoted_message_id?: string | null
           remote_jid?: string | null
+          sender_name?: string | null
+          sender_role?: string | null
           sent_by_user_id?: string | null
           status?: string
           tenant_id?: string

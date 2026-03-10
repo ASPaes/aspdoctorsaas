@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useSenderMap } from './useSenderMap';
 
 export interface Message {
   id: string;
@@ -43,13 +42,14 @@ const MESSAGE_SELECT = [
   'transcription_status',
   'sent_by_user_id',
   'instance_id',
+  'sender_name',
+  'sender_role',
 ].join(',');
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
-  const { senderMap } = useSenderMap();
 
-  const { data: rawMessages = [], isLoading, error } = useQuery({
+  const { data: messages = [] as Message[], isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'messages', conversationId],
     queryFn: async () => {
       if (!conversationId) return [];
@@ -61,24 +61,13 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         .order('timestamp', { ascending: true });
 
       if (error) throw error;
-      return (data ?? []) as unknown as any[];
+      return ((data ?? []) as unknown as Message[]).map((m) => ({
+        ...m,
+        metadata: null, // not fetched in lean select
+      }));
     },
     enabled: !!conversationId,
   });
-
-  // Enrich messages with sender info from the shared cache (no extra queries)
-  const messages = useMemo(() => {
-    if (!rawMessages.length) return [] as Message[];
-    return rawMessages.map((m: any) => {
-      const sender = m.sent_by_user_id && senderMap[m.sent_by_user_id];
-      return {
-        ...m,
-        metadata: null, // not fetched in lean select
-        sender_name: sender ? sender.nome : null,
-        sender_role: sender ? sender.cargo : null,
-      } as Message;
-    });
-  }, [rawMessages, senderMap]);
 
   // Mark conversation as read when opened
   useEffect(() => {

@@ -85,28 +85,29 @@ Deno.serve(async (req) => {
     // --- PARALLELIZED: conversation fetch + sender resolution ---
     const senderUserId = (claimsData.claims as any).sub as string | undefined;
 
-    const [convResult, senderLabel] = await Promise.all([
+    const [convResult, senderInfo] = await Promise.all([
       // 1) Fetch conversation with contact info
       supabase
         .from('whatsapp_conversations')
         .select(`*, whatsapp_contacts!inner (phone_number, name)`)
         .eq('id', body.conversationId)
         .single(),
-      // 2) Resolve sender name
-      (async (): Promise<string> => {
-        if (!senderUserId) return '';
+      // 2) Resolve sender name + role
+      (async (): Promise<{ label: string; name: string; role: string | null }> => {
+        if (!senderUserId) return { label: '', name: '', role: null };
         const { data: profile } = await supabase
           .from('profiles')
           .select('funcionario_id')
           .eq('user_id', senderUserId)
           .maybeSingle();
-        if (!profile?.funcionario_id) return '';
+        if (!profile?.funcionario_id) return { label: '', name: '', role: null };
         const { data: func } = await supabase
           .from('funcionarios')
-          .select('nome')
+          .select('nome, cargo')
           .eq('id', profile.funcionario_id)
           .maybeSingle();
-        return func?.nome ? `*${func.nome}*` : '';
+        if (!func?.nome) return { label: '', name: '', role: null };
+        return { label: `*${func.nome}*`, name: func.nome, role: func.cargo || null };
       })(),
     ]);
 
@@ -243,7 +244,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Prefix sender label to message content for the Evolution API payload
+    const senderLabel = senderInfo.label;
     const prefixedBody = { ...body };
     if (senderLabel && prefixedBody.content) {
       prefixedBody.content = `${senderLabel}\n${prefixedBody.content}`;
@@ -319,6 +320,8 @@ Deno.serve(async (req) => {
           metadata: body.fileName ? { fileName: body.fileName } : null,
           sent_by_user_id: senderUserId || null,
           instance_id: sendInstanceId,
+          sender_name: senderInfo.name || null,
+          sender_role: senderInfo.role || null,
         })
         .select()
         .single(),
