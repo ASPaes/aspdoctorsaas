@@ -103,7 +103,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
           {/* Contact Info — compact header */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <Avatar className="h-12 w-12 shrink-0">
               {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
               <AvatarFallback className="text-xs">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
@@ -120,11 +120,11 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-medium truncate">{name}</p>
+                  <p className="text-sm font-medium break-words" title={name}>{name}</p>
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                     <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number}
                   </p>
-                  {contact?.notes && <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{contact.notes}</p>}
+                  {contact?.notes && <p className="text-[10px] text-muted-foreground mt-0.5 break-words">{contact.notes}</p>}
                 </>
               )}
             </div>
