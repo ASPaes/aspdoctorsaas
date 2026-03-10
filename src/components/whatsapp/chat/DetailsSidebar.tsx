@@ -308,10 +308,6 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 </DialogContent>
               </Dialog>
             )}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Nenhuma análise disponível. Clique em "Analisar".</p>
-            )}
           </div>
 
           {/* Notes */}
