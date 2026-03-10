@@ -1875,7 +1875,12 @@ export type Database = {
           id: string
           instance_id: string | null
           is_from_me: boolean
+          media_ext: string | null
+          media_filename: string | null
+          media_kind: string | null
           media_mimetype: string | null
+          media_path: string | null
+          media_size_bytes: number | null
           media_url: string | null
           message_id: string
           message_type: string
@@ -1900,7 +1905,12 @@ export type Database = {
           id?: string
           instance_id?: string | null
           is_from_me?: boolean
+          media_ext?: string | null
+          media_filename?: string | null
+          media_kind?: string | null
           media_mimetype?: string | null
+          media_path?: string | null
+          media_size_bytes?: number | null
           media_url?: string | null
           message_id: string
           message_type?: string
@@ -1925,7 +1935,12 @@ export type Database = {
           id?: string
           instance_id?: string | null
           is_from_me?: boolean
+          media_ext?: string | null
+          media_filename?: string | null
+          media_kind?: string | null
           media_mimetype?: string | null
+          media_path?: string | null
+          media_size_bytes?: number | null
           media_url?: string | null
           message_id?: string
           message_type?: string
