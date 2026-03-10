@@ -36,7 +36,7 @@ export function ClienteLinkCard({ conversation }: Props) {
 
   const clienteId = isLinked ? (metadata?.cliente_id as string) : null;
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
-  const { data: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
+  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
 
   if (isLinked && linkedCliente) {
     const isBirthday = clienteDetails?.contato_aniversario
