@@ -50,12 +50,9 @@ export const useCreateConversation = () => {
         contact = newContact;
       }
 
-      if (contactError) throw contactError;
-
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('*')
-        .eq('instance_id', params.instanceId)
         .eq('contact_id', contact.id)
         .maybeSingle();
 
