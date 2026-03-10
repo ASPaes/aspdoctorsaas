@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   display_name: z.string().min(1, "Nome obrigatório"),
@@ -43,6 +45,21 @@ interface EditInstanceDialogProps {
 export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanceDialogProps) => {
   const { updateInstance } = useWhatsAppInstances();
 
+  const { data: secrets } = useQuery({
+    queryKey: ['whatsapp', 'instance-secrets', instance.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from('whatsapp_instance_secrets') as any)
+        .select('api_url, api_key')
+        .eq('instance_id', instance.id)
+        .single();
+      if (error) throw error;
+      return data as { api_url: string; api_key: string };
+    },
+    enabled: open,
+    staleTime: 0,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -61,10 +78,11 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       display_name: instance.display_name || '',
       instance_name: instance.instance_name,
       instance_id_external: instance.instance_id_external || '',
-      api_url: '', api_key: '',
+      api_url: secrets?.api_url || '',
+      api_key: secrets?.api_key || '',
       provider_type: (instance.provider_type as "self_hosted" | "cloud") || 'self_hosted',
     });
-  }, [instance, form]);
+  }, [instance, secrets, form]);
 
   const onSubmit = async (values: FormValues) => {
     try {
