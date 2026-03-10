@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink } from "lucide-react";
+import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink, Search } from "lucide-react";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { useLinkedClienteDetails } from "../hooks/useLinkedClienteDetails";
+import { useClienteSearch } from "../hooks/useClienteSearch";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -19,6 +21,8 @@ export function ClienteLinkCard({ conversation }: Props) {
   const phoneNumber = conversation.contact?.phone_number || "";
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const {
     linkedCliente,
@@ -32,6 +36,7 @@ export function ClienteLinkCard({ conversation }: Props) {
 
   const clienteId = isLinked ? (metadata?.cliente_id as string) : null;
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
+  const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
 
   if (isLinked && linkedCliente) {
     const isBirthday = clienteDetails?.contato_aniversario
@@ -45,18 +50,18 @@ export function ClienteLinkCard({ conversation }: Props) {
     return (
       <div className="bg-muted rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" />
+          <Building2 className="h-4 w-4 text-primary shrink-0" />
           <span className="text-xs font-medium text-muted-foreground">Cliente Vinculado</span>
-          <Badge variant="secondary" className="text-[10px] ml-auto">Vinculado</Badge>
+          <Badge variant="secondary" className="text-[10px] ml-auto shrink-0">Vinculado</Badge>
         </div>
-        <p className="text-sm font-medium">
+        <p className="text-sm font-medium break-words">
           #{linkedCliente.codigo_sequencial} — {linkedCliente.nome_fantasia || linkedCliente.razao_social || "Sem nome"}
         </p>
 
         {/* Birthday alert */}
         {isBirthday && (
           <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 rounded-md px-2 py-1.5 text-xs font-medium">
-            <Cake className="h-3.5 w-3.5" />
+            <Cake className="h-3.5 w-3.5 shrink-0" />
             🎉 Contato principal está de aniversário hoje!
           </div>
         )}
@@ -170,10 +175,10 @@ export function ClienteLinkCard({ conversation }: Props) {
     return (
       <div className="bg-accent/50 border border-accent rounded-md p-3 space-y-2">
         <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-accent-foreground" />
+          <Building2 className="h-4 w-4 text-accent-foreground shrink-0" />
           <span className="text-xs font-medium text-accent-foreground">Sugestão de vínculo</span>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground break-words">
           Este contato parece ser o cliente{" "}
           <span className="font-semibold text-foreground">
             #{suggestedCliente.codigo_sequencial} — {suggestedCliente.nome_fantasia || suggestedCliente.razao_social}
@@ -193,5 +198,64 @@ export function ClienteLinkCard({ conversation }: Props) {
     );
   }
 
-  return null;
+  // No suggestion found — show manual link option
+  return (
+    <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs font-medium text-muted-foreground">Cliente</span>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 text-[10px] gap-1"
+          onClick={() => setSearchOpen(!searchOpen)}
+        >
+          <Search className="h-3 w-3" />
+          Vincular
+        </Button>
+      </div>
+      {!searchOpen && (
+        <p className="text-[10px] text-muted-foreground">Nenhum cliente vinculado. Clique em "Vincular" para buscar.</p>
+      )}
+      {searchOpen && (
+        <div className="space-y-2">
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nome, CNPJ ou código..."
+            className="text-xs h-7"
+            autoFocus
+          />
+          {isSearching && <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
+          {searchResults && searchResults.length > 0 && (
+            <div className="max-h-40 overflow-y-auto space-y-1">
+              {searchResults.map((c) => (
+                <button
+                  key={c.id}
+                  className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-xs flex items-center justify-between gap-2 transition-colors"
+                  onClick={() => {
+                    linkCliente(c.id);
+                    setSearchOpen(false);
+                    setSearchTerm("");
+                  }}
+                  disabled={isLinking}
+                >
+                  <span className="truncate">
+                    <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                    {c.nome_fantasia || c.razao_social}
+                  </span>
+                  <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+          )}
+          {searchResults && searchResults.length === 0 && searchTerm.length >= 2 && (
+            <p className="text-[10px] text-muted-foreground text-center py-1">Nenhum cliente encontrado</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
