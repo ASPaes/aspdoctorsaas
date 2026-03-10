@@ -92,21 +92,22 @@ Deno.serve(async (req) => {
         .select(`*, whatsapp_contacts!inner (phone_number, name)`)
         .eq('id', body.conversationId)
         .single(),
-      // 2) Resolve sender name
-      (async (): Promise<string> => {
-        if (!senderUserId) return '';
+      // 2) Resolve sender name + role
+      (async (): Promise<{ label: string; name: string; role: string | null }> => {
+        if (!senderUserId) return { label: '', name: '', role: null };
         const { data: profile } = await supabase
           .from('profiles')
           .select('funcionario_id')
           .eq('user_id', senderUserId)
           .maybeSingle();
-        if (!profile?.funcionario_id) return '';
+        if (!profile?.funcionario_id) return { label: '', name: '', role: null };
         const { data: func } = await supabase
           .from('funcionarios')
-          .select('nome')
+          .select('nome, cargo')
           .eq('id', profile.funcionario_id)
           .maybeSingle();
-        return func?.nome ? `*${func.nome}*` : '';
+        if (!func?.nome) return { label: '', name: '', role: null };
+        return { label: `*${func.nome}*`, name: func.nome, role: func.cargo || null };
       })(),
     ]);
 
