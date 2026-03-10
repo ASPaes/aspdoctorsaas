@@ -278,17 +278,9 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                   </div>
                 )}
 
-                {/* CS Ticket Alert inline */}
+                {/* CS Ticket — compact: just a button suggestion */}
                 {sentiment.needs_cs_ticket && !sentiment.cs_ticket_created_id && (
                   <CSTicketAlert sentiment={sentiment} conversation={conversation} variant="inline" />
-                )}
-                {sentiment.cs_ticket_reason && (
-                  <p
-                    className="text-[10px] text-destructive bg-destructive/10 rounded-md p-2 whitespace-normal break-words"
-                    style={{ overflowWrap: 'anywhere' }}
-                  >
-                    {sentiment.cs_ticket_reason}
-                  </p>
                 )}
                 {sentiment.cs_ticket_created_id && (
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-md p-2">
