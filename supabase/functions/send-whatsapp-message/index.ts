@@ -299,8 +299,41 @@ Deno.serve(async (req) => {
 
     const messageTimestamp = new Date().toISOString();
 
+    // --- Compute media metadata for persistence ---
+    const savedMediaUrl = persistentMediaPath || extractedMediaUrl || body.mediaUrl || null;
+    let mediaPath: string | null = persistentMediaPath || null;
+    let mediaFilename: string | null = body.fileName || null;
+    let mediaExt: string | null = null;
+    let mediaSizeBytes: number | null = null;
+    let mediaKind: string | null = null;
+
+    if (body.messageType !== 'text' && savedMediaUrl) {
+      mediaKind = body.messageType === 'document' ? 'document'
+        : body.messageType === 'image' ? 'image'
+        : body.messageType === 'audio' ? 'audio'
+        : body.messageType === 'video' ? 'video'
+        : 'other';
+
+      if (!mediaFilename && mediaPath) {
+        mediaFilename = mediaPath.split('/').pop() || null;
+      }
+      if (mediaFilename && mediaFilename.includes('.')) {
+        mediaExt = mediaFilename.split('.').pop()?.toLowerCase() || null;
+      } else if (body.mediaMimetype) {
+        const sub = body.mediaMimetype.split('/')[1]?.split(';')[0]?.trim();
+        mediaExt = sub || null;
+      }
+
+      // If we uploaded to storage, we know the size
+      if (body.mediaBase64) {
+        const raw = body.mediaBase64.startsWith('data:')
+          ? body.mediaBase64.split(',')[1] || ''
+          : body.mediaBase64;
+        try { mediaSizeBytes = Math.floor(raw.length * 3 / 4); } catch {}
+      }
+    }
+
     // --- PARALLELIZED: save message + update conversation ---
-    // CHANGED: include instance_id in the saved message
     const [saveResult] = await Promise.all([
       anonClient
         .from('whatsapp_messages')
@@ -311,8 +344,13 @@ Deno.serve(async (req) => {
           remote_jid: contact.phone_number,
           content: messageContent,
           message_type: body.messageType,
-          media_url: persistentMediaPath || extractedMediaUrl || body.mediaUrl || null,
+          media_url: savedMediaUrl,
           media_mimetype: body.mediaMimetype || null,
+          media_path: mediaPath,
+          media_filename: mediaFilename,
+          media_ext: mediaExt,
+          media_size_bytes: mediaSizeBytes,
+          media_kind: mediaKind,
           status: 'sent',
           is_from_me: true,
           timestamp: messageTimestamp,

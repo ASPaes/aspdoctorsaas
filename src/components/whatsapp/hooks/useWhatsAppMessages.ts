@@ -11,6 +11,11 @@ export interface Message {
   message_type: string;
   media_url: string | null;
   media_mimetype: string | null;
+  media_path: string | null;
+  media_filename: string | null;
+  media_ext: string | null;
+  media_size_bytes: number | null;
+  media_kind: string | null;
   status: string;
   is_from_me: boolean;
   timestamp: string;
@@ -34,6 +39,11 @@ const MESSAGE_SELECT = [
   'message_type',
   'media_url',
   'media_mimetype',
+  'media_path',
+  'media_filename',
+  'media_ext',
+  'media_size_bytes',
+  'media_kind',
   'status',
   'is_from_me',
   'timestamp',
