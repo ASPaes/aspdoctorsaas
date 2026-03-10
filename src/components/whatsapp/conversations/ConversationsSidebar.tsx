@@ -235,7 +235,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           <Input
             placeholder="Buscar conversas..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-8 h-9"
           />
         </div>
