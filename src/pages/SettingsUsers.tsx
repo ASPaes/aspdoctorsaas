@@ -219,6 +219,55 @@ export default function SettingsUsers() {
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(u.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {u.user_id !== profile?.user_id && !u.is_super_admin && (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Enviar link de redefinição de senha"
+                          onClick={() => {
+                            if (!u.email) return;
+                            resetPassword.mutate(u.email, {
+                              onSuccess: () => toast.success(`Link de redefinição enviado para ${u.email}`),
+                              onError: (err: any) => toast.error(err.message),
+                            });
+                          }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Remover usuário">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover usuário</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover <strong>{u.email}</strong> do workspace? Esta ação não pode ser desfeita. Você poderá enviar um novo convite depois.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => {
+                                  deleteUser.mutate(u.user_id, {
+                                    onSuccess: () => toast.success("Usuário removido."),
+                                    onError: (err: any) => toast.error(err.message),
+                                  });
+                                }}
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
