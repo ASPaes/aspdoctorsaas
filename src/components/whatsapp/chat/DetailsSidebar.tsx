@@ -229,23 +229,23 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 </div>
                 {sentiment.summary && (
                   <div>
-                    <p className="text-xs text-muted-foreground bg-muted rounded-md p-2 line-clamp-3">{sentiment.summary}</p>
-                    {sentiment.summary.length > 120 && (
+                    <p className="text-xs text-muted-foreground bg-muted rounded-md p-2 break-words whitespace-pre-wrap">{sentiment.summary}</p>
+                    {sentiment.summary.length > 100 && (
                       <Button
                         variant="link"
                         size="sm"
                         className="h-auto p-0 text-[10px] mt-1"
                         onClick={() => setSentimentDialogOpen(true)}
                       >
-                        Ver mais
+                        Ver detalhes completos
                       </Button>
                     )}
                   </div>
                 )}
-            {sentiment.keywords && sentiment.keywords.length > 0 && (
+                {sentiment.keywords && sentiment.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {sentiment.keywords.map((kw: string, i: number) => (
-                      <Badge key={i} variant="outline" className="text-[10px]">{kw}</Badge>
+                      <Badge key={i} variant="outline" className="text-[10px] whitespace-nowrap">{kw}</Badge>
                     ))}
                   </div>
                 )}
@@ -253,9 +253,12 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 {sentiment.needs_cs_ticket && !sentiment.cs_ticket_created_id && (
                   <CSTicketAlert sentiment={sentiment} conversation={conversation} variant="inline" />
                 )}
+                {sentiment.cs_ticket_reason && (
+                  <p className="text-[10px] text-destructive bg-destructive/10 rounded-md p-2 break-words">{sentiment.cs_ticket_reason}</p>
+                )}
                 {sentiment.cs_ticket_created_id && (
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-md p-2">
-                    <Ticket className="h-3 w-3" />
+                    <Ticket className="h-3 w-3 shrink-0" />
                     Ticket CS já criado
                   </div>
                 )}
