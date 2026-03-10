@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { X, Pin, Plus, Loader2, Phone, Mail, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket } from "lucide-react";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
@@ -37,6 +38,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
   const [newNote, setNewNote] = useState("");
   const [editingContact, setEditingContact] = useState(false);
+  const [sentimentDialogOpen, setSentimentDialogOpen] = useState(false);
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
 
@@ -226,7 +228,19 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                   </div>
                 </div>
                 {sentiment.summary && (
-                  <p className="text-xs text-muted-foreground bg-muted rounded-md p-2">{sentiment.summary}</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground bg-muted rounded-md p-2 line-clamp-3">{sentiment.summary}</p>
+                    {sentiment.summary.length > 120 && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-[10px] mt-1"
+                        onClick={() => setSentimentDialogOpen(true)}
+                      >
+                        Ver mais
+                      </Button>
+                    )}
+                  </div>
                 )}
             {sentiment.keywords && sentiment.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -248,6 +262,51 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">Nenhuma análise disponível. Clique em "Analisar".</p>
+            )}
+
+            {/* Sentiment Detail Dialog */}
+            {sentiment && (
+              <Dialog open={sentimentDialogOpen} onOpenChange={setSentimentDialogOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <span className="text-xl">{getSentimentEmoji()}</span>
+                      Análise de Sentimento — {getSentimentLabel()}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {sentiment.confidence != null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Confiança:</span>
+                        <Progress value={Math.round(sentiment.confidence * 100)} className={`h-2 flex-1 ${getSentimentProgressColor()}`} />
+                        <span className="text-xs font-medium">{Math.round(sentiment.confidence * 100)}%</span>
+                      </div>
+                    )}
+                    {sentiment.summary && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Resumo</p>
+                        <p className="text-sm bg-muted rounded-md p-3 whitespace-pre-wrap">{sentiment.summary}</p>
+                      </div>
+                    )}
+                    {sentiment.keywords && sentiment.keywords.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Palavras-chave</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sentiment.keywords.map((kw: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {sentiment.cs_ticket_reason && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Motivo para ticket CS</p>
+                        <p className="text-sm bg-destructive/10 text-destructive rounded-md p-3">{sentiment.cs_ticket_reason}</p>
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
 
