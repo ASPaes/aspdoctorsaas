@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { X, Pin, Plus, Loader2, Phone, Mail, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown } from "lucide-react";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { useConversationSummaries } from "../hooks/useConversationSummaries";
@@ -41,6 +42,12 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [sentimentDialogOpen, setSentimentDialogOpen] = useState(false);
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
+
+  // Collapsible section states
+  const [topicsOpen, setTopicsOpen] = useState(true);
+  const [sentimentOpen, setSentimentOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(true);
+  const [summariesOpen, setSummariesOpen] = useState(false);
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const isClienteLinked = !!(metadata?.cliente_id);
@@ -93,6 +100,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
 
   return (
     <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink">
+      {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0">
         <h3 className="text-sm font-semibold">Detalhes</h3>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
@@ -101,8 +109,8 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6">
-          {/* Contact Info — compact header */}
+        <div className="p-4 space-y-4">
+          {/* Contact Info */}
           <div className="flex items-start gap-3">
             <Avatar className="h-12 w-12 shrink-0">
               {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
@@ -120,11 +128,11 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-medium break-words" title={name}>{name}</p>
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <p className="text-sm font-medium break-all leading-tight" title={name}>{name}</p>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
                     <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number}
                   </p>
-                  {contact?.notes && <p className="text-[10px] text-muted-foreground mt-0.5 break-words">{contact.notes}</p>}
+                  {contact?.notes && <p className="text-[10px] text-muted-foreground mt-1 break-words whitespace-pre-wrap">{contact.notes}</p>}
                 </>
               )}
             </div>
@@ -141,7 +149,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
           {/* Tags */}
           {contact?.tags && contact.tags.length > 0 && (
             <div>
-              <div className="flex items-center gap-1 mb-2">
+              <div className="flex items-center gap-1 mb-1.5">
                 <Tag className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground">Tags</span>
               </div>
@@ -153,25 +161,27 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             </div>
           )}
 
-          {/* Tópicos IA */}
           <Separator />
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Tópicos IA</span>
-              </div>
+
+          {/* Tópicos IA — Collapsible */}
+          <CollapsibleSection
+            icon={<Sparkles className="h-3.5 w-3.5" />}
+            title="Tópicos IA"
+            open={topicsOpen}
+            onOpenChange={setTopicsOpen}
+            action={
               <Button
                 size="sm"
                 variant="outline"
                 className="h-6 text-[10px] gap-1"
-                onClick={() => categorizeMutation.mutate(conversation.id)}
+                onClick={(e) => { e.stopPropagation(); categorizeMutation.mutate(conversation.id); }}
                 disabled={categorizeMutation.isPending}
               >
                 {categorizeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 {topicsData?.topics?.length ? "Recategorizar" : "Categorizar"}
               </Button>
-            </div>
+            }
+          >
             {topicsData?.topics && topicsData.topics.length > 0 ? (
               <div className="space-y-2">
                 <TopicBadges topics={topicsData.topics} size="default" showIcon={false} maxTopics={10} />
@@ -187,34 +197,37 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Nenhum tópico identificado. Clique em "Categorizar" para analisar.</p>
+              <p className="text-xs text-muted-foreground">Nenhum tópico identificado.</p>
             )}
-          </div>
+          </CollapsibleSection>
 
-          {/* Sentimento IA Completo */}
           <Separator />
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Sentimento IA</span>
-              </div>
+
+          {/* Sentimento IA — Collapsible */}
+          <CollapsibleSection
+            icon={<MessageSquare className="h-3.5 w-3.5" />}
+            title="Sentimento IA"
+            open={sentimentOpen}
+            onOpenChange={setSentimentOpen}
+            action={
               <Button
                 size="sm"
                 variant="outline"
                 className="h-6 text-[10px] gap-1"
-                onClick={analyze}
+                onClick={(e) => { e.stopPropagation(); analyze(); }}
                 disabled={isAnalyzing}
               >
                 {isAnalyzing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                 Analisar
               </Button>
-            </div>
+            }
+          >
             {sentiment ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
+                {/* Emoji + label + confidence bar */}
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{getSentimentEmoji()}</span>
-                  <div className="flex-1">
+                  <span className="text-2xl leading-none">{getSentimentEmoji()}</span>
+                  <div className="flex-1 min-w-0">
                     <p className={`text-sm font-semibold ${getSentimentColor()}`}>{getSentimentLabel()}</p>
                     {sentiment.confidence != null && (
                       <div className="flex items-center gap-2 mt-1">
@@ -222,26 +235,24 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                           value={Math.round(sentiment.confidence * 100)}
                           className={`h-1.5 flex-1 ${getSentimentProgressColor()}`}
                         />
-                        <span className="text-[10px] text-muted-foreground w-8">{Math.round(sentiment.confidence * 100)}%</span>
+                        <span className="text-[10px] text-muted-foreground w-8 text-right">{Math.round(sentiment.confidence * 100)}%</span>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* Summary — full text, scrollable if very long */}
                 {sentiment.summary && (
-                  <div>
-                    <p className="text-xs text-muted-foreground bg-muted rounded-md p-2 break-words whitespace-pre-wrap">{sentiment.summary}</p>
-                    {sentiment.summary.length > 100 && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-[10px] mt-1"
-                        onClick={() => setSentimentDialogOpen(true)}
-                      >
-                        Ver detalhes completos
-                      </Button>
-                    )}
+                  <div
+                    className="text-xs text-muted-foreground bg-muted rounded-md p-2.5 break-words whitespace-pre-wrap max-h-40 overflow-y-auto cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => setSentimentDialogOpen(true)}
+                    title="Clique para expandir"
+                  >
+                    {sentiment.summary}
                   </div>
                 )}
+
+                {/* Keywords */}
                 {sentiment.keywords && sentiment.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {sentiment.keywords.map((kw: string, i: number) => (
@@ -249,12 +260,13 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                     ))}
                   </div>
                 )}
+
                 {/* CS Ticket Alert inline */}
                 {sentiment.needs_cs_ticket && !sentiment.cs_ticket_created_id && (
                   <CSTicketAlert sentiment={sentiment} conversation={conversation} variant="inline" />
                 )}
                 {sentiment.cs_ticket_reason && (
-                  <p className="text-[10px] text-destructive bg-destructive/10 rounded-md p-2 break-words">{sentiment.cs_ticket_reason}</p>
+                  <p className="text-[10px] text-destructive bg-destructive/10 rounded-md p-2 break-words whitespace-pre-wrap">{sentiment.cs_ticket_reason}</p>
                 )}
                 {sentiment.cs_ticket_created_id && (
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-muted rounded-md p-2">
@@ -264,110 +276,120 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Nenhuma análise disponível. Clique em "Analisar".</p>
+              <p className="text-xs text-muted-foreground">Nenhuma análise disponível.</p>
             )}
+          </CollapsibleSection>
 
-            {/* Sentiment Detail Dialog */}
-            {sentiment && (
-              <Dialog open={sentimentDialogOpen} onOpenChange={setSentimentDialogOpen}>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <span className="text-xl">{getSentimentEmoji()}</span>
-                      Análise de Sentimento — {getSentimentLabel()}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    {sentiment.confidence != null && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Confiança:</span>
-                        <Progress value={Math.round(sentiment.confidence * 100)} className={`h-2 flex-1 ${getSentimentProgressColor()}`} />
-                        <span className="text-xs font-medium">{Math.round(sentiment.confidence * 100)}%</span>
+          {/* Sentiment Detail Dialog */}
+          {sentiment && (
+            <Dialog open={sentimentDialogOpen} onOpenChange={setSentimentDialogOpen}>
+              <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <span className="text-xl">{getSentimentEmoji()}</span>
+                    Análise de Sentimento — {getSentimentLabel()}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {sentiment.confidence != null && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Confiança:</span>
+                      <Progress value={Math.round(sentiment.confidence * 100)} className={`h-2 flex-1 ${getSentimentProgressColor()}`} />
+                      <span className="text-xs font-medium">{Math.round(sentiment.confidence * 100)}%</span>
+                    </div>
+                  )}
+                  {sentiment.summary && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Resumo</p>
+                      <p className="text-sm bg-muted rounded-md p-3 whitespace-pre-wrap break-words">{sentiment.summary}</p>
+                    </div>
+                  )}
+                  {sentiment.keywords && sentiment.keywords.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Palavras-chave</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sentiment.keywords.map((kw: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>
+                        ))}
                       </div>
-                    )}
-                    {sentiment.summary && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Resumo</p>
-                        <p className="text-sm bg-muted rounded-md p-3 whitespace-pre-wrap">{sentiment.summary}</p>
-                      </div>
-                    )}
-                    {sentiment.keywords && sentiment.keywords.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Palavras-chave</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {sentiment.keywords.map((kw: string, i: number) => (
-                            <Badge key={i} variant="outline" className="text-xs">{kw}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {sentiment.cs_ticket_reason && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Motivo para ticket CS</p>
-                        <p className="text-sm bg-destructive/10 text-destructive rounded-md p-3">{sentiment.cs_ticket_reason}</p>
-                      </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
+                    </div>
+                  )}
+                  {sentiment.cs_ticket_reason && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Motivo para ticket CS</p>
+                      <p className="text-sm bg-destructive/10 text-destructive rounded-md p-3 break-words whitespace-pre-wrap">{sentiment.cs_ticket_reason}</p>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
 
-          {/* Notes */}
           <Separator />
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Notas</span>
-              </div>
-            </div>
-            <div className="space-y-2 mb-2">
+
+          {/* Notes — Collapsible */}
+          <CollapsibleSection
+            icon={<StickyNote className="h-3.5 w-3.5" />}
+            title="Notas"
+            badge={notes.length > 0 ? notes.length : undefined}
+            open={notesOpen}
+            onOpenChange={setNotesOpen}
+          >
+            <div className="space-y-2">
               {notes.map((note) => (
-                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group">
+                <div key={note.id} className="bg-muted rounded-md p-2 text-xs relative group break-words whitespace-pre-wrap">
                   <p>{note.content}</p>
                   <button
-                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive"
+                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-destructive transition-opacity"
                     onClick={() => deleteNote(note.id)}
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
               ))}
-            </div>
-            <div className="flex gap-1">
-              <Textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Adicionar nota..."
-                className="text-xs min-h-[32px]"
-                rows={1}
-              />
-              <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleAddNote} disabled={isCreating || !newNote.trim()}>
-                {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-              </Button>
-            </div>
-          </div>
-
-          {/* Summaries */}
-          <Separator />
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Resumos</span>
+              <div className="flex gap-1">
+                <Textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Adicionar nota..."
+                  className="text-xs min-h-[32px]"
+                  rows={1}
+                />
+                <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleAddNote} disabled={isCreating || !newNote.trim()}>
+                  {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                </Button>
               </div>
-              <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={generateSummary} disabled={isGenerating}>
+            </div>
+          </CollapsibleSection>
+
+          <Separator />
+
+          {/* Summaries — Collapsible (collapsed by default) */}
+          <CollapsibleSection
+            icon={<FileText className="h-3.5 w-3.5" />}
+            title="Resumos"
+            badge={summaries.length > 0 ? summaries.length : undefined}
+            open={summariesOpen}
+            onOpenChange={setSummariesOpen}
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[10px]"
+                onClick={(e) => { e.stopPropagation(); generateSummary(); }}
+                disabled={isGenerating}
+              >
                 {isGenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Gerar"}
               </Button>
-            </div>
+            }
+          >
             <div className="space-y-2">
               {summaries.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Nenhum resumo disponível</p>
               ) : (
                 summaries.map((s) => (
-                  <div key={s.id} className="bg-muted rounded-md p-2 text-xs space-y-1">
-                    <p>{s.summary}</p>
+                  <div key={s.id} className="bg-muted rounded-md p-2 text-xs space-y-1 break-words">
+                    <p className="whitespace-pre-wrap">{s.summary}</p>
                     {s.key_points && s.key_points.length > 0 && (
                       <ul className="list-disc list-inside text-muted-foreground">
                         {s.key_points.map((kp: string, i: number) => <li key={i}>{kp}</li>)}
@@ -385,9 +407,49 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 ))
               )}
             </div>
-          </div>
+          </CollapsibleSection>
         </div>
       </ScrollArea>
     </div>
+  );
+}
+
+/* ─── Reusable collapsible section ─── */
+function CollapsibleSection({
+  icon,
+  title,
+  badge,
+  open,
+  onOpenChange,
+  action,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  badge?: number;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <div className="flex items-center justify-between">
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors py-1">
+            <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${open ? "" : "-rotate-90"}`} />
+            {icon}
+            <span>{title}</span>
+            {badge != null && (
+              <span className="ml-1 bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[9px] leading-none font-semibold">{badge}</span>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+      <CollapsibleContent className="mt-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
