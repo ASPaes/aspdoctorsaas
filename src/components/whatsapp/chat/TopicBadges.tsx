@@ -28,7 +28,7 @@ export function TopicBadges({ topics, size = 'default', showIcon = false, maxTop
     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
       {showIcon && <Tag className="h-3 w-3 text-muted-foreground shrink-0" />}
       {displayTopics.map((topic, index) => (
-        <Badge key={index} variant="secondary" className={`${getTopicColor(topic)} ${size === 'sm' ? 'text-xs px-1.5 py-0' : ''}`}>
+        <Badge key={index} variant="secondary" className={`${getTopicColor(topic)} whitespace-normal ${size === 'sm' ? 'text-xs px-1.5 py-0' : ''}`}>
           {getTopicLabel(topic)}
         </Badge>
       ))}
