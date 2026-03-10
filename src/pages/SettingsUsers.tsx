@@ -9,6 +9,8 @@ import {
   useCreateInvite,
   useCancelInvite,
   useUpdateUserFuncionario,
+  useResetUserPassword,
+  useDeleteTenantUser,
 } from "@/hooks/useTenantUsers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +23,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Users, UserPlus, Trash2, Loader2, Copy, Link } from "lucide-react";
+import { Users, UserPlus, Trash2, Loader2, Copy, KeyRound } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function SettingsUsers() {
   const { profile } = useAuth();
@@ -33,6 +46,8 @@ export default function SettingsUsers() {
   const createInvite = useCreateInvite();
   const cancelInvite = useCancelInvite();
   const updateFuncionario = useUpdateUserFuncionario();
+  const resetPassword = useResetUserPassword();
+  const deleteUser = useDeleteTenantUser();
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const { data: funcionarios = [] } = useQuery({
@@ -138,6 +153,7 @@ export default function SettingsUsers() {
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Criado em</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -202,6 +218,55 @@ export default function SettingsUsers() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {u.user_id !== profile?.user_id && !u.is_super_admin && (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Enviar link de redefinição de senha"
+                          onClick={() => {
+                            if (!u.email) return;
+                            resetPassword.mutate(u.email, {
+                              onSuccess: () => toast.success(`Link de redefinição enviado para ${u.email}`),
+                              onError: (err: any) => toast.error(err.message),
+                            });
+                          }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Remover usuário">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover usuário</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover <strong>{u.email}</strong> do workspace? Esta ação não pode ser desfeita. Você poderá enviar um novo convite depois.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => {
+                                  deleteUser.mutate(u.user_id, {
+                                    onSuccess: () => toast.success("Usuário removido."),
+                                    onError: (err: any) => toast.error(err.message),
+                                  });
+                                }}
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

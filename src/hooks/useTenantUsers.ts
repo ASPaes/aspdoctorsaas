@@ -166,6 +166,31 @@ export function useCreateInvite() {
   });
 }
 
+export function useResetUserPassword() {
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+    },
+  });
+}
+
+export function useDeleteTenantUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
 export function useCancelInvite() {
   const qc = useQueryClient();
   return useMutation({
