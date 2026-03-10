@@ -320,6 +320,8 @@ Deno.serve(async (req) => {
           metadata: body.fileName ? { fileName: body.fileName } : null,
           sent_by_user_id: senderUserId || null,
           instance_id: sendInstanceId,
+          sender_name: senderInfo.name || null,
+          sender_role: senderInfo.role || null,
         })
         .select()
         .single(),
