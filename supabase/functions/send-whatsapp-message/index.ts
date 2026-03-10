@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
     // --- PARALLELIZED: conversation fetch + sender resolution ---
     const senderUserId = (claimsData.claims as any).sub as string | undefined;
 
-    const [convResult, senderLabel] = await Promise.all([
+    const [convResult, senderInfo] = await Promise.all([
       // 1) Fetch conversation with contact info
       supabase
         .from('whatsapp_conversations')
