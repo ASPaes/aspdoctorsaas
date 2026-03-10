@@ -46,6 +46,8 @@ export default function SettingsUsers() {
   const createInvite = useCreateInvite();
   const cancelInvite = useCancelInvite();
   const updateFuncionario = useUpdateUserFuncionario();
+  const resetPassword = useResetUserPassword();
+  const deleteUser = useDeleteTenantUser();
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const { data: funcionarios = [] } = useQuery({
