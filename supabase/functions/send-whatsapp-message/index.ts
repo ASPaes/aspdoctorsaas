@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Prefix sender label to message content for the Evolution API payload
+    const senderLabel = senderInfo.label;
     const prefixedBody = { ...body };
     if (senderLabel && prefixedBody.content) {
       prefixedBody.content = `${senderLabel}\n${prefixedBody.content}`;
