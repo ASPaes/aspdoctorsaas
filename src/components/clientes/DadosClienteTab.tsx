@@ -366,18 +366,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormLabel>Telefone WhatsApp *</FormLabel>
             <div className="flex gap-2">
               <FormControl>
-                <Input
-                  placeholder="+55 (49) 99966-6019"
-                  value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  onBlur={() => {
-                    if (field.value) {
-                      const normalized = normalizeBRPhone(field.value);
-                      if (isValidBRPhone(normalized)) {
-                        field.onChange(formatBRPhone(normalized));
-                      }
-                    }
-                  }}
+                <PhoneInputBR
+                  value={field.value}
+                  onChange={field.onChange}
+                  showError
                 />
               </FormControl>
               {canOpenWhatsApp && (
