@@ -23,28 +23,20 @@ export function useClienteSearch(searchTerm: string) {
   }, [searchTerm]);
 
   const query = useQuery({
-    queryKey: ['clientes-search', debouncedTerm],
+    queryKey: ['clientes-search', debouncedTerm, tid],
     queryFn: async (): Promise<ClienteSearchResult[]> => {
       if (!debouncedTerm || debouncedTerm.length < 2) return [];
 
       const term = debouncedTerm.trim();
       const isNumeric = /^\d+$/.test(term);
 
-      // Get current user's tenant via RLS
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tenant_id')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-        .single();
-
-      if (!profile?.tenant_id) return [];
-
       let q = supabase
         .from('clientes')
         .select('id, razao_social, nome_fantasia, telefone_whatsapp, cnpj, codigo_sequencial')
         .eq('cancelado', false)
-        .eq('tenant_id', profile.tenant_id)
         .limit(20);
+
+      if (tid) q = q.eq('tenant_id', tid);
 
       if (isNumeric && term.length <= 6) {
         // Search by codigo_sequencial or phone (with and without 55 prefix)
