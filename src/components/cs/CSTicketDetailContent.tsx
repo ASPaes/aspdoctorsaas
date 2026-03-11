@@ -272,16 +272,22 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1 min-w-0">
+      <div className="flex items-start justify-between gap-4 min-w-0">
+        <div className="space-y-1 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">{CS_TICKET_TIPO_LABELS[currentTicket.tipo]}</Badge>
+            {currentTicket.assunto.startsWith('[WhatsApp]') && (
+              <Badge variant="secondary" className="gap-1 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/40 border-0">
+                <MessageCircle className="h-3 w-3" />WhatsApp
+              </Badge>
+            )}
             {currentTicket.escalado && <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Escalado</Badge>}
             {!currentTicket.primeira_acao_em && <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Aguardando 1ª ação</Badge>}
             {currentTicket.oport_resultado && <Badge className={currentTicket.oport_resultado === 'ganho' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'}>{currentTicket.oport_resultado === 'ganho' ? 'Ganho' : 'Perdido'}</Badge>}
           </div>
-          <h3 className="text-lg font-semibold truncate">{currentTicket.assunto}</h3>
-          <p className="text-sm text-muted-foreground">{currentTicket.descricao_curta}</p>
+          <h3 className="text-lg font-semibold break-words whitespace-normal">
+            {currentTicket.assunto.startsWith('[WhatsApp] ') ? currentTicket.assunto.replace('[WhatsApp] ', '') : currentTicket.assunto}
+          </h3>
         </div>
         <div className="flex gap-2 shrink-0">
           <Badge className={PRIORIDADE_COLORS[currentTicket.prioridade]}>{CS_TICKET_PRIORIDADE_LABELS[currentTicket.prioridade]}</Badge>
@@ -289,7 +295,48 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
         </div>
       </div>
 
-      {/* Cliente Info */}
+      {/* Descrição curta */}
+      <p className="text-sm text-muted-foreground break-words whitespace-normal">{currentTicket.descricao_curta}</p>
+
+      {/* WhatsApp metadata block — parsed from description */}
+      {currentTicket.assunto.startsWith('[WhatsApp]') && currentTicket.descricao_curta && (() => {
+        const desc = currentTicket.descricao_curta;
+        const lines = desc.split('\n');
+        const meta: { label: string; value: string }[] = [];
+        const keywords: string[] = [];
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('📱 Conversa WhatsApp com:')) meta.push({ label: 'Conversa', value: trimmed.replace('📱 Conversa WhatsApp com:', '').trim() });
+          else if (trimmed.startsWith('📊 Sentimento:')) meta.push({ label: 'Sentimento', value: trimmed.replace('📊 Sentimento:', '').trim() });
+          else if (trimmed.startsWith('💬 Resumo IA:')) meta.push({ label: 'Resumo IA', value: trimmed.replace('💬 Resumo IA:', '').trim() });
+          else if (trimmed.startsWith('🔑 Palavras-chave:')) {
+            const kwStr = trimmed.replace('🔑 Palavras-chave:', '').trim();
+            if (kwStr && kwStr !== '—') kwStr.split(',').map(k => k.trim()).filter(Boolean).forEach(k => keywords.push(k));
+          }
+          else if (trimmed.startsWith('⚠️ Motivo do alerta:')) meta.push({ label: 'Motivo do alerta', value: trimmed.replace('⚠️ Motivo do alerta:', '').trim() });
+        }
+        if (meta.length === 0 && keywords.length === 0) return null;
+        return (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs space-y-1.5 min-w-0">
+            <p className="font-medium text-foreground text-sm">Contexto WhatsApp / IA</p>
+            {meta.map((m, i) => (
+              <p key={i} className="text-muted-foreground break-words whitespace-normal overflow-wrap-anywhere">
+                <span className="font-medium text-foreground">{m.label}:</span> {m.value}
+              </p>
+            ))}
+            {keywords.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                <span className="font-medium text-foreground">Palavras-chave:</span>
+                {keywords.map((kw, i) => (
+                  <Badge key={i} variant="secondary" className="text-[10px] font-normal">{kw}</Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Cliente Info — unified card */}
       {currentTicket.cliente_id ? (
         <div className="bg-muted/50 rounded-lg p-3 space-y-1">
           <div className="flex items-center gap-2 text-sm"><Building2 className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{currentTicket.cliente?.nome_fantasia || currentTicket.cliente?.razao_social}</span></div>
@@ -297,30 +344,42 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
             <div className="flex items-center gap-1"><DollarSign className="h-3 w-3" /><span>MRR: {formatCurrency(currentTicket.cliente?.mensalidade || 0)}</span></div>
             <div className="flex items-center gap-1"><User className="h-3 w-3" /><span>{currentTicket.cliente?.cancelado ? 'Cancelado' : 'Ativo'}</span></div>
           </div>
+          {currentTicket.contato_externo_nome && (
+            <p className="text-xs text-muted-foreground mt-1">Contato externo: <span className="text-foreground font-medium">{currentTicket.contato_externo_nome}</span></p>
+          )}
         </div>
       ) : (
-        <div className="bg-muted/50 rounded-lg p-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <User className="h-4 w-4" />
-            <span className="italic">Ticket Interno</span>
-            {currentTicket.contato_externo_nome && <span className="text-foreground font-medium ml-2">— Contato: {currentTicket.contato_externo_nome}</span>}
+        <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Cliente</span>
           </div>
+          <p className="text-xs text-muted-foreground">Nenhum cliente vinculado.</p>
+          {currentTicket.contato_externo_nome && (
+            <p className="text-xs text-muted-foreground">Contato externo: <span className="text-foreground font-medium">{currentTicket.contato_externo_nome}</span></p>
+          )}
         </div>
       )}
 
-      {/* Quick Actions */}
+      {/* Quick Actions — always same buttons */}
       {currentTicket.status !== 'concluido' && currentTicket.status !== 'cancelado' && (
-      <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {!currentTicket.primeira_acao_em && <Button size="sm" onClick={handleRegistrarPrimeiraAcao}><Play className="h-4 w-4 mr-1" />Registrar 1ª Ação</Button>}
-          {currentTicket.cliente?.telefone_whatsapp && (
-            <Button size="sm" variant="outline" className="text-green-600 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-950" onClick={() => {
-              const phone = currentTicket.cliente!.telefone_whatsapp!.replace(/\D/g, '');
-              const name = encodeURIComponent(currentTicket.cliente!.nome_fantasia || currentTicket.cliente!.razao_social || '');
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-green-600 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-950"
+            disabled={!currentTicket.cliente?.telefone_whatsapp}
+            title={!currentTicket.cliente?.telefone_whatsapp ? 'Sem conversa vinculada' : undefined}
+            onClick={() => {
+              if (!currentTicket.cliente?.telefone_whatsapp) return;
+              const phone = currentTicket.cliente.telefone_whatsapp.replace(/\D/g, '');
+              const name = encodeURIComponent(currentTicket.cliente.nome_fantasia || currentTicket.cliente.razao_social || '');
               navigate(`/whatsapp?phone=${phone}&clienteId=${currentTicket.cliente_id}&clienteName=${name}`);
-            }}>
-              <MessageCircle className="h-4 w-4 mr-1" />WhatsApp
-            </Button>
-          )}
+            }}
+          >
+            <MessageCircle className="h-4 w-4 mr-1" />WhatsApp
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setShowReassignDialog(true)}><ArrowUpDown className="h-4 w-4 mr-1" />Reatribuir</Button>
           <Button size="sm" variant="default" onClick={() => setShowConcluirDialog(true)}><CheckCircle className="h-4 w-4 mr-1" />Concluir</Button>
           <Button size="sm" variant="destructive" onClick={() => setShowDeleteDialog(true)}><Trash2 className="h-4 w-4 mr-1" />Excluir</Button>
