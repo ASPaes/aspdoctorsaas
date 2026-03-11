@@ -35,6 +35,7 @@ function normalizePhoneNumber(remoteJid: string): { phone: string; isGroup: bool
 
 function getMessageType(message: any): string {
   if (message.reactionMessage) return 'reaction';
+  if (message.protocolMessage?.type === 0 || message.protocolMessage?.type === 'REVOKE') return 'revoke';
   if (message.conversation || message.extendedTextMessage) return 'text';
   if (message.imageMessage) return 'image';
   if (message.audioMessage) return 'audio';
@@ -44,6 +45,11 @@ function getMessageType(message: any): string {
   if (message.contactMessage) return 'contact';
   if (message.contactsArrayMessage) return 'contacts';
   return 'text';
+}
+
+function isRevokeMessage(message: any): boolean {
+  return !!(message?.protocolMessage && 
+    (message.protocolMessage.type === 0 || message.protocolMessage.type === 'REVOKE'));
 }
 
 function isEditedMessage(message: any): boolean {
@@ -841,19 +847,39 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     if (updates.status === 3 || updates.status === 'READ') status = 'read';
     else if (updates.status === 2 || updates.status === 'DELIVERY_ACK') status = 'delivered';
     else if (updates.status === 1 || updates.status === 'SERVER_ACK') status = 'sent';
+    else if (updates.status === 'REVOKED' || updates.status === 4) status = 'revoked';
 
     // Evolution API sends keyId (flat) or key.id depending on version
     const messageId = updates.keyId || updates.key?.id;
     if (messageId) {
-      const { error } = await supabase
-        .from('whatsapp_messages')
-        .update({ status })
-        .eq('message_id', messageId);
+      if (status === 'revoked') {
+        // Mark as revoked in our soft-delete system
+        const { error } = await supabase
+          .from('whatsapp_messages')
+          .update({
+            delete_status: 'revoked',
+            delete_scope: 'everyone',
+            message_type: 'revoked',
+            content: '',
+          })
+          .eq('message_id', messageId);
 
-      if (error) {
-        console.error('[evolution-webhook] Error updating message status:', error);
+        if (error) {
+          console.error('[evolution-webhook] Error marking message as revoked:', error);
+        } else {
+          console.log('[evolution-webhook] Message revoked via status update for messageId:', messageId);
+        }
       } else {
-        console.log('[evolution-webhook] Message status updated to:', status, 'for messageId:', messageId);
+        const { error } = await supabase
+          .from('whatsapp_messages')
+          .update({ status })
+          .eq('message_id', messageId);
+
+        if (error) {
+          console.error('[evolution-webhook] Error updating message status:', error);
+        } else {
+          console.log('[evolution-webhook] Message status updated to:', status, 'for messageId:', messageId);
+        }
       }
     } else {
       console.warn('[evolution-webhook] No messageId found in update payload:', JSON.stringify(updates));
@@ -948,6 +974,50 @@ async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: an
   }
 }
 
+async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: any) {
+  try {
+    const { data } = payload;
+    const message = data.message;
+    const revokedKeyId = message?.protocolMessage?.key?.id;
+
+    if (!revokedKeyId) {
+      console.warn('[evolution-webhook] REVOKE event but no protocolMessage.key.id found');
+      return;
+    }
+
+    console.log('[evolution-webhook] Processing REVOKE for original messageId:', revokedKeyId);
+
+    const { data: existingMsg, error: fetchError } = await supabase
+      .from('whatsapp_messages')
+      .select('id, delete_status')
+      .eq('message_id', revokedKeyId)
+      .maybeSingle();
+
+    if (fetchError || !existingMsg) {
+      console.warn('[evolution-webhook] Revoked message not found in DB:', revokedKeyId);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('whatsapp_messages')
+      .update({
+        delete_status: 'revoked',
+        delete_scope: 'everyone',
+        content: '',
+        message_type: 'revoked',
+      })
+      .eq('id', existingMsg.id);
+
+    if (updateError) {
+      console.error('[evolution-webhook] Error marking message as revoked:', updateError);
+    } else {
+      console.log('[evolution-webhook] Message successfully marked as revoked:', existingMsg.id);
+    }
+  } catch (error) {
+    console.error('[evolution-webhook] Error in processMessageRevoke:', error);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -963,7 +1033,9 @@ Deno.serve(async (req) => {
 
     switch (payload.event) {
       case 'messages.upsert':
-        if (isEditedMessage(payload.data?.message)) {
+        if (isRevokeMessage(payload.data?.message)) {
+          await processMessageRevoke(payload, supabase);
+        } else if (isEditedMessage(payload.data?.message)) {
           await processMessageEdit(payload, supabase);
         } else {
           await processMessageUpsert(payload, supabase);

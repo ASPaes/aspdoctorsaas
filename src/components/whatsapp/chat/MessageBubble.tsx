@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -19,16 +20,26 @@ interface Props {
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (msgId: string) => void;
-  onDelete?: (msgId: string) => void;
+  onDeleteLocal?: (msgId: string) => void;
+  onDeleteEveryone?: (msgId: string) => void;
+  onRetryDelete?: (msgId: string) => void;
   onForward?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
 }
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 
-function canDeleteMsg(msg: Message): boolean {
+function canDeleteEveryone(msg: Message): boolean {
   if (msg.id.startsWith('temp-')) return false;
-  return msg.is_from_me && msg.status !== 'deleted' && (Date.now() - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
+  const deleteStatus = (msg as any).delete_status;
+  if (deleteStatus && deleteStatus !== 'active') return false;
+  return msg.is_from_me && (Date.now() - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
+}
+
+function canDeleteLocal(msg: Message): boolean {
+  if (msg.id.startsWith('temp-')) return false;
+  const deleteStatus = (msg as any).delete_status;
+  return !deleteStatus || deleteStatus === 'active' || deleteStatus === 'failed';
 }
 
 export function MessageBubble({
@@ -37,7 +48,9 @@ export function MessageBubble({
   selectionMode,
   isSelected,
   onToggleSelect,
-  onDelete,
+  onDeleteLocal,
+  onDeleteEveryone,
+  onRetryDelete,
   onForward,
   onEnterSelectionMode,
 }: Props) {
@@ -45,12 +58,17 @@ export function MessageBubble({
   const { timezone } = useChatTimezone();
   const time = formatTzTime(msg.timestamp, timezone);
   const [showTranscription, setShowTranscription] = useState(false);
-  const isDeleted = msg.status === 'deleted';
+
+  const deleteStatus = (msg as any).delete_status as string | undefined;
+  const deleteScope = (msg as any).delete_scope as string | undefined;
+  const isDeleted = msg.status === 'deleted' || deleteStatus === 'revoked';
+  const isPending = deleteStatus === 'pending';
+  const isFailed = deleteStatus === 'failed';
 
   const hasTranscription = msg.message_type === 'audio' && msg.audio_transcription;
   const isTranscribing = msg.message_type === 'audio' && msg.transcription_status === 'processing';
 
-  const statusIcon = isMe && !isDeleted && (
+  const statusIcon = isMe && !isDeleted && !isPending && (
     msg.status === "read" || msg.status === "delivered" ? (
       <CheckCheck className={cn("h-3 w-3", msg.status === "read" ? "text-blue-400" : "text-muted-foreground/60")} />
     ) : msg.status === "sending" ? (
@@ -60,7 +78,27 @@ export function MessageBubble({
     )
   );
 
-  // Deleted message render
+  // ─── PENDING state: "Apagando…" ───
+  if (isPending) {
+    return (
+      <div className={cn("flex mb-1", isMe ? "justify-end" : "justify-start")}>
+        <div className={cn(
+          "max-w-[75%] rounded-lg px-3 py-1.5 text-sm italic opacity-70",
+          isMe ? "bg-primary/30 text-primary-foreground/70 rounded-br-sm" : "bg-muted/50 text-foreground/70 rounded-bl-sm"
+        )}>
+          <div className="flex items-center gap-1.5">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <p>Apagando mensagem…</p>
+          </div>
+          <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
+            <span className="text-[10px] opacity-60">{time}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── REVOKED state: "Mensagem apagada" ───
   if (isDeleted) {
     return (
       <div className={cn("flex mb-1", isMe ? "justify-end" : "justify-start")}>
@@ -68,9 +106,47 @@ export function MessageBubble({
           "max-w-[75%] rounded-lg px-3 py-1.5 text-sm italic opacity-60",
           isMe ? "bg-primary/30 text-primary-foreground/60 rounded-br-sm" : "bg-muted/50 text-foreground/60 rounded-bl-sm"
         )}>
-          <p>🚫 Mensagem apagada</p>
+          <p>🚫 {deleteScope === 'local' ? 'Mensagem excluída do sistema' : 'Mensagem apagada'}</p>
           <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
             <span className="text-[10px] opacity-60">{time}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── FAILED state: show message + error hint ───
+  if (isFailed) {
+    return (
+      <div className={cn("flex mb-1", isMe ? "justify-end" : "justify-start")}>
+        <div className="flex flex-col items-end gap-1 max-w-[75%]">
+          <div className={cn(
+            "rounded-lg px-3 py-1.5 text-sm relative w-full",
+            isMe ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"
+          )}>
+            {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+            <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
+              <span className="text-[10px] opacity-60">{time}</span>
+              {statusIcon}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-destructive">
+            <AlertCircle className="h-3 w-3" />
+            <span>Falha ao apagar para todos</span>
+            <button
+              onClick={() => onRetryDelete?.(msg.id)}
+              className="flex items-center gap-0.5 underline hover:no-underline"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Tentar novamente
+            </button>
+            <span className="text-muted-foreground">·</span>
+            <button
+              onClick={() => onDeleteLocal?.(msg.id)}
+              className="underline hover:no-underline text-muted-foreground"
+            >
+              Excluir do sistema
+            </button>
           </div>
         </div>
       </div>
@@ -109,7 +185,6 @@ export function MessageBubble({
       )}
       {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
 
-      {/* Audio transcription */}
       {hasTranscription && (
         <div className="mt-1">
           <button
@@ -172,13 +247,20 @@ export function MessageBubble({
         <DropdownMenuTrigger asChild>
           {bubbleContent}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[160px]">
-          {canDeleteMsg(msg) && (
-            <DropdownMenuItem onClick={() => onDelete?.(msg.id)} className="text-destructive focus:text-destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Apagar
+        <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[180px]">
+          {canDeleteLocal(msg) && (
+            <DropdownMenuItem onClick={() => onDeleteLocal?.(msg.id)}>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Excluir do sistema
             </DropdownMenuItem>
           )}
+          {canDeleteEveryone(msg) && (
+            <DropdownMenuItem onClick={() => onDeleteEveryone?.(msg.id)} className="text-destructive focus:text-destructive">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Apagar para todos
+            </DropdownMenuItem>
+          )}
+          {(canDeleteLocal(msg) || canDeleteEveryone(msg)) && <DropdownMenuSeparator />}
           <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
             <Forward className="h-4 w-4 mr-2" />
             Encaminhar
