@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { maskCPF, maskPhone } from "@/lib/masks";
+import { maskCPF } from "@/lib/masks";
+import { normalizeBRPhone, formatBRPhone } from "@/lib/phoneBR";
+import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 
 interface Props {
   clienteId: string;
@@ -50,11 +52,12 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
 
   const addMutation = useMutation({
     mutationFn: async () => {
+      const normalizedFone = form.fone ? normalizeBRPhone(form.fone) : null;
       const { error } = await supabase.from("cliente_contatos" as any).insert({
         cliente_id: clienteId,
         nome: form.nome,
         cpf: form.cpf || null,
-        fone: form.fone || null,
+        fone: normalizedFone || null,
         email: form.email || null,
         cargo: form.cargo || null,
         aniversario: form.aniversario || null,
@@ -111,7 +114,7 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
               {contatos.map((c: any) => (
                 <TableRow key={c.id}>
                   <TableCell className="text-xs">{c.nome}</TableCell>
-                  <TableCell className="text-xs">{c.fone ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{c.fone ? formatBRPhone(normalizeBRPhone(c.fone)) : "—"}</TableCell>
                   <TableCell className="text-xs">{c.email ?? "—"}</TableCell>
                   <TableCell className="text-xs">{c.cargo ?? "—"}</TableCell>
                   <TableCell>
@@ -144,7 +147,10 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium">Fone</label>
-                <Input placeholder="(00) 00000-0000" value={form.fone} onChange={(e) => updateField("fone", maskPhone(e.target.value))} />
+                <PhoneInputBR
+                  value={form.fone}
+                  onChange={(v) => updateField("fone", v)}
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium">Email</label>

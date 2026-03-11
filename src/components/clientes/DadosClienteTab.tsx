@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
-import { maskCNPJ, maskPhone, maskCPF, maskCEP, normalizePhoneBR } from "@/lib/masks";
-import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
+import { maskCNPJ, maskCPF, maskCEP } from "@/lib/masks";
+import { normalizeBRPhone } from "@/lib/phoneBR";
+import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -167,7 +168,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       if (data.ddd_telefone_1) {
         const phoneDig = data.ddd_telefone_1.replace(/\D/g, "");
         if (phoneDig.length >= 10) {
-          form.setValue("telefone_contato", maskPhone(phoneDig));
+          const { formatBRPhone } = await import("@/lib/phoneBR");
+          form.setValue("telefone_contato", formatBRPhone(normalizeBRPhone(phoneDig)));
         }
       }
 
@@ -350,18 +352,9 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           <FormItem>
             <FormLabel>Telefone Contato</FormLabel>
             <FormControl>
-              <Input
-                placeholder="+55 (49) 99966-6019"
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value)}
-                onBlur={() => {
-                  if (field.value) {
-                    const normalized = normalizeBRPhone(field.value);
-                    if (isValidBRPhone(normalized)) {
-                      field.onChange(formatBRPhone(normalized));
-                    }
-                  }
-                }}
+              <PhoneInputBR
+                value={field.value}
+                onChange={field.onChange}
               />
             </FormControl>
             <FormMessage />
@@ -374,18 +367,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormLabel>Telefone WhatsApp *</FormLabel>
             <div className="flex gap-2">
               <FormControl>
-                <Input
-                  placeholder="+55 (49) 99966-6019"
-                  value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  onBlur={() => {
-                    if (field.value) {
-                      const normalized = normalizeBRPhone(field.value);
-                      if (isValidBRPhone(normalized)) {
-                        field.onChange(formatBRPhone(normalized));
-                      }
-                    }
-                  }}
+                <PhoneInputBR
+                  value={field.value}
+                  onChange={field.onChange}
+                  showError
                 />
               </FormControl>
               {canOpenWhatsApp && (
@@ -595,18 +580,9 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           <FormItem>
             <FormLabel>Fone do Contato</FormLabel>
             <FormControl>
-              <Input
-                placeholder="+55 (49) 99966-6019"
-                value={field.value ?? ""}
-                onChange={(e) => field.onChange(e.target.value)}
-                onBlur={() => {
-                  if (field.value) {
-                    const normalized = normalizeBRPhone(field.value);
-                    if (isValidBRPhone(normalized)) {
-                      field.onChange(formatBRPhone(normalized));
-                    }
-                  }
-                }}
+              <PhoneInputBR
+                value={field.value}
+                onChange={field.onChange}
               />
             </FormControl>
             <FormMessage />

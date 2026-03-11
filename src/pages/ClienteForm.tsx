@@ -24,7 +24,7 @@ import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
-import { normalizeBRPhone, isValidBRPhone } from "@/lib/phoneBR";
+import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
@@ -271,8 +271,10 @@ export default function ClienteForm() {
     const c = clienteQuery.data;
     form.reset({
       data_cadastro: c.data_cadastro, razao_social: c.razao_social, nome_fantasia: c.nome_fantasia,
-      cnpj: c.cnpj, email: c.email ?? "", telefone_contato: c.telefone_contato,
-      telefone_whatsapp: c.telefone_whatsapp, estado_id: c.estado_id, cidade_id: c.cidade_id,
+      cnpj: c.cnpj, email: c.email ?? "",
+      telefone_contato: c.telefone_contato ? formatBRPhone(normalizeBRPhone(c.telefone_contato)) : null,
+      telefone_whatsapp: c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null,
+      estado_id: c.estado_id, cidade_id: c.cidade_id,
       area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
       observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
       funcionario_id: c.funcionario_id, origem_venda_id: (c as any).origem_venda_id ?? null,
@@ -297,7 +299,7 @@ export default function ClienteForm() {
       cert_a1_ultimo_vendedor_id: (c as any).cert_a1_ultimo_vendedor_id ?? null,
       contato_nome: (c as any).contato_nome ?? null,
       contato_cpf: (c as any).contato_cpf ?? null,
-      contato_fone: (c as any).contato_fone ?? null,
+      contato_fone: (c as any).contato_fone ? formatBRPhone(normalizeBRPhone((c as any).contato_fone)) : null,
       contato_aniversario: (c as any).contato_aniversario ?? null,
       unidade_base_id: (c as any).unidade_base_id ?? null,
       matriz_id: (c as any).matriz_id ?? null,
