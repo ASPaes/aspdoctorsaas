@@ -119,12 +119,15 @@ Deno.serve(async (req) => {
         const baseUrl = api_url.endsWith('/') ? api_url.slice(0, -1) : api_url;
         const cleanUrl = baseUrl.replace(/\/manager$/, '');
         try {
+          const deleteBody = { id: msg.message_id, remoteJid: msg.remote_jid, fromMe: true };
+          console.log(`[${FUNCTION_NAME}][${requestId}] Evolution delete request: url=${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}, body=${JSON.stringify(deleteBody)}`);
           const resp = await fetch(`${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json', apikey: api_key },
-            body: JSON.stringify({ id: msg.message_id, remoteJid: msg.remote_jid, fromMe: true }),
+            body: JSON.stringify(deleteBody),
           });
-          console.log(`[${FUNCTION_NAME}][${requestId}] Evolution delete ${msg.id}: ${resp.status}`);
+          const respText = await resp.text();
+          console.log(`[${FUNCTION_NAME}][${requestId}] Evolution delete ${msg.id}: status=${resp.status}, response=${respText.slice(0, 500)}`);
         } catch (err) {
           console.error(`[${FUNCTION_NAME}][${requestId}] Evolution delete failed for ${msg.id}:`, err);
         }
