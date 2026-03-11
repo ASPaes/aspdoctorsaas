@@ -195,9 +195,9 @@ export default function ClienteForm() {
   const mcPonderadaQuery = useQuery({
     queryKey: ["mc-ponderada-global"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await tf(supabase
         .from("vw_clientes_financeiro")
-        .select("mensalidade, custo_operacao, cancelado");
+        .select("mensalidade, custo_operacao, cancelado"));
       if (error) throw error;
       const ativos = (data ?? []).filter(c => !c.cancelado);
       let receita = 0, cogs = 0;
