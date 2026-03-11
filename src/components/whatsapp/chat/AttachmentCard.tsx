@@ -1,4 +1,5 @@
-import { FileText, Image, Music, Video, File, ExternalLink, Download } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, Image, Music, Video, File, ExternalLink, Download, Loader2 } from 'lucide-react';
 import { formatBytes } from '@/utils/whatsapp/formatBytes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
