@@ -35,6 +35,7 @@ function normalizePhoneNumber(remoteJid: string): { phone: string; isGroup: bool
 
 function getMessageType(message: any): string {
   if (message.reactionMessage) return 'reaction';
+  if (message.protocolMessage?.type === 0 || message.protocolMessage?.type === 'REVOKE') return 'revoke';
   if (message.conversation || message.extendedTextMessage) return 'text';
   if (message.imageMessage) return 'image';
   if (message.audioMessage) return 'audio';
@@ -44,6 +45,11 @@ function getMessageType(message: any): string {
   if (message.contactMessage) return 'contact';
   if (message.contactsArrayMessage) return 'contacts';
   return 'text';
+}
+
+function isRevokeMessage(message: any): boolean {
+  return !!(message?.protocolMessage && 
+    (message.protocolMessage.type === 0 || message.protocolMessage.type === 'REVOKE'));
 }
 
 function isEditedMessage(message: any): boolean {
