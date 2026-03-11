@@ -27,6 +27,7 @@ type TimelineItem =
 
 export function ChatMessages({
   conversationId,
+  unreadCount = 0,
   onReply,
   selectionMode,
   selectedMessages,
