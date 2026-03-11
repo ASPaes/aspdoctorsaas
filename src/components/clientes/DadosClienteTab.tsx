@@ -214,10 +214,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
   const handleOpenWhatsApp = useCallback(() => {
     if (!whatsappDigits || !clienteId || !onNavigate) return;
-    const normalizedPhone = normalizePhoneBR(whatsappDigits);
+    const normalizedPhone = normalizeBRPhone(whatsappValue ?? "");
     const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
     onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
-  }, [whatsappDigits, clienteId, form, onNavigate]);
+  }, [whatsappValue, whatsappDigits, clienteId, form, onNavigate]);
 
   return (
     <div className="space-y-6">

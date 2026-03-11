@@ -110,7 +110,7 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   // Check required fields
   if (!values.cnpj || values.cnpj.replace(/\D/g, "").length < 14) missingFields.push(fieldLabels.cnpj);
   if (!values.email) missingFields.push(fieldLabels.email);
-  if (!values.telefone_whatsapp || values.telefone_whatsapp.replace(/\D/g, "").length < 10) missingFields.push(fieldLabels.telefone_whatsapp);
+  if (!values.telefone_whatsapp || !isValidBRPhone(normalizeBRPhone(values.telefone_whatsapp))) missingFields.push(fieldLabels.telefone_whatsapp);
   if (!values.data_venda) missingFields.push(fieldLabels.data_venda);
   if (!values.funcionario_id) missingFields.push(fieldLabels.funcionario_id);
   if (!values.origem_venda_id) missingFields.push(fieldLabels.origem_venda_id);
