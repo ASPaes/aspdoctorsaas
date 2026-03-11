@@ -1,141 +1,132 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { getAIConfig, callAI } from "../_shared/ai-client.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Validate JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-
-    const anonClient = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
     });
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("user_id", claimsData.claims.sub)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return new Response(JSON.stringify({ error: "Tenant não encontrado" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const aiConfig = await getAIConfig(profile.tenant_id, supabase);
+    if (!aiConfig) {
+      return new Response(
+        JSON.stringify({
+          error: "ai_not_configured",
+          message: "Nenhuma IA configurada. Acesse Configurações > Inteligência Artificial.",
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const { message, action, targetLanguage } = await req.json();
+    if (!message || !action) throw new Error("Message and action are required");
 
-    if (!message || !action) {
-      throw new Error('Message and action are required');
-    }
+    let prompt = "";
+    let userHistory = "";
 
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    let prompt = '';
-    let userHistory = '';
-
-    if (action === 'my_tone') {
-      const { data: messages } = await supabase
-        .from('whatsapp_messages')
-        .select('content')
-        .eq('is_from_me', true)
-        .not('content', 'is', null)
-        .order('timestamp', { ascending: false })
+    if (action === "my_tone") {
+      const { data: msgs } = await supabase
+        .from("whatsapp_messages")
+        .select("content")
+        .eq("is_from_me", true)
+        .not("content", "is", null)
+        .order("timestamp", { ascending: false })
         .limit(20);
-
-      if (messages && messages.length > 0) {
-        userHistory = messages.map((m: any, i: number) => `${i + 1}. "${m.content}"`).join('\n');
+      if (msgs && msgs.length > 0) {
+        userHistory = msgs.map((m: any, i: number) => `${i + 1}. "${m.content}"`).join("\n");
       }
     }
 
+    const languageNames: Record<string, string> = { en: "inglês", es: "espanhol", fr: "francês", de: "alemão", it: "italiano", pt: "português" };
+
     switch (action) {
-      case 'expand':
-        prompt = `Você é um assistente de atendimento. Expanda esta mensagem curta em uma resposta completa e profissional, mantendo o mesmo significado mas adicionando contexto e detalhes úteis:\n\n"${message}"\n\nResponda apenas com o texto expandido, sem explicações.`;
+      case "expand":
+        prompt = `Expanda esta mensagem em uma resposta completa e profissional:\n\n"${message}"\n\nResponda apenas com o texto expandido.`;
         break;
-      case 'rephrase':
-        prompt = `Reformule esta mensagem mantendo exatamente o mesmo significado, mas usando palavras e estrutura diferentes:\n\n"${message}"\n\nResponda apenas com o texto reformulado.`;
+      case "rephrase":
+        prompt = `Reformule esta mensagem mantendo o mesmo significado:\n\n"${message}"\n\nResponda apenas com o texto reformulado.`;
         break;
-      case 'my_tone':
-        if (!userHistory) {
-          prompt = `Reescreva esta mensagem de forma profissional e amigável:\n\n"${message}"\n\nResponda apenas com a mensagem reescrita.`;
-        } else {
-          prompt = `Aqui estão exemplos de mensagens enviadas anteriormente:\n\n${userHistory}\n\nAgora reescreva esta mensagem usando o mesmo estilo de escrita dos exemplos acima, incluindo o tom, vocabulário e uso de emojis:\n\n"${message}"\n\nResponda apenas com a mensagem reescrita no mesmo estilo.`;
-        }
+      case "my_tone":
+        prompt = userHistory
+          ? `Exemplos de mensagens anteriores:\n\n${userHistory}\n\nReescreva usando o mesmo estilo:\n\n"${message}"\n\nResponda apenas com a mensagem reescrita.`
+          : `Reescreva de forma profissional e amigável:\n\n"${message}"\n\nResponda apenas com a mensagem reescrita.`;
         break;
-      case 'friendly':
-        prompt = `Reescreva esta mensagem de forma mais casual, amigável e acolhedora. Use emojis apropriados:\n\n"${message}"\n\nResponda apenas com a versão amigável.`;
+      case "friendly":
+        prompt = `Reescreva de forma casual, amigável e acolhedora com emojis:\n\n"${message}"\n\nResponda apenas com a versão amigável.`;
         break;
-      case 'formal':
-        prompt = `Reescreva esta mensagem de forma mais profissional e formal, removendo gírias e mantendo um tom corporativo:\n\n"${message}"\n\nResponda apenas com a versão formal.`;
+      case "formal":
+        prompt = `Reescreva de forma profissional e formal:\n\n"${message}"\n\nResponda apenas com a versão formal.`;
         break;
-      case 'fix_grammar':
-        prompt = `Corrija todos os erros de gramática, ortografia e pontuação nesta mensagem, mantendo o tom e significado:\n\n"${message}"\n\nResponda apenas com o texto corrigido.`;
+      case "fix_grammar":
+        prompt = `Corrija gramática, ortografia e pontuação:\n\n"${message}"\n\nResponda apenas com o texto corrigido.`;
         break;
-      case 'translate':
-        const languageNames: Record<string, string> = { 'en': 'inglês', 'es': 'espanhol', 'fr': 'francês', 'de': 'alemão', 'it': 'italiano', 'pt': 'português' };
-        const langName = languageNames[targetLanguage || 'en'] || targetLanguage;
-        prompt = `Traduza esta mensagem para ${langName}, mantendo o tom e o contexto:\n\n"${message}"\n\nResponda apenas com a tradução.`;
+      case "translate":
+        prompt = `Traduza para ${languageNames[targetLanguage || "en"] || targetLanguage}:\n\n"${message}"\n\nResponda apenas com a tradução.`;
         break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
 
-    console.log('[compose-whatsapp-message] Action:', action);
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
-      if (aiResponse.status === 402) throw new Error('Payment required. Please add credits.');
-      const errorText = await aiResponse.text();
-      console.error('[compose-whatsapp-message] AI error:', aiResponse.status, errorText);
-      throw new Error('AI processing failed');
+    let composedText: string;
+    try {
+      composedText = await callAI(aiConfig, [{ role: "user", content: prompt }]);
+    } catch (aiError: any) {
+      const msg = aiError.message || "";
+      if (msg.includes("401") || msg.includes("invalid_api_key")) {
+        return new Response(JSON.stringify({ error: "ai_key_invalid", message: "Chave de API inválida." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (msg.includes("429")) {
+        return new Response(JSON.stringify({ error: "rate_limit", message: "Limite da API atingido." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      throw aiError;
     }
-
-    const aiData = await aiResponse.json();
-    const composedText = aiData.choices?.[0]?.message?.content;
-
-    if (!composedText) throw new Error('No response from AI');
-
-    console.log('[compose-whatsapp-message] Success for action:', action);
 
     return new Response(
       JSON.stringify({ original: message, composed: composedText.trim(), action }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
   } catch (error) {
-    console.error('[compose-whatsapp-message] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("[compose-whatsapp-message] Error:", error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
