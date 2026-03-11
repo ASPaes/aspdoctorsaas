@@ -1169,8 +1169,6 @@ Deno.serve(async (req) => {
         await processMessageUpdate(payload, supabase);
         break;
       case 'messages.delete': {
-        // Evolution sends messages.delete when a message is revoked
-        // Treat same as revoke — resolve the deleted message key and mark revoked
         const deleteData = payload.data;
         const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
         if (deletedKeyId) {
@@ -1194,8 +1192,12 @@ Deno.serve(async (req) => {
               })
               .eq('tenant_id', resolved.tenantId)
               .eq('message_id', deletedKeyId)
-              .select('id');
+              .select('id, conversation_id');
             console.log(`[evolution-webhook] messages.delete processed: keyId=${deletedKeyId} rows=${delRows?.length ?? 0}${delErr ? ' error=' + delErr.message : ''}`);
+            // Refresh sidebar preview
+            if (delRows && delRows.length > 0 && delRows[0].conversation_id) {
+              await refreshConversationPreviewAfterRevoke(supabase, delRows[0].conversation_id);
+            }
           }
         } else {
           console.log('[evolution-webhook] messages.delete with no key id:', JSON.stringify(deleteData).slice(0, 300));
