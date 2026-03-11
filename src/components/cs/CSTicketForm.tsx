@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { escapeLike } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { useCreateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS, CS_INDICACAO_STATUS_LABELS,

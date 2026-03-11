@@ -68,8 +68,9 @@ export function TenantFilterProvider({ children }: { children: React.ReactNode }
   });
 
   // For super admins with a selected tenant, pass the tenant_id to queries
-  // For normal users, effectiveTenantId is null (RLS handles scoping)
-  const effectiveTenantId = isSuperAdmin ? selectedTenantId : null;
+  // For normal users, always pass their own tenant_id for query performance
+  // (RLS still enforces security, but explicit filter helps DB use indexes)
+  const effectiveTenantId = isSuperAdmin ? selectedTenantId : (profile?.tenant_id || null);
 
   const value = useMemo(() => ({
     selectedTenantId: isSuperAdmin ? selectedTenantId : null,
