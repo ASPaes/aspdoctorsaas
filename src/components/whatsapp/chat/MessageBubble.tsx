@@ -27,6 +27,7 @@ interface Props {
 const FIVE_MINUTES = 5 * 60 * 1000;
 
 function canDeleteMsg(msg: Message): boolean {
+  if (msg.id.startsWith('temp-')) return false;
   return msg.is_from_me && msg.status !== 'deleted' && (Date.now() - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
 }
 
