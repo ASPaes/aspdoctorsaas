@@ -49,12 +49,13 @@ export function MessageBubble({
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
   const isSystem = Boolean(
-    msg.isSystem ??
+    msg.isSystem ?? (
       rawKind === 'system' ||
       rawKind === 'event' ||
       (msg as any).metadata?.system === true ||
       (msg as any).protocolMessage?.type === 'REVOKE' ||
       (msg as any).metadata?.protocolMessage?.type === 'REVOKE'
+    )
   );
 
   const { timezone } = useChatTimezone();
