@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,7 +17,29 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, Save, Loader2, CheckCircle2, XCircle, Brain, Upload, FileText } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Shield,
+  Save,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Brain,
+  Upload,
+  FileText,
+  FlaskConical,
+  AlertTriangle,
+  Clock,
+} from "lucide-react";
 
 const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
@@ -51,6 +73,7 @@ function formatProviderLabel(provider: string): string {
 }
 
 const MAX_SYSTEM_PROMPT = 30000;
+const TEST_VALIDITY_MINUTES = 30;
 
 const schema = z.object({
   provider: z.enum(["openai", "anthropic", "gemini", "custom"]),
@@ -66,11 +89,25 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+function isTestRecent(lastTestedAt: string | null): boolean {
+  if (!lastTestedAt) return false;
+  const diff = Date.now() - new Date(lastTestedAt).getTime();
+  return diff < TEST_VALIDITY_MINUTES * 60 * 1000;
+}
+
+function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
+}
+
 export default function AISettingsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [pendingActivation, setPendingActivation] = useState<boolean | null>(null);
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["ai_settings", tid],
@@ -78,11 +115,11 @@ export default function AISettingsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_settings")
-        .select("id, provider, api_key_hint, model, base_url, is_active, updated_at, system_prompt")
+        .select("id, provider, api_key_hint, model, base_url, is_active, updated_at, system_prompt, last_tested_at, last_test_ok, last_test_error")
         .eq("tenant_id", tid!)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as any;
     },
   });
 
@@ -119,16 +156,12 @@ export default function AISettingsTab() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       let text = (event.target?.result as string) || "";
       if (text.length > MAX_SYSTEM_PROMPT) {
         text = text.substring(0, MAX_SYSTEM_PROMPT);
-        toast({
-          title: "Conteúdo truncado",
-          description: `O arquivo excedia ${MAX_SYSTEM_PROMPT.toLocaleString("pt-BR")} caracteres e foi truncado.`,
-        });
+        toast({ title: "Conteúdo truncado", description: `O arquivo excedia ${MAX_SYSTEM_PROMPT.toLocaleString("pt-BR")} caracteres e foi truncado.` });
       }
       form.setValue("system_prompt", text, { shouldDirty: true, shouldValidate: true });
     };
@@ -136,13 +169,29 @@ export default function AISettingsTab() {
     e.target.value = "";
   };
 
+  // --- Toggle (activate/deactivate) with confirmation ---
   const toggleMutation = useMutation({
     mutationFn: async (newVal: boolean) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão expirada");
+
       const { error } = await supabase
         .from("ai_settings")
         .update({ is_active: newVal })
         .eq("id", settings!.id);
       if (error) throw error;
+
+      // Audit
+      await supabase.from("audit_events").insert({
+        tenant_id: tid,
+        actor_user_id: session.user.id,
+        event_type: newVal ? "ai_config_activated" : "ai_config_deactivated",
+        metadata: {
+          provider: settings?.provider,
+          model: settings?.model,
+          last_test_ok: settings?.last_test_ok,
+        },
+      });
     },
     onSuccess: (_, newVal) => {
       queryClient.invalidateQueries({ queryKey: ["ai_settings", tid] });
@@ -153,6 +202,51 @@ export default function AISettingsTab() {
     },
   });
 
+  const handleToggleRequest = (newVal: boolean) => {
+    if (newVal) {
+      // Activating — show confirmation dialog
+      setPendingActivation(true);
+      setRiskAcknowledged(false);
+      setActivateDialogOpen(true);
+    } else {
+      // Deactivating — direct
+      toggleMutation.mutate(false);
+    }
+  };
+
+  const confirmActivation = () => {
+    setActivateDialogOpen(false);
+    toggleMutation.mutate(true);
+  };
+
+  const testRecentAndOk = settings?.last_test_ok && isTestRecent(settings?.last_tested_at);
+
+  // --- Test mutation ---
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão expirada");
+
+      const { data, error } = await supabase.functions.invoke("test-ai-config", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (error) throw error;
+      return data as { ok: boolean; latency_ms: number; model_used: string; provider_used: string; error_message?: string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["ai_settings", tid] });
+      if (data.ok) {
+        toast({ title: "✅ Configuração validada", description: `Resposta em ${data.latency_ms}ms — Modelo: ${data.model_used}` });
+      } else {
+        toast({ title: "❌ Teste falhou", description: data.error_message || "Erro desconhecido", variant: "destructive" });
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao testar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // --- Save mutation ---
   const saveMutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -177,7 +271,7 @@ export default function AISettingsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ai_settings", tid] });
-      toast({ title: "IA configurada com sucesso!" });
+      toast({ title: "Configuração salva como rascunho", description: "Use o toggle para ativar a IA após testar." });
       form.setValue("api_key", "");
     },
     onError: (err: any) => {
@@ -244,7 +338,7 @@ export default function AISettingsTab() {
                 </div>
                 <Switch
                   checked={settings.is_active}
-                  onCheckedChange={(v) => toggleMutation.mutate(v)}
+                  onCheckedChange={handleToggleRequest}
                   disabled={toggleMutation.isPending}
                 />
               </div>
@@ -269,9 +363,35 @@ export default function AISettingsTab() {
                 <p className="text-sm text-muted-foreground">Sem diretrizes personalizadas</p>
               )}
 
+              {/* Test status */}
+              <div className="flex items-center gap-2 text-sm">
+                {settings.last_tested_at ? (
+                  <>
+                    {settings.last_test_ok ? (
+                      <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="h-3 w-3 mr-1" /> Teste OK
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-destructive text-destructive">
+                        <XCircle className="h-3 w-3 mr-1" /> Teste falhou
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatDateTime(settings.last_tested_at)}
+                      {!isTestRecent(settings.last_tested_at) && (
+                        <span className="text-amber-600 dark:text-amber-400 ml-1">(expirado)</span>
+                      )}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Nenhum teste realizado</span>
+                )}
+              </div>
+
               {settings.updated_at && (
                 <p className="text-xs text-muted-foreground">
-                  Última atualização: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(settings.updated_at))}
+                  Última atualização: {formatDateTime(settings.updated_at)}
                 </p>
               )}
 
@@ -396,14 +516,107 @@ export default function AISettingsTab() {
                 </FormItem>
               )} />
 
-              <Button type="submit" disabled={saveMutation.isPending} className="w-full">
-                {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-                Salvar configuração
-              </Button>
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                <Button type="submit" disabled={saveMutation.isPending} className="flex-1">
+                  {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                  Salvar configuração
+                </Button>
+                {hasConfig && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={testMutation.isPending || !settings.api_key_hint}
+                    onClick={() => testMutation.mutate()}
+                  >
+                    {testMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FlaskConical className="h-4 w-4 mr-1" />}
+                    Testar configuração
+                  </Button>
+                )}
+              </div>
             </form>
           </Form>
         </CardContent>
       </Card>
+
+      {/* Activation confirmation dialog */}
+      <Dialog open={activateDialogOpen} onOpenChange={setActivateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ativar IA para este tenant?</DialogTitle>
+            <DialogDescription>
+              Revise as informações abaixo antes de confirmar a ativação.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+              <span className="text-muted-foreground">Provedor</span>
+              <span className="font-medium">{formatProviderLabel(settings?.provider || "")}</span>
+
+              <span className="text-muted-foreground">Modelo</span>
+              <span className="font-medium">{settings?.model || "—"}</span>
+
+              <span className="text-muted-foreground">Último teste</span>
+              <span className="font-medium">
+                {settings?.last_tested_at ? (
+                  <span className="flex items-center gap-1">
+                    {settings.last_test_ok ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-destructive" />
+                    )}
+                    {formatDateTime(settings.last_tested_at)}
+                  </span>
+                ) : (
+                  "Nunca testado"
+                )}
+              </span>
+
+              <span className="text-muted-foreground">Última atualização</span>
+              <span className="font-medium">{settings?.updated_at ? formatDateTime(settings.updated_at) : "—"}</span>
+            </div>
+
+            {!testRecentAndOk && (
+              <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-amber-800 dark:text-amber-300">
+                  {!settings?.last_tested_at
+                    ? "Nenhum teste foi realizado. Recomendamos testar antes de ativar."
+                    : !settings?.last_test_ok
+                      ? "O último teste falhou. Recomendamos testar novamente."
+                      : `O teste foi realizado há mais de ${TEST_VALIDITY_MINUTES} minutos. Recomendamos testar novamente.`}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {!testRecentAndOk && (
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="risk-ack"
+                  checked={riskAcknowledged}
+                  onCheckedChange={(v) => setRiskAcknowledged(v === true)}
+                />
+                <label htmlFor="risk-ack" className="text-sm text-muted-foreground cursor-pointer leading-tight">
+                  Entendo o risco e desejo ativar sem teste recente válido.
+                </label>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancelar</Button>
+            </DialogClose>
+            <Button
+              onClick={confirmActivation}
+              disabled={!testRecentAndOk && !riskAcknowledged}
+            >
+              Confirmar ativação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
