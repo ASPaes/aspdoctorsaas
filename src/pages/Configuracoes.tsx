@@ -235,6 +235,12 @@ export default function Configuracoes() {
         <TabsContent value="whatsapp">
           <WhatsAppSettingsContent />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="ia">
+            <AISettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
