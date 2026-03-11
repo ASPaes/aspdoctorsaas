@@ -147,7 +147,10 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium">Fone</label>
-                <Input placeholder="(00) 00000-0000" value={form.fone} onChange={(e) => updateField("fone", maskPhone(e.target.value))} />
+                <PhoneInputBR
+                  value={form.fone}
+                  onChange={(v) => updateField("fone", v)}
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium">Email</label>
