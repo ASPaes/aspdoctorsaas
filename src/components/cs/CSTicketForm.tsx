@@ -68,6 +68,8 @@ function buildDraftKey(tenantId: string | null, userId: string | null, clienteId
 
 export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defaultOwnerId }: CSTicketFormProps) {
   const { user, profile } = useAuth();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   const draftKey = buildDraftKey(profile?.tenant_id ?? null, user?.id ?? null, clienteId);
 
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
