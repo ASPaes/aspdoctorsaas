@@ -114,7 +114,7 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
               {contatos.map((c: any) => (
                 <TableRow key={c.id}>
                   <TableCell className="text-xs">{c.nome}</TableCell>
-                  <TableCell className="text-xs">{c.fone ?? "—"}</TableCell>
+                  <TableCell className="text-xs">{c.fone ? formatBRPhone(normalizeBRPhone(c.fone)) : "—"}</TableCell>
                   <TableCell className="text-xs">{c.email ?? "—"}</TableCell>
                   <TableCell className="text-xs">{c.cargo ?? "—"}</TableCell>
                   <TableCell>
