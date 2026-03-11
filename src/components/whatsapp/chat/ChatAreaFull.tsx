@@ -134,6 +134,7 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         />
         <ChatMessages
           conversationId={conversation.id}
+          unreadCount={conversation.unread_count ?? 0}
           onReply={setReplyTo}
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}
