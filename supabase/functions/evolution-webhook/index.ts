@@ -580,7 +580,7 @@ async function processReaction(payload: EvolutionWebhookPayload, supabase: any, 
         conversation_id: targetMessage.conversation_id,
         emoji,
         reactor_jid: reactorJid,
-        is_from_me: key.fromMe,
+        is_from_me: getPayloadIsFromMe(data),
         tenant_id: tenantId,
       }, { 
         onConflict: 'message_id,reactor_jid',
