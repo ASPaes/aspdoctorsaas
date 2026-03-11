@@ -6,6 +6,7 @@ import { MediaContent } from "./MediaContent";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,23 +21,14 @@ interface Props {
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (msgId: string) => void;
-  onDeleteLocal?: (msgId: string) => void;
+  onDeletePanelOnly?: (msgId: string) => void;
   onDeleteEveryone?: (msgId: string) => void;
   onRetryDelete?: (msgId: string) => void;
   onForward?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
 }
 
-const FIVE_MINUTES = 5 * 60 * 1000;
-
-function canDeleteEveryone(msg: Message): boolean {
-  if (msg.id.startsWith('temp-')) return false;
-  const deleteStatus = (msg as any).delete_status;
-  if (deleteStatus && deleteStatus !== 'active') return false;
-  return msg.is_from_me && (Date.now() - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
-}
-
-function canDeleteLocal(msg: Message): boolean {
+function canDeletePanelOnly(msg: Message): boolean {
   if (msg.id.startsWith('temp-')) return false;
   const deleteStatus = (msg as any).delete_status;
   return !deleteStatus || deleteStatus === 'active' || deleteStatus === 'failed';
@@ -48,7 +40,7 @@ export function MessageBubble({
   selectionMode,
   isSelected,
   onToggleSelect,
-  onDeleteLocal,
+  onDeletePanelOnly,
   onDeleteEveryone,
   onRetryDelete,
   onForward,
@@ -61,7 +53,7 @@ export function MessageBubble({
 
   const deleteStatus = (msg as any).delete_status as string | undefined;
   const deleteScope = (msg as any).delete_scope as string | undefined;
-  const isDeleted = msg.status === 'deleted' || deleteStatus === 'revoked';
+  const isDeleted = msg.status === 'deleted' || deleteStatus === 'revoked' || msg.message_type === 'revoked';
   const isPending = deleteStatus === 'pending';
   const isFailed = deleteStatus === 'failed';
 
@@ -106,7 +98,7 @@ export function MessageBubble({
           "max-w-[75%] rounded-lg px-3 py-1.5 text-sm italic opacity-60",
           isMe ? "bg-primary/30 text-primary-foreground/60 rounded-br-sm" : "bg-muted/50 text-foreground/60 rounded-bl-sm"
         )}>
-          <p>🚫 {deleteScope === 'local' ? 'Mensagem excluída do sistema' : 'Mensagem apagada'}</p>
+          <p>🚫 {deleteScope === 'local' ? 'Removida do painel' : 'Mensagem apagada'}</p>
           <div className={cn("flex items-center gap-1 mt-0.5", isMe ? "justify-end" : "justify-start")}>
             <span className="text-[10px] opacity-60">{time}</span>
           </div>
@@ -142,10 +134,10 @@ export function MessageBubble({
             </button>
             <span className="text-muted-foreground">·</span>
             <button
-              onClick={() => onDeleteLocal?.(msg.id)}
+              onClick={() => onDeletePanelOnly?.(msg.id)}
               className="underline hover:no-underline text-muted-foreground"
             >
-              Excluir do sistema
+              Remover do painel
             </button>
           </div>
         </div>
@@ -238,6 +230,14 @@ export function MessageBubble({
   }
 
   // Normal mode with context menu
+  const handleDeleteEveryone = () => {
+    if (!msg.is_from_me) {
+      toast.error("Só é possível apagar para todos mensagens enviadas por você.");
+      return;
+    }
+    onDeleteEveryone?.(msg.id);
+  };
+
   return (
     <div
       className={cn("flex mb-1", isMe ? "justify-end" : "justify-start")}
@@ -248,19 +248,19 @@ export function MessageBubble({
           {bubbleContent}
         </DropdownMenuTrigger>
         <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[180px]">
-          {canDeleteLocal(msg) && (
-            <DropdownMenuItem onClick={() => onDeleteLocal?.(msg.id)}>
-              <EyeOff className="h-4 w-4 mr-2" />
-              Excluir do sistema
-            </DropdownMenuItem>
-          )}
-          {canDeleteEveryone(msg) && (
-            <DropdownMenuItem onClick={() => onDeleteEveryone?.(msg.id)} className="text-destructive focus:text-destructive">
+          {msg.is_from_me && canDeletePanelOnly(msg) && (
+            <DropdownMenuItem onClick={handleDeleteEveryone} className="text-destructive focus:text-destructive">
               <Trash2 className="h-4 w-4 mr-2" />
-              Apagar para todos
+              Apagar para todos (WhatsApp)
             </DropdownMenuItem>
           )}
-          {(canDeleteLocal(msg) || canDeleteEveryone(msg)) && <DropdownMenuSeparator />}
+          {canDeletePanelOnly(msg) && (
+            <DropdownMenuItem onClick={() => onDeletePanelOnly?.(msg.id)}>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Remover do painel
+            </DropdownMenuItem>
+          )}
+          {canDeletePanelOnly(msg) && <DropdownMenuSeparator />}
           <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
             <Forward className="h-4 w-4 mr-2" />
             Encaminhar

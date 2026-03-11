@@ -16,7 +16,7 @@ interface Props {
   selectionMode?: boolean;
   selectedMessages?: Set<string>;
   onToggleSelect?: (msgId: string) => void;
-  onDeleteLocal?: (msgId: string) => void;
+  onDeletePanelOnly?: (msgId: string) => void;
   onDeleteEveryone?: (msgId: string) => void;
   onRetryDelete?: (msgId: string) => void;
   onForwardSingle?: (msgId: string) => void;
@@ -34,7 +34,7 @@ export function ChatMessages({
   selectionMode,
   selectedMessages,
   onToggleSelect,
-  onDeleteLocal,
+  onDeletePanelOnly,
   onDeleteEveryone,
   onRetryDelete,
   onForwardSingle,
@@ -158,7 +158,7 @@ export function ChatMessages({
                     selectionMode={selectionMode}
                     isSelected={selectedMessages?.has(item.msg.id)}
                     onToggleSelect={onToggleSelect}
-                    onDeleteLocal={onDeleteLocal}
+                    onDeletePanelOnly={onDeletePanelOnly}
                     onDeleteEveryone={onDeleteEveryone}
                     onRetryDelete={onRetryDelete}
                     onForward={onForwardSingle}
