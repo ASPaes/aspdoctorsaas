@@ -847,19 +847,39 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     if (updates.status === 3 || updates.status === 'READ') status = 'read';
     else if (updates.status === 2 || updates.status === 'DELIVERY_ACK') status = 'delivered';
     else if (updates.status === 1 || updates.status === 'SERVER_ACK') status = 'sent';
+    else if (updates.status === 'REVOKED' || updates.status === 4) status = 'revoked';
 
     // Evolution API sends keyId (flat) or key.id depending on version
     const messageId = updates.keyId || updates.key?.id;
     if (messageId) {
-      const { error } = await supabase
-        .from('whatsapp_messages')
-        .update({ status })
-        .eq('message_id', messageId);
+      if (status === 'revoked') {
+        // Mark as revoked in our soft-delete system
+        const { error } = await supabase
+          .from('whatsapp_messages')
+          .update({
+            delete_status: 'revoked',
+            delete_scope: 'everyone',
+            message_type: 'revoked',
+            content: '',
+          })
+          .eq('message_id', messageId);
 
-      if (error) {
-        console.error('[evolution-webhook] Error updating message status:', error);
+        if (error) {
+          console.error('[evolution-webhook] Error marking message as revoked:', error);
+        } else {
+          console.log('[evolution-webhook] Message revoked via status update for messageId:', messageId);
+        }
       } else {
-        console.log('[evolution-webhook] Message status updated to:', status, 'for messageId:', messageId);
+        const { error } = await supabase
+          .from('whatsapp_messages')
+          .update({ status })
+          .eq('message_id', messageId);
+
+        if (error) {
+          console.error('[evolution-webhook] Error updating message status:', error);
+        } else {
+          console.log('[evolution-webhook] Message status updated to:', status, 'for messageId:', messageId);
+        }
       }
     } else {
       console.warn('[evolution-webhook] No messageId found in update payload:', JSON.stringify(updates));
