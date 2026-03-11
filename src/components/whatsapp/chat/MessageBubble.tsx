@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
