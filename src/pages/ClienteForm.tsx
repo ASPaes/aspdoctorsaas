@@ -24,6 +24,7 @@ import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
+import { normalizeBRPhone, isValidBRPhone } from "@/lib/phoneBR";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
@@ -36,7 +37,11 @@ const clienteSchema = z.object({
     z.string().min(1, "E-mail obrigatório").email("E-mail inválido")
   ),
   telefone_contato: z.string().nullable(),
-  telefone_whatsapp: z.string().nullable().refine(v => !!v && v.replace(/\D/g, "").length >= 10, { message: "WhatsApp obrigatório" }),
+  telefone_whatsapp: z.string().nullable().refine(v => {
+    if (!v) return false;
+    const normalized = normalizeBRPhone(v);
+    return isValidBRPhone(normalized);
+  }, { message: "WhatsApp inválido. Use formato: (DD) NNNNN-NNNN" }),
   estado_id: z.number().nullable(),
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
@@ -105,7 +110,7 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   // Check required fields
   if (!values.cnpj || values.cnpj.replace(/\D/g, "").length < 14) missingFields.push(fieldLabels.cnpj);
   if (!values.email) missingFields.push(fieldLabels.email);
-  if (!values.telefone_whatsapp || values.telefone_whatsapp.replace(/\D/g, "").length < 10) missingFields.push(fieldLabels.telefone_whatsapp);
+  if (!values.telefone_whatsapp || !isValidBRPhone(normalizeBRPhone(values.telefone_whatsapp))) missingFields.push(fieldLabels.telefone_whatsapp);
   if (!values.data_venda) missingFields.push(fieldLabels.data_venda);
   if (!values.funcionario_id) missingFields.push(fieldLabels.funcionario_id);
   if (!values.origem_venda_id) missingFields.push(fieldLabels.origem_venda_id);
@@ -310,6 +315,7 @@ export default function ClienteForm() {
       const payload: any = {
         ...values,
         email: values.email?.trim().toLowerCase() || null,
+        telefone_whatsapp: values.telefone_whatsapp ? normalizeBRPhone(values.telefone_whatsapp) : null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
         custo_fixo_percentual: values.custo_fixo_percentual != null ? values.custo_fixo_percentual / 100 : null,
       };

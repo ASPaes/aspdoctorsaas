@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
 import { maskCNPJ, maskPhone, maskCPF, maskCEP, normalizePhoneBR } from "@/lib/masks";
+import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -213,10 +214,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
   const handleOpenWhatsApp = useCallback(() => {
     if (!whatsappDigits || !clienteId || !onNavigate) return;
-    const normalizedPhone = normalizePhoneBR(whatsappDigits);
+    const normalizedPhone = normalizeBRPhone(whatsappValue ?? "");
     const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
     onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
-  }, [whatsappDigits, clienteId, form, onNavigate]);
+  }, [whatsappValue, whatsappDigits, clienteId, form, onNavigate]);
 
   return (
     <div className="space-y-6">
@@ -366,9 +367,17 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <div className="flex gap-2">
               <FormControl>
                 <Input
-                  placeholder="(00) 00000-0000"
+                  placeholder="+55 (49) 99966-6019"
                   value={field.value ?? ""}
-                  onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={() => {
+                    if (field.value) {
+                      const normalized = normalizeBRPhone(field.value);
+                      if (isValidBRPhone(normalized)) {
+                        field.onChange(formatBRPhone(normalized));
+                      }
+                    }
+                  }}
                 />
               </FormControl>
               {canOpenWhatsApp && (
