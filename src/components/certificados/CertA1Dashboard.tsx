@@ -80,7 +80,7 @@ export function CertA1Dashboard() {
       let vendasQuery = tf(supabase
         .from("certificado_a1_vendas")
         .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
-        .not("data_venda", "is", null);
+        .not("data_venda", "is", null));
       if (periodoInicioStr && periodoFimStr) {
         vendasQuery = vendasQuery.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
       }
