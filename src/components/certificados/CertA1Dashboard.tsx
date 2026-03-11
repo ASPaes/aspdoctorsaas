@@ -91,7 +91,7 @@ export function CertA1Dashboard() {
         const { data: clientes } = await tf(supabase
           .from("clientes")
           .select("id, razao_social, nome_fantasia, telefone_whatsapp")
-          .in("id", clienteIds));
+          .in("id", clienteIds as string[]));
         (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
