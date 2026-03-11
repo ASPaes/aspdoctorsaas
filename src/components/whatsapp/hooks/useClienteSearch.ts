@@ -14,6 +14,7 @@ export interface ClienteSearchResult {
 }
 
 export function useClienteSearch(searchTerm: string) {
+  const { effectiveTenantId: tid } = useTenantFilter();
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 
   useEffect(() => {
