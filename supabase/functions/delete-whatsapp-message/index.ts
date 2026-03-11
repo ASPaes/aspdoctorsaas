@@ -119,7 +119,8 @@ Deno.serve(async (req) => {
         const baseUrl = api_url.endsWith('/') ? api_url.slice(0, -1) : api_url;
         const cleanUrl = baseUrl.replace(/\/manager$/, '');
         try {
-          const deleteBody = { id: msg.message_id, remoteJid: msg.remote_jid, fromMe: true };
+          const jid = msg.remote_jid && msg.remote_jid.includes('@') ? msg.remote_jid : `${msg.remote_jid}@s.whatsapp.net`;
+          const deleteBody = { id: msg.message_id, remoteJid: jid, fromMe: true };
           console.log(`[${FUNCTION_NAME}][${requestId}] Evolution delete request: url=${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}, body=${JSON.stringify(deleteBody)}`);
           const resp = await fetch(`${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}`, {
             method: 'DELETE',
