@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { maskCPF, maskPhone } from "@/lib/masks";
+import { maskCPF } from "@/lib/masks";
+import { normalizeBRPhone } from "@/lib/phoneBR";
+import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 
 interface Props {
   clienteId: string;
