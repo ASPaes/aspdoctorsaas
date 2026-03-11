@@ -38,6 +38,9 @@ export function ChatMessages({
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
+  const prevConversationId = useRef(conversationId);
 
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
