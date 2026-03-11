@@ -274,10 +274,17 @@ Deno.serve(async (req) => {
       const cleanUrl = baseUrl.replace(/\/manager$/, '');
 
       try {
-        // Resolve proper @s.whatsapp.net JID (handles @lid format)
-        const resolvedJid = await resolveRemoteJid(supabase, msg.remote_jid, conversationId, requestId);
-        if (!resolvedJid) {
-          const errorMsg = 'Could not resolve remoteJid for this conversation';
+        // Use the original remote_jid stored on the message first
+        let jidToUse = msg.remote_jid;
+        console.log(`[${FUNCTION_NAME}][${requestId}] Message details: message_id=${msg.message_id}, original_remote_jid=${msg.remote_jid}, fromMe=${msg.is_from_me}`);
+
+        // If original JID is missing, try to resolve from conversation contact
+        if (!jidToUse) {
+          jidToUse = await resolveRemoteJid(supabase, null, conversationId, requestId);
+        }
+
+        if (!jidToUse) {
+          const errorMsg = 'Could not determine remoteJid for this message';
           await supabase.from('whatsapp_messages').update({
             delete_scope: 'everyone',
             delete_status: 'failed',
@@ -288,55 +295,53 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        console.log(`[${FUNCTION_NAME}][${requestId}] Message details: message_id=${msg.message_id}, original_remote_jid=${msg.remote_jid}, resolved_jid=${resolvedJid}, fromMe=${msg.is_from_me}`);
-
         // Step 1: Mark as PENDING before calling Evolution
-        const previousStatus = msg.status;
         await supabase.from('whatsapp_messages').update({
           delete_scope: 'everyone',
           delete_status: 'pending',
           deleted_by: userId,
         }).eq('id', msg.id);
 
-        // Step 2: Call Evolution API
-        const deleteBody = { id: msg.message_id, remoteJid: resolvedJid, fromMe: true };
+        // Step 2: Try Evolution API with original JID first
         const evolutionUrl = `${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}`;
+        let deleteBody = { id: msg.message_id, remoteJid: jidToUse, fromMe: true };
 
         console.log(`[${FUNCTION_NAME}][${requestId}] Evolution DELETE: ${evolutionUrl}`);
         console.log(`[${FUNCTION_NAME}][${requestId}] Body: ${JSON.stringify(deleteBody)}`);
 
-        const resp = await fetch(evolutionUrl, {
+        let resp = await fetch(evolutionUrl, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json', apikey: api_key },
           body: JSON.stringify(deleteBody),
         });
-        const respText = await resp.text();
+        let respText = await resp.text();
         console.log(`[${FUNCTION_NAME}][${requestId}] Evolution response: status=${resp.status} body=${respText.slice(0, 500)}`);
 
-        if (resp.ok) {
-          // Evolution accepted. Now directly mark as revoked since Evolution returns 201
-          // (webhook confirmation may come later but we treat 2xx as success)
-          await supabase.from('whatsapp_messages').update({
-            delete_status: 'revoked',
-            delete_scope: 'everyone',
-            deleted_at: new Date().toISOString(),
-            content: '',
-            message_type: 'revoked',
-            media_url: null,
-            media_path: null,
-            media_mimetype: null,
-            media_filename: null,
-            media_ext: null,
-            media_kind: null,
-            delete_error: null,
-          }).eq('id', msg.id);
+        // If original JID failed and it's @lid, try resolved @s.whatsapp.net as fallback
+        if (!resp.ok && jidToUse.includes('@lid')) {
+          const fallbackJid = await resolveRemoteJid(supabase, jidToUse, conversationId, requestId);
+          if (fallbackJid && fallbackJid !== jidToUse) {
+            console.log(`[${FUNCTION_NAME}][${requestId}] Retrying with resolved JID: ${fallbackJid}`);
+            deleteBody = { id: msg.message_id, remoteJid: fallbackJid, fromMe: true };
+            resp = await fetch(evolutionUrl, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json', apikey: api_key },
+              body: JSON.stringify(deleteBody),
+            });
+            respText = await resp.text();
+            console.log(`[${FUNCTION_NAME}][${requestId}] Evolution fallback response: status=${resp.status} body=${respText.slice(0, 500)}`);
+          }
+        }
 
-          console.log(`[${FUNCTION_NAME}][${requestId}] ✅ Message revoked: ${msg.id} (message_id=${msg.message_id})`);
+        if (resp.ok) {
+          // Evolution accepted the request (201/PENDING).
+          // Keep status as 'pending' — the webhook will confirm revoke.
+          // Do NOT mark as revoked here.
+          console.log(`[${FUNCTION_NAME}][${requestId}] ✅ Evolution accepted delete: ${msg.id} (message_id=${msg.message_id}), waiting for webhook confirmation`);
           results.push({ id: msg.id, status: 'pending' });
         } else {
           const errorMsg = `Evolution API ${resp.status}: ${respText.slice(0, 200)}`;
           console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Evolution error: ${errorMsg}`);
-          // Revert to previous state
           await supabase.from('whatsapp_messages').update({
             delete_status: 'failed',
             delete_scope: 'everyone',
