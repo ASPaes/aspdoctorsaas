@@ -17,12 +17,15 @@ export interface ClienteDetailsForChat {
 }
 
 export function useLinkedClienteDetails(clienteId: string | null) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+
   return useQuery({
-    queryKey: ['linked-cliente-details', clienteId],
+    queryKey: ['linked-cliente-details', clienteId, tid],
     queryFn: async (): Promise<ClienteDetailsForChat | null> => {
       if (!clienteId) return null;
 
-      const { data: c } = await supabase
+      const { data: c } = await tf(supabase
         .from('clientes')
         .select(`
           cnpj, email, data_ativacao, data_cadastro, contato_aniversario,
