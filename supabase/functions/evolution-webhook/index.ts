@@ -842,7 +842,8 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     else if (updates.status === 2 || updates.status === 'DELIVERY_ACK') status = 'delivered';
     else if (updates.status === 1 || updates.status === 'SERVER_ACK') status = 'sent';
 
-    const messageId = updates.key?.id;
+    // Evolution API sends keyId (flat) or key.id depending on version
+    const messageId = updates.keyId || updates.key?.id;
     if (messageId) {
       const { error } = await supabase
         .from('whatsapp_messages')
@@ -852,8 +853,10 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
       if (error) {
         console.error('[evolution-webhook] Error updating message status:', error);
       } else {
-        console.log('[evolution-webhook] Message status updated to:', status);
+        console.log('[evolution-webhook] Message status updated to:', status, 'for messageId:', messageId);
       }
+    } else {
+      console.warn('[evolution-webhook] No messageId found in update payload:', JSON.stringify(updates));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpdate:', error);
