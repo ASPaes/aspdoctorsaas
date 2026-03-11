@@ -69,27 +69,43 @@ export function AttachmentCard({
     }
   };
 
+  const [downloading, setDownloading] = useState(false);
+
   const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) return;
 
-      const response = await fetch(getProxyUrl(messageId, 'attachment') + `&token=${token}`);
-      if (!response.ok) return;
+      const proxyUrl = getProxyUrl(messageId, 'attachment') + `&token=${token}`;
+      const response = await fetch(proxyUrl, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        console.error('Download failed:', response.status);
+        return;
+      }
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Delay cleanup to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 200);
     } catch (err) {
       console.error('Download failed:', err);
+    } finally {
+      setDownloading(false);
     }
   };
 
