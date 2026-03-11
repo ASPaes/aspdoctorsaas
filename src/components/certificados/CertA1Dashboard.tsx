@@ -113,13 +113,13 @@ export function CertA1Dashboard() {
       const minus20Str = format(subDays(today, 20), "yyyy-MM-dd");
       const plus30Str = format(addDays(today, 30), "yyyy-MM-dd");
 
-      const { data: certClientes } = await supabase
+      const { data: certClientes } = await tf(supabase
         .from("clientes")
         .select("id, cert_a1_vencimento")
         .eq("cancelado", false)
         .not("cert_a1_vencimento", "is", null)
         .gte("cert_a1_vencimento", minus20Str)
-        .lte("cert_a1_vencimento", plus30Str) as any;
+        .lte("cert_a1_vencimento", plus30Str)) as any;
 
       const oportunidadesJanela = certClientes?.length || 0;
       const vencendo30 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= todayStr && c.cert_a1_vencimento <= plus30Str).length || 0;
