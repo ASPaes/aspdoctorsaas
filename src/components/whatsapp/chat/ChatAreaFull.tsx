@@ -268,6 +268,3 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     </div>
   );
 }
-
-// Need to import EyeOff for the selection bar
-import { EyeOff } from "lucide-react";
