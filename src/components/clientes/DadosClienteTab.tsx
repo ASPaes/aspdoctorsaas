@@ -168,7 +168,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       if (data.ddd_telefone_1) {
         const phoneDig = data.ddd_telefone_1.replace(/\D/g, "");
         if (phoneDig.length >= 10) {
-          form.setValue("telefone_contato", maskPhone(phoneDig));
+          const { formatBRPhone } = await import("@/lib/phoneBR");
+          form.setValue("telefone_contato", formatBRPhone(normalizeBRPhone(phoneDig)));
         }
       }
 
