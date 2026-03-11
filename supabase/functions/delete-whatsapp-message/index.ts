@@ -60,8 +60,10 @@ Deno.serve(async (req) => {
       .in('id', messageIds)
       .eq('conversation_id', conversationId);
 
+    console.log(`[${FUNCTION_NAME}][${requestId}] Query result: found=${messages?.length ?? 0}, error=${msgError?.message ?? 'none'}, ids=${JSON.stringify(messageIds)}`);
+
     if (msgError || !messages || messages.length === 0) {
-      return new Response(JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, detail: 'Messages not found', requestId }), {
+      return new Response(JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, detail: msgError?.message || 'Messages not found', requestId }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
     }
