@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface ClienteDetailsForChat {
   cnpj: string | null;
@@ -16,19 +17,22 @@ export interface ClienteDetailsForChat {
 }
 
 export function useLinkedClienteDetails(clienteId: string | null) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+
   return useQuery({
-    queryKey: ['linked-cliente-details', clienteId],
+    queryKey: ['linked-cliente-details', clienteId, tid],
     queryFn: async (): Promise<ClienteDetailsForChat | null> => {
       if (!clienteId) return null;
 
-      const { data: c } = await supabase
+      const { data: c } = await tf(supabase
         .from('clientes')
         .select(`
           cnpj, email, data_ativacao, data_cadastro, contato_aniversario,
           area_atuacao_id, segmento_id, unidade_base_id,
           fornecedor_id, produto_id, cidade_id, estado_id
         `)
-        .eq('id', clienteId)
+        .eq('id', clienteId))
         .single();
 
       if (!c) return null;

@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { escapeLike } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { useCreateCSTicket, useFuncionariosAtivos } from './hooks/useCSTickets';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS, CS_INDICACAO_STATUS_LABELS,
@@ -67,6 +68,8 @@ function buildDraftKey(tenantId: string | null, userId: string | null, clienteId
 
 export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defaultOwnerId }: CSTicketFormProps) {
   const { user, profile } = useAuth();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
   const draftKey = buildDraftKey(profile?.tenant_id ?? null, user?.id ?? null, clienteId);
 
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
@@ -190,10 +193,10 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
     setLoadingClientes(true);
     const debounce = setTimeout(async () => {
       const escaped = escapeLike(searchCliente);
-      const { data } = await supabase.from('clientes').select('id, razao_social, nome_fantasia')
+      const { data } = await tf(supabase.from('clientes').select('id, razao_social, nome_fantasia')
         .eq('cancelado', false)
         .or(`razao_social.ilike.%${escaped}%,nome_fantasia.ilike.%${escaped}%`)
-        .limit(10);
+        .limit(10));
       if (data) setClientes(data);
       setLoadingClientes(false);
     }, 300);

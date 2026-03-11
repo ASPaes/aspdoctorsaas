@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLookups } from "@/hooks/useLookups";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { getNavIds } from "@/hooks/useClientesFilters";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -136,6 +137,8 @@ export default function ClienteForm() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
   const [mrrModalOpen, setMrrModalOpen] = useState(false);
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
   // Navigation between records
   const navInfo = useMemo(() => {
@@ -191,9 +194,9 @@ export default function ClienteForm() {
   const mcPonderadaQuery = useQuery({
     queryKey: ["mc-ponderada-global"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await tf(supabase
         .from("vw_clientes_financeiro")
-        .select("mensalidade, custo_operacao, cancelado");
+        .select("mensalidade, custo_operacao, cancelado"));
       if (error) throw error;
       const ativos = (data ?? []).filter(c => !c.cancelado);
       let receita = 0, cogs = 0;
@@ -248,7 +251,7 @@ export default function ClienteForm() {
   const clienteQuery = useQuery({
     queryKey: ["cliente", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clientes").select("*").eq("id", id!).single();
+      const { data, error } = await tf(supabase.from("clientes").select("*").eq("id", id!)).single();
       if (error) throw error;
       return data;
     },
@@ -482,7 +485,7 @@ export default function ClienteForm() {
             onVencimentoChange={(v) => form.setValue("cert_a1_vencimento", v)}
             onVendaRegistrada={async () => {
               if (!id) return;
-              const { data } = await supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id).single();
+              const { data } = await tf(supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id)).single();
               if (data) {
                 form.setValue("cert_a1_vencimento", (data as any).cert_a1_vencimento ?? null);
                 form.setValue("cert_a1_ultima_venda_em", (data as any).cert_a1_ultima_venda_em ?? null);

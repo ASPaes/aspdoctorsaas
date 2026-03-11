@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLookups } from "@/hooks/useLookups";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, addDays, subDays, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
 import { DateRangePicker, DateRange } from "@/components/ui/date-range-picker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
@@ -55,6 +56,8 @@ export function CertA1Dashboard() {
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
   const now = new Date();
   const [periodo, setPeriodo] = useState<DateRange>({
@@ -71,12 +74,12 @@ export function CertA1Dashboard() {
   const periodoFimStr = periodo.to ? format(periodo.to, "yyyy-MM-dd") : null;
 
   const { data: metrics, isLoading } = useQuery({
-    queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr],
+    queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr, tid],
     queryFn: async () => {
-      let vendasQuery = supabase
+      let vendasQuery = tf(supabase
         .from("certificado_a1_vendas")
         .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
-        .not("data_venda", "is", null);
+        .not("data_venda", "is", null));
       if (periodoInicioStr && periodoFimStr) {
         vendasQuery = vendasQuery.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
       }
@@ -85,10 +88,10 @@ export function CertA1Dashboard() {
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
       let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null; telefone_whatsapp: string | null }> = {};
       if (clienteIds.length > 0) {
-        const { data: clientes } = await supabase
+        const { data: clientes } = await tf(supabase
           .from("clientes")
           .select("id, razao_social, nome_fantasia, telefone_whatsapp")
-          .in("id", clienteIds);
+          .in("id", clienteIds as string[]));
         (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
@@ -109,23 +112,23 @@ export function CertA1Dashboard() {
       const minus20Str = format(subDays(today, 20), "yyyy-MM-dd");
       const plus30Str = format(addDays(today, 30), "yyyy-MM-dd");
 
-      const { data: certClientes } = await supabase
+      const { data: certClientes } = await tf(supabase
         .from("clientes")
         .select("id, cert_a1_vencimento")
         .eq("cancelado", false)
         .not("cert_a1_vencimento", "is", null)
         .gte("cert_a1_vencimento", minus20Str)
-        .lte("cert_a1_vencimento", plus30Str) as any;
+        .lte("cert_a1_vencimento", plus30Str)) as any;
 
       const oportunidadesJanela = certClientes?.length || 0;
       const vencendo30 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= todayStr && c.cert_a1_vencimento <= plus30Str).length || 0;
       const vencidos20 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= minus20Str && c.cert_a1_vencimento < todayStr).length || 0;
 
-      const { count: semData } = await supabase
+      const { count: semData } = await tf(supabase
         .from("clientes")
         .select("id", { count: "exact", head: true })
         .eq("cancelado", false)
-        .is("cert_a1_vencimento", null) as any;
+        .is("cert_a1_vencimento", null)) as any;
 
       const vendasDetalhe = (vendas ?? []).map(v => ({
         id: v.id,
