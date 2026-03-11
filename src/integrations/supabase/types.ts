@@ -2552,7 +2552,15 @@ export type Database = {
             Returns: string
           }
       current_tenant_id: { Args: never; Returns: string }
+      decrypt_api_key: {
+        Args: { p_encrypted: string; p_encryption_key: string }
+        Returns: string
+      }
       email_domain: { Args: { email: string }; Returns: string }
+      encrypt_api_key: {
+        Args: { p_encryption_key: string; p_key: string }
+        Returns: string
+      }
       fn_cohort_logos:
         | {
             Args: {
