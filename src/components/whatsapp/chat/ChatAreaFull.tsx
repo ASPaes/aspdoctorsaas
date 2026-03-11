@@ -45,7 +45,13 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
 
   const deleteMutation = useDeleteMessages();
-  const { messages } = useWhatsAppMessages(conversation?.id || null);
+  const queryClient = useQueryClient();
+
+  // Read messages from the query cache instead of calling useWhatsAppMessages
+  // to avoid creating a duplicate realtime subscription
+  const messages: Message[] = queryClient.getQueryData(
+    ['whatsapp', 'messages', conversation?.id]
+  ) ?? [];
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {

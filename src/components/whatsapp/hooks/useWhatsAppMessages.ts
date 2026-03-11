@@ -91,11 +91,16 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
   }, [conversationId]);
 
   // Realtime subscription — append/update messages in cache instead of full refetch
+  // Use a unique channel name per hook instance to avoid conflicts when multiple
+  // components call this hook with the same conversationId (e.g. ChatAreaFull + ChatMessages)
+  const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+
   useEffect(() => {
     if (!conversationId) return;
 
+    const channelName = `messages-rt-${conversationId}-${channelIdRef.current}`;
     const channel = supabase
-      .channel(`messages-rt-${conversationId}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
