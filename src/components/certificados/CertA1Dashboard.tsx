@@ -56,6 +56,9 @@ export function CertA1Dashboard() {
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+  const navigate = useNavigate();
 
   const now = new Date();
   const [periodo, setPeriodo] = useState<DateRange>({
