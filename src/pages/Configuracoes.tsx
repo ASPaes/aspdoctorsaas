@@ -27,6 +27,7 @@ import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
+import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -168,6 +169,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
           {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+          {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="percentuais">
@@ -233,6 +235,12 @@ export default function Configuracoes() {
         <TabsContent value="whatsapp">
           <WhatsAppSettingsContent />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="ia">
+            <AISettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
