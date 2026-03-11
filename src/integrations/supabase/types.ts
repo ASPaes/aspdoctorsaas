@@ -2543,10 +2543,7 @@ export type Database = {
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       norm_txt: { Args: { t: string }; Returns: string }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
-      unaccent: { Args: { "": string }; Returns: string }
       validate_invite_token: {
         Args: { p_token: string }
         Returns: {
