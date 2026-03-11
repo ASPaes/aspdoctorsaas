@@ -33,7 +33,7 @@ serve(async (req) => {
       throw new Error("Acesso negado: apenas admins podem configurar IA");
     }
 
-    const { provider, api_key, model, base_url, tenant_id } = await req.json();
+    const { provider, api_key, model, base_url, tenant_id, system_prompt } = await req.json();
 
     const targetTenantId = profile.is_super_admin && tenant_id
       ? tenant_id
@@ -41,6 +41,10 @@ serve(async (req) => {
 
     if (!targetTenantId) throw new Error("tenant_id não encontrado");
     if (!provider) throw new Error("provider é obrigatório");
+
+    if (system_prompt !== undefined && system_prompt !== null && system_prompt.length > 30000) {
+      throw new Error("Diretrizes excedem o limite de 30.000 caracteres");
+    }
 
     const encryptionKey = Deno.env.get("AI_SETTINGS_ENCRYPTION_KEY")!;
 
@@ -50,7 +54,11 @@ serve(async (req) => {
       model: model || null,
       base_url: base_url || null,
       is_active: true,
+      system_prompt: system_prompt !== undefined ? (system_prompt || null) : undefined,
     };
+
+    // Remove undefined para não sobrescrever com null se não foi enviado
+    if (payload.system_prompt === undefined) delete payload.system_prompt;
 
     if (api_key && api_key.length > 0 && !api_key.startsWith("****")) {
       const { data: encrypted } = await supabase.rpc("encrypt_api_key", {
