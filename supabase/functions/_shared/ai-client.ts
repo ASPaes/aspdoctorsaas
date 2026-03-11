@@ -5,6 +5,7 @@ export interface AIConfig {
   model: string;
   provider: string;
   baseUrl?: string;
+  systemPrompt?: string | null;
 }
 
 export async function getAIConfig(
@@ -14,7 +15,7 @@ export async function getAIConfig(
   try {
     const { data, error } = await supabase
       .from("ai_settings")
-      .select("api_key_encrypted, model, provider, base_url, is_active")
+      .select("api_key_encrypted, model, provider, base_url, is_active, system_prompt")
       .eq("tenant_id", tenantId)
       .eq("is_active", true)
       .maybeSingle();
@@ -37,6 +38,7 @@ export async function getAIConfig(
       model: data.model || "gpt-5.4",
       provider: data.provider,
       baseUrl: data.base_url || undefined,
+      systemPrompt: data.system_prompt || null,
     };
   } catch {
     return null;
@@ -48,7 +50,13 @@ export async function callAI(
   messages: { role: string; content: string }[],
   tools?: any[]
 ): Promise<string> {
-  const { provider, apiKey, model, baseUrl } = config;
+  const { provider, apiKey, model, baseUrl, systemPrompt } = config;
+
+  // Injeta o systemPrompt do tenant como primeiro system message
+  // se já existir um system no array, o do tenant vem antes (maior prioridade)
+  const enrichedMessages = systemPrompt
+    ? [{ role: "system", content: systemPrompt }, ...messages]
+    : messages;
 
   if (provider === "openai" || provider === "custom") {
     const url =
@@ -56,7 +64,7 @@ export async function callAI(
         ? `${baseUrl}/chat/completions`
         : "https://api.openai.com/v1/chat/completions";
 
-    const body: any = { model, messages, max_tokens: 1000 };
+    const body: any = { model, messages: enrichedMessages, max_tokens: 1500 };
     if (tools && tools.length > 0) {
       body.tools = tools;
       body.tool_choice = { type: "function", function: { name: tools[0].function.name } };
@@ -80,17 +88,23 @@ export async function callAI(
   }
 
   if (provider === "anthropic") {
-    const systemMsg = messages.find((m) => m.role === "system")?.content;
-    const userMessages = messages.filter(
+    // Anthropic: separar system de user/assistant
+    // Combinar todos os system messages em um único bloco
+    const systemParts = enrichedMessages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content);
+    const userMessages = enrichedMessages.filter(
       (m) => m.role === "user" || m.role === "assistant"
     );
 
     const body: any = {
       model,
-      max_tokens: 1000,
+      max_tokens: 1500,
       messages: userMessages,
     };
-    if (systemMsg) body.system = systemMsg;
+    if (systemParts.length > 0) {
+      body.system = systemParts.join("\n\n---\n\n");
+    }
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -109,17 +123,22 @@ export async function callAI(
 
   if (provider === "gemini") {
     const cleanModel = model.replace(/^models\//, "");
-    const contents = messages
+
+    // Combinar todos os system messages para o systemInstruction do Gemini
+    const systemParts = enrichedMessages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content);
+
+    const contents = enrichedMessages
       .filter((m) => m.role !== "system")
       .map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
       }));
 
-    const systemMsg = messages.find((m) => m.role === "system")?.content;
     const body: any = { contents };
-    if (systemMsg) {
-      body.systemInstruction = { parts: [{ text: systemMsg }] };
+    if (systemParts.length > 0) {
+      body.systemInstruction = { parts: [{ text: systemParts.join("\n\n---\n\n") }] };
     }
 
     const res = await fetch(

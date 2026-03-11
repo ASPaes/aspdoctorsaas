@@ -24,6 +24,7 @@ export type Database = {
           is_active: boolean
           model: string | null
           provider: string
+          system_prompt: string | null
           tenant_id: string
           updated_at: string
         }
@@ -36,6 +37,7 @@ export type Database = {
           is_active?: boolean
           model?: string | null
           provider?: string
+          system_prompt?: string | null
           tenant_id: string
           updated_at?: string
         }
@@ -48,6 +50,7 @@ export type Database = {
           is_active?: boolean
           model?: string | null
           provider?: string
+          system_prompt?: string | null
           tenant_id?: string
           updated_at?: string
         }
