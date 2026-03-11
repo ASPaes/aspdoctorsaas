@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, Save, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Save, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
@@ -21,11 +22,23 @@ const PROVIDERS = [
   { value: "custom", label: "Personalizado" },
 ] as const;
 
-const MODEL_PLACEHOLDERS: Record<string, string> = {
-  openai: "gpt-4o",
-  anthropic: "claude-sonnet-4-5-20251001",
-  gemini: "gemini-1.5-pro",
-  custom: "nome-do-modelo",
+const MODELS_BY_PROVIDER: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: "gpt-4o", label: "gpt-4o" },
+    { value: "gpt-4o-mini", label: "gpt-4o-mini" },
+    { value: "gpt-4-turbo", label: "gpt-4-turbo" },
+    { value: "gpt-3.5-turbo", label: "gpt-3.5-turbo" },
+  ],
+  anthropic: [
+    { value: "claude-opus-4-5-20251001", label: "claude-opus-4-5-20251001" },
+    { value: "claude-sonnet-4-5-20251001", label: "claude-sonnet-4-5-20251001" },
+    { value: "claude-haiku-4-5-20251001", label: "claude-haiku-4-5-20251001" },
+  ],
+  gemini: [
+    { value: "gemini-1.5-pro", label: "gemini-1.5-pro" },
+    { value: "gemini-1.5-flash", label: "gemini-1.5-flash" },
+    { value: "gemini-2.0-flash", label: "gemini-2.0-flash" },
+  ],
 };
 
 const schema = z.object({
@@ -37,6 +50,10 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+function formatProviderLabel(provider: string): string {
+  return PROVIDERS.find((p) => p.value === provider)?.label ?? provider;
+}
+
 export default function AISettingsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -47,7 +64,7 @@ export default function AISettingsTab() {
     queryFn: async () => {
       let q = supabase
         .from("ai_settings")
-        .select("id, provider, api_key_hint, model, base_url, is_active");
+        .select("id, provider, api_key_hint, model, base_url, is_active, updated_at");
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.maybeSingle();
       if (error) throw error;
@@ -72,6 +89,16 @@ export default function AISettingsTab() {
       });
     }
   }, [settings]);
+
+  // Clear model when provider changes
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "provider") {
+        form.setValue("model", "");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -106,93 +133,153 @@ export default function AISettingsTab() {
     },
   });
 
+  const isConfigured = !!settings?.api_key_hint;
+  const models = MODELS_BY_PROVIDER[provider];
+
   return (
-    <Card className="max-w-lg">
-      <CardHeader>
-        <CardTitle>Inteligência Artificial</CardTitle>
-        <CardDescription>Configure o provedor de IA para funcionalidades inteligentes do sistema.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
-          <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertDescription className="text-amber-800 dark:text-amber-300">
-            Sua chave de API é armazenada com criptografia e nunca é exibida após salva. Apenas os últimos 4 caracteres ficam visíveis para confirmação.
-          </AlertDescription>
-        </Alert>
+    <div className="space-y-4 max-w-lg">
+      {/* Status Card */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3 mb-3">
+            {isConfigured ? (
+              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Configurado
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-muted-foreground">
+                <XCircle className="h-3 w-3 mr-1" />
+                Não configurado
+              </Badge>
+            )}
+          </div>
+          {settings ? (
+            <div className="space-y-1 text-sm">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+                <span><strong className="text-foreground">Provedor:</strong> {formatProviderLabel(settings.provider)}</span>
+                {settings.model && <span><strong className="text-foreground">Modelo:</strong> {settings.model}</span>}
+                {settings.api_key_hint && <span><strong className="text-foreground">Chave:</strong> {settings.api_key_hint}</span>}
+              </div>
+              {settings.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Última atualização: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(settings.updated_at))}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Nenhuma configuração de IA encontrada para este tenant.</p>
+          )}
+        </CardContent>
+      </Card>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
-            <FormField control={form.control} name="provider" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Provedor</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o provedor" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {PROVIDERS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
+      {/* Form Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Inteligência Artificial</CardTitle>
+          <CardDescription>Configure o provedor de IA para funcionalidades inteligentes do sistema.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-800 dark:text-amber-300">
+              Sua chave de API é armazenada com criptografia e nunca é exibida após salva. Apenas os últimos 4 caracteres ficam visíveis para confirmação.
+            </AlertDescription>
+          </Alert>
 
-            <FormField control={form.control} name="api_key" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Chave de API</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    placeholder={settings?.api_key_hint
-                      ? `Chave salva: ${settings.api_key_hint} — deixe em branco para manter`
-                      : "Insira sua chave de API"}
-                    {...field}
-                  />
-                </FormControl>
-                <FormDescription>
-                  {settings?.api_key_hint
-                    ? "Deixe em branco para manter a chave atual."
-                    : "Obrigatório na primeira configuração."}
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField control={form.control} name="model" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Modelo</FormLabel>
-                <FormControl>
-                  <Input placeholder={MODEL_PLACEHOLDERS[provider] || "nome-do-modelo"} {...field} />
-                </FormControl>
-                <FormDescription>Deixe em branco para usar o modelo padrão do provedor.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {provider === "custom" && (
-              <FormField control={form.control} name="base_url" render={({ field }) => (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+              <FormField control={form.control} name="provider" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>URL Base</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://sua-api.com/v1" {...field} />
-                  </FormControl>
-                  <FormDescription>Endpoint da API compatível com OpenAI.</FormDescription>
+                  <FormLabel>Provedor</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o provedor" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PROVIDERS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )} />
-            )}
 
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+              <FormField control={form.control} name="api_key" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Chave de API</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder={settings?.api_key_hint
+                        ? `Chave salva: ${settings.api_key_hint} — deixe em branco para manter`
+                        : "Insira sua chave de API"}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {settings?.api_key_hint
+                      ? "Deixe em branco para manter a chave atual."
+                      : "Obrigatório na primeira configuração."}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="model" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Modelo</FormLabel>
+                  {models ? (
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o modelo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {models.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <FormControl>
+                      <Input placeholder="nome-do-modelo" {...field} />
+                    </FormControl>
+                  )}
+                  <FormDescription>
+                    {provider === "custom"
+                      ? "Informe o nome do modelo personalizado."
+                      : "Selecione o modelo desejado."}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {provider === "custom" && (
+                <FormField control={form.control} name="base_url" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>URL Base</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://sua-api.com/v1" {...field} />
+                    </FormControl>
+                    <FormDescription>Endpoint da API compatível com OpenAI.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
+
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Salvar
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
