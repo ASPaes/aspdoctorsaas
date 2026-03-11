@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
         const updateData: Record<string, any> = {
           last_message_at: messageTimestamp,
           last_message_preview: messageContent.substring(0, 200),
-          is_last_message_from_me: true,
+          is_last_message_from_me: persistedIsFromMe,
           updated_at: messageTimestamp,
         };
 
