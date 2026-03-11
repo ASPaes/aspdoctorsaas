@@ -137,6 +137,9 @@ export default function ClienteForm() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
   const [mrrModalOpen, setMrrModalOpen] = useState(false);
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+  const [mrrModalOpen, setMrrModalOpen] = useState(false);
 
   // Navigation between records
   const navInfo = useMemo(() => {
