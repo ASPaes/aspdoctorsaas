@@ -164,32 +164,32 @@ export function MessageBubble({
 
   // Normal mode with context menu
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <div
-          className={cn("flex mb-1 group cursor-pointer", isMe ? "justify-end" : "justify-start")}
-          onDoubleClick={() => onReply?.(msg)}
-        >
+    <div
+      className={cn("flex mb-1", isMe ? "justify-end" : "justify-start")}
+      onDoubleClick={() => onReply?.(msg)}
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           {bubbleContent}
-        </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[160px]">
-        {canDeleteMsg(msg) && (
-          <DropdownMenuItem onClick={() => onDelete?.(msg.id)} className="text-destructive focus:text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Apagar
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[160px]">
+          {canDeleteMsg(msg) && (
+            <DropdownMenuItem onClick={() => onDelete?.(msg.id)} className="text-destructive focus:text-destructive">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Apagar
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
+            <Forward className="h-4 w-4 mr-2" />
+            Encaminhar
           </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
-          <Forward className="h-4 w-4 mr-2" />
-          Encaminhar
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onEnterSelectionMode?.(msg.id)}>
-          <CheckSquare className="h-4 w-4 mr-2" />
-          Selecionar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuItem onClick={() => onEnterSelectionMode?.(msg.id)}>
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Selecionar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
