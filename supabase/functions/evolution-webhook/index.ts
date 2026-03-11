@@ -922,13 +922,16 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
           })
           .eq('tenant_id', tenantId)
           .eq('message_id', waKeyId)
-          .select('id');
+          .select('id, conversation_id');
 
         const count = revokedRows?.length ?? 0;
         if (error) {
           console.error('[evolution-webhook] Error revoking message:', error);
         } else {
           console.log(`[evolution-webhook] Revoked via status update: keyId=${waKeyId} rows=${count}`);
+          if (revokedRows && revokedRows.length > 0 && revokedRows[0].conversation_id) {
+            await refreshConversationPreviewAfterRevoke(supabase, revokedRows[0].conversation_id);
+          }
         }
       } else {
         // Build update payload: status + optionally backfill remote_jid
