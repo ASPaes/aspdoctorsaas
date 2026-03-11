@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, Save, Loader2, CheckCircle2, XCircle, Brain } from "lucide-react";
+import { Shield, Save, Loader2, CheckCircle2, XCircle, Brain, Upload, FileText } from "lucide-react";
 
 const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
@@ -49,11 +50,18 @@ function formatProviderLabel(provider: string): string {
   return PROVIDERS.find((p) => p.value === provider)?.label ?? provider;
 }
 
+const MAX_SYSTEM_PROMPT = 30000;
+
 const schema = z.object({
   provider: z.enum(["openai", "anthropic", "gemini", "custom"]),
   api_key: z.string().optional(),
   model: z.string().optional(),
   base_url: z.string().url("URL inválida").optional().or(z.literal("")),
+  system_prompt: z
+    .string()
+    .max(MAX_SYSTEM_PROMPT, `Máximo de ${MAX_SYSTEM_PROMPT.toLocaleString("pt-BR")} caracteres`)
+    .optional()
+    .or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -62,6 +70,7 @@ export default function AISettingsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["ai_settings", tid],
@@ -69,7 +78,7 @@ export default function AISettingsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_settings")
-        .select("id, provider, api_key_hint, model, base_url, is_active, updated_at")
+        .select("id, provider, api_key_hint, model, base_url, is_active, updated_at, system_prompt")
         .eq("tenant_id", tid!)
         .maybeSingle();
       if (error) throw error;
@@ -81,10 +90,11 @@ export default function AISettingsTab() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { provider: "openai", api_key: "", model: "", base_url: "" },
+    defaultValues: { provider: "openai", api_key: "", model: "", base_url: "", system_prompt: "" },
   });
 
   const provider = form.watch("provider");
+  const systemPromptValue = form.watch("system_prompt") ?? "";
   const models = MODELS_BY_PROVIDER[provider];
 
   useEffect(() => {
@@ -94,6 +104,7 @@ export default function AISettingsTab() {
         api_key: "",
         model: settings.model || "",
         base_url: settings.base_url || "",
+        system_prompt: settings.system_prompt ?? "",
       });
     }
   }, [settings]);
@@ -104,6 +115,26 @@ export default function AISettingsTab() {
     });
     return () => sub.unsubscribe();
   }, [form]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      let text = (event.target?.result as string) || "";
+      if (text.length > MAX_SYSTEM_PROMPT) {
+        text = text.substring(0, MAX_SYSTEM_PROMPT);
+        toast({
+          title: "Conteúdo truncado",
+          description: `O arquivo excedia ${MAX_SYSTEM_PROMPT.toLocaleString("pt-BR")} caracteres e foi truncado.`,
+        });
+      }
+      form.setValue("system_prompt", text, { shouldDirty: true, shouldValidate: true });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const toggleMutation = useMutation({
     mutationFn: async (newVal: boolean) => {
@@ -131,6 +162,7 @@ export default function AISettingsTab() {
         provider: values.provider,
         model: values.model || undefined,
         base_url: values.provider === "custom" ? values.base_url || undefined : undefined,
+        system_prompt: values.system_prompt || undefined,
       };
       if (values.api_key && values.api_key.length > 0) {
         body.api_key = values.api_key;
@@ -160,6 +192,9 @@ export default function AISettingsTab() {
       </div>
     );
   }
+
+  const charCount = systemPromptValue.length;
+  const charWarning = charCount >= 27000;
 
   return (
     <div className="max-w-lg">
@@ -219,6 +254,20 @@ export default function AISettingsTab() {
                 {settings.model && <span><strong className="text-foreground">Modelo:</strong> {settings.model}</span>}
                 {settings.api_key_hint && <span><strong className="text-foreground">Chave:</strong> {settings.api_key_hint}</span>}
               </div>
+
+              {settings.system_prompt ? (
+                <div className="flex items-center gap-2">
+                  <FileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                    Diretrizes configuradas
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ({settings.system_prompt.length.toLocaleString("pt-BR")} caracteres)
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sem diretrizes personalizadas</p>
+              )}
 
               {settings.updated_at && (
                 <p className="text-xs text-muted-foreground">
@@ -302,6 +351,50 @@ export default function AISettingsTab() {
                   </FormItem>
                 )} />
               )}
+
+              <Separator />
+
+              {/* System Prompt / Diretrizes */}
+              <FormField control={form.control} name="system_prompt" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Diretrizes da IA (System Prompt)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Ex: Você é um assistente médico especializado em cardiologia. Sempre responda em português formal..."
+                      rows={8}
+                      maxLength={MAX_SYSTEM_PROMPT}
+                      {...field}
+                    />
+                  </FormControl>
+                  <div className="flex items-center justify-between">
+                    <FormDescription>
+                      Define o comportamento base da IA em todas as análises.
+                    </FormDescription>
+                    <span className={`text-xs tabular-nums ${charWarning ? "text-amber-500" : "text-muted-foreground"}`}>
+                      {charCount.toLocaleString("pt-BR")} / {MAX_SYSTEM_PROMPT.toLocaleString("pt-BR")} caracteres
+                    </span>
+                  </div>
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt"
+                      hidden
+                      onChange={handleFileUpload}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1" />
+                      Importar arquivo (.txt)
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
               <Button type="submit" disabled={saveMutation.isPending} className="w-full">
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
