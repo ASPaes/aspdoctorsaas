@@ -22,6 +22,9 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          last_test_error: string | null
+          last_test_ok: boolean | null
+          last_tested_at: string | null
           model: string | null
           provider: string
           system_prompt: string | null
@@ -35,6 +38,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
           model?: string | null
           provider?: string
           system_prompt?: string | null
@@ -48,6 +54,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          last_tested_at?: string | null
           model?: string | null
           provider?: string
           system_prompt?: string | null

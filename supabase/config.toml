@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.save-ai-settings]
 verify_jwt = false
+
+[functions.test-ai-config]
+verify_jwt = false

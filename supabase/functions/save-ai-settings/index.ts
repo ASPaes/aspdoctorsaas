@@ -75,6 +75,19 @@ serve(async (req) => {
 
     if (upsertError) throw upsertError;
 
+    // Audit event — never log the API key
+    await supabase.from("audit_events").insert({
+      tenant_id: targetTenantId,
+      actor_user_id: user.id,
+      event_type: "ai_config_saved",
+      metadata: {
+        provider,
+        model: model || null,
+        prompt_length: system_prompt ? system_prompt.length : null,
+        has_new_key: !!(api_key && api_key.length > 0 && !api_key.startsWith("****")),
+      },
+    });
+
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
