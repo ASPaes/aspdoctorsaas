@@ -836,25 +836,75 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
   }
 }
 
+/**
+ * Normalize remoteJid: strip ":digits" suffix before @lid
+ * e.g. "314951...:26@lid" → "314951...@lid"
+ */
+function normalizeRemoteJid(jid: string | null | undefined): string | null {
+  if (!jid) return null;
+  const trimmed = jid.trim();
+  if (trimmed.includes('@lid')) {
+    return trimmed.replace(/:\d+@lid/, '@lid');
+  }
+  return trimmed;
+}
+
+async function resolveInstanceTenant(supabase: any, instanceName: string): Promise<{ instanceId: string; tenantId: string } | null> {
+  let { data } = await supabase
+    .from('whatsapp_instances')
+    .select('id, tenant_id')
+    .eq('instance_name', instanceName)
+    .maybeSingle();
+
+  if (!data) {
+    const res = await supabase
+      .from('whatsapp_instances')
+      .select('id, tenant_id')
+      .eq('instance_id_external', instanceName)
+      .maybeSingle();
+    data = res.data;
+  }
+
+  if (!data) return null;
+  return { instanceId: data.id, tenantId: data.tenant_id };
+}
+
 async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: any) {
   try {
-    const { data } = payload;
-    const updates = data.update || data;
+    const { instance, data } = payload;
 
-    console.log('[evolution-webhook] Processing message update:', updates);
+    // Evolution may send an array of updates or a single object
+    const rawUpdates = Array.isArray(data) ? data : [data.update || data];
 
-    let status = 'sent';
-    if (updates.status === 3 || updates.status === 'READ') status = 'read';
-    else if (updates.status === 2 || updates.status === 'DELIVERY_ACK') status = 'delivered';
-    else if (updates.status === 1 || updates.status === 'SERVER_ACK') status = 'sent';
-    else if (updates.status === 'REVOKED' || updates.status === 4) status = 'revoked';
+    const resolved = await resolveInstanceTenant(supabase, instance);
+    if (!resolved) {
+      console.warn('[evolution-webhook] Instance not found for status update:', instance);
+      return;
+    }
+    const { tenantId } = resolved;
 
-    // Evolution API sends keyId (flat) or key.id depending on version
-    const messageId = updates.keyId || updates.key?.id;
-    if (messageId) {
+    for (const updates of rawUpdates) {
+      const waKeyId = updates.keyId || updates.key?.id || null;
+      const internalMessageId = updates.messageId || null;
+      const rawRemoteJid = updates.remoteJid || updates.key?.remoteJid || null;
+      const normalizedJid = normalizeRemoteJid(rawRemoteJid);
+
+      console.log(`[evolution-webhook] Processing message update: { keyId: ${waKeyId}, internalMessageId: ${internalMessageId}, status: ${updates.status}, remoteJid: ${rawRemoteJid}, normalizedJid: ${normalizedJid} }`);
+
+      if (!waKeyId) {
+        console.warn('[evolution-webhook] No keyId in update payload, skipping:', JSON.stringify(updates).slice(0, 300));
+        continue;
+      }
+
+      // Map Evolution status to our status
+      let status = 'sent';
+      if (updates.status === 3 || updates.status === 'READ') status = 'read';
+      else if (updates.status === 2 || updates.status === 'DELIVERY_ACK') status = 'delivered';
+      else if (updates.status === 1 || updates.status === 'SERVER_ACK') status = 'sent';
+      else if (updates.status === 'REVOKED' || updates.status === 4) status = 'revoked';
+
       if (status === 'revoked') {
-        // Mark as revoked in our soft-delete system (same as processMessageRevoke)
-        const { error } = await supabase
+        const { data: revokedRows, error } = await supabase
           .from('whatsapp_messages')
           .update({
             delete_status: 'revoked',
@@ -870,27 +920,39 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
             media_kind: null,
             delete_error: null,
           })
-          .eq('message_id', messageId);
+          .eq('tenant_id', tenantId)
+          .eq('message_id', waKeyId)
+          .select('id');
 
+        const count = revokedRows?.length ?? 0;
         if (error) {
-          console.error('[evolution-webhook] Error marking message as revoked:', error);
+          console.error('[evolution-webhook] Error revoking message:', error);
         } else {
-          console.log('[evolution-webhook] ✅ Message revoked via status update for messageId:', messageId);
+          console.log(`[evolution-webhook] Revoked via status update: keyId=${waKeyId} rows=${count}`);
         }
       } else {
-        const { error } = await supabase
-          .from('whatsapp_messages')
-          .update({ status })
-          .eq('message_id', messageId);
+        // Build update payload: status + optionally backfill remote_jid
+        const updatePayload: Record<string, any> = { status };
+        if (normalizedJid) {
+          updatePayload.remote_jid = normalizedJid;
+        }
 
+        const { data: updatedRows, error } = await supabase
+          .from('whatsapp_messages')
+          .update(updatePayload)
+          .eq('tenant_id', tenantId)
+          .eq('message_id', waKeyId)
+          .select('id');
+
+        const count = updatedRows?.length ?? 0;
         if (error) {
           console.error('[evolution-webhook] Error updating message status:', error);
+        } else if (count === 0) {
+          console.warn(`[evolution-webhook] Status update matched 0 rows: tenant=${tenantId} keyId=${waKeyId} internalId=${internalMessageId}`);
         } else {
-          console.log('[evolution-webhook] Message status updated to:', status, 'for messageId:', messageId);
+          console.log(`[evolution-webhook] Status updated to ${status}: keyId=${waKeyId} rows=${count}`);
         }
       }
-    } else {
-      console.warn('[evolution-webhook] No messageId found in update payload:', JSON.stringify(updates));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpdate:', error);
