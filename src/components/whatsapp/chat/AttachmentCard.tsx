@@ -134,8 +134,8 @@ export function AttachmentCard({
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpen} title="Abrir">
           <ExternalLink className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Baixar">
-          <Download className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleDownload} title="Baixar" disabled={downloading}>
+          {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
         </Button>
       </div>
     </div>
