@@ -54,6 +54,9 @@ const MESSAGE_SELECT = [
   'instance_id',
   'sender_name',
   'sender_role',
+  'delete_status',
+  'delete_scope',
+  'delete_error',
 ].join(',');
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
