@@ -19,8 +19,8 @@ export function CSTicketAlert({ sentiment, conversation, variant = "banner" }: C
     <>
       <Button
         size="sm"
-        variant="destructive"
-        className="h-7 text-[11px] gap-1.5 w-full"
+        variant="outline"
+        className="h-7 text-[11px] gap-1.5 w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
         onClick={() => setTicketModalOpen(true)}
       >
         <Ticket className="h-3.5 w-3.5" />
