@@ -9,16 +9,24 @@ const corsHeaders = {
 /**
  * Resolve a valid @s.whatsapp.net JID for Evolution API.
  * WhatsApp internally uses @lid (Linked ID) which doesn't work with the delete endpoint.
- * When we encounter @lid, we look up the contact's phone number from the conversation.
  */
 async function resolveRemoteJid(
   supabase: any,
   remoteJid: string | null,
-  conversationId: string
+  conversationId: string,
+  requestId: string
 ): Promise<string | null> {
   // If already has @s.whatsapp.net or @g.us, use as-is
   if (remoteJid && (remoteJid.includes('@s.whatsapp.net') || remoteJid.includes('@g.us'))) {
+    console.log(`[${FUNCTION_NAME}][${requestId}] JID already valid: ${remoteJid}`);
     return remoteJid;
+  }
+
+  // Normalize @lid: strip ":NN" suffix
+  let normalized = remoteJid;
+  if (remoteJid && remoteJid.includes('@lid')) {
+    normalized = remoteJid.replace(/:\d+@lid/, '@lid');
+    console.log(`[${FUNCTION_NAME}][${requestId}] Normalized @lid: ${remoteJid} -> ${normalized}`);
   }
 
   // For @lid or missing JIDs, resolve from contact's phone_number
@@ -29,7 +37,7 @@ async function resolveRemoteJid(
     .maybeSingle();
 
   if (!conv?.whatsapp_contacts?.phone_number) {
-    console.log(`[${FUNCTION_NAME}] Could not resolve phone for conversation ${conversationId}`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Could not resolve phone for conversation ${conversationId}`);
     return null;
   }
 
@@ -37,8 +45,51 @@ async function resolveRemoteJid(
   const isGroup = conv.whatsapp_contacts.is_group;
   const suffix = isGroup ? '@g.us' : '@s.whatsapp.net';
   const resolved = `${phone}${suffix}`;
-  console.log(`[${FUNCTION_NAME}] Resolved JID: ${remoteJid || '(null)'} -> ${resolved}`);
+  console.log(`[${FUNCTION_NAME}][${requestId}] Resolved JID: ${remoteJid || '(null)'} -> ${resolved}`);
   return resolved;
+}
+
+/**
+ * After deletion, recalculate last_message_preview from the most recent
+ * non-revoked/non-deleted message in the conversation.
+ */
+async function refreshConversationPreview(supabase: any, conversationId: string, requestId: string) {
+  try {
+    const { data: lastMsg } = await supabase
+      .from('whatsapp_messages')
+      .select('content, timestamp, is_from_me, message_type')
+      .eq('conversation_id', conversationId)
+      .not('delete_status', 'eq', 'revoked')
+      .not('message_type', 'eq', 'revoked')
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastMsg) {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_preview: (lastMsg.content || '').substring(0, 200),
+          last_message_at: lastMsg.timestamp,
+          is_last_message_from_me: lastMsg.is_from_me,
+        })
+        .eq('id', conversationId);
+      console.log(`[${FUNCTION_NAME}][${requestId}] Conversation preview refreshed`);
+    } else {
+      // No messages left
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_preview: null,
+          last_message_at: null,
+          is_last_message_from_me: false,
+        })
+        .eq('id', conversationId);
+      console.log(`[${FUNCTION_NAME}][${requestId}] Conversation preview cleared (no messages)`);
+    }
+  } catch (err) {
+    console.error(`[${FUNCTION_NAME}][${requestId}] Error refreshing preview:`, err);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -81,7 +132,7 @@ Deno.serve(async (req) => {
     const { messageIds, conversationId, mode } = body as {
       messageIds: string[];
       conversationId: string;
-      mode: 'local' | 'everyone';
+      mode: 'panel_only' | 'everyone';
     };
 
     if (!Array.isArray(messageIds) || messageIds.length === 0 || !conversationId) {
@@ -90,8 +141,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (mode !== 'local' && mode !== 'everyone') {
-      return new Response(JSON.stringify({ type: 'about:blank', title: 'Validation Error', status: 400, detail: 'mode must be "local" or "everyone"', requestId }), {
+    if (mode !== 'panel_only' && mode !== 'everyone') {
+      return new Response(JSON.stringify({ type: 'about:blank', title: 'Validation Error', status: 400, detail: 'mode must be "panel_only" or "everyone"', requestId }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
     }
@@ -101,7 +152,7 @@ Deno.serve(async (req) => {
     // Fetch messages
     const { data: messages, error: msgError } = await supabase
       .from('whatsapp_messages')
-      .select('id, message_id, remote_jid, is_from_me, timestamp, sent_by_user_id, instance_id, conversation_id, delete_status, media_url, content')
+      .select('id, message_id, remote_jid, is_from_me, timestamp, sent_by_user_id, instance_id, conversation_id, delete_status, media_url, content, status')
       .in('id', messageIds)
       .eq('conversation_id', conversationId);
 
@@ -112,14 +163,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── MODE: LOCAL ───
-    if (mode === 'local') {
+    // ─── MODE: PANEL_ONLY ───
+    if (mode === 'panel_only') {
       const validIds = messages
-        .filter(m => m.delete_status === 'active' || m.delete_status === 'failed')
+        .filter(m => m.delete_status === 'active' || m.delete_status === 'failed' || !m.delete_status)
         .map(m => m.id);
 
       if (validIds.length === 0) {
-        return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'No messages eligible for local deletion', requestId }), {
+        return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'No messages eligible for panel deletion', requestId }), {
           status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
         });
       }
@@ -131,30 +182,39 @@ Deno.serve(async (req) => {
           delete_status: 'revoked',
           deleted_at: new Date().toISOString(),
           deleted_by: userId,
+          content: '',
+          message_type: 'revoked',
+          media_url: null,
+          media_path: null,
+          media_mimetype: null,
+          media_filename: null,
+          media_ext: null,
+          media_kind: null,
         })
         .in('id', validIds);
 
       if (updateError) {
-        console.error(`[${FUNCTION_NAME}][${requestId}] Error marking local delete:`, updateError);
+        console.error(`[${FUNCTION_NAME}][${requestId}] Error marking panel delete:`, updateError);
         return new Response(JSON.stringify({ type: 'about:blank', title: 'Internal Server Error', status: 500, detail: 'Failed to mark messages', requestId }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
         });
       }
 
-      console.log(`[${FUNCTION_NAME}][${requestId}] Local delete OK: ${validIds.length} messages`);
-      return new Response(JSON.stringify({ success: true, mode: 'local', deleted: validIds }), {
+      // Refresh sidebar preview
+      await refreshConversationPreview(supabase, conversationId, requestId);
+
+      console.log(`[${FUNCTION_NAME}][${requestId}] Panel delete OK: ${validIds.length} messages`);
+      return new Response(JSON.stringify({ success: true, mode: 'panel_only', deleted: validIds }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // ─── MODE: EVERYONE ───
-    const now = Date.now();
-    const FIVE_MINUTES = 5 * 60 * 1000;
     const errors: string[] = [];
     const validMessages: typeof messages = [];
 
     for (const msg of messages) {
-      if (msg.delete_status !== 'active' && msg.delete_status !== 'failed') {
+      if (msg.delete_status === 'revoked' || msg.delete_status === 'pending') {
         errors.push(`${msg.id}: already ${msg.delete_status}`);
         continue;
       }
@@ -164,11 +224,6 @@ Deno.serve(async (req) => {
       }
       if (!msg.message_id) {
         errors.push(`${msg.id}: no Evolution message_id`);
-        continue;
-      }
-      const elapsed = now - new Date(msg.timestamp).getTime();
-      if (elapsed > FIVE_MINUTES) {
-        errors.push(`${msg.id}: older than 5 minutes (${Math.round(elapsed / 1000)}s)`);
         continue;
       }
       validMessages.push(msg);
@@ -220,7 +275,7 @@ Deno.serve(async (req) => {
 
       try {
         // Resolve proper @s.whatsapp.net JID (handles @lid format)
-        const resolvedJid = await resolveRemoteJid(supabase, msg.remote_jid, conversationId);
+        const resolvedJid = await resolveRemoteJid(supabase, msg.remote_jid, conversationId, requestId);
         if (!resolvedJid) {
           const errorMsg = 'Could not resolve remoteJid for this conversation';
           await supabase.from('whatsapp_messages').update({
@@ -233,7 +288,10 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        console.log(`[${FUNCTION_NAME}][${requestId}] Message details: message_id=${msg.message_id}, original_remote_jid=${msg.remote_jid}, resolved_jid=${resolvedJid}, fromMe=${msg.is_from_me}`);
+
         // Step 1: Mark as PENDING before calling Evolution
+        const previousStatus = msg.status;
         await supabase.from('whatsapp_messages').update({
           delete_scope: 'everyone',
           delete_status: 'pending',
@@ -253,36 +311,60 @@ Deno.serve(async (req) => {
           body: JSON.stringify(deleteBody),
         });
         const respText = await resp.text();
-        console.log(`[${FUNCTION_NAME}][${requestId}] Evolution response for ${msg.id}: status=${resp.status} body=${respText.slice(0, 500)}`);
+        console.log(`[${FUNCTION_NAME}][${requestId}] Evolution response: status=${resp.status} body=${respText.slice(0, 500)}`);
 
         if (resp.ok) {
-          // Keep as PENDING — webhook REVOKE event will confirm
-          console.log(`[${FUNCTION_NAME}][${requestId}] ✅ Pending revoke for ${msg.id} (message_id=${msg.message_id})`);
+          // Evolution accepted. Now directly mark as revoked since Evolution returns 201
+          // (webhook confirmation may come later but we treat 2xx as success)
+          await supabase.from('whatsapp_messages').update({
+            delete_status: 'revoked',
+            delete_scope: 'everyone',
+            deleted_at: new Date().toISOString(),
+            content: '',
+            message_type: 'revoked',
+            media_url: null,
+            media_path: null,
+            media_mimetype: null,
+            media_filename: null,
+            media_ext: null,
+            media_kind: null,
+            delete_error: null,
+          }).eq('id', msg.id);
+
+          console.log(`[${FUNCTION_NAME}][${requestId}] ✅ Message revoked: ${msg.id} (message_id=${msg.message_id})`);
           results.push({ id: msg.id, status: 'pending' });
         } else {
           const errorMsg = `Evolution API ${resp.status}: ${respText.slice(0, 200)}`;
-          console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Evolution error for ${msg.id}: ${errorMsg}`);
+          console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Evolution error: ${errorMsg}`);
+          // Revert to previous state
           await supabase.from('whatsapp_messages').update({
             delete_status: 'failed',
+            delete_scope: 'everyone',
             delete_error: errorMsg,
+            deleted_by: userId,
           }).eq('id', msg.id);
           results.push({ id: msg.id, status: 'failed', error: errorMsg });
         }
       } catch (err) {
         const errorMsg = `Network error: ${(err as Error).message?.slice(0, 150)}`;
-        console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Network error for ${msg.id}:`, err);
+        console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Network error:`, err);
         await supabase.from('whatsapp_messages').update({
           delete_status: 'failed',
+          delete_scope: 'everyone',
           delete_error: errorMsg,
+          deleted_by: userId,
         }).eq('id', msg.id);
         results.push({ id: msg.id, status: 'failed', error: errorMsg });
       }
     }
 
+    // Refresh sidebar preview after all deletions
+    await refreshConversationPreview(supabase, conversationId, requestId);
+
     const pendingIds = results.filter(r => r.status === 'pending').map(r => r.id);
     const failedIds = results.filter(r => r.status === 'failed').map(r => r.id);
 
-    console.log(`[${FUNCTION_NAME}][${requestId}] Done: ${pendingIds.length} pending, ${failedIds.length} failed`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Done: ${pendingIds.length} revoked, ${failedIds.length} failed`);
 
     return new Response(JSON.stringify({
       success: true,

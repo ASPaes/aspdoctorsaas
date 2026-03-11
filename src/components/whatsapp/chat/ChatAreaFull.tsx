@@ -10,6 +10,7 @@ import { DetailsSidebar } from "./DetailsSidebar";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,9 +27,7 @@ interface Props {
   onClose?: () => void;
 }
 
-const FIVE_MINUTES = 5 * 60 * 1000;
-
-type DeleteMode = 'local' | 'everyone';
+type DeleteMode = 'panel_only' | 'everyone';
 
 export function ChatAreaFull({ conversation, onClose }: Props) {
   const [showDetails, setShowDetails] = useState(false);
@@ -73,21 +72,20 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     setSelectedMessages(new Set([msgId]));
   }, []);
 
-  // Check if all selected messages can be deleted for everyone (from me + < 5 min)
+  // Check if all selected messages can be deleted for everyone (from me)
   const allSelectedCanDeleteEveryone = useMemo(() => {
     if (selectedMessages.size === 0) return false;
-    const now = Date.now();
     return [...selectedMessages].every(id => {
       if (id.startsWith('temp-')) return false;
       const msg = messages.find(m => m.id === id);
-      return msg && msg.is_from_me && (msg as any).delete_status !== 'revoked' && (now - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
+      return msg && msg.is_from_me && (msg as any).delete_status !== 'revoked';
     });
   }, [selectedMessages, messages]);
 
   // Handlers
-  const handleDeleteLocal = (msgId: string) => {
+  const handleDeletePanelOnly = (msgId: string) => {
     setDeleteIds([msgId]);
-    setDeleteMode('local');
+    setDeleteMode('panel_only');
     setDeleteConfirmOpen(true);
   };
 
@@ -108,13 +106,22 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     setForwardOpen(true);
   };
 
-  const handleBulkDeleteLocal = () => {
+  const handleBulkDeletePanelOnly = () => {
     setDeleteIds([...selectedMessages]);
-    setDeleteMode('local');
+    setDeleteMode('panel_only');
     setDeleteConfirmOpen(true);
   };
 
   const handleBulkDeleteEveryone = () => {
+    // Check all selected are from me
+    const allFromMe = [...selectedMessages].every(id => {
+      const msg = messages.find(m => m.id === id);
+      return msg?.is_from_me;
+    });
+    if (!allFromMe) {
+      toast.error("Só é possível apagar para todos mensagens enviadas por você.");
+      return;
+    }
     setDeleteIds([...selectedMessages]);
     setDeleteMode('everyone');
     setDeleteConfirmOpen(true);
@@ -163,7 +170,7 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}
           onToggleSelect={toggleSelect}
-          onDeleteLocal={handleDeleteLocal}
+          onDeletePanelOnly={handleDeletePanelOnly}
           onDeleteEveryone={handleDeleteEveryone}
           onRetryDelete={handleRetryDelete}
           onForwardSingle={handleForwardSingle}
@@ -180,11 +187,11 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleBulkDeleteLocal}
+                onClick={handleBulkDeletePanelOnly}
                 disabled={selectedMessages.size === 0 || deleteMutation.isPending}
               >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Excluir do sistema
+                <EyeOff className="h-4 w-4 mr-1" />
+                Remover do painel
               </Button>
               {allSelectedCanDeleteEveryone && (
                 <Button
@@ -238,22 +245,22 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deleteMode === 'local'
-                ? `Excluir do sistema?`
+              {deleteMode === 'panel_only'
+                ? `Remover do painel?`
                 : `Apagar para todos?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteMode === 'local'
-                ? `${deleteIds.length === 1 ? 'A mensagem será removida apenas da sua visualização.' : `${deleteIds.length} mensagens serão removidas apenas da sua visualização.`} O destinatário continuará vendo.`
+              {deleteMode === 'panel_only'
+                ? `${deleteIds.length === 1 ? 'A mensagem será removida apenas da sua visualização.' : `${deleteIds.length} mensagens serão removidas apenas da sua visualização.`} O destinatário continuará vendo no WhatsApp.`
                 : deleteIds.length === 1
-                  ? 'A mensagem será apagada no WhatsApp do destinatário.'
-                  : `${deleteIds.length} mensagens serão apagadas no WhatsApp do destinatário.`}
+                  ? 'A mensagem será apagada no WhatsApp do destinatário. O WhatsApp pode não permitir apagar mensagens antigas.'
+                  : `${deleteIds.length} mensagens serão apagadas no WhatsApp do destinatário. O WhatsApp pode não permitir apagar mensagens antigas.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleteMode === 'local' ? 'Excluir' : 'Apagar para todos'}
+              {deleteMode === 'panel_only' ? 'Remover do painel' : 'Apagar para todos'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -261,3 +268,6 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     </div>
   );
 }
+
+// Need to import EyeOff for the selection bar
+import { EyeOff } from "lucide-react";
