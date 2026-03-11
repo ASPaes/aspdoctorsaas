@@ -52,11 +52,12 @@ export default function ContatosAdicionaisModal({ clienteId, open, onOpenChange 
 
   const addMutation = useMutation({
     mutationFn: async () => {
+      const normalizedFone = form.fone ? normalizeBRPhone(form.fone) : null;
       const { error } = await supabase.from("cliente_contatos" as any).insert({
         cliente_id: clienteId,
         nome: form.nome,
         cpf: form.cpf || null,
-        fone: form.fone || null,
+        fone: normalizedFone || null,
         email: form.email || null,
         cargo: form.cargo || null,
         aniversario: form.aniversario || null,
