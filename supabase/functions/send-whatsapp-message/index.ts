@@ -281,6 +281,12 @@ Deno.serve(async (req) => {
 
     const evolutionData = await evolutionResponse.json();
     const messageId = evolutionData.key?.id || `msg_${Date.now()}`;
+    const persistedIsFromMe = Boolean(
+      evolutionData?.key?.fromMe ??
+      evolutionData?.key?.from_me ??
+      evolutionData?.message?.key?.fromMe ??
+      true
+    );
 
     let extractedMediaUrl: string | null = null;
     if (body.messageType === 'audio' && evolutionData.message?.audioMessage?.url) {
@@ -352,7 +358,7 @@ Deno.serve(async (req) => {
           media_size_bytes: mediaSizeBytes,
           media_kind: mediaKind,
           status: 'sent',
-          is_from_me: true,
+          is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
           metadata: body.fileName ? { fileName: body.fileName } : null,
@@ -367,7 +373,7 @@ Deno.serve(async (req) => {
         const updateData: Record<string, any> = {
           last_message_at: messageTimestamp,
           last_message_preview: messageContent.substring(0, 200),
-          is_last_message_from_me: true,
+          is_last_message_from_me: persistedIsFromMe,
           updated_at: messageTimestamp,
         };
 

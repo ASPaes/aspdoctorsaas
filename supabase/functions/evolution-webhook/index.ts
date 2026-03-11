@@ -56,7 +56,17 @@ function isEditedMessage(message: any): boolean {
   return !!(message?.editedMessage || message?.protocolMessage?.editedMessage);
 }
 
-function getMessageContent(message: any, type: string): string {
+function getPayloadIsFromMe(data: any): boolean {
+  return Boolean(
+    data?.key?.fromMe ??
+      data?.key?.from_me ??
+      data?.fromMe ??
+      data?.message?.key?.fromMe ??
+      data?.message?.key?.from_me ??
+      false
+  );
+}
+
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
   
@@ -570,7 +580,7 @@ async function processReaction(payload: EvolutionWebhookPayload, supabase: any, 
         conversation_id: targetMessage.conversation_id,
         emoji,
         reactor_jid: reactorJid,
-        is_from_me: key.fromMe,
+        is_from_me: getPayloadIsFromMe(data),
         tenant_id: tenantId,
       }, { 
         onConflict: 'message_id,reactor_jid',
@@ -646,13 +656,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     console.log('[evolution-webhook] Normalized phone:', phone, 'isGroup:', isGroup);
 
+    const payloadIsFromMe = getPayloadIsFromMe(data);
+
     const contactId = await findOrCreateContact(
       supabase,
       instanceData.id,
       phone,
       pushName || phone,
       isGroup,
-      key.fromMe,
+      payloadIsFromMe,
       tenantId,
       secrets.api_url,
       secrets.api_key,
@@ -740,7 +752,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
     // Dedupe insert: use upsert with onConflict to silently ignore duplicates
-    const isFromMe = key.fromMe || false;
+    const isFromMe = getPayloadIsFromMe(data);
     const { data: savedMsg, error: messageError } = await supabase
       .from('whatsapp_messages')
       .upsert({
