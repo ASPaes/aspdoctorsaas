@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
           media_size_bytes: mediaSizeBytes,
           media_kind: mediaKind,
           status: 'sent',
-          is_from_me: true,
+          is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
           metadata: body.fileName ? { fileName: body.fileName } : null,
