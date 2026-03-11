@@ -24,7 +24,7 @@ import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
-import { normalizeBRPhone, isValidBRPhone } from "@/lib/phoneBR";
+import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
