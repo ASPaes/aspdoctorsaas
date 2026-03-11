@@ -64,7 +64,7 @@ export async function callAI(
         ? `${baseUrl}/chat/completions`
         : "https://api.openai.com/v1/chat/completions";
 
-    const body: any = { model, messages: enrichedMessages, max_tokens: 1500 };
+    const body: any = { model, messages: enrichedMessages, max_completion_tokens: 1500 };
     if (tools && tools.length > 0) {
       body.tools = tools;
       body.tool_choice = { type: "function", function: { name: tools[0].function.name } };
