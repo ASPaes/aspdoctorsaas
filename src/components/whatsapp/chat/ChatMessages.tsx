@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { ArrowRightLeft } from "lucide-react";
 
 interface Props {
   conversationId: string;
+  unreadCount?: number;
   onReply?: (msg: Message) => void;
   selectionMode?: boolean;
   selectedMessages?: Set<string>;
@@ -26,6 +27,7 @@ type TimelineItem =
 
 export function ChatMessages({
   conversationId,
+  unreadCount = 0,
   onReply,
   selectionMode,
   selectedMessages,
@@ -38,6 +40,9 @@ export function ChatMessages({
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
+  const prevConversationId = useRef(conversationId);
 
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
@@ -55,6 +60,16 @@ export function ChatMessages({
     return items;
   }, [messages, assignments]);
 
+  // Compute the ID of the first unread incoming message
+  const firstUnreadId = useMemo(() => {
+    if (!unreadCount || unreadCount <= 0) return null;
+    // Find the last N incoming (not from me) messages — the first of those is the "first unread"
+    const incomingMessages = messages.filter(m => !m.is_from_me);
+    if (incomingMessages.length <= 0) return null;
+    const firstUnreadIdx = Math.max(0, incomingMessages.length - unreadCount);
+    return incomingMessages[firstUnreadIdx]?.id ?? null;
+  }, [messages, unreadCount]);
+
   // Group timeline items by date
   const dateGroups = useMemo(() => {
     const groups: { date: string; items: TimelineItem[] }[] = [];
@@ -71,9 +86,31 @@ export function ChatMessages({
     return groups;
   }, [timelineItems, timezone]);
 
+  // Reset scroll tracking when conversation changes
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    if (conversationId !== prevConversationId.current) {
+      setHasScrolledToUnread(false);
+      prevConversationId.current = conversationId;
+    }
+  }, [conversationId]);
+
+  // Scroll to bottom on new messages, or to first unread on initial load
+  useEffect(() => {
+    if (!messages.length) return;
+
+    if (!hasScrolledToUnread) {
+      // First load — scroll to first unread or bottom
+      if (firstUnreadRef.current) {
+        firstUnreadRef.current.scrollIntoView({ behavior: "auto" });
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+      setHasScrolledToUnread(true);
+    } else {
+      // Subsequent messages — always scroll to bottom
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length, hasScrolledToUnread]);
 
   if (isLoading) {
     return (
@@ -106,17 +143,25 @@ export function ChatMessages({
             </div>
             {items.map((item) =>
               item.type === 'message' ? (
-                <MessageBubble
-                  key={item.msg.id}
-                  msg={item.msg}
-                  onReply={onReply}
-                  selectionMode={selectionMode}
-                  isSelected={selectedMessages?.has(item.msg.id)}
-                  onToggleSelect={onToggleSelect}
-                  onDelete={onDeleteSingle}
-                  onForward={onForwardSingle}
-                  onEnterSelectionMode={onEnterSelectionMode}
-                />
+                <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
+                  {item.msg.id === firstUnreadId && (
+                    <div className="flex items-center gap-2 my-2">
+                      <div className="flex-1 h-px bg-primary/40" />
+                      <span className="text-[10px] text-primary font-medium px-2">Mensagens não lidas</span>
+                      <div className="flex-1 h-px bg-primary/40" />
+                    </div>
+                  )}
+                  <MessageBubble
+                    msg={item.msg}
+                    onReply={onReply}
+                    selectionMode={selectionMode}
+                    isSelected={selectedMessages?.has(item.msg.id)}
+                    onToggleSelect={onToggleSelect}
+                    onDelete={onDeleteSingle}
+                    onForward={onForwardSingle}
+                    onEnterSelectionMode={onEnterSelectionMode}
+                  />
+                </div>
               ) : (
                 <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
                   <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">

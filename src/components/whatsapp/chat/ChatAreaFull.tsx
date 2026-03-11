@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { MessageSquare, Trash2, Forward, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { ChatHeader } from "./ChatHeader";
@@ -8,7 +9,6 @@ import { ChatInput } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
-import { useWhatsAppMessages } from "../hooks/useWhatsAppMessages";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -45,7 +45,13 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
 
   const deleteMutation = useDeleteMessages();
-  const { messages } = useWhatsAppMessages(conversation?.id || null);
+  const queryClient = useQueryClient();
+
+  // Read messages from the query cache instead of calling useWhatsAppMessages
+  // to avoid creating a duplicate realtime subscription
+  const messages: Message[] = queryClient.getQueryData(
+    ['whatsapp', 'messages', conversation?.id]
+  ) ?? [];
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {
@@ -128,6 +134,7 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         />
         <ChatMessages
           conversationId={conversation.id}
+          unreadCount={conversation.unread_count ?? 0}
           onReply={setReplyTo}
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}
