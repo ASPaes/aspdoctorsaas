@@ -56,7 +56,17 @@ function isEditedMessage(message: any): boolean {
   return !!(message?.editedMessage || message?.protocolMessage?.editedMessage);
 }
 
-function getMessageContent(message: any, type: string): string {
+function getPayloadIsFromMe(data: any): boolean {
+  return Boolean(
+    data?.key?.fromMe ??
+      data?.key?.from_me ??
+      data?.fromMe ??
+      data?.message?.key?.fromMe ??
+      data?.message?.key?.from_me ??
+      false
+  );
+}
+
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
   
