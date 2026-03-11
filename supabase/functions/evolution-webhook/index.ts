@@ -752,7 +752,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
     // Dedupe insert: use upsert with onConflict to silently ignore duplicates
-    const isFromMe = key.fromMe || false;
+    const isFromMe = getPayloadIsFromMe(data);
     const { data: savedMsg, error: messageError } = await supabase
       .from('whatsapp_messages')
       .upsert({
