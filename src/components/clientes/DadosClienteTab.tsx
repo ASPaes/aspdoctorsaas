@@ -596,9 +596,17 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormLabel>Fone do Contato</FormLabel>
             <FormControl>
               <Input
-                placeholder="(00) 00000-0000"
+                placeholder="+55 (49) 99966-6019"
                 value={field.value ?? ""}
-                onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                onChange={(e) => field.onChange(e.target.value)}
+                onBlur={() => {
+                  if (field.value) {
+                    const normalized = normalizeBRPhone(field.value);
+                    if (isValidBRPhone(normalized)) {
+                      field.onChange(formatBRPhone(normalized));
+                    }
+                  }
+                }}
               />
             </FormControl>
             <FormMessage />
