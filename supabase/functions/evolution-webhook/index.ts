@@ -853,21 +853,29 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     const messageId = updates.keyId || updates.key?.id;
     if (messageId) {
       if (status === 'revoked') {
-        // Mark as revoked in our soft-delete system
+        // Mark as revoked in our soft-delete system (same as processMessageRevoke)
         const { error } = await supabase
           .from('whatsapp_messages')
           .update({
             delete_status: 'revoked',
             delete_scope: 'everyone',
+            deleted_at: new Date().toISOString(),
             message_type: 'revoked',
             content: '',
+            media_url: null,
+            media_path: null,
+            media_mimetype: null,
+            media_filename: null,
+            media_ext: null,
+            media_kind: null,
+            delete_error: null,
           })
           .eq('message_id', messageId);
 
         if (error) {
           console.error('[evolution-webhook] Error marking message as revoked:', error);
         } else {
-          console.log('[evolution-webhook] Message revoked via status update for messageId:', messageId);
+          console.log('[evolution-webhook] ✅ Message revoked via status update for messageId:', messageId);
         }
       } else {
         const { error } = await supabase

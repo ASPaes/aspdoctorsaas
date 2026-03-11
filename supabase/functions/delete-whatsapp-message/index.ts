@@ -6,6 +6,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+/**
+ * Resolve a valid @s.whatsapp.net JID for Evolution API.
+ * WhatsApp internally uses @lid (Linked ID) which doesn't work with the delete endpoint.
+ * When we encounter @lid, we look up the contact's phone number from the conversation.
+ */
+async function resolveRemoteJid(
+  supabase: any,
+  remoteJid: string | null,
+  conversationId: string
+): Promise<string | null> {
+  // If already has @s.whatsapp.net or @g.us, use as-is
+  if (remoteJid && (remoteJid.includes('@s.whatsapp.net') || remoteJid.includes('@g.us'))) {
+    return remoteJid;
+  }
+
+  // For @lid or missing JIDs, resolve from contact's phone_number
+  const { data: conv } = await supabase
+    .from('whatsapp_conversations')
+    .select('contact_id, whatsapp_contacts(phone_number, is_group)')
+    .eq('id', conversationId)
+    .maybeSingle();
+
+  if (!conv?.whatsapp_contacts?.phone_number) {
+    console.log(`[${FUNCTION_NAME}] Could not resolve phone for conversation ${conversationId}`);
+    return null;
+  }
+
+  const phone = conv.whatsapp_contacts.phone_number;
+  const isGroup = conv.whatsapp_contacts.is_group;
+  const suffix = isGroup ? '@g.us' : '@s.whatsapp.net';
+  const resolved = `${phone}${suffix}`;
+  console.log(`[${FUNCTION_NAME}] Resolved JID: ${remoteJid || '(null)'} -> ${resolved}`);
+  return resolved;
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID().slice(0, 8);
 
@@ -61,16 +96,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`[${FUNCTION_NAME}][${requestId}] Mode: ${mode}, ${messageIds.length} messages from conversation ${conversationId}`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Mode: ${mode}, ${messageIds.length} messages, conversation: ${conversationId}`);
 
     // Fetch messages
     const { data: messages, error: msgError } = await supabase
       .from('whatsapp_messages')
-      .select('id, message_id, remote_jid, is_from_me, timestamp, sent_by_user_id, instance_id, conversation_id, delete_status')
+      .select('id, message_id, remote_jid, is_from_me, timestamp, sent_by_user_id, instance_id, conversation_id, delete_status, media_url, content')
       .in('id', messageIds)
       .eq('conversation_id', conversationId);
 
     if (msgError || !messages || messages.length === 0) {
+      console.error(`[${FUNCTION_NAME}][${requestId}] Messages not found:`, msgError?.message);
       return new Response(JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, detail: msgError?.message || 'Messages not found', requestId }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
@@ -105,7 +141,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      console.log(`[${FUNCTION_NAME}][${requestId}] Local delete: ${validIds.length} messages`);
+      console.log(`[${FUNCTION_NAME}][${requestId}] Local delete OK: ${validIds.length} messages`);
       return new Response(JSON.stringify({ success: true, mode: 'local', deleted: validIds }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -118,32 +154,28 @@ Deno.serve(async (req) => {
     const validMessages: typeof messages = [];
 
     for (const msg of messages) {
-      if (msg.delete_status !== 'active') {
+      if (msg.delete_status !== 'active' && msg.delete_status !== 'failed') {
         errors.push(`${msg.id}: already ${msg.delete_status}`);
         continue;
       }
       if (!msg.is_from_me) {
-        errors.push(`${msg.id}: not sent by you`);
+        errors.push(`${msg.id}: not sent by you (is_from_me=false)`);
         continue;
       }
       if (!msg.message_id) {
         errors.push(`${msg.id}: no Evolution message_id`);
         continue;
       }
-      if (!msg.remote_jid) {
-        errors.push(`${msg.id}: no remote_jid`);
-        continue;
-      }
       const elapsed = now - new Date(msg.timestamp).getTime();
       if (elapsed > FIVE_MINUTES) {
-        errors.push(`${msg.id}: older than 5 minutes`);
+        errors.push(`${msg.id}: older than 5 minutes (${Math.round(elapsed / 1000)}s)`);
         continue;
       }
       validMessages.push(msg);
     }
 
     if (validMessages.length === 0) {
-      return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'No messages eligible for deletion', requestId, errors }), {
+      return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'No messages eligible for delete-for-everyone', requestId, errors }), {
         status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
     }
@@ -167,17 +199,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Process each message: call Evolution + mark pending
+    // Process each message
     const results: { id: string; status: 'pending' | 'failed'; error?: string }[] = [];
 
     for (const msg of validMessages) {
       if (!msg.instance_id || !instanceSecrets[msg.instance_id]) {
-        // No instance secrets — mark failed
         await supabase.from('whatsapp_messages').update({
           delete_scope: 'everyone',
           delete_status: 'failed',
           delete_error: 'Instance secrets not found',
-          deleted_at: new Date().toISOString(),
           deleted_by: userId,
         }).eq('id', msg.id);
         results.push({ id: msg.id, status: 'failed', error: 'Instance secrets not found' });
@@ -189,50 +219,61 @@ Deno.serve(async (req) => {
       const cleanUrl = baseUrl.replace(/\/manager$/, '');
 
       try {
-        const jid = msg.remote_jid && msg.remote_jid.includes('@')
-          ? msg.remote_jid
-          : `${msg.remote_jid}@s.whatsapp.net`;
-        const deleteBody = { id: msg.message_id, remoteJid: jid, fromMe: true };
+        // Resolve proper @s.whatsapp.net JID (handles @lid format)
+        const resolvedJid = await resolveRemoteJid(supabase, msg.remote_jid, conversationId);
+        if (!resolvedJid) {
+          const errorMsg = 'Could not resolve remoteJid for this conversation';
+          await supabase.from('whatsapp_messages').update({
+            delete_scope: 'everyone',
+            delete_status: 'failed',
+            delete_error: errorMsg,
+            deleted_by: userId,
+          }).eq('id', msg.id);
+          results.push({ id: msg.id, status: 'failed', error: errorMsg });
+          continue;
+        }
 
-        console.log(`[${FUNCTION_NAME}][${requestId}] Evolution delete: url=${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}`);
+        // Step 1: Mark as PENDING before calling Evolution
+        await supabase.from('whatsapp_messages').update({
+          delete_scope: 'everyone',
+          delete_status: 'pending',
+          deleted_by: userId,
+        }).eq('id', msg.id);
 
-        const resp = await fetch(`${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}`, {
+        // Step 2: Call Evolution API
+        const deleteBody = { id: msg.message_id, remoteJid: resolvedJid, fromMe: true };
+        const evolutionUrl = `${cleanUrl}/chat/deleteMessageForEveryone/${instance_name}`;
+
+        console.log(`[${FUNCTION_NAME}][${requestId}] Evolution DELETE: ${evolutionUrl}`);
+        console.log(`[${FUNCTION_NAME}][${requestId}] Body: ${JSON.stringify(deleteBody)}`);
+
+        const resp = await fetch(evolutionUrl, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json', apikey: api_key },
           body: JSON.stringify(deleteBody),
         });
         const respText = await resp.text();
-        console.log(`[${FUNCTION_NAME}][${requestId}] Evolution response ${msg.id}: status=${resp.status}, body=${respText.slice(0, 300)}`);
+        console.log(`[${FUNCTION_NAME}][${requestId}] Evolution response for ${msg.id}: status=${resp.status} body=${respText.slice(0, 500)}`);
 
         if (resp.ok) {
-          // Mark as PENDING — wait for webhook REVOKE confirmation
-          await supabase.from('whatsapp_messages').update({
-            delete_scope: 'everyone',
-            delete_status: 'pending',
-            deleted_at: new Date().toISOString(),
-            deleted_by: userId,
-          }).eq('id', msg.id);
+          // Keep as PENDING — webhook REVOKE event will confirm
+          console.log(`[${FUNCTION_NAME}][${requestId}] ✅ Pending revoke for ${msg.id} (message_id=${msg.message_id})`);
           results.push({ id: msg.id, status: 'pending' });
         } else {
-          const errorMsg = `Evolution API error: ${resp.status}`;
+          const errorMsg = `Evolution API ${resp.status}: ${respText.slice(0, 200)}`;
+          console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Evolution error for ${msg.id}: ${errorMsg}`);
           await supabase.from('whatsapp_messages').update({
-            delete_scope: 'everyone',
             delete_status: 'failed',
             delete_error: errorMsg,
-            deleted_at: new Date().toISOString(),
-            deleted_by: userId,
           }).eq('id', msg.id);
           results.push({ id: msg.id, status: 'failed', error: errorMsg });
         }
       } catch (err) {
-        const errorMsg = `Network error: ${(err as Error).message?.slice(0, 100)}`;
-        console.error(`[${FUNCTION_NAME}][${requestId}] Evolution delete failed for ${msg.id}:`, err);
+        const errorMsg = `Network error: ${(err as Error).message?.slice(0, 150)}`;
+        console.error(`[${FUNCTION_NAME}][${requestId}] ❌ Network error for ${msg.id}:`, err);
         await supabase.from('whatsapp_messages').update({
-          delete_scope: 'everyone',
           delete_status: 'failed',
           delete_error: errorMsg,
-          deleted_at: new Date().toISOString(),
-          deleted_by: userId,
         }).eq('id', msg.id);
         results.push({ id: msg.id, status: 'failed', error: errorMsg });
       }
@@ -254,7 +295,7 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error(`[${FUNCTION_NAME}][${requestId}] Error:`, error);
+    console.error(`[${FUNCTION_NAME}][${requestId}] Fatal error:`, error);
     return new Response(JSON.stringify({ type: 'about:blank', title: 'Internal Server Error', status: 500, detail: 'Unexpected error', requestId }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
     });
