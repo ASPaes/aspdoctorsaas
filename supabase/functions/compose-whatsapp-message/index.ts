@@ -34,7 +34,7 @@ serve(async (req) => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("tenant_id")
-      .eq("user_id", claimsData.claims.sub)
+      .eq("user_id", userData.user.id)
       .single();
 
     if (!profile?.tenant_id) {
