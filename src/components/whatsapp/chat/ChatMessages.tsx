@@ -74,9 +74,31 @@ export function ChatMessages({
     return groups;
   }, [timelineItems, timezone]);
 
+  // Reset scroll tracking when conversation changes
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    if (conversationId !== prevConversationId.current) {
+      setHasScrolledToUnread(false);
+      prevConversationId.current = conversationId;
+    }
+  }, [conversationId]);
+
+  // Scroll to bottom on new messages, or to first unread on initial load
+  useEffect(() => {
+    if (!messages.length) return;
+
+    if (!hasScrolledToUnread) {
+      // First load — scroll to first unread or bottom
+      if (firstUnreadRef.current) {
+        firstUnreadRef.current.scrollIntoView({ behavior: "auto" });
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" });
+      }
+      setHasScrolledToUnread(true);
+    } else {
+      // Subsequent messages — always scroll to bottom
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length, hasScrolledToUnread]);
 
   if (isLoading) {
     return (
