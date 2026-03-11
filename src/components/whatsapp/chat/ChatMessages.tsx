@@ -60,6 +60,16 @@ export function ChatMessages({
     return items;
   }, [messages, assignments]);
 
+  // Compute the ID of the first unread incoming message
+  const firstUnreadId = useMemo(() => {
+    if (!unreadCount || unreadCount <= 0) return null;
+    // Find the last N incoming (not from me) messages — the first of those is the "first unread"
+    const incomingMessages = messages.filter(m => !m.is_from_me);
+    if (incomingMessages.length <= 0) return null;
+    const firstUnreadIdx = Math.max(0, incomingMessages.length - unreadCount);
+    return incomingMessages[firstUnreadIdx]?.id ?? null;
+  }, [messages, unreadCount]);
+
   // Group timeline items by date
   const dateGroups = useMemo(() => {
     const groups: { date: string; items: TimelineItem[] }[] = [];
