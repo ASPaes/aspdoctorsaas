@@ -1,9 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const FUNCTION_NAME = 'delete-whatsapp-message';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 Deno.serve(async (req) => {
@@ -60,8 +60,10 @@ Deno.serve(async (req) => {
       .in('id', messageIds)
       .eq('conversation_id', conversationId);
 
+    console.log(`[${FUNCTION_NAME}][${requestId}] Query result: found=${messages?.length ?? 0}, error=${msgError?.message ?? 'none'}, ids=${JSON.stringify(messageIds)}`);
+
     if (msgError || !messages || messages.length === 0) {
-      return new Response(JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, detail: 'Messages not found', requestId }), {
+      return new Response(JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, detail: msgError?.message || 'Messages not found', requestId }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
     }
