@@ -974,6 +974,50 @@ async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: an
   }
 }
 
+async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: any) {
+  try {
+    const { data } = payload;
+    const message = data.message;
+    const revokedKeyId = message?.protocolMessage?.key?.id;
+
+    if (!revokedKeyId) {
+      console.warn('[evolution-webhook] REVOKE event but no protocolMessage.key.id found');
+      return;
+    }
+
+    console.log('[evolution-webhook] Processing REVOKE for original messageId:', revokedKeyId);
+
+    const { data: existingMsg, error: fetchError } = await supabase
+      .from('whatsapp_messages')
+      .select('id, delete_status')
+      .eq('message_id', revokedKeyId)
+      .maybeSingle();
+
+    if (fetchError || !existingMsg) {
+      console.warn('[evolution-webhook] Revoked message not found in DB:', revokedKeyId);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('whatsapp_messages')
+      .update({
+        delete_status: 'revoked',
+        delete_scope: 'everyone',
+        content: '',
+        message_type: 'revoked',
+      })
+      .eq('id', existingMsg.id);
+
+    if (updateError) {
+      console.error('[evolution-webhook] Error marking message as revoked:', updateError);
+    } else {
+      console.log('[evolution-webhook] Message successfully marked as revoked:', existingMsg.id);
+    }
+  } catch (error) {
+    console.error('[evolution-webhook] Error in processMessageRevoke:', error);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -989,7 +1033,9 @@ Deno.serve(async (req) => {
 
     switch (payload.event) {
       case 'messages.upsert':
-        if (isEditedMessage(payload.data?.message)) {
+        if (isRevokeMessage(payload.data?.message)) {
+          await processMessageRevoke(payload, supabase);
+        } else if (isEditedMessage(payload.data?.message)) {
           await processMessageEdit(payload, supabase);
         } else {
           await processMessageUpsert(payload, supabase);
