@@ -316,6 +316,8 @@ export default function ClienteForm() {
         ...values,
         email: values.email?.trim().toLowerCase() || null,
         telefone_whatsapp: values.telefone_whatsapp ? normalizeBRPhone(values.telefone_whatsapp) : null,
+        telefone_contato: values.telefone_contato ? normalizeBRPhone(values.telefone_contato) : null,
+        contato_fone: values.contato_fone ? normalizeBRPhone(values.contato_fone) : null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
         custo_fixo_percentual: values.custo_fixo_percentual != null ? values.custo_fixo_percentual / 100 : null,
       };
