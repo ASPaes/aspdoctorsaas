@@ -24,6 +24,7 @@ import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
+import { normalizeBRPhone, isValidBRPhone } from "@/lib/phoneBR";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
@@ -36,7 +37,11 @@ const clienteSchema = z.object({
     z.string().min(1, "E-mail obrigatório").email("E-mail inválido")
   ),
   telefone_contato: z.string().nullable(),
-  telefone_whatsapp: z.string().nullable().refine(v => !!v && v.replace(/\D/g, "").length >= 10, { message: "WhatsApp obrigatório" }),
+  telefone_whatsapp: z.string().nullable().refine(v => {
+    if (!v) return false;
+    const normalized = normalizeBRPhone(v);
+    return isValidBRPhone(normalized);
+  }, { message: "WhatsApp inválido. Use formato: (DD) NNNNN-NNNN" }),
   estado_id: z.number().nullable(),
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
