@@ -1044,6 +1044,47 @@ async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: an
   }
 }
 
+/**
+ * After a revoke, refresh the conversation's last_message_preview
+ * to show the most recent non-revoked message.
+ */
+async function refreshConversationPreviewAfterRevoke(supabase: any, conversationId: string) {
+  try {
+    const { data: lastMsg } = await supabase
+      .from('whatsapp_messages')
+      .select('content, timestamp, is_from_me, message_type')
+      .eq('conversation_id', conversationId)
+      .not('delete_status', 'eq', 'revoked')
+      .not('message_type', 'eq', 'revoked')
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastMsg) {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_preview: (lastMsg.content || '').substring(0, 200),
+          last_message_at: lastMsg.timestamp,
+          is_last_message_from_me: lastMsg.is_from_me,
+        })
+        .eq('id', conversationId);
+    } else {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_preview: null,
+          last_message_at: null,
+          is_last_message_from_me: false,
+        })
+        .eq('id', conversationId);
+    }
+    console.log('[evolution-webhook] Conversation preview refreshed after revoke');
+  } catch (err) {
+    console.error('[evolution-webhook] Error refreshing conversation preview:', err);
+  }
+}
+
 async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: any) {
   try {
     const { data } = payload;
@@ -1059,7 +1100,7 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
 
     const { data: existingMsg, error: fetchError } = await supabase
       .from('whatsapp_messages')
-      .select('id, delete_status, media_url, content')
+      .select('id, conversation_id, delete_status, media_url, content')
       .eq('message_id', revokedKeyId)
       .maybeSingle();
 
@@ -1077,7 +1118,6 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
         deleted_at: new Date().toISOString(),
         content: '',
         message_type: 'revoked',
-        // Clear media so it's not rendered
         media_url: null,
         media_path: null,
         media_mimetype: null,
@@ -1092,6 +1132,10 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
       console.error('[evolution-webhook] Error marking message as revoked:', updateError);
     } else {
       console.log('[evolution-webhook] ✅ Message confirmed revoked:', existingMsg.id);
+      // Refresh sidebar preview
+      if (existingMsg.conversation_id) {
+        await refreshConversationPreviewAfterRevoke(supabase, existingMsg.conversation_id);
+      }
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageRevoke:', error);
