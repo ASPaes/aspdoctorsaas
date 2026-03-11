@@ -252,7 +252,7 @@ export default function ClienteForm() {
   const clienteQuery = useQuery({
     queryKey: ["cliente", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clientes").select("*").eq("id", id!).single();
+      const { data, error } = await tf(supabase.from("clientes").select("*").eq("id", id!)).single();
       if (error) throw error;
       return data;
     },
