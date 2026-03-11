@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
@@ -240,12 +240,15 @@ export function MessageBubble({
 
   return (
     <div
-      className={cn("flex mb-1", isMe ? "justify-end" : "justify-start")}
+      className={cn("group flex mb-1 items-end gap-0.5", isMe ? "justify-end flex-row-reverse" : "justify-start")}
       onDoubleClick={() => onReply?.(msg)}
     >
+      {bubbleContent}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          {bubbleContent}
+          <button className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-accent/50 shrink-0">
+            <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align={isMe ? "end" : "start"} className="min-w-[180px]">
           {msg.is_from_me && canDeletePanelOnly(msg) && (
