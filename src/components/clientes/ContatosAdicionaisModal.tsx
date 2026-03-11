@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { maskCPF } from "@/lib/masks";
-import { normalizeBRPhone } from "@/lib/phoneBR";
+import { normalizeBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 
 interface Props {
