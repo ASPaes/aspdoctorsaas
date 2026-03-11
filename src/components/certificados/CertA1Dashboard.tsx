@@ -75,9 +75,9 @@ export function CertA1Dashboard() {
   const periodoFimStr = periodo.to ? format(periodo.to, "yyyy-MM-dd") : null;
 
   const { data: metrics, isLoading } = useQuery({
-    queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr],
+    queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr, tid],
     queryFn: async () => {
-      let vendasQuery = supabase
+      let vendasQuery = tf(supabase
         .from("certificado_a1_vendas")
         .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
         .not("data_venda", "is", null);
