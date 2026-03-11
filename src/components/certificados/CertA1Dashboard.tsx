@@ -89,10 +89,10 @@ export function CertA1Dashboard() {
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
       let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null; telefone_whatsapp: string | null }> = {};
       if (clienteIds.length > 0) {
-        const { data: clientes } = await supabase
+        const { data: clientes } = await tf(supabase
           .from("clientes")
           .select("id, razao_social, nome_fantasia, telefone_whatsapp")
-          .in("id", clienteIds);
+          .in("id", clienteIds));
         (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
