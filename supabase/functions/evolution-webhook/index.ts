@@ -656,13 +656,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     console.log('[evolution-webhook] Normalized phone:', phone, 'isGroup:', isGroup);
 
+    const payloadIsFromMe = getPayloadIsFromMe(data);
+
     const contactId = await findOrCreateContact(
       supabase,
       instanceData.id,
       phone,
       pushName || phone,
       isGroup,
-      key.fromMe,
+      payloadIsFromMe,
       tenantId,
       secrets.api_url,
       secrets.api_key,
