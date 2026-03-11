@@ -143,17 +143,25 @@ export function ChatMessages({
             </div>
             {items.map((item) =>
               item.type === 'message' ? (
-                <MessageBubble
-                  key={item.msg.id}
-                  msg={item.msg}
-                  onReply={onReply}
-                  selectionMode={selectionMode}
-                  isSelected={selectedMessages?.has(item.msg.id)}
-                  onToggleSelect={onToggleSelect}
-                  onDelete={onDeleteSingle}
-                  onForward={onForwardSingle}
-                  onEnterSelectionMode={onEnterSelectionMode}
-                />
+                <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
+                  {item.msg.id === firstUnreadId && (
+                    <div className="flex items-center gap-2 my-2">
+                      <div className="flex-1 h-px bg-primary/40" />
+                      <span className="text-[10px] text-primary font-medium px-2">Mensagens não lidas</span>
+                      <div className="flex-1 h-px bg-primary/40" />
+                    </div>
+                  )}
+                  <MessageBubble
+                    msg={item.msg}
+                    onReply={onReply}
+                    selectionMode={selectionMode}
+                    isSelected={selectedMessages?.has(item.msg.id)}
+                    onToggleSelect={onToggleSelect}
+                    onDelete={onDeleteSingle}
+                    onForward={onForwardSingle}
+                    onEnterSelectionMode={onEnterSelectionMode}
+                  />
+                </div>
               ) : (
                 <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
                   <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
