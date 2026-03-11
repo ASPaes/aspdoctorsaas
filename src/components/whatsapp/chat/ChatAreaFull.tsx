@@ -28,6 +28,8 @@ interface Props {
 
 const FIVE_MINUTES = 5 * 60 * 1000;
 
+type DeleteMode = 'local' | 'everyone';
+
 export function ChatAreaFull({ conversation, onClose }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -43,12 +45,11 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
   // Delete confirm
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
+  const [deleteMode, setDeleteMode] = useState<DeleteMode>('everyone');
 
   const deleteMutation = useDeleteMessages();
   const queryClient = useQueryClient();
 
-  // Read messages from the query cache instead of calling useWhatsAppMessages
-  // to avoid creating a duplicate realtime subscription
   const messages: Message[] = queryClient.getQueryData(
     ['whatsapp', 'messages', conversation?.id]
   ) ?? [];
@@ -72,20 +73,33 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     setSelectedMessages(new Set([msgId]));
   }, []);
 
-  // Check if all selected messages can be deleted
-  const allSelectedCanDelete = useMemo(() => {
+  // Check if all selected messages can be deleted for everyone (from me + < 5 min)
+  const allSelectedCanDeleteEveryone = useMemo(() => {
     if (selectedMessages.size === 0) return false;
     const now = Date.now();
     return [...selectedMessages].every(id => {
       if (id.startsWith('temp-')) return false;
       const msg = messages.find(m => m.id === id);
-      return msg && msg.is_from_me && msg.status !== 'deleted' && (now - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
+      return msg && msg.is_from_me && (msg as any).delete_status !== 'revoked' && (now - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
     });
   }, [selectedMessages, messages]);
 
   // Handlers
-  const handleDeleteSingle = (msgId: string) => {
+  const handleDeleteLocal = (msgId: string) => {
     setDeleteIds([msgId]);
+    setDeleteMode('local');
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteEveryone = (msgId: string) => {
+    setDeleteIds([msgId]);
+    setDeleteMode('everyone');
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleRetryDelete = (msgId: string) => {
+    setDeleteIds([msgId]);
+    setDeleteMode('everyone');
     setDeleteConfirmOpen(true);
   };
 
@@ -94,8 +108,15 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     setForwardOpen(true);
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDeleteLocal = () => {
     setDeleteIds([...selectedMessages]);
+    setDeleteMode('local');
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleBulkDeleteEveryone = () => {
+    setDeleteIds([...selectedMessages]);
+    setDeleteMode('everyone');
     setDeleteConfirmOpen(true);
   };
 
@@ -106,7 +127,11 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
 
   const confirmDelete = async () => {
     if (!conversation) return;
-    await deleteMutation.mutateAsync({ messageIds: deleteIds, conversationId: conversation.id });
+    await deleteMutation.mutateAsync({
+      messageIds: deleteIds,
+      conversationId: conversation.id,
+      mode: deleteMode,
+    });
     setDeleteConfirmOpen(false);
     setDeleteIds([]);
     exitSelectionMode();
@@ -124,7 +149,6 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
 
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         <ChatHeader
           conversation={conversation}
@@ -139,7 +163,9 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}
           onToggleSelect={toggleSelect}
-          onDeleteSingle={handleDeleteSingle}
+          onDeleteLocal={handleDeleteLocal}
+          onDeleteEveryone={handleDeleteEveryone}
+          onRetryDelete={handleRetryDelete}
           onForwardSingle={handleForwardSingle}
           onEnterSelectionMode={enterSelectionMode}
         />
@@ -151,15 +177,24 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
               {selectedMessages.size} selecionada{selectedMessages.size !== 1 ? 's' : ''}
             </span>
             <div className="flex items-center gap-2">
-              {allSelectedCanDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkDeleteLocal}
+                disabled={selectedMessages.size === 0 || deleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Excluir do sistema
+              </Button>
+              {allSelectedCanDeleteEveryone && (
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={handleBulkDelete}
+                  onClick={handleBulkDeleteEveryone}
                   disabled={deleteMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  Apagar ({selectedMessages.size})
+                  Apagar para todos ({selectedMessages.size})
                 </Button>
               )}
               <Button
@@ -185,7 +220,6 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         )}
       </div>
 
-      {/* Details sidebar */}
       {showDetails && (
         <DetailsSidebar
           conversation={conversation}
@@ -193,7 +227,6 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         />
       )}
 
-      {/* Forward dialog */}
       <ForwardMessageDialog
         open={forwardOpen}
         onOpenChange={setForwardOpen}
@@ -201,21 +234,26 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         onDone={() => { setForwardIds([]); exitSelectionMode(); }}
       />
 
-      {/* Delete confirmation */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Apagar mensagem{deleteIds.length !== 1 ? 'ns' : ''}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteMode === 'local'
+                ? `Excluir do sistema?`
+                : `Apagar para todos?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteIds.length === 1
-                ? 'Esta mensagem será apagada para todos.'
-                : `${deleteIds.length} mensagens serão apagadas para todos.`}
+              {deleteMode === 'local'
+                ? `${deleteIds.length === 1 ? 'A mensagem será removida apenas da sua visualização.' : `${deleteIds.length} mensagens serão removidas apenas da sua visualização.`} O destinatário continuará vendo.`
+                : deleteIds.length === 1
+                  ? 'A mensagem será apagada no WhatsApp do destinatário.'
+                  : `${deleteIds.length} mensagens serão apagadas no WhatsApp do destinatário.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Apagar
+              {deleteMode === 'local' ? 'Excluir' : 'Apagar para todos'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

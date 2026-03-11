@@ -16,7 +16,9 @@ interface Props {
   selectionMode?: boolean;
   selectedMessages?: Set<string>;
   onToggleSelect?: (msgId: string) => void;
-  onDeleteSingle?: (msgId: string) => void;
+  onDeleteLocal?: (msgId: string) => void;
+  onDeleteEveryone?: (msgId: string) => void;
+  onRetryDelete?: (msgId: string) => void;
   onForwardSingle?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
 }
@@ -32,7 +34,9 @@ export function ChatMessages({
   selectionMode,
   selectedMessages,
   onToggleSelect,
-  onDeleteSingle,
+  onDeleteLocal,
+  onDeleteEveryone,
+  onRetryDelete,
   onForwardSingle,
   onEnterSelectionMode,
 }: Props) {
@@ -63,7 +67,6 @@ export function ChatMessages({
   // Compute the ID of the first unread incoming message
   const firstUnreadId = useMemo(() => {
     if (!unreadCount || unreadCount <= 0) return null;
-    // Find the last N incoming (not from me) messages — the first of those is the "first unread"
     const incomingMessages = messages.filter(m => !m.is_from_me);
     if (incomingMessages.length <= 0) return null;
     const firstUnreadIdx = Math.max(0, incomingMessages.length - unreadCount);
@@ -99,7 +102,6 @@ export function ChatMessages({
     if (!messages.length) return;
 
     if (!hasScrolledToUnread) {
-      // First load — scroll to first unread or bottom
       if (firstUnreadRef.current) {
         firstUnreadRef.current.scrollIntoView({ behavior: "auto" });
       } else {
@@ -107,7 +109,6 @@ export function ChatMessages({
       }
       setHasScrolledToUnread(true);
     } else {
-      // Subsequent messages — always scroll to bottom
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages.length, hasScrolledToUnread]);
@@ -157,7 +158,9 @@ export function ChatMessages({
                     selectionMode={selectionMode}
                     isSelected={selectedMessages?.has(item.msg.id)}
                     onToggleSelect={onToggleSelect}
-                    onDelete={onDeleteSingle}
+                    onDeleteLocal={onDeleteLocal}
+                    onDeleteEveryone={onDeleteEveryone}
+                    onRetryDelete={onRetryDelete}
                     onForward={onForwardSingle}
                     onEnterSelectionMode={onEnterSelectionMode}
                   />
