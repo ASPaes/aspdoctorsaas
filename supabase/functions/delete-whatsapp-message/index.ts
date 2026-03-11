@@ -363,13 +363,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Refresh sidebar preview after all deletions
-    await refreshConversationPreview(supabase, conversationId, requestId);
+    // NOTE: Do NOT refresh sidebar preview here for 'everyone' mode.
+    // Messages are still 'pending'. The webhook will confirm revoke and refresh preview.
 
     const pendingIds = results.filter(r => r.status === 'pending').map(r => r.id);
     const failedIds = results.filter(r => r.status === 'failed').map(r => r.id);
 
-    console.log(`[${FUNCTION_NAME}][${requestId}] Done: ${pendingIds.length} revoked, ${failedIds.length} failed`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Done: ${pendingIds.length} pending, ${failedIds.length} failed`);
 
     return new Response(JSON.stringify({
       success: true,
