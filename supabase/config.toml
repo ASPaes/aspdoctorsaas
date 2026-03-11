@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.forward-whatsapp-message]
 verify_jwt = false
+
+[functions.save-ai-settings]
+verify_jwt = false
