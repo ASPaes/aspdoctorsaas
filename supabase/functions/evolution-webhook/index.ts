@@ -1124,6 +1124,40 @@ Deno.serve(async (req) => {
       case 'messages.update':
         await processMessageUpdate(payload, supabase);
         break;
+      case 'messages.delete': {
+        // Evolution sends messages.delete when a message is revoked
+        // Treat same as revoke — resolve the deleted message key and mark revoked
+        const deleteData = payload.data;
+        const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
+        if (deletedKeyId) {
+          const resolved = await resolveInstanceTenant(supabase, payload.instance);
+          if (resolved) {
+            const { data: delRows, error: delErr } = await supabase
+              .from('whatsapp_messages')
+              .update({
+                delete_status: 'revoked',
+                delete_scope: 'everyone',
+                deleted_at: new Date().toISOString(),
+                message_type: 'revoked',
+                content: '',
+                media_url: null,
+                media_path: null,
+                media_mimetype: null,
+                media_filename: null,
+                media_ext: null,
+                media_kind: null,
+                delete_error: null,
+              })
+              .eq('tenant_id', resolved.tenantId)
+              .eq('message_id', deletedKeyId)
+              .select('id');
+            console.log(`[evolution-webhook] messages.delete processed: keyId=${deletedKeyId} rows=${delRows?.length ?? 0}${delErr ? ' error=' + delErr.message : ''}`);
+          }
+        } else {
+          console.log('[evolution-webhook] messages.delete with no key id:', JSON.stringify(deleteData).slice(0, 300));
+        }
+        break;
+      }
       case 'connection.update':
         await processConnectionUpdate(payload, supabase);
         break;
