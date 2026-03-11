@@ -299,7 +299,7 @@ export default function ClienteForm() {
       cert_a1_ultimo_vendedor_id: (c as any).cert_a1_ultimo_vendedor_id ?? null,
       contato_nome: (c as any).contato_nome ?? null,
       contato_cpf: (c as any).contato_cpf ?? null,
-      contato_fone: (c as any).contato_fone ?? null,
+      contato_fone: (c as any).contato_fone ? formatBRPhone(normalizeBRPhone((c as any).contato_fone)) : null,
       contato_aniversario: (c as any).contato_aniversario ?? null,
       unidade_base_id: (c as any).unidade_base_id ?? null,
       matriz_id: (c as any).matriz_id ?? null,
