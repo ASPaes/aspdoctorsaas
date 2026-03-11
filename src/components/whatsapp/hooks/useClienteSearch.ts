@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { escapeLike } from '@/lib/utils';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export interface ClienteSearchResult {
   id: string;
