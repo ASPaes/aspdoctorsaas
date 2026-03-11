@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { MessageSquare, Trash2, Forward, X } from "lucide-react";
+import { MessageSquare, Trash2, Forward, X, EyeOff } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import type { Message } from "../hooks/useWhatsAppMessages";
@@ -268,6 +268,3 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     </div>
   );
 }
-
-// Need to import EyeOff for the selection bar
-import { EyeOff } from "lucide-react";
