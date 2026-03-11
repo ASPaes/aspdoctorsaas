@@ -71,6 +71,7 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     if (selectedMessages.size === 0) return false;
     const now = Date.now();
     return [...selectedMessages].every(id => {
+      if (id.startsWith('temp-')) return false;
       const msg = messages.find(m => m.id === id);
       return msg && msg.is_from_me && msg.status !== 'deleted' && (now - new Date(msg.timestamp).getTime()) <= FIVE_MINUTES;
     });
