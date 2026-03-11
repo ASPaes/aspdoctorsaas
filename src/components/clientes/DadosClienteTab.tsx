@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
 import { maskCNPJ, maskPhone, maskCPF, maskCEP, normalizePhoneBR } from "@/lib/masks";
+import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
