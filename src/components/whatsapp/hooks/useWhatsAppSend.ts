@@ -38,6 +38,8 @@ export const useWhatsAppSend = () => {
         optimisticMediaUrl = base64Data;
       }
 
+      const optimisticType = newMessage.messageType === 'video' ? 'media' : newMessage.messageType;
+
       const optimisticMessage: Partial<Message> = {
         id: 'temp-' + Date.now(),
         conversation_id: newMessage.conversationId,
@@ -47,6 +49,9 @@ export const useWhatsAppSend = () => {
         media_mimetype: newMessage.mediaMimetype ?? null,
         status: 'sending',
         is_from_me: true,
+        isFromMe: true,
+        isSystem: false,
+        type: optimisticType,
         timestamp: new Date().toISOString(),
         message_id: '',
         remote_jid: '',

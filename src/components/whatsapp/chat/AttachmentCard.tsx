@@ -111,7 +111,7 @@ export function AttachmentCard({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-muted/50 border border-border/50 p-3 min-w-[220px] max-w-[320px]">
+    <div className="flex items-center gap-3 rounded-lg bg-muted/50 border border-border/50 p-3 min-w-0 max-w-full">
       <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
         <Icon className="h-5 w-5 text-primary" />
       </div>

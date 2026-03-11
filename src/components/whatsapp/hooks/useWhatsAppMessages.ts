@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export type MessageUiType = 'text' | 'media' | 'audio' | 'document' | 'image' | 'system' | string;
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -18,6 +20,8 @@ export interface Message {
   media_kind: string | null;
   status: string;
   is_from_me: boolean;
+  isFromMe?: boolean;
+  fromMe?: boolean;
   timestamp: string;
   quoted_message_id: string | null;
   metadata: Record<string, any> | null;
@@ -27,7 +31,70 @@ export interface Message {
   sender_name: string | null;
   sender_role: string | null;
   instance_id: string | null;
+  isSystem?: boolean;
+  type?: MessageUiType;
+  key?: { fromMe?: boolean; from_me?: boolean };
+  protocolMessage?: { type?: string | number };
+  delete_status?: string | null;
+  delete_scope?: string | null;
+  delete_error?: string | null;
 }
+
+const getRawType = (message: Partial<Message> & Record<string, any>): string => {
+  return (
+    message.message_type ??
+    message.messageType ??
+    message.type ??
+    'text'
+  );
+};
+
+const getIsFromMe = (message: Partial<Message> & Record<string, any>): boolean => {
+  return Boolean(
+    message.is_from_me ??
+      message.isFromMe ??
+      message.fromMe ??
+      message.key?.fromMe ??
+      message.key?.from_me ??
+      false
+  );
+};
+
+const getIsSystem = (message: Partial<Message> & Record<string, any>, rawType: string): boolean => {
+  return Boolean(
+    rawType === 'system' ||
+      rawType === 'event' ||
+      message.metadata?.system === true ||
+      message.protocolMessage?.type === 'REVOKE' ||
+      message.metadata?.protocolMessage?.type === 'REVOKE'
+  );
+};
+
+const toUiType = (rawType: string, isSystem: boolean): MessageUiType => {
+  if (isSystem) return 'system';
+  if (rawType === 'audio') return 'audio';
+  if (rawType === 'document') return 'document';
+  if (rawType === 'image') return 'image';
+  if (rawType === 'video' || rawType === 'sticker') return 'media';
+  if (rawType === 'text') return 'text';
+  return rawType;
+};
+
+const normalizeMessage = (message: Partial<Message> & Record<string, any>): Message => {
+  const rawType = getRawType(message);
+  const isFromMe = getIsFromMe(message);
+  const isSystem = getIsSystem(message, rawType);
+
+  return {
+    ...(message as Message),
+    message_type: rawType,
+    is_from_me: isFromMe,
+    isFromMe,
+    isSystem,
+    type: toUiType(rawType, isSystem),
+    metadata: message.metadata ?? null,
+  };
+};
 
 // Lean select — only fields the UI needs
 const MESSAGE_SELECT = [
@@ -48,6 +115,7 @@ const MESSAGE_SELECT = [
   'is_from_me',
   'timestamp',
   'quoted_message_id',
+  'metadata',
   'audio_transcription',
   'transcription_status',
   'sent_by_user_id',
@@ -74,10 +142,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         .order('timestamp', { ascending: true });
 
       if (error) throw error;
-      return ((data ?? []) as unknown as Message[]).map((m) => ({
-        ...m,
-        metadata: null, // not fetched in lean select
-      }));
+      return ((data ?? []) as Array<Partial<Message> & Record<string, any>>).map(normalizeMessage);
     },
     enabled: !!conversationId,
   });
@@ -110,21 +175,21 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         table: 'whatsapp_messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        const newMsg = payload.new as any;
+        const normalizedNewMsg = normalizeMessage(payload.new as any);
         queryClient.setQueryData(
           ['whatsapp', 'messages', conversationId],
           (old: any[] | undefined) => {
-            if (!old) return [newMsg];
+            if (!old) return [normalizedNewMsg];
 
             // Check for exact id/message_id match OR a temp optimistic entry
             const isTempMatch = (m: any) =>
-              m.id.startsWith?.('temp-') &&
-              m.is_from_me === true &&
-              m.conversation_id === newMsg.conversation_id;
+              m.id?.startsWith?.('temp-') &&
+              getIsFromMe(m) === true &&
+              m.conversation_id === normalizedNewMsg.conversation_id;
 
             const isExactMatch = (m: any) =>
-              m.id === newMsg.id ||
-              (newMsg.message_id && m.message_id === newMsg.message_id);
+              m.id === normalizedNewMsg.id ||
+              (normalizedNewMsg.message_id && m.message_id === normalizedNewMsg.message_id);
 
             const hasMatch = old.some((m) => isExactMatch(m) || isTempMatch(m));
 
@@ -134,12 +199,12 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
               return old.map((m) => {
                 if (!replaced && (isExactMatch(m) || isTempMatch(m))) {
                   replaced = true;
-                  return newMsg;
+                  return normalizedNewMsg;
                 }
                 return m;
               });
             }
-            return [...old, newMsg];
+            return [...old, normalizedNewMsg];
           }
         );
       })
@@ -149,12 +214,12 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         table: 'whatsapp_messages',
         filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        const updated = payload.new as any;
+        const normalizedUpdated = normalizeMessage(payload.new as any);
         queryClient.setQueryData(
           ['whatsapp', 'messages', conversationId],
           (old: any[] | undefined) => {
             if (!old) return old;
-            return old.map((m) => m.id === updated.id ? updated : m);
+            return old.map((m) => (m.id === normalizedUpdated.id ? normalizedUpdated : m));
           }
         );
       })
