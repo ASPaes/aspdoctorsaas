@@ -281,6 +281,12 @@ Deno.serve(async (req) => {
 
     const evolutionData = await evolutionResponse.json();
     const messageId = evolutionData.key?.id || `msg_${Date.now()}`;
+    const persistedIsFromMe = Boolean(
+      evolutionData?.key?.fromMe ??
+      evolutionData?.key?.from_me ??
+      evolutionData?.message?.key?.fromMe ??
+      true
+    );
 
     let extractedMediaUrl: string | null = null;
     if (body.messageType === 'audio' && evolutionData.message?.audioMessage?.url) {
