@@ -67,6 +67,7 @@ function getPayloadIsFromMe(data: any): boolean {
   );
 }
 
+function getMessageContent(message: any, type: string): string {
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
   
