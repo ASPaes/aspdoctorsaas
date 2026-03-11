@@ -486,7 +486,7 @@ export default function ClienteForm() {
             onVencimentoChange={(v) => form.setValue("cert_a1_vencimento", v)}
             onVendaRegistrada={async () => {
               if (!id) return;
-              const { data } = await supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id).single();
+              const { data } = await tf(supabase.from("clientes").select("cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id").eq("id", id)).single();
               if (data) {
                 form.setValue("cert_a1_vencimento", (data as any).cert_a1_vencimento ?? null);
                 form.setValue("cert_a1_ultima_venda_em", (data as any).cert_a1_ultima_venda_em ?? null);

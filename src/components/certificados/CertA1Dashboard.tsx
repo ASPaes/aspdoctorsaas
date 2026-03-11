@@ -125,11 +125,11 @@ export function CertA1Dashboard() {
       const vencendo30 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= todayStr && c.cert_a1_vencimento <= plus30Str).length || 0;
       const vencidos20 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= minus20Str && c.cert_a1_vencimento < todayStr).length || 0;
 
-      const { count: semData } = await supabase
+      const { count: semData } = await tf(supabase
         .from("clientes")
         .select("id", { count: "exact", head: true })
         .eq("cancelado", false)
-        .is("cert_a1_vencimento", null) as any;
+        .is("cert_a1_vencimento", null)) as any;
 
       const vendasDetalhe = (vendas ?? []).map(v => ({
         id: v.id,

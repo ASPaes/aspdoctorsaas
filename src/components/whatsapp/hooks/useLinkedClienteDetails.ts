@@ -32,7 +32,7 @@ export function useLinkedClienteDetails(clienteId: string | null) {
           area_atuacao_id, segmento_id, unidade_base_id,
           fornecedor_id, produto_id, cidade_id, estado_id
         `)
-        .eq('id', clienteId)
+        .eq('id', clienteId))
         .single();
 
       if (!c) return null;
