@@ -326,7 +326,7 @@ export default function Clientes() {
     });
 
     return sorted;
-  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters]);
+  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters, somenteMatrizes, matrizIdsSet]);
 
   // Query "Novos no Mês"
   const { data: novosNoMes } = useQuery({
