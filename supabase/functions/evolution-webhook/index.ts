@@ -864,9 +864,93 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       checkAndTriggerAutoSentiment(supabase, conversationId, supabaseUrl);
       checkAndTriggerAutoCategorization(supabase, conversationId, supabaseUrl);
+      // Auto-create support attendance for incoming customer messages
+      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId)
+        .catch(err => console.error('[evolution-webhook] ensureAttendance error:', err));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpsert:', error);
+  }
+}
+
+/**
+ * Ensure a support_attendance exists for an incoming customer message.
+ * Rules:
+ * - If there's already an active attendance (status != 'closed'), skip.
+ * - If the last closed attendance is within the post_close_reopen_window_minutes, skip.
+ * - Otherwise, create a new attendance with status='waiting'.
+ */
+async function ensureAttendanceForIncomingMessage(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string
+): Promise<void> {
+  try {
+    // 1. Check for any active (non-closed) attendance
+    const { data: activeAttendance } = await supabase
+      .from('support_attendances')
+      .select('id, status')
+      .eq('conversation_id', conversationId)
+      .neq('status', 'closed')
+      .limit(1)
+      .maybeSingle();
+
+    if (activeAttendance) {
+      console.log(`[ensure-attendance] Active attendance already exists: ${activeAttendance.id} (${activeAttendance.status})`);
+      return;
+    }
+
+    // 2. Check post-close reopen window
+    const { data: lastClosed } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at')
+      .eq('conversation_id', conversationId)
+      .eq('status', 'closed')
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastClosed?.closed_at) {
+      // Fetch support_config for reopen window
+      const { data: config } = await supabase
+        .from('configuracoes')
+        .select('support_config')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      const reopenWindowMinutes = (config?.support_config as any)?.post_close_reopen_window_minutes ?? 5;
+      const closedAt = new Date(lastClosed.closed_at);
+      const now = new Date();
+      const diffMinutes = (now.getTime() - closedAt.getTime()) / (1000 * 60);
+
+      if (diffMinutes < reopenWindowMinutes) {
+        console.log(`[ensure-attendance] Within reopen window (${diffMinutes.toFixed(1)} < ${reopenWindowMinutes} min), skipping`);
+        return;
+      }
+    }
+
+    // 3. Create new attendance
+    const { data: newAttendance, error } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        status: 'waiting',
+        opened_at: new Date().toISOString(),
+        opened_by: null,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[ensure-attendance] Error creating attendance:', error);
+    } else {
+      console.log(`[ensure-attendance] ✅ New attendance created: ${newAttendance.id} for conversation: ${conversationId}`);
+    }
+  } catch (err) {
+    console.error('[ensure-attendance] Unexpected error:', err);
   }
 }
 

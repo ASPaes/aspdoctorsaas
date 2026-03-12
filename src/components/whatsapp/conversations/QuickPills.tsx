@@ -3,21 +3,23 @@ import { cn } from "@/lib/utils";
 interface Props {
   active: string;
   onChange: (pill: string) => void;
-  unreadCount: number;
+  inProgressCount: number;
   waitingCount: number;
+  closedCount: number;
 }
 
 const pills = [
-  { key: "all", label: "Todas" },
-  { key: "unread", label: "Não lidas" },
-  { key: "waiting", label: "Aguardando" },
-  { key: "mine", label: "Minhas" },
+  { key: "all", label: "Todos" },
+  { key: "in_progress", label: "Em andamento" },
+  { key: "waiting", label: "Fila" },
+  { key: "closed", label: "Encerrados" },
 ];
 
-export function QuickPills({ active, onChange, unreadCount, waitingCount }: Props) {
+export function QuickPills({ active, onChange, inProgressCount, waitingCount, closedCount }: Props) {
   const getCount = (key: string) => {
-    if (key === "unread") return unreadCount;
+    if (key === "in_progress") return inProgressCount;
     if (key === "waiting") return waitingCount;
+    if (key === "closed") return closedCount;
     return 0;
   };
 

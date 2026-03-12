@@ -666,6 +666,7 @@ export type Database = {
           custo_fixo_percentual: number
           id: number
           imposto_percentual: number
+          support_config: Json
           tenant_id: string | null
           updated_at: string
         }
@@ -675,6 +676,7 @@ export type Database = {
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          support_config?: Json
           tenant_id?: string | null
           updated_at?: string
         }
@@ -684,6 +686,7 @@ export type Database = {
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          support_config?: Json
           tenant_id?: string | null
           updated_at?: string
         }
@@ -1434,6 +1437,383 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      support_agent_presence: {
+        Row: {
+          status: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_agent_presence_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      support_area_members: {
+        Row: {
+          area_id: string
+          ativo: boolean
+          created_at: string
+          id: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          area_id: string
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          area_id?: string
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_area_members_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "support_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_area_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      support_areas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          tenant_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          tenant_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      support_attendance_sequences: {
+        Row: {
+          ano: number
+          last_seq: number
+          tenant_id: string
+        }
+        Insert: {
+          ano: number
+          last_seq?: number
+          tenant_id: string
+        }
+        Update: {
+          ano?: number
+          last_seq?: number
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      support_attendances: {
+        Row: {
+          ai_category: string | null
+          ai_problem: string | null
+          ai_solution: string | null
+          ai_summary: string | null
+          ai_tags: string[] | null
+          ano: number
+          area_id: string | null
+          assigned_to: string | null
+          attendance_code: string
+          cliente_id: string | null
+          closed_at: string | null
+          closed_by: string | null
+          closed_reason: string | null
+          contact_id: string
+          conversation_id: string
+          created_at: string
+          first_response_at: string | null
+          handle_seconds: number
+          handoffs_count: number
+          id: string
+          msg_agent_count: number
+          msg_customer_count: number
+          opened_at: string
+          opened_by: string | null
+          seq_number: number
+          status: string
+          tenant_id: string
+          updated_at: string
+          wait_seconds: number
+        }
+        Insert: {
+          ai_category?: string | null
+          ai_problem?: string | null
+          ai_solution?: string | null
+          ai_summary?: string | null
+          ai_tags?: string[] | null
+          ano?: number
+          area_id?: string | null
+          assigned_to?: string | null
+          attendance_code?: string
+          cliente_id?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          contact_id: string
+          conversation_id: string
+          created_at?: string
+          first_response_at?: string | null
+          handle_seconds?: number
+          handoffs_count?: number
+          id?: string
+          msg_agent_count?: number
+          msg_customer_count?: number
+          opened_at?: string
+          opened_by?: string | null
+          seq_number?: number
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          wait_seconds?: number
+        }
+        Update: {
+          ai_category?: string | null
+          ai_problem?: string | null
+          ai_solution?: string | null
+          ai_summary?: string | null
+          ai_tags?: string[] | null
+          ano?: number
+          area_id?: string | null
+          assigned_to?: string | null
+          attendance_code?: string
+          cliente_id?: string | null
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_reason?: string | null
+          contact_id?: string
+          conversation_id?: string
+          created_at?: string
+          first_response_at?: string | null
+          handle_seconds?: number
+          handoffs_count?: number
+          id?: string
+          msg_agent_count?: number
+          msg_customer_count?: number
+          opened_at?: string
+          opened_by?: string | null
+          seq_number?: number
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          wait_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_attendances_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "support_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "support_attendances_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "support_attendances_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_opened_by_fkey"
+            columns: ["opened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      support_csat: {
+        Row: {
+          asked_at: string
+          attendance_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          responded_at: string | null
+          score: number | null
+          tenant_id: string
+        }
+        Insert: {
+          asked_at?: string
+          attendance_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          responded_at?: string | null
+          score?: number | null
+          tenant_id: string
+        }
+        Update: {
+          asked_at?: string
+          attendance_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          responded_at?: string | null
+          score?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_csat_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "support_attendances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_kb_articles: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          area_id: string | null
+          created_at: string
+          id: string
+          problem: string
+          solution: string
+          source_attendance_id: string | null
+          status: string
+          tags: string[] | null
+          tenant_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          area_id?: string | null
+          created_at?: string
+          id?: string
+          problem: string
+          solution: string
+          source_attendance_id?: string | null
+          status?: string
+          tags?: string[] | null
+          tenant_id: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          area_id?: string | null
+          created_at?: string
+          id?: string
+          problem?: string
+          solution?: string
+          source_attendance_id?: string | null
+          status?: string
+          tags?: string[] | null
+          tenant_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_kb_articles_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "support_kb_articles_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "support_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_kb_articles_source_attendance_id_fkey"
+            columns: ["source_attendance_id"]
+            isOneToOne: false
+            referencedRelation: "support_attendances"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tenants: {
         Row: {
@@ -2630,6 +3010,10 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
+      next_support_attendance_seq: {
+        Args: { p_tenant: string }
+        Returns: number
+      }
       norm_txt: { Args: { t: string }; Returns: string }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       validate_invite_token: {

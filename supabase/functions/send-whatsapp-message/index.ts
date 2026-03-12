@@ -434,6 +434,40 @@ Deno.serve(async (req) => {
       }).catch(err => console.error('[send-whatsapp-message] Transcription trigger error:', err));
     }
 
+    // Auto-assign waiting attendance to sender on first reply
+    if (senderUserId) {
+      try {
+        const { data: waitingAttendance } = await supabase
+          .from('support_attendances')
+          .select('id')
+          .eq('conversation_id', body.conversationId)
+          .eq('status', 'waiting')
+          .is('assigned_to', null)
+          .limit(1)
+          .maybeSingle();
+
+        if (waitingAttendance) {
+          const { error: assignError } = await supabase
+            .from('support_attendances')
+            .update({
+              assigned_to: senderUserId,
+              status: 'in_progress',
+              first_response_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', waitingAttendance.id);
+
+          if (assignError) {
+            console.error('[send-whatsapp-message] Error auto-assigning attendance:', assignError);
+          } else {
+            console.log(`[send-whatsapp-message] ✅ Attendance ${waitingAttendance.id} auto-assigned to ${senderUserId}`);
+          }
+        }
+      } catch (err) {
+        console.error('[send-whatsapp-message] Auto-assign attendance error:', err);
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: savedMessage }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

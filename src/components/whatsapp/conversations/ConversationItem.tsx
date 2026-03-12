@@ -1,18 +1,21 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
+import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
 
 interface Props {
   conversation: ConversationWithContact;
   isSelected: boolean;
   onClick: () => void;
   instanceName?: string;
+  attendance?: AttendanceInfo;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance }: Props) {
   const contact = conv.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
   const { sentiment } = useWhatsAppSentiment(conv.id);
@@ -29,7 +32,6 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const previewText = rawPreview.length > MAX_PREVIEW
     ? rawPreview.substring(0, MAX_PREVIEW) + "…"
     : rawPreview;
-
 
   const getInitials = (n: string) => n.substring(0, 2).toUpperCase();
 
@@ -62,6 +64,18 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const timeStr = formatTime(conv.last_message_at);
 
+  const attendanceBadge = attendance ? (
+    attendance.status === "waiting" ? (
+      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+        Fila
+      </Badge>
+    ) : attendance.status === "in_progress" ? (
+      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-blue-500/50 text-blue-600 dark:text-blue-400">
+        Em atend.
+      </Badge>
+    ) : null
+  ) : null;
+
   return (
     <button
       onClick={onClick}
@@ -90,6 +104,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
           <span className="text-sm font-medium truncate flex-1 min-w-0">{name}</span>
+          {attendanceBadge}
           {timeStr && (
             <span className={cn(
               "text-xs whitespace-nowrap shrink-0",
