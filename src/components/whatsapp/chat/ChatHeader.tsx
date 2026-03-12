@@ -18,6 +18,7 @@ import { TransferDialog } from "./TransferDialog";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
+import { SignatureControl } from "./SignatureControl";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -74,6 +75,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         </div>
 
         <div className="flex items-center gap-1.5">
+          <SignatureControl conversationId={conversation.id} />
           <QueueIndicator
             conversationId={conversation.id}
             assignedTo={conversation.assigned_to || null}

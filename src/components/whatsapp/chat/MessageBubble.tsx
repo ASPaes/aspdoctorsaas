@@ -184,14 +184,30 @@ export function MessageBubble({
           : "mr-auto bg-muted text-foreground rounded-bl-sm"
       )}
     >
-      {isFromMe && msg.sender_name && (
-        <p className={cn(
-          "text-[10px] font-semibold mb-0.5",
-          isFromMe ? "text-primary-foreground/80" : "text-foreground/80"
-        )}>
-          {msg.sender_name}{msg.sender_role ? ` · ${msg.sender_role}` : ''}
-        </p>
-      )}
+      {isFromMe && (() => {
+        const sigMode = (msg.metadata as any)?.sender_signature_mode;
+        const sigValue = (msg.metadata as any)?.sender_signature_value;
+        // Show discrete signature header based on mode used at send time
+        if (sigMode === 'ticket' && sigValue) {
+          return (
+            <p className={cn("text-[10px] font-mono font-semibold mb-0.5", "text-primary-foreground/70")}>
+              #{sigValue}
+            </p>
+          );
+        }
+        if (sigMode === 'none') {
+          return null; // No signature shown
+        }
+        // Default: show sender name (backward compat for old messages without metadata)
+        if (msg.sender_name) {
+          return (
+            <p className={cn("text-[10px] font-semibold mb-0.5", "text-primary-foreground/80")}>
+              {msg.sender_name}{msg.sender_role ? ` · ${msg.sender_role}` : ''}
+            </p>
+          );
+        }
+        return null;
+      })()}
 
       {msg.quoted_message_id && (
         <div className={cn(
