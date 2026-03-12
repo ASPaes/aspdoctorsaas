@@ -124,7 +124,7 @@ export default function WhatsApp() {
         </ResizablePanel>
         <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
         <ResizablePanel defaultSize={75}>
-          <ChatAreaFull conversation={selected} />
+          <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
