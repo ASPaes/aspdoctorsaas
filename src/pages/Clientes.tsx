@@ -518,6 +518,7 @@ export default function Clientes() {
   const activeFilters = useMemo(() => {
     const badges: { key: string; label: string; displayValue: string; onClear: () => void }[] = [];
 
+    if (somenteMatrizes) badges.push({ key: "mat", label: "Somente Matrizes", displayValue: "Sim", onClear: () => updateFilter("somenteMatrizes", false) });
     if (unidadeBaseQuick) badges.push({ key: "ub", label: "Unidade Base", displayValue: resolveLabel(unidadeBaseQuick, lookups.unidadesBase.data), onClear: () => updateFilter("unidadeBaseQuick", "") });
     if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => updateFilter("recorrenciaAdv", "") });
     if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => updateFilter("modeloContratoId", "") });
