@@ -124,6 +124,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     setMatrizSearch("");
     setMatrizNome(null);
     setMatrizNotFound(false);
+    setMatrizError(null);
     form.setValue("matriz_id", null);
   }, [form]);
 
