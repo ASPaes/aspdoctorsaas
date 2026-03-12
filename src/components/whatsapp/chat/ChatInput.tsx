@@ -123,6 +123,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply }: Props) {
         suggestions={suggestions}
         isLoading={isLoadingSmartReplies}
         isRefreshing={isRefreshing}
+        error={null}
         onSelectSuggestion={handleSmartReplySelect}
         onRefresh={refresh}
       />
