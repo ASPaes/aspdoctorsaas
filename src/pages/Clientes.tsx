@@ -133,7 +133,6 @@ export default function Clientes() {
       }
       return ids;
     },
-    enabled: somenteMatrizes,
     staleTime: 60_000,
   });
 
