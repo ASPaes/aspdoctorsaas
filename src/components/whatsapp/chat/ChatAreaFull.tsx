@@ -32,7 +32,7 @@ interface Props {
 
 type DeleteMode = 'panel_only' | 'everyone';
 
-export function ChatAreaFull({ conversation, onClose }: Props) {
+export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
 
