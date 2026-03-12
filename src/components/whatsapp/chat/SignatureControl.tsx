@@ -1,6 +1,7 @@
+import { PenLine } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useSignatureMode } from "../hooks/useSignatureMode";
+import { cn } from "@/lib/utils";
 
 interface Props {
   conversationId: string;
@@ -16,19 +17,21 @@ export function SignatureControl({ conversationId }: Props) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => update({ mode: isEnabled ? "none" : "name" })}>
-          <Checkbox
-            checked={isEnabled}
-            className="h-3.5 w-3.5"
-            tabIndex={-1}
-          />
-          <span className="text-[11px] text-muted-foreground select-none hidden sm:inline">
-            Assinatura
-          </span>
-        </div>
+        <button
+          onClick={() => update({ mode: isEnabled ? "none" : "name" })}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors border select-none",
+            isEnabled
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "bg-muted text-muted-foreground border-border"
+          )}
+        >
+          <PenLine className="h-3 w-3" />
+          <span className="hidden sm:inline">{isEnabled ? "Assinatura" : "Sem assinatura"}</span>
+        </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="text-xs">
-        {isEnabled ? "Mensagens prefixadas com seu nome" : "Sem assinatura — ideal para URA/bot"}
+        {isEnabled ? "Mensagens prefixadas com seu nome — clique para desativar" : "Sem assinatura — clique para ativar"}
       </TooltipContent>
     </Tooltip>
   );
