@@ -979,7 +979,7 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
           .update(updatePayload)
           .eq('tenant_id', tenantId)
           .eq('message_id', waKeyId)
-          .select('id');
+          .select('id, conversation_id');
 
         const count = updatedRows?.length ?? 0;
         if (error) {
@@ -988,6 +988,13 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
           console.warn(`[evolution-webhook] Status update matched 0 rows: tenant=${tenantId} keyId=${waKeyId} internalId=${internalMessageId}`);
         } else {
           console.log(`[evolution-webhook] Status updated to ${status}: keyId=${waKeyId} rows=${count}`);
+          // Touch conversation updated_at so the fallback realtime listener triggers a refetch
+          if (updatedRows && updatedRows.length > 0 && updatedRows[0].conversation_id) {
+            await supabase
+              .from('whatsapp_conversations')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', updatedRows[0].conversation_id);
+          }
         }
       }
     }
