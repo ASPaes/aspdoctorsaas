@@ -85,6 +85,19 @@ export default function WhatsApp() {
     });
   }, [instances]);
 
+  // Navigate to a conversation by ID (fetch full record with contact join)
+  const handleNavigateToConversation = useCallback(async (conversationId: string) => {
+    const { data } = await supabase
+      .from("whatsapp_conversations")
+      .select("*, contact:whatsapp_contacts(*)")
+      .eq("id", conversationId)
+      .single();
+
+    if (data) {
+      setSelected(data as unknown as ConversationWithContact);
+    }
+  }, []);
+
   // Mobile: show either sidebar or chat
   if (isMobile) {
     if (selected) {
