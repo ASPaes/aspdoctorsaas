@@ -11,6 +11,8 @@ import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { NewConversationModal } from "../conversations/NewConversationModal";
+import { EditContactModal } from "./EditContactModal";
 import {
   AlertDialog,
   AlertDialogAction,
