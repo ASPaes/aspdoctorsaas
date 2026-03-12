@@ -615,16 +615,6 @@ export default function Clientes() {
             {isLoading ? <Skeleton className="h-7 w-12" /> : <p className="text-2xl font-bold">{kpis.clientesNovosMes}</p>}
           </CardContent>
         </Card>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="somente-matrizes"
-            checked={somenteMatrizes}
-            onCheckedChange={(v) => updateFilter("somenteMatrizes", !!v)}
-          />
-          <label htmlFor="somente-matrizes" className="text-sm cursor-pointer select-none whitespace-nowrap">
-            Somente Matrizes
-          </label>
-        </div>
       </div>
 
       {/* Quick filters bar */}
