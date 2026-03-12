@@ -167,6 +167,8 @@ export function ChatMessages({
                     onRetryDelete={onRetryDelete}
                     onForward={onForwardSingle}
                     onEnterSelectionMode={onEnterSelectionMode}
+                    onContactChat={onContactChat}
+                    onContactSave={onContactSave}
                   />
                 </div>
               ) : (
