@@ -89,9 +89,12 @@ export const useWhatsAppSend = () => {
       }
     },
     onSettled: (_data, _error, variables) => {
-      // Only invalidate conversations list (for last_message_* reorder).
-      // Messages are updated via realtime subscription — no need to refetch here.
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      // Delayed invalidation to replace temp message with real DB row (including correct status).
+      // Gives realtime INSERT a chance to arrive first; acts as fallback if it doesn't.
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
+      }, 1500);
     },
   });
 
