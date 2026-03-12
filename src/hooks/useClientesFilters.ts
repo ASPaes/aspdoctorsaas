@@ -164,6 +164,7 @@ export function useClientesFilters() {
       margemMin: "",
       margemMax: "",
       unidadeBaseQuick: "",
+      somenteMatrizes: false,
       page: 0,
     }));
   }, []);
