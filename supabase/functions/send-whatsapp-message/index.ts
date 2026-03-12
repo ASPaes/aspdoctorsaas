@@ -244,12 +244,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    const senderLabel = senderInfo.label;
+    // --- Signature mode logic ---
+    const sigMode = (conversation as any).sender_signature_mode || 'name';
+    const sigTicketCode = (conversation as any).sender_ticket_code || null;
+
+    let signaturePrefix = '';
+    let signatureValue = '';
+
+    if (sigMode === 'name' && senderInfo.label) {
+      signaturePrefix = senderInfo.label;
+      signatureValue = senderInfo.name;
+    } else if (sigMode === 'ticket') {
+      if (!sigTicketCode && body.messageType === 'text') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Código de atendimento não definido. Defina o código antes de enviar.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (sigTicketCode) {
+        signaturePrefix = `#${sigTicketCode}`;
+        signatureValue = sigTicketCode;
+      }
+    }
+    // sigMode === 'none' → no prefix
+
     const prefixedBody = { ...body };
-    if (senderLabel && prefixedBody.content) {
-      prefixedBody.content = `${senderLabel}\n${prefixedBody.content}`;
-    } else if (senderLabel && prefixedBody.messageType === 'text' && !prefixedBody.content) {
-      prefixedBody.content = senderLabel;
+    if (signaturePrefix && prefixedBody.content) {
+      prefixedBody.content = `${signaturePrefix}\n${prefixedBody.content}`;
+    } else if (signaturePrefix && prefixedBody.messageType === 'text' && !prefixedBody.content) {
+      prefixedBody.content = signaturePrefix;
     }
 
     // Use signed URL from storage if available, otherwise fall back to base64/mediaUrl
