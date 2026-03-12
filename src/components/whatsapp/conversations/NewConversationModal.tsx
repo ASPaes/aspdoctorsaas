@@ -19,6 +19,7 @@ interface Props {
   onCreated?: (conversationId: string) => void;
   initialPhone?: string;
   initialName?: string;
+  initialInstanceId?: string;
 }
 
 export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName }: Props) {
