@@ -289,6 +289,22 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NewConversationModal
+        open={newConvOpen}
+        onOpenChange={setNewConvOpen}
+        initialPhone={newConvPhone}
+        initialName={newConvName}
+      />
+
+      <EditContactModal
+        open={saveContactOpen}
+        onOpenChange={setSaveContactOpen}
+        contactId=""
+        contactName={saveContactName}
+        contactPhone={saveContactPhone}
+        isNewContact
+      />
     </div>
   );
 }
