@@ -1561,6 +1561,7 @@ export type Database = {
           ano: number
           area_id: string | null
           assigned_to: string | null
+          assumed_at: string | null
           attendance_code: string
           cliente_id: string | null
           closed_at: string | null
@@ -1573,6 +1574,8 @@ export type Database = {
           handle_seconds: number
           handoffs_count: number
           id: string
+          last_customer_message_at: string | null
+          last_operator_message_at: string | null
           msg_agent_count: number
           msg_customer_count: number
           opened_at: string
@@ -1592,6 +1595,7 @@ export type Database = {
           ano?: number
           area_id?: string | null
           assigned_to?: string | null
+          assumed_at?: string | null
           attendance_code?: string
           cliente_id?: string | null
           closed_at?: string | null
@@ -1604,6 +1608,8 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          last_customer_message_at?: string | null
+          last_operator_message_at?: string | null
           msg_agent_count?: number
           msg_customer_count?: number
           opened_at?: string
@@ -1623,6 +1629,7 @@ export type Database = {
           ano?: number
           area_id?: string | null
           assigned_to?: string | null
+          assumed_at?: string | null
           attendance_code?: string
           cliente_id?: string | null
           closed_at?: string | null
@@ -1635,6 +1642,8 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          last_customer_message_at?: string | null
+          last_operator_message_at?: string | null
           msg_agent_count?: number
           msg_customer_count?: number
           opened_at?: string
@@ -1713,6 +1722,7 @@ export type Database = {
           reason: string | null
           responded_at: string | null
           score: number | null
+          status: string
           tenant_id: string
         }
         Insert: {
@@ -1723,6 +1733,7 @@ export type Database = {
           reason?: string | null
           responded_at?: string | null
           score?: number | null
+          status?: string
           tenant_id: string
         }
         Update: {
@@ -1733,6 +1744,7 @@ export type Database = {
           reason?: string | null
           responded_at?: string | null
           score?: number | null
+          status?: string
           tenant_id?: string
         }
         Relationships: [
