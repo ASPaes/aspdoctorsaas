@@ -296,6 +296,10 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }
         onOpenChange={setNewConvOpen}
         initialPhone={newConvPhone}
         initialName={newConvName}
+        initialInstanceId={conversation?.instance_id}
+        onCreated={(convId) => {
+          onNavigateToConversation?.(convId);
+        }}
       />
 
       <EditContactModal

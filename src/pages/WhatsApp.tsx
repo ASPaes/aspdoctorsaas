@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ConversationsSidebar } from "@/components/whatsapp/conversations/ConversationsSidebar";
 import { ChatAreaFull } from "@/components/whatsapp/chat/ChatAreaFull";
