@@ -290,6 +290,8 @@ export default function Clientes() {
     }
 
     const filtered = rows.filter((row) => {
+      // Somente Matrizes filter
+      if (somenteMatrizes && matrizIdsSet && !matrizIdsSet.has(row.id)) return false;
       const lucroReal = computeLucroReal(row);
       const margemBruta = computeMargemBruta(row);
       if (valueFilters.lucroMin !== null && lucroReal < valueFilters.lucroMin) return false;
