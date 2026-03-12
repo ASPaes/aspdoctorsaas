@@ -11,10 +11,11 @@ interface ContactCardProps {
   metadata: Record<string, any> | null;
   messageType: string;
   isFromMe: boolean;
-  onStartConversation?: (phone: string, name: string) => void;
+  onContactChat?: (phone: string, name: string) => void;
+  onContactSave?: (phone: string, name: string) => void;
 }
 
-function parseVCard(vcard: string | null): { name: string; phones: string[] } {
+export function parseVCard(vcard: string | null): { name: string; phones: string[] } {
   if (!vcard) return { name: '', phones: [] };
 
   let name = '';
@@ -25,7 +26,6 @@ function parseVCard(vcard: string | null): { name: string; phones: string[] } {
     if (line.startsWith('FN:')) {
       name = line.substring(3).trim();
     }
-    // Match TEL lines: TEL;type=CELL:+55... or TEL:+55... or waid=...
     if (line.toUpperCase().startsWith('TEL')) {
       const colonIdx = line.indexOf(':');
       if (colonIdx !== -1) {
@@ -56,30 +56,18 @@ function formatPhone(phone: string): string {
 function SingleContactCard({
   contact,
   isFromMe,
-  onStartConversation,
+  onContactChat,
+  onContactSave,
 }: {
   contact: ContactInfo;
   isFromMe: boolean;
-  onStartConversation?: (phone: string, name: string) => void;
+  onContactChat?: (phone: string, name: string) => void;
+  onContactSave?: (phone: string, name: string) => void;
 }) {
   const { name, phones } = parseVCard(contact.vcard);
   const displayName = contact.displayName || name || 'Contato';
   const primaryPhone = phones[0] || '';
-
-  const handleChat = () => {
-    if (primaryPhone && onStartConversation) {
-      const digits = primaryPhone.replace(/\D/g, '');
-      onStartConversation(digits, displayName);
-    }
-  };
-
-  const handleAddContact = () => {
-    if (primaryPhone) {
-      const digits = primaryPhone.replace(/\D/g, '');
-      // Open WhatsApp web link to add contact (or navigate to contacts page)
-      window.open(`https://wa.me/${digits}`, '_blank');
-    }
-  };
+  const digits = primaryPhone.replace(/\D/g, '');
 
   return (
     <div className={cn(
@@ -113,48 +101,50 @@ function SingleContactCard({
         </div>
       </div>
 
-      <div className={cn(
-        "flex gap-2 pt-2 border-t",
-        isFromMe ? "border-primary-foreground/20" : "border-border/50"
-      )}>
-        {primaryPhone && onStartConversation && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "flex-1 h-7 text-xs gap-1",
-              isFromMe
-                ? "text-primary-foreground hover:bg-primary-foreground/10"
-                : "text-foreground hover:bg-accent"
-            )}
-            onClick={handleChat}
-          >
-            <MessageCircle className="h-3.5 w-3.5" />
-            Conversar
-          </Button>
-        )}
-        {primaryPhone && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "flex-1 h-7 text-xs gap-1",
-              isFromMe
-                ? "text-primary-foreground hover:bg-primary-foreground/10"
-                : "text-foreground hover:bg-accent"
-            )}
-            onClick={handleAddContact}
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            Adicionar
-          </Button>
-        )}
-      </div>
+      {digits && (
+        <div className={cn(
+          "flex gap-2 pt-2 border-t",
+          isFromMe ? "border-primary-foreground/20" : "border-border/50"
+        )}>
+          {onContactChat && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex-1 h-7 text-xs gap-1",
+                isFromMe
+                  ? "text-primary-foreground hover:bg-primary-foreground/10"
+                  : "text-foreground hover:bg-accent"
+              )}
+              onClick={() => onContactChat(digits, displayName)}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Conversar
+            </Button>
+          )}
+          {onContactSave && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "flex-1 h-7 text-xs gap-1",
+                isFromMe
+                  ? "text-primary-foreground hover:bg-primary-foreground/10"
+                  : "text-foreground hover:bg-accent"
+              )}
+              onClick={() => onContactSave(digits, displayName)}
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Adicionar
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export function ContactCard({ metadata, messageType, isFromMe, onStartConversation }: ContactCardProps) {
+export function ContactCard({ metadata, messageType, isFromMe, onContactChat, onContactSave }: ContactCardProps) {
   if (!metadata) return null;
 
   if (messageType === 'contact' && metadata.contact) {
@@ -162,7 +152,8 @@ export function ContactCard({ metadata, messageType, isFromMe, onStartConversati
       <SingleContactCard
         contact={metadata.contact}
         isFromMe={isFromMe}
-        onStartConversation={onStartConversation}
+        onContactChat={onContactChat}
+        onContactSave={onContactSave}
       />
     );
   }
@@ -175,7 +166,8 @@ export function ContactCard({ metadata, messageType, isFromMe, onStartConversati
             key={i}
             contact={c}
             isFromMe={isFromMe}
-            onStartConversation={onStartConversation}
+            onContactChat={onContactChat}
+            onContactSave={onContactSave}
           />
         ))}
       </div>
