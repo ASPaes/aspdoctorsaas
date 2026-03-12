@@ -13,7 +13,7 @@ interface Props {
 }
 
 const MODE_CONFIG: Record<SignatureMode, { icon: typeof User; label: string; tooltip: string }> = {
-  name: { icon: User, label: "Nome", tooltip: "Mensagens prefixadas com seu nome" },
+  name: { icon: User, label: "Assinatura", tooltip: "Mensagens prefixadas com seu nome" },
   none: { icon: Ban, label: "Sem", tooltip: "Sem assinatura — ideal para URA/bot" },
   ticket: { icon: Hash, label: "Ticket", tooltip: "Prefixo com código de atendimento" },
 };
