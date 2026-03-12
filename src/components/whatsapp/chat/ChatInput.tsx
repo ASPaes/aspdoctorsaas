@@ -31,7 +31,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply }: Props) {
   const sendMutation = useWhatsAppSend();
 
   const { macros, incrementUsage } = useWhatsAppMacros();
-  const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh } = useSmartReply(conversationId);
+  const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
 
   useEffect(() => {
     const match = message.match(/\/macro:\s*(\S*)$/i);
@@ -123,6 +123,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply }: Props) {
         suggestions={suggestions}
         isLoading={isLoadingSmartReplies}
         isRefreshing={isRefreshing}
+        error={smartReplyError}
         onSelectSuggestion={handleSmartReplySelect}
         onRefresh={refresh}
       />
