@@ -15,6 +15,7 @@ interface EditContactModalProps {
   contactPhone: string;
   contactNotes?: string | null;
   onSuccess?: () => void;
+  isNewContact?: boolean;
 }
 
 interface ContactFormData { name: string; notes: string; }

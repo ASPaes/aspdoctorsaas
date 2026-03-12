@@ -31,6 +31,15 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
 
+  // Sync initial values when modal opens with pre-filled data
+  useEffect(() => {
+    if (open && initialPhone) {
+      setPhone(initialPhone);
+      setName(initialName || '');
+      setTab('avulso');
+    }
+  }, [open, initialPhone, initialName]);
+
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
 
   const handleSelectCliente = (cliente: ClienteSearchResult) => {
