@@ -514,6 +514,9 @@ export default function ClienteForm() {
             />
           )}
 
+          {/* Filiais vinculadas (apenas em edição) */}
+          {isEditing && id && <FiliaisSection clienteId={id} />}
+
           {/* Card: Cancelamento */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">

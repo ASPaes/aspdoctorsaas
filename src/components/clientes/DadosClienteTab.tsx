@@ -322,11 +322,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           {matrizNome && (
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               <Search className="h-3 w-3" />
-              {matrizNome}
+              Vinculado à Matriz: {matrizSearch} — {matrizNome}
             </p>
           )}
           {matrizNotFound && !matrizSearching && (
             <p className="text-xs text-destructive mt-1">Nenhum cliente com este código</p>
+          )}
+          {matrizError && !matrizSearching && (
+            <p className="text-xs text-destructive mt-1">{matrizError}</p>
           )}
         </FormItem>
 
