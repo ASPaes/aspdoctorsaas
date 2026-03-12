@@ -384,7 +384,11 @@ Deno.serve(async (req) => {
           is_from_me: persistedIsFromMe,
           timestamp: messageTimestamp,
           quoted_message_id: body.quotedMessageId || null,
-          metadata: body.fileName ? { fileName: body.fileName } : null,
+          metadata: {
+            ...(body.fileName ? { fileName: body.fileName } : {}),
+            sender_signature_mode: sigMode,
+            sender_signature_value: signatureValue || null,
+          },
           sent_by_user_id: senderUserId || null,
           instance_id: sendInstanceId,
           sender_name: senderInfo.name || null,

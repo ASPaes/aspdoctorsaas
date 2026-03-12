@@ -75,6 +75,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         </div>
 
         <div className="flex items-center gap-1.5">
+          <SignatureControl conversationId={conversation.id} />
           <QueueIndicator
             conversationId={conversation.id}
             assignedTo={conversation.assigned_to || null}
