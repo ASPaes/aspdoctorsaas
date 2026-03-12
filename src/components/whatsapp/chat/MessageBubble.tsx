@@ -207,10 +207,8 @@ export function MessageBubble({
           metadata={msg.metadata}
           messageType={msg.message_type}
           isFromMe={isFromMe}
-          onStartConversation={(phone, name) => {
-            // Open WhatsApp conversation with this number
-            window.open(`https://wa.me/${phone}`, '_blank');
-          }}
+          onContactChat={onContactChat}
+          onContactSave={onContactSave}
         />
       )}
 
