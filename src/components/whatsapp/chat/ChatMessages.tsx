@@ -21,6 +21,8 @@ interface Props {
   onRetryDelete?: (msgId: string) => void;
   onForwardSingle?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
+  onContactChat?: (phone: string, name: string) => void;
+  onContactSave?: (phone: string, name: string) => void;
 }
 
 type TimelineItem =
