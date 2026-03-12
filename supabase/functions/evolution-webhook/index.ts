@@ -752,6 +752,26 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const quotedMessageId = message.extendedTextMessage?.contextInfo?.stanzaId || null;
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
+    // Build metadata for contact messages (vCard data)
+    let messageMetadata: Record<string, any> | null = null;
+    if (messageType === 'contact' && message.contactMessage) {
+      const cm = message.contactMessage;
+      messageMetadata = {
+        contact: {
+          displayName: cm.displayName || null,
+          vcard: cm.vcard || null,
+        },
+      };
+      console.log('[evolution-webhook] Contact message metadata saved for:', cm.displayName);
+    } else if (messageType === 'contacts' && message.contactsArrayMessage) {
+      const contacts = (message.contactsArrayMessage.contacts || []).map((c: any) => ({
+        displayName: c.displayName || null,
+        vcard: c.vcard || null,
+      }));
+      messageMetadata = { contacts };
+      console.log('[evolution-webhook] Contacts array metadata saved, count:', contacts.length);
+    }
+
     // Dedupe insert: use upsert with onConflict to silently ignore duplicates
     const isFromMe = getPayloadIsFromMe(data);
     const { data: savedMsg, error: messageError } = await supabase
@@ -775,6 +795,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         timestamp,
         tenant_id: tenantId,
         instance_id: instanceData.id,
+        metadata: messageMetadata,
       }, {
         onConflict: 'tenant_id,message_id',
         ignoreDuplicates: true,

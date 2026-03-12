@@ -3,6 +3,7 @@ import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare
 import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
+import { ContactCard } from "./ContactCard";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -197,12 +198,24 @@ export function MessageBubble({
         </div>
       )}
 
-      {msg.media_url && msg.message_type !== "text" && (
+      {(msg.message_type === 'contact' || msg.message_type === 'contacts') && msg.metadata && (
+        <ContactCard
+          metadata={msg.metadata}
+          messageType={msg.message_type}
+          isFromMe={isFromMe}
+          onStartConversation={(phone, name) => {
+            // Open WhatsApp conversation with this number
+            window.open(`https://wa.me/${phone}`, '_blank');
+          }}
+        />
+      )}
+
+      {msg.media_url && msg.message_type !== "text" && msg.message_type !== "contact" && msg.message_type !== "contacts" && (
         <div className="min-w-0">
           <MediaContent messageId={msg.id} messageType={msg.message_type} mediaUrl={msg.media_url} metadata={msg.metadata} mediaFilename={msg.media_filename} mediaExt={msg.media_ext} mediaSizeBytes={msg.media_size_bytes} mediaKind={msg.media_kind} mediaMimetype={msg.media_mimetype} />
         </div>
       )}
-      {msg.content && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
+      {msg.content && msg.message_type !== 'contact' && msg.message_type !== 'contacts' && <p className="whitespace-pre-wrap break-words">{msg.content}</p>}
 
       {hasTranscription && (
         <div className="mt-1 min-w-0">
