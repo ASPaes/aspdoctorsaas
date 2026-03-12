@@ -21,6 +21,8 @@ interface Props {
   onRetryDelete?: (msgId: string) => void;
   onForwardSingle?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
+  onContactChat?: (phone: string, name: string) => void;
+  onContactSave?: (phone: string, name: string) => void;
 }
 
 type TimelineItem =
@@ -39,6 +41,8 @@ export function ChatMessages({
   onRetryDelete,
   onForwardSingle,
   onEnterSelectionMode,
+  onContactChat,
+  onContactSave,
 }: Props) {
   const { messages, isLoading } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
@@ -163,6 +167,8 @@ export function ChatMessages({
                     onRetryDelete={onRetryDelete}
                     onForward={onForwardSingle}
                     onEnterSelectionMode={onEnterSelectionMode}
+                    onContactChat={onContactChat}
+                    onContactSave={onContactSave}
                   />
                 </div>
               ) : (

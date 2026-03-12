@@ -27,6 +27,8 @@ interface Props {
   onRetryDelete?: (msgId: string) => void;
   onForward?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
+  onContactChat?: (phone: string, name: string) => void;
+  onContactSave?: (phone: string, name: string) => void;
 }
 
 function canDeletePanelOnly(msg: Message): boolean {
@@ -46,6 +48,8 @@ export function MessageBubble({
   onRetryDelete,
   onForward,
   onEnterSelectionMode,
+  onContactChat,
+  onContactSave,
 }: Props) {
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
@@ -203,10 +207,8 @@ export function MessageBubble({
           metadata={msg.metadata}
           messageType={msg.message_type}
           isFromMe={isFromMe}
-          onStartConversation={(phone, name) => {
-            // Open WhatsApp conversation with this number
-            window.open(`https://wa.me/${phone}`, '_blank');
-          }}
+          onContactChat={onContactChat}
+          onContactSave={onContactSave}
         />
       )}
 

@@ -11,6 +11,8 @@ import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { NewConversationModal } from "../conversations/NewConversationModal";
+import { EditContactModal } from "./EditContactModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +47,14 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
   const [deleteMode, setDeleteMode] = useState<DeleteMode>('everyone');
+
+  // Contact card actions
+  const [newConvOpen, setNewConvOpen] = useState(false);
+  const [newConvPhone, setNewConvPhone] = useState('');
+  const [newConvName, setNewConvName] = useState('');
+  const [saveContactOpen, setSaveContactOpen] = useState(false);
+  const [saveContactPhone, setSaveContactPhone] = useState('');
+  const [saveContactName, setSaveContactName] = useState('');
 
   const deleteMutation = useDeleteMessages();
   const queryClient = useQueryClient();
@@ -144,6 +154,18 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     exitSelectionMode();
   };
 
+  const handleContactChat = useCallback((phone: string, name: string) => {
+    setNewConvPhone(phone);
+    setNewConvName(name);
+    setNewConvOpen(true);
+  }, []);
+
+  const handleContactSave = useCallback((phone: string, name: string) => {
+    setSaveContactPhone(phone);
+    setSaveContactName(name);
+    setSaveContactOpen(true);
+  }, []);
+
   if (!conversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
@@ -175,6 +197,8 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
           onRetryDelete={handleRetryDelete}
           onForwardSingle={handleForwardSingle}
           onEnterSelectionMode={enterSelectionMode}
+          onContactChat={handleContactChat}
+          onContactSave={handleContactSave}
         />
 
         {/* Selection action bar */}
@@ -265,6 +289,22 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NewConversationModal
+        open={newConvOpen}
+        onOpenChange={setNewConvOpen}
+        initialPhone={newConvPhone}
+        initialName={newConvName}
+      />
+
+      <EditContactModal
+        open={saveContactOpen}
+        onOpenChange={setSaveContactOpen}
+        contactId=""
+        contactName={saveContactName}
+        contactPhone={saveContactPhone}
+        isNewContact
+      />
     </div>
   );
 }
