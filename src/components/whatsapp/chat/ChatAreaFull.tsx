@@ -48,6 +48,14 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
   const [deleteIds, setDeleteIds] = useState<string[]>([]);
   const [deleteMode, setDeleteMode] = useState<DeleteMode>('everyone');
 
+  // Contact card actions
+  const [newConvOpen, setNewConvOpen] = useState(false);
+  const [newConvPhone, setNewConvPhone] = useState('');
+  const [newConvName, setNewConvName] = useState('');
+  const [saveContactOpen, setSaveContactOpen] = useState(false);
+  const [saveContactPhone, setSaveContactPhone] = useState('');
+  const [saveContactName, setSaveContactName] = useState('');
+
   const deleteMutation = useDeleteMessages();
   const queryClient = useQueryClient();
 
