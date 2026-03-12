@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ConversationsSidebar } from "@/components/whatsapp/conversations/ConversationsSidebar";
 import { ChatAreaFull } from "@/components/whatsapp/chat/ChatAreaFull";
@@ -85,12 +85,25 @@ export default function WhatsApp() {
     });
   }, [instances]);
 
+  // Navigate to a conversation by ID (fetch full record with contact join)
+  const handleNavigateToConversation = useCallback(async (conversationId: string) => {
+    const { data } = await supabase
+      .from("whatsapp_conversations")
+      .select("*, contact:whatsapp_contacts(*)")
+      .eq("id", conversationId)
+      .single();
+
+    if (data) {
+      setSelected(data as unknown as ConversationWithContact);
+    }
+  }, []);
+
   // Mobile: show either sidebar or chat
   if (isMobile) {
     if (selected) {
       return (
         <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
-          <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} />
+          <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} />
         </div>
       );
     }
@@ -111,7 +124,7 @@ export default function WhatsApp() {
         </ResizablePanel>
         <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
         <ResizablePanel defaultSize={75}>
-          <ChatAreaFull conversation={selected} />
+          <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

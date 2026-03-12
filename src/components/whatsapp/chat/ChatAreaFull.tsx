@@ -27,11 +27,12 @@ import {
 interface Props {
   conversation: ConversationWithContact | null;
   onClose?: () => void;
+  onNavigateToConversation?: (conversationId: string) => void;
 }
 
 type DeleteMode = 'panel_only' | 'everyone';
 
-export function ChatAreaFull({ conversation, onClose }: Props) {
+export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
 
@@ -295,6 +296,10 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
         onOpenChange={setNewConvOpen}
         initialPhone={newConvPhone}
         initialName={newConvName}
+        initialInstanceId={conversation?.instance_id}
+        onCreated={(convId) => {
+          onNavigateToConversation?.(convId);
+        }}
       />
 
       <EditContactModal

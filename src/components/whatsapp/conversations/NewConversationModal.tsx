@@ -19,9 +19,10 @@ interface Props {
   onCreated?: (conversationId: string) => void;
   initialPhone?: string;
   initialName?: string;
+  initialInstanceId?: string;
 }
 
-export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName }: Props) {
+export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName, initialInstanceId }: Props) {
   const { instances } = useWhatsAppInstances();
   const createConversation = useCreateConversation();
   const [instanceId, setInstanceId] = useState("");
@@ -39,6 +40,17 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       setTab('avulso');
     }
   }, [open, initialPhone, initialName]);
+
+  // Auto-select instance when initialInstanceId is provided or only one instance exists
+  useEffect(() => {
+    if (open && !instanceId) {
+      if (initialInstanceId) {
+        setInstanceId(initialInstanceId);
+      } else if (instances.length === 1) {
+        setInstanceId(instances[0].id);
+      }
+    }
+  }, [open, initialInstanceId, instances, instanceId]);
 
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
 
