@@ -22,6 +22,7 @@ import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
+import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
@@ -512,6 +513,9 @@ export default function ClienteForm() {
               clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
             />
           )}
+
+          {/* Filiais vinculadas (apenas em edição) */}
+          {isEditing && id && <FiliaisSection clienteId={id} />}
 
           {/* Card: Cancelamento */}
           <Card>

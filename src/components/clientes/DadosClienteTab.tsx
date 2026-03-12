@@ -41,6 +41,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const [matrizNome, setMatrizNome] = useState<string | null>(null);
   const [matrizSearching, setMatrizSearching] = useState(false);
   const [matrizNotFound, setMatrizNotFound] = useState(false);
+  const [matrizError, setMatrizError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Load matriz info when editing existing client with matriz_id
@@ -70,6 +71,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     const cleaned = codigoSeq.replace(/\D/g, "").slice(0, 10);
     setMatrizSearch(cleaned);
     setMatrizNotFound(false);
+    setMatrizError(null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -81,15 +83,32 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
     debounceRef.current = setTimeout(async () => {
       setMatrizSearching(true);
+      setMatrizError(null);
       const { data } = await supabase
         .from("clientes")
-        .select("id, razao_social, nome_fantasia")
+        .select("id, razao_social, nome_fantasia, matriz_id")
         .eq("codigo_sequencial", Number(cleaned))
         .limit(1)
         .single();
       setMatrizSearching(false);
 
       if (data) {
+        // Validate: cannot select self
+        if (clienteId && data.id === clienteId) {
+          form.setValue("matriz_id", null);
+          setMatrizNome(null);
+          setMatrizNotFound(false);
+          setMatrizError("Um cliente não pode ser matriz dele mesmo.");
+          return;
+        }
+        // Validate: cannot select a filial (already has matriz_id)
+        if ((data as any).matriz_id) {
+          form.setValue("matriz_id", null);
+          setMatrizNome(null);
+          setMatrizNotFound(false);
+          setMatrizError("Este cliente é uma filial e não pode ser usado como Matriz.");
+          return;
+        }
         form.setValue("matriz_id", data.id);
         setMatrizNome(data.razao_social || data.nome_fantasia || "");
         setMatrizNotFound(false);
@@ -105,6 +124,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     setMatrizSearch("");
     setMatrizNome(null);
     setMatrizNotFound(false);
+    setMatrizError(null);
     form.setValue("matriz_id", null);
   }, [form]);
 
@@ -302,11 +322,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           {matrizNome && (
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               <Search className="h-3 w-3" />
-              {matrizNome}
+              Vinculado à Matriz: {matrizSearch} — {matrizNome}
             </p>
           )}
           {matrizNotFound && !matrizSearching && (
             <p className="text-xs text-destructive mt-1">Nenhum cliente com este código</p>
+          )}
+          {matrizError && !matrizSearching && (
+            <p className="text-xs text-destructive mt-1">{matrizError}</p>
           )}
         </FormItem>
 

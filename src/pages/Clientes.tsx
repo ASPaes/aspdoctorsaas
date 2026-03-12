@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle } from "lucide-react";
@@ -46,7 +47,7 @@ export default function Clientes() {
 
   // Destructure for readability
   const {
-    searchText, status, unidadeBaseQuick,
+    searchText, status, unidadeBaseQuick, somenteMatrizes,
     periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId,
     areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
@@ -110,13 +111,39 @@ export default function Clientes() {
   const estadoIdNumeric = estadoId && estadoId !== "__null__" ? Number(estadoId) : null;
   const lookups = useLookups(estadoIdNumeric);
 
+  // Fetch IDs of clients that are matrizes (have at least one filial)
+  const { data: matrizIdsSet } = useQuery({
+    queryKey: ["matriz_ids", tid],
+    queryFn: async () => {
+      const pageSize = 1000;
+      const ids = new Set<string>();
+      for (let offset = 0; ; offset += pageSize) {
+        let q = tf(supabase
+          .from("clientes")
+          .select("matriz_id")
+          .not("matriz_id", "is", null)) as any;
+        q = q.range(offset, offset + pageSize - 1);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data) {
+          if (row.matriz_id) ids.add(row.matriz_id);
+        }
+        if (data.length < pageSize) break;
+      }
+      return ids;
+    },
+    enabled: somenteMatrizes,
+    staleTime: 60_000,
+  });
+
   // Build query key from all filters
   const filterKey = useMemo(() => ({
-    debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+    debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid,
-  }), [debouncedSearch, status, unidadeBaseQuick, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+  }), [debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid]);
@@ -153,8 +180,8 @@ export default function Clientes() {
       || valueFilters.margemMin !== null
       || valueFilters.margemMax !== null;
 
-    return Boolean(hasDateFilter || hasValueFilter);
-  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters]);
+    return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes);
+  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes]);
 
   const round2 = useCallback((n: number) => Math.round((n + Number.EPSILON) * 100) / 100, []);
 
@@ -264,6 +291,8 @@ export default function Clientes() {
     }
 
     const filtered = rows.filter((row) => {
+      // Somente Matrizes filter
+      if (somenteMatrizes && matrizIdsSet && !matrizIdsSet.has(row.id)) return false;
       const lucroReal = computeLucroReal(row);
       const margemBruta = computeMargemBruta(row);
       if (valueFilters.lucroMin !== null && lucroReal < valueFilters.lucroMin) return false;
@@ -298,7 +327,7 @@ export default function Clientes() {
     });
 
     return sorted;
-  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters]);
+  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters, somenteMatrizes, matrizIdsSet]);
 
   // Query "Novos no Mês"
   const { data: novosNoMes } = useQuery({
@@ -489,6 +518,7 @@ export default function Clientes() {
   const activeFilters = useMemo(() => {
     const badges: { key: string; label: string; displayValue: string; onClear: () => void }[] = [];
 
+    if (somenteMatrizes) badges.push({ key: "mat", label: "Somente Matrizes", displayValue: "Sim", onClear: () => updateFilter("somenteMatrizes", false) });
     if (unidadeBaseQuick) badges.push({ key: "ub", label: "Unidade Base", displayValue: resolveLabel(unidadeBaseQuick, lookups.unidadesBase.data), onClear: () => updateFilter("unidadeBaseQuick", "") });
     if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => updateFilter("recorrenciaAdv", "") });
     if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => updateFilter("modeloContratoId", "") });
@@ -513,7 +543,7 @@ export default function Clientes() {
     if (margemMin || margemMax) badges.push({ key: "marg", label: "Margem", displayValue: `${margemMin || "…"} – ${margemMax || "…"}`, onClear: () => { updateFilter("margemMin", ""); updateFilter("margemMax", ""); } });
 
     return badges;
-  }, [unidadeBaseQuick, recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
+  }, [unidadeBaseQuick, somenteMatrizes, recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
 
   // Helper for Select value/onChange with __all__ pattern
   const selVal = (v: string) => v || "__all__";
@@ -585,6 +615,16 @@ export default function Clientes() {
             {isLoading ? <Skeleton className="h-7 w-12" /> : <p className="text-2xl font-bold">{kpis.clientesNovosMes}</p>}
           </CardContent>
         </Card>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="somente-matrizes"
+            checked={somenteMatrizes}
+            onCheckedChange={(v) => updateFilter("somenteMatrizes", !!v)}
+          />
+          <label htmlFor="somente-matrizes" className="text-sm cursor-pointer select-none whitespace-nowrap">
+            Somente Matrizes
+          </label>
+        </div>
       </div>
 
       {/* Quick filters bar */}
