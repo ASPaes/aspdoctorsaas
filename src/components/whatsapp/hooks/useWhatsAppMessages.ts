@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export type MessageUiType = 'text' | 'media' | 'audio' | 'document' | 'image' | 'system' | string;
@@ -158,10 +158,14 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     }
   }, [conversationId]);
 
-  // Realtime subscription — append/update messages in cache instead of full refetch
-  // Use a unique channel name per hook instance to avoid conflicts when multiple
-  // components call this hook with the same conversationId (e.g. ChatAreaFull + ChatMessages)
+  // ── Realtime: primary subscription (filtered by conversation_id) ──
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+
+  // Notify callback for new messages (used by ChatMessages for smart scroll)
+  const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
+  const onNewMessage = useCallback((cb: (msg: Message) => void) => {
+    newMessageCallbackRef.current = cb;
+  }, []);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -181,7 +185,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           (old: any[] | undefined) => {
             if (!old) return [normalizedNewMsg];
 
-            // Check for exact id/message_id match OR a temp optimistic entry
             const isTempMatch = (m: any) =>
               m.id?.startsWith?.('temp-') &&
               getIsFromMe(m) === true &&
@@ -194,7 +197,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
             const hasMatch = old.some((m) => isExactMatch(m) || isTempMatch(m));
 
             if (hasMatch) {
-              // Replace the first matching entry (temp → real, or exact update)
               let replaced = false;
               return old.map((m) => {
                 if (!replaced && (isExactMatch(m) || isTempMatch(m))) {
@@ -207,6 +209,8 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
             return [...old, normalizedNewMsg];
           }
         );
+        // Notify listeners (smart scroll)
+        newMessageCallbackRef.current?.(normalizedNewMsg);
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -223,10 +227,42 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           }
         );
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`[useWhatsAppMessages] Channel ${channelName} status: ${status}. Will rely on fallback.`);
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [conversationId, queryClient]);
 
-  return { messages, isLoading, error };
+  // ── Fallback: listen to conversation updates (last_message_at changes) ──
+  // If the primary Realtime channel fails, this ensures messages still refresh.
+  const lastInvalidateRef = useRef(0);
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const fallbackChannel = supabase
+      .channel(`msg-fallback-${conversationId}-${channelIdRef.current}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'whatsapp_conversations',
+        filter: `id=eq.${conversationId}`
+      }, () => {
+        const now = Date.now();
+        if (now - lastInvalidateRef.current > 2000) {
+          lastInvalidateRef.current = now;
+          queryClient.invalidateQueries({
+            queryKey: ['whatsapp', 'messages', conversationId],
+          });
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(fallbackChannel); };
+  }, [conversationId, queryClient]);
+
+  return { messages, isLoading, error, onNewMessage };
 };

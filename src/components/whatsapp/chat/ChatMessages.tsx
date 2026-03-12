@@ -1,4 +1,5 @@
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -7,7 +8,7 @@ import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages"
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, ChevronDown } from "lucide-react";
 
 interface Props {
   conversationId: string;
@@ -29,6 +30,8 @@ type TimelineItem =
   | { type: 'message'; msg: Message }
   | { type: 'transfer'; event: AssignmentEvent };
 
+const NEAR_BOTTOM_THRESHOLD = 150;
+
 export function ChatMessages({
   conversationId,
   unreadCount = 0,
@@ -44,13 +47,46 @@ export function ChatMessages({
   onContactChat,
   onContactSave,
 }: Props) {
-  const { messages, isLoading } = useWhatsAppMessages(conversationId);
+  const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useChatTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
   const prevConversationId = useRef(conversationId);
+
+  // Smart scroll state
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
+  const [showNewMessages, setShowNewMessages] = useState(false);
+  const pendingNewCountRef = useRef(0);
+
+  // Track scroll position
+  const handleScroll = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    isNearBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD;
+    if (isNearBottomRef.current) {
+      setShowNewMessages(false);
+      pendingNewCountRef.current = 0;
+    }
+  }, []);
+
+  // Listen for new messages from realtime
+  useEffect(() => {
+    onNewMessage((msg: Message) => {
+      if (msg.is_from_me) {
+        // Always scroll to bottom for own messages
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        return;
+      }
+      if (!isNearBottomRef.current) {
+        pendingNewCountRef.current += 1;
+        setShowNewMessages(true);
+      }
+    });
+  }, [onNewMessage]);
 
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
@@ -97,11 +133,14 @@ export function ChatMessages({
   useEffect(() => {
     if (conversationId !== prevConversationId.current) {
       setHasScrolledToUnread(false);
+      setShowNewMessages(false);
+      pendingNewCountRef.current = 0;
+      isNearBottomRef.current = true;
       prevConversationId.current = conversationId;
     }
   }, [conversationId]);
 
-  // Scroll to bottom on new messages, or to first unread on initial load
+  // Scroll to bottom on new messages (smart), or to first unread on initial load
   useEffect(() => {
     if (!messages.length) return;
 
@@ -112,10 +151,16 @@ export function ChatMessages({
         bottomRef.current?.scrollIntoView({ behavior: "auto" });
       }
       setHasScrolledToUnread(true);
-    } else {
+    } else if (isNearBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages.length, hasScrolledToUnread]);
+
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowNewMessages(false);
+    pendingNewCountRef.current = 0;
+  }, []);
 
   if (isLoading) {
     return (
@@ -134,59 +179,91 @@ export function ChatMessages({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-hidden">
-    <ScrollArea className="h-full px-4 py-2">
-      {messages.length === 0 ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground">
-          <p className="text-sm">Nenhuma mensagem ainda</p>
-        </div>
-      ) : (
-        dateGroups.map(({ date, items }) => (
-          <div key={date}>
-            <div className="flex justify-center my-3">
-              <span className="text-[10px] bg-muted text-muted-foreground px-3 py-0.5 rounded-full">{date}</span>
-            </div>
-            {items.map((item) =>
-              item.type === 'message' ? (
-                <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
-                  {item.msg.id === firstUnreadId && (
-                    <div className="flex items-center gap-2 my-2">
-                      <div className="flex-1 h-px bg-primary/40" />
-                      <span className="text-[10px] text-primary font-medium px-2">Mensagens não lidas</span>
-                      <div className="flex-1 h-px bg-primary/40" />
-                    </div>
-                  )}
-                  <MessageBubble
-                    msg={item.msg}
-                    onReply={onReply}
-                    selectionMode={selectionMode}
-                    isSelected={selectedMessages?.has(item.msg.id)}
-                    onToggleSelect={onToggleSelect}
-                    onDeletePanelOnly={onDeletePanelOnly}
-                    onDeleteEveryone={onDeleteEveryone}
-                    onRetryDelete={onRetryDelete}
-                    onForward={onForwardSingle}
-                    onEnterSelectionMode={onEnterSelectionMode}
-                    onContactChat={onContactChat}
-                    onContactSave={onContactSave}
-                  />
-                </div>
-              ) : (
-                <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
-                  <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
-                    <ArrowRightLeft className="h-3 w-3" />
-                    Transferido para {item.event.agent_name || 'Agente'}
-                    {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
-                    <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
-                  </span>
-                </div>
-              )
-            )}
+    <div className="flex-1 min-h-0 overflow-hidden relative">
+      <ScrollArea className="h-full px-4 py-2" onScrollCapture={handleScroll}>
+        {/* Grab the viewport ref for scroll position detection */}
+        <ScrollAreaViewportRef viewportRef={viewportRef} />
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <p className="text-sm">Nenhuma mensagem ainda</p>
           </div>
-        ))
+        ) : (
+          dateGroups.map(({ date, items }) => (
+            <div key={date}>
+              <div className="flex justify-center my-3">
+                <span className="text-[10px] bg-muted text-muted-foreground px-3 py-0.5 rounded-full">{date}</span>
+              </div>
+              {items.map((item) =>
+                item.type === 'message' ? (
+                  <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
+                    {item.msg.id === firstUnreadId && (
+                      <div className="flex items-center gap-2 my-2">
+                        <div className="flex-1 h-px bg-primary/40" />
+                        <span className="text-[10px] text-primary font-medium px-2">Mensagens não lidas</span>
+                        <div className="flex-1 h-px bg-primary/40" />
+                      </div>
+                    )}
+                    <MessageBubble
+                      msg={item.msg}
+                      onReply={onReply}
+                      selectionMode={selectionMode}
+                      isSelected={selectedMessages?.has(item.msg.id)}
+                      onToggleSelect={onToggleSelect}
+                      onDeletePanelOnly={onDeletePanelOnly}
+                      onDeleteEveryone={onDeleteEveryone}
+                      onRetryDelete={onRetryDelete}
+                      onForward={onForwardSingle}
+                      onEnterSelectionMode={onEnterSelectionMode}
+                      onContactChat={onContactChat}
+                      onContactSave={onContactSave}
+                    />
+                  </div>
+                ) : (
+                  <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
+                      <ArrowRightLeft className="h-3 w-3" />
+                      Transferido para {item.event.agent_name || 'Agente'}
+                      {item.event.agent_role ? ` · ${item.event.agent_role}` : ''}
+                      <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+          ))
+        )}
+        <div ref={bottomRef} />
+      </ScrollArea>
+
+      {/* Floating "New messages" button */}
+      {showNewMessages && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-lg hover:opacity-90 transition-opacity"
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+          Novas mensagens
+        </button>
       )}
-      <div ref={bottomRef} />
-    </ScrollArea>
     </div>
   );
+}
+
+/**
+ * Helper component to grab the Radix ScrollArea viewport ref.
+ * The viewport is the first [data-radix-scroll-area-viewport] child.
+ */
+function ScrollAreaViewportRef({ viewportRef }: { viewportRef: React.MutableRefObject<HTMLDivElement | null> }) {
+  const selfRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (selfRef.current) {
+      const viewport = selfRef.current.closest('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
+      if (viewport) {
+        viewportRef.current = viewport;
+      }
+    }
+  }, [viewportRef]);
+
+  return <span ref={selfRef} className="hidden" aria-hidden />;
 }
