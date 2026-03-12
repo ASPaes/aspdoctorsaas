@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Plus, MessageSquare, BarChart3, Users, Settings, X } from "lucide-react";
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
+import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type SortBy, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
@@ -101,15 +102,14 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
   // Determine query-level assignment filter
   const resolvedAssignedTo = useMemo(() => {
-    if (activePill === "mine") return user?.id;
     if (filters.assignedToMe) return user?.id;
     if (filters.assignedToAgent && filters.assignedToAgent !== "__unassigned__") return filters.assignedToAgent;
     return undefined;
-  }, [activePill, filters.assignedToMe, filters.assignedToAgent, user?.id]);
+  }, [filters.assignedToMe, filters.assignedToAgent, user?.id]);
 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
-  const { conversations, isLoading, unreadCount, waitingCount } = useWhatsAppConversations({
+  const { conversations, isLoading } = useWhatsAppConversations({
     search: search.trim() || undefined,
     instanceId: filters.instanceId,
     status: filters.status,
@@ -119,19 +119,65 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
 
+  // Get attendance data for all loaded conversations
+  const conversationIds = useMemo(() => conversations.map(c => c.id), [conversations]);
+  const { attendanceMap } = useAttendanceStatus(conversationIds, activePill === "closed");
+
+  // Compute pill counts
+  const pillCounts = useMemo(() => {
+    let inProgress = 0;
+    let waiting = 0;
+    let closed = 0;
+
+    for (const conv of conversations) {
+      const att = attendanceMap.get(conv.id);
+      if (!att) continue;
+      // For non-admin, skip conversations not assigned to them (except waiting/unassigned)
+      if (!isAdmin && user?.id) {
+        if (att.status === "in_progress" && att.assigned_to !== user.id) continue;
+        if (att.status === "closed" && att.assigned_to !== user.id) continue;
+      }
+      if (att.status === "in_progress") inProgress++;
+      else if (att.status === "waiting") waiting++;
+      else if (att.status === "closed") closed++;
+    }
+
+    return { inProgress, waiting, closed };
+  }, [conversations, attendanceMap, isAdmin, user?.id]);
+
   const filtered = useMemo(() => {
     let result = [...conversations];
 
-    // Non-admin visibility: only show assigned to me OR unassigned (queue)
+    // Non-admin visibility: only show conversations with attendance assigned to me, waiting (queue), or no attendance
     if (!isAdmin && user?.id) {
-      result = result.filter(c => c.assigned_to === user.id || c.assigned_to === null);
+      result = result.filter(c => {
+        const att = attendanceMap.get(c.id);
+        if (!att) return true; // No attendance = show (legacy conversation)
+        if (att.status === "waiting" && !att.assigned_to) return true; // Queue
+        if (att.assigned_to === user.id) return true; // Mine
+        return false;
+      });
     }
 
-    // Quick pill filters
-    if (activePill === "unread") {
-      result = result.filter(c => c.unread_count > 0);
+    // Attendance-based pill filters
+    if (activePill === "in_progress") {
+      result = result.filter(c => {
+        const att = attendanceMap.get(c.id);
+        return att?.status === "in_progress";
+      });
     } else if (activePill === "waiting") {
-      result = result.filter(c => c.isLastMessageFromMe === false);
+      result = result.filter(c => {
+        const att = attendanceMap.get(c.id);
+        return att?.status === "waiting" && !att?.assigned_to;
+      });
+    } else if (activePill === "closed") {
+      result = result.filter(c => {
+        const att = attendanceMap.get(c.id);
+        if (!att || att.status !== "closed") return false;
+        // Non-admin: only show own closed
+        if (!isAdmin && user?.id && att.assigned_to !== user.id) return false;
+        return true;
+      });
     }
 
     // Sort
@@ -181,7 +227,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id]);
+  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap]);
 
   const handleCreated = (convId: string) => {
     setForcedConvId(convId);
@@ -285,8 +331,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         <QuickPills
           active={activePill}
           onChange={setActivePill}
-          unreadCount={unreadCount}
-          waitingCount={waitingCount}
+          inProgressCount={pillCounts.inProgress}
+          waitingCount={pillCounts.waiting}
+          closedCount={pillCounts.closed}
         />
       </div>
 
@@ -334,6 +381,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
                 isSelected={selectedId === conv.id}
                 onClick={() => handleSelect(conv)}
                 instanceName={instances.length > 1 ? instanceMap[conv.instance_id] : undefined}
+                attendance={attendanceMap.get(conv.id)}
               />
             ))}
           </div>
