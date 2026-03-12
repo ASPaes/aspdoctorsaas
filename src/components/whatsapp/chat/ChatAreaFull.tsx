@@ -27,6 +27,7 @@ import {
 interface Props {
   conversation: ConversationWithContact | null;
   onClose?: () => void;
+  onNavigateToConversation?: (conversationId: string) => void;
 }
 
 type DeleteMode = 'panel_only' | 'everyone';
