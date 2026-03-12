@@ -20,6 +20,8 @@ export interface ConversationWithContact {
   metadata: Record<string, any> | null;
   tenant_id: string;
   is_last_message_from_me: boolean;
+  sender_signature_mode?: string;
+  sender_ticket_code?: string | null;
   contact: {
     id: string;
     name: string | null;
