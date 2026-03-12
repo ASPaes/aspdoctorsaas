@@ -864,6 +864,9 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       checkAndTriggerAutoSentiment(supabase, conversationId, supabaseUrl);
       checkAndTriggerAutoCategorization(supabase, conversationId, supabaseUrl);
+      // Auto-create support attendance for incoming customer messages
+      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId)
+        .catch(err => console.error('[evolution-webhook] ensureAttendance error:', err));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpsert:', error);
