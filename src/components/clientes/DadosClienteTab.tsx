@@ -71,6 +71,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     const cleaned = codigoSeq.replace(/\D/g, "").slice(0, 10);
     setMatrizSearch(cleaned);
     setMatrizNotFound(false);
+    setMatrizError(null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
