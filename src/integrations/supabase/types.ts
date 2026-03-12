@@ -1661,6 +1661,8 @@ export type Database = {
           last_message_preview: string | null
           metadata: Json | null
           priority: string | null
+          sender_signature_mode: string
+          sender_ticket_code: string | null
           status: string
           tenant_id: string
           unread_count: number
@@ -1678,6 +1680,8 @@ export type Database = {
           last_message_preview?: string | null
           metadata?: Json | null
           priority?: string | null
+          sender_signature_mode?: string
+          sender_ticket_code?: string | null
           status?: string
           tenant_id: string
           unread_count?: number
@@ -1695,6 +1699,8 @@ export type Database = {
           last_message_preview?: string | null
           metadata?: Json | null
           priority?: string | null
+          sender_signature_mode?: string
+          sender_ticket_code?: string | null
           status?: string
           tenant_id?: string
           unread_count?: number
