@@ -27,6 +27,8 @@ interface Props {
   onRetryDelete?: (msgId: string) => void;
   onForward?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
+  onContactChat?: (phone: string, name: string) => void;
+  onContactSave?: (phone: string, name: string) => void;
 }
 
 function canDeletePanelOnly(msg: Message): boolean {
