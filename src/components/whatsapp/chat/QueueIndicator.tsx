@@ -1,8 +1,9 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { UserCheck, ArrowRightLeft, Loader2 } from "lucide-react";
+import { UserCheck, ArrowRightLeft, Loader2, Users, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface QueueIndicatorProps {
   conversationId: string;
@@ -22,58 +23,54 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
     assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
   };
 
-  const handleRelease = () => {
-    unassignConversation(conversationId);
-  };
+  // Chip display
+  const chipConfig = isInQueue
+    ? { icon: Users, label: "Na fila", className: "bg-warning/10 text-warning border-warning/20" }
+    : isAssignedToMe
+      ? { icon: User, label: "Comigo", className: "bg-primary/10 text-primary border-primary/20" }
+      : { icon: UserCheck, label: "Atribuída", className: "bg-accent/10 text-accent border-accent/20" };
+
+  const ChipIcon = chipConfig.icon;
 
   return (
     <div className="flex items-center gap-1.5">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border select-none",
+              chipConfig.className
+            )}
+          >
+            <ChipIcon className="h-3 w-3" />
+            <span className="hidden sm:inline">{chipConfig.label}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">{chipConfig.label}</TooltipContent>
+      </Tooltip>
+
+      {/* Primary action button */}
       {isInQueue ? (
-        <>
-          <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 text-[10px] h-5">
-            Na Fila
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs gap-1.5"
-            onClick={handleClaim}
-            disabled={isAssigning}
-          >
-            {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
-            Assumir
-          </Button>
-        </>
-      ) : isAssignedToMe ? (
-        <>
-          <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20 text-[10px] h-5">
-            Comigo
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs gap-1.5"
-            onClick={onTransferClick}
-          >
-            <ArrowRightLeft className="h-3 w-3" />
-            Transferir
-          </Button>
-        </>
+        <Button
+          variant="default"
+          size="sm"
+          className="h-7 text-xs gap-1.5 rounded-full"
+          onClick={handleClaim}
+          disabled={isAssigning}
+        >
+          {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+          Assumir
+        </Button>
       ) : (
-        <>
-          <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 text-[10px] h-5">
-            Atribuída
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs gap-1.5"
-            onClick={onTransferClick}
-          >
-            <ArrowRightLeft className="h-3 w-3" />
-            Transferir
-          </Button>
-        </>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs gap-1.5 rounded-full"
+          onClick={onTransferClick}
+        >
+          <ArrowRightLeft className="h-3 w-3" />
+          <span className="hidden md:inline">Transferir</span>
+        </Button>
       )}
     </div>
   );
