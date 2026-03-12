@@ -17,15 +17,17 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: (conversationId: string) => void;
+  initialPhone?: string;
+  initialName?: string;
 }
 
-export function NewConversationModal({ open, onOpenChange, onCreated }: Props) {
+export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName }: Props) {
   const { instances } = useWhatsAppInstances();
   const createConversation = useCreateConversation();
   const [instanceId, setInstanceId] = useState("");
-  const [phone, setPhone] = useState("");
-  const [name, setName] = useState("");
-  const [tab, setTab] = useState("cliente");
+  const [phone, setPhone] = useState(initialPhone || "");
+  const [name, setName] = useState(initialName || "");
+  const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
 
