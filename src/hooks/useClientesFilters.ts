@@ -40,6 +40,7 @@ const defaultFilters: ClientesFilters = {
   searchText: "",
   status: "ativos",
   unidadeBaseQuick: "",
+  somenteMatrizes: false,
   periodoCadastro: {},
   periodoCancelamento: {},
   periodoVenda: {},
