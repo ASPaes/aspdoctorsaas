@@ -3,6 +3,7 @@ import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare
 import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
+import { ContactCard } from "./ContactCard";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
