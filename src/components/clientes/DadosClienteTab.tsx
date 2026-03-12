@@ -41,6 +41,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const [matrizNome, setMatrizNome] = useState<string | null>(null);
   const [matrizSearching, setMatrizSearching] = useState(false);
   const [matrizNotFound, setMatrizNotFound] = useState(false);
+  const [matrizError, setMatrizError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Load matriz info when editing existing client with matriz_id
