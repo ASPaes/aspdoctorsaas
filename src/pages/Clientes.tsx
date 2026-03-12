@@ -179,8 +179,8 @@ export default function Clientes() {
       || valueFilters.margemMin !== null
       || valueFilters.margemMax !== null;
 
-    return Boolean(hasDateFilter || hasValueFilter);
-  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters]);
+    return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes);
+  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes]);
 
   const round2 = useCallback((n: number) => Math.round((n + Number.EPSILON) * 100) / 100, []);
 
