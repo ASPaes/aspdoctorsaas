@@ -833,6 +833,16 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={(v) => updateFilter("lucroMin", v)} onMaxChange={(v) => updateFilter("lucroMax", v)} prefix="R$" />
               <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={(v) => updateFilter("margemMin", v)} onMaxChange={(v) => updateFilter("margemMax", v)} prefix="%" />
+              <div className="flex items-center gap-2 pt-5">
+                <Checkbox
+                  id="somente-matrizes"
+                  checked={somenteMatrizes}
+                  onCheckedChange={(v) => updateFilter("somenteMatrizes", !!v)}
+                />
+                <label htmlFor="somente-matrizes" className="text-sm cursor-pointer select-none whitespace-nowrap">
+                  Somente Matrizes
+                </label>
+              </div>
             </div>
           </div>
         </CollapsibleContent>
