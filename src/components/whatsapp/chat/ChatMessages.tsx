@@ -41,6 +41,8 @@ export function ChatMessages({
   onRetryDelete,
   onForwardSingle,
   onEnterSelectionMode,
+  onContactChat,
+  onContactSave,
 }: Props) {
   const { messages, isLoading } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
