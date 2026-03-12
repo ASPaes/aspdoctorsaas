@@ -110,6 +110,32 @@ export default function Clientes() {
   const estadoIdNumeric = estadoId && estadoId !== "__null__" ? Number(estadoId) : null;
   const lookups = useLookups(estadoIdNumeric);
 
+  // Fetch IDs of clients that are matrizes (have at least one filial)
+  const { data: matrizIdsSet } = useQuery({
+    queryKey: ["matriz_ids", tid],
+    queryFn: async () => {
+      const pageSize = 1000;
+      const ids = new Set<string>();
+      for (let offset = 0; ; offset += pageSize) {
+        let q = tf(supabase
+          .from("clientes")
+          .select("matriz_id")
+          .not("matriz_id", "is", null)) as any;
+        q = q.range(offset, offset + pageSize - 1);
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        for (const row of data) {
+          if (row.matriz_id) ids.add(row.matriz_id);
+        }
+        if (data.length < pageSize) break;
+      }
+      return ids;
+    },
+    enabled: somenteMatrizes,
+    staleTime: 60_000,
+  });
+
   // Build query key from all filters
   const filterKey = useMemo(() => ({
     debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
