@@ -7,7 +7,7 @@ import { Search, Plus, MessageSquare, BarChart3, Users, Settings, X } from "luci
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { ConversationItem } from "./ConversationItem";
-import { ConversationFiltersPopover, type SortBy } from "./ConversationFiltersPopover";
+import { ConversationFiltersPopover, type SortBy, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
 import { NewConversationModal } from "./NewConversationModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,10 +48,12 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const [showNewModal, setShowNewModal] = useState(false);
   const [activePill, setActivePillRaw] = useState(saved?.activePill ?? "all");
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
-  const [filters, setFiltersRaw] = useState<{ sortBy: SortBy; status: string | undefined; instanceId: string | undefined }>({
+  const [filters, setFiltersRaw] = useState<FiltersState>({
     sortBy: saved?.sortBy ?? "recent",
     status: saved?.status ?? undefined,
     instanceId: saved?.instanceId ?? undefined,
+    assignedToMe: saved?.assignedToMe ?? false,
+    assignedToAgent: saved?.assignedToAgent ?? undefined,
   });
 
   const persist = (patch: Record<string, any>) => {
@@ -66,10 +68,16 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     persist({ activePill: v });
   };
 
-  const setFilters = (updater: typeof filters | ((prev: typeof filters) => typeof filters)) => {
+  const setFilters = (updater: FiltersState | ((prev: FiltersState) => FiltersState)) => {
     setFiltersRaw((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      persist({ sortBy: next.sortBy, status: next.status, instanceId: next.instanceId });
+      persist({
+        sortBy: next.sortBy,
+        status: next.status,
+        instanceId: next.instanceId,
+        assignedToMe: next.assignedToMe,
+        assignedToAgent: next.assignedToAgent,
+      });
       return next;
     });
   };
@@ -79,7 +87,8 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     persist({ search: v });
   };
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const { instances } = useWhatsAppInstances();
 
   const instanceMap = useMemo(() => {
@@ -90,17 +99,33 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     return map;
   }, [instances]);
 
+  // Determine query-level assignment filter
+  const resolvedAssignedTo = useMemo(() => {
+    if (activePill === "mine") return user?.id;
+    if (filters.assignedToMe) return user?.id;
+    if (filters.assignedToAgent && filters.assignedToAgent !== "__unassigned__") return filters.assignedToAgent;
+    return undefined;
+  }, [activePill, filters.assignedToMe, filters.assignedToAgent, user?.id]);
+
+  const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
+
   const { conversations, isLoading, unreadCount, waitingCount } = useWhatsAppConversations({
     search: search.trim() || undefined,
     instanceId: filters.instanceId,
     status: filters.status,
-    assignedTo: activePill === "mine" ? user?.id : undefined,
+    assignedTo: resolvedAssignedTo,
+    unassigned: resolvedUnassigned || undefined,
     pageSize: 100,
     includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
 
   const filtered = useMemo(() => {
     let result = [...conversations];
+
+    // Non-admin visibility: only show assigned to me OR unassigned (queue)
+    if (!isAdmin && user?.id) {
+      result = result.filter(c => c.assigned_to === user.id || c.assigned_to === null);
+    }
 
     // Quick pill filters
     if (activePill === "unread") {
@@ -143,7 +168,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         break;
     }
 
-    // Force newly created conv to top (only for new chats without messages yet)
+    // Force newly created conv to top
     if (forcedConvId) {
       const forcedConv = result.find(c => c.id === forcedConvId);
       if (forcedConv && !forcedConv.last_message_at) {
@@ -156,7 +181,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, forcedConvId]);
+  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id]);
 
   const handleCreated = (convId: string) => {
     setForcedConvId(convId);
@@ -189,6 +214,20 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       key: "sort",
       label: SORT_LABELS[filters.sortBy] || filters.sortBy,
       onRemove: () => setFilters(f => ({ ...f, sortBy: "recent" })),
+    });
+  }
+  if (filters.assignedToMe) {
+    activeFilterBadges.push({
+      key: "assignedToMe",
+      label: "Atribuídas a mim",
+      onRemove: () => setFilters(f => ({ ...f, assignedToMe: false })),
+    });
+  }
+  if (filters.assignedToAgent) {
+    activeFilterBadges.push({
+      key: "assignedToAgent",
+      label: filters.assignedToAgent === "__unassigned__" ? "Na Fila" : "Operador",
+      onRemove: () => setFilters(f => ({ ...f, assignedToAgent: undefined })),
     });
   }
 
