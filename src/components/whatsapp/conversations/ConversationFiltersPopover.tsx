@@ -3,15 +3,23 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Filter, X } from "lucide-react";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export type SortBy = "recent" | "unread" | "waiting" | "oldest";
 
-interface FiltersState {
+export interface FiltersState {
   sortBy: SortBy;
   status: string | undefined;
   instanceId: string | undefined;
+  assignedToMe: boolean;
+  assignedToAgent: string | undefined;
 }
 
 interface Props {
@@ -35,15 +43,53 @@ const STATUS_OPTIONS = [
 
 export function ConversationFiltersPopover({ filters, onChange }: Props) {
   const { instances } = useWhatsAppInstances();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const [open, setOpen] = useState(false);
+
+  // For admin: load agents (users with funcionario linked)
+  const { data: tenantUsers } = useTenantUsers();
+
+  // Resolve funcionario names for agents
+  const agentOptions = useQuery({
+    queryKey: ["whatsapp-agent-options", tenantUsers],
+    enabled: isAdmin && !!tenantUsers && tenantUsers.length > 0,
+    queryFn: async () => {
+      if (!tenantUsers) return [];
+      const funcIds = tenantUsers
+        .filter((u) => u.funcionario_id && u.status === "ativo")
+        .map((u) => u.funcionario_id!);
+
+      if (funcIds.length === 0) return tenantUsers.filter(u => u.status === "ativo").map(u => ({
+        userId: u.user_id,
+        label: u.email,
+      }));
+
+      const { data: funcs } = await supabase
+        .from("funcionarios")
+        .select("id, nome")
+        .in("id", funcIds);
+
+      const funcMap = new Map((funcs ?? []).map((f) => [f.id, f.nome]));
+
+      return tenantUsers
+        .filter((u) => u.status === "ativo")
+        .map((u) => ({
+          userId: u.user_id,
+          label: u.funcionario_id ? funcMap.get(u.funcionario_id) || u.email : u.email,
+        }));
+    },
+  });
 
   const activeCount =
     (filters.sortBy !== "recent" ? 1 : 0) +
     (filters.status ? 1 : 0) +
-    (filters.instanceId ? 1 : 0);
+    (filters.instanceId ? 1 : 0) +
+    (filters.assignedToMe ? 1 : 0) +
+    (filters.assignedToAgent ? 1 : 0);
 
   const handleClear = () => {
-    onChange({ sortBy: "recent", status: undefined, instanceId: undefined });
+    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined });
   };
 
   return (
@@ -71,6 +117,41 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
             </Button>
           )}
         </div>
+
+        {/* Operador — role-aware */}
+        {isAdmin ? (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Operador</label>
+            <Select
+              value={filters.assignedToAgent || "all"}
+              onValueChange={(v) => onChange({ ...filters, assignedToAgent: v === "all" ? undefined : v, assignedToMe: false })}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="__unassigned__">Na Fila (sem operador)</SelectItem>
+                {(agentOptions.data ?? []).map((a) => (
+                  <SelectItem key={a.userId} value={a.userId}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <Label htmlFor="assigned-to-me" className="text-xs font-medium text-muted-foreground">
+              Somente atribuídas a mim
+            </Label>
+            <Switch
+              id="assigned-to-me"
+              checked={filters.assignedToMe}
+              onCheckedChange={(v) => onChange({ ...filters, assignedToMe: v })}
+            />
+          </div>
+        )}
 
         {/* Ordenação */}
         <div className="space-y-1.5">
