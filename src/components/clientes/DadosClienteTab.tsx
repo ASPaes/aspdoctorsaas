@@ -81,15 +81,32 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
     debounceRef.current = setTimeout(async () => {
       setMatrizSearching(true);
+      setMatrizError(null);
       const { data } = await supabase
         .from("clientes")
-        .select("id, razao_social, nome_fantasia")
+        .select("id, razao_social, nome_fantasia, matriz_id")
         .eq("codigo_sequencial", Number(cleaned))
         .limit(1)
         .single();
       setMatrizSearching(false);
 
       if (data) {
+        // Validate: cannot select self
+        if (clienteId && data.id === clienteId) {
+          form.setValue("matriz_id", null);
+          setMatrizNome(null);
+          setMatrizNotFound(false);
+          setMatrizError("Um cliente não pode ser matriz dele mesmo.");
+          return;
+        }
+        // Validate: cannot select a filial (already has matriz_id)
+        if ((data as any).matriz_id) {
+          form.setValue("matriz_id", null);
+          setMatrizNome(null);
+          setMatrizNotFound(false);
+          setMatrizError("Este cliente é uma filial e não pode ser usado como Matriz.");
+          return;
+        }
         form.setValue("matriz_id", data.id);
         setMatrizNome(data.razao_social || data.nome_fantasia || "");
         setMatrizNotFound(false);
