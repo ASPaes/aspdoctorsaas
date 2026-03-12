@@ -385,7 +385,7 @@ export default function Clientes() {
   });
 
   const { data: queryResult, isLoading, isPlaceholderData } = useQuery({
-    queryKey: ["clientes_lista", filterKey, page],
+    queryKey: ["clientes_lista", filterKey, page, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null],
     queryFn: async () => {
       if (hasDateOrValueFilters) {
         const rows = await fetchClientesFilteredRows();
