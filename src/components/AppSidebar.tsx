@@ -1,4 +1,4 @@
-import { Users, ClipboardList, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, UserCog, LayoutDashboard, MessageCircle } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,8 +14,13 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -26,12 +31,53 @@ const navItems = [
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrador",
+  viewer: "Visualizador",
+  user: "Usuário",
+};
+
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user, profileLoading } = useAuth();
   const isSuperAdmin = profile?.is_super_admin === true;
+
+  // Fetch funcionario name if linked
+  const { data: funcionarioNome } = useQuery({
+    queryKey: ["funcionario-nome", profile?.funcionario_id],
+    enabled: !!profile?.funcionario_id,
+    staleTime: 30 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("funcionarios")
+        .select("nome")
+        .eq("id", profile!.funcionario_id!)
+        .maybeSingle();
+      return data?.nome ?? null;
+    },
+  });
+
+  // Resolve display name
+  const displayName =
+    funcionarioNome ||
+    (user?.email ? user.email.split("@")[0] : "Usuário");
+
+  // Resolve role label
+  const roleLabel = isSuperAdmin
+    ? "Super Admin"
+    : ROLE_LABELS[profile?.role ?? ""] ?? profile?.role ?? "";
+
+  const initials = getInitials(displayName);
 
   const handleLogout = async () => {
     await signOut();
@@ -65,6 +111,57 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        {/* User card */}
+        <div className="px-2 pb-1">
+          {profileLoading ? (
+            <div className="flex items-center gap-2 px-1 py-2">
+              <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+              {!collapsed && (
+                <div className="flex-1 space-y-1 overflow-hidden">
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              )}
+            </div>
+          ) : collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex justify-center py-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-[10px] font-medium bg-sidebar-accent text-sidebar-accent-foreground">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p className="font-medium">{displayName}</p>
+                {roleLabel && <p className="text-xs text-muted-foreground">{roleLabel}</p>}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <div className="flex items-center gap-2 px-1 py-2">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarFallback className="text-[10px] font-medium bg-sidebar-accent text-sidebar-accent-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium leading-tight truncate text-sidebar-foreground">
+                  {displayName}
+                </p>
+                {roleLabel && (
+                  <p className="text-xs leading-tight truncate text-muted-foreground">
+                    {roleLabel}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Separator className="bg-sidebar-border" />
+
         <SidebarMenu>
           {isSuperAdmin && (
             <SidebarMenuItem>
