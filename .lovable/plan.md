@@ -1,19 +1,29 @@
 
 
-## Objetivo
-Adicionar KPI de "Tickets Abertos" na aba Indicações do CS Dashboard e alterar o cálculo de taxa de conversão para `ganhas / total de tickets` (em vez de `ganhas / (ganhas + perdidas)`).
+## Problema
 
-## Mudanças
+Ao clicar em "Conversar" no card de contato, o sistema cria a conversa (toast "Conversa criada com sucesso") mas **não navega para ela**. O `NewConversationModal` dentro de `ChatAreaFull` não tem callback `onCreated`, e `ChatAreaFull` não tem como selecionar uma conversa diferente porque o estado `selected` é gerenciado pelo pai (`WhatsApp.tsx`).
 
-### 1. `src/components/cs/hooks/useCSDashboardData.ts`
-- Adicionar campo `indicacoesTotalMovimentados: number` no retorno (total de tickets de indicação movimentados no período).
-- Alterar cálculo de `indicacoesConversaoPercent`: de `ganhas / (ganhas + perdidas)` para `ganhas / totalMovimentados`.
+## Solução
 
-### 2. `src/components/cs/CSDashboard.tsx` (aba Indicações, ~linhas 232-237)
-- Trocar grid de 3 colunas para 4 colunas.
-- Adicionar KPI "Tickets Abertos" (tipo indicação) antes dos demais.
-- Os 4 KPIs ficam: **Abertas** | **Ganhas** | **Perdidas** | **% Conversão**.
+Adicionar um fluxo completo: modal cria a conversa -> busca os dados completos -> seleciona a conversa no painel.
 
-### Sem impacto em
-- Nenhuma outra aba ou componente.
+### Alterações
+
+1. **`ChatAreaFull.tsx`** — Adicionar prop `onNavigateToConversation` e passar como `onCreated` no `NewConversationModal`. No callback, buscar a conversa completa (com contact join) e chamar o handler do pai. Também auto-preencher a instância da conversa atual no modal.
+
+2. **`WhatsApp.tsx`** — Passar callback `onNavigateToConversation` para `ChatAreaFull` que faz o fetch da conversa e chama `setSelected`.
+
+3. **`NewConversationModal`** — Auto-selecionar a instância quando `initialPhone` é fornecido e há apenas uma instância (ou receber `initialInstanceId` como prop para pré-selecionar).
+
+### Fluxo resultante
+
+```text
+Clique "Conversar" no ContactCard
+  → Abre NewConversationModal (telefone + nome + instância pré-preenchidos)
+  → Usuário confirma "Iniciar Conversa"
+  → Conversa criada no banco
+  → onCreated dispara → busca conversa completa → setSelected(conv)
+  → Chat navega automaticamente para a nova conversa
+```
 
