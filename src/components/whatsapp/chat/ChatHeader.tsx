@@ -18,6 +18,7 @@ import { TransferDialog } from "./TransferDialog";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
+import { SignatureControl } from "./SignatureControl";
 
 interface Props {
   conversation: ConversationWithContact;
