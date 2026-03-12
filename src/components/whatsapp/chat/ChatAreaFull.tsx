@@ -197,6 +197,8 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
           onRetryDelete={handleRetryDelete}
           onForwardSingle={handleForwardSingle}
           onEnterSelectionMode={enterSelectionMode}
+          onContactChat={handleContactChat}
+          onContactSave={handleContactSave}
         />
 
         {/* Selection action bar */}
