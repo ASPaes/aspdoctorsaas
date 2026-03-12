@@ -434,37 +434,51 @@ Deno.serve(async (req) => {
       }).catch(err => console.error('[send-whatsapp-message] Transcription trigger error:', err));
     }
 
-    // Auto-assign waiting attendance to sender on first reply
+    // Auto-assign waiting attendance to sender on first reply + increment agent count
     if (senderUserId) {
       try {
-        const { data: waitingAttendance } = await supabase
+        const now = new Date().toISOString();
+
+        // Try to find active attendance (waiting or in_progress)
+        const { data: activeAtt } = await supabase
           .from('support_attendances')
-          .select('id')
+          .select('id, status, assigned_to, msg_agent_count')
           .eq('conversation_id', body.conversationId)
-          .eq('status', 'waiting')
-          .is('assigned_to', null)
+          .neq('status', 'closed')
           .limit(1)
           .maybeSingle();
 
-        if (waitingAttendance) {
-          const { error: assignError } = await supabase
-            .from('support_attendances')
-            .update({
-              assigned_to: senderUserId,
-              status: 'in_progress',
-              first_response_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', waitingAttendance.id);
+        if (activeAtt) {
+          const update: Record<string, any> = {
+            msg_agent_count: (activeAtt.msg_agent_count || 0) + 1,
+            last_operator_message_at: now,
+            updated_at: now,
+          };
 
-          if (assignError) {
-            console.error('[send-whatsapp-message] Error auto-assigning attendance:', assignError);
+          // Auto-assign if still waiting and unassigned
+          if (activeAtt.status === 'waiting' && !activeAtt.assigned_to) {
+            update.assigned_to = senderUserId;
+            update.status = 'in_progress';
+            update.first_response_at = now;
+            update.assumed_at = now;
+          }
+
+          const { error: updateErr } = await supabase
+            .from('support_attendances')
+            .update(update)
+            .eq('id', activeAtt.id);
+
+          if (updateErr) {
+            console.error('[send-whatsapp-message] Error updating attendance:', updateErr);
           } else {
-            console.log(`[send-whatsapp-message] ✅ Attendance ${waitingAttendance.id} auto-assigned to ${senderUserId}`);
+            if (update.assigned_to) {
+              console.log(`[send-whatsapp-message] ✅ Attendance ${activeAtt.id} auto-assigned to ${senderUserId}`);
+            }
+            console.log(`[send-whatsapp-message] ✅ msg_agent_count incremented on ${activeAtt.id}`);
           }
         }
       } catch (err) {
-        console.error('[send-whatsapp-message] Auto-assign attendance error:', err);
+        console.error('[send-whatsapp-message] Attendance update error:', err);
       }
     }
 

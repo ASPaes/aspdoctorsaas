@@ -867,6 +867,14 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       // Auto-create support attendance for incoming customer messages
       ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId)
         .catch(err => console.error('[evolution-webhook] ensureAttendance error:', err));
+
+      // Increment msg_customer_count + last_customer_message_at on active attendance
+      incrementAttendanceCounter(supabase, conversationId, 'customer')
+        .catch(err => console.error('[evolution-webhook] incrementCustomerCount error:', err));
+    } else {
+      // Operator message sent via Evolution (e.g. from phone) — increment agent count
+      incrementAttendanceCounter(supabase, conversationId, 'agent')
+        .catch(err => console.error('[evolution-webhook] incrementAgentCount error:', err));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpsert:', error);
@@ -951,6 +959,45 @@ async function ensureAttendanceForIncomingMessage(
     }
   } catch (err) {
     console.error('[ensure-attendance] Unexpected error:', err);
+  }
+}
+
+/**
+ * Increment msg_customer_count or msg_agent_count on the active attendance.
+ */
+async function incrementAttendanceCounter(
+  supabase: any,
+  conversationId: string,
+  side: 'customer' | 'agent'
+): Promise<void> {
+  const { data: att } = await supabase
+    .from('support_attendances')
+    .select('id, msg_customer_count, msg_agent_count')
+    .eq('conversation_id', conversationId)
+    .neq('status', 'closed')
+    .limit(1)
+    .maybeSingle();
+
+  if (!att) return;
+
+  const now = new Date().toISOString();
+  const update: Record<string, any> = { updated_at: now };
+
+  if (side === 'customer') {
+    update.msg_customer_count = (att.msg_customer_count || 0) + 1;
+    update.last_customer_message_at = now;
+  } else {
+    update.msg_agent_count = (att.msg_agent_count || 0) + 1;
+    update.last_operator_message_at = now;
+  }
+
+  const { error } = await supabase
+    .from('support_attendances')
+    .update(update)
+    .eq('id', att.id);
+
+  if (error) {
+    console.error(`[incrementAttendanceCounter] Error (${side}):`, error);
   }
 }
 
