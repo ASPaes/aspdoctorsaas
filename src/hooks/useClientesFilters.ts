@@ -8,6 +8,7 @@ export interface ClientesFilters {
   searchText: string;
   status: string;
   unidadeBaseQuick: string;
+  somenteMatrizes: boolean;
   periodoCadastro: DateRange;
   periodoCancelamento: DateRange;
   periodoVenda: DateRange;
