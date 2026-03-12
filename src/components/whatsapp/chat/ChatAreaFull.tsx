@@ -154,6 +154,18 @@ export function ChatAreaFull({ conversation, onClose }: Props) {
     exitSelectionMode();
   };
 
+  const handleContactChat = useCallback((phone: string, name: string) => {
+    setNewConvPhone(phone);
+    setNewConvName(name);
+    setNewConvOpen(true);
+  }, []);
+
+  const handleContactSave = useCallback((phone: string, name: string) => {
+    setSaveContactPhone(phone);
+    setSaveContactName(name);
+    setSaveContactOpen(true);
+  }, []);
+
   if (!conversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
