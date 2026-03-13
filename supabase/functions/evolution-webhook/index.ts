@@ -888,13 +888,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
   }
 }
 
-const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj)[\s!.?]*$/i;
+const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
 /**
  * Ensure a support_attendance exists for an incoming customer message.
  * Rules:
- * 1.1) If last closed attendance <= X min: REOPEN same attendance (waiting)
- * 1.2) If > X min: CREATE NEW attendance (waiting)
+ * 1.1) If last closed attendance <= X min AND NOT inactive_closed: REOPEN same (waiting)
+ *      - Preserve history: keep closed_at/closed_by/closed_reason
+ *      - Set reopened_at=now(), reopened_from='customer'
+ * 1.2) If > X min OR inactive_closed OR no previous: CREATE NEW (waiting, created_from='customer')
  * 1.3) If message is goodbye within Y min of close: IGNORE (no reopen/new)
  * If active attendance exists: just skip (counter incremented separately)
  */
@@ -931,17 +933,18 @@ async function ensureAttendanceForIncomingMessage(
     const reopenWindowMinutes = supportConfig.post_close_reopen_window_minutes ?? 5;
     const ignoreGoodbyeMinutes = supportConfig.post_close_ignore_goodbye_minutes ?? 3;
 
-    // 3. Find last closed attendance
+    // 3. Find last closed attendance (both 'closed' and 'inactive_closed')
     const { data: lastClosed } = await supabase
       .from('support_attendances')
-      .select('id, closed_at, status')
+      .select('id, closed_at, status, closed_reason')
       .eq('conversation_id', conversationId)
-      .eq('status', 'closed')
+      .in('status', ['closed', 'inactive_closed'])
       .order('closed_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     const now = new Date();
+    const nowIso = now.toISOString();
     const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
     const diffMinutes = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
 
@@ -949,40 +952,37 @@ async function ensureAttendanceForIncomingMessage(
     if (messageContent && closedAt && diffMinutes <= ignoreGoodbyeMinutes) {
       const trimmed = (messageContent || '').trim();
       if (GOODBYE_PATTERNS.test(trimmed)) {
-        console.log(`[attendance] ignore goodbye "${trimmed}" (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
+        console.log(`[attendance] IGNORE goodbye "${trimmed}" (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
         return;
       }
     }
 
-    // 1.1) Within reopen window: reopen same attendance
-    if (lastClosed && diffMinutes <= reopenWindowMinutes) {
-      // Don't reopen inactive_closed
-      if (lastClosed.status === 'inactive_closed') {
-        console.log(`[attendance] Last attendance was inactive_closed, creating new instead. conv=${conversationId}`);
+    // 1.1) Within reopen window AND status is 'closed' (NOT inactive_closed): reopen same
+    if (lastClosed && diffMinutes <= reopenWindowMinutes && lastClosed.status === 'closed') {
+      // Reopen: preserve closed history, set reopened fields
+      const { error: reopenErr } = await supabase
+        .from('support_attendances')
+        .update({
+          status: 'waiting',
+          reopened_at: nowIso,
+          reopened_from: 'customer',
+          // Preserve closed_at, closed_by, closed_reason as historical record
+          // Reset metrics for the new session
+          wait_seconds: 0,
+          handle_seconds: 0,
+          updated_at: nowIso,
+        })
+        .eq('id', lastClosed.id);
+
+      if (reopenErr) {
+        console.error('[attendance] Error reopening:', reopenErr);
       } else {
-        const { error: reopenErr } = await supabase
-          .from('support_attendances')
-          .update({
-            status: 'waiting',
-            closed_at: null,
-            closed_by: null,
-            closed_reason: null,
-            wait_seconds: 0,
-            handle_seconds: 0,
-            updated_at: now.toISOString(),
-          })
-          .eq('id', lastClosed.id);
-
-        if (reopenErr) {
-          console.error('[attendance] Error reopening:', reopenErr);
-        } else {
-          console.log(`[attendance] reopen existing att=${lastClosed.id} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
-        }
-        return;
+        console.log(`[attendance] REOPEN by customer att=${lastClosed.id} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
       }
+      return;
     }
 
-    // 1.2) Past reopen window or no previous: create new
+    // 1.2) Past reopen window, inactive_closed, or no previous: create new
     const { data: newAtt, error: createErr } = await supabase
       .from('support_attendances')
       .insert({
@@ -990,8 +990,9 @@ async function ensureAttendanceForIncomingMessage(
         conversation_id: conversationId,
         contact_id: contactId,
         status: 'waiting',
-        opened_at: now.toISOString(),
+        opened_at: nowIso,
         opened_by: null,
+        created_from: 'customer',
       })
       .select('id, attendance_code')
       .single();
@@ -999,7 +1000,7 @@ async function ensureAttendanceForIncomingMessage(
     if (createErr) {
       console.error('[attendance] Error creating new:', createErr);
     } else {
-      console.log(`[attendance] create new att=${newAtt.id} code=${newAtt.attendance_code} (${diffMinutes === Infinity ? 'no previous' : diffMinutes.toFixed(1) + ' min since close'}) tenant=${tenantId} conv=${conversationId}`);
+      console.log(`[attendance] NEW by customer att=${newAtt.id} code=${newAtt.attendance_code} (${diffMinutes === Infinity ? 'no previous' : diffMinutes.toFixed(1) + ' min since close'}) tenant=${tenantId} conv=${conversationId}`);
     }
   } catch (err) {
     console.error('[attendance] Unexpected error:', err);

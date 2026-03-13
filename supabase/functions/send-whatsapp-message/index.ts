@@ -449,90 +449,40 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-        // No active attendance — try reopen or create new
+        // No active attendance — ALWAYS create new for operator (never reopen)
         if (!activeAtt) {
-          // Fetch config
-          const { data: cfgRow } = await supabase
-            .from('configuracoes')
-            .select('support_config')
-            .eq('tenant_id', tenantId)
-            .maybeSingle();
+          const contactIdForAtt = contact?.phone_number ? (
+            await supabase
+              .from('whatsapp_contacts')
+              .select('id')
+              .eq('phone_number', contact.phone_number)
+              .eq('tenant_id', tenantId)
+              .maybeSingle()
+          ).data?.id : null;
 
-          const reopenWindow = ((cfgRow?.support_config || {}) as any).post_close_reopen_window_minutes ?? 5;
-
-          // Find last closed
-          const { data: lastClosed } = await supabase
+          const { data: newAtt, error: createErr } = await supabase
             .from('support_attendances')
-            .select('id, closed_at, status, contact_id, msg_agent_count')
-            .eq('conversation_id', body.conversationId)
-            .eq('status', 'closed')
-            .order('closed_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+            .insert({
+              tenant_id: tenantId,
+              conversation_id: body.conversationId,
+              contact_id: contactIdForAtt || body.conversationId,
+              status: 'in_progress',
+              opened_at: nowIso,
+              assigned_to: senderUserId,
+              assumed_at: nowIso,
+              first_response_at: nowIso,
+              msg_agent_count: 1,
+              last_operator_message_at: nowIso,
+              created_from: 'agent',
+            })
+            .select('id, attendance_code')
+            .single();
 
-          const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
-          const diff = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
-
-          if (lastClosed && diff <= reopenWindow && lastClosed.status !== 'inactive_closed') {
-            // Reopen existing + directly in_progress
-            const { error: reopenErr } = await supabase
-              .from('support_attendances')
-              .update({
-                status: 'in_progress',
-                closed_at: null,
-                closed_by: null,
-                closed_reason: null,
-                wait_seconds: 0,
-                handle_seconds: 0,
-                assigned_to: senderUserId,
-                assumed_at: nowIso,
-                first_response_at: nowIso,
-                msg_agent_count: (lastClosed.msg_agent_count || 0) + 1,
-                last_operator_message_at: nowIso,
-                updated_at: nowIso,
-              })
-              .eq('id', lastClosed.id);
-
-            if (reopenErr) {
-              console.error('[send-whatsapp-message] Error reopening attendance:', reopenErr);
-            } else {
-              console.log(`[send-whatsapp-message] [attendance] reopen existing att=${lastClosed.id} (${diff.toFixed(1)} min) -> in_progress by ${senderUserId}`);
-              activeAtt = { id: lastClosed.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: (lastClosed.msg_agent_count || 0) + 1 };
-            }
+          if (createErr) {
+            console.error('[send-whatsapp-message] Error creating attendance:', createErr);
           } else {
-            // Create new attendance directly as in_progress
-            const contactIdForAtt = contact?.phone_number ? (
-              await supabase
-                .from('whatsapp_contacts')
-                .select('id')
-                .eq('phone_number', contact.phone_number)
-                .eq('tenant_id', tenantId)
-                .maybeSingle()
-            ).data?.id : null;
-
-            const { data: newAtt, error: createErr } = await supabase
-              .from('support_attendances')
-              .insert({
-                tenant_id: tenantId,
-                conversation_id: body.conversationId,
-                contact_id: contactIdForAtt || body.conversationId,
-                status: 'in_progress',
-                opened_at: nowIso,
-                assigned_to: senderUserId,
-                assumed_at: nowIso,
-                first_response_at: nowIso,
-                msg_agent_count: 1,
-                last_operator_message_at: nowIso,
-              })
-              .select('id, attendance_code')
-              .single();
-
-            if (createErr) {
-              console.error('[send-whatsapp-message] Error creating attendance:', createErr);
-            } else {
-              console.log(`[send-whatsapp-message] [attendance] create new att=${newAtt.id} code=${newAtt.attendance_code} -> in_progress by ${senderUserId}`);
-              activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1 };
-            }
+            console.log(`[attendance] NEW by agent att=${newAtt.id} code=${newAtt.attendance_code} -> in_progress by ${senderUserId}`);
+            activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1 };
           }
 
           // Reopen conversation visually if it was closed
