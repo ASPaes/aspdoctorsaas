@@ -954,15 +954,26 @@ async function ensureAttendanceForIncomingMessage(
     }
 
     // 1.1) Within reopen window AND status is 'closed' (NOT inactive_closed): reopen same
+    //      STICKY: assign back to the last operator so it goes straight to "in_progress"
     if (lastClosed && diffMinutes <= reopenWindowMinutes && lastClosed.status === 'closed') {
-      // Reopen: preserve closed history, set reopened fields
+      // Fetch the last operator (assigned_to) from the closed attendance
+      const { data: closedFull } = await supabase
+        .from('support_attendances')
+        .select('assigned_to')
+        .eq('id', lastClosed.id)
+        .single();
+
+      const lastOperator = closedFull?.assigned_to ?? null;
+
+      // Reopen: sticky to last operator → in_progress; if no operator → waiting (queue)
       const { error: reopenErr } = await supabase
         .from('support_attendances')
         .update({
-          status: 'waiting',
+          status: lastOperator ? 'in_progress' : 'waiting',
+          assigned_to: lastOperator,
+          assumed_at: lastOperator ? nowIso : null,
           reopened_at: nowIso,
           reopened_from: 'customer',
-          // Preserve closed_at, closed_by, closed_reason as historical record
           // Reset metrics for the new session
           wait_seconds: 0,
           handle_seconds: 0,
@@ -973,7 +984,7 @@ async function ensureAttendanceForIncomingMessage(
       if (reopenErr) {
         console.error('[attendance] Error reopening:', reopenErr);
       } else {
-        console.log(`[attendance] REOPEN by customer att=${lastClosed.id} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
+        console.log(`[attendance] REOPEN by customer att=${lastClosed.id} assigned_to=${lastOperator} status=${lastOperator ? 'in_progress' : 'waiting'} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
       }
       return;
     }
