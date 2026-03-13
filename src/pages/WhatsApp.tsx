@@ -18,6 +18,33 @@ export default function WhatsApp() {
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
+  const queryClient = useQueryClient();
+
+  // Keep selected conversation in sync with latest data from query cache
+  useEffect(() => {
+    if (!selected) return;
+    const channel = supabase
+      .channel(`selected-conv-sync-${selected.id}`)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "whatsapp_conversations",
+        filter: `id=eq.${selected.id}`,
+      }, async () => {
+        // Re-fetch the full conversation with contact join
+        const { data } = await supabase
+          .from("whatsapp_conversations")
+          .select("*, contact:whatsapp_contacts(*)")
+          .eq("id", selected.id)
+          .single();
+        if (data) {
+          setSelected(data as unknown as ConversationWithContact);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [selected?.id]);
 
   // Capture URL params once on mount and clear them immediately
   const pendingParamsRef = useRef<{ phone: string; clienteId: string | null; clienteName: string | null } | null>(null);
