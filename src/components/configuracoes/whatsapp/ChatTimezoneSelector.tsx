@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Save, Loader2, Globe } from "lucide-react";
-import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -21,7 +21,7 @@ const TIMEZONE_OPTIONS = [
 ];
 
 export function ChatTimezoneSelector() {
-  const { timezone, updateTimezone } = useChatTimezone();
+  const { timezone, updateTimezone } = useAppTimezone();
   const [selected, setSelected] = useState(timezone);
   const { effectiveTenantId: tid } = useTenantFilter();
   const { toast } = useToast();
@@ -59,10 +59,10 @@ export function ChatTimezoneSelector() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Globe className="h-5 w-5" />
-          Fuso Horário do Chat
+          Fuso Horário do Sistema
         </CardTitle>
         <CardDescription>
-          Define o fuso horário usado para exibir horários das mensagens e conversas.
+          Define o fuso horário usado para exibir datas e horários em todo o sistema.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

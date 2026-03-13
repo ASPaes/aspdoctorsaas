@@ -7,7 +7,7 @@ import { MessageInput } from "./MessageInput";
 import { type Conversation } from "./hooks/useConversations";
 import { cn } from "@/lib/utils";
 import { MediaContent } from "./chat/MediaContent";
-import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime, formatDateLabel } from "@/lib/formatDateWithTimezone";
 
 interface Props {
@@ -60,7 +60,7 @@ function groupByDateInline(messages: Message[], timezone: string): { date: strin
 
 export function ChatArea({ conversation }: Props) {
   const { data: messages = [], isLoading } = useMessages(conversation?.id ?? null);
-  const { timezone } = useChatTimezone();
+  const { timezone } = useAppTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

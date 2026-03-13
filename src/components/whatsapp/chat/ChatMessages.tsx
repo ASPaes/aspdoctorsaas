@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
 import { AttendanceEventBadge, parseAttendanceEvent } from "./AttendanceEventBadge";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
-import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
 import { ArrowRightLeft, ChevronDown } from "lucide-react";
@@ -50,7 +50,7 @@ export function ChatMessages({
 }: Props) {
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
-  const { timezone } = useChatTimezone();
+  const { timezone } = useAppTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);

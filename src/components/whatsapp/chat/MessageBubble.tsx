@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
 import { ContactCard } from "./ContactCard";
-import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -63,7 +63,7 @@ export function MessageBubble({
     )
   );
 
-  const { timezone } = useChatTimezone();
+  const { timezone } = useAppTimezone();
   const time = formatTzTime(msg.timestamp, timezone);
   const [showTranscription, setShowTranscription] = useState(false);
 
