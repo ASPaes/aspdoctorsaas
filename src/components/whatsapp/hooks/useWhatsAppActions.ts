@@ -71,15 +71,8 @@ export const useWhatsAppActions = () => {
         .eq('id', conversationId);
       if (error) throw error;
 
-      // Close the active support_attendance
+      // Close the active support_attendance (already fetched above)
       try {
-        const { data: activeAtt } = await supabase
-          .from('support_attendances')
-          .select('id, opened_at, assumed_at, attendance_code')
-          .eq('conversation_id', conversationId)
-          .neq('status', 'closed')
-          .limit(1)
-          .maybeSingle();
 
         if (activeAtt) {
           const now = new Date();
