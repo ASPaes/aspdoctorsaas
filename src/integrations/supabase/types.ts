@@ -1635,6 +1635,8 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          ura_human_fallback: boolean
+          ura_invalid_count: number
           ura_option_selected: number | null
           ura_sent_at: string | null
           wait_seconds: number
@@ -1674,6 +1676,8 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          ura_human_fallback?: boolean
+          ura_invalid_count?: number
           ura_option_selected?: number | null
           ura_sent_at?: string | null
           wait_seconds?: number
@@ -1713,6 +1717,8 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          ura_human_fallback?: boolean
+          ura_invalid_count?: number
           ura_option_selected?: number | null
           ura_sent_at?: string | null
           wait_seconds?: number
