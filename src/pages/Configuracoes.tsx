@@ -171,6 +171,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
+          <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
