@@ -211,9 +211,12 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         event: 'INSERT',
         schema: 'public',
         table: 'whatsapp_messages',
-        filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        const normalizedNewMsg = normalizeMessage(payload.new as any);
+        const incoming = payload.new as any;
+        // Filter in callback — avoids Realtime filter issues with REPLICA IDENTITY
+        if (incoming.conversation_id !== conversationId) return;
+
+        const normalizedNewMsg = normalizeMessage(incoming);
         queryClient.setQueryData(
           ['whatsapp', 'messages', conversationId],
           (old: Message[] | undefined) => mergeMessage(old ?? [], normalizedNewMsg)
@@ -228,9 +231,11 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         event: 'UPDATE',
         schema: 'public',
         table: 'whatsapp_messages',
-        filter: `conversation_id=eq.${conversationId}`
       }, (payload) => {
-        const normalizedUpdated = normalizeMessage(payload.new as any);
+        const updated = payload.new as any;
+        if (updated.conversation_id !== conversationId) return;
+
+        const normalizedUpdated = normalizeMessage(updated);
         queryClient.setQueryData(
           ['whatsapp', 'messages', conversationId],
           (old: any[] | undefined) => {
