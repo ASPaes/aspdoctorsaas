@@ -539,6 +539,7 @@ Deno.serve(async (req) => {
         const nowIso = now.toISOString();
 
         // Try to find active attendance (waiting or in_progress), most recent first
+        // This will find the pre-created attendance if one was made above
         let { data: activeAtt } = await supabase
           .from('support_attendances')
           .select('id, status, assigned_to, msg_agent_count, first_response_at, assumed_at, wait_seconds, opened_at')
@@ -548,87 +549,9 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
 
-        // No active attendance — ALWAYS create new for operator (never reopen)
         if (!activeAtt) {
-          const contactIdForAtt = contact?.phone_number ? (
-            await supabase
-              .from('whatsapp_contacts')
-              .select('id')
-              .eq('phone_number', contact.phone_number)
-              .eq('tenant_id', tenantId)
-              .maybeSingle()
-          ).data?.id : null;
-
-          const { data: newAtt, error: createErr } = await supabase
-            .from('support_attendances')
-            .insert({
-              tenant_id: tenantId,
-              conversation_id: body.conversationId,
-              contact_id: contactIdForAtt || body.conversationId,
-              status: 'in_progress',
-              opened_at: nowIso,
-              assigned_to: senderUserId,
-              assumed_at: nowIso,
-              first_response_at: nowIso,
-              msg_agent_count: 1,
-              last_operator_message_at: nowIso,
-              created_from: 'agent',
-            })
-            .select('id, attendance_code')
-            .single();
-
-          if (createErr) {
-            console.error('[send-whatsapp-message] Error creating attendance:', createErr);
-          } else {
-            console.log(`[attendance] NEW by agent att=${newAtt.id} code=${newAtt.attendance_code} -> in_progress by ${senderUserId}`);
-            activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1, first_response_at: nowIso, assumed_at: nowIso, wait_seconds: 0, opened_at: nowIso } as any;
-
-            // --- Send opening notification to customer via Evolution API ---
-            // Use a timestamp slightly before the agent's message so it appears first in timeline
-            const openTimestamp = new Date(now.getTime() - 1000).toISOString();
-            try {
-              const contactName = contact?.name || '';
-              const openingText = contactName
-                ? `Olá ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
-                : `Olá, o atendimento ${newAtt.attendance_code} foi iniciado.`;
-              const destNumber = getDestinationNumber(contact.phone_number);
-              const openEndpoint = `${secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '')}/message/sendText/${instanceIdentifier}`;
-              const openHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...authHeaders };
-              const openResp = await fetch(openEndpoint, {
-                method: 'POST',
-                headers: openHeaders,
-                body: JSON.stringify({ number: destNumber, text: openingText }),
-              });
-              if (openResp.ok) {
-                const openData = await openResp.json();
-                const openMsgId = openData.key?.id || `att_open_${Date.now()}`;
-                // Persist as system message so it renders as a badge, not a bubble
-                await supabase.from('whatsapp_messages').upsert({
-                  conversation_id: body.conversationId,
-                  remote_jid: contact.phone_number,
-                  message_id: openMsgId,
-                  content: `✅ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
-                  message_type: 'system',
-                  is_from_me: true,
-                  status: 'sent',
-                  timestamp: openTimestamp,
-                  tenant_id: tenantId,
-                  metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
-                }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
-                console.log(`[send-whatsapp-message] Opening notification sent to customer for att=${newAtt.id}`);
-              } else {
-                console.error('[send-whatsapp-message] Failed to send opening notification:', await openResp.text());
-              }
-            } catch (openErr) {
-              console.error('[send-whatsapp-message] Error sending opening notification:', openErr);
-            }
-          }
-
-          // Reopen conversation visually AND sync assigned_to
-          await supabase
-            .from('whatsapp_conversations')
-            .update({ status: 'active', assigned_to: senderUserId, updated_at: nowIso })
-            .eq('id', body.conversationId);
+          // Should not happen if pre-creation worked, but handle edge case
+          console.warn('[send-whatsapp-message] No active attendance found post-send (pre-creation may have failed)');
         } else {
           // Active attendance exists — increment and auto-assign
           const update: Record<string, any> = {
