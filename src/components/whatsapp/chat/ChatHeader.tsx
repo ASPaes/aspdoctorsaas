@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -10,6 +10,7 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import { useConversationTopics } from "../hooks/useConversationTopics";
+import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { Badge } from "@/components/ui/badge";
 import { EditContactModal } from "./EditContactModal";
 import { QueueIndicator } from "./QueueIndicator";
@@ -42,8 +43,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
-  const statusLabel = conversation.status === "active" ? "Ativa" : conversation.status === "closed" ? "Encerrada" : "Arquivada";
-  const statusVariant = conversation.status === "active" ? "default" : "secondary";
+  // Use attendance status for more accurate status display
+  const { attendanceMap } = useAttendanceStatus([conversation.id]);
+  const attendance = attendanceMap.get(conversation.id);
+
+  const effectiveStatus = useMemo(() => {
+    if (attendance) {
+      if (attendance.status === "waiting") return "waiting";
+      if (attendance.status === "in_progress") return "in_progress";
+      if (attendance.status === "closed" || attendance.status === "inactive_closed") return "closed";
+    }
+    return conversation.status;
+  }, [attendance, conversation.status]);
+
+  const statusLabel = effectiveStatus === "waiting" ? "Na Fila"
+    : effectiveStatus === "in_progress" ? "Em Atendimento"
+    : effectiveStatus === "closed" ? "Encerrada"
+    : effectiveStatus === "active" ? "Ativa"
+    : effectiveStatus === "archived" ? "Arquivada"
+    : conversation.status;
+  const statusVariant = (effectiveStatus === "waiting" || effectiveStatus === "in_progress" || effectiveStatus === "active") ? "default" : "secondary";
 
   return (
     <div className="shrink-0">
