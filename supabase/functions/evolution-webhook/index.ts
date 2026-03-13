@@ -875,6 +875,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         contactName: pushName || phone,
       };
 
+      // --- CSAT: check if there's a pending CSAT survey for this conversation ---
+      const csatHandled = await handleCsatResponse(
+        supabase, instanceCtx, conversationId, tenantId, content
+      );
+      if (csatHandled) {
+        // CSAT consumed the message — don't create attendance or reopen
+        console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
+        return;
+      }
+
       // Check if this message is a URA response BEFORE creating/reopening attendance
       const supportConfig = await getSupportConfig(supabase, tenantId);
       const uraHandled = await handleUraResponse(
