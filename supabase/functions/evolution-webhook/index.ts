@@ -926,6 +926,7 @@ async function sendUraWelcome(
   conversationId: string,
   contactId: string,
   tenantId: string,
+  attendanceId: string,
   supportConfig: any
 ): Promise<void> {
   try {
@@ -957,35 +958,13 @@ async function sendUraWelcome(
     const fullMessage = `${welcomeText}\n\n${optionsList}`;
 
     // Send via Evolution API
-    const { remoteJid } = instanceCtx;
-    const phoneNumber = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/:\d+/, '');
-    const endpoint = `${instanceCtx.apiUrl}/message/sendText/${instanceCtx.instanceName}`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (instanceCtx.providerType === 'cloud') {
-      headers['Authorization'] = `Bearer ${instanceCtx.apiKey}`;
-    } else {
-      headers['apikey'] = instanceCtx.apiKey;
-    }
-
-    const evoResponse = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        number: phoneNumber,
-        text: fullMessage,
-      }),
-    });
-
-    if (!evoResponse.ok) {
-      const errText = await evoResponse.text();
-      console.error('[ura] Evolution API error sending URA welcome:', errText);
+    const sent = await sendEvolutionText(instanceCtx, fullMessage);
+    if (!sent.ok) {
+      console.error('[ura] Evolution API error sending URA welcome:', sent.error);
       return;
     }
 
-    const evoData = await evoResponse.json();
-    const messageId = evoData.key?.id || `ura_${Date.now()}`;
+    const messageId = sent.messageId || `ura_${Date.now()}`;
     const nowIso = new Date().toISOString();
 
     // Persist URA message in whatsapp_messages
@@ -993,7 +972,7 @@ async function sendUraWelcome(
       .from('whatsapp_messages')
       .insert({
         conversation_id: conversationId,
-        remote_jid: remoteJid,
+        remote_jid: instanceCtx.remoteJid,
         message_id: messageId,
         content: fullMessage,
         message_type: 'text',
@@ -1014,10 +993,161 @@ async function sendUraWelcome(
       })
       .eq('id', conversationId);
 
-    console.log(`[ura] Welcome message sent successfully conv=${conversationId} msgId=${messageId}`);
+    // Mark attendance as URA sent
+    await supabase
+      .from('support_attendances')
+      .update({ ura_sent_at: nowIso, updated_at: nowIso })
+      .eq('id', attendanceId);
+
+    console.log(`[ura] Welcome message sent successfully conv=${conversationId} att=${attendanceId} msgId=${messageId}`);
   } catch (err) {
     console.error('[ura] Error sending URA welcome:', err);
   }
+}
+
+/**
+ * Helper to send a text message via Evolution API.
+ */
+async function sendEvolutionText(
+  ctx: InstanceContext,
+  text: string
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+  const phoneNumber = ctx.remoteJid
+    .replace('@s.whatsapp.net', '')
+    .replace('@lid', '')
+    .replace(/:\d+/, '');
+  const endpoint = `${ctx.apiUrl}/message/sendText/${ctx.instanceName}`;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (ctx.providerType === 'cloud') {
+    headers['Authorization'] = `Bearer ${ctx.apiKey}`;
+  } else {
+    headers['apikey'] = ctx.apiKey;
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ number: phoneNumber, text }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    return { ok: false, error: errText };
+  }
+
+  const data = await response.json();
+  return { ok: true, messageId: data.key?.id };
+}
+
+/**
+ * Handle an incoming customer message when the attendance is waiting + URA sent.
+ * Returns true if the message was consumed as a URA response.
+ */
+async function handleUraResponse(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  messageContent: string,
+  supportConfig: any
+): Promise<boolean> {
+  if (!supportConfig.support_ura_enabled) return false;
+
+  // Check if there's an active waiting attendance with URA sent but no area selected
+  const { data: att } = await supabase
+    .from('support_attendances')
+    .select('id, ura_sent_at, area_id')
+    .eq('conversation_id', conversationId)
+    .eq('status', 'waiting')
+    .not('ura_sent_at', 'is', null)
+    .is('area_id', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!att) return false;
+
+  // Fetch active support areas (same order as sent)
+  const { data: areas } = await supabase
+    .from('support_areas')
+    .select('id, nome')
+    .eq('tenant_id', tenantId)
+    .eq('ativo', true)
+    .order('nome');
+
+  if (!areas || areas.length === 0) return false;
+
+  const trimmed = (messageContent || '').trim();
+  const optionNumber = parseInt(trimmed, 10);
+
+  // Invalid option
+  if (isNaN(optionNumber) || optionNumber < 1 || optionNumber > areas.length) {
+    console.log(`[ura] Invalid option: "${trimmed}" (expected 1-${areas.length}) conv=${conversationId}`);
+    const invalidTemplate = supportConfig.support_ura_invalid_option_template || '';
+    if (invalidTemplate) {
+      const sent = await sendEvolutionText(instanceCtx, invalidTemplate);
+      if (sent.ok) {
+        const nowIso = new Date().toISOString();
+        await supabase.from('whatsapp_messages').insert({
+          conversation_id: conversationId,
+          remote_jid: instanceCtx.remoteJid,
+          message_id: sent.messageId || `ura_inv_${Date.now()}`,
+          content: invalidTemplate,
+          message_type: 'text',
+          is_from_me: true,
+          status: 'sent',
+          timestamp: nowIso,
+          tenant_id: tenantId,
+          metadata: { ura: true, ura_invalid: true },
+        });
+        await supabase.from('whatsapp_conversations').update({
+          last_message_at: nowIso,
+          last_message_preview: invalidTemplate.substring(0, 200),
+          is_last_message_from_me: true,
+        }).eq('id', conversationId);
+      }
+    }
+    return true; // consumed as URA interaction
+  }
+
+  // Valid option — assign area
+  const selectedArea = areas[optionNumber - 1];
+  const nowIso = new Date().toISOString();
+
+  await supabase
+    .from('support_attendances')
+    .update({
+      area_id: selectedArea.id,
+      ura_option_selected: optionNumber,
+      updated_at: nowIso,
+    })
+    .eq('id', att.id);
+
+  console.log(`[ura] Area selected: ${selectedArea.nome} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
+
+  // Send confirmation message
+  const confirmText = `✅ Você escolheu *${selectedArea.nome}*. Aguarde, em breve um atendente irá te ajudar!`;
+  const sent = await sendEvolutionText(instanceCtx, confirmText);
+  if (sent.ok) {
+    await supabase.from('whatsapp_messages').insert({
+      conversation_id: conversationId,
+      remote_jid: instanceCtx.remoteJid,
+      message_id: sent.messageId || `ura_conf_${Date.now()}`,
+      content: confirmText,
+      message_type: 'text',
+      is_from_me: true,
+      status: 'sent',
+      timestamp: nowIso,
+      tenant_id: tenantId,
+      metadata: { ura: true, ura_confirmed: true, area_id: selectedArea.id },
+    });
+    await supabase.from('whatsapp_conversations').update({
+      last_message_at: nowIso,
+      last_message_preview: confirmText.substring(0, 200),
+      is_last_message_from_me: true,
+    }).eq('id', conversationId);
+  }
+
+  return true;
 }
 
 async function ensureAttendanceForIncomingMessage(
