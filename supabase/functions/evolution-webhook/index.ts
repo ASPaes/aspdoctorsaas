@@ -923,16 +923,11 @@ async function ensureAttendanceForIncomingMessage(
       return;
     }
 
-    // 2. Get config
-    const { data: config } = await supabase
-      .from('configuracoes')
-      .select('support_config')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
-    const supportConfig = (config?.support_config || {}) as any;
-    const reopenWindowMinutes = supportConfig.post_close_reopen_window_minutes ?? 5;
-    const ignoreGoodbyeMinutes = supportConfig.post_close_ignore_goodbye_minutes ?? 3;
+    // 2. Get config from dedicated columns (falls back to DB defaults)
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    const reopenWindowMinutes = supportConfig.support_reopen_window_minutes;
+    // Ignore goodbye window = half of reopen window (capped at 3 min) for backward compat
+    const ignoreGoodbyeMinutes = Math.min(Math.floor(reopenWindowMinutes / 2), 3);
 
     // 3. Find last closed attendance (both 'closed' and 'inactive_closed')
     const { data: lastClosed } = await supabase
