@@ -179,6 +179,7 @@ export default function KBTab() {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="draft">Rascunho</SelectItem>
+                <SelectItem value="pending_review">Aguardando Aprovação</SelectItem>
                 <SelectItem value="approved">Aprovado</SelectItem>
               </SelectContent>
             </Select>
