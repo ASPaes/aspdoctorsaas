@@ -243,6 +243,10 @@ export default function Configuracoes() {
             <AISettingsTab />
           </TabsContent>
         )}
+
+        <TabsContent value="kb">
+          <KBTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
