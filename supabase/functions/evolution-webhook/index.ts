@@ -1124,6 +1124,140 @@ function pickRandom(pool: string[]): string {
 }
 
 /**
+ * Handle CSAT (Customer Satisfaction) response flow.
+ * Checks if there's a pending CSAT survey for the conversation's closed attendance.
+ * Returns true if the message was consumed by CSAT logic.
+ *
+ * Flow:
+ * 1. Find pending CSAT where status='pending' (waiting for score)
+ * 2. If score is valid → save, send thanks, optionally ask for reason
+ * 3. If status='awaiting_reason' → save reason, close CSAT
+ * 4. If CSAT has timed out → mark as expired, don't consume message
+ */
+async function handleCsatResponse(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  messageContent: string
+): Promise<boolean> {
+  try {
+    // Find the attendance linked to this conversation that was recently closed
+    const { data: closedAtt } = await supabase
+      .from('support_attendances')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('status', 'closed')
+      .eq('closed_reason', 'manual')
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!closedAtt) return false;
+
+    // Find pending/awaiting_reason CSAT for this attendance
+    const { data: csat } = await supabase
+      .from('support_csat')
+      .select('id, status, asked_at, score')
+      .eq('attendance_id', closedAtt.id)
+      .in('status', ['pending', 'awaiting_reason'])
+      .limit(1)
+      .maybeSingle();
+
+    if (!csat) return false;
+
+    // Get config for timeout and thresholds
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+
+    // Check timeout
+    const askedAt = new Date(csat.asked_at);
+    const now = new Date();
+    const elapsedMinutes = (now.getTime() - askedAt.getTime()) / (1000 * 60);
+
+    if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
+      // Expired — mark as expired and don't consume message
+      await supabase
+        .from('support_csat')
+        .update({ status: 'expired' })
+        .eq('id', csat.id);
+      console.log(`[csat] CSAT expired for att=${closedAtt.id} (${elapsedMinutes.toFixed(1)} min > ${supportConfig.support_csat_timeout_minutes} min)`);
+      return false;
+    }
+
+    const trimmed = (messageContent || '').trim();
+
+    // --- Status: pending (waiting for score) ---
+    if (csat.status === 'pending') {
+      const scoreNum = parseInt(trimmed, 10);
+      const minScore = supportConfig.support_csat_score_min;
+      const maxScore = supportConfig.support_csat_score_max;
+
+      if (isNaN(scoreNum) || scoreNum < minScore || scoreNum > maxScore) {
+        // Invalid score — send a gentle reminder and consume
+        const reminder = `Por favor, envie apenas um número de ${minScore} a ${maxScore}.`;
+        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, reminder, { csat: true });
+        return true;
+      }
+
+      // Valid score — save it
+      const nowIso = now.toISOString();
+      const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
+      const newStatus = needsReason ? 'awaiting_reason' : 'completed';
+
+      await supabase
+        .from('support_csat')
+        .update({
+          score: scoreNum,
+          responded_at: nowIso,
+          status: newStatus,
+        })
+        .eq('id', csat.id);
+
+      console.log(`[csat] Score ${scoreNum} saved for att=${closedAtt.id} csat=${csat.id} -> ${newStatus}`);
+
+      // Send thanks message
+      const thanksTemplate = supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.';
+      await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, thanksTemplate, { csat: true, csat_thanks: true });
+
+      // If low score, ask for reason
+      if (needsReason) {
+        const reasonTemplate = supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?';
+        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, reasonTemplate, { csat: true, csat_reason_prompt: true });
+      }
+
+      return true;
+    }
+
+    // --- Status: awaiting_reason ---
+    if (csat.status === 'awaiting_reason') {
+      await supabase
+        .from('support_csat')
+        .update({
+          reason: trimmed,
+          status: 'completed',
+        })
+        .eq('id', csat.id);
+
+      console.log(`[csat] Reason saved for csat=${csat.id}: "${trimmed.substring(0, 50)}"`);
+
+      // Send a final acknowledgment
+      await sendAndPersistAutoMessage(
+        supabase, instanceCtx, conversationId, tenantId,
+        'Obrigado pelo feedback! Vamos usar sua opinião para melhorar nosso atendimento. 🙏',
+        { csat: true, csat_reason_ack: true }
+      );
+
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[csat] Error handling CSAT response:', err);
+    return false;
+  }
+}
+
+/**
  * Handle an incoming customer message when the attendance is waiting + URA active.
  * Returns true if the message was consumed (URA response, waiting ack, human intent, etc.).
  */
