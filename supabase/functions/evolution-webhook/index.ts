@@ -1462,6 +1462,9 @@ async function ensureAttendanceForIncomingMessage(
       console.error('[attendance] Error creating new:', createErr);
     } else {
       console.log(`[attendance] NEW by customer att=${newAtt.id} code=${newAtt.attendance_code} (${diffMinutes === Infinity ? 'no previous' : diffMinutes.toFixed(1) + ' min since close'}) tenant=${tenantId} conv=${conversationId}`);
+      // Insert system message for attendance opened
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+        .catch(err => console.error('[attendance] Error inserting system msg:', err));
       // Fire-and-forget: send URA welcome message if enabled
       if (instanceCtx) {
         sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig)
