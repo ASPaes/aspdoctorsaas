@@ -957,19 +957,22 @@ async function sendUraWelcome(
       .eq('ativo', true)
       .order('nome');
 
-    if (!areas || areas.length === 0) {
-      console.log('[ura] No active support areas, skipping URA');
-      return;
-    }
-
-    // Build welcome message with numbered options
+    // Build welcome message
     const customerName = instanceCtx.contactName || '';
     let welcomeText = (supportConfig.support_ura_welcome_template || '')
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
 
-    const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
-    const fullMessage = `${welcomeText}\n\n${optionsList}`;
+    let fullMessage: string;
+    if (areas && areas.length > 0) {
+      // Append numbered options from support_areas
+      const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
+      fullMessage = `${welcomeText}\n\n${optionsList}`;
+    } else {
+      // No support_areas — template already contains the options
+      fullMessage = welcomeText;
+      console.log('[ura] No support_areas found, sending template as-is');
+    }
 
     // Send via Evolution API
     const sent = await sendEvolutionText(instanceCtx, fullMessage);
