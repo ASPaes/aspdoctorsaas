@@ -88,6 +88,7 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
     setIsSubmitting(true);
     try {
       const result = await createTicket.mutateAsync({
+        ...(tid ? { tenant_id: tid } : {}),
         cliente_id: clienteId,
         tipo,
         assunto,
