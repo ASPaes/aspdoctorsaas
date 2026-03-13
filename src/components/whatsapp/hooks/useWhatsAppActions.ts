@@ -95,7 +95,7 @@ export const useWhatsAppActions = () => {
             })
             .eq('id', activeAtt.id);
 
-          // Insert system message + send closure to customer via WhatsApp
+          // Check CSAT config and decide flow
           if (activeAtt.attendance_code) {
             const { data: profile } = await supabase
               .from('profiles')
@@ -104,40 +104,8 @@ export const useWhatsAppActions = () => {
               .single();
 
             if (profile?.tenant_id) {
-              const msgId = `system_att_closed_${activeAtt.id}`;
-              await supabase.from('whatsapp_messages' as any).upsert({
-                conversation_id: conversationId,
-                remote_jid: '',
-                message_id: msgId,
-                content: `🔒 Atendimento ${activeAtt.attendance_code} encerrado com sucesso.`,
-                message_type: 'system',
-                is_from_me: false,
-                status: 'sent',
-                timestamp: now.toISOString(),
-                tenant_id: profile.tenant_id,
-                metadata: { system: true, attendance_event: 'closed', attendance_id: activeAtt.id },
-              }, {
-                onConflict: 'tenant_id,message_id',
-                ignoreDuplicates: true,
-              });
-
-              // Send closure message to customer via WhatsApp
-              try {
-                const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
-                await supabase.functions.invoke('send-whatsapp-message', {
-                  body: {
-                    conversationId,
-                    content: closureText,
-                    messageType: 'text',
-                    systemMessage: true,
-                  },
-                });
-                console.log('[closeConversation] Closure message sent to customer');
-              } catch (sendErr) {
-                console.error('[closeConversation] Error sending closure message to customer:', sendErr);
-              }
-
-              // --- CSAT: send survey if enabled and close reason is manual ---
+              // Check if CSAT is enabled
+              let csatEnabled = false;
               try {
                 const { data: config } = await supabase
                   .from('configuracoes')
@@ -146,6 +114,8 @@ export const useWhatsAppActions = () => {
                   .maybeSingle();
 
                 if (config?.support_csat_enabled) {
+                  csatEnabled = true;
+
                   // Get contact name for template
                   const { data: convData } = await supabase
                     .from('whatsapp_conversations')
@@ -169,7 +139,7 @@ export const useWhatsAppActions = () => {
                     asked_at: now.toISOString(),
                   });
 
-                  // Send CSAT prompt to customer
+                  // Send CSAT prompt to customer (closure message will be sent after CSAT completes)
                   await supabase.functions.invoke('send-whatsapp-message', {
                     body: {
                       conversationId,
@@ -178,10 +148,45 @@ export const useWhatsAppActions = () => {
                       systemMessage: true,
                     },
                   });
-                  console.log('[closeConversation] CSAT survey sent to customer');
+                  console.log('[closeConversation] CSAT survey sent — closure message deferred until CSAT completes');
                 }
               } catch (csatErr) {
                 console.error('[closeConversation] Error sending CSAT survey:', csatErr);
+              }
+
+              // Only send closure message immediately if CSAT is NOT enabled
+              if (!csatEnabled) {
+                const msgId = `system_att_closed_${activeAtt.id}`;
+                await supabase.from('whatsapp_messages' as any).upsert({
+                  conversation_id: conversationId,
+                  remote_jid: '',
+                  message_id: msgId,
+                  content: `🔒 Atendimento ${activeAtt.attendance_code} encerrado com sucesso.`,
+                  message_type: 'system',
+                  is_from_me: false,
+                  status: 'sent',
+                  timestamp: now.toISOString(),
+                  tenant_id: profile.tenant_id,
+                  metadata: { system: true, attendance_event: 'closed', attendance_id: activeAtt.id },
+                }, {
+                  onConflict: 'tenant_id,message_id',
+                  ignoreDuplicates: true,
+                });
+
+                try {
+                  const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
+                  await supabase.functions.invoke('send-whatsapp-message', {
+                    body: {
+                      conversationId,
+                      content: closureText,
+                      messageType: 'text',
+                      systemMessage: true,
+                    },
+                  });
+                  console.log('[closeConversation] Closure message sent (no CSAT)');
+                } catch (sendErr) {
+                  console.error('[closeConversation] Error sending closure message:', sendErr);
+                }
               }
             }
           }

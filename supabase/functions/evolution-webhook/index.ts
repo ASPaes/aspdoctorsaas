@@ -1175,12 +1175,16 @@ async function handleCsatResponse(
     const elapsedMinutes = (now.getTime() - askedAt.getTime()) / (1000 * 60);
 
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
-      // Expired — mark as expired and don't consume message
+      // Expired — mark as expired, send deferred closure message, don't consume message
       await supabase
         .from('support_csat')
         .update({ status: 'expired' })
         .eq('id', csat.id);
       console.log(`[csat] CSAT expired for att=${closedAtt.id} (${elapsedMinutes.toFixed(1)} min > ${supportConfig.support_csat_timeout_minutes} min)`);
+
+      // Send deferred closure message now that CSAT is done
+      await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
+
       return false;
     }
 
@@ -1223,6 +1227,9 @@ async function handleCsatResponse(
       if (needsReason) {
         const reasonTemplate = supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?';
         await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, reasonTemplate, { csat: true, csat_reason_prompt: true });
+      } else {
+        // High score — CSAT completed, send deferred closure message
+        await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
       }
 
       return true;
@@ -1247,6 +1254,9 @@ async function handleCsatResponse(
         { csat: true, csat_reason_ack: true }
       );
 
+      // Reason collected — CSAT completed, send deferred closure message
+      await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
+
       return true;
     }
 
@@ -1254,6 +1264,50 @@ async function handleCsatResponse(
   } catch (err) {
     console.error('[csat] Error handling CSAT response:', err);
     return false;
+  }
+}
+
+/**
+ * Send the deferred closure message after CSAT flow completes or expires.
+ * Inserts a system message in the timeline and sends a WhatsApp message to the customer.
+ */
+async function sendDeferredClosureMessage(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  attendanceId: string
+): Promise<void> {
+  try {
+    // Get attendance_code
+    const { data: att } = await supabase
+      .from('support_attendances')
+      .select('attendance_code')
+      .eq('id', attendanceId)
+      .single();
+
+    if (!att?.attendance_code) {
+      console.error(`[csat] Could not find attendance_code for att=${attendanceId}`);
+      return;
+    }
+
+    const code = att.attendance_code;
+
+    // Insert system message in timeline
+    await insertAttendanceSystemMessage(supabase, conversationId, tenantId, attendanceId, code, 'closed');
+
+    // Send closure message to customer via WhatsApp
+    const closureText = `✅ Atendimento *${code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, closureText, {
+      system: true,
+      attendance_event: 'closed',
+      attendance_id: attendanceId,
+      deferred_after_csat: true,
+    });
+
+    console.log(`[csat] Deferred closure message sent for att=${attendanceId} code=${code}`);
+  } catch (err) {
+    console.error(`[csat] Error sending deferred closure message for att=${attendanceId}:`, err);
   }
 }
 
