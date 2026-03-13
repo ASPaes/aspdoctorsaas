@@ -21,6 +21,7 @@ import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { TopicBadges } from "./TopicBadges";
+import { useTenantUsers } from "@/hooks/useTenantUsers";
 
 interface Props {
   conversation: ConversationWithContact;
