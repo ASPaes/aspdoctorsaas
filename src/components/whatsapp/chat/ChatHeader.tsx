@@ -43,7 +43,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
-  // Use attendance status for more accurate status display
+  // Use attendance status as single source of truth for status display
   const { attendanceMap } = useAttendanceStatus([conversation.id]);
   const attendance = attendanceMap.get(conversation.id);
 

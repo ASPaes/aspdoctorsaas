@@ -82,8 +82,20 @@ export const useWhatsAppActions = () => {
         console.error('[closeConversation] Error closing attendance:', e);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, { conversationId }) => {
       toast.success('Conversa encerrada com sucesso');
+      // Optimistic: patch attendance caches immediately
+      queryClient.setQueriesData<Map<string, any>>(
+        { queryKey: ["attendance-status"] },
+        (oldMap) => {
+          if (!oldMap) return oldMap;
+          const entry = oldMap.get(conversationId);
+          if (!entry) return oldMap;
+          const newMap = new Map(oldMap);
+          newMap.set(conversationId, { ...entry, status: "closed", closed_at: new Date().toISOString() });
+          return newMap;
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
     },

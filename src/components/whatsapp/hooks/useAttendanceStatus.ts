@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AttendanceInfo {
@@ -13,14 +13,17 @@ export interface AttendanceInfo {
 /**
  * Fetches active support_attendances for a list of conversation IDs.
  * Returns a Map<conversationId, AttendanceInfo>.
- * For "closed" filter, returns the latest closed attendance per conversation.
+ *
+ * Uses setQueriesData on realtime events to instantly propagate changes
+ * across ALL useAttendanceStatus consumers (sidebar, header, queue indicator).
  */
 export function useAttendanceStatus(
   conversationIds: string[],
   includeClosedFilter = false
 ) {
   const queryClient = useQueryClient();
-  const queryKey = ["attendance-status", conversationIds.sort().join(","), includeClosedFilter];
+  const sortedKey = conversationIds.length > 0 ? conversationIds.slice().sort().join(",") : "";
+  const queryKey = ["attendance-status", sortedKey, includeClosedFilter];
 
   const { data, isLoading } = useQuery({
     queryKey,
@@ -78,27 +81,67 @@ export function useAttendanceStatus(
       return map;
     },
     enabled: conversationIds.length > 0,
-    refetchInterval: 8000,
-    staleTime: 4000,
+    // Fallback polling — only if realtime fails
+    refetchInterval: 10000,
+    staleTime: 2000,
   });
 
-  // Subscribe to realtime changes on support_attendances to invalidate immediately
+  // Patch ALL attendance-status caches immediately on realtime event
+  const patchAllCaches = useCallback((row: any) => {
+    const convId = row.conversation_id as string;
+    const info: AttendanceInfo = {
+      id: row.id,
+      status: row.status,
+      assigned_to: row.assigned_to,
+      opened_at: row.opened_at,
+      closed_at: row.closed_at,
+    };
+
+    // setQueriesData updates ALL matching queries regardless of their specific key
+    queryClient.setQueriesData<Map<string, AttendanceInfo>>(
+      { queryKey: ["attendance-status"] },
+      (oldMap) => {
+        if (!oldMap) return oldMap;
+        // Only patch if this conversation is in this cache's set
+        if (!oldMap.has(convId)) {
+          // For INSERT: check if the old map's query was for this conversation
+          // We can't know for sure, so let invalidation handle adding new entries
+          return oldMap;
+        }
+        const newMap = new Map(oldMap);
+        newMap.set(convId, info);
+        return newMap;
+      }
+    );
+
+    // Also invalidate to pick up new entries (INSERT) and ensure consistency
+    queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+    // Invalidate conversations so sidebar picks up status changes
+    queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+  }, [queryClient]);
+
+  // Single realtime subscription — shared channel name to avoid duplicates
   useEffect(() => {
     const channel = supabase
       .channel("attendance-status-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "support_attendances" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-          // Also invalidate conversations so sidebar re-fetches (status may have changed)
-          queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+        (payload) => {
+          const row = payload.new as any;
+          if (row && row.conversation_id) {
+            patchAllCaches(row);
+          } else {
+            // DELETE or unexpected — just invalidate
+            queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+            queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+          }
         }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, patchAllCaches]);
 
   return {
     attendanceMap: data ?? new Map<string, AttendanceInfo>(),

@@ -32,8 +32,21 @@ export const useConversationAssignment = () => {
 
       return { conversationId, assignedTo };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Optimistic: patch attendance caches so status updates instantly
+      queryClient.setQueriesData<Map<string, any>>(
+        { queryKey: ["attendance-status"] },
+        (oldMap) => {
+          if (!oldMap) return oldMap;
+          const entry = oldMap.get(result.conversationId);
+          if (!entry) return oldMap;
+          const newMap = new Map(oldMap);
+          newMap.set(result.conversationId, { ...entry, status: "in_progress", assigned_to: result.assignedTo });
+          return newMap;
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       toast({ title: "Conversa atribuída", description: "A conversa foi atribuída com sucesso." });
     },
     onError: () => {
@@ -61,8 +74,20 @@ export const useConversationAssignment = () => {
 
       return { conversationId, newAssignee };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      queryClient.setQueriesData<Map<string, any>>(
+        { queryKey: ["attendance-status"] },
+        (oldMap) => {
+          if (!oldMap) return oldMap;
+          const entry = oldMap.get(result.conversationId);
+          if (!entry) return oldMap;
+          const newMap = new Map(oldMap);
+          newMap.set(result.conversationId, { ...entry, assigned_to: result.newAssignee });
+          return newMap;
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       toast({ title: "Conversa transferida", description: "A conversa foi transferida com sucesso." });
     },
     onError: () => {
