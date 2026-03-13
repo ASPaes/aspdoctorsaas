@@ -883,6 +883,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
       if (uraHandled) {
         // URA consumed the message — just increment counter, skip attendance creation
+        // NOTE: If URA closed the attendance (option 0), do NOT reopen the conversation
         incrementAttendanceCounter(supabase, conversationId, 'customer')
           .catch(err => console.error('[evolution-webhook] increment error:', err));
       } else {
@@ -890,17 +891,17 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
           .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
           .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
-      }
 
-      // Also reopen the conversation visually if it was closed
-      supabase
-        .from('whatsapp_conversations')
-        .update({ status: 'active', updated_at: new Date().toISOString() })
-        .eq('id', conversationId)
-        .eq('status', 'closed')
-        .then(({ error: reopenConvErr }: any) => {
-          if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
-        });
+        // Also reopen the conversation visually if it was closed (only for non-URA messages)
+        supabase
+          .from('whatsapp_conversations')
+          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .eq('id', conversationId)
+          .eq('status', 'closed')
+          .then(({ error: reopenConvErr }: any) => {
+            if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
+          });
+      }
     } else {
       // Operator message sent via Evolution (e.g. from phone)
       // If no active attendance, create new one assigned to this operator
