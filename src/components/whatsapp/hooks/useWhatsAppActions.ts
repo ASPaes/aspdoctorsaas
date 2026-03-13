@@ -125,19 +125,23 @@ export const useWhatsAppActions = () => {
               try {
                 const { data: conv } = await supabase
                   .from('whatsapp_conversations')
-                  .select('remote_jid, instance_id, whatsapp_instances(instance_name, server_url)')
+                  .select('instance_id, contact:whatsapp_contacts(phone_number), whatsapp_instances(instance_name, server_url)')
                   .eq('id', conversationId)
                   .single();
 
-                if (conv?.instance_id && conv?.remote_jid) {
-                  const inst = (conv as any).whatsapp_instances;
+                const contact = (conv as any)?.contact;
+                const inst = (conv as any)?.whatsapp_instances;
+                const phone = contact?.phone_number;
+
+                if (conv?.instance_id && phone && inst) {
+                  const remoteJid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
                   const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
 
                   await supabase.functions.invoke('send-whatsapp-message', {
                     body: {
-                      instanceName: inst?.instance_name,
-                      serverUrl: inst?.server_url,
-                      remoteJid: conv.remote_jid,
+                      instanceName: inst.instance_name,
+                      serverUrl: inst.server_url,
+                      remoteJid,
                       message: closureText,
                       conversationId,
                     },
