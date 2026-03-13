@@ -440,12 +440,13 @@ Deno.serve(async (req) => {
         const now = new Date();
         const nowIso = now.toISOString();
 
-        // Try to find active attendance (waiting or in_progress)
+        // Try to find active attendance (waiting or in_progress), most recent first
         let { data: activeAtt } = await supabase
           .from('support_attendances')
-          .select('id, status, assigned_to, msg_agent_count')
+          .select('id, status, assigned_to, msg_agent_count, first_response_at, assumed_at, wait_seconds, opened_at')
           .eq('conversation_id', body.conversationId)
           .in('status', ['waiting', 'in_progress'])
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
@@ -482,7 +483,7 @@ Deno.serve(async (req) => {
             console.error('[send-whatsapp-message] Error creating attendance:', createErr);
           } else {
             console.log(`[attendance] NEW by agent att=${newAtt.id} code=${newAtt.attendance_code} -> in_progress by ${senderUserId}`);
-            activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1 };
+            activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1, first_response_at: nowIso, assumed_at: nowIso, wait_seconds: 0, opened_at: nowIso } as any;
           }
 
           // Reopen conversation visually AND sync assigned_to
@@ -498,11 +499,22 @@ Deno.serve(async (req) => {
             updated_at: nowIso,
           };
 
-          if (activeAtt.status === 'waiting' && !activeAtt.assigned_to) {
-            update.assigned_to = senderUserId;
+          // If status is 'waiting', ALWAYS transition to 'in_progress' when operator sends a message
+          // The act of sending IS "assuming" — no need to click "Assumir"
+          if (activeAtt.status === 'waiting') {
             update.status = 'in_progress';
-            update.first_response_at = nowIso;
-            update.assumed_at = nowIso;
+            update.assigned_to = senderUserId;
+            if (!activeAtt.first_response_at) {
+              update.first_response_at = nowIso;
+            }
+            if (!activeAtt.assumed_at) {
+              update.assumed_at = nowIso;
+            }
+            if (activeAtt.wait_seconds === 0 && activeAtt.opened_at) {
+              const waitMs = now.getTime() - new Date(activeAtt.opened_at).getTime();
+              update.wait_seconds = Math.max(0, Math.floor(waitMs / 1000));
+            }
+            console.log(`[send-whatsapp-message] Transitioning attendance ${activeAtt.id} from waiting -> in_progress`);
           }
 
           const { error: updateErr } = await supabase
@@ -513,12 +525,12 @@ Deno.serve(async (req) => {
           if (updateErr) {
             console.error('[send-whatsapp-message] Error updating attendance:', updateErr);
           } else {
-            if (update.assigned_to) {
-              console.log(`[send-whatsapp-message] ✅ Attendance ${activeAtt.id} auto-assigned to ${senderUserId}`);
+            if (update.assigned_to || update.status) {
+              console.log(`[send-whatsapp-message] ✅ Attendance ${activeAtt.id} -> status=${update.status || activeAtt.status}, assigned_to=${update.assigned_to || activeAtt.assigned_to}`);
               // Sync assigned_to on conversation too
               await supabase
                 .from('whatsapp_conversations')
-                .update({ assigned_to: senderUserId, status: 'active', updated_at: nowIso })
+                .update({ assigned_to: update.assigned_to || activeAtt.assigned_to, status: 'active', updated_at: nowIso })
                 .eq('id', body.conversationId);
             }
             console.log(`[send-whatsapp-message] ✅ msg_agent_count incremented on ${activeAtt.id}`);
