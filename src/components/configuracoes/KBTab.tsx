@@ -160,9 +160,22 @@ export default function KBTab() {
     });
   };
 
-  const archive = (id: string) => {
-    updateMutation.mutate({ id, payload: { status: "archived" } });
-  };
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("support_kb_articles")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kb_articles"] });
+      toast.success("Artigo excluído");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir: " + err.message);
+    },
+  });
 
   if (isLoading) {
     return (
