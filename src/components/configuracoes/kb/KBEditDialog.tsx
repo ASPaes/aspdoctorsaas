@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ExternalLink, RefreshCw, Trash2, Sparkles } from "lucide-react";
+import { ExternalLink, RefreshCw, Trash2, Sparkles, Send } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
