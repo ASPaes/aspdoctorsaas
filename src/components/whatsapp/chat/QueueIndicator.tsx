@@ -25,7 +25,8 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const effectiveStatus = attendance?.status;
 
   const isAssignedToMe = effectiveAssignedTo === user?.id;
-  const isInQueue = !effectiveAssignedTo || effectiveStatus === "waiting";
+  // Only show as "queue" if status=waiting AND no one is assigned
+  const isInQueue = effectiveStatus === "waiting" && !effectiveAssignedTo;
   const isInProgress = effectiveStatus === "in_progress";
 
   const handleClaim = () => {
@@ -34,15 +35,20 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   };
 
   // Chip display
-  const chipConfig = isInQueue && !isAssignedToMe
+  const chipConfig = isInQueue
     ? { icon: Users, label: "Na fila", className: "bg-warning/10 text-warning border-warning/20" }
     : isAssignedToMe && isInProgress
       ? { icon: User, label: "Comigo", className: "bg-primary/10 text-primary border-primary/20" }
       : isAssignedToMe
         ? { icon: Clock, label: "Comigo (fila)", className: "bg-primary/10 text-primary border-primary/20" }
-        : { icon: UserCheck, label: "Atribuída", className: "bg-accent/10 text-accent border-accent/20" };
+        : effectiveAssignedTo
+          ? { icon: UserCheck, label: "Atribuída", className: "bg-accent/10 text-accent border-accent/20" }
+          : { icon: Users, label: "Sem atendimento", className: "bg-muted text-muted-foreground border-border" };
 
   const ChipIcon = chipConfig.icon;
+
+  // Assumir button: only when in queue (waiting + no assigned_to)
+  const canClaim = isInQueue && !isAssignedToMe;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -62,7 +68,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
       </Tooltip>
 
       {/* Primary action button */}
-      {isInQueue && !isAssignedToMe ? (
+      {canClaim ? (
         <Button
           variant="default"
           size="sm"

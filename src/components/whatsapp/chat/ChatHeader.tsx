@@ -21,6 +21,7 @@ import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { TopicBadges } from "./TopicBadges";
+import { useTenantUsers } from "@/hooks/useTenantUsers";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -46,6 +47,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   // Use attendance status as single source of truth for status display
   const { attendanceMap } = useAttendanceStatus([conversation.id]);
   const attendance = attendanceMap.get(conversation.id);
+
+  // Resolve assigned operator name
+  const { data: tenantUsers } = useTenantUsers();
+  const assignedOperatorName = useMemo(() => {
+    const assignedTo = attendance?.assigned_to;
+    if (!assignedTo || !tenantUsers) return null;
+    const u = tenantUsers.find((tu) => tu.user_id === assignedTo);
+    return u?.email?.split("@")[0] || u?.email || null;
+  }, [attendance?.assigned_to, tenantUsers]);
 
   const effectiveStatus = useMemo(() => {
     if (attendance) {
@@ -91,6 +101,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </Button>
               <Badge variant={statusVariant as any} className="text-[10px] h-4 shrink-0 whitespace-nowrap">{statusLabel}</Badge>
+              {assignedOperatorName && (
+                <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
+                  Técnico: {assignedOperatorName}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number}</p>
           </div>

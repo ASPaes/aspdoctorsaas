@@ -880,9 +880,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
         });
     } else {
-      // Operator message sent via Evolution (e.g. from phone) — increment agent count
-      incrementAttendanceCounter(supabase, conversationId, 'agent')
-        .catch(err => console.error('[evolution-webhook] incrementAgentCount error:', err));
+      // Operator message sent via Evolution (e.g. from phone)
+      // If no active attendance, create new one assigned to this operator
+      ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
+        .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
+        .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpsert:', error);
@@ -954,15 +956,26 @@ async function ensureAttendanceForIncomingMessage(
     }
 
     // 1.1) Within reopen window AND status is 'closed' (NOT inactive_closed): reopen same
+    //      STICKY: assign back to the last operator so it goes straight to "in_progress"
     if (lastClosed && diffMinutes <= reopenWindowMinutes && lastClosed.status === 'closed') {
-      // Reopen: preserve closed history, set reopened fields
+      // Fetch the last operator (assigned_to) from the closed attendance
+      const { data: closedFull } = await supabase
+        .from('support_attendances')
+        .select('assigned_to')
+        .eq('id', lastClosed.id)
+        .single();
+
+      const lastOperator = closedFull?.assigned_to ?? null;
+
+      // Reopen: sticky to last operator → in_progress; if no operator → waiting (queue)
       const { error: reopenErr } = await supabase
         .from('support_attendances')
         .update({
-          status: 'waiting',
+          status: lastOperator ? 'in_progress' : 'waiting',
+          assigned_to: lastOperator,
+          assumed_at: lastOperator ? nowIso : null,
           reopened_at: nowIso,
           reopened_from: 'customer',
-          // Preserve closed_at, closed_by, closed_reason as historical record
           // Reset metrics for the new session
           wait_seconds: 0,
           handle_seconds: 0,
@@ -973,7 +986,7 @@ async function ensureAttendanceForIncomingMessage(
       if (reopenErr) {
         console.error('[attendance] Error reopening:', reopenErr);
       } else {
-        console.log(`[attendance] REOPEN by customer att=${lastClosed.id} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
+        console.log(`[attendance] REOPEN by customer att=${lastClosed.id} assigned_to=${lastOperator} status=${lastOperator ? 'in_progress' : 'waiting'} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
       }
       return;
     }
@@ -1000,6 +1013,59 @@ async function ensureAttendanceForIncomingMessage(
     }
   } catch (err) {
     console.error('[attendance] Unexpected error:', err);
+  }
+}
+
+/**
+ * Ensure attendance exists when an OPERATOR sends a message.
+ * If no active attendance → create new one as in_progress (operator-initiated).
+ * If active attendance exists → skip (counter incremented separately).
+ */
+async function ensureAttendanceForOperatorMessage(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+  _instanceId: string
+): Promise<void> {
+  try {
+    const { data: activeAtt } = await supabase
+      .from('support_attendances')
+      .select('id, status, assigned_to')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+
+    if (activeAtt) {
+      console.log(`[attendance-operator] Active attendance exists: ${activeAtt.id} (${activeAtt.status})`);
+      return;
+    }
+
+    // No active attendance — create new one (operator-initiated)
+    const nowIso = new Date().toISOString();
+    const { data: newAtt, error: createErr } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        status: 'in_progress',
+        opened_at: nowIso,
+        assumed_at: nowIso,
+        opened_by: null,
+        created_from: 'operator',
+      })
+      .select('id, attendance_code')
+      .single();
+
+    if (createErr) {
+      console.error('[attendance-operator] Error creating:', createErr);
+    } else {
+      console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
+    }
+  } catch (err) {
+    console.error('[attendance-operator] Unexpected error:', err);
   }
 }
 

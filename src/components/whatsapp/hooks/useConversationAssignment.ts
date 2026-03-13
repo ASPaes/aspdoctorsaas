@@ -30,6 +30,27 @@ export const useConversationAssignment = () => {
         reason: reason || null,
       } as any);
 
+      // Also update the active attendance: set assigned_to + status=in_progress
+      const { data: activeAtt } = await supabase
+        .from('support_attendances')
+        .select('id, status')
+        .eq('conversation_id', conversationId)
+        .in('status', ['waiting', 'in_progress'])
+        .limit(1)
+        .maybeSingle();
+
+      if (activeAtt) {
+        await supabase
+          .from('support_attendances')
+          .update({
+            assigned_to: assignedTo,
+            status: 'in_progress',
+            assumed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', activeAtt.id);
+      }
+
       return { conversationId, assignedTo };
     },
     onSuccess: (result) => {
