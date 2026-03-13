@@ -119,7 +119,9 @@ Conversa com: ${contactName}
 ${messagesText}
 
 Retorne APENAS um JSON válido sem markdown:
-{ "summary": "Resumo da conversa (máx 200 palavras)", "key_points": ["Ponto 1", "Ponto 2"], "action_items": ["Ação 1"], "sentiment": "positive" }`;
+{ "summary": "Resumo da conversa (máx 200 palavras)", "key_points": ["Ponto 1", "Ponto 2"], "action_items": ["Ação 1"], "sentiment": "positive", "tags": ["palavra1", "palavra2"] }
+
+REGRAS para "tags": devem ser palavras-chave únicas e curtas (1-2 palavras no máximo), como tópicos. Exemplos: "suporte", "financeiro", "cancelamento", "certificado", "caixa", "nota fiscal". NÃO use frases longas.`;
 
     let result: any;
     try {
