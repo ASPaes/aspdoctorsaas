@@ -119,7 +119,9 @@ Conversa com: ${contactName}
 ${messagesText}
 
 Retorne APENAS um JSON válido sem markdown:
-{ "summary": "Resumo da conversa (máx 200 palavras)", "key_points": ["Ponto 1", "Ponto 2"], "action_items": ["Ação 1"], "sentiment": "positive" }`;
+{ "summary": "Resumo da conversa (máx 200 palavras)", "key_points": ["Ponto 1", "Ponto 2"], "action_items": ["Ação 1"], "sentiment": "positive", "tags": ["palavra1", "palavra2"] }
+
+REGRAS para "tags": devem ser palavras-chave únicas e curtas (1-2 palavras no máximo), como tópicos. Exemplos: "suporte", "financeiro", "cancelamento", "certificado", "caixa", "nota fiscal". NÃO use frases longas.`;
 
     let result: any;
     try {
@@ -173,7 +175,7 @@ Retorne APENAS um JSON válido sem markdown:
           ai_summary: result.summary?.substring(0, 200) || null,
           ai_problem: result.summary || null,
           ai_solution: (result.action_items || []).join("\n") || null,
-          ai_tags: result.key_points || [],
+          ai_tags: result.tags || result.key_points || [],
           updated_at: new Date().toISOString(),
         })
         .eq("id", attendanceId);
