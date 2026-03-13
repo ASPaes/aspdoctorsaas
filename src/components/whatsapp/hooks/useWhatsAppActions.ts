@@ -48,9 +48,20 @@ export const useWhatsAppActions = () => {
 
   const closeMutation = useMutation({
     mutationFn: async ({ conversationId, generateSummary }: { conversationId: string; generateSummary: boolean }) => {
+      // Fetch active attendance early so we can scope the summary
+      const { data: activeAtt } = await supabase
+        .from('support_attendances')
+        .select('id, opened_at, assumed_at, attendance_code')
+        .eq('conversation_id', conversationId)
+        .neq('status', 'closed')
+        .limit(1)
+        .maybeSingle();
+
       if (generateSummary) {
         try {
-          await supabase.functions.invoke('generate-conversation-summary', { body: { conversationId } });
+          await supabase.functions.invoke('generate-conversation-summary', {
+            body: { conversationId, attendanceId: activeAtt?.id || undefined },
+          });
         } catch (e) { console.error('Erro ao gerar resumo:', e); }
       }
 
