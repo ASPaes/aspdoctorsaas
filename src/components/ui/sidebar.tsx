@@ -17,9 +17,9 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "15rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 320;
-const SIDEBAR_WIDTH_STORAGE_KEY = "sidebar:width";
+const SIDEBAR_DEFAULT_WIDTH = 248;
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContext = {
