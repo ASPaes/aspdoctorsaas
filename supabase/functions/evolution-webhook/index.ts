@@ -942,7 +942,8 @@ async function sendUraWelcome(
   contactId: string,
   tenantId: string,
   attendanceId: string,
-  supportConfig: any
+  supportConfig: any,
+  attendanceCode?: string
 ): Promise<void> {
   try {
     if (!supportConfig.support_ura_enabled) {
@@ -964,14 +965,17 @@ async function sendUraWelcome(
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
 
+    // Prepend attendance code header if available
+    const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
+
     let fullMessage: string;
     if (areas && areas.length > 0) {
       // Append numbered options from support_areas
       const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
-      fullMessage = `${welcomeText}\n\n${optionsList}`;
+      fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
     } else {
       // No support_areas — template already contains the options
-      fullMessage = welcomeText;
+      fullMessage = `${codeHeader}${welcomeText}`;
       console.log('[ura] No support_areas found, sending template as-is');
     }
 
@@ -1126,7 +1130,7 @@ async function handleUraResponse(
   // Find active waiting attendance with URA sent
   const { data: att } = await supabase
     .from('support_attendances')
-    .select('id, ura_sent_at, area_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
+    .select('id, attendance_code, ura_sent_at, area_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
     .eq('conversation_id', conversationId)
     .eq('status', 'waiting')
     .not('ura_sent_at', 'is', null)
@@ -1214,9 +1218,13 @@ async function handleUraResponse(
       .update({ status: 'closed', updated_at: nowIso })
       .eq('id', conversationId);
     console.log(`[ura] Customer chose to close attendance+conversation att=${att.id} conv=${conversationId}`);
+    const code = att.attendance_code || '';
+    const closeText = code
+      ? `✅ Atendimento *${code}* encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. Estamos à disposição! 😊`
+      : '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!';
     await sendAndPersistAutoMessage(
       supabase, instanceCtx, conversationId, tenantId,
-      '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!',
+      closeText,
       { ura: true, ura_closed: true }
     );
     return true;
@@ -1474,7 +1482,7 @@ async function ensureAttendanceForIncomingMessage(
         .catch(err => console.error('[attendance] Error inserting system msg:', err));
       // Fire-and-forget: send URA welcome message if enabled
       if (instanceCtx) {
-        sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig)
+        sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
           .catch(err => console.error('[ura] Error in sendUraWelcome:', err));
       }
     }
