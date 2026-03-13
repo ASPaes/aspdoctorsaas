@@ -144,9 +144,10 @@ export const useWhatsAppActions = () => {
         }
       );
     },
-    onSuccess: () => {
+    onSuccess: (conversationId) => {
       toast.success('Conversa encerrada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
     },
     onError: () => {
       toast.error('Erro ao encerrar conversa');
