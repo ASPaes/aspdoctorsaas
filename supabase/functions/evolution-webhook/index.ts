@@ -1056,9 +1056,61 @@ async function sendEvolutionText(
   return { ok: true, messageId: data.key?.id };
 }
 
+// --- Message pools for natural, varied responses ---
+
+const INVALID_OPTION_MESSAGES = [
+  'Hmm, não consegui entender sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
+  'Opa, não identifiquei a opção escolhida. Poderia enviar só o número correspondente? 🙏',
+  'Desculpe, não entendi! Envie apenas o número da opção desejada para eu te direcionar.',
+  'Não reconheci a opção. Tente enviar só o número, por favor! 😊',
+];
+
+const WAITING_AGENT_MESSAGES = [
+  'Pode ficar tranquilo! Você já está na fila e será atendido em breve 😊',
+  'Recebemos sua mensagem! Um atendente já vai te chamar, aguarde só mais um pouquinho 🙏',
+  'Fique tranquilo, já estamos direcionando seu atendimento. Em breve alguém vai te ajudar!',
+  'Sua mensagem foi recebida! Estamos encaminhando, aguarde um momento ⏳',
+];
+
+const HUMAN_FALLBACK_MESSAGES = [
+  'Entendido! Vou te direcionar para um atendente agora mesmo. Aguarde um momento 😊',
+  'Sem problemas! Já estou encaminhando você para um atendente humano. Aguarde! 🙏',
+  'Certo! Vamos te conectar com um atendente. Só um instante!',
+];
+
+const HUMAN_INTENT_AFTER_RETRIES_MESSAGES = [
+  'Percebi que está com dificuldade. Vou te encaminhar direto para um atendente 😊',
+  'Tudo bem! Vou direcionar você para um atendente que pode te ajudar melhor. Aguarde!',
+];
+
+/** Simple human-intent detector — checks for common phrases indicating desire to talk to a person */
+function detectsHumanIntent(text: string): boolean {
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .trim();
+
+  const patterns = [
+    /\b(quero|preciso|gostaria|desejo)\b.*(falar|conversar|atendimento|ajuda|contato|atendente|humano|pessoa|suporte|operador)/,
+    /\b(falar|conversar)\b.*(alguem|pessoa|humano|atendente|operador|suporte)/,
+    /\b(atendente|humano|suporte|operador|pessoa|ajuda)\b/,
+    /\bme\s+atend[ea]/,
+    /\bpreciso\s+de\s+ajuda\b/,
+    /\bfalar\s+com\s+(voce|vc|alguem)\b/,
+  ];
+
+  return patterns.some(p => p.test(normalized));
+}
+
+/** Pick a random message from a pool */
+function pickRandom(pool: string[]): string {
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 /**
- * Handle an incoming customer message when the attendance is waiting + URA sent.
- * Returns true if the message was consumed as a URA response.
+ * Handle an incoming customer message when the attendance is waiting + URA active.
+ * Returns true if the message was consumed (URA response, waiting ack, human intent, etc.).
  */
 async function handleUraResponse(
   supabase: any,
@@ -1070,20 +1122,44 @@ async function handleUraResponse(
 ): Promise<boolean> {
   if (!supportConfig.support_ura_enabled) return false;
 
-  // Check if there's an active waiting attendance with URA sent but no area selected
+  // Find active waiting attendance with URA sent
   const { data: att } = await supabase
     .from('support_attendances')
-    .select('id, ura_sent_at, area_id')
+    .select('id, ura_sent_at, area_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
     .eq('conversation_id', conversationId)
     .eq('status', 'waiting')
     .not('ura_sent_at', 'is', null)
-    .is('area_id', null)
     .limit(1)
     .maybeSingle();
 
   if (!att) return false;
 
-  // Fetch active support areas (same order as sent)
+  // If already assigned to an agent, don't intercept — let normal chat flow handle it
+  if (att.assigned_to) return false;
+
+  // If already fell back to human, send "waiting for agent" message
+  if (att.ura_human_fallback) {
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
+    return true;
+  }
+
+  // If area already selected (valid URA choice made), send "waiting" message
+  if (att.area_id || att.ura_option_selected !== null) {
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
+    return true;
+  }
+
+  const trimmed = (messageContent || '').trim();
+
+  // --- 1. Detect human intent ---
+  if (detectsHumanIntent(trimmed)) {
+    console.log(`[ura] Human intent detected: "${trimmed}" conv=${conversationId}`);
+    await markHumanFallback(supabase, att.id);
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(HUMAN_FALLBACK_MESSAGES));
+    return true;
+  }
+
+  // --- 2. Validate numeric option ---
   const { data: areas } = await supabase
     .from('support_areas')
     .select('id, nome')
@@ -1092,40 +1168,35 @@ async function handleUraResponse(
     .order('nome');
 
   const hasAreas = areas && areas.length > 0;
-  const trimmed = (messageContent || '').trim();
   const optionNumber = parseInt(trimmed, 10);
-
-  // Determine max option: from support_areas count, or parse from template
   const maxOption = hasAreas ? areas.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || '');
 
   // Invalid option
   if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
-    console.log(`[ura] Invalid option: "${trimmed}" (expected 0-${maxOption}) conv=${conversationId}`);
-    const invalidTemplate = supportConfig.support_ura_invalid_option_template || '';
-    if (invalidTemplate) {
-      const sent = await sendEvolutionText(instanceCtx, invalidTemplate);
-      if (sent.ok) {
-        const nowIso = new Date().toISOString();
-        await supabase.from('whatsapp_messages').insert({
-          conversation_id: conversationId,
-          remote_jid: instanceCtx.remoteJid,
-          message_id: sent.messageId || `ura_inv_${Date.now()}`,
-          content: invalidTemplate,
-          message_type: 'text',
-          is_from_me: true,
-          status: 'sent',
-          timestamp: nowIso,
-          tenant_id: tenantId,
-          metadata: { ura: true, ura_invalid: true },
-        });
-        await supabase.from('whatsapp_conversations').update({
-          last_message_at: nowIso,
-          last_message_preview: invalidTemplate.substring(0, 200),
-          is_last_message_from_me: true,
-        }).eq('id', conversationId);
-      }
+    const currentInvalid = (att.ura_invalid_count || 0) + 1;
+    console.log(`[ura] Invalid option: "${trimmed}" (attempt ${currentInvalid}/4) conv=${conversationId}`);
+
+    // Update counter
+    await supabase
+      .from('support_attendances')
+      .update({ ura_invalid_count: currentInvalid, updated_at: new Date().toISOString() })
+      .eq('id', att.id);
+
+    // --- 4. After 4 invalid attempts, fallback to human ---
+    if (currentInvalid >= 4) {
+      console.log(`[ura] Max retries reached (${currentInvalid}), fallback to human conv=${conversationId}`);
+      await markHumanFallback(supabase, att.id);
+      await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(HUMAN_INTENT_AFTER_RETRIES_MESSAGES));
+      return true;
     }
-    return true; // consumed as URA interaction
+
+    // Send varied invalid message
+    await sendAndPersistAutoMessage(
+      supabase, instanceCtx, conversationId, tenantId,
+      pickRandom(INVALID_OPTION_MESSAGES),
+      { ura: true, ura_invalid: true }
+    );
+    return true;
   }
 
   // Option 0 = close attendance
@@ -1136,23 +1207,15 @@ async function handleUraResponse(
       .update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, updated_at: nowIso })
       .eq('id', att.id);
     console.log(`[ura] Customer chose to close attendance att=${att.id} conv=${conversationId}`);
-    const closeText = '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!';
-    const sent = await sendEvolutionText(instanceCtx, closeText);
-    if (sent.ok) {
-      await supabase.from('whatsapp_messages').insert({
-        conversation_id: conversationId, remote_jid: instanceCtx.remoteJid,
-        message_id: sent.messageId || `ura_close_${Date.now()}`, content: closeText,
-        message_type: 'text', is_from_me: true, status: 'sent', timestamp: nowIso,
-        tenant_id: tenantId, metadata: { ura: true, ura_closed: true },
-      });
-      await supabase.from('whatsapp_conversations').update({
-        last_message_at: nowIso, last_message_preview: closeText.substring(0, 200), is_last_message_from_me: true,
-      }).eq('id', conversationId);
-    }
+    await sendAndPersistAutoMessage(
+      supabase, instanceCtx, conversationId, tenantId,
+      '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!',
+      { ura: true, ura_closed: true }
+    );
     return true;
   }
 
-  // Valid option — assign area if available
+  // Valid option — assign area
   const nowIso = new Date().toISOString();
   const selectedArea = hasAreas ? areas[optionNumber - 1] : null;
   const areaName = selectedArea?.nome || `Opção ${optionNumber}`;
@@ -1172,30 +1235,60 @@ async function handleUraResponse(
 
   console.log(`[ura] Area selected: ${areaName} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
 
-  // Send confirmation message
   const confirmText = `✅ Você escolheu *${areaName}*. Aguarde, em breve um atendente irá te ajudar!`;
-  const sent = await sendEvolutionText(instanceCtx, confirmText);
-  if (sent.ok) {
-    await supabase.from('whatsapp_messages').insert({
-      conversation_id: conversationId,
-      remote_jid: instanceCtx.remoteJid,
-      message_id: sent.messageId || `ura_conf_${Date.now()}`,
-      content: confirmText,
-      message_type: 'text',
-      is_from_me: true,
-      status: 'sent',
-      timestamp: nowIso,
-      tenant_id: tenantId,
-      metadata: { ura: true, ura_confirmed: true, area_id: selectedArea?.id || null },
-    });
-    await supabase.from('whatsapp_conversations').update({
-      last_message_at: nowIso,
-      last_message_preview: confirmText.substring(0, 200),
-      is_last_message_from_me: true,
-    }).eq('id', conversationId);
-  }
+  await sendAndPersistAutoMessage(
+    supabase, instanceCtx, conversationId, tenantId,
+    confirmText,
+    { ura: true, ura_confirmed: true, area_id: selectedArea?.id || null }
+  );
 
   return true;
+}
+
+/** Mark attendance as human-fallback: ready for human queue without URA completion */
+async function markHumanFallback(supabase: any, attendanceId: string): Promise<void> {
+  const nowIso = new Date().toISOString();
+  await supabase
+    .from('support_attendances')
+    .update({
+      ura_human_fallback: true,
+      updated_at: nowIso,
+    })
+    .eq('id', attendanceId);
+}
+
+/** Send a text message via Evolution API and persist it in whatsapp_messages + update conversation preview */
+async function sendAndPersistAutoMessage(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  text: string,
+  metadata?: Record<string, any>
+): Promise<void> {
+  const sent = await sendEvolutionText(instanceCtx, text);
+  if (!sent.ok) {
+    console.error('[ura] Error sending auto message:', sent.error);
+    return;
+  }
+  const nowIso = new Date().toISOString();
+  await supabase.from('whatsapp_messages').insert({
+    conversation_id: conversationId,
+    remote_jid: instanceCtx.remoteJid,
+    message_id: sent.messageId || `ura_auto_${Date.now()}`,
+    content: text,
+    message_type: 'text',
+    is_from_me: true,
+    status: 'sent',
+    timestamp: nowIso,
+    tenant_id: tenantId,
+    metadata: metadata || { ura: true },
+  });
+  await supabase.from('whatsapp_conversations').update({
+    last_message_at: nowIso,
+    last_message_preview: text.substring(0, 200),
+    is_last_message_from_me: true,
+  }).eq('id', conversationId);
 }
 
 /**
