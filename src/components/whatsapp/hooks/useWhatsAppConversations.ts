@@ -186,13 +186,23 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         table: 'whatsapp_conversations'
       }, (payload) => {
         const updated = payload.new as any;
-        // Patch the specific conversation in cache instead of full refetch
+        // Patch the specific conversation in cache and re-sort
         queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
           if (!old?.conversations) return old;
           const idx = old.conversations.findIndex((c: any) => c.id === updated.id);
-          if (idx === -1) return old; // new conversation — need full refetch
+          if (idx === -1) {
+            // Conversation not in current page — invalidate to pick it up
+            queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+            return old;
+          }
           const patched = [...old.conversations];
-          patched[idx] = { ...patched[idx], ...updated };
+          patched[idx] = { ...patched[idx], ...updated, unread_count: parseInt(String(updated.unread_count ?? patched[idx].unread_count ?? 0), 10) || 0 };
+          // Re-sort by last_message_at descending so most recent is always first
+          patched.sort((a: any, b: any) => {
+            const tA = a.last_message_at || a.created_at || '';
+            const tB = b.last_message_at || b.created_at || '';
+            return tB.localeCompare(tA);
+          });
           return { ...old, conversations: patched };
         });
       })

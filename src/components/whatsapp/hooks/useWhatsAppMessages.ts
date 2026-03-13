@@ -211,6 +211,8 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         );
         // Notify listeners (smart scroll)
         newMessageCallbackRef.current?.(normalizedNewMsg);
+        // Also ensure the sidebar conversations list updates (preview, ordering)
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       })
       .on('postgres_changes', {
         event: 'UPDATE',
