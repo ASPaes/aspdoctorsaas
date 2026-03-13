@@ -16,7 +16,6 @@ import { useConversationTopics } from "../hooks/useConversationTopics";
 import { useCategorizeConversation } from "../hooks/useCategorizeConversation";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useKBDraft } from "../hooks/useKBDraft";
-import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
