@@ -74,11 +74,12 @@ export function ConversationList({ selectedId, onSelect }: Props) {
                 key={conv.id}
                 onClick={() => onSelect(conv)}
                 className={cn(
-                  "w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
+                  "w-full grid gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
                   selectedId === conv.id && "bg-accent"
                 )}
+                style={{ gridTemplateColumns: "40px minmax(0, 1fr) max-content" }}
               >
-                <Avatar className="h-10 w-10 shrink-0">
+                <Avatar className="h-10 w-10 shrink-0 self-center">
                   {conv.contact_profile_picture && (
                     <AvatarImage src={conv.contact_profile_picture} />
                   )}
@@ -87,25 +88,26 @@ export function ConversationList({ selectedId, onSelect }: Props) {
                   </AvatarFallback>
                 </Avatar>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate">
-                      {conv.contact_name || conv.contact_phone}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+                <div className="min-w-0 overflow-hidden self-center">
+                  <p className="text-sm font-medium truncate">
+                    {conv.contact_name || conv.contact_phone}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {conv.last_message_preview || "Sem mensagens"}
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-end gap-1 self-start whitespace-nowrap shrink-0">
+                  {conv.last_message_at && (
+                    <span className="text-[10px] text-muted-foreground">
                       {formatTime(conv.last_message_at)}
                     </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-xs text-muted-foreground truncate">
-                      {conv.last_message_preview || "Sem mensagens"}
-                    </p>
-                    {conv.unread_count > 0 && (
-                      <Badge variant="default" className="h-5 min-w-5 px-1.5 text-[10px] shrink-0 ml-2">
-                        {conv.unread_count > 99 ? "99+" : conv.unread_count}
-                      </Badge>
-                    )}
-                  </div>
+                  )}
+                  {conv.unread_count > 0 && (
+                    <Badge variant="default" className="h-5 min-w-5 px-1.5 text-[10px] shrink-0">
+                      {conv.unread_count > 99 ? "99+" : conv.unread_count}
+                    </Badge>
+                  )}
                 </div>
               </button>
             ))}

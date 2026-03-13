@@ -48,19 +48,19 @@ function KanbanCard({ ticket, index, onView, onEdit, onChangeStatus }: { ticket:
   return (
     <Draggable draggableId={ticket.id} index={index}>
       {(provided, snapshot) => (
-        <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`group relative p-3 rounded-lg border border-l-4 ${PRIORIDADE_BORDER[ticket.prioridade]} bg-card transition-shadow cursor-grab active:cursor-grabbing ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md'}`}>
+        <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} className={`group relative p-3 rounded-lg border border-l-4 ${PRIORIDADE_BORDER[ticket.prioridade]} bg-card transition-shadow cursor-grab active:cursor-grabbing min-w-0 ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/20' : 'hover:shadow-md'}`}>
           <div className="absolute top-2 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="flex items-start justify-between gap-2 mb-2 pl-4" onClick={onView}>
-            <div className="flex items-center gap-1.5 min-w-0 cursor-pointer">
+          <div className="flex items-start justify-between gap-2 mb-2 pl-4 min-w-0" onClick={onView}>
+            <div className="flex items-center gap-1.5 min-w-0 flex-1 cursor-pointer">
               {ticket.cliente_id ? <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> : <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-              <span className="text-sm font-medium truncate">{ticket.cliente?.nome_fantasia || ticket.cliente?.razao_social || 'Interno'}</span>
+              <span className="text-sm font-medium truncate min-w-0">{ticket.cliente?.nome_fantasia || ticket.cliente?.razao_social || 'Interno'}</span>
               {ticket.escalado && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"><MoreVertical className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"><MoreVertical className="h-3.5 w-3.5" /></Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(); }}><Eye className="h-4 w-4 mr-2" /> Ver detalhes</DropdownMenuItem>
@@ -71,10 +71,10 @@ function KanbanCard({ ticket, index, onView, onEdit, onChangeStatus }: { ticket:
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-2 pl-4 cursor-pointer" onClick={onView}>{ticket.assunto}</p>
-          <div className="flex items-center justify-between gap-2 pl-4">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{CS_TICKET_TIPO_LABELS[ticket.tipo]}</Badge>
-            <Badge className={`text-[10px] px-1.5 py-0 ${PRIORIDADE_COLORS[ticket.prioridade]}`}>{CS_TICKET_PRIORIDADE_LABELS[ticket.prioridade]}</Badge>
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-2 pl-4 cursor-pointer min-w-0" onClick={onView}>{ticket.assunto}</p>
+          <div className="flex items-center justify-between gap-2 pl-4 min-w-0">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap shrink-0">{CS_TICKET_TIPO_LABELS[ticket.tipo]}</Badge>
+            <Badge className={`text-[10px] px-1.5 py-0 whitespace-nowrap shrink-0 ${PRIORIDADE_COLORS[ticket.prioridade]}`}>{CS_TICKET_PRIORIDADE_LABELS[ticket.prioridade]}</Badge>
           </div>
           {followupDate && (
             <div className={`flex items-center gap-1 mt-2 pl-4 text-[10px] ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
