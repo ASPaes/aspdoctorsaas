@@ -1635,6 +1635,8 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          ura_option_selected: number | null
+          ura_sent_at: string | null
           wait_seconds: number
         }
         Insert: {
@@ -1672,6 +1674,8 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          ura_option_selected?: number | null
+          ura_sent_at?: string | null
           wait_seconds?: number
         }
         Update: {
@@ -1709,6 +1713,8 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          ura_option_selected?: number | null
+          ura_sent_at?: string | null
           wait_seconds?: number
         }
         Relationships: [
