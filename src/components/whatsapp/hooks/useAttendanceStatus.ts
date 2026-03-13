@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface AttendanceInfo {
   id: string;
@@ -14,50 +15,69 @@ export interface AttendanceInfo {
  * Fetches active support_attendances for a list of conversation IDs.
  * Returns a Map<conversationId, AttendanceInfo>.
  *
- * Uses setQueriesData on realtime events to instantly propagate changes
- * across ALL useAttendanceStatus consumers (sidebar, header, queue indicator).
+ * Each hook instance creates its own uniquely-named Supabase Realtime channel
+ * so that unmounting one consumer (e.g. ChatHeader) does NOT kill the
+ * subscription used by another consumer (e.g. ConversationsSidebar).
+ *
+ * On every realtime event the handler uses setQueriesData to patch ALL
+ * attendance-status caches instantly, keeping Sidebar + Header in sync.
  */
 export function useAttendanceStatus(
   conversationIds: string[],
   includeClosedFilter = false
 ) {
   const queryClient = useQueryClient();
-  const sortedKey = conversationIds.length > 0 ? conversationIds.slice().sort().join(",") : "";
+  const { profile } = useAuth();
+  const tenantId = profile?.tenant_id;
+
+  const sortedKey =
+    conversationIds.length > 0
+      ? conversationIds.slice().sort().join(",")
+      : "";
   const queryKey = ["attendance-status", sortedKey, includeClosedFilter];
 
   const { data, isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
-      if (conversationIds.length === 0) return new Map<string, AttendanceInfo>();
+      if (conversationIds.length === 0)
+        return new Map<string, AttendanceInfo>();
 
       // Fetch non-closed (active) attendances
       const { data: activeRows } = await supabase
         .from("support_attendances")
-        .select("id, conversation_id, status, assigned_to, opened_at, closed_at")
+        .select(
+          "id, conversation_id, status, assigned_to, opened_at, closed_at"
+        )
         .in("conversation_id", conversationIds)
-        .in("status", ["waiting", "in_progress"]);
+        .in("status", ["waiting", "in_progress"])
+        .order("created_at", { ascending: false });
 
       const map = new Map<string, AttendanceInfo>();
 
       if (activeRows) {
         for (const row of activeRows) {
-          map.set(row.conversation_id, {
-            id: row.id,
-            status: row.status,
-            assigned_to: row.assigned_to,
-            opened_at: row.opened_at,
-            closed_at: row.closed_at,
-          });
+          // Keep only the most recent per conversation
+          if (!map.has(row.conversation_id)) {
+            map.set(row.conversation_id, {
+              id: row.id,
+              status: row.status,
+              assigned_to: row.assigned_to,
+              opened_at: row.opened_at,
+              closed_at: row.closed_at,
+            });
+          }
         }
       }
 
       // If we need closed data too (for "encerrados" filter), fetch last closed
       if (includeClosedFilter) {
-        const missingIds = conversationIds.filter(id => !map.has(id));
+        const missingIds = conversationIds.filter((id) => !map.has(id));
         if (missingIds.length > 0) {
           const { data: closedRows } = await supabase
             .from("support_attendances")
-            .select("id, conversation_id, status, assigned_to, opened_at, closed_at")
+            .select(
+              "id, conversation_id, status, assigned_to, opened_at, closed_at"
+            )
             .in("conversation_id", missingIds)
             .in("status", ["closed", "inactive_closed"])
             .order("closed_at", { ascending: false });
@@ -81,66 +101,94 @@ export function useAttendanceStatus(
       return map;
     },
     enabled: conversationIds.length > 0,
-    // Fallback polling — only if realtime fails
     refetchInterval: 10000,
     staleTime: 2000,
   });
 
   // Patch ALL attendance-status caches immediately on realtime event
-  const patchAllCaches = useCallback((row: any) => {
-    const convId = row.conversation_id as string;
-    const info: AttendanceInfo = {
-      id: row.id,
-      status: row.status,
-      assigned_to: row.assigned_to,
-      opened_at: row.opened_at,
-      closed_at: row.closed_at,
-    };
+  const patchAllCaches = useCallback(
+    (row: any) => {
+      const convId = row.conversation_id as string;
+      if (!convId) return;
 
-    // setQueriesData updates ALL matching queries regardless of their specific key
-    queryClient.setQueriesData<Map<string, AttendanceInfo>>(
-      { queryKey: ["attendance-status"] },
-      (oldMap) => {
-        if (!oldMap) return oldMap;
-        // Only patch if this conversation is in this cache's set
-        if (!oldMap.has(convId)) {
-          // For INSERT: check if the old map's query was for this conversation
-          // We can't know for sure, so let invalidation handle adding new entries
+      // Tenant isolation: ignore events from other tenants
+      if (tenantId && row.tenant_id && row.tenant_id !== tenantId) return;
+
+      const info: AttendanceInfo = {
+        id: row.id,
+        status: row.status,
+        assigned_to: row.assigned_to,
+        opened_at: row.opened_at,
+        closed_at: row.closed_at,
+      };
+
+      // setQueriesData updates ALL matching queries regardless of their specific key
+      queryClient.setQueriesData<Map<string, AttendanceInfo>>(
+        { queryKey: ["attendance-status"] },
+        (oldMap) => {
+          if (!oldMap) return oldMap;
+
+          // If this conversation is tracked in this cache, patch it
+          if (oldMap.has(convId)) {
+            const newMap = new Map(oldMap);
+            newMap.set(convId, info);
+            return newMap;
+          }
+
+          // For INSERT of a new attendance for a conversation we're tracking
+          // We can't know without the full key, so fall through to invalidation
           return oldMap;
         }
-        const newMap = new Map(oldMap);
-        newMap.set(convId, info);
-        return newMap;
-      }
-    );
+      );
 
-    // Also invalidate to pick up new entries (INSERT) and ensure consistency
-    queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-    // Invalidate conversations so sidebar picks up status changes
-    queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
-  }, [queryClient]);
+      // Also invalidate to pick up new entries (INSERT) and ensure consistency
+      queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+      // Invalidate conversations so sidebar picks up status changes
+      queryClient.invalidateQueries({
+        queryKey: ["whatsapp", "conversations"],
+      });
+    },
+    [queryClient, tenantId]
+  );
 
-  // Single realtime subscription — shared channel name to avoid duplicates
+  // Unique channel name per hook instance — prevents unmount of one consumer
+  // from killing the subscription of another (e.g. Header vs Sidebar).
+  const channelRef = useRef<string>(
+    `att-rt-${crypto.randomUUID().slice(0, 8)}`
+  );
+
   useEffect(() => {
+    const channelName = channelRef.current;
+
     const channel = supabase
-      .channel("attendance-status-realtime")
+      .channel(channelName)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "support_attendances" },
+        {
+          event: "*",
+          schema: "public",
+          table: "support_attendances",
+        },
         (payload) => {
           const row = payload.new as any;
           if (row && row.conversation_id) {
             patchAllCaches(row);
           } else {
             // DELETE or unexpected — just invalidate
-            queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-            queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+            queryClient.invalidateQueries({
+              queryKey: ["attendance-status"],
+            });
+            queryClient.invalidateQueries({
+              queryKey: ["whatsapp", "conversations"],
+            });
           }
         }
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [queryClient, patchAllCaches]);
 
   return {
