@@ -487,22 +487,9 @@ Deno.serve(async (req) => {
             console.log(`[attendance] NEW by agent att=${newAtt.id} code=${newAtt.attendance_code} -> in_progress by ${senderUserId}`);
             activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1, first_response_at: nowIso, assumed_at: nowIso, wait_seconds: 0, opened_at: nowIso } as any;
 
-            // --- Insert system message for attendance opened (idempotent) ---
-            const openedMsgId = `system_att_opened_${newAtt.id}`;
-            await supabase.from('whatsapp_messages').upsert({
-              conversation_id: body.conversationId,
-              remote_jid: '',
-              message_id: openedMsgId,
-              content: `✅ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
-              message_type: 'system',
-              is_from_me: false,
-              status: 'sent',
-              timestamp: nowIso,
-              tenant_id: tenantId,
-              metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
-            }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
-
             // --- Send opening notification to customer via Evolution API ---
+            // Use a timestamp slightly before the agent's message so it appears first in timeline
+            const openTimestamp = new Date(now.getTime() - 1000).toISOString();
             try {
               const openingText = `📋 *Atendimento ${newAtt.attendance_code}*\n\nOlá! Seu atendimento foi iniciado. Em que posso ajudar? 😊`;
               const destNumber = getDestinationNumber(contact.phone_number);
@@ -516,16 +503,16 @@ Deno.serve(async (req) => {
               if (openResp.ok) {
                 const openData = await openResp.json();
                 const openMsgId = openData.key?.id || `att_open_${Date.now()}`;
-                // Persist the opening message sent to customer
+                // Persist as system message so it renders as a badge, not a bubble
                 await supabase.from('whatsapp_messages').upsert({
                   conversation_id: body.conversationId,
                   remote_jid: contact.phone_number,
                   message_id: openMsgId,
-                  content: openingText,
-                  message_type: 'text',
+                  content: `✅ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
+                  message_type: 'system',
                   is_from_me: true,
                   status: 'sent',
-                  timestamp: nowIso,
+                  timestamp: openTimestamp,
                   tenant_id: tenantId,
                   metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
                 }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
