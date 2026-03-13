@@ -31,6 +31,7 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
   const { data: funcionarios } = useFuncionariosAtivos();
   const createTicket = useCreateCSTicket();
   const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const clienteId = metadata?.cliente_id as string | undefined;
