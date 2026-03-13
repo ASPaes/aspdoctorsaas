@@ -28,6 +28,7 @@ import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/Assi
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
+import KBTab from "@/components/configuracoes/KBTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -170,6 +171,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
+          <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
@@ -241,6 +243,10 @@ export default function Configuracoes() {
             <AISettingsTab />
           </TabsContent>
         )}
+
+        <TabsContent value="kb">
+          <KBTab />
+        </TabsContent>
       </Tabs>
     </div>
   );

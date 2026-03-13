@@ -1,0 +1,371 @@
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Search, CheckCircle, Archive, ExternalLink, Pencil, X } from "lucide-react";
+
+type KBArticle = {
+  id: string;
+  title: string | null;
+  problem: string;
+  solution: string;
+  tags: string[] | null;
+  status: string;
+  area_id: string | null;
+  source_attendance_id: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  created_at: string;
+  updated_at: string;
+  tenant_id: string;
+  area?: { nome: string } | null;
+  attendance?: { attendance_code: string } | null;
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Rascunho",
+  approved: "Aprovado",
+  archived: "Arquivado",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  archived: "bg-muted text-muted-foreground",
+};
+
+export default function KBTab() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const queryClient = useQueryClient();
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [areaFilter, setAreaFilter] = useState<string>("all");
+  const [editingArticle, setEditingArticle] = useState<KBArticle | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", problem: "", solution: "", tags: "" });
+
+  // Fetch areas for filter
+  const { data: areas } = useQuery({
+    queryKey: ["support_areas", tid],
+    queryFn: async () => {
+      let q = supabase.from("support_areas").select("id, nome").eq("ativo", true);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data } = await q.order("nome");
+      return data || [];
+    },
+  });
+
+  // Fetch KB articles
+  const { data: articles, isLoading } = useQuery({
+    queryKey: ["kb_articles", tid, statusFilter, areaFilter],
+    queryFn: async () => {
+      let q = supabase
+        .from("support_kb_articles")
+        .select("*, area:support_areas(nome), attendance:support_attendances(attendance_code)")
+        .order("created_at", { ascending: false });
+      if (tid) q = q.eq("tenant_id", tid);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (areaFilter !== "all") q = q.eq("area_id", areaFilter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []) as unknown as KBArticle[];
+    },
+  });
+
+  // Filtered by search
+  const filtered = useMemo(() => {
+    if (!articles) return [];
+    if (!search.trim()) return articles;
+    const s = search.toLowerCase();
+    return articles.filter(
+      (a) =>
+        (a.title || "").toLowerCase().includes(s) ||
+        a.problem.toLowerCase().includes(s) ||
+        a.solution.toLowerCase().includes(s) ||
+        (a.tags || []).some((t) => t.toLowerCase().includes(s))
+    );
+  }, [articles, search]);
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Record<string, any> }) => {
+      const { error } = await supabase
+        .from("support_kb_articles")
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kb_articles"] });
+      toast.success("Artigo atualizado");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao atualizar: " + err.message);
+    },
+  });
+
+  const openEdit = (article: KBArticle) => {
+    setEditingArticle(article);
+    setEditForm({
+      title: article.title || "",
+      problem: article.problem || "",
+      solution: article.solution || "",
+      tags: (article.tags || []).join(", "),
+    });
+  };
+
+  const saveEdit = () => {
+    if (!editingArticle) return;
+    const tags = editForm.tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    updateMutation.mutate(
+      {
+        id: editingArticle.id,
+        payload: {
+          title: editForm.title || null,
+          problem: editForm.problem,
+          solution: editForm.solution,
+          tags,
+        },
+      },
+      { onSuccess: () => setEditingArticle(null) }
+    );
+  };
+
+  const approve = (id: string) => {
+    updateMutation.mutate({
+      id,
+      payload: {
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        approved_by: profile?.user_id || null,
+      },
+    });
+  };
+
+  const archive = (id: string) => {
+    updateMutation.mutate({ id, payload: { status: "archived" } });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full max-w-sm" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Base de Conhecimento</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por título, problema ou tags..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="draft">Rascunho</SelectItem>
+                <SelectItem value="approved">Aprovado</SelectItem>
+                <SelectItem value="archived">Arquivado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={areaFilter} onValueChange={setAreaFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Área" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as áreas</SelectItem>
+                {(areas || []).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table */}
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Nenhum artigo encontrado.
+            </p>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Área</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Tags</TableHead>
+                    <TableHead>Atendimento</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((article) => (
+                    <TableRow key={article.id}>
+                      <TableCell className="font-medium max-w-[250px] truncate">
+                        {article.title || "Sem título"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {(article.area as any)?.nome || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={STATUS_COLORS[article.status] || ""}>
+                          {STATUS_LABELS[article.status] || article.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[150px]">
+                        <div className="flex flex-wrap gap-1">
+                          {(article.tags || []).slice(0, 3).map((t, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {t}
+                            </Badge>
+                          ))}
+                          {(article.tags || []).length > 3 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{(article.tags || []).length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {(article.attendance as any)?.attendance_code ? (
+                          <span className="font-mono text-xs">
+                            {(article.attendance as any).attendance_code}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(article)} title="Editar">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {isAdmin && article.status === "draft" && (
+                            <Button variant="ghost" size="icon" onClick={() => approve(article.id)} title="Aprovar">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                          )}
+                          {isAdmin && article.status !== "archived" && (
+                            <Button variant="ghost" size="icon" onClick={() => archive(article.id)} title="Arquivar">
+                              <Archive className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingArticle} onOpenChange={(open) => !open && setEditingArticle(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Artigo de KB</DialogTitle>
+          </DialogHeader>
+          {editingArticle && (
+            <div className="space-y-4">
+              {(editingArticle.attendance as any)?.attendance_code && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Origem: Atendimento{" "}
+                  <span className="font-mono font-medium">
+                    {(editingArticle.attendance as any).attendance_code}
+                  </span>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>Título</Label>
+                <Input
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  placeholder="Título do artigo"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Problema</Label>
+                <Textarea
+                  value={editForm.problem}
+                  onChange={(e) => setEditForm({ ...editForm, problem: e.target.value })}
+                  placeholder="Descreva o problema..."
+                  rows={4}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Solução</Label>
+                <Textarea
+                  value={editForm.solution}
+                  onChange={(e) => setEditForm({ ...editForm, solution: e.target.value })}
+                  placeholder="Descreva a solução..."
+                  rows={4}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tags (separadas por vírgula)</Label>
+                <Input
+                  value={editForm.tags}
+                  onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                  placeholder="suporte, financeiro, contrato"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <Badge variant="outline" className={STATUS_COLORS[editingArticle.status] || ""}>
+                  {STATUS_LABELS[editingArticle.status] || editingArticle.status}
+                </Badge>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditingArticle(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit} disabled={updateMutation.isPending}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
