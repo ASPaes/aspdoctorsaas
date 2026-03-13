@@ -245,8 +245,8 @@ export function ChatMessages({
                       <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
                     </span>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           ))
         )}
