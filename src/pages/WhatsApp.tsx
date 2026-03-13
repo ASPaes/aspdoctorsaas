@@ -147,7 +147,7 @@ export default function WhatsApp() {
   return (
     <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background w-full max-w-full">
       <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={25} minSize={18} maxSize={40}>
+        <ResizablePanel defaultSize={25} minSize={22} maxSize={40}>
           <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
         </ResizablePanel>
         <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
