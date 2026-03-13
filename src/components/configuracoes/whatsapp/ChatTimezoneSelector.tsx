@@ -21,7 +21,7 @@ const TIMEZONE_OPTIONS = [
 ];
 
 export function ChatTimezoneSelector() {
-  const { timezone, updateTimezone } = useChatTimezone();
+  const { timezone, updateTimezone } = useAppTimezone();
   const [selected, setSelected] = useState(timezone);
   const { effectiveTenantId: tid } = useTenantFilter();
   const { toast } = useToast();
