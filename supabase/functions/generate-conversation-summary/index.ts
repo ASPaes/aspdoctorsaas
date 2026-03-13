@@ -30,7 +30,7 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { conversationId } = await req.json();
+    const { conversationId, attendanceId } = await req.json();
     if (!conversationId) throw new Error("conversationId é obrigatório");
 
     const { data: conversation } = await supabase
@@ -52,18 +52,45 @@ serve(async (req) => {
       );
     }
 
-    const { data: messages, error: messagesError } = await supabase
+    // --- Determine time window ---
+    let periodStart: string | null = null;
+    let periodEnd: string | null = null;
+
+    if (attendanceId) {
+      const { data: att } = await supabase
+        .from("support_attendances")
+        .select("opened_at, closed_at")
+        .eq("id", attendanceId)
+        .single();
+
+      if (att) {
+        periodStart = att.opened_at;
+        periodEnd = att.closed_at || new Date().toISOString();
+        console.log(`[generate-summary] Scoping to attendance ${attendanceId}: ${periodStart} → ${periodEnd}`);
+      }
+    }
+
+    // --- Fetch messages (scoped to attendance window if available) ---
+    let query = supabase
       .from("whatsapp_messages")
       .select("content, timestamp, is_from_me, audio_transcription, message_type")
       .eq("conversation_id", conversationId)
       .order("timestamp", { ascending: false })
-      .limit(30);
+      .limit(50);
 
+    if (periodStart) {
+      query = query.gte("timestamp", periodStart);
+    }
+    if (periodEnd) {
+      query = query.lte("timestamp", periodEnd);
+    }
+
+    const { data: messages, error: messagesError } = await query;
     if (messagesError) throw messagesError;
 
-    if (!messages || messages.length < 5) {
+    if (!messages || messages.length < 3) {
       return new Response(
-        JSON.stringify({ message: "Mínimo de 5 mensagens necessário para resumo." }),
+        JSON.stringify({ message: "Mínimo de 3 mensagens necessário para resumo." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -81,7 +108,12 @@ serve(async (req) => {
       .join("\n");
 
     const contactName = (conversation.contact as any)?.name || "Cliente";
+    const scopeNote = attendanceId
+      ? "IMPORTANTE: Analise SOMENTE as mensagens abaixo, que correspondem a um único atendimento específico. Não extrapole para contextos anteriores."
+      : "";
+
     const prompt = `Analise esta conversa de WhatsApp e gere um resumo estruturado.
+${scopeNote}
 
 Conversa com: ${contactName}
 ${messagesText}
@@ -113,23 +145,40 @@ Retorne APENAS um JSON válido sem markdown:
       throw aiError;
     }
 
+    const summaryInsert: Record<string, any> = {
+      conversation_id: conversationId,
+      tenant_id: conversation.tenant_id,
+      summary: result.summary,
+      key_points: result.key_points || [],
+      action_items: result.action_items || [],
+      sentiment_at_time: result.sentiment,
+      message_count: messages.length,
+      period_start: messages[0].timestamp,
+      period_end: messages[messages.length - 1].timestamp,
+    };
+
     const { data: savedSummary, error: saveError } = await supabase
       .from("whatsapp_conversation_summaries")
-      .insert({
-        conversation_id: conversationId,
-        tenant_id: conversation.tenant_id,
-        summary: result.summary,
-        key_points: result.key_points || [],
-        action_items: result.action_items || [],
-        sentiment_at_time: result.sentiment,
-        message_count: messages.length,
-        period_start: messages[0].timestamp,
-        period_end: messages[messages.length - 1].timestamp,
-      })
+      .insert(summaryInsert)
       .select()
       .single();
 
     if (saveError) throw saveError;
+
+    // --- Update attendance AI fields if attendanceId provided ---
+    if (attendanceId) {
+      await supabase
+        .from("support_attendances")
+        .update({
+          ai_summary: result.summary?.substring(0, 200) || null,
+          ai_problem: result.summary || null,
+          ai_solution: (result.action_items || []).join("\n") || null,
+          ai_tags: result.key_points || [],
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", attendanceId);
+      console.log(`[generate-summary] Updated attendance AI fields for ${attendanceId}`);
+    }
 
     return new Response(JSON.stringify({ success: true, summary: savedSummary }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
