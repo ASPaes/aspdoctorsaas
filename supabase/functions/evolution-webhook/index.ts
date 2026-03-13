@@ -1120,6 +1120,11 @@ async function ensureAttendanceForIncomingMessage(
       console.error('[attendance] Error creating new:', createErr);
     } else {
       console.log(`[attendance] NEW by customer att=${newAtt.id} code=${newAtt.attendance_code} (${diffMinutes === Infinity ? 'no previous' : diffMinutes.toFixed(1) + ' min since close'}) tenant=${tenantId} conv=${conversationId}`);
+      // Fire-and-forget: send URA welcome message if enabled
+      if (instanceCtx) {
+        sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, supportConfig)
+          .catch(err => console.error('[ura] Error in sendUraWelcome:', err));
+      }
     }
   } catch (err) {
     console.error('[attendance] Unexpected error:', err);
