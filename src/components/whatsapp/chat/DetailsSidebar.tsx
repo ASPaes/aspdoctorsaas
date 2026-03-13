@@ -53,12 +53,24 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [kbOpen, setKbOpen] = useState(true);
   const [kbEditOpen, setKbEditOpen] = useState(false);
 
-  // Attendance status for KB section
-  const attendanceMap = useAttendanceStatus(conversation.id);
-  const attendanceEntry = attendanceMap instanceof Map ? attendanceMap.get(conversation.id) : null;
-  const closedAttendanceId = attendanceEntry?.status === 'closed' ? attendanceEntry.id : null;
+  // Find latest closed attendance for this conversation (for KB section)
+  const { data: latestClosedAttendance } = useQuery({
+    queryKey: ['latest-closed-attendance', conversation.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('support_attendances')
+        .select('id')
+        .eq('conversation_id', conversation.id)
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    staleTime: 30000,
+  });
 
-  // Also check for any closed attendance linked to this conversation
+  const closedAttendanceId = latestClosedAttendance?.id || null;
   const { draft: kbDraft, isLoading: kbLoading, submitForReview, isSubmitting: kbSubmitting } = useKBDraft(closedAttendanceId);
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
