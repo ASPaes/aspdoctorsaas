@@ -175,7 +175,7 @@ REGRAS para "tags": devem ser palavras-chave únicas e curtas (1-2 palavras no m
           ai_summary: result.summary?.substring(0, 200) || null,
           ai_problem: result.summary || null,
           ai_solution: (result.action_items || []).join("\n") || null,
-          ai_tags: result.key_points || [],
+          ai_tags: result.tags || result.key_points || [],
           updated_at: new Date().toISOString(),
         })
         .eq("id", attendanceId);
