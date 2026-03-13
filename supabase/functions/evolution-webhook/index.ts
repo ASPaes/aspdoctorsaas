@@ -1175,14 +1175,21 @@ async function handleCsatResponse(
     const elapsedMinutes = (now.getTime() - askedAt.getTime()) / (1000 * 60);
 
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
-      // Expired — mark as expired, send deferred closure message, don't consume message
+      // Expired — mark as expired
       await supabase
         .from('support_csat')
-        .update({ status: 'expired' })
+        .update({ status: 'expired', responded_at: new Date().toISOString() })
         .eq('id', csat.id);
-      console.log(`[csat] CSAT expired for att=${closedAtt.id} (${elapsedMinutes.toFixed(1)} min > ${supportConfig.support_csat_timeout_minutes} min)`);
+      console.log(`[csat] CSAT expired (reactive) for att=${closedAtt.id} (${elapsedMinutes.toFixed(1)} min > ${supportConfig.support_csat_timeout_minutes} min)`);
 
-      // Send deferred closure message now that CSAT is done
+      // Send friendly timeout message
+      const friendlyMsg = 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊';
+      await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, friendlyMsg, {
+        csat: true,
+        csat_timeout: true,
+      });
+
+      // Send deferred closure message
       await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
 
       return false;
