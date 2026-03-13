@@ -9,13 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, CheckCircle, Trash2, ExternalLink, Pencil, X } from "lucide-react";
+import { Search, CheckCircle, Trash2, Pencil } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import KBEditDialog from "./kb/KBEditDialog";
 
 type KBArticle = {
   id: string;
@@ -55,7 +53,6 @@ export default function KBTab() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [editingArticle, setEditingArticle] = useState<KBArticle | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", problem: "", solution: "", tags: "" });
 
   // Fetch areas for filter
   const { data: areas } = useQuery({
@@ -99,7 +96,7 @@ export default function KBTab() {
     );
   }, [articles, search]);
 
-  // Update mutation
+  // Approve mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, payload }: { id: string; payload: Record<string, any> }) => {
       const { error } = await supabase
@@ -117,47 +114,6 @@ export default function KBTab() {
     },
   });
 
-  const openEdit = (article: KBArticle) => {
-    setEditingArticle(article);
-    setEditForm({
-      title: article.title || "",
-      problem: article.problem || "",
-      solution: article.solution || "",
-      tags: (article.tags || []).join(", "),
-    });
-  };
-
-  const saveEdit = () => {
-    if (!editingArticle) return;
-    const tags = editForm.tags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    updateMutation.mutate(
-      {
-        id: editingArticle.id,
-        payload: {
-          title: editForm.title || null,
-          problem: editForm.problem,
-          solution: editForm.solution,
-          tags,
-        },
-      },
-      { onSuccess: () => setEditingArticle(null) }
-    );
-  };
-
-  const approve = (id: string) => {
-    updateMutation.mutate({
-      id,
-      payload: {
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        approved_by: profile?.user_id || null,
-      },
-    });
-  };
-
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -174,6 +130,17 @@ export default function KBTab() {
       toast.error("Erro ao excluir: " + err.message);
     },
   });
+
+  const approve = (id: string) => {
+    updateMutation.mutate({
+      id,
+      payload: {
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        approved_by: profile?.user_id || null,
+      },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -210,7 +177,6 @@ export default function KBTab() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="draft">Rascunho</SelectItem>
                 <SelectItem value="approved">Aprovado</SelectItem>
-                
               </SelectContent>
             </Select>
             <Select value={areaFilter} onValueChange={setAreaFilter}>
@@ -285,7 +251,7 @@ export default function KBTab() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(article)} title="Editar">
+                          <Button variant="ghost" size="icon" onClick={() => setEditingArticle(article)} title="Editar">
                             <Pencil className="h-4 w-4" />
                           </Button>
                           {isAdmin && article.status === "draft" && (
@@ -331,74 +297,13 @@ export default function KBTab() {
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingArticle} onOpenChange={(open) => !open && setEditingArticle(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar Artigo de KB</DialogTitle>
-          </DialogHeader>
-          {editingArticle && (
-            <div className="space-y-4">
-              {(editingArticle.attendance as any)?.attendance_code && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Origem: Atendimento{" "}
-                  <span className="font-mono font-medium">
-                    {(editingArticle.attendance as any).attendance_code}
-                  </span>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label>Título</Label>
-                <Input
-                  value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  placeholder="Título do artigo"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Problema</Label>
-                <Textarea
-                  value={editForm.problem}
-                  onChange={(e) => setEditForm({ ...editForm, problem: e.target.value })}
-                  placeholder="Descreva o problema..."
-                  rows={4}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Solução</Label>
-                <Textarea
-                  value={editForm.solution}
-                  onChange={(e) => setEditForm({ ...editForm, solution: e.target.value })}
-                  placeholder="Descreva a solução..."
-                  rows={4}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Tags (separadas por vírgula)</Label>
-                <Input
-                  value={editForm.tags}
-                  onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                  placeholder="suporte, financeiro, contrato"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Status:</span>
-                <Badge variant="outline" className={STATUS_COLORS[editingArticle.status] || ""}>
-                  {STATUS_LABELS[editingArticle.status] || editingArticle.status}
-                </Badge>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditingArticle(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={saveEdit} disabled={updateMutation.isPending}>
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {editingArticle && (
+        <KBEditDialog
+          article={editingArticle}
+          areas={areas || []}
+          onClose={() => setEditingArticle(null)}
+        />
+      )}
     </div>
   );
 }
