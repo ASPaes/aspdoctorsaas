@@ -865,7 +865,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       checkAndTriggerAutoSentiment(supabase, conversationId, supabaseUrl);
       checkAndTriggerAutoCategorization(supabase, conversationId, supabaseUrl);
-      // Ensure attendance exists (reopen/new/ignore goodbye) then increment counter
+
       const instanceCtx: InstanceContext = {
         apiUrl: secrets.api_url,
         apiKey: secrets.api_key,
@@ -874,9 +874,23 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         remoteJid: key.remoteJid,
         contactName: pushName || phone,
       };
-      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
-        .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
-        .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
+
+      // Check if this message is a URA response BEFORE creating/reopening attendance
+      const supportConfig = await getSupportConfig(supabase, tenantId);
+      const uraHandled = await handleUraResponse(
+        supabase, instanceCtx, conversationId, tenantId, content, supportConfig
+      );
+
+      if (uraHandled) {
+        // URA consumed the message — just increment counter, skip attendance creation
+        incrementAttendanceCounter(supabase, conversationId, 'customer')
+          .catch(err => console.error('[evolution-webhook] increment error:', err));
+      } else {
+        // Normal flow: ensure attendance exists (reopen/new/ignore goodbye) then increment counter
+        ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
+          .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
+          .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
+      }
 
       // Also reopen the conversation visually if it was closed
       supabase
