@@ -51,6 +51,16 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [sentimentOpen, setSentimentOpen] = useState(true);
   const [notesOpen, setNotesOpen] = useState(true);
   const [summariesOpen, setSummariesOpen] = useState(false);
+  const [kbOpen, setKbOpen] = useState(true);
+  const [kbEditOpen, setKbEditOpen] = useState(false);
+
+  // Attendance status for KB section
+  const attendanceMap = useAttendanceStatus(conversation.id);
+  const attendanceEntry = attendanceMap instanceof Map ? attendanceMap.get(conversation.id) : null;
+  const closedAttendanceId = attendanceEntry?.status === 'closed' ? attendanceEntry.id : null;
+
+  // Also check for any closed attendance linked to this conversation
+  const { draft: kbDraft, isLoading: kbLoading, submitForReview, isSubmitting: kbSubmitting } = useKBDraft(closedAttendanceId);
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const isClienteLinked = !!(metadata?.cliente_id);
