@@ -222,7 +222,7 @@ REGRAS:
         ai_summary: (result.summary || "").substring(0, 500),
         ai_problem: (result.problem || "").substring(0, 1000),
         ai_solution: (result.solution || "").substring(0, 1000),
-        ai_tags: result.tags || [],
+        ai_tags: (result.tags || []).slice(0, 5),
         updated_at: new Date().toISOString(),
       })
       .eq("id", attendanceId);
