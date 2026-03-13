@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Message } from './useWhatsAppMessages';
+import { normalizeMessage, mergeMessage, type Message } from './useWhatsAppMessages';
 
 interface SendMessageParams {
   conversationId: string;
@@ -11,8 +11,10 @@ interface SendMessageParams {
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
-  instanceId?: string; // optional: choose which instance to send from
+  instanceId?: string;
 }
+
+let tempCounter = 0;
 
 export const useWhatsAppSend = () => {
   const queryClient = useQueryClient();
@@ -26,8 +28,11 @@ export const useWhatsAppSend = () => {
       return data;
     },
     onMutate: async (newMessage) => {
+      // Generate a stable temp ID for this specific send
+      const tempId = `temp-${Date.now()}-${++tempCounter}`;
+
       await queryClient.cancelQueries({ queryKey: ['whatsapp', 'messages', newMessage.conversationId] });
-      const previousMessages = queryClient.getQueryData(['whatsapp', 'messages', newMessage.conversationId]);
+      const previousMessages = queryClient.getQueryData<Message[]>(['whatsapp', 'messages', newMessage.conversationId]);
 
       // Generate a local preview URL for base64 media
       let optimisticMediaUrl = newMessage.mediaUrl ?? null;
@@ -40,8 +45,8 @@ export const useWhatsAppSend = () => {
 
       const optimisticType = newMessage.messageType === 'video' ? 'media' : newMessage.messageType;
 
-      const optimisticMessage: Partial<Message> = {
-        id: 'temp-' + Date.now(),
+      const optimisticMessage = normalizeMessage({
+        id: tempId,
         conversation_id: newMessage.conversationId,
         content: newMessage.content || '',
         message_type: newMessage.messageType,
@@ -57,31 +62,37 @@ export const useWhatsAppSend = () => {
         remote_jid: '',
         quoted_message_id: newMessage.quotedMessageId || null,
         metadata: {},
-      };
-
-      queryClient.setQueryData(['whatsapp', 'messages', newMessage.conversationId], (old: Message[] = []) => [
-        ...old,
-        optimisticMessage as Message,
-      ]);
-
-      // Optimistically update conversation's last_message_at for instant reorder
-      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-        if (!old?.conversations) return old;
-        return {
-          ...old,
-          conversations: old.conversations.map((c: any) =>
-            c.id === newMessage.conversationId
-              ? {
-                  ...c,
-                  last_message_at: new Date().toISOString(),
-                  last_message_preview: newMessage.content?.substring(0, 100) || `Sent ${newMessage.messageType}`,
-                }
-              : c
-          ),
-        };
       });
 
-      return { previousMessages };
+      queryClient.setQueryData(
+        ['whatsapp', 'messages', newMessage.conversationId],
+        (old: Message[] = []) => [...old, optimisticMessage]
+      );
+
+      // Optimistically update conversation's last_message_at for instant sidebar reorder
+      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+        if (!old?.conversations) return old;
+        const patched = old.conversations.map((c: any) =>
+          c.id === newMessage.conversationId
+            ? {
+                ...c,
+                last_message_at: new Date().toISOString(),
+                last_message_preview: newMessage.content?.substring(0, 100) || `Sent ${newMessage.messageType}`,
+                is_last_message_from_me: true,
+                isLastMessageFromMe: true,
+              }
+            : c
+        );
+        // Re-sort
+        patched.sort((a: any, b: any) => {
+          const tA = a.last_message_at || a.created_at || '';
+          const tB = b.last_message_at || b.created_at || '';
+          return tB.localeCompare(tA);
+        });
+        return { ...old, conversations: patched };
+      });
+
+      return { previousMessages, tempId };
     },
     onError: (_err, newMessage, context) => {
       if (context?.previousMessages) {
@@ -89,12 +100,11 @@ export const useWhatsAppSend = () => {
       }
     },
     onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-      // Delayed invalidation to replace temp message with real DB row (including correct status).
-      // Gives realtime INSERT a chance to arrive first; acts as fallback if it doesn't.
+      // Delayed invalidation to reconcile temp message with real DB row.
+      // Gives realtime INSERT a chance to arrive first; acts as fallback.
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
-      }, 1500);
+      }, 2000);
     },
   });
 

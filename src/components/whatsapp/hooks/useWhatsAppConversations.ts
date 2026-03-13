@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { escapeLike } from '@/lib/utils';
@@ -91,8 +91,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         .range(from, to);
 
       if (tid) query = query.eq('tenant_id', tid);
-      // Instance filter: for unified conversations, filter by messages that have this instance_id
-      // Keep backward compat: if conversation still has instance_id, use it; otherwise skip
       if (filters?.instanceId) query = query.eq('instance_id', filters.instanceId);
       if (filters?.status) query = query.eq('status', filters.status);
       if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
@@ -113,7 +111,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         ...conv,
         unread_count: parseInt(String((conv as any).unread_count ?? 0), 10) || 0,
         last_message_at: conv.last_message_at || null,
-        // Map denormalized column to UI field — NO extra query needed
         isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
@@ -145,16 +142,13 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       };
 
       const [countResult, unreadResult, waitingResult] = await Promise.all([
-        // Total count
         buildFullFilter(
           supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
         ),
-        // Unread count
         buildBaseFilter(
           supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
             .gt('unread_count', 0)
         ),
-        // Waiting count — uses denormalized is_last_message_from_me instead of scanning messages
         buildBaseFilter(
           supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
             .eq('status', 'active')
@@ -176,10 +170,13 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     },
   });
 
-  // Realtime: only invalidate when the specific conversation changes
+  // Realtime: unique channel per hook instance to avoid collision
+  const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+
   useEffect(() => {
+    const channelName = `conversations-rt-${channelIdRef.current}`;
     const channel = supabase
-      .channel('conversations-changes')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -191,13 +188,17 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           if (!old?.conversations) return old;
           const idx = old.conversations.findIndex((c: any) => c.id === updated.id);
           if (idx === -1) {
-            // Conversation not in current page — invalidate to pick it up
-            queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+            // Conversation not in current page — schedule a soft refetch
+            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] }), 500);
             return old;
           }
           const patched = [...old.conversations];
-          patched[idx] = { ...patched[idx], ...updated, unread_count: parseInt(String(updated.unread_count ?? patched[idx].unread_count ?? 0), 10) || 0 };
-          // Re-sort by last_message_at descending so most recent is always first
+          patched[idx] = {
+            ...patched[idx],
+            ...updated,
+            unread_count: parseInt(String(updated.unread_count ?? patched[idx].unread_count ?? 0), 10) || 0,
+          };
+          // Re-sort by last_message_at descending
           patched.sort((a: any, b: any) => {
             const tA = a.last_message_at || a.created_at || '';
             const tB = b.last_message_at || b.created_at || '';
@@ -211,7 +212,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         schema: 'public',
         table: 'whatsapp_conversations'
       }, () => {
-        // New conversation — invalidate to pick it up
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       })
       .subscribe();

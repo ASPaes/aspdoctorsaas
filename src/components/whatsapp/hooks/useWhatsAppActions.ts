@@ -3,6 +3,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
+/**
+ * Helper: optimistically patch a conversation in all sidebar query caches.
+ */
+function patchConversation(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+  patch: Record<string, any>
+) {
+  queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+    if (!old?.conversations) return old;
+    const idx = old.conversations.findIndex((c: any) => c.id === conversationId);
+    if (idx === -1) return old;
+    const patched = [...old.conversations];
+    patched[idx] = { ...patched[idx], ...patch };
+    return { ...old, conversations: patched };
+  });
+}
+
 export const useWhatsAppActions = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -14,12 +32,18 @@ export const useWhatsAppActions = () => {
         .update({ status: 'archived' })
         .eq('id', conversationId);
       if (error) throw error;
+      return conversationId;
+    },
+    onMutate: async (conversationId) => {
+      patchConversation(queryClient, conversationId, { status: 'archived' });
     },
     onSuccess: () => {
       toast.success('Conversa arquivada com sucesso');
+    },
+    onError: () => {
+      toast.error('Erro ao arquivar conversa');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     },
-    onError: () => { toast.error('Erro ao arquivar conversa'); },
   });
 
   const closeMutation = useMutation({
@@ -30,14 +54,13 @@ export const useWhatsAppActions = () => {
         } catch (e) { console.error('Erro ao gerar resumo:', e); }
       }
 
-      // 1) Close the whatsapp_conversation (visual)
       const { error } = await supabase
         .from('whatsapp_conversations')
         .update({ status: 'closed' })
         .eq('id', conversationId);
       if (error) throw error;
 
-      // 2) Close the active support_attendance (real attendance closure)
+      // Close the active support_attendance
       try {
         const { data: activeAtt } = await supabase
           .from('support_attendances')
@@ -59,7 +82,7 @@ export const useWhatsAppActions = () => {
             ? Math.round((now.getTime() - assumedAt.getTime()) / 1000)
             : 0;
 
-          const { error: closeErr } = await supabase
+          await supabase
             .from('support_attendances')
             .update({
               status: 'closed',
@@ -71,20 +94,16 @@ export const useWhatsAppActions = () => {
               updated_at: now.toISOString(),
             })
             .eq('id', activeAtt.id);
-
-          if (closeErr) {
-            console.error('[closeConversation] Error closing attendance:', closeErr);
-          } else {
-            console.log(`[closeConversation] ✅ Attendance ${activeAtt.id} closed`);
-          }
         }
       } catch (e) {
         console.error('[closeConversation] Error closing attendance:', e);
       }
+
+      return conversationId;
     },
-    onSuccess: (_, { conversationId }) => {
-      toast.success('Conversa encerrada com sucesso');
-      // Optimistic: patch attendance caches immediately
+    onMutate: async ({ conversationId }) => {
+      // Optimistic: mark closed immediately in sidebar + attendance cache
+      patchConversation(queryClient, conversationId, { status: 'closed' });
       queryClient.setQueriesData<Map<string, any>>(
         { queryKey: ["attendance-status"] },
         (oldMap) => {
@@ -96,10 +115,16 @@ export const useWhatsAppActions = () => {
           return newMap;
         }
       );
+    },
+    onSuccess: () => {
+      toast.success('Conversa encerrada com sucesso');
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+    },
+    onError: () => {
+      toast.error('Erro ao encerrar conversa');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
     },
-    onError: () => { toast.error('Erro ao encerrar conversa'); },
   });
 
   const reopenMutation = useMutation({
@@ -109,12 +134,18 @@ export const useWhatsAppActions = () => {
         .update({ status: 'active' })
         .eq('id', conversationId);
       if (error) throw error;
+      return conversationId;
+    },
+    onMutate: async (conversationId) => {
+      patchConversation(queryClient, conversationId, { status: 'active' });
     },
     onSuccess: () => {
       toast.success('Conversa reaberta com sucesso');
+    },
+    onError: () => {
+      toast.error('Erro ao reabrir conversa');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     },
-    onError: () => { toast.error('Erro ao reabrir conversa'); },
   });
 
   const markAsUnreadMutation = useMutation({
@@ -124,12 +155,18 @@ export const useWhatsAppActions = () => {
         .update({ unread_count: 1 })
         .eq('id', conversationId);
       if (error) throw error;
+      return conversationId;
+    },
+    onMutate: async (conversationId) => {
+      patchConversation(queryClient, conversationId, { unread_count: 1 });
     },
     onSuccess: () => {
       toast.success('Conversa marcada como não lida');
+    },
+    onError: () => {
+      toast.error('Erro ao marcar conversa como não lida');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     },
-    onError: () => { toast.error('Erro ao marcar conversa como não lida'); },
   });
 
   const updateContactMutation = useMutation({
