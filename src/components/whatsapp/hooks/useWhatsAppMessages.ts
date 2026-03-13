@@ -80,7 +80,7 @@ const toUiType = (rawType: string, isSystem: boolean): MessageUiType => {
   return rawType;
 };
 
-const normalizeMessage = (message: Partial<Message> & Record<string, any>): Message => {
+export const normalizeMessage = (message: Partial<Message> & Record<string, any>): Message => {
   const rawType = getRawType(message);
   const isFromMe = getIsFromMe(message);
   const isSystem = getIsSystem(message, rawType);
@@ -126,6 +126,40 @@ const MESSAGE_SELECT = [
   'delete_scope',
   'delete_error',
 ].join(',');
+
+/**
+ * Deduplicate and merge a new message into an existing list.
+ * Replaces temp optimistic messages or exact ID/message_id matches.
+ * Returns the new array (or the old one if nothing changed).
+ */
+export function mergeMessage(old: Message[], incoming: Message): Message[] {
+  // Try to find an exact match by real id or message_id
+  const exactIdx = old.findIndex(
+    (m) =>
+      m.id === incoming.id ||
+      (incoming.message_id && m.message_id === incoming.message_id)
+  );
+  if (exactIdx !== -1) {
+    const updated = [...old];
+    updated[exactIdx] = incoming;
+    return updated;
+  }
+
+  // Try to replace the OLDEST temp message for this conversation (FIFO reconciliation)
+  const tempIdx = old.findIndex(
+    (m) =>
+      m.id?.startsWith?.('temp-') &&
+      m.conversation_id === incoming.conversation_id
+  );
+  if (tempIdx !== -1) {
+    const updated = [...old];
+    updated[tempIdx] = incoming;
+    return updated;
+  }
+
+  // No match — append
+  return [...old, incoming];
+}
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
@@ -182,37 +216,13 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         const normalizedNewMsg = normalizeMessage(payload.new as any);
         queryClient.setQueryData(
           ['whatsapp', 'messages', conversationId],
-          (old: any[] | undefined) => {
-            if (!old) return [normalizedNewMsg];
-
-            const isTempMatch = (m: any) =>
-              m.id?.startsWith?.('temp-') &&
-              getIsFromMe(m) === true &&
-              m.conversation_id === normalizedNewMsg.conversation_id;
-
-            const isExactMatch = (m: any) =>
-              m.id === normalizedNewMsg.id ||
-              (normalizedNewMsg.message_id && m.message_id === normalizedNewMsg.message_id);
-
-            const hasMatch = old.some((m) => isExactMatch(m) || isTempMatch(m));
-
-            if (hasMatch) {
-              let replaced = false;
-              return old.map((m) => {
-                if (!replaced && (isExactMatch(m) || isTempMatch(m))) {
-                  replaced = true;
-                  return normalizedNewMsg;
-                }
-                return m;
-              });
-            }
-            return [...old, normalizedNewMsg];
-          }
+          (old: Message[] | undefined) => mergeMessage(old ?? [], normalizedNewMsg)
         );
         // Notify listeners (smart scroll)
         newMessageCallbackRef.current?.(normalizedNewMsg);
-        // Also ensure the sidebar conversations list updates (preview, ordering)
-        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+
+        // Patch the sidebar conversation inline (lightweight, no full refetch)
+        patchConversationPreview(queryClient, conversationId, normalizedNewMsg);
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -239,7 +249,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
   }, [conversationId, queryClient]);
 
   // ── Fallback: listen to conversation updates (last_message_at changes) ──
-  // If the primary Realtime channel fails, this ensures messages still refresh.
   const lastInvalidateRef = useRef(0);
 
   useEffect(() => {
@@ -268,3 +277,40 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 
   return { messages, isLoading, error, onNewMessage };
 };
+
+/**
+ * Lightweight helper to patch a conversation's preview/ordering in the sidebar cache
+ * without triggering a full refetch. Called when a message INSERT arrives.
+ */
+function patchConversationPreview(
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+  msg: Message
+) {
+  queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+    if (!old?.conversations) return old;
+    const idx = old.conversations.findIndex((c: any) => c.id === conversationId);
+    if (idx === -1) return old;
+
+    const patched = [...old.conversations];
+    const now = msg.timestamp || new Date().toISOString();
+    patched[idx] = {
+      ...patched[idx],
+      last_message_at: now,
+      last_message_preview: msg.content?.substring(0, 100) || patched[idx].last_message_preview,
+      is_last_message_from_me: msg.is_from_me,
+      isLastMessageFromMe: msg.is_from_me,
+      // Increment unread for non-from-me messages (unless this is the open conversation — handled by read marker)
+      ...(msg.is_from_me ? {} : { unread_count: (patched[idx].unread_count || 0) + 1 }),
+    };
+
+    // Re-sort by most recent activity
+    patched.sort((a: any, b: any) => {
+      const tA = a.last_message_at || a.created_at || '';
+      const tB = b.last_message_at || b.created_at || '';
+      return tB.localeCompare(tA);
+    });
+
+    return { ...old, conversations: patched };
+  });
+}
