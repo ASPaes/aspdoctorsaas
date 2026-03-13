@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
-import { useChatTimezone } from "@/hooks/useChatTimezone";
+import { useAppTimezone } from "@/hooks/useAppTimezone";
 import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
 
 interface Props {
