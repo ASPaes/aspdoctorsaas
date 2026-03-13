@@ -153,7 +153,37 @@ const Sidebar = React.forwardRef<
     collapsible?: "offcanvas" | "icon" | "none";
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, open, sidebarWidth, setSidebarWidth } = useSidebar();
+
+  // Drag resize logic
+  const isResizing = React.useRef(false);
+  const handleMouseDown = React.useCallback(
+    (e: React.MouseEvent) => {
+      if (!open) return;
+      e.preventDefault();
+      isResizing.current = true;
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isResizing.current) return;
+        const delta = side === "left" ? ev.clientX - startX : startX - ev.clientX;
+        setSidebarWidth(startWidth + delta);
+      };
+      const onMouseUp = () => {
+        isResizing.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [open, sidebarWidth, setSidebarWidth, side],
+  );
 
   if (collapsible === "none") {
     return (
@@ -213,7 +243,6 @@ const Sidebar = React.forwardRef<
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
             : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -227,6 +256,16 @@ const Sidebar = React.forwardRef<
         >
           {children}
         </div>
+        {/* Resize handle — only when expanded */}
+        {open && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={cn(
+              "absolute top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-muted-foreground/20 transition-colors z-[31]",
+              side === "left" ? "right-0" : "left-0"
+            )}
+          />
+        )}
       </div>
     </div>
   );
