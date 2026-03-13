@@ -186,17 +186,12 @@ export function useCreateCSTicket() {
 
   return useMutation({
     mutationFn: async (data: CreateTicketData) => {
-      console.log('[CS] createTicket payload:', JSON.stringify(data));
       const { data: result, error } = await supabase
         .from('cs_tickets')
         .insert(data as any)
         .select()
         .single();
-      if (error) {
-        console.error('[CS] createTicket error:', error.message, '| code:', error.code, '| details:', error.details, '| hint:', error.hint);
-        throw error;
-      }
-      console.log('[CS] createTicket success:', result?.id);
+      if (error) throw error;
       return result;
     },
     onSuccess: () => {
