@@ -1017,6 +1017,59 @@ async function ensureAttendanceForIncomingMessage(
 }
 
 /**
+ * Ensure attendance exists when an OPERATOR sends a message.
+ * If no active attendance → create new one as in_progress (operator-initiated).
+ * If active attendance exists → skip (counter incremented separately).
+ */
+async function ensureAttendanceForOperatorMessage(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+  _instanceId: string
+): Promise<void> {
+  try {
+    const { data: activeAtt } = await supabase
+      .from('support_attendances')
+      .select('id, status, assigned_to')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+
+    if (activeAtt) {
+      console.log(`[attendance-operator] Active attendance exists: ${activeAtt.id} (${activeAtt.status})`);
+      return;
+    }
+
+    // No active attendance — create new one (operator-initiated)
+    const nowIso = new Date().toISOString();
+    const { data: newAtt, error: createErr } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        status: 'in_progress',
+        opened_at: nowIso,
+        assumed_at: nowIso,
+        opened_by: null,
+        created_from: 'operator',
+      })
+      .select('id, attendance_code')
+      .single();
+
+    if (createErr) {
+      console.error('[attendance-operator] Error creating:', createErr);
+    } else {
+      console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
+    }
+  } catch (err) {
+    console.error('[attendance-operator] Unexpected error:', err);
+  }
+}
+
+/**
  * Increment msg_customer_count or msg_agent_count on the active attendance.
  */
 async function incrementAttendanceCounter(
