@@ -1482,7 +1482,7 @@ async function ensureAttendanceForIncomingMessage(
         .catch(err => console.error('[attendance] Error inserting system msg:', err));
       // Fire-and-forget: send URA welcome message if enabled
       if (instanceCtx) {
-        sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig)
+        sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
           .catch(err => console.error('[ura] Error in sendUraWelcome:', err));
       }
     }
