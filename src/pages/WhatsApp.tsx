@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ConversationsSidebar } from "@/components/whatsapp/conversations/ConversationsSidebar";
 import { ChatAreaFull } from "@/components/whatsapp/chat/ChatAreaFull";
 import type { ConversationWithContact } from "@/components/whatsapp/hooks/useWhatsAppConversations";
