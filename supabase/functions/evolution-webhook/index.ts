@@ -1091,14 +1091,16 @@ async function handleUraResponse(
     .eq('ativo', true)
     .order('nome');
 
-  if (!areas || areas.length === 0) return false;
-
+  const hasAreas = areas && areas.length > 0;
   const trimmed = (messageContent || '').trim();
   const optionNumber = parseInt(trimmed, 10);
 
+  // Determine max option: from support_areas count, or parse from template
+  const maxOption = hasAreas ? areas.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || '');
+
   // Invalid option
-  if (isNaN(optionNumber) || optionNumber < 1 || optionNumber > areas.length) {
-    console.log(`[ura] Invalid option: "${trimmed}" (expected 1-${areas.length}) conv=${conversationId}`);
+  if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
+    console.log(`[ura] Invalid option: "${trimmed}" (expected 0-${maxOption}) conv=${conversationId}`);
     const invalidTemplate = supportConfig.support_ura_invalid_option_template || '';
     if (invalidTemplate) {
       const sent = await sendEvolutionText(instanceCtx, invalidTemplate);
@@ -1126,23 +1128,52 @@ async function handleUraResponse(
     return true; // consumed as URA interaction
   }
 
-  // Valid option — assign area
-  const selectedArea = areas[optionNumber - 1];
+  // Option 0 = close attendance
+  if (optionNumber === 0) {
+    const nowIso = new Date().toISOString();
+    await supabase
+      .from('support_attendances')
+      .update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, updated_at: nowIso })
+      .eq('id', att.id);
+    console.log(`[ura] Customer chose to close attendance att=${att.id} conv=${conversationId}`);
+    const closeText = '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!';
+    const sent = await sendEvolutionText(instanceCtx, closeText);
+    if (sent.ok) {
+      await supabase.from('whatsapp_messages').insert({
+        conversation_id: conversationId, remote_jid: instanceCtx.remoteJid,
+        message_id: sent.messageId || `ura_close_${Date.now()}`, content: closeText,
+        message_type: 'text', is_from_me: true, status: 'sent', timestamp: nowIso,
+        tenant_id: tenantId, metadata: { ura: true, ura_closed: true },
+      });
+      await supabase.from('whatsapp_conversations').update({
+        last_message_at: nowIso, last_message_preview: closeText.substring(0, 200), is_last_message_from_me: true,
+      }).eq('id', conversationId);
+    }
+    return true;
+  }
+
+  // Valid option — assign area if available
   const nowIso = new Date().toISOString();
+  const selectedArea = hasAreas ? areas[optionNumber - 1] : null;
+  const areaName = selectedArea?.nome || `Opção ${optionNumber}`;
+
+  const updatePayload: Record<string, any> = {
+    ura_option_selected: optionNumber,
+    updated_at: nowIso,
+  };
+  if (selectedArea) {
+    updatePayload.area_id = selectedArea.id;
+  }
 
   await supabase
     .from('support_attendances')
-    .update({
-      area_id: selectedArea.id,
-      ura_option_selected: optionNumber,
-      updated_at: nowIso,
-    })
+    .update(updatePayload)
     .eq('id', att.id);
 
-  console.log(`[ura] Area selected: ${selectedArea.nome} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
+  console.log(`[ura] Area selected: ${areaName} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
 
   // Send confirmation message
-  const confirmText = `✅ Você escolheu *${selectedArea.nome}*. Aguarde, em breve um atendente irá te ajudar!`;
+  const confirmText = `✅ Você escolheu *${areaName}*. Aguarde, em breve um atendente irá te ajudar!`;
   const sent = await sendEvolutionText(instanceCtx, confirmText);
   if (sent.ok) {
     await supabase.from('whatsapp_messages').insert({
@@ -1155,7 +1186,7 @@ async function handleUraResponse(
       status: 'sent',
       timestamp: nowIso,
       tenant_id: tenantId,
-      metadata: { ura: true, ura_confirmed: true, area_id: selectedArea.id },
+      metadata: { ura: true, ura_confirmed: true, area_id: selectedArea?.id || null },
     });
     await supabase.from('whatsapp_conversations').update({
       last_message_at: nowIso,
@@ -1165,6 +1196,21 @@ async function handleUraResponse(
   }
 
   return true;
+}
+
+/**
+ * Extract the highest numbered option from a URA template string.
+ * E.g. "1 - Suporte\n2 - Financeiro\n0 - Encerrar" → 2 (ignores 0)
+ */
+function extractMaxOptionFromTemplate(template: string): number {
+  const matches = template.match(/^(\d+)\s*[-–.]/gm);
+  if (!matches) return 5; // fallback
+  let max = 0;
+  for (const m of matches) {
+    const n = parseInt(m, 10);
+    if (n > max) max = n;
+  }
+  return max || 5;
 }
 
 async function ensureAttendanceForIncomingMessage(
