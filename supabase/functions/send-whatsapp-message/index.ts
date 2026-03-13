@@ -436,7 +436,8 @@ Deno.serve(async (req) => {
     }
 
     // Ensure attendance exists + auto-assign + increment agent count
-    if (senderUserId) {
+    // Skip attendance logic for system messages (e.g. closure notifications)
+    if (senderUserId && !body.systemMessage) {
       try {
         const now = new Date();
         const nowIso = now.toISOString();
@@ -485,6 +486,56 @@ Deno.serve(async (req) => {
           } else {
             console.log(`[attendance] NEW by agent att=${newAtt.id} code=${newAtt.attendance_code} -> in_progress by ${senderUserId}`);
             activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1, first_response_at: nowIso, assumed_at: nowIso, wait_seconds: 0, opened_at: nowIso } as any;
+
+            // --- Insert system message for attendance opened (idempotent) ---
+            const openedMsgId = `system_att_opened_${newAtt.id}`;
+            await supabase.from('whatsapp_messages').upsert({
+              conversation_id: body.conversationId,
+              remote_jid: '',
+              message_id: openedMsgId,
+              content: `✅ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
+              message_type: 'system',
+              is_from_me: false,
+              status: 'sent',
+              timestamp: nowIso,
+              tenant_id: tenantId,
+              metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
+            }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+
+            // --- Send opening notification to customer via Evolution API ---
+            try {
+              const openingText = `📋 *Atendimento ${newAtt.attendance_code}*\n\nOlá! Seu atendimento foi iniciado. Em que posso ajudar? 😊`;
+              const destNumber = getDestinationNumber(contact.phone_number);
+              const openEndpoint = `${secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '')}/message/sendText/${instanceIdentifier}`;
+              const openHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...authHeaders };
+              const openResp = await fetch(openEndpoint, {
+                method: 'POST',
+                headers: openHeaders,
+                body: JSON.stringify({ number: destNumber, text: openingText }),
+              });
+              if (openResp.ok) {
+                const openData = await openResp.json();
+                const openMsgId = openData.key?.id || `att_open_${Date.now()}`;
+                // Persist the opening message sent to customer
+                await supabase.from('whatsapp_messages').upsert({
+                  conversation_id: body.conversationId,
+                  remote_jid: contact.phone_number,
+                  message_id: openMsgId,
+                  content: openingText,
+                  message_type: 'text',
+                  is_from_me: true,
+                  status: 'sent',
+                  timestamp: nowIso,
+                  tenant_id: tenantId,
+                  metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
+                }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+                console.log(`[send-whatsapp-message] Opening notification sent to customer for att=${newAtt.id}`);
+              } else {
+                console.error('[send-whatsapp-message] Failed to send opening notification:', await openResp.text());
+              }
+            } catch (openErr) {
+              console.error('[send-whatsapp-message] Error sending opening notification:', openErr);
+            }
           }
 
           // Reopen conversation visually AND sync assigned_to
