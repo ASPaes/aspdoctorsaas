@@ -337,7 +337,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
           <CollapsibleSection
             icon={<FileText className="h-3.5 w-3.5" />}
             title="Resumos"
-            badge={summaries.length > 0 ? summaries.length : undefined}
+            badge={conversationSummary ? 1 : undefined}
             open={summariesOpen}
             onOpenChange={setSummariesOpen}
             action={
@@ -353,27 +353,25 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
             }
           >
             <div className="space-y-2 min-w-0">
-              {summaries.length === 0 ? (
+              {!conversationSummary ? (
                 <p className="text-xs text-muted-foreground">Nenhum resumo disponível</p>
               ) : (
-                summaries.map((s) => (
-                  <div key={s.id} className="bg-muted rounded-md p-2 text-xs space-y-1 min-w-0">
-                    <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{s.summary}</p>
-                    {s.key_points && s.key_points.length > 0 && (
+                <div className="bg-muted rounded-md p-2 text-xs space-y-1 min-w-0">
+                  <p className="whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>{conversationSummary.summary}</p>
+                  {conversationSummary.key_points && conversationSummary.key_points.length > 0 && (
+                    <ul className="list-disc list-inside text-muted-foreground">
+                      {conversationSummary.key_points.map((kp: string, i: number) => <li key={i} className="break-words">{kp}</li>)}
+                    </ul>
+                  )}
+                  {conversationSummary.action_items && conversationSummary.action_items.length > 0 && (
+                    <div className="pt-1 border-t border-border mt-1">
+                      <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Recomendações:</p>
                       <ul className="list-disc list-inside text-muted-foreground">
-                        {s.key_points.map((kp: string, i: number) => <li key={i} className="break-words">{kp}</li>)}
+                        {conversationSummary.action_items.map((ai: string, i: number) => <li key={i} className="break-words">{ai}</li>)}
                       </ul>
-                    )}
-                    {s.action_items && s.action_items.length > 0 && (
-                      <div className="pt-1 border-t border-border mt-1">
-                        <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Ações pendentes:</p>
-                        <ul className="list-disc list-inside text-muted-foreground">
-                          {s.action_items.map((ai: string, i: number) => <li key={i} className="break-words">{ai}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </CollapsibleSection>
