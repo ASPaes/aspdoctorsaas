@@ -485,12 +485,11 @@ Deno.serve(async (req) => {
             activeAtt = { id: newAtt.id, status: 'in_progress', assigned_to: senderUserId, msg_agent_count: 1 };
           }
 
-          // Reopen conversation visually if it was closed
+          // Reopen conversation visually AND sync assigned_to
           await supabase
             .from('whatsapp_conversations')
-            .update({ status: 'active', updated_at: nowIso })
-            .eq('id', body.conversationId)
-            .eq('status', 'closed');
+            .update({ status: 'active', assigned_to: senderUserId, updated_at: nowIso })
+            .eq('id', body.conversationId);
         } else {
           // Active attendance exists — increment and auto-assign
           const update: Record<string, any> = {
