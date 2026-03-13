@@ -105,19 +105,29 @@ export const useConversationAssignment = () => {
 
       return { conversationId, newAssignee };
     },
-    onSuccess: (result) => {
+    onMutate: async (vars) => {
+      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+        if (!old?.conversations) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map((c: any) =>
+            c.id === vars.conversationId ? { ...c, assigned_to: vars.newAssignee } : c
+          ),
+        };
+      });
       queryClient.setQueriesData<Map<string, any>>(
         { queryKey: ["attendance-status"] },
         (oldMap) => {
           if (!oldMap) return oldMap;
-          const entry = oldMap.get(result.conversationId);
+          const entry = oldMap.get(vars.conversationId);
           if (!entry) return oldMap;
           const newMap = new Map(oldMap);
-          newMap.set(result.conversationId, { ...entry, assigned_to: result.newAssignee });
+          newMap.set(vars.conversationId, { ...entry, assigned_to: vars.newAssignee });
           return newMap;
         }
       );
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       toast({ title: "Conversa transferida", description: "A conversa foi transferida com sucesso." });
     },
