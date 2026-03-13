@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -10,6 +10,7 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import { useConversationTopics } from "../hooks/useConversationTopics";
+import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { Badge } from "@/components/ui/badge";
 import { EditContactModal } from "./EditContactModal";
 import { QueueIndicator } from "./QueueIndicator";
