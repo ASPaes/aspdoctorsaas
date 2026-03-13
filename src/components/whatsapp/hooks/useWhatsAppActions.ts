@@ -121,21 +121,67 @@ export const useWhatsAppActions = () => {
                 ignoreDuplicates: true,
               });
 
-              // Send closure message to customer via WhatsApp using send-whatsapp-message with correct params
+              // Send closure message to customer via WhatsApp
               try {
                 const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
-
                 await supabase.functions.invoke('send-whatsapp-message', {
                   body: {
                     conversationId,
                     content: closureText,
                     messageType: 'text',
-                    systemMessage: true, // Skip attendance creation logic
+                    systemMessage: true,
                   },
                 });
                 console.log('[closeConversation] Closure message sent to customer');
               } catch (sendErr) {
                 console.error('[closeConversation] Error sending closure message to customer:', sendErr);
+              }
+
+              // --- CSAT: send survey if enabled and close reason is manual ---
+              try {
+                const { data: config } = await supabase
+                  .from('configuracoes')
+                  .select('support_csat_enabled, support_csat_prompt_template, support_csat_score_min, support_csat_score_max')
+                  .eq('tenant_id', profile.tenant_id)
+                  .maybeSingle();
+
+                if (config?.support_csat_enabled) {
+                  // Get contact name for template
+                  const { data: convData } = await supabase
+                    .from('whatsapp_conversations')
+                    .select('contact:whatsapp_contacts(name)')
+                    .eq('id', conversationId)
+                    .single();
+                  const contactName = (convData as any)?.contact?.name || '';
+
+                  const promptTemplate = config.support_csat_prompt_template ||
+                    'Oi {{customer_name}}, para encerrar este atendimento é muito importante entender como foi sua experiência. De 0 a 5, como você avalia este atendimento? (Responda apenas a nota)';
+                  const csatPrompt = promptTemplate
+                    .replace(/\{\{customer_name\}\}/g, contactName)
+                    .replace(/\{\{score_min\}\}/g, String(config.support_csat_score_min ?? 0))
+                    .replace(/\{\{score_max\}\}/g, String(config.support_csat_score_max ?? 5));
+
+                  // Create support_csat record
+                  await supabase.from('support_csat').insert({
+                    tenant_id: profile.tenant_id,
+                    attendance_id: activeAtt.id,
+                    status: 'pending',
+                    asked_at: now.toISOString(),
+                  });
+
+                  // Send CSAT prompt to customer
+                  await supabase.functions.invoke('send-whatsapp-message', {
+                    body: {
+                      conversationId,
+                      content: csatPrompt,
+                      messageType: 'text',
+                      systemMessage: true,
+                    },
+                  });
+                  console.log('[closeConversation] CSAT survey sent to customer');
+                }
+              } catch (csatErr) {
+                console.error('[closeConversation] Error sending CSAT survey:', csatErr);
               }
             }
           }
