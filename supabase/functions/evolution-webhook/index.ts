@@ -965,14 +965,17 @@ async function sendUraWelcome(
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
 
+    // Prepend attendance code header if available
+    const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
+
     let fullMessage: string;
     if (areas && areas.length > 0) {
       // Append numbered options from support_areas
       const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
-      fullMessage = `${welcomeText}\n\n${optionsList}`;
+      fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
     } else {
       // No support_areas — template already contains the options
-      fullMessage = welcomeText;
+      fullMessage = `${codeHeader}${welcomeText}`;
       console.log('[ura] No support_areas found, sending template as-is');
     }
 
