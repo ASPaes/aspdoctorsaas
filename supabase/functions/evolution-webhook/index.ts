@@ -1199,14 +1199,20 @@ async function handleUraResponse(
     return true;
   }
 
-  // Option 0 = close attendance
+  // Option 0 = close attendance AND conversation
   if (optionNumber === 0) {
     const nowIso = new Date().toISOString();
+    // Close the attendance
     await supabase
       .from('support_attendances')
       .update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, updated_at: nowIso })
       .eq('id', att.id);
-    console.log(`[ura] Customer chose to close attendance att=${att.id} conv=${conversationId}`);
+    // Close the conversation visually
+    await supabase
+      .from('whatsapp_conversations')
+      .update({ status: 'closed', updated_at: nowIso })
+      .eq('id', conversationId);
+    console.log(`[ura] Customer chose to close attendance+conversation att=${att.id} conv=${conversationId}`);
     await sendAndPersistAutoMessage(
       supabase, instanceCtx, conversationId, tenantId,
       '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!',
