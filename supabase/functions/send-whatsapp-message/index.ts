@@ -515,6 +515,11 @@ Deno.serve(async (req) => {
           } else {
             if (update.assigned_to) {
               console.log(`[send-whatsapp-message] ✅ Attendance ${activeAtt.id} auto-assigned to ${senderUserId}`);
+              // Sync assigned_to on conversation too
+              await supabase
+                .from('whatsapp_conversations')
+                .update({ assigned_to: senderUserId, status: 'active', updated_at: nowIso })
+                .eq('id', body.conversationId);
             }
             console.log(`[send-whatsapp-message] ✅ msg_agent_count incremented on ${activeAtt.id}`);
           }
