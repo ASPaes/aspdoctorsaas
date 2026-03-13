@@ -25,6 +25,7 @@ export default function WhatsAppSettings() {
       <Tabs defaultValue="instances">
         <TabsList>
           <TabsTrigger value="instances">Instâncias</TabsTrigger>
+          <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="assignment">Atribuição</TabsTrigger>
           <TabsTrigger value="team">Equipe</TabsTrigger>
