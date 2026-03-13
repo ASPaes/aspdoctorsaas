@@ -1884,6 +1884,102 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          aberto_em: string
+          agendado_para: string
+          assunto: string
+          attendance_id: string
+          atualizado_em: string
+          cliente_id: string
+          concluido_em: string | null
+          criado_por: string | null
+          descricao: string | null
+          fornecedor_id: number | null
+          id: string
+          motivo_cancelamento: string | null
+          prioridade: Database["public"]["Enums"]["support_ticket_prioridade"]
+          responsavel_user_id: string | null
+          status: Database["public"]["Enums"]["support_ticket_status"]
+          tenant_id: string
+          tipo: Database["public"]["Enums"]["support_ticket_tipo"]
+        }
+        Insert: {
+          aberto_em?: string
+          agendado_para: string
+          assunto: string
+          attendance_id: string
+          atualizado_em?: string
+          cliente_id: string
+          concluido_em?: string | null
+          criado_por?: string | null
+          descricao?: string | null
+          fornecedor_id?: number | null
+          id?: string
+          motivo_cancelamento?: string | null
+          prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["support_ticket_status"]
+          tenant_id: string
+          tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
+        }
+        Update: {
+          aberto_em?: string
+          agendado_para?: string
+          assunto?: string
+          attendance_id?: string
+          atualizado_em?: string
+          cliente_id?: string
+          concluido_em?: string | null
+          criado_por?: string | null
+          descricao?: string | null
+          fornecedor_id?: number | null
+          id?: string
+          motivo_cancelamento?: string | null
+          prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
+          responsavel_user_id?: string | null
+          status?: Database["public"]["Enums"]["support_ticket_status"]
+          tenant_id?: string
+          tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_attendance_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "support_attendances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_cliente_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_cliente_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_fornecedor_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_tenant_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           cnpj: string | null
@@ -3138,6 +3234,15 @@ export type Database = {
       movimento_mrr_tipo: "upsell" | "cross_sell" | "downsell" | "venda_avulsa"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
       sentiment_type: "positive" | "neutral" | "negative"
+      support_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
+      support_ticket_status:
+        | "aberto"
+        | "agendado"
+        | "em_andamento"
+        | "aguardando_terceiro"
+        | "concluido"
+        | "cancelado"
+      support_ticket_tipo: "cliente" | "fornecedor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3313,6 +3418,16 @@ export const Constants = {
       movimento_mrr_tipo: ["upsell", "cross_sell", "downsell", "venda_avulsa"],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
       sentiment_type: ["positive", "neutral", "negative"],
+      support_ticket_prioridade: ["baixa", "media", "alta", "urgente"],
+      support_ticket_status: [
+        "aberto",
+        "agendado",
+        "em_andamento",
+        "aguardando_terceiro",
+        "concluido",
+        "cancelado",
+      ],
+      support_ticket_tipo: ["cliente", "fornecedor"],
     },
   },
 } as const
