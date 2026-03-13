@@ -1413,11 +1413,12 @@ async function ensureAttendanceForIncomingMessage(
       // Fetch the last operator (assigned_to) from the closed attendance
       const { data: closedFull } = await supabase
         .from('support_attendances')
-        .select('assigned_to')
+        .select('assigned_to, attendance_code')
         .eq('id', lastClosed.id)
         .single();
 
       const lastOperator = closedFull?.assigned_to ?? null;
+      const attCode = closedFull?.attendance_code ?? '';
 
       // Reopen: sticky to last operator → in_progress; if no operator → waiting (queue)
       const { error: reopenErr } = await supabase
@@ -1439,6 +1440,11 @@ async function ensureAttendanceForIncomingMessage(
         console.error('[attendance] Error reopening:', reopenErr);
       } else {
         console.log(`[attendance] REOPEN by customer att=${lastClosed.id} assigned_to=${lastOperator} status=${lastOperator ? 'in_progress' : 'waiting'} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
+        // Insert system message for attendance reopened
+        if (attCode) {
+          insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
+            .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
+        }
       }
       return;
     }
