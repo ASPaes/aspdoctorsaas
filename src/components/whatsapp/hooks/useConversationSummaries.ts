@@ -20,17 +20,19 @@ export const useConversationSummaries = (conversationId: string | null) => {
   const queryClient = useQueryClient();
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const { data: summaries, isLoading } = useQuery({
-    queryKey: ['conversation-summaries', conversationId],
+  const { data: summary, isLoading } = useQuery({
+    queryKey: ['conversation-summary', conversationId],
     queryFn: async () => {
-      if (!conversationId) return [];
+      if (!conversationId) return null;
       const { data, error } = await supabase
         .from('whatsapp_conversation_summaries')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
-      return data as unknown as ConversationSummary[];
+      return data as unknown as ConversationSummary | null;
     },
     enabled: !!conversationId,
   });
@@ -43,8 +45,8 @@ export const useConversationSummaries = (conversationId: string | null) => {
       if (error) throw error;
       if (data.message) { toast.info(data.message); return; }
       if (data.error) { toast.error(data.error); return; }
-      toast.success('Resumo gerado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['conversation-summaries', conversationId] });
+      toast.success('Resumo atualizado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['conversation-summary', conversationId] });
     } catch (error) {
       console.error('Erro ao gerar resumo:', error);
       toast.error('Erro ao gerar resumo. Tente novamente.');
@@ -60,10 +62,10 @@ export const useConversationSummaries = (conversationId: string | null) => {
     },
     onSuccess: () => {
       toast.success('Resumo excluído');
-      queryClient.invalidateQueries({ queryKey: ['conversation-summaries', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-summary', conversationId] });
     },
     onError: () => { toast.error('Erro ao excluir resumo'); },
   });
 
-  return { summaries: summaries || [], isLoading, isGenerating, generateSummary, deleteSummary: deleteSummary.mutate };
+  return { summary: summary || null, isLoading, isGenerating, generateSummary, deleteSummary: deleteSummary.mutate };
 };
