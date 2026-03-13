@@ -880,9 +880,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
         });
     } else {
-      // Operator message sent via Evolution (e.g. from phone) — increment agent count
-      incrementAttendanceCounter(supabase, conversationId, 'agent')
-        .catch(err => console.error('[evolution-webhook] incrementAgentCount error:', err));
+      // Operator message sent via Evolution (e.g. from phone)
+      // If no active attendance, create new one assigned to this operator
+      ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
+        .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
+        .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpsert:', error);
