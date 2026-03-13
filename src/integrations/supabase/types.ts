@@ -1570,6 +1570,7 @@ export type Database = {
           contact_id: string
           conversation_id: string
           created_at: string
+          created_from: string | null
           first_response_at: string | null
           handle_seconds: number
           handoffs_count: number
@@ -1580,6 +1581,8 @@ export type Database = {
           msg_customer_count: number
           opened_at: string
           opened_by: string | null
+          reopened_at: string | null
+          reopened_from: string | null
           seq_number: number
           status: string
           tenant_id: string
@@ -1604,6 +1607,7 @@ export type Database = {
           contact_id: string
           conversation_id: string
           created_at?: string
+          created_from?: string | null
           first_response_at?: string | null
           handle_seconds?: number
           handoffs_count?: number
@@ -1614,6 +1618,8 @@ export type Database = {
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          reopened_at?: string | null
+          reopened_from?: string | null
           seq_number?: number
           status?: string
           tenant_id: string
@@ -1638,6 +1644,7 @@ export type Database = {
           contact_id?: string
           conversation_id?: string
           created_at?: string
+          created_from?: string | null
           first_response_at?: string | null
           handle_seconds?: number
           handoffs_count?: number
@@ -1648,6 +1655,8 @@ export type Database = {
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          reopened_at?: string | null
+          reopened_from?: string | null
           seq_number?: number
           status?: string
           tenant_id?: string
