@@ -15,6 +15,7 @@ interface SendMessageRequest {
   fileName?: string;
   quotedMessageId?: string;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
+  systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
 }
 
 function getEvolutionAuthHeaders(apiKey: string, _providerType: string): Record<string, string> {
