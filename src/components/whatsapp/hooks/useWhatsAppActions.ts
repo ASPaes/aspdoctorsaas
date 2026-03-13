@@ -57,13 +57,7 @@ export const useWhatsAppActions = () => {
         .limit(1)
         .maybeSingle();
 
-      if (generateSummary) {
-        try {
-          await supabase.functions.invoke('generate-conversation-summary', {
-            body: { conversationId, attendanceId: activeAtt?.id || undefined },
-          });
-        } catch (e) { console.error('Erro ao gerar resumo:', e); }
-      }
+      // Summary generation removed — finalize-attendance handles it
 
       const { error } = await supabase
         .from('whatsapp_conversations')
