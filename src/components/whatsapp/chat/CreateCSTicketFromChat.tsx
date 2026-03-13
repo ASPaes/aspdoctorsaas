@@ -12,6 +12,7 @@ import { Loader2, AlertTriangle, Ticket, LinkIcon, Building2 } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateCSTicket, useFuncionariosAtivos } from "@/components/cs/hooks/useCSTickets";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_PRIORIDADE_LABELS,
   type CSTicketTipo, type CSTicketPrioridade,
