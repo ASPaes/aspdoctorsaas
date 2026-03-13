@@ -866,7 +866,15 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       checkAndTriggerAutoSentiment(supabase, conversationId, supabaseUrl);
       checkAndTriggerAutoCategorization(supabase, conversationId, supabaseUrl);
       // Ensure attendance exists (reopen/new/ignore goodbye) then increment counter
-      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content)
+      const instanceCtx: InstanceContext = {
+        apiUrl: secrets.api_url,
+        apiKey: secrets.api_key,
+        instanceName: evolutionInstanceId,
+        providerType: instanceData.provider_type || 'self_hosted',
+        remoteJid: key.remoteJid,
+        contactName: pushName || phone,
+      };
+      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
         .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
         .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
 
