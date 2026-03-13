@@ -240,7 +240,7 @@ REGRAS:
       .single();
 
     if (convData?.contact_id) {
-      await supabase.from("whatsapp_sentiments").upsert(
+      await supabase.from("whatsapp_sentiment_analysis").upsert(
         {
           tenant_id: att.tenant_id,
           conversation_id: att.conversation_id,
@@ -248,10 +248,9 @@ REGRAS:
           sentiment: sentimentValue,
           confidence,
           summary: (result.summary || "").substring(0, 500),
-          keywords: result.tags || [],
-          updated_at: new Date().toISOString(),
+          keywords: (result.tags || []).slice(0, 5),
         },
-        { onConflict: "tenant_id,conversation_id" }
+        { onConflict: "conversation_id" }
       );
     }
 
