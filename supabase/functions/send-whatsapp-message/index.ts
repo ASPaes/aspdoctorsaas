@@ -493,8 +493,8 @@ Deno.serve(async (req) => {
             try {
               const contactName = contact?.name || '';
               const openingText = contactName
-                ? `Olá ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado. Em breve daremos continuidade ao seu chamado.`
-                : `Olá, o atendimento ${newAtt.attendance_code} foi iniciado. Em breve daremos continuidade ao seu chamado.`;
+                ? `Olá ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
+                : `Olá, o atendimento ${newAtt.attendance_code} foi iniciado.`;
               const destNumber = getDestinationNumber(contact.phone_number);
               const openEndpoint = `${secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '')}/message/sendText/${instanceIdentifier}`;
               const openHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...authHeaders };
