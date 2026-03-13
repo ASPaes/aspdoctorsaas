@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send } from "lucide-react";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { useConversationSummaries } from "../hooks/useConversationSummaries";
@@ -15,10 +17,12 @@ import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import { useConversationTopics } from "../hooks/useConversationTopics";
 import { useCategorizeConversation } from "../hooks/useCategorizeConversation";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
+import { useKBDraft } from "../hooks/useKBDraft";
 import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
+import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -48,6 +52,28 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [sentimentOpen, setSentimentOpen] = useState(true);
   const [notesOpen, setNotesOpen] = useState(true);
   const [summariesOpen, setSummariesOpen] = useState(false);
+  const [kbOpen, setKbOpen] = useState(true);
+  const [kbEditOpen, setKbEditOpen] = useState(false);
+
+  // Find latest closed attendance for this conversation (for KB section)
+  const { data: latestClosedAttendance } = useQuery({
+    queryKey: ['latest-closed-attendance', conversation.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('support_attendances')
+        .select('id')
+        .eq('conversation_id', conversation.id)
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    staleTime: 30000,
+  });
+
+  const closedAttendanceId = latestClosedAttendance?.id || null;
+  const { draft: kbDraft, isLoading: kbLoading, submitForReview, isSubmitting: kbSubmitting } = useKBDraft(closedAttendanceId);
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const isClienteLinked = !!(metadata?.cliente_id);
@@ -375,6 +401,74 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               )}
             </div>
           </CollapsibleSection>
+
+          {/* ─── Base de Conhecimento (KB) ─── */}
+          {closedAttendanceId && (
+            <>
+              <Separator />
+              <CollapsibleSection
+                icon={<BookOpen className="h-3.5 w-3.5" />}
+                title="Base de Conhecimento"
+                open={kbOpen}
+                onOpenChange={setKbOpen}
+              >
+                {kbLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Carregando...
+                  </div>
+                ) : kbDraft ? (
+                  <div className="space-y-2 min-w-0">
+                    <div className="bg-muted rounded-md p-2 text-xs space-y-1 min-w-0">
+                      <p className="font-medium truncate">{kbDraft.title || "Sem título"}</p>
+                      <Badge variant="outline" className={`text-[10px] ${
+                        kbDraft.status === 'draft' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                        kbDraft.status === 'pending_review' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {kbDraft.status === 'draft' ? 'Rascunho' : kbDraft.status === 'pending_review' ? 'Aguardando Aprovação' : 'Aprovado'}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] gap-1 flex-1"
+                        onClick={() => setKbEditOpen(true)}
+                      >
+                        <Pencil className="h-3 w-3" /> Revisar
+                      </Button>
+                      {kbDraft.status === 'draft' && (
+                        <Button
+                          size="sm"
+                          className="h-6 text-[10px] gap-1 flex-1"
+                          onClick={() => submitForReview(kbDraft.id)}
+                          disabled={kbSubmitting}
+                        >
+                          {kbSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                          Enviar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Processando análise...</p>
+                )}
+              </CollapsibleSection>
+
+              {/* KB Edit Dialog */}
+              {kbEditOpen && kbDraft && (
+                <KBEditDialog
+                  article={{
+                    ...kbDraft,
+                    area: null,
+                    attendance: null,
+                  }}
+                  areas={[]}
+                  onClose={() => setKbEditOpen(false)}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

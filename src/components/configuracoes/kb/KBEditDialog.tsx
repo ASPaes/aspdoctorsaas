@@ -10,15 +10,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { ExternalLink, RefreshCw, Trash2, Sparkles } from "lucide-react";
+import { ExternalLink, RefreshCw, Trash2, Sparkles, Send } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
+  pending_review: "Aguardando Aprovação",
   approved: "Aprovado",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  pending_review: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 };
 
@@ -316,6 +318,22 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
           </AlertDialog>
 
           <div className="flex gap-2">
+            {article.status === 'draft' && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  updateMutation.mutate(
+                    { status: 'pending_review', updated_at: new Date().toISOString() },
+                    { onSuccess: () => onClose() }
+                  );
+                }}
+                disabled={updateMutation.isPending}
+                className="gap-1.5"
+              >
+                <Send className="h-4 w-4" />
+                Enviar para Aprovação
+              </Button>
+            )}
             <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>

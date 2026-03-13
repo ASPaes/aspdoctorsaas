@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.check-csat-timeout]
 verify_jwt = false
+
+[functions.finalize-attendance]
+verify_jwt = false

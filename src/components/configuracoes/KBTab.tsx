@@ -36,11 +36,13 @@ type KBArticle = {
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
+  pending_review: "Aguardando Aprovação",
   approved: "Aprovado",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  pending_review: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 };
 
@@ -177,6 +179,7 @@ export default function KBTab() {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="draft">Rascunho</SelectItem>
+                <SelectItem value="pending_review">Aguardando Aprovação</SelectItem>
                 <SelectItem value="approved">Aprovado</SelectItem>
               </SelectContent>
             </Select>
@@ -255,7 +258,7 @@ export default function KBTab() {
                           <Button variant="ghost" size="icon" onClick={() => setEditingArticle(article)} title="Editar">
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          {isAdmin && article.status === "draft" && (
+                          {isAdmin && (article.status === "draft" || article.status === "pending_review") && (
                             <Button variant="ghost" size="icon" onClick={() => approve(article.id)} title="Aprovar">
                               <CheckCircle className="h-4 w-4 text-green-600" />
                             </Button>
