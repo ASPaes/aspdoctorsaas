@@ -48,6 +48,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { attendanceMap } = useAttendanceStatus([conversation.id]);
   const attendance = attendanceMap.get(conversation.id);
 
+  // Resolve assigned operator name
+  const { data: tenantUsers } = useTenantUsers();
+  const assignedOperatorName = useMemo(() => {
+    const assignedTo = attendance?.assigned_to;
+    if (!assignedTo || !tenantUsers) return null;
+    const u = tenantUsers.find((tu) => tu.user_id === assignedTo);
+    return u?.email?.split("@")[0] || u?.email || null;
+  }, [attendance?.assigned_to, tenantUsers]);
+
   const effectiveStatus = useMemo(() => {
     if (attendance) {
       if (attendance.status === "waiting") return "waiting";
