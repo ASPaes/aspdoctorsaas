@@ -1523,6 +1523,9 @@ async function ensureAttendanceForOperatorMessage(
       console.error('[attendance-operator] Error creating:', createErr);
     } else {
       console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
+      // Insert system message for attendance opened
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+        .catch(err => console.error('[attendance-operator] Error inserting system msg:', err));
     }
   } catch (err) {
     console.error('[attendance-operator] Unexpected error:', err);
