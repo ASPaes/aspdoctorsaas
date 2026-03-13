@@ -66,46 +66,37 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   return (
     <div className="shrink-0">
-      <div className="border-b border-border bg-background">
-        {/* Main row */}
-        <div className="flex items-center gap-3 px-4 py-2.5 min-h-[56px]">
+      <div className="border-b border-border bg-background px-3 py-2">
+        {/* Row 1: Identity + primary actions */}
+        <div className="flex items-center gap-2 min-h-[40px]">
 
-          {/* ─── LEFT: Identity ─── */}
-          <div className="flex items-center gap-3 min-w-0 shrink-0">
-            {onClose && (
-              <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden shrink-0" onClick={onClose}>
-                <X className="h-4 w-4" />
+          {/* Close (mobile) */}
+          {onClose && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden shrink-0" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+
+          {/* Avatar */}
+          <Avatar className="h-9 w-9 shrink-0">
+            {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
+            <AvatarFallback className="text-xs font-medium">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
+
+          {/* Name + status */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold truncate min-w-0">{name}</p>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
+                <Pencil className="h-3 w-3 text-muted-foreground" />
               </Button>
-            )}
-
-            <Avatar className="h-9 w-9 shrink-0">
-              {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
-              <AvatarFallback className="text-xs font-medium">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-semibold truncate">{name}</p>
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
-                  <Pencil className="h-3 w-3 text-muted-foreground" />
-                </Button>
-                <Badge variant={statusVariant as any} className="text-[10px] h-4 shrink-0">{statusLabel}</Badge>
-              </div>
-              <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number}</p>
+              <Badge variant={statusVariant as any} className="text-[10px] h-4 shrink-0 whitespace-nowrap">{statusLabel}</Badge>
             </div>
+            <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number}</p>
           </div>
 
-          {/* ─── CENTER: Context chips ─── */}
-          <div className="flex-1 flex items-center justify-center gap-2 overflow-x-auto scrollbar-none min-w-0 px-2">
-            <SignatureControl conversationId={conversation.id} />
-            <SentimentChip sentiment={sentimentData} />
-            {topicsData?.topics && topicsData.topics.length > 0 && (
-              <TopicBadges topics={topicsData.topics} size="sm" showIcon={false} maxTopics={2} />
-            )}
-          </div>
-
-          {/* ─── RIGHT: Actions ─── */}
-          <div className="flex items-center gap-1 shrink-0">
+          {/* Primary actions — always visible */}
+          <div className="flex items-center gap-0.5 shrink-0">
             <QueueIndicator
               conversationId={conversation.id}
               assignedTo={conversation.assigned_to || null}
@@ -114,16 +105,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={analyze} disabled={isAnalyzing}>
-                  <RefreshCw className={`h-4 w-4 ${isAnalyzing ? "animate-spin" : ""}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggleDetails}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggleDetails}>
                   <PanelRightOpen className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
@@ -132,11 +114,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* Collapsed actions that were inline before */}
+                <DropdownMenuItem onClick={analyze} disabled={isAnalyzing}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isAnalyzing ? "animate-spin" : ""}`} /> Analisar sentimento
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 {conversation.status === "active" && (
                   <>
                     <DropdownMenuItem onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}>
@@ -173,6 +160,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
+
+        {/* Row 2: Context chips — wraps naturally */}
+        <div className="flex items-center gap-1.5 flex-wrap mt-1 pl-12">
+          <SignatureControl conversationId={conversation.id} />
+          <SentimentChip sentiment={sentimentData} />
+          {topicsData?.topics && topicsData.topics.length > 0 && (
+            <TopicBadges topics={topicsData.topics} size="sm" showIcon={false} maxTopics={2} />
+          )}
         </div>
       </div>
 
