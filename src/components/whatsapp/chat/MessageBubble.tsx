@@ -63,7 +63,7 @@ export function MessageBubble({
     )
   );
 
-  const { timezone } = useChatTimezone();
+  const { timezone } = useAppTimezone();
   const time = formatTzTime(msg.timestamp, timezone);
   const [showTranscription, setShowTranscription] = useState(false);
 

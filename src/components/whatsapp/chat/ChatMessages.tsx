@@ -50,7 +50,7 @@ export function ChatMessages({
 }: Props) {
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
-  const { timezone } = useChatTimezone();
+  const { timezone } = useAppTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);

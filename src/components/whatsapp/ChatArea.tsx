@@ -60,7 +60,7 @@ function groupByDateInline(messages: Message[], timezone: string): { date: strin
 
 export function ChatArea({ conversation }: Props) {
   const { data: messages = [], isLoading } = useMessages(conversation?.id ?? null);
-  const { timezone } = useChatTimezone();
+  const { timezone } = useAppTimezone();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
