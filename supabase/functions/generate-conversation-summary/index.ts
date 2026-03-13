@@ -145,20 +145,21 @@ Retorne APENAS um JSON válido sem markdown:
       throw aiError;
     }
 
+    const summaryInsert: Record<string, any> = {
+      conversation_id: conversationId,
+      tenant_id: conversation.tenant_id,
+      summary: result.summary,
+      key_points: result.key_points || [],
+      action_items: result.action_items || [],
+      sentiment_at_time: result.sentiment,
+      message_count: messages.length,
+      period_start: messages[0].timestamp,
+      period_end: messages[messages.length - 1].timestamp,
+    };
+
     const { data: savedSummary, error: saveError } = await supabase
       .from("whatsapp_conversation_summaries")
-      .insert({
-        conversation_id: conversationId,
-        tenant_id: conversation.tenant_id,
-        summary: result.summary,
-        key_points: result.key_points || [],
-        action_items: result.action_items || [],
-        sentiment_at_time: result.sentiment,
-        message_count: messages.length,
-        period_start: messages[0].timestamp,
-        period_end: messages[messages.length - 1].timestamp,
-        ...(attendanceId ? { attendance_id: attendanceId } : {}),
-      })
+      .insert(summaryInsert)
       .select()
       .single();
 
