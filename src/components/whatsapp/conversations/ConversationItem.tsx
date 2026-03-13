@@ -80,12 +80,14 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
+        "w-full grid gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
         isSelected && "bg-accent",
         needsCSTicket && "ring-1 ring-destructive/40"
       )}
+      style={{ gridTemplateColumns: "40px minmax(0, 1fr) max-content" }}
     >
-      <div className="relative shrink-0">
+      {/* Col 1 — Avatar */}
+      <div className="relative shrink-0 self-center">
         <Avatar className="h-10 w-10">
           {contact?.profile_picture_url && (
             <AvatarImage src={contact.profile_picture_url} />
@@ -101,42 +103,39 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         )}
       </div>
 
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-medium truncate min-w-0 flex-1">{name}</span>
-          <div className="flex items-center gap-1 shrink-0">
-            {attendanceBadge}
-            {timeStr && (
-              <span className={cn(
-                "text-xs whitespace-nowrap",
-                hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
-              )}>
-                {timeStr}
-              </span>
-            )}
-          </div>
-        </div>
+      {/* Col 2 — Name + Preview (truncatable) */}
+      <div className="min-w-0 overflow-hidden self-center">
+        <p className="text-sm font-medium truncate">{name}</p>
         <div className="flex items-center gap-1 mt-0.5">
-          <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-            {conv.isLastMessageFromMe && (
-              <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
-            )}
-            <span className="text-xs text-muted-foreground truncate">
-              {previewText}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground shrink-0" />}
-            {hasUnread && (
-              <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            )}
-          </div>
+          {conv.isLastMessageFromMe && (
+            <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
+          )}
+          <span className="text-xs text-muted-foreground truncate">{previewText}</span>
         </div>
         {instanceName && (
           <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{instanceName}</p>
         )}
+      </div>
+
+      {/* Col 3 — Meta: time + badge + unread (never hidden) */}
+      <div className="flex flex-col items-end gap-1 self-start whitespace-nowrap shrink-0">
+        {timeStr && (
+          <span className={cn(
+            "text-xs",
+            hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
+          )}>
+            {timeStr}
+          </span>
+        )}
+        {attendanceBadge}
+        <div className="flex items-center gap-1">
+          {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
+          {hasUnread && (
+            <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );
