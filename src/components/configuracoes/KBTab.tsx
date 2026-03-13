@@ -210,7 +210,7 @@ export default function KBTab() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="draft">Rascunho</SelectItem>
                 <SelectItem value="approved">Aprovado</SelectItem>
-                <SelectItem value="archived">Arquivado</SelectItem>
+                
               </SelectContent>
             </Select>
             <Select value={areaFilter} onValueChange={setAreaFilter}>
