@@ -91,6 +91,8 @@ export function useAttendanceStatus(
         { event: "*", schema: "public", table: "support_attendances" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+          // Also invalidate conversations so sidebar re-fetches (status may have changed)
+          queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
         }
       )
       .subscribe();
