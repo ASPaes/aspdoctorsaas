@@ -491,7 +491,7 @@ Deno.serve(async (req) => {
             // Use a timestamp slightly before the agent's message so it appears first in timeline
             const openTimestamp = new Date(now.getTime() - 1000).toISOString();
             try {
-              const openingText = `📋 *Atendimento ${newAtt.attendance_code}*\n\nOlá! Seu atendimento foi iniciado. Em que posso ajudar? 😊`;
+              const openingText = `O atendimento ${newAtt.attendance_code} foi aberto`;
               const destNumber = getDestinationNumber(contact.phone_number);
               const openEndpoint = `${secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '')}/message/sendText/${instanceIdentifier}`;
               const openHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...authHeaders };
