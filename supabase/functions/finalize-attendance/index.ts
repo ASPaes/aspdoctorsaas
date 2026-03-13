@@ -176,12 +176,12 @@ Retorne APENAS JSON válido sem markdown:
 {
   "sentiment": "positive|neutral|negative",
   "confidence": 0.0-1.0,
-  "topics": ["topico1", "topico2"],
-  "summary": "Resumo curto do atendimento (máx 100 palavras)",
+  "topics": ["topico1"],
+  "summary": "Resumo curto (máx 80 palavras)",
   "title": "Título curto para KB (máx 80 chars)",
-  "problem": "Problema/dúvida do cliente (máx 100 palavras)",
-  "solution": "Como o técnico resolveu (máx 100 palavras)",
-  "tags": ["tag1", "tag2"],
+  "problem": "Problema/dúvida do cliente (máx 80 palavras)",
+  "solution": "Como o técnico resolveu (máx 80 palavras)",
+  "tags": ["tag1"],
   "suggested_area": "nome da área mais adequada ou null"
 }
 
@@ -189,7 +189,8 @@ REGRAS:
 - Seja conciso e objetivo
 - "problem": apenas o relato inicial do cliente
 - "solution": orientação do técnico, forma instrucional
-- "tags": palavras curtas (1-2 termos)
+- "tags": máximo 5, palavras curtas (1-2 termos)
+- "topics": máximo 5
 - "suggested_area": escolha entre as áreas disponíveis ou null`;
 
     const rawResult = await callAI(
@@ -221,7 +222,7 @@ REGRAS:
         ai_summary: (result.summary || "").substring(0, 500),
         ai_problem: (result.problem || "").substring(0, 1000),
         ai_solution: (result.solution || "").substring(0, 1000),
-        ai_tags: result.tags || [],
+        ai_tags: (result.tags || []).slice(0, 5),
         updated_at: new Date().toISOString(),
       })
       .eq("id", attendanceId);
@@ -239,7 +240,7 @@ REGRAS:
       .single();
 
     if (convData?.contact_id) {
-      await supabase.from("whatsapp_sentiments").upsert(
+      await supabase.from("whatsapp_sentiment_analysis").upsert(
         {
           tenant_id: att.tenant_id,
           conversation_id: att.conversation_id,
@@ -247,15 +248,15 @@ REGRAS:
           sentiment: sentimentValue,
           confidence,
           summary: (result.summary || "").substring(0, 500),
-          keywords: result.tags || [],
-          updated_at: new Date().toISOString(),
+          keywords: (result.tags || []).slice(0, 5),
         },
-        { onConflict: "tenant_id,conversation_id" }
+        { onConflict: "conversation_id" }
       );
     }
 
     // 10. Update conversation metadata with topics
-    if (result.topics && result.topics.length > 0) {
+    const limitedTopics = (result.topics || []).slice(0, 5);
+    if (limitedTopics.length > 0) {
       const { data: conv } = await supabase
         .from("whatsapp_conversations")
         .select("metadata")
@@ -268,8 +269,8 @@ REGRAS:
         .update({
           metadata: {
             ...existingMetadata,
-            topics: result.topics,
-            primary_topic: result.topics[0],
+            topics: limitedTopics,
+            primary_topic: limitedTopics[0],
             ai_confidence: confidence,
             categorized_at: new Date().toISOString(),
           },
@@ -280,9 +281,11 @@ REGRAS:
     // 11. Resolve area_id from suggested_area
     let resolvedAreaId = att.area_id || null;
     if (result.suggested_area && areas && areas.length > 0) {
-      const suggestedLower = result.suggested_area.toLowerCase();
-      const match = areas.find((a: any) => a.nome.toLowerCase() === suggestedLower);
+      const normalize = (s: string) => s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const suggestedNorm = normalize(result.suggested_area);
+      const match = areas.find((a: any) => normalize(a.nome) === suggestedNorm);
       if (match) resolvedAreaId = match.id;
+      // Se não encontrou, mantém area_id original sem erro
     }
 
     // 12. Create KB draft
@@ -293,7 +296,7 @@ REGRAS:
       summary: (result.summary || "").substring(0, 500),
       problem: result.problem || "",
       solution: result.solution || "",
-      tags: Array.isArray(result.tags) ? result.tags : [],
+      tags: Array.isArray(result.tags) ? result.tags.slice(0, 5) : [],
       area_id: resolvedAreaId,
       status: "draft",
     });
@@ -301,7 +304,7 @@ REGRAS:
     console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
 
     return new Response(
-      JSON.stringify({ success: true, sentiment: sentimentValue, topics: result.topics || [] }),
+      JSON.stringify({ success: true, sentiment: sentimentValue, topics: limitedTopics }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
