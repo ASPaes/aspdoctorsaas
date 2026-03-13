@@ -59,10 +59,10 @@ export function ChatTimezoneSelector() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Globe className="h-5 w-5" />
-          Fuso Horário do Chat
+          Fuso Horário do Sistema
         </CardTitle>
         <CardDescription>
-          Define o fuso horário usado para exibir horários das mensagens e conversas.
+          Define o fuso horário usado para exibir datas e horários em todo o sistema.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
