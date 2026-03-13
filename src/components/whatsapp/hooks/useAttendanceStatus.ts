@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AttendanceInfo {
@@ -18,6 +19,7 @@ export function useAttendanceStatus(
   conversationIds: string[],
   includeClosedFilter = false
 ) {
+  const queryClient = useQueryClient();
   const queryKey = ["attendance-status", conversationIds.sort().join(","), includeClosedFilter];
 
   const { data, isLoading } = useQuery({
@@ -30,7 +32,7 @@ export function useAttendanceStatus(
         .from("support_attendances")
         .select("id, conversation_id, status, assigned_to, opened_at, closed_at")
         .in("conversation_id", conversationIds)
-        .neq("status", "closed");
+        .in("status", ["waiting", "in_progress"]);
 
       const map = new Map<string, AttendanceInfo>();
 
@@ -54,11 +56,10 @@ export function useAttendanceStatus(
             .from("support_attendances")
             .select("id, conversation_id, status, assigned_to, opened_at, closed_at")
             .in("conversation_id", missingIds)
-            .eq("status", "closed")
+            .in("status", ["closed", "inactive_closed"])
             .order("closed_at", { ascending: false });
 
           if (closedRows) {
-            // Only keep the latest closed per conversation
             for (const row of closedRows) {
               if (!map.has(row.conversation_id)) {
                 map.set(row.conversation_id, {
@@ -77,9 +78,25 @@ export function useAttendanceStatus(
       return map;
     },
     enabled: conversationIds.length > 0,
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 8000,
+    staleTime: 4000,
   });
+
+  // Subscribe to realtime changes on support_attendances to invalidate immediately
+  useEffect(() => {
+    const channel = supabase
+      .channel("attendance-status-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "support_attendances" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   return {
     attendanceMap: data ?? new Map<string, AttendanceInfo>(),
