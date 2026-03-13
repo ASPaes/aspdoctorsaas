@@ -176,12 +176,12 @@ Retorne APENAS JSON válido sem markdown:
 {
   "sentiment": "positive|neutral|negative",
   "confidence": 0.0-1.0,
-  "topics": ["topico1", "topico2"],
-  "summary": "Resumo curto do atendimento (máx 100 palavras)",
+  "topics": ["topico1"],
+  "summary": "Resumo curto (máx 80 palavras)",
   "title": "Título curto para KB (máx 80 chars)",
-  "problem": "Problema/dúvida do cliente (máx 100 palavras)",
-  "solution": "Como o técnico resolveu (máx 100 palavras)",
-  "tags": ["tag1", "tag2"],
+  "problem": "Problema/dúvida do cliente (máx 80 palavras)",
+  "solution": "Como o técnico resolveu (máx 80 palavras)",
+  "tags": ["tag1"],
   "suggested_area": "nome da área mais adequada ou null"
 }
 
@@ -189,7 +189,8 @@ REGRAS:
 - Seja conciso e objetivo
 - "problem": apenas o relato inicial do cliente
 - "solution": orientação do técnico, forma instrucional
-- "tags": palavras curtas (1-2 termos)
+- "tags": máximo 5, palavras curtas (1-2 termos)
+- "topics": máximo 5
 - "suggested_area": escolha entre as áreas disponíveis ou null`;
 
     const rawResult = await callAI(
