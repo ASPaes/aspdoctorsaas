@@ -17,9 +17,9 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "15rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 320;
-const SIDEBAR_WIDTH_STORAGE_KEY = "sidebar:width";
+const SIDEBAR_DEFAULT_WIDTH = 248;
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContext = {
@@ -71,21 +71,11 @@ const SidebarProvider = React.forwardRef<
     [setOpenProp, open],
   );
 
-  // Resizable width state
-  const [sidebarWidth, _setSidebarWidth] = React.useState<number>(() => {
-    try {
-      const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
-      if (stored) {
-        const n = parseInt(stored, 10);
-        if (n >= SIDEBAR_MIN_WIDTH && n <= SIDEBAR_MAX_WIDTH) return n;
-      }
-    } catch {}
-    return 240;
-  });
+  // Resizable width state — always starts at comfortable default
+  const [sidebarWidth, _setSidebarWidth] = React.useState<number>(SIDEBAR_DEFAULT_WIDTH);
   const setSidebarWidth = React.useCallback((w: number) => {
     const clamped = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, w));
     _setSidebarWidth(clamped);
-    try { localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped)); } catch {}
   }, []);
 
   const toggleSidebar = React.useCallback(() => {
