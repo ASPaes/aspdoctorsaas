@@ -255,7 +255,8 @@ REGRAS:
     }
 
     // 10. Update conversation metadata with topics
-    if (result.topics && result.topics.length > 0) {
+    const limitedTopics = (result.topics || []).slice(0, 5);
+    if (limitedTopics.length > 0) {
       const { data: conv } = await supabase
         .from("whatsapp_conversations")
         .select("metadata")
@@ -268,8 +269,8 @@ REGRAS:
         .update({
           metadata: {
             ...existingMetadata,
-            topics: result.topics,
-            primary_topic: result.topics[0],
+            topics: limitedTopics,
+            primary_topic: limitedTopics[0],
             ai_confidence: confidence,
             categorized_at: new Date().toISOString(),
           },
