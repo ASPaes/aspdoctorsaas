@@ -1298,6 +1298,48 @@ async function sendAndPersistAutoMessage(
 }
 
 /**
+ * Insert a local-only system message into the chat history (NOT sent to WhatsApp).
+ * Used for attendance lifecycle events (opened, closed, reopened).
+ * Uses attendance_id in message_id to guarantee idempotency via unique constraint.
+ */
+async function insertAttendanceSystemMessage(
+  supabase: any,
+  conversationId: string,
+  tenantId: string,
+  attendanceId: string,
+  attendanceCode: string,
+  event: 'opened' | 'closed' | 'reopened'
+): Promise<void> {
+  const emoji = event === 'closed' ? '🔒' : '✅';
+  const label = event === 'opened' ? 'aberto' : event === 'closed' ? 'encerrado' : 'reaberto';
+  const content = `${emoji} Atendimento ${attendanceCode} ${label} com sucesso.`;
+  const messageId = `system_att_${event}_${attendanceId}`;
+  const nowIso = new Date().toISOString();
+
+  const { error } = await supabase.from('whatsapp_messages').upsert({
+    conversation_id: conversationId,
+    remote_jid: '',
+    message_id: messageId,
+    content,
+    message_type: 'system',
+    is_from_me: false,
+    status: 'sent',
+    timestamp: nowIso,
+    tenant_id: tenantId,
+    metadata: { system: true, attendance_event: event, attendance_id: attendanceId },
+  }, {
+    onConflict: 'tenant_id,message_id',
+    ignoreDuplicates: true,
+  });
+
+  if (error) {
+    console.error(`[attendance-system-msg] Error inserting ${event} message:`, error);
+  } else {
+    console.log(`[attendance-system-msg] ${event} message inserted for att=${attendanceId} code=${attendanceCode}`);
+  }
+}
+
+/**
  * Extract the highest numbered option from a URA template string.
  * E.g. "1 - Suporte\n2 - Financeiro\n0 - Encerrar" → 2 (ignores 0)
  */
@@ -1371,11 +1413,12 @@ async function ensureAttendanceForIncomingMessage(
       // Fetch the last operator (assigned_to) from the closed attendance
       const { data: closedFull } = await supabase
         .from('support_attendances')
-        .select('assigned_to')
+        .select('assigned_to, attendance_code')
         .eq('id', lastClosed.id)
         .single();
 
       const lastOperator = closedFull?.assigned_to ?? null;
+      const attCode = closedFull?.attendance_code ?? '';
 
       // Reopen: sticky to last operator → in_progress; if no operator → waiting (queue)
       const { error: reopenErr } = await supabase
@@ -1397,6 +1440,11 @@ async function ensureAttendanceForIncomingMessage(
         console.error('[attendance] Error reopening:', reopenErr);
       } else {
         console.log(`[attendance] REOPEN by customer att=${lastClosed.id} assigned_to=${lastOperator} status=${lastOperator ? 'in_progress' : 'waiting'} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
+        // Insert system message for attendance reopened
+        if (attCode) {
+          insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
+            .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
+        }
       }
       return;
     }
@@ -1420,6 +1468,9 @@ async function ensureAttendanceForIncomingMessage(
       console.error('[attendance] Error creating new:', createErr);
     } else {
       console.log(`[attendance] NEW by customer att=${newAtt.id} code=${newAtt.attendance_code} (${diffMinutes === Infinity ? 'no previous' : diffMinutes.toFixed(1) + ' min since close'}) tenant=${tenantId} conv=${conversationId}`);
+      // Insert system message for attendance opened
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+        .catch(err => console.error('[attendance] Error inserting system msg:', err));
       // Fire-and-forget: send URA welcome message if enabled
       if (instanceCtx) {
         sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig)
@@ -1478,6 +1529,9 @@ async function ensureAttendanceForOperatorMessage(
       console.error('[attendance-operator] Error creating:', createErr);
     } else {
       console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
+      // Insert system message for attendance opened
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+        .catch(err => console.error('[attendance-operator] Error inserting system msg:', err));
     }
   } catch (err) {
     console.error('[attendance-operator] Unexpected error:', err);
