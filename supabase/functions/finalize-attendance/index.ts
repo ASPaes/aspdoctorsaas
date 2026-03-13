@@ -281,9 +281,11 @@ REGRAS:
     // 11. Resolve area_id from suggested_area
     let resolvedAreaId = att.area_id || null;
     if (result.suggested_area && areas && areas.length > 0) {
-      const suggestedLower = result.suggested_area.toLowerCase();
-      const match = areas.find((a: any) => a.nome.toLowerCase() === suggestedLower);
+      const normalize = (s: string) => s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const suggestedNorm = normalize(result.suggested_area);
+      const match = areas.find((a: any) => normalize(a.nome) === suggestedNorm);
       if (match) resolvedAreaId = match.id;
+      // Se não encontrou, mantém area_id original sem erro
     }
 
     // 12. Create KB draft
