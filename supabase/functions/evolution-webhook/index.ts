@@ -942,7 +942,8 @@ async function sendUraWelcome(
   contactId: string,
   tenantId: string,
   attendanceId: string,
-  supportConfig: any
+  supportConfig: any,
+  attendanceCode?: string
 ): Promise<void> {
   try {
     if (!supportConfig.support_ura_enabled) {
