@@ -14,6 +14,7 @@ import type {
 } from '../types';
 
 interface CreateTicketData {
+  tenant_id?: string;
   cliente_id?: string | null;
   tipo: CSTicketTipo;
   assunto: string;

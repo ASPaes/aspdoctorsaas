@@ -216,7 +216,9 @@ export function CSTicketForm({ open, onOpenChange, clienteId, clienteNome, defau
   }, [onOpenChange]);
 
   const onSubmit = async (data: TicketFormData) => {
+    const tenantId = tid || profile?.tenant_id;
     await createTicket.mutateAsync({
+      ...(tenantId ? { tenant_id: tenantId } : {}),
       cliente_id: isInterno ? null : data.cliente_id,
       tipo: data.tipo as CSTicketTipo,
       assunto: data.assunto,
