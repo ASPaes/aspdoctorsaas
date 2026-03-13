@@ -118,6 +118,45 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               onTransferClick={() => setIsTransferOpen(true)}
             />
 
+            {/* Analisar sentimento — visible button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={analyze} disabled={isAnalyzing}>
+                  <Brain className={`h-4 w-4 ${isAnalyzing ? "animate-spin" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
+            </Tooltip>
+
+            {/* Encerrar conversa — visible button */}
+            {conversation.status === "active" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Encerrar conversa</TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Reabrir — visible when closed */}
+            {(conversation.status === "closed" || conversation.status === "archived") && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => reopenConversation(conversation.id)}>
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Reabrir conversa</TooltipContent>
+              </Tooltip>
+            )}
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggleDetails}>
@@ -127,6 +166,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <TooltipContent side="bottom" className="text-xs">Detalhes</TooltipContent>
             </Tooltip>
 
+            {/* Menu de ações secundárias */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -134,27 +174,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {/* Collapsed actions that were inline before */}
-                <DropdownMenuItem onClick={analyze} disabled={isAnalyzing}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isAnalyzing ? "animate-spin" : ""}`} /> Analisar sentimento
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 {conversation.status === "active" && (
-                  <>
-                    <DropdownMenuItem onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}>
-                      <X className="h-4 w-4 mr-2" /> Encerrar conversa
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => archiveConversation(conversation.id)}>
-                      <Archive className="h-4 w-4 mr-2" /> Arquivar
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {(conversation.status === "closed" || conversation.status === "archived") && (
-                  <DropdownMenuItem onClick={() => reopenConversation(conversation.id)}>
-                    <RotateCcw className="h-4 w-4 mr-2" /> Reabrir conversa
+                  <DropdownMenuItem onClick={() => archiveConversation(conversation.id)}>
+                    <Archive className="h-4 w-4 mr-2" /> Arquivar
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
                   <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
                 </DropdownMenuItem>
