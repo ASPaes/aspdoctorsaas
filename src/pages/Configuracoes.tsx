@@ -28,6 +28,7 @@ import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/Assi
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
+import KBTab from "@/components/configuracoes/KBTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
