@@ -18,6 +18,7 @@ import KBEditDialog from "./kb/KBEditDialog";
 type KBArticle = {
   id: string;
   title: string | null;
+  summary: string | null;
   problem: string;
   solution: string;
   tags: string[] | null;
