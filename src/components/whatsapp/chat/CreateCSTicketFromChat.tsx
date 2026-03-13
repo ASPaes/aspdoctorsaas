@@ -12,6 +12,7 @@ import { Loader2, AlertTriangle, Ticket, LinkIcon, Building2 } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateCSTicket, useFuncionariosAtivos } from "@/components/cs/hooks/useCSTickets";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_PRIORIDADE_LABELS,
   type CSTicketTipo, type CSTicketPrioridade,
@@ -30,6 +31,7 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
   const { data: funcionarios } = useFuncionariosAtivos();
   const createTicket = useCreateCSTicket();
   const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const clienteId = metadata?.cliente_id as string | undefined;
@@ -86,6 +88,7 @@ export function CreateCSTicketFromChat({ open, onOpenChange, conversation, senti
     setIsSubmitting(true);
     try {
       const result = await createTicket.mutateAsync({
+        ...(tid ? { tenant_id: tid } : {}),
         cliente_id: clienteId,
         tipo,
         assunto,
