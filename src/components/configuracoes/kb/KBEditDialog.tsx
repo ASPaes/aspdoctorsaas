@@ -318,6 +318,22 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
           </AlertDialog>
 
           <div className="flex gap-2">
+            {article.status === 'draft' && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  updateMutation.mutate(
+                    { status: 'pending_review', updated_at: new Date().toISOString() },
+                    { onSuccess: () => onClose() }
+                  );
+                }}
+                disabled={updateMutation.isPending}
+                className="gap-1.5"
+              >
+                <Send className="h-4 w-4" />
+                Enviar para Aprovação
+              </Button>
+            )}
             <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>

@@ -258,7 +258,7 @@ export default function KBTab() {
                           <Button variant="ghost" size="icon" onClick={() => setEditingArticle(article)} title="Editar">
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          {isAdmin && article.status === "draft" && (
+                          {isAdmin && (article.status === "draft" || article.status === "pending_review") && (
                             <Button variant="ghost" size="icon" onClick={() => approve(article.id)} title="Aprovar">
                               <CheckCircle className="h-4 w-4 text-green-600" />
                             </Button>

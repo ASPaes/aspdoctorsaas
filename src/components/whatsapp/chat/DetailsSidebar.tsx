@@ -388,6 +388,74 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               )}
             </div>
           </CollapsibleSection>
+
+          {/* ─── Base de Conhecimento (KB) ─── */}
+          {closedAttendanceId && (
+            <>
+              <Separator />
+              <CollapsibleSection
+                icon={<BookOpen className="h-3.5 w-3.5" />}
+                title="Base de Conhecimento"
+                open={kbOpen}
+                onOpenChange={setKbOpen}
+              >
+                {kbLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Carregando...
+                  </div>
+                ) : kbDraft ? (
+                  <div className="space-y-2 min-w-0">
+                    <div className="bg-muted rounded-md p-2 text-xs space-y-1 min-w-0">
+                      <p className="font-medium truncate">{kbDraft.title || "Sem título"}</p>
+                      <Badge variant="outline" className={`text-[10px] ${
+                        kbDraft.status === 'draft' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                        kbDraft.status === 'pending_review' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {kbDraft.status === 'draft' ? 'Rascunho' : kbDraft.status === 'pending_review' ? 'Aguardando Aprovação' : 'Aprovado'}
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-[10px] gap-1 flex-1"
+                        onClick={() => setKbEditOpen(true)}
+                      >
+                        <Pencil className="h-3 w-3" /> Revisar
+                      </Button>
+                      {kbDraft.status === 'draft' && (
+                        <Button
+                          size="sm"
+                          className="h-6 text-[10px] gap-1 flex-1"
+                          onClick={() => submitForReview(kbDraft.id)}
+                          disabled={kbSubmitting}
+                        >
+                          {kbSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                          Enviar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Processando análise...</p>
+                )}
+              </CollapsibleSection>
+
+              {/* KB Edit Dialog */}
+              {kbEditOpen && kbDraft && (
+                <KBEditDialog
+                  article={{
+                    ...kbDraft,
+                    area: null,
+                    attendance: null,
+                  }}
+                  areas={[]}
+                  onClose={() => setKbEditOpen(false)}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
