@@ -14,7 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, CheckCircle, Archive, ExternalLink, Pencil, X } from "lucide-react";
+import { Search, CheckCircle, Trash2, ExternalLink, Pencil, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 type KBArticle = {
   id: string;
@@ -37,13 +38,11 @@ type KBArticle = {
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
   approved: "Aprovado",
-  archived: "Arquivado",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
   approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  archived: "bg-muted text-muted-foreground",
 };
 
 export default function KBTab() {
@@ -159,9 +158,22 @@ export default function KBTab() {
     });
   };
 
-  const archive = (id: string) => {
-    updateMutation.mutate({ id, payload: { status: "archived" } });
-  };
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("support_kb_articles")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kb_articles"] });
+      toast.success("Artigo excluído");
+    },
+    onError: (err: any) => {
+      toast.error("Erro ao excluir: " + err.message);
+    },
+  });
 
   if (isLoading) {
     return (
@@ -198,7 +210,7 @@ export default function KBTab() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="draft">Rascunho</SelectItem>
                 <SelectItem value="approved">Aprovado</SelectItem>
-                <SelectItem value="archived">Arquivado</SelectItem>
+                
               </SelectContent>
             </Select>
             <Select value={areaFilter} onValueChange={setAreaFilter}>
@@ -281,10 +293,31 @@ export default function KBTab() {
                               <CheckCircle className="h-4 w-4 text-green-600" />
                             </Button>
                           )}
-                          {isAdmin && article.status !== "archived" && (
-                            <Button variant="ghost" size="icon" onClick={() => archive(article.id)} title="Arquivar">
-                              <Archive className="h-4 w-4 text-muted-foreground" />
-                            </Button>
+                          {isAdmin && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" title="Excluir">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Excluir artigo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta ação não pode ser desfeita. O artigo será removido permanentemente da base de conhecimento.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteMutation.mutate(article.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                         </div>
                       </TableCell>
