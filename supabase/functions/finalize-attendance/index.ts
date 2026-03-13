@@ -296,7 +296,7 @@ REGRAS:
       summary: (result.summary || "").substring(0, 500),
       problem: result.problem || "",
       solution: result.solution || "",
-      tags: Array.isArray(result.tags) ? result.tags : [],
+      tags: Array.isArray(result.tags) ? result.tags.slice(0, 5) : [],
       area_id: resolvedAreaId,
       status: "draft",
     });
