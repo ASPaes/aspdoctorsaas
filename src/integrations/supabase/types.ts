@@ -666,7 +666,23 @@ export type Database = {
           custo_fixo_percentual: number
           id: number
           imposto_percentual: number
+          support_auto_close_inactivity_minutes: number
           support_config: Json
+          support_csat_enabled: boolean
+          support_csat_prompt_template: string
+          support_csat_reason_prompt_template: string
+          support_csat_reason_threshold: number
+          support_csat_score_max: number
+          support_csat_score_min: number
+          support_csat_thanks_template: string
+          support_csat_timeout_minutes: number
+          support_inactivity_warning_before_minutes: number
+          support_inactivity_warning_template: string
+          support_reopen_window_minutes: number
+          support_send_inactivity_warning: boolean
+          support_ura_enabled: boolean
+          support_ura_invalid_option_template: string
+          support_ura_welcome_template: string
           tenant_id: string | null
           updated_at: string
         }
@@ -676,7 +692,23 @@ export type Database = {
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          support_auto_close_inactivity_minutes?: number
           support_config?: Json
+          support_csat_enabled?: boolean
+          support_csat_prompt_template?: string
+          support_csat_reason_prompt_template?: string
+          support_csat_reason_threshold?: number
+          support_csat_score_max?: number
+          support_csat_score_min?: number
+          support_csat_thanks_template?: string
+          support_csat_timeout_minutes?: number
+          support_inactivity_warning_before_minutes?: number
+          support_inactivity_warning_template?: string
+          support_reopen_window_minutes?: number
+          support_send_inactivity_warning?: boolean
+          support_ura_enabled?: boolean
+          support_ura_invalid_option_template?: string
+          support_ura_welcome_template?: string
           tenant_id?: string | null
           updated_at?: string
         }
@@ -686,7 +718,23 @@ export type Database = {
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          support_auto_close_inactivity_minutes?: number
           support_config?: Json
+          support_csat_enabled?: boolean
+          support_csat_prompt_template?: string
+          support_csat_reason_prompt_template?: string
+          support_csat_reason_threshold?: number
+          support_csat_score_max?: number
+          support_csat_score_min?: number
+          support_csat_thanks_template?: string
+          support_csat_timeout_minutes?: number
+          support_inactivity_warning_before_minutes?: number
+          support_inactivity_warning_template?: string
+          support_reopen_window_minutes?: number
+          support_send_inactivity_warning?: boolean
+          support_ura_enabled?: boolean
+          support_ura_invalid_option_template?: string
+          support_ura_welcome_template?: string
           tenant_id?: string | null
           updated_at?: string
         }
