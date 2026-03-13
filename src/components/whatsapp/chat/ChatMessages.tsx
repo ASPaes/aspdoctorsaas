@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
+import { AttendanceEventBadge, parseAttendanceEvent } from "./AttendanceEventBadge";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
