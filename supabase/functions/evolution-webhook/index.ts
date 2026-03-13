@@ -903,12 +903,122 @@ const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|l
  * 1.3) If message is goodbye within Y min of close: IGNORE (no reopen/new)
  * If active attendance exists: just skip (counter incremented separately)
  */
+interface InstanceContext {
+  apiUrl: string;
+  apiKey: string;
+  instanceName: string; // Evolution identifier (instance_name or external id)
+  providerType: string;
+  remoteJid: string;
+  contactName: string;
+}
+
+async function sendUraWelcome(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+  supportConfig: any
+): Promise<void> {
+  try {
+    if (!supportConfig.support_ura_enabled) {
+      console.log('[ura] URA disabled, skipping welcome message');
+      return;
+    }
+
+    // Fetch active support areas for this tenant
+    const { data: areas } = await supabase
+      .from('support_areas')
+      .select('id, nome')
+      .eq('tenant_id', tenantId)
+      .eq('ativo', true)
+      .order('nome');
+
+    if (!areas || areas.length === 0) {
+      console.log('[ura] No active support areas, skipping URA');
+      return;
+    }
+
+    // Build welcome message with numbered options
+    const customerName = instanceCtx.contactName || '';
+    let welcomeText = (supportConfig.support_ura_welcome_template || '')
+      .replace(/\{\{customer_name\}\}/g, customerName)
+      .trim();
+
+    const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
+    const fullMessage = `${welcomeText}\n\n${optionsList}`;
+
+    // Send via Evolution API
+    const { remoteJid } = instanceCtx;
+    const phoneNumber = remoteJid.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/:\d+/, '');
+    const endpoint = `${instanceCtx.apiUrl}/message/sendText/${instanceCtx.instanceName}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (instanceCtx.providerType === 'cloud') {
+      headers['Authorization'] = `Bearer ${instanceCtx.apiKey}`;
+    } else {
+      headers['apikey'] = instanceCtx.apiKey;
+    }
+
+    const evoResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        number: phoneNumber,
+        text: fullMessage,
+      }),
+    });
+
+    if (!evoResponse.ok) {
+      const errText = await evoResponse.text();
+      console.error('[ura] Evolution API error sending URA welcome:', errText);
+      return;
+    }
+
+    const evoData = await evoResponse.json();
+    const messageId = evoData.key?.id || `ura_${Date.now()}`;
+    const nowIso = new Date().toISOString();
+
+    // Persist URA message in whatsapp_messages
+    await supabase
+      .from('whatsapp_messages')
+      .insert({
+        conversation_id: conversationId,
+        remote_jid: remoteJid,
+        message_id: messageId,
+        content: fullMessage,
+        message_type: 'text',
+        is_from_me: true,
+        status: 'sent',
+        timestamp: nowIso,
+        tenant_id: tenantId,
+        metadata: { ura: true },
+      });
+
+    // Update conversation preview
+    await supabase
+      .from('whatsapp_conversations')
+      .update({
+        last_message_at: nowIso,
+        last_message_preview: fullMessage.substring(0, 200),
+        is_last_message_from_me: true,
+      })
+      .eq('id', conversationId);
+
+    console.log(`[ura] Welcome message sent successfully conv=${conversationId} msgId=${messageId}`);
+  } catch (err) {
+    console.error('[ura] Error sending URA welcome:', err);
+  }
+}
+
 async function ensureAttendanceForIncomingMessage(
   supabase: any,
   conversationId: string,
   contactId: string,
   tenantId: string,
-  messageContent?: string
+  messageContent?: string,
+  instanceCtx?: InstanceContext
 ): Promise<void> {
   try {
     // 1. Check for any active (non-closed) attendance
