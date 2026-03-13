@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { UserCheck, ArrowRightLeft, Loader2, Users, User } from "lucide-react";
+import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
+import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -15,8 +16,17 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const { user } = useAuth();
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
-  const isAssignedToMe = assignedTo === user?.id;
-  const isInQueue = !assignedTo;
+  // Use attendance status as source of truth (it updates via realtime)
+  const { attendanceMap } = useAttendanceStatus([conversationId]);
+  const attendance = attendanceMap.get(conversationId);
+
+  // Determine effective assignment from attendance (more accurate) or fallback to conversation prop
+  const effectiveAssignedTo = attendance?.assigned_to ?? assignedTo;
+  const effectiveStatus = attendance?.status;
+
+  const isAssignedToMe = effectiveAssignedTo === user?.id;
+  const isInQueue = !effectiveAssignedTo || effectiveStatus === "waiting";
+  const isInProgress = effectiveStatus === "in_progress";
 
   const handleClaim = () => {
     if (!user?.id) return;
@@ -24,11 +34,13 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   };
 
   // Chip display
-  const chipConfig = isInQueue
+  const chipConfig = isInQueue && !isAssignedToMe
     ? { icon: Users, label: "Na fila", className: "bg-warning/10 text-warning border-warning/20" }
-    : isAssignedToMe
+    : isAssignedToMe && isInProgress
       ? { icon: User, label: "Comigo", className: "bg-primary/10 text-primary border-primary/20" }
-      : { icon: UserCheck, label: "Atribuída", className: "bg-accent/10 text-accent border-accent/20" };
+      : isAssignedToMe
+        ? { icon: Clock, label: "Comigo (fila)", className: "bg-primary/10 text-primary border-primary/20" }
+        : { icon: UserCheck, label: "Atribuída", className: "bg-accent/10 text-accent border-accent/20" };
 
   const ChipIcon = chipConfig.icon;
 
@@ -50,7 +62,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
       </Tooltip>
 
       {/* Primary action button */}
-      {isInQueue ? (
+      {isInQueue && !isAssignedToMe ? (
         <Button
           variant="default"
           size="sm"
