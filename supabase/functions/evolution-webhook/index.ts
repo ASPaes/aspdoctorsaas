@@ -864,13 +864,20 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       checkAndTriggerAutoSentiment(supabase, conversationId, supabaseUrl);
       checkAndTriggerAutoCategorization(supabase, conversationId, supabaseUrl);
-      // Auto-create support attendance for incoming customer messages
-      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId)
-        .catch(err => console.error('[evolution-webhook] ensureAttendance error:', err));
+      // Ensure attendance exists (reopen/new/ignore goodbye) then increment counter
+      ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content)
+        .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
+        .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
 
-      // Increment msg_customer_count + last_customer_message_at on active attendance
-      incrementAttendanceCounter(supabase, conversationId, 'customer')
-        .catch(err => console.error('[evolution-webhook] incrementCustomerCount error:', err));
+      // Also reopen the conversation visually if it was closed
+      supabase
+        .from('whatsapp_conversations')
+        .update({ status: 'active', updated_at: new Date().toISOString() })
+        .eq('id', conversationId)
+        .eq('status', 'closed')
+        .then(({ error: reopenConvErr }: any) => {
+          if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
+        });
     } else {
       // Operator message sent via Evolution (e.g. from phone) — increment agent count
       incrementAttendanceCounter(supabase, conversationId, 'agent')
