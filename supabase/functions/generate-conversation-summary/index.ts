@@ -112,16 +112,29 @@ serve(async (req) => {
       ? "IMPORTANTE: Analise SOMENTE as mensagens abaixo, que correspondem a um único atendimento específico. Não extrapole para contextos anteriores."
       : "";
 
-    const prompt = `Analise esta conversa de WhatsApp e gere um resumo estruturado.
+    const prompt = `Analise esta conversa de WhatsApp e extraia informações estruturadas para uma base de conhecimento de suporte.
 ${scopeNote}
 
 Conversa com: ${contactName}
 ${messagesText}
 
-Retorne APENAS um JSON válido sem markdown:
-{ "summary": "Resumo da conversa (máx 200 palavras)", "key_points": ["Ponto 1", "Ponto 2"], "action_items": ["Ação 1"], "sentiment": "positive", "tags": ["palavra1", "palavra2"] }
+Retorne APENAS um JSON válido sem markdown com os seguintes campos:
 
-REGRAS para "tags": devem ser palavras-chave únicas e curtas (1-2 palavras no máximo), como tópicos. Exemplos: "suporte", "financeiro", "cancelamento", "certificado", "caixa", "nota fiscal". NÃO use frases longas.`;
+{
+  "summary": "Resumo completo do atendimento (máx 200 palavras), descrevendo o que aconteceu do início ao fim.",
+  "problem": "Descreva SOMENTE o problema ou dúvida relatada pelo CLIENTE nas primeiras mensagens. Não inclua a solução nem o desfecho. Foque no que o cliente está enfrentando ou perguntando.",
+  "solution": "Descreva de forma interpretativa como o ATENDENTE resolveu o problema ou orientou o cliente. Não copie mensagens literalmente, mas interprete a solução dada de forma clara e útil para que outro atendente possa replicar no futuro.",
+  "key_points": ["Ponto 1", "Ponto 2"],
+  "action_items": ["Ação 1"],
+  "sentiment": "positive",
+  "tags": ["palavra1", "palavra2"]
+}
+
+REGRAS:
+- "problem": SOMENTE a dúvida/problema do cliente, sem incluir a resolução.
+- "solution": Interpretação da orientação dada pelo técnico, escrita de forma instrucional para futuros atendentes.
+- "summary": Resumo geral de todo o atendimento, do início ao fim.
+- "tags": palavras-chave únicas e curtas (1-2 palavras). Exemplos: "suporte", "financeiro", "caixa", "nota fiscal". NÃO use frases longas.`;
 
     let result: any;
     try {
@@ -173,8 +186,8 @@ REGRAS para "tags": devem ser palavras-chave únicas e curtas (1-2 palavras no m
         .from("support_attendances")
         .update({
           ai_summary: result.summary?.substring(0, 200) || null,
-          ai_problem: result.summary || null,
-          ai_solution: (result.action_items || []).join("\n") || null,
+          ai_problem: result.problem || null,
+          ai_solution: result.solution || null,
           ai_tags: result.tags || result.key_points || [],
           updated_at: new Date().toISOString(),
         })

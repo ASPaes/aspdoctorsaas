@@ -25,6 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
 type KBArticle = {
   id: string;
   title: string | null;
+  summary: string | null;
   problem: string;
   solution: string;
   tags: string[] | null;
@@ -53,13 +54,13 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
 
   const [editForm, setEditForm] = useState(() => ({
     title: article?.title || "",
+    summary: article?.summary || "",
     problem: article?.problem || "",
     solution: article?.solution || "",
     tags: (article?.tags || []).join(", "),
     area_id: article?.area_id || "none",
   }));
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (payload: Record<string, any>) => {
       const { error } = await supabase
@@ -77,7 +78,6 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -96,12 +96,10 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
     },
   });
 
-  // Regenerate AI suggestions
   const regenerateMutation = useMutation({
     mutationFn: async () => {
       if (!article?.source_attendance_id) throw new Error("Sem atendimento vinculado");
 
-      // Get conversation_id from the attendance
       const { data: att, error: attError } = await supabase
         .from("support_attendances")
         .select("conversation_id")
@@ -119,7 +117,6 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
       if (error) throw error;
       if (data?.error) throw new Error(data.message || data.error);
 
-      // Fetch updated attendance AI fields
       const { data: updated } = await supabase
         .from("support_attendances")
         .select("ai_summary, ai_problem, ai_solution, ai_tags")
@@ -133,6 +130,7 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
         setEditForm({
           ...editForm,
           title: data.ai_summary || editForm.title,
+          summary: data.ai_summary || editForm.summary,
           problem: data.ai_problem || editForm.problem,
           solution: data.ai_solution || editForm.solution,
           tags: (data.ai_tags || []).join(", "),
@@ -158,6 +156,7 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
     updateMutation.mutate(
       {
         title: editForm.title || null,
+        summary: editForm.summary || null,
         problem: editForm.problem,
         solution: editForm.solution,
         tags,
@@ -217,24 +216,40 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
               placeholder="Título do artigo"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label>Resumo do Atendimento</Label>
+            <Textarea
+              value={editForm.summary}
+              onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })}
+              placeholder="Resumo geral do atendimento, do início ao fim..."
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label>Problema</Label>
+            <p className="text-xs text-muted-foreground">Dúvida ou problema relatado pelo cliente.</p>
             <Textarea
               value={editForm.problem}
               onChange={(e) => setEditForm({ ...editForm, problem: e.target.value })}
-              placeholder="Descreva o problema..."
-              rows={4}
+              placeholder="Descreva o problema relatado pelo cliente..."
+              rows={3}
             />
           </div>
+
           <div className="space-y-2">
             <Label>Solução</Label>
+            <p className="text-xs text-muted-foreground">Como o técnico orientou/resolveu o problema.</p>
             <Textarea
               value={editForm.solution}
               onChange={(e) => setEditForm({ ...editForm, solution: e.target.value })}
-              placeholder="Descreva a solução..."
-              rows={4}
+              placeholder="Descreva a orientação ou solução dada pelo técnico..."
+              rows={3}
             />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tags (separadas por vírgula)</Label>
@@ -264,6 +279,7 @@ export default function KBEditDialog({ article, areas, onClose }: KBEditDialogPr
               </Select>
             </div>
           </div>
+
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Status:</span>
             <Badge variant="outline" className={STATUS_COLORS[article.status] || ""}>

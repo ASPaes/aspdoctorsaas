@@ -1837,6 +1837,7 @@ export type Database = {
           solution: string
           source_attendance_id: string | null
           status: string
+          summary: string | null
           tags: string[] | null
           tenant_id: string
           title: string | null
@@ -1852,6 +1853,7 @@ export type Database = {
           solution: string
           source_attendance_id?: string | null
           status?: string
+          summary?: string | null
           tags?: string[] | null
           tenant_id: string
           title?: string | null
@@ -1867,6 +1869,7 @@ export type Database = {
           solution?: string
           source_attendance_id?: string | null
           status?: string
+          summary?: string | null
           tags?: string[] | null
           tenant_id?: string
           title?: string | null
