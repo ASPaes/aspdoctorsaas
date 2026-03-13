@@ -1126,7 +1126,7 @@ async function handleUraResponse(
   // Find active waiting attendance with URA sent
   const { data: att } = await supabase
     .from('support_attendances')
-    .select('id, ura_sent_at, area_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
+    .select('id, attendance_code, ura_sent_at, area_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
     .eq('conversation_id', conversationId)
     .eq('status', 'waiting')
     .not('ura_sent_at', 'is', null)
