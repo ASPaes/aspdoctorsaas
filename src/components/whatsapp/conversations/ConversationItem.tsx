@@ -101,34 +101,38 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-medium truncate flex-1 min-w-0">{name}</span>
-          {attendanceBadge}
-          {timeStr && (
-            <span className={cn(
-              "text-xs whitespace-nowrap shrink-0",
-              hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
-            )}>
-              {timeStr}
-            </span>
-          )}
+          <span className="text-sm font-medium truncate min-w-0 flex-1">{name}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            {attendanceBadge}
+            {timeStr && (
+              <span className={cn(
+                "text-xs whitespace-nowrap",
+                hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
+              )}>
+                {timeStr}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-1 mt-0.5">
-          <div className="flex items-center gap-1 min-w-0 flex-1">
+          <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
             {conv.isLastMessageFromMe && (
               <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground truncate">
               {previewText}
             </span>
           </div>
-          {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground shrink-0" />}
-          {hasUnread && (
-            <span className="shrink-0 flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground shrink-0" />}
+            {hasUnread && (
+              <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </div>
         </div>
         {instanceName && (
           <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">{instanceName}</p>
