@@ -191,6 +191,58 @@ export const useWhatsAppActions = () => {
             }
           }
         }
+
+          // --- Generate KB draft from attendance ---
+          try {
+            // Wait a moment for summary to be generated (fire-and-forget above)
+            // Then fetch the latest summary for this conversation
+            const { data: latestSummary } = await supabase
+              .from('whatsapp_conversation_summaries')
+              .select('summary, key_points, action_items')
+              .eq('conversation_id', conversationId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            // Check if KB draft already exists for this attendance
+            const { data: existingKb } = await supabase
+              .from('support_kb_articles')
+              .select('id')
+              .eq('source_attendance_id', activeAtt.id)
+              .limit(1)
+              .maybeSingle();
+
+            if (!existingKb && profile?.tenant_id) {
+              // Get attendance area
+              const { data: attFull } = await supabase
+                .from('support_attendances')
+                .select('area_id, ai_problem, ai_solution, ai_tags, ai_summary, attendance_code')
+                .eq('id', activeAtt.id)
+                .single();
+
+              const problem = attFull?.ai_problem || latestSummary?.summary || '';
+              const solution = attFull?.ai_solution || (latestSummary?.action_items || []).join('\n') || '';
+              const tags = attFull?.ai_tags || (latestSummary?.key_points || []);
+              const title = attFull?.ai_summary
+                ? attFull.ai_summary.substring(0, 120)
+                : `Atendimento ${attFull?.attendance_code || activeAtt.attendance_code || ''}`;
+
+              await supabase.from('support_kb_articles').insert({
+                tenant_id: profile.tenant_id,
+                source_attendance_id: activeAtt.id,
+                title,
+                problem,
+                solution,
+                tags: Array.isArray(tags) ? tags : [],
+                area_id: attFull?.area_id || null,
+                status: 'draft',
+              });
+              console.log('[closeConversation] KB draft created for attendance:', activeAtt.id);
+            }
+          } catch (kbErr) {
+            console.error('[closeConversation] Error creating KB draft:', kbErr);
+          }
+        }
       } catch (e) {
         console.error('[closeConversation] Error closing attendance:', e);
       }
