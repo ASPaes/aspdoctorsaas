@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { MessageBubble } from "./MessageBubble";
+import { AttendanceEventBadge, parseAttendanceEvent } from "./AttendanceEventBadge";
 import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages";
 import { useChatTimezone } from "@/hooks/useChatTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
@@ -193,32 +194,49 @@ export function ChatMessages({
               <div className="flex justify-center my-3">
                 <span className="text-[10px] bg-muted text-muted-foreground px-3 py-0.5 rounded-full">{date}</span>
               </div>
-              {items.map((item) =>
-                item.type === 'message' ? (
-                  <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
-                    {item.msg.id === firstUnreadId && (
-                      <div className="flex items-center gap-2 my-2">
-                        <div className="flex-1 h-px bg-primary/40" />
-                        <span className="text-[10px] text-primary font-medium px-2">Mensagens não lidas</span>
-                        <div className="flex-1 h-px bg-primary/40" />
-                      </div>
-                    )}
-                    <MessageBubble
-                      msg={item.msg}
-                      onReply={onReply}
-                      selectionMode={selectionMode}
-                      isSelected={selectedMessages?.has(item.msg.id)}
-                      onToggleSelect={onToggleSelect}
-                      onDeletePanelOnly={onDeletePanelOnly}
-                      onDeleteEveryone={onDeleteEveryone}
-                      onRetryDelete={onRetryDelete}
-                      onForward={onForwardSingle}
-                      onEnterSelectionMode={onEnterSelectionMode}
-                      onContactChat={onContactChat}
-                      onContactSave={onContactSave}
-                    />
-                  </div>
-                ) : (
+              {items.map((item) => {
+                if (item.type === 'message') {
+                  // Check if this is an attendance system event
+                  const attendanceEvent = parseAttendanceEvent(item.msg);
+                  if (attendanceEvent) {
+                    return (
+                      <AttendanceEventBadge
+                        key={item.msg.id}
+                        eventType={attendanceEvent.eventType}
+                        attendanceCode={attendanceEvent.code}
+                        timestamp={formatTime(item.msg.timestamp, timezone)}
+                      />
+                    );
+                  }
+
+                  return (
+                    <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
+                      {item.msg.id === firstUnreadId && (
+                        <div className="flex items-center gap-2 my-2">
+                          <div className="flex-1 h-px bg-primary/40" />
+                          <span className="text-[10px] text-primary font-medium px-2">Mensagens não lidas</span>
+                          <div className="flex-1 h-px bg-primary/40" />
+                        </div>
+                      )}
+                      <MessageBubble
+                        msg={item.msg}
+                        onReply={onReply}
+                        selectionMode={selectionMode}
+                        isSelected={selectedMessages?.has(item.msg.id)}
+                        onToggleSelect={onToggleSelect}
+                        onDeletePanelOnly={onDeletePanelOnly}
+                        onDeleteEveryone={onDeleteEveryone}
+                        onRetryDelete={onRetryDelete}
+                        onForward={onForwardSingle}
+                        onEnterSelectionMode={onEnterSelectionMode}
+                        onContactChat={onContactChat}
+                        onContactSave={onContactSave}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
                   <div key={`transfer-${item.event.id}`} className="flex justify-center my-2">
                     <span className="inline-flex items-center gap-1.5 text-[10px] bg-accent/50 text-accent-foreground px-3 py-1 rounded-full">
                       <ArrowRightLeft className="h-3 w-3" />
@@ -227,8 +245,8 @@ export function ChatMessages({
                       <span className="opacity-60 ml-1">{formatTime(item.event.created_at, timezone)}</span>
                     </span>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           ))
         )}
