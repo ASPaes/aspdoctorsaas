@@ -53,53 +53,65 @@ export function CSTicketList({ onViewTicket, onEditTicket, filters }: CSTicketLi
   return (
     <div className="space-y-4">
       <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[200px]">Cliente / Interno</TableHead>
-              <TableHead>Assunto</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Prioridade</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Próx. Follow-up</TableHead>
-              <TableHead className="w-16"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-6 w-full" /></TableCell>)}</TableRow>
-            )) : tickets?.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">Nenhum ticket encontrado</TableCell></TableRow>
-            ) : tickets?.map((ticket) => (
-              <TableRow key={ticket.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewTicket(ticket)}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {ticket.cliente_id ? (<><Building2 className="h-4 w-4 text-muted-foreground" /><span className="font-medium truncate max-w-[150px]">{ticket.cliente?.nome_fantasia || ticket.cliente?.razao_social || '-'}</span></>) : (<><User className="h-4 w-4 text-muted-foreground" /><span className="text-muted-foreground italic">Interno</span></>)}
-                    {ticket.escalado && <AlertTriangle className="h-4 w-4 text-destructive" />}
-                  </div>
-                </TableCell>
-                <TableCell className="max-w-xs truncate font-medium">{ticket.assunto}</TableCell>
-                <TableCell><Badge variant="outline" className="text-xs">{CS_TICKET_TIPO_LABELS[ticket.tipo]}</Badge></TableCell>
-                <TableCell><Badge className={PRIORIDADE_COLORS[ticket.prioridade]}>{CS_TICKET_PRIORIDADE_LABELS[ticket.prioridade]}</Badge></TableCell>
-                <TableCell><Badge className={STATUS_COLORS[ticket.status]}>{CS_TICKET_STATUS_LABELS[ticket.status]}</Badge></TableCell>
-                <TableCell>{ticket.owner?.nome || '-'}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{ticket.proximo_followup_em ? format(new Date(ticket.proximo_followup_em), 'dd/MM/yy', { locale: ptBR }) : '-'}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewTicket(ticket); }}><Eye className="h-4 w-4 mr-2" />Visualizar</DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditTicket(ticket); }}><Edit className="h-4 w-4 mr-2" />Editar</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTicketId(ticket.id); }}><Trash2 className="h-4 w-4 mr-2" />Excluir</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[160px]">Cliente / Interno</TableHead>
+                <TableHead className="min-w-[180px]">Assunto</TableHead>
+                <TableHead className="whitespace-nowrap">Tipo</TableHead>
+                <TableHead className="whitespace-nowrap">Prioridade</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap">Owner</TableHead>
+                <TableHead className="whitespace-nowrap">Próx. Follow-up</TableHead>
+                <TableHead className="w-12"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => <TableCell key={j}><Skeleton className="h-6 w-full" /></TableCell>)}</TableRow>
+              )) : tickets?.length === 0 ? (
+                <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">Nenhum ticket encontrado</TableCell></TableRow>
+              ) : tickets?.map((ticket) => (
+                <TableRow key={ticket.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewTicket(ticket)}>
+                  <TableCell>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {ticket.cliente_id ? (
+                        <>
+                          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium truncate">{ticket.cliente?.nome_fantasia || ticket.cliente?.razao_social || '-'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-muted-foreground italic">Interno</span>
+                        </>
+                      )}
+                      {ticket.escalado && <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />}
+                    </div>
+                  </TableCell>
+                  <TableCell><p className="font-medium truncate max-w-[260px]">{ticket.assunto}</p></TableCell>
+                  <TableCell><Badge variant="outline" className="text-xs whitespace-nowrap shrink-0">{CS_TICKET_TIPO_LABELS[ticket.tipo]}</Badge></TableCell>
+                  <TableCell><Badge className={`whitespace-nowrap shrink-0 ${PRIORIDADE_COLORS[ticket.prioridade]}`}>{CS_TICKET_PRIORIDADE_LABELS[ticket.prioridade]}</Badge></TableCell>
+                  <TableCell><Badge className={`whitespace-nowrap shrink-0 ${STATUS_COLORS[ticket.status]}`}>{CS_TICKET_STATUS_LABELS[ticket.status]}</Badge></TableCell>
+                  <TableCell className="whitespace-nowrap">{ticket.owner?.nome || '-'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{ticket.proximo_followup_em ? format(new Date(ticket.proximo_followup_em), 'dd/MM/yy', { locale: ptBR }) : '-'}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewTicket(ticket); }}><Eye className="h-4 w-4 mr-2" />Visualizar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEditTicket(ticket); }}><Edit className="h-4 w-4 mr-2" />Editar</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTicketId(ticket.id); }}><Trash2 className="h-4 w-4 mr-2" />Excluir</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <AlertDialog open={!!deleteTicketId} onOpenChange={(open) => !open && setDeleteTicketId(null)}>
