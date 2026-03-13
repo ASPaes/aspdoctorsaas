@@ -95,7 +95,7 @@ export const useWhatsAppActions = () => {
             })
             .eq('id', activeAtt.id);
 
-          // Insert system message for attendance closed
+          // Insert system message + send closure to customer via WhatsApp
           if (activeAtt.attendance_code) {
             const { data: profile } = await supabase
               .from('profiles')
@@ -120,6 +120,36 @@ export const useWhatsAppActions = () => {
                 onConflict: 'tenant_id,message_id',
                 ignoreDuplicates: true,
               });
+
+              // Send closure message to customer via WhatsApp
+              try {
+                const { data: conv } = await supabase
+                  .from('whatsapp_conversations')
+                  .select('instance_id, contact:whatsapp_contacts(phone_number), whatsapp_instances(instance_name, server_url)')
+                  .eq('id', conversationId)
+                  .single();
+
+                const contact = (conv as any)?.contact;
+                const inst = (conv as any)?.whatsapp_instances;
+                const phone = contact?.phone_number;
+
+                if (conv?.instance_id && phone && inst) {
+                  const remoteJid = phone.includes('@') ? phone : `${phone}@s.whatsapp.net`;
+                  const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
+
+                  await supabase.functions.invoke('send-whatsapp-message', {
+                    body: {
+                      instanceName: inst.instance_name,
+                      serverUrl: inst.server_url,
+                      remoteJid,
+                      message: closureText,
+                      conversationId,
+                    },
+                  });
+                }
+              } catch (sendErr) {
+                console.error('[closeConversation] Error sending closure message to customer:', sendErr);
+              }
             }
           }
         }
