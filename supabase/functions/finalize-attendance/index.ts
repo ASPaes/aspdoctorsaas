@@ -304,7 +304,7 @@ REGRAS:
     console.log(`[${FUNCTION_NAME}][${requestId}] Sucesso — KB draft criado, sentimento=${sentimentValue}`);
 
     return new Response(
-      JSON.stringify({ success: true, sentiment: sentimentValue, topics: result.topics || [] }),
+      JSON.stringify({ success: true, sentiment: sentimentValue, topics: limitedTopics }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
