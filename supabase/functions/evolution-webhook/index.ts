@@ -1722,6 +1722,26 @@ async function ensureAttendanceForOperatorMessage(
       return;
     }
 
+    // Cooldown: if the last attendance was closed < 30s ago, skip creating a new one.
+    // This prevents spurious attendances from system messages (CSAT, closure) or quick operator follow-ups.
+    const OPERATOR_COOLDOWN_SECONDS = 30;
+    const { data: lastClosed } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at')
+      .eq('conversation_id', conversationId)
+      .eq('status', 'closed')
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastClosed?.closed_at) {
+      const closedAgo = (Date.now() - new Date(lastClosed.closed_at).getTime()) / 1000;
+      if (closedAgo < OPERATOR_COOLDOWN_SECONDS) {
+        console.log(`[attendance-operator] Cooldown active — last closed ${Math.round(closedAgo)}s ago (< ${OPERATOR_COOLDOWN_SECONDS}s). Skipping new attendance.`);
+        return;
+      }
+    }
+
     // No active attendance — create new one (operator-initiated)
     const nowIso = new Date().toISOString();
     const { data: newAtt, error: createErr } = await supabase
