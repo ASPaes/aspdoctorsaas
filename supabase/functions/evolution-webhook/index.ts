@@ -1298,6 +1298,48 @@ async function sendAndPersistAutoMessage(
 }
 
 /**
+ * Insert a local-only system message into the chat history (NOT sent to WhatsApp).
+ * Used for attendance lifecycle events (opened, closed, reopened).
+ * Uses attendance_id in message_id to guarantee idempotency via unique constraint.
+ */
+async function insertAttendanceSystemMessage(
+  supabase: any,
+  conversationId: string,
+  tenantId: string,
+  attendanceId: string,
+  attendanceCode: string,
+  event: 'opened' | 'closed' | 'reopened'
+): Promise<void> {
+  const emoji = event === 'closed' ? '🔒' : '✅';
+  const label = event === 'opened' ? 'aberto' : event === 'closed' ? 'encerrado' : 'reaberto';
+  const content = `${emoji} Atendimento ${attendanceCode} ${label} com sucesso.`;
+  const messageId = `system_att_${event}_${attendanceId}`;
+  const nowIso = new Date().toISOString();
+
+  const { error } = await supabase.from('whatsapp_messages').upsert({
+    conversation_id: conversationId,
+    remote_jid: '',
+    message_id: messageId,
+    content,
+    message_type: 'system',
+    is_from_me: false,
+    status: 'sent',
+    timestamp: nowIso,
+    tenant_id: tenantId,
+    metadata: { system: true, attendance_event: event, attendance_id: attendanceId },
+  }, {
+    onConflict: 'tenant_id,message_id',
+    ignoreDuplicates: true,
+  });
+
+  if (error) {
+    console.error(`[attendance-system-msg] Error inserting ${event} message:`, error);
+  } else {
+    console.log(`[attendance-system-msg] ${event} message inserted for att=${attendanceId} code=${attendanceCode}`);
+  }
+}
+
+/**
  * Extract the highest numbered option from a URA template string.
  * E.g. "1 - Suporte\n2 - Financeiro\n0 - Encerrar" → 2 (ignores 0)
  */
