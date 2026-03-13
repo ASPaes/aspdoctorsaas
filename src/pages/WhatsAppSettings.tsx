@@ -8,6 +8,7 @@ import MacrosTab from "@/components/whatsapp/settings/MacrosTab";
 import AssignmentTab from "@/components/whatsapp/settings/AssignmentTab";
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
+import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
