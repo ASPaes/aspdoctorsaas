@@ -1,0 +1,1 @@
+ALTER TABLE public.support_kb_articles ADD COLUMN IF NOT EXISTS summary text;
