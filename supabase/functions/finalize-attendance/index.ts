@@ -33,9 +33,8 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims) {
+    const { data: { user: callerUser }, error: userErr } = await anonClient.auth.getUser();
+    if (userErr || !callerUser) {
       return new Response(
         JSON.stringify({ type: "about:blank", title: "Unauthorized", status: 401, detail: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/problem+json" } }
