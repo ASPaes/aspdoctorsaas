@@ -29,17 +29,21 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user: callerUser }, error: userErr } = await anonClient.auth.getUser();
-    if (userErr || !callerUser) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      console.error(`[${FUNCTION_NAME}][${requestId}] Auth error:`, claimsErr?.message);
       return new Response(
         JSON.stringify({ type: "about:blank", title: "Unauthorized", status: 401, detail: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/problem+json" } }
       );
     }
+    console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${claimsData.claims.sub}`);
 
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
