@@ -228,6 +228,8 @@ export const useWhatsAppActions = () => {
       toast.success('Conversa encerrada com sucesso');
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['kb-draft'] });
     },
     onError: () => {
       toast.error('Erro ao encerrar conversa');
