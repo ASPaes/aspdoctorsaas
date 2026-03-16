@@ -1,21 +1,46 @@
 
 
-## Fix: Instance Change Failing Due to Contact Constraint
+## Objetivo
+Implementar análise final consolidada de IA no encerramento do atendimento + geração de KB draft com validação do técnico.
 
-### Problem
-The `useChangeInstance` hook searches for existing contacts filtering by `instance_id`, missing the tenant-level contact that already exists. It then tries to insert a duplicate, violating the `whatsapp_contacts_tenant_phone_unique` constraint.
+## Status: ✅ Implementado
 
-### Solution
-Simplify the hook: since contacts are unified at tenant level, the same contact_id can be used across instances. The hook only needs to update the conversation's `instance_id` — no contact creation or lookup needed.
+## Arquitetura
 
-### Changes
+### Fluxo de encerramento (1 chamada IA)
+```
+Encerramento
+  ├─ Verifica se já existe KB para esse attendance → skip se sim
+  ├─ Chama finalize-attendance (1 chamada IA consolidada)
+  │   └─ Retorna: sentiment, topics, summary, title, problem, solution, tags, suggested_area
+  ├─ Salva AI fields no support_attendances
+  ├─ Atualiza sentiment na whatsapp_sentiments
+  ├─ Atualiza topics no metadata da conversa
+  └─ Cria KB draft (status: 'draft')
+```
 
-**File: `src/components/whatsapp/hooks/useChangeInstance.ts`**
-- Remove the contact lookup by `instance_id`
-- Remove the contact creation logic
-- Simply update the conversation's `instance_id` (keep the same `contact_id`)
-- The mutation becomes a single update call
+### Fluxo do técnico
+```
+DetailsSidebar → Seção "Base de Conhecimento"
+  ├─ Mostra título + status do draft
+  ├─ Botão "Revisar" → abre KBEditDialog
+  ├─ Botão "Enviar" → muda status para pending_review
+  └─ KBEditDialog tem botão "Enviar para Aprovação"
+```
 
-### Technical Detail
-The cross-instance unification (memory) established that contacts use `(tenant_id, phone_number)` as the unique key. The conversation already points to the correct contact. Changing instance only means future messages go through a different WhatsApp number — the contact record stays the same.
+### Status do KB
+- `draft` → Rascunho (gerado pela IA)
+- `pending_review` → Validado pelo técnico, aguardando aprovação do admin
+- `approved` → Aprovado pelo admin
 
+## Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `supabase/functions/finalize-attendance/index.ts` | **Novo** — Edge Function consolidada |
+| `src/components/whatsapp/hooks/useKBDraft.ts` | **Novo** — Hook para KB draft |
+| `src/components/whatsapp/hooks/useWhatsAppActions.ts` | Modificado — fire-and-forget para finalize-attendance |
+| `src/components/whatsapp/chat/DetailsSidebar.tsx` | Modificado — seção KB |
+| `src/components/configuracoes/KBTab.tsx` | Modificado — status pending_review |
+| `src/components/configuracoes/kb/KBEditDialog.tsx` | Modificado — status + botão aprovação |
+| `supabase/config.toml` | Modificado — finalize-attendance entry |

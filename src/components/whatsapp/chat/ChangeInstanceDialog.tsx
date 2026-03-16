@@ -25,9 +25,7 @@ export function ChangeInstanceDialog({ open, onOpenChange, conversation }: Props
     changeInstance.mutate(
       {
         conversationId: conversation.id,
-        currentContactId: conversation.contact_id,
         targetInstanceId,
-        tenantId: conversation.tenant_id,
       },
       {
         onSuccess: () => {
