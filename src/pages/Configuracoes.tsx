@@ -46,9 +46,10 @@ function WhatsAppSettingsContent() {
   return (
     <div className="space-y-4">
       <Tabs value={whatsappSubTab} onValueChange={setWhatsappSubTab}>
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
+          <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="equipe">Equipe</TabsTrigger>
