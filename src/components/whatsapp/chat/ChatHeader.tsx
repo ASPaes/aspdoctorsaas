@@ -213,6 +213,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         {/* Row 2: Context chips — wraps naturally */}
         <div className="flex items-center gap-1.5 flex-wrap mt-1 pl-12">
           <SignatureControl conversationId={conversation.id} />
+          {selectedDepartment && (
+            <Badge variant="outline" className="text-[10px] h-4 gap-1">
+              <Building2 className="h-2.5 w-2.5" />
+              {selectedDepartment.name}
+            </Badge>
+          )}
+          {conversationInstance && hasMultipleInstances && (
+            <Badge variant="secondary" className="text-[10px] h-4">
+              {conversationInstance.display_name || conversationInstance.instance_name}
+            </Badge>
+          )}
           <SentimentChip sentiment={sentimentData} />
           {topicsData?.topics && topicsData.topics.length > 0 && (
             <TopicBadges topics={topicsData.topics} size="sm" showIcon={false} maxTopics={2} />
