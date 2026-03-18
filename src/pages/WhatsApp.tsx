@@ -159,3 +159,11 @@ function WhatsAppContent() {
     </div>
   );
 }
+
+export default function WhatsApp() {
+  return (
+    <DepartmentFilterProvider>
+      <WhatsAppContent />
+    </DepartmentFilterProvider>
+  );
+}
