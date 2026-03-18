@@ -84,13 +84,21 @@ export function AppSidebar() {
 
   // Resolve display name
   const displayName =
-    funcionarioNome ||
+    funcionarioData?.nome ||
     (user?.email ? user.email.split("@")[0] : "Usuário");
 
-  // Resolve role label
-  const roleLabel = isSuperAdmin
-    ? "Super Admin"
-    : ROLE_LABELS[profile?.role ?? ""] ?? profile?.role ?? "";
+  // Resolve subtitle: cargo + setor or role
+  const subtitleParts: string[] = [];
+  if (isSuperAdmin) {
+    subtitleParts.push("Super Admin");
+  } else if (funcionarioData) {
+    if (funcionarioData.cargo) subtitleParts.push(funcionarioData.cargo);
+    if (departmentName) subtitleParts.push(departmentName);
+    if (subtitleParts.length === 0) subtitleParts.push(ROLE_LABELS[profile?.role ?? ""] ?? "Sem função");
+  } else {
+    subtitleParts.push(ROLE_LABELS[profile?.role ?? ""] ?? profile?.role ?? "");
+  }
+  const roleLabel = subtitleParts.join(" · ");
 
   const initials = getInitials(displayName);
 
