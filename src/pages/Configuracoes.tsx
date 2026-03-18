@@ -28,6 +28,7 @@ import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/Assi
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
+import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 
