@@ -52,18 +52,33 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const isSuperAdmin = profile?.is_super_admin === true;
 
-  // Fetch funcionario name if linked
-  const { data: funcionarioNome } = useQuery({
-    queryKey: ["funcionario-nome", profile?.funcionario_id],
+  // Fetch funcionario name, cargo and department
+  const { data: funcionarioData } = useQuery({
+    queryKey: ["funcionario-sidebar", profile?.funcionario_id],
     enabled: !!profile?.funcionario_id,
-    staleTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from("funcionarios")
-        .select("nome")
+        .select("nome, cargo, department_id")
         .eq("id", profile!.funcionario_id!)
         .maybeSingle();
-      return data?.nome ?? null;
+      return data ?? null;
+    },
+  });
+
+  // Fetch department name if linked
+  const { data: departmentName } = useQuery({
+    queryKey: ["department-name", funcionarioData?.department_id],
+    enabled: !!funcionarioData?.department_id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("support_departments")
+        .select("name")
+        .eq("id", funcionarioData!.department_id!)
+        .maybeSingle();
+      return data?.name ?? null;
     },
   });
 
