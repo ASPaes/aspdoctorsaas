@@ -28,6 +28,7 @@ interface Props {
   onToggleDetails: () => void;
   showDetails: boolean;
   onClose?: () => void;
+  onNavigateToConversation?: (conversationId: string) => void;
 }
 
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose }: Props) {
