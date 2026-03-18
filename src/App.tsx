@@ -35,7 +35,6 @@ const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 
 const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
-const WhatsAppSettings = lazy(() => import("@/pages/WhatsAppSettings"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 
