@@ -114,6 +114,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { conversations, isLoading } = useWhatsAppConversations({
     search: search.trim() || undefined,
     instanceId: filters.instanceId,
+    instanceIds: filteredInstanceIds ?? undefined,
     status: filters.status,
     assignedTo: resolvedAssignedTo,
     unassigned: resolvedUnassigned || undefined,
