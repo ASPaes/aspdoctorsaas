@@ -1151,6 +1151,7 @@ export type Database = {
         Row: {
           ativo: boolean
           cargo: string | null
+          department_id: string | null
           email: string | null
           id: number
           nome: string
@@ -1159,6 +1160,7 @@ export type Database = {
         Insert: {
           ativo?: boolean
           cargo?: string | null
+          department_id?: string | null
           email?: string | null
           id?: number
           nome: string
@@ -1167,12 +1169,21 @@ export type Database = {
         Update: {
           ativo?: boolean
           cargo?: string | null
+          department_id?: string | null
           email?: string | null
           id?: number
           nome?: string
           tenant_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "funcionarios_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invites: {
         Row: {
@@ -1822,6 +1833,161 @@ export type Database = {
             columns: ["attendance_id"]
             isOneToOne: false
             referencedRelation: "support_attendances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_department_instances: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          instance_id: string
+          is_active: boolean
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          instance_id: string
+          is_active?: boolean
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          instance_id?: string
+          is_active?: boolean
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_department_instances_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_department_instances_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_department_instances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_department_members: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          is_active: boolean
+          is_head: boolean
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          is_active?: boolean
+          is_head?: boolean
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          is_active?: boolean
+          is_head?: boolean
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_department_members_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_department_members_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_department_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      support_departments: {
+        Row: {
+          created_at: string
+          default_instance_id: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_default_fallback: boolean
+          name: string
+          slug: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_instance_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default_fallback?: boolean
+          name: string
+          slug: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_instance_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default_fallback?: boolean
+          name?: string
+          slug?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_departments_default_instance_id_fkey"
+            columns: ["default_instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_departments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
