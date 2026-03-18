@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 
 export default function WhatsApp() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
