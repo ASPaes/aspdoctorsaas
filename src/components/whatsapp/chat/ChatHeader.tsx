@@ -28,9 +28,10 @@ interface Props {
   onToggleDetails: () => void;
   showDetails: boolean;
   onClose?: () => void;
+  onNavigateToConversation?: (conversationId: string) => void;
 }
 
-export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose }: Props) {
+export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation }: Props) {
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
@@ -239,6 +240,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={isChangeInstanceOpen}
         onOpenChange={setIsChangeInstanceOpen}
         conversation={conversation}
+        onConversationChanged={onNavigateToConversation}
       />
     </div>
   );

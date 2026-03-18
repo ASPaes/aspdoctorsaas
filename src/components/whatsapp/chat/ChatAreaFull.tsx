@@ -185,6 +185,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }
           onToggleDetails={() => setShowDetails(!showDetails)}
           showDetails={showDetails}
           onClose={onClose}
+          onNavigateToConversation={onNavigateToConversation}
         />
         <ChatMessages
           conversationId={conversation.id}

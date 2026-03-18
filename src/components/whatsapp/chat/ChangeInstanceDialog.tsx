@@ -10,9 +10,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   conversation: ConversationWithContact;
+  /** Called with the target conversation ID so the parent can navigate to it */
+  onConversationChanged?: (targetConversationId: string) => void;
 }
 
-export function ChangeInstanceDialog({ open, onOpenChange, conversation }: Props) {
+export function ChangeInstanceDialog({ open, onOpenChange, conversation, onConversationChanged }: Props) {
   const { instances } = useWhatsAppInstances();
   const changeInstance = useChangeInstance();
   const [targetInstanceId, setTargetInstanceId] = useState<string>("");
@@ -25,12 +27,14 @@ export function ChangeInstanceDialog({ open, onOpenChange, conversation }: Props
     changeInstance.mutate(
       {
         conversationId: conversation.id,
+        contactId: conversation.contact_id,
         targetInstanceId,
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
           setTargetInstanceId("");
           onOpenChange(false);
+          onConversationChanged?.(result.targetConversationId);
         },
       }
     );
@@ -42,7 +46,7 @@ export function ChangeInstanceDialog({ open, onOpenChange, conversation }: Props
         <DialogHeader>
           <DialogTitle>Trocar Instância</DialogTitle>
           <DialogDescription>
-            As mensagens serão preservadas. Próximas mensagens serão enviadas pela nova instância.
+            Será aberta a conversa deste contato na instância selecionada. Cada instância mantém seu próprio histórico.
           </DialogDescription>
         </DialogHeader>
 
