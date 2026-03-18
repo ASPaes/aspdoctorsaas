@@ -82,6 +82,10 @@ function WhatsAppSettingsContent() {
           <TeamTab />
         </TabsContent>
 
+        <TabsContent value="setores" className="mt-4">
+          <SetoresTab />
+        </TabsContent>
+
         <TabsContent value="seguranca" className="mt-4">
           <SecuritySettingsTab />
         </TabsContent>
