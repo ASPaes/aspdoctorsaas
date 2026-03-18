@@ -43,6 +43,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
+
+  // Department context
+  const { selectedDepartment } = useDepartmentFilter();
+  const conversationInstance = useMemo(
+    () => instances.find((i) => i.id === conversation.instance_id),
+    [instances, conversation.instance_id]
+  );
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
