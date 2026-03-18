@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 
-export default function WhatsApp() {
+function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
