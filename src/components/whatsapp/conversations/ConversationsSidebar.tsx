@@ -329,6 +329,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         </div>
       </div>
 
+      {/* Department Selector */}
+      <DepartmentSelector />
+
       {/* Quick Pills */}
       <div className="pt-2">
         <QuickPills
