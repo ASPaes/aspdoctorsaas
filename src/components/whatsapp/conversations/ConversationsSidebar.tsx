@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, MessageSquare, BarChart3, Users, Settings, X } from "lucide-react";
+import { Search, Plus, MessageSquare, BarChart3, Users, X } from "lucide-react";
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
@@ -302,14 +302,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Relatórios</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/whatsapp/settings")}>
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Configurações</TooltipContent>
             </Tooltip>
             <ConversationFiltersPopover filters={filters} onChange={setFilters} />
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>

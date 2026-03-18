@@ -28,6 +28,7 @@ import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/Assi
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
+import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 
@@ -45,9 +46,10 @@ function WhatsAppSettingsContent() {
   return (
     <div className="space-y-4">
       <Tabs value={whatsappSubTab} onValueChange={setWhatsappSubTab}>
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
+          <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="equipe">Equipe</TabsTrigger>
@@ -57,6 +59,10 @@ function WhatsAppSettingsContent() {
 
         <TabsContent value="setup" className="mt-4">
           <SetupGuideCollapsible />
+        </TabsContent>
+
+        <TabsContent value="atendimento" className="mt-4">
+          <AtendimentoCsatTab />
         </TabsContent>
 
         <TabsContent value="instancias" className="mt-4 space-y-4">
