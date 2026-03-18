@@ -52,30 +52,53 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const isSuperAdmin = profile?.is_super_admin === true;
 
-  // Fetch funcionario name if linked
-  const { data: funcionarioNome } = useQuery({
-    queryKey: ["funcionario-nome", profile?.funcionario_id],
+  // Fetch funcionario name, cargo and department
+  const { data: funcionarioData } = useQuery({
+    queryKey: ["funcionario-sidebar", profile?.funcionario_id],
     enabled: !!profile?.funcionario_id,
-    staleTime: 30 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from("funcionarios")
-        .select("nome")
+        .select("nome, cargo, department_id")
         .eq("id", profile!.funcionario_id!)
         .maybeSingle();
-      return data?.nome ?? null;
+      return data ?? null;
+    },
+  });
+
+  // Fetch department name if linked
+  const { data: departmentName } = useQuery({
+    queryKey: ["department-name", funcionarioData?.department_id],
+    enabled: !!funcionarioData?.department_id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("support_departments")
+        .select("name")
+        .eq("id", funcionarioData!.department_id!)
+        .maybeSingle();
+      return data?.name ?? null;
     },
   });
 
   // Resolve display name
   const displayName =
-    funcionarioNome ||
+    funcionarioData?.nome ||
     (user?.email ? user.email.split("@")[0] : "Usuário");
 
-  // Resolve role label
-  const roleLabel = isSuperAdmin
-    ? "Super Admin"
-    : ROLE_LABELS[profile?.role ?? ""] ?? profile?.role ?? "";
+  // Resolve subtitle: cargo + setor or role
+  const subtitleParts: string[] = [];
+  if (isSuperAdmin) {
+    subtitleParts.push("Super Admin");
+  } else if (funcionarioData) {
+    if (funcionarioData.cargo) subtitleParts.push(funcionarioData.cargo);
+    if (departmentName) subtitleParts.push(departmentName);
+    if (subtitleParts.length === 0) subtitleParts.push(ROLE_LABELS[profile?.role ?? ""] ?? "Sem função");
+  } else {
+    subtitleParts.push(ROLE_LABELS[profile?.role ?? ""] ?? profile?.role ?? "");
+  }
+  const roleLabel = subtitleParts.join(" · ");
 
   const initials = getInitials(displayName);
 
