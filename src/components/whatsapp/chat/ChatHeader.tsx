@@ -240,6 +240,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={isChangeInstanceOpen}
         onOpenChange={setIsChangeInstanceOpen}
         conversation={conversation}
+        onConversationChanged={onNavigateToConversation}
       />
     </div>
   );
