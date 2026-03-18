@@ -61,6 +61,10 @@ function WhatsAppSettingsContent() {
           <SetupGuideCollapsible />
         </TabsContent>
 
+        <TabsContent value="atendimento" className="mt-4">
+          <AtendimentoCsatTab />
+        </TabsContent>
+
         <TabsContent value="instancias" className="mt-4 space-y-4">
           <InstanceSetupCollapsible onOpenAddDialog={() => setAddDialogOpen(true)} />
           <div className="flex justify-end">

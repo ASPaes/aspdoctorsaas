@@ -199,12 +199,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/whatsapp/settings" className="flex items-center">
-                    <Settings className="h-4 w-4 mr-2" /> Configurações
-                  </Link>
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

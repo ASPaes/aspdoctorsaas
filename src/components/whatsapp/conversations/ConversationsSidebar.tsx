@@ -303,14 +303,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
               </TooltipTrigger>
               <TooltipContent>Relatórios</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/whatsapp/settings")}>
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Configurações</TooltipContent>
-            </Tooltip>
             <ConversationFiltersPopover filters={filters} onChange={setFilters} />
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>
               <Plus className="h-4 w-4" />
