@@ -51,6 +51,7 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="equipe">Equipe</TabsTrigger>
+          <TabsTrigger value="setores">Setores</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
         </TabsList>
 
