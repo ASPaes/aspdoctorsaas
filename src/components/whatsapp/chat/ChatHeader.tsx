@@ -31,7 +31,7 @@ interface Props {
   onNavigateToConversation?: (conversationId: string) => void;
 }
 
-export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose }: Props) {
+export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation }: Props) {
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
