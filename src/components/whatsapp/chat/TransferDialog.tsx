@@ -22,7 +22,7 @@ interface TransferDialogProps {
 function useFuncionariosLookup() {
   const { effectiveTenantId: tid } = useTenantFilter();
   return useQuery({
-    queryKey: ["funcionarios-lookup", tid],
+    queryKey: ["funcionarios-lookup-map", tid],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await supabase
