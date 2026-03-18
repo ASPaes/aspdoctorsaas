@@ -390,7 +390,8 @@ async function applyAutoAssignment(
 }
 
 /**
- * UNIFIED: Find or create conversation by tenant_id + contact_id (cross-instance).
+ * INSTANCE-SCOPED: Find or create conversation by tenant_id + instance_id + contact_id.
+ * Each instance has its own conversation per contact.
  */
 async function findOrCreateConversation(
   supabase: any,
@@ -399,11 +400,12 @@ async function findOrCreateConversation(
   tenantId: string
 ): Promise<string | null> {
   try {
-    // CHANGED: search by tenant_id + contact_id instead of instance_id + contact_id
+    // Search by tenant_id + instance_id + contact_id (per-instance conversation)
     const { data: existingConversation, error: findError } = await supabase
       .from('whatsapp_conversations')
       .select('id')
       .eq('tenant_id', tenantId)
+      .eq('instance_id', instanceId)
       .eq('contact_id', contactId)
       .maybeSingle();
 
@@ -412,11 +414,10 @@ async function findOrCreateConversation(
     }
 
     if (existingConversation) {
-      console.log('[evolution-webhook] Conversation found (unified):', existingConversation.id);
+      console.log('[evolution-webhook] Conversation found (instance-scoped):', existingConversation.id);
       return existingConversation.id;
     }
 
-    // instance_id is kept for reference but conversation is tenant-scoped
     const { data: newConversation, error: createError } = await supabase
       .from('whatsapp_conversations')
       .insert({
@@ -433,7 +434,7 @@ async function findOrCreateConversation(
       return null;
     }
 
-    console.log('[evolution-webhook] Conversation created:', newConversation.id);
+    console.log('[evolution-webhook] Conversation created (instance-scoped):', newConversation.id);
     
     await applyAutoAssignment(supabase, instanceId, newConversation.id, tenantId);
     

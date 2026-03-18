@@ -50,9 +50,11 @@ export const useCreateConversation = () => {
         contact = newContact;
       }
 
+      // Instance-scoped: find conversation for this specific instance + contact
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('*')
+        .eq('instance_id', params.instanceId)
         .eq('contact_id', contact.id)
         .maybeSingle();
 
