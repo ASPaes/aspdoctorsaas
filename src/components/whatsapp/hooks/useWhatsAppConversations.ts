@@ -92,7 +92,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         .range(from, to);
 
       if (tid) query = query.eq('tenant_id', tid);
-      if (filters?.instanceId) query = query.eq('instance_id', filters.instanceId);
+      if (filters?.instanceIds && filters.instanceIds.length > 0) {
+        query = query.in('instance_id', filters.instanceIds);
+      } else if (filters?.instanceId) {
+        query = query.eq('instance_id', filters.instanceId);
+      }
       if (filters?.status) query = query.eq('status', filters.status);
       if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
       if (filters?.unassigned) query = query.is('assigned_to', null);
