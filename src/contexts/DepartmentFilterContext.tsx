@@ -68,8 +68,16 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
   );
 }
 
+const FALLBACK: DepartmentFilterContextValue = {
+  departments: [],
+  isLoading: false,
+  selectedDepartmentId: null,
+  setSelectedDepartmentId: () => {},
+  filteredInstanceIds: null,
+  selectedDepartment: null,
+};
+
 export function useDepartmentFilter() {
   const ctx = useContext(DepartmentFilterContext);
-  if (!ctx) throw new Error("useDepartmentFilter must be used within DepartmentFilterProvider");
-  return ctx;
+  return ctx ?? FALLBACK;
 }
