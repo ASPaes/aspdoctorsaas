@@ -11,6 +11,8 @@ import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type SortBy, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
 import { NewConversationModal } from "./NewConversationModal";
+import { DepartmentSelector } from "./DepartmentSelector";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
