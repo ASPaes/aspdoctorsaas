@@ -40,6 +40,7 @@ export interface ConversationWithContact {
 
 export interface ConversationsFilters {
   instanceId?: string;
+  instanceIds?: string[];
   search?: string;
   status?: string;
   assignedTo?: string;
