@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, RefreshCw, Pencil, Settings, Ticket, ArrowLeftRight, XCircle, Brain } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, RefreshCw, Pencil, Settings, Ticket, ArrowLeftRight, XCircle, Brain, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
@@ -22,6 +22,7 @@ import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { TopicBadges } from "./TopicBadges";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -42,6 +43,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
+
+  // Department context
+  const { selectedDepartment } = useDepartmentFilter();
+  const conversationInstance = useMemo(
+    () => instances.find((i) => i.id === conversation.instance_id),
+    [instances, conversation.instance_id]
+  );
   const contact = conversation.contact;
   const name = contact?.name || contact?.phone_number || "Desconhecido";
 
@@ -205,6 +213,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         {/* Row 2: Context chips — wraps naturally */}
         <div className="flex items-center gap-1.5 flex-wrap mt-1 pl-12">
           <SignatureControl conversationId={conversation.id} />
+          {selectedDepartment && (
+            <Badge variant="outline" className="text-[10px] h-4 gap-1">
+              <Building2 className="h-2.5 w-2.5" />
+              {selectedDepartment.name}
+            </Badge>
+          )}
+          {conversationInstance && hasMultipleInstances && (
+            <Badge variant="secondary" className="text-[10px] h-4">
+              {conversationInstance.display_name || conversationInstance.instance_name}
+            </Badge>
+          )}
           <SentimentChip sentiment={sentimentData} />
           {topicsData?.topics && topicsData.topics.length > 0 && (
             <TopicBadges topics={topicsData.topics} size="sm" showIcon={false} maxTopics={2} />

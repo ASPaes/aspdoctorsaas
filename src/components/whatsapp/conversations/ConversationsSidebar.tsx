@@ -11,6 +11,8 @@ import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type SortBy, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
 import { NewConversationModal } from "./NewConversationModal";
+import { DepartmentSelector } from "./DepartmentSelector";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -91,7 +93,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const { instances } = useWhatsAppInstances();
-
+  const { filteredInstanceIds } = useDepartmentFilter();
   const instanceMap = useMemo(() => {
     const map: Record<string, string> = {};
     instances.forEach((inst) => {
@@ -112,6 +114,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { conversations, isLoading } = useWhatsAppConversations({
     search: search.trim() || undefined,
     instanceId: filters.instanceId,
+    instanceIds: filteredInstanceIds ?? undefined,
     status: filters.status,
     assignedTo: resolvedAssignedTo,
     unassigned: resolvedUnassigned || undefined,
@@ -325,6 +328,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           />
         </div>
       </div>
+
+      {/* Department Selector */}
+      <DepartmentSelector />
 
       {/* Quick Pills */}
       <div className="pt-2">
