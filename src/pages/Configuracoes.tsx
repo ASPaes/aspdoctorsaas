@@ -27,6 +27,7 @@ import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
+import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 
