@@ -23,6 +23,8 @@ import { SentimentChip } from "./SentimentChip";
 import { TopicBadges } from "./TopicBadges";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 interface Props {
   conversation: ConversationWithContact;
