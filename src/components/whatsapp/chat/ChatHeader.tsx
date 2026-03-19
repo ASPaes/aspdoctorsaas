@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -22,6 +23,8 @@ import { SentimentChip } from "./SentimentChip";
 import { TopicBadges } from "./TopicBadges";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -42,6 +45,30 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
+
+  // Fetch department name from conversation.department_id
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const convDeptId = (conversation as any).department_id;
+  const { data: convDepartment } = useQuery({
+    queryKey: ["conv-department", convDeptId],
+    enabled: !!convDeptId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("id", convDeptId)
+        .single();
+      return data;
+    },
+  });
+
+  // Resolve current instance name
+  const currentInstanceId = (conversation as any).current_instance_id;
+  const currentInstance = useMemo(
+    () => instances.find((i) => i.id === currentInstanceId),
+    [instances, currentInstanceId]
+  );
 
   // Department context
   const { selectedDepartment } = useDepartmentFilter();
@@ -206,13 +233,24 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         {/* Row 2: Context chips — wraps naturally */}
         <div className="flex items-center gap-1.5 flex-wrap mt-1 pl-12">
           <SignatureControl conversationId={conversation.id} />
-          {selectedDepartment && (
+          {convDepartment && (
+            <Badge variant="outline" className="text-[10px] h-4 gap-1 border-primary/30 text-primary">
+              <Building2 className="h-2.5 w-2.5" />
+              {convDepartment.name}
+            </Badge>
+          )}
+          {currentInstance && (
+            <span className="text-[10px] text-muted-foreground">
+              via {currentInstance.display_name || currentInstance.instance_name}
+            </span>
+          )}
+          {!convDepartment && selectedDepartment && (
             <Badge variant="outline" className="text-[10px] h-4 gap-1">
               <Building2 className="h-2.5 w-2.5" />
               {selectedDepartment.name}
             </Badge>
           )}
-          {conversationInstance && hasMultipleInstances && (
+          {conversationInstance && hasMultipleInstances && !currentInstance && (
             <Badge variant="secondary" className="text-[10px] h-4">
               {conversationInstance.display_name || conversationInstance.instance_name}
             </Badge>

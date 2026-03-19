@@ -957,22 +957,25 @@ async function sendUraWelcome(
   attendanceCode?: string
 ): Promise<void> {
   try {
-    if (!supportConfig.support_ura_enabled) {
+    // Use new department-based URA (ura_enabled) with fallback to legacy (support_ura_enabled)
+    const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+    if (!uraEnabled) {
       console.log('[ura] URA disabled, skipping welcome message');
       return;
     }
 
-    // Fetch active support areas for this tenant
-    const { data: areas } = await supabase
-      .from('support_areas')
-      .select('id, nome')
+    // Fetch active support DEPARTMENTS for this tenant (replaces support_areas)
+    const { data: departments } = await supabase
+      .from('support_departments')
+      .select('id, name, default_instance_id')
       .eq('tenant_id', tenantId)
-      .eq('ativo', true)
-      .order('nome');
+      .eq('is_active', true)
+      .order('name');
 
-    // Build welcome message
+    // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
-    let welcomeText = (supportConfig.support_ura_welcome_template || '')
+    const template = supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '';
+    let welcomeText = template
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
 
@@ -980,14 +983,21 @@ async function sendUraWelcome(
     const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
 
     let fullMessage: string;
-    if (areas && areas.length > 0) {
-      // Append numbered options from support_areas
-      const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
-      fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
+    if (departments && departments.length > 0) {
+      // Build numbered options from support_departments
+      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n');
+      // Replace {options} placeholder if present, otherwise append
+      if (welcomeText.includes('{options}')) {
+        fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
+      } else {
+        fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
+      }
+      // Append close option
+      fullMessage += '\n0. Encerrar atendimento';
     } else {
-      // No support_areas — template already contains the options
+      // No departments — send template as-is
       fullMessage = `${codeHeader}${welcomeText}`;
-      console.log('[ura] No support_areas found, sending template as-is');
+      console.log('[ura] No support_departments found, sending template as-is');
     }
 
     // Send via Evolution API
@@ -1026,13 +1036,18 @@ async function sendUraWelcome(
       })
       .eq('id', conversationId);
 
-    // Mark attendance as URA sent
+    // Mark attendance as URA pending (new state machine)
     await supabase
       .from('support_attendances')
-      .update({ ura_sent_at: nowIso, updated_at: nowIso })
+      .update({
+        ura_sent_at: nowIso,
+        ura_state: 'pending',
+        ura_asked_at: nowIso,
+        updated_at: nowIso,
+      })
       .eq('id', attendanceId);
 
-    console.log(`[ura] Welcome message sent successfully conv=${conversationId} att=${attendanceId} msgId=${messageId}`);
+    console.log(`[ura] Welcome message sent successfully conv=${conversationId} att=${attendanceId} msgId=${messageId} ura_state=pending`);
   } catch (err) {
     console.error('[ura] Error sending URA welcome:', err);
   }
@@ -1331,19 +1346,35 @@ async function handleUraResponse(
   messageContent: string,
   supportConfig: any
 ): Promise<boolean> {
-  if (!supportConfig.support_ura_enabled) return false;
+  // Use new department-based URA with fallback to legacy
+  const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+  if (!uraEnabled) return false;
 
-  // Find active waiting attendance with URA sent
+  // Find active waiting attendance with URA pending state
   const { data: att } = await supabase
     .from('support_attendances')
-    .select('id, attendance_code, ura_sent_at, area_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
+    .select('id, attendance_code, ura_sent_at, ura_state, ura_asked_at, department_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
     .eq('conversation_id', conversationId)
     .eq('status', 'waiting')
-    .not('ura_sent_at', 'is', null)
     .limit(1)
     .maybeSingle();
 
   if (!att) return false;
+
+  // Only intercept if URA is pending (sent and waiting for response)
+  // Also handle legacy: ura_sent_at set but ura_state still 'none'
+  const isUraPending = att.ura_state === 'pending' || (att.ura_sent_at && att.ura_state === 'none');
+  if (!isUraPending && att.ura_state !== 'pending') {
+    // URA already completed or not started — check if department already assigned
+    if (att.department_id || att.ura_option_selected !== null) {
+      // Already routed, just waiting for agent
+      if (!att.assigned_to) {
+        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
+        return true;
+      }
+    }
+    return false;
+  }
 
   // If already assigned to an agent, don't intercept — let normal chat flow handle it
   if (att.assigned_to) return false;
@@ -1354,10 +1385,25 @@ async function handleUraResponse(
     return true;
   }
 
-  // If area already selected (valid URA choice made), send "waiting" message
-  if (att.area_id || att.ura_option_selected !== null) {
+  // If department already selected (valid URA choice made), send "waiting" message
+  if (att.department_id || att.ura_option_selected !== null) {
     await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
     return true;
+  }
+
+  // --- Check URA timeout ---
+  const uraTimeoutMinutes = supportConfig.ura_timeout_minutes ?? 2;
+  if (att.ura_asked_at) {
+    const askedAt = new Date(att.ura_asked_at);
+    const now = new Date();
+    const elapsedMinutes = (now.getTime() - askedAt.getTime()) / (1000 * 60);
+    if (elapsedMinutes > uraTimeoutMinutes) {
+      console.log(`[ura] URA timed out (${elapsedMinutes.toFixed(1)} min > ${uraTimeoutMinutes} min) conv=${conversationId}`);
+      // Assign to default department
+      await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig);
+      // Don't consume — let the message flow into normal attendance handling
+      return false;
+    }
   }
 
   const trimmed = (messageContent || '').trim();
@@ -1366,21 +1412,23 @@ async function handleUraResponse(
   if (detectsHumanIntent(trimmed)) {
     console.log(`[ura] Human intent detected: "${trimmed}" conv=${conversationId}`);
     await markHumanFallback(supabase, att.id);
+    // Assign default department for human fallback
+    await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig);
     await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(HUMAN_FALLBACK_MESSAGES));
     return true;
   }
 
-  // --- 2. Validate numeric option ---
-  const { data: areas } = await supabase
-    .from('support_areas')
-    .select('id, nome')
+  // --- 2. Validate numeric option using support_departments ---
+  const { data: departments } = await supabase
+    .from('support_departments')
+    .select('id, name, default_instance_id')
     .eq('tenant_id', tenantId)
-    .eq('ativo', true)
-    .order('nome');
+    .eq('is_active', true)
+    .order('name');
 
-  const hasAreas = areas && areas.length > 0;
+  const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
-  const maxOption = hasAreas ? areas.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || '');
+  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '');
 
   // Invalid option
   if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
@@ -1393,18 +1441,25 @@ async function handleUraResponse(
       .update({ ura_invalid_count: currentInvalid, updated_at: new Date().toISOString() })
       .eq('id', att.id);
 
-    // --- 4. After 4 invalid attempts, fallback to human ---
+    // After 4 invalid attempts, fallback to human + default department
     if (currentInvalid >= 4) {
       console.log(`[ura] Max retries reached (${currentInvalid}), fallback to human conv=${conversationId}`);
       await markHumanFallback(supabase, att.id);
+      await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig);
       await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(HUMAN_INTENT_AFTER_RETRIES_MESSAGES));
       return true;
     }
 
-    // Send varied invalid message
+    // Send varied invalid message — use new template with {options} replacement
+    const invalidTemplate = supportConfig.ura_invalid_option_template || supportConfig.support_ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
+    let invalidMsg = invalidTemplate;
+    if (hasDepartments && invalidMsg.includes('{options}')) {
+      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n') + '\n0. Encerrar atendimento';
+      invalidMsg = invalidMsg.replace('{options}', optionsList);
+    }
     await sendAndPersistAutoMessage(
       supabase, instanceCtx, conversationId, tenantId,
-      pickRandom(INVALID_OPTION_MESSAGES),
+      invalidMsg,
       { ura: true, ura_invalid: true }
     );
     return true;
@@ -1413,12 +1468,10 @@ async function handleUraResponse(
   // Option 0 = close attendance AND conversation
   if (optionNumber === 0) {
     const nowIso = new Date().toISOString();
-    // Close the attendance
     await supabase
       .from('support_attendances')
-      .update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, updated_at: nowIso })
+      .update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso })
       .eq('id', att.id);
-    // Close the conversation visually
     await supabase
       .from('whatsapp_conversations')
       .update({ status: 'closed', updated_at: nowIso })
@@ -1436,17 +1489,20 @@ async function handleUraResponse(
     return true;
   }
 
-  // Valid option — assign area
+  // Valid option — assign department + route instance
   const nowIso = new Date().toISOString();
-  const selectedArea = hasAreas ? areas[optionNumber - 1] : null;
-  const areaName = selectedArea?.nome || `Opção ${optionNumber}`;
+  const selectedDept = hasDepartments ? departments[optionNumber - 1] : null;
+  const deptName = selectedDept?.name || `Opção ${optionNumber}`;
 
   const updatePayload: Record<string, any> = {
     ura_option_selected: optionNumber,
+    ura_selected_option: optionNumber,
+    ura_state: 'completed',
+    ura_completed_at: nowIso,
     updated_at: nowIso,
   };
-  if (selectedArea) {
-    updatePayload.area_id = selectedArea.id;
+  if (selectedDept) {
+    updatePayload.department_id = selectedDept.id;
   }
 
   await supabase
@@ -1454,16 +1510,79 @@ async function handleUraResponse(
     .update(updatePayload)
     .eq('id', att.id);
 
-  console.log(`[ura] Area selected: ${areaName} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
+  // Route conversation to department: set department_id + current_instance_id
+  if (selectedDept) {
+    const convUpdate: Record<string, any> = {
+      department_id: selectedDept.id,
+      updated_at: nowIso,
+    };
+    if (selectedDept.default_instance_id) {
+      convUpdate.current_instance_id = selectedDept.default_instance_id;
+    }
+    await supabase
+      .from('whatsapp_conversations')
+      .update(convUpdate)
+      .eq('id', conversationId);
+    console.log(`[ura] Department routed: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId} instance=${selectedDept.default_instance_id || 'none'}`);
+  } else {
+    console.log(`[ura] Option selected: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
+  }
 
-  const confirmText = `✅ Você escolheu *${areaName}*. Aguarde, em breve um atendente irá te ajudar!`;
+  const confirmText = `✅ Você escolheu *${deptName}*. Aguarde, em breve um atendente irá te ajudar!`;
   await sendAndPersistAutoMessage(
     supabase, instanceCtx, conversationId, tenantId,
     confirmText,
-    { ura: true, ura_confirmed: true, area_id: selectedArea?.id || null }
+    { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null }
   );
 
   return true;
+}
+
+/**
+ * Assign the default department (from config) to an attendance + conversation.
+ * Used on URA timeout and human fallback.
+ */
+async function assignDefaultDepartment(
+  supabase: any,
+  attendanceId: string,
+  conversationId: string,
+  tenantId: string,
+  supportConfig: any
+): Promise<void> {
+  const defaultDeptId = supportConfig.ura_default_department_id;
+  const nowIso = new Date().toISOString();
+
+  const attUpdate: Record<string, any> = {
+    ura_state: 'completed',
+    ura_completed_at: nowIso,
+    updated_at: nowIso,
+  };
+
+  const convUpdate: Record<string, any> = {
+    updated_at: nowIso,
+  };
+
+  if (defaultDeptId) {
+    attUpdate.department_id = defaultDeptId;
+    convUpdate.department_id = defaultDeptId;
+
+    // Fetch default department's instance
+    const { data: dept } = await supabase
+      .from('support_departments')
+      .select('default_instance_id, name')
+      .eq('id', defaultDeptId)
+      .single();
+
+    if (dept?.default_instance_id) {
+      convUpdate.current_instance_id = dept.default_instance_id;
+    }
+    console.log(`[ura] Default department assigned: ${dept?.name || defaultDeptId} att=${attendanceId}`);
+  } else {
+    console.log(`[ura] No default department configured, URA completed without routing att=${attendanceId}`);
+  }
+
+  await supabase.from('support_attendances').update(attUpdate).eq('id', attendanceId);
+  await supabase.from('whatsapp_conversations').update(convUpdate).eq('id', conversationId);
 }
 
 /** Mark attendance as human-fallback: ready for human queue without URA completion */
