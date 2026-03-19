@@ -281,6 +281,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }
             conversationId={conversation.id}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
+            initialMessage={initialGreeting}
           />
         )}
       </div>
