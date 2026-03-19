@@ -78,7 +78,7 @@ export function useAttendanceStatus(
           const { data: closedRows } = await supabase
             .from("support_attendances")
             .select(
-              "id, conversation_id, status, assigned_to, opened_at, closed_at"
+              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id"
             )
             .in("conversation_id", missingIds)
             .in("status", ["closed", "inactive_closed"])
