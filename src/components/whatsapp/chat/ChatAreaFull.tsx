@@ -62,6 +62,34 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }
 
   const deleteMutation = useDeleteMessages();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { getSenderLabel } = useSenderMap();
+  const { timezone } = useAppTimezone();
+
+  // Generate greeting for new conversations (no messages yet)
+  const initialGreeting = useMemo(() => {
+    if (!conversation || conversation.last_message_at) return undefined;
+    
+    const techName = user?.id ? getSenderLabel(user.id).name : null;
+    
+    // Get current hour in the configured timezone
+    const now = new Date();
+    let hour: number;
+    try {
+      const timeStr = now.toLocaleString('pt-BR', { timeZone: timezone, hour: 'numeric', hour12: false });
+      hour = parseInt(timeStr, 10);
+    } catch {
+      hour = now.getHours();
+    }
+
+    let greeting: string;
+    if (hour >= 6 && hour < 12) greeting = "Bom dia";
+    else if (hour >= 12 && hour < 18) greeting = "Boa tarde";
+    else greeting = "Boa noite";
+
+    const namePart = techName ? ` Sou ${techName} e` : "";
+    return `Olá, ${greeting}!${namePart} estou abrindo um novo atendimento com você.`;
+  }, [conversation?.id, conversation?.last_message_at, user?.id, getSenderLabel, timezone]);
 
   const messages: Message[] = queryClient.getQueryData(
     ['whatsapp', 'messages', conversation?.id]
