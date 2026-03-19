@@ -158,6 +158,11 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       if (error) throw error;
       return (data ?? []) as AccessUser[];
     },
+    meta: {
+      onError: (err: any) => {
+        toast({ title: "Erro ao carregar usuários", description: err?.message ?? "Erro desconhecido", variant: "destructive" });
+      },
+    },
   });
 
   // Fetch departments for dropdown
