@@ -21,10 +21,17 @@ export interface SupportConfig {
   support_csat_reason_prompt_template: string;
   support_csat_thanks_template: string;
 
-  // URA
+  // Legacy URA (support_areas based — kept for backward compat)
   support_ura_enabled: boolean;
   support_ura_welcome_template: string;
   support_ura_invalid_option_template: string;
+
+  // URA v2 (department-based routing)
+  ura_enabled: boolean;
+  ura_welcome_template: string;
+  ura_invalid_option_template: string;
+  ura_timeout_minutes: number;
+  ura_default_department_id: string | null;
 }
 
 /** Defaults matching the DB column defaults exactly */
@@ -51,6 +58,15 @@ const DEFAULTS: SupportConfig = {
     'Olá {{customer_name}}! 👋 Para te direcionar melhor, escolha uma opção:',
   support_ura_invalid_option_template:
     'Não entendi sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
+
+  // URA v2 defaults
+  ura_enabled: true,
+  ura_welcome_template:
+    'Olá! 👋 Para te atender mais rápido, escolha um setor:\n{options}\n\nResponda apenas com o número. 😊',
+  ura_invalid_option_template:
+    'Não entendi sua opção 😅\nPor favor, responda com um número válido:\n{options}',
+  ura_timeout_minutes: 2,
+  ura_default_department_id: null,
 };
 
 const SELECT_FIELDS = [
@@ -70,6 +86,12 @@ const SELECT_FIELDS = [
   'support_ura_enabled',
   'support_ura_welcome_template',
   'support_ura_invalid_option_template',
+  // URA v2 fields
+  'ura_enabled',
+  'ura_welcome_template',
+  'ura_invalid_option_template',
+  'ura_timeout_minutes',
+  'ura_default_department_id',
 ].join(', ');
 
 /**
