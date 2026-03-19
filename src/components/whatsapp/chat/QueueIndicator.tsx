@@ -3,6 +3,7 @@ import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock } from "lucide-r
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
