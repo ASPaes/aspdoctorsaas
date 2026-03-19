@@ -415,6 +415,19 @@ async function findOrCreateConversation(
 
     if (existingConversation) {
       console.log('[evolution-webhook] Conversation found (instance-scoped):', existingConversation.id);
+      // STICKY: ensure current_instance_id is set (only once, never overwritten)
+      const { data: convData } = await supabase
+        .from('whatsapp_conversations')
+        .select('current_instance_id')
+        .eq('id', existingConversation.id)
+        .single();
+      if (convData && !convData.current_instance_id) {
+        await supabase
+          .from('whatsapp_conversations')
+          .update({ current_instance_id: instanceId })
+          .eq('id', existingConversation.id);
+        console.log(`[evolution-webhook] STICKY: set current_instance_id=${instanceId} for conv=${existingConversation.id}`);
+      }
       return existingConversation.id;
     }
 
@@ -425,6 +438,7 @@ async function findOrCreateConversation(
         contact_id: contactId,
         status: 'active',
         tenant_id: tenantId,
+        current_instance_id: instanceId, // STICKY: set on creation
       })
       .select('id')
       .single();
@@ -1510,20 +1524,16 @@ async function handleUraResponse(
     .update(updatePayload)
     .eq('id', att.id);
 
-  // Route conversation to department: set department_id + current_instance_id
+  // Route conversation to department: set department_id ONLY (instance stays sticky)
   if (selectedDept) {
-    const convUpdate: Record<string, any> = {
-      department_id: selectedDept.id,
-      updated_at: nowIso,
-    };
-    if (selectedDept.default_instance_id) {
-      convUpdate.current_instance_id = selectedDept.default_instance_id;
-    }
     await supabase
       .from('whatsapp_conversations')
-      .update(convUpdate)
+      .update({
+        department_id: selectedDept.id,
+        updated_at: nowIso,
+      })
       .eq('id', conversationId);
-    console.log(`[ura] Department routed: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId} instance=${selectedDept.default_instance_id || 'none'}`);
+    console.log(`[ura] Department routed: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId} (instance NOT changed — sticky)`);
   } else {
     console.log(`[ura] Option selected: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
   }
@@ -1565,18 +1575,15 @@ async function assignDefaultDepartment(
   if (defaultDeptId) {
     attUpdate.department_id = defaultDeptId;
     convUpdate.department_id = defaultDeptId;
+    // NOTE: current_instance_id is NOT changed here — instance stays sticky
 
-    // Fetch default department's instance
     const { data: dept } = await supabase
       .from('support_departments')
-      .select('default_instance_id, name')
+      .select('name')
       .eq('id', defaultDeptId)
       .single();
 
-    if (dept?.default_instance_id) {
-      convUpdate.current_instance_id = dept.default_instance_id;
-    }
-    console.log(`[ura] Default department assigned: ${dept?.name || defaultDeptId} att=${attendanceId}`);
+    console.log(`[ura] Default department assigned: ${dept?.name || defaultDeptId} att=${attendanceId} (instance NOT changed — sticky)`);
   } else {
     console.log(`[ura] No default department configured, URA completed without routing att=${attendanceId}`);
   }
