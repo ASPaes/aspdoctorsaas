@@ -54,7 +54,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const ChipIcon = chipConfig.icon;
 
   // Assumir button: only when in queue (waiting + no assigned_to)
-  const canClaim = isInQueue && !isAssignedToMe;
+  const canClaim = isInQueue && !isAssignedToMe && isInUserDepartment;
 
   return (
     <div className="flex items-center gap-1.5">
