@@ -114,7 +114,10 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { conversations, isLoading } = useWhatsAppConversations({
     search: search.trim() || undefined,
     instanceId: filters.instanceId,
-    instanceIds: filteredInstanceIds ?? undefined,
+    // When a department is selected, don't filter by instanceIds at query level
+    // because conversations routed via URA may have a different instance_id.
+    // Department filtering happens client-side using attendanceMap.department_id.
+    instanceIds: selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined),
     status: filters.status,
     assignedTo: resolvedAssignedTo,
     unassigned: resolvedUnassigned || undefined,
