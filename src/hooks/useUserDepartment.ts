@@ -5,27 +5,27 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 /**
  * Returns the department_id the current user belongs to
- * (from support_department_members).
+ * by following profiles.funcionario_id → funcionarios.department_id.
+ * This is the canonical source of truth for department membership.
  */
 export function useUserDepartment() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const funcionarioId = profile?.funcionario_id;
 
-  return useQuery({
-    queryKey: ["user-department-membership", user?.id, tid],
-    enabled: !!user?.id && !!tid,
+  return useQuery<string | null>({
+    queryKey: ["user-department-via-funcionario", user?.id, tid, funcionarioId],
+    enabled: !!user?.id && !!tid && !!funcionarioId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("support_department_members")
+        .from("funcionarios")
         .select("department_id")
-        .eq("user_id", user!.id)
+        .eq("id", funcionarioId!)
         .eq("tenant_id", tid!)
-        .eq("is_active", true)
-        .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return data?.department_id as string | null;
+      return (data?.department_id as string | null) ?? null;
     },
   });
 }
