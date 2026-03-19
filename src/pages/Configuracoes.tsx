@@ -49,8 +49,6 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
-          <TabsTrigger value="equipe">Equipe</TabsTrigger>
-          <TabsTrigger value="setores">Setores</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
         </TabsList>
 
@@ -79,14 +77,6 @@ function WhatsAppSettingsContent() {
 
         <TabsContent value="atribuicao" className="mt-4">
           <AssignmentRulesManager />
-        </TabsContent>
-
-        <TabsContent value="equipe" className="mt-4">
-          <TeamTab />
-        </TabsContent>
-
-        <TabsContent value="setores" className="mt-4">
-          <SetoresTab />
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
