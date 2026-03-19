@@ -242,9 +242,11 @@ export const useConversationAssignment = () => {
   return {
     assignConversation: assignConversation.mutate,
     transferConversation: transferConversation.mutate,
+    transferToDepartment: transferToDepartment.mutate,
     unassignConversation: unassignConversation.mutate,
     getAssignmentHistory,
     isAssigning: assignConversation.isPending,
     isTransferring: transferConversation.isPending,
+    isTransferringDepartment: transferToDepartment.isPending,
   };
 };
