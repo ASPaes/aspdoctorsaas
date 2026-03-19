@@ -162,12 +162,11 @@ export default function Configuracoes() {
       </div>
 
       <Tabs defaultValue={isAdmin ? defaultTab : "percentuais"}>
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="percentuais">Percentuais</TabsTrigger>
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
-          {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="acessos">🔐 Acessos & Equipe</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
           <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
@@ -222,14 +221,8 @@ export default function Configuracoes() {
         </TabsContent>
 
         {isAdmin && (
-          <TabsContent value="usuarios">
-            <UsuariosTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="aprovacoes">
-            <AprovacaoAcessosTab />
+          <TabsContent value="acessos">
+            <AcessosEquipeTab />
           </TabsContent>
         )}
 
