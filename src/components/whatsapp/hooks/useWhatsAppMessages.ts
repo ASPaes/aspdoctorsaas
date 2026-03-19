@@ -192,7 +192,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     }
   }, [conversationId]);
 
-  // ── Realtime: primary subscription (filtered by conversation_id) ──
+  // ── Realtime: single channel with filtered subscription ──
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
 
   // Notify callback for new messages (used by ChatMessages for smart scroll)
@@ -201,83 +201,83 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     newMessageCallbackRef.current = cb;
   }, []);
 
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const channelName = `messages-rt-${conversationId}-${channelIdRef.current}`;
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'whatsapp_messages',
-      }, (payload) => {
-        const incoming = payload.new as any;
-        // Filter in callback — avoids Realtime filter issues with REPLICA IDENTITY
-        if (incoming.conversation_id !== conversationId) return;
-
-        const normalizedNewMsg = normalizeMessage(incoming);
-        queryClient.setQueryData(
-          ['whatsapp', 'messages', conversationId],
-          (old: Message[] | undefined) => mergeMessage(old ?? [], normalizedNewMsg)
-        );
-        // Notify listeners (smart scroll)
-        newMessageCallbackRef.current?.(normalizedNewMsg);
-
-        // Patch the sidebar conversation inline (lightweight, no full refetch)
-        patchConversationPreview(queryClient, conversationId, normalizedNewMsg);
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'whatsapp_messages',
-      }, (payload) => {
-        const updated = payload.new as any;
-        if (updated.conversation_id !== conversationId) return;
-
-        const normalizedUpdated = normalizeMessage(updated);
-        queryClient.setQueryData(
-          ['whatsapp', 'messages', conversationId],
-          (old: any[] | undefined) => {
-            if (!old) return old;
-            return old.map((m) => (m.id === normalizedUpdated.id ? normalizedUpdated : m));
-          }
-        );
-      })
-      .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn(`[useWhatsAppMessages] Channel ${channelName} status: ${status}. Will rely on fallback.`);
-        }
-      });
-
-    return () => { supabase.removeChannel(channel); };
-  }, [conversationId, queryClient]);
-
-  // ── Fallback: listen to conversation updates (last_message_at changes) ──
+  // Track last invalidation for fallback throttle
   const lastInvalidateRef = useRef(0);
 
   useEffect(() => {
     if (!conversationId) return;
 
-    const fallbackChannel = supabase
-      .channel(`msg-fallback-${conversationId}-${channelIdRef.current}`)
+    const uid = channelIdRef.current;
+    const channelName = `msgs-${conversationId.slice(0, 8)}-${uid}`;
+
+    if (import.meta.env.DEV) {
+      console.log(`[realtime] subscribing messages conversationId=${conversationId}`);
+    }
+
+    const channel = supabase
+      .channel(channelName)
+      // PRIMARY: filtered INSERT on whatsapp_messages
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'whatsapp_messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        const incoming = normalizeMessage(payload.new as any);
+        if (import.meta.env.DEV) {
+          console.log(`[realtime] new message id=${incoming.id} conv=${conversationId}`);
+        }
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', conversationId],
+          (old: Message[] | undefined) => mergeMessage(old ?? [], incoming)
+        );
+        newMessageCallbackRef.current?.(incoming);
+        patchConversationPreview(queryClient, conversationId, incoming);
+      })
+      // PRIMARY: filtered UPDATE on whatsapp_messages
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'whatsapp_messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        const updated = normalizeMessage(payload.new as any);
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', conversationId],
+          (old: Message[] | undefined) => {
+            if (!old) return old;
+            return old.map((m) => (m.id === updated.id ? updated : m));
+          }
+        );
+      })
+      // FALLBACK: conversation update → invalidate messages if realtime INSERT was missed
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'whatsapp_conversations',
-        filter: `id=eq.${conversationId}`
+        filter: `id=eq.${conversationId}`,
       }, () => {
         const now = Date.now();
         if (now - lastInvalidateRef.current > 2000) {
           lastInvalidateRef.current = now;
+          if (import.meta.env.DEV) {
+            console.log(`[realtime] fallback refetch conv=${conversationId}`);
+          }
           queryClient.invalidateQueries({
             queryKey: ['whatsapp', 'messages', conversationId],
           });
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (import.meta.env.DEV) {
+          console.log(`[realtime] channel ${channelName} status: ${status}`);
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`[realtime] channel ${channelName} failed (${status}). Fallback will handle.`);
+        }
+      });
 
-    return () => { supabase.removeChannel(fallbackChannel); };
+    return () => { supabase.removeChannel(channel); };
   }, [conversationId, queryClient]);
 
   return { messages, isLoading, error, onNewMessage };
