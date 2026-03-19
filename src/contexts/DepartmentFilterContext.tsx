@@ -24,7 +24,7 @@ const DepartmentFilterContext = createContext<DepartmentFilterContextValue | und
 
 export function DepartmentFilterProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const [selectedDepartmentId, setSelectedDepartmentIdRaw] = useState<string | null>(() => {
     try {

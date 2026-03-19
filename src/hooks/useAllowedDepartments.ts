@@ -23,7 +23,7 @@ export function useAllowedDepartments() {
   const { user, profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   return useQuery<AllowedDepartment[]>({
     queryKey: ["allowed_departments", tid, user?.id, isAdmin],
