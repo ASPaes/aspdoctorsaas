@@ -1575,18 +1575,15 @@ async function assignDefaultDepartment(
   if (defaultDeptId) {
     attUpdate.department_id = defaultDeptId;
     convUpdate.department_id = defaultDeptId;
+    // NOTE: current_instance_id is NOT changed here — instance stays sticky
 
-    // Fetch default department's instance
     const { data: dept } = await supabase
       .from('support_departments')
-      .select('default_instance_id, name')
+      .select('name')
       .eq('id', defaultDeptId)
       .single();
 
-    if (dept?.default_instance_id) {
-      convUpdate.current_instance_id = dept.default_instance_id;
-    }
-    console.log(`[ura] Default department assigned: ${dept?.name || defaultDeptId} att=${attendanceId}`);
+    console.log(`[ura] Default department assigned: ${dept?.name || defaultDeptId} att=${attendanceId} (instance NOT changed — sticky)`);
   } else {
     console.log(`[ura] No default department configured, URA completed without routing att=${attendanceId}`);
   }

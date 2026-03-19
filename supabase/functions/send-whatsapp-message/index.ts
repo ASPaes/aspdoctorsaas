@@ -132,43 +132,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Instance resolution priority:
+    // Instance resolution priority (STICKY — never change the WhatsApp number):
     // 1) explicit instanceId from request
-    // 2) conversation.current_instance_id (set by URA/department routing)
-    // 3) department's default_instance_id (from active attendance)
-    // 4) conversation.instance_id (original)
-    // 5) last received message's instance
-    // 6) any connected instance for tenant
-    let sendInstanceId = body.instanceId || conversation.current_instance_id || null;
-
-    // Fallback to department default instance if not resolved yet
-    if (!sendInstanceId) {
-      const { data: activeAtt } = await supabase
-        .from('support_attendances')
-        .select('department_id')
-        .eq('conversation_id', body.conversationId)
-        .in('status', ['waiting', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (activeAtt?.department_id) {
-        const { data: dept } = await supabase
-          .from('support_departments')
-          .select('default_instance_id')
-          .eq('id', activeAtt.department_id)
-          .single();
-        if (dept?.default_instance_id) {
-          sendInstanceId = dept.default_instance_id;
-          console.log('[send-whatsapp-message] Using department default instance:', sendInstanceId);
-        }
-      }
-    }
-
-    // Fallback to conversation's original instance
-    if (!sendInstanceId) {
-      sendInstanceId = conversation.instance_id;
-    }
+    // 2) conversation.current_instance_id (set once on first message, never changed)
+    // 3) conversation.instance_id (original inbound instance)
+    // 4) last received message's instance
+    // 5) any connected instance for tenant
+    let sendInstanceId = body.instanceId || conversation.current_instance_id || conversation.instance_id || null;
     
     if (!sendInstanceId) {
       // Fallback: find the instance of the last received message in this conversation
