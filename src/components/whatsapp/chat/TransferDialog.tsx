@@ -57,7 +57,7 @@ function useDepartments() {
   });
 }
 
-export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee }: TransferDialogProps) {
+export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee, onDepartmentTransferred }: TransferDialogProps) {
   const [tab, setTab] = useState<string>("agent");
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
