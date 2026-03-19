@@ -16,7 +16,6 @@ import { EditContactModal } from "./EditContactModal";
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
-import { EditContactModal } from "./EditContactModal";
 import {
   AlertDialog,
   AlertDialogAction,
