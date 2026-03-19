@@ -136,6 +136,75 @@ export const useConversationAssignment = () => {
     },
   });
 
+  const transferToDepartment = useMutation({
+    mutationFn: async ({ conversationId, departmentId, reason }: { conversationId: string; departmentId: string; reason?: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Get the department's default_instance_id
+      const { data: dept } = await supabase
+        .from('support_departments')
+        .select('id, default_instance_id')
+        .eq('id', departmentId)
+        .single();
+
+      if (!dept) throw new Error('Setor não encontrado');
+
+      // Update conversation: department + instance + unassign
+      const convUpdate: Record<string, any> = {
+        department_id: departmentId,
+        assigned_to: null,
+      };
+      if (dept.default_instance_id) {
+        convUpdate.current_instance_id = dept.default_instance_id;
+      }
+      const { error: convErr } = await supabase
+        .from('whatsapp_conversations')
+        .update(convUpdate)
+        .eq('id', conversationId);
+      if (convErr) throw convErr;
+
+      // Update active attendance
+      const { data: activeAtt } = await supabase
+        .from('support_attendances')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .in('status', ['waiting', 'in_progress'])
+        .limit(1)
+        .maybeSingle();
+
+      if (activeAtt) {
+        await supabase
+          .from('support_attendances')
+          .update({
+            department_id: departmentId,
+            assigned_to: null,
+            status: 'waiting',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', activeAtt.id);
+      }
+
+      // Log assignment
+      await supabase.from('conversation_assignments').insert({
+        conversation_id: conversationId,
+        assigned_to: null,
+        assigned_by: user.id,
+        reason: reason ? `[Setor] ${reason}` : '[Transferência de setor]',
+      } as any);
+
+      return { conversationId, departmentId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      toast({ title: "Setor alterado", description: "A conversa foi transferida para o novo setor." });
+    },
+    onError: () => {
+      toast({ title: "Erro ao transferir setor", description: "Não foi possível transferir a conversa.", variant: "destructive" });
+    },
+  });
+
   const unassignConversation = useMutation({
     mutationFn: async (conversationId: string) => {
       const { error } = await supabase
