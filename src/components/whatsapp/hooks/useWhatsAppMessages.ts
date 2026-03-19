@@ -133,6 +133,11 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    refetchInterval: (query) => {
+      // Poll every 5s as safety net if realtime is not delivering
+      return query.state.data && (query.state.data as Message[]).length >= 0 ? 5000 : false;
+    },
+    refetchIntervalInBackground: false,
   });
 
   useEffect(() => {
