@@ -92,7 +92,14 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
     if (!selectedDept) return;
     transferToDepartment(
       { conversationId, departmentId: selectedDept, reason: reason || undefined },
-      { onSuccess: () => { onOpenChange(false); setSelectedDept(""); setReason(""); } }
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          setSelectedDept("");
+          setReason("");
+          onDepartmentTransferred?.();
+        },
+      }
     );
   };
 
