@@ -268,6 +268,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onOpenChange={setIsTransferOpen}
         conversationId={conversation.id}
         currentAssignee={conversation.assigned_to || null}
+        onDepartmentTransferred={onDepartmentTransferred}
       />
       <CreateCSTicketFromChat
         open={isManualTicketOpen}
