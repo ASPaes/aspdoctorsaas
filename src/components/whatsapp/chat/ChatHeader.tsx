@@ -63,13 +63,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     },
   });
 
-  // Resolve current instance name
-  const currentInstanceId = (conversation as any).current_instance_id;
-  const currentInstance = useMemo(
-    () => instances.find((i) => i.id === currentInstanceId),
-    [instances, currentInstanceId]
-  );
-
   // Department context
   const { selectedDepartment } = useDepartmentFilter();
   const conversationInstance = useMemo(
