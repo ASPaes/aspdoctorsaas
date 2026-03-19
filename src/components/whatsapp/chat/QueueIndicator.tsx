@@ -14,7 +14,7 @@ interface QueueIndicatorProps {
 }
 
 export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: QueueIndicatorProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
