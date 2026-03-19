@@ -7,7 +7,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Building2 } from "lucide-react";
-import { useMemo } from "react";
 
 export function DepartmentSelector() {
   const {
@@ -16,25 +15,17 @@ export function DepartmentSelector() {
     setSelectedDepartmentId,
     isLoading,
     canSeeAllDepartments,
-    userDepartmentId,
   } = useDepartmentFilter();
 
-  // Non-admin users only see their own department
-  const visibleDepartments = useMemo(() => {
-    if (canSeeAllDepartments) return departments;
-    if (!userDepartmentId) return [];
-    return departments.filter((d) => d.id === userDepartmentId);
-  }, [departments, canSeeAllDepartments, userDepartmentId]);
-
-  if (isLoading || visibleDepartments.length === 0) return null;
+  if (isLoading || departments.length === 0) return null;
 
   // Non-admin with exactly 1 department: show read-only label
-  if (!canSeeAllDepartments && visibleDepartments.length === 1) {
+  if (!canSeeAllDepartments && departments.length === 1) {
     return (
       <div className="flex items-center gap-1.5 px-3 pb-2">
         <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         <span className="text-xs text-muted-foreground truncate">
-          {visibleDepartments[0].name}
+          {departments[0].name}
         </span>
       </div>
     );
@@ -54,7 +45,7 @@ export function DepartmentSelector() {
           {canSeeAllDepartments && (
             <SelectItem value="all">Todos os setores</SelectItem>
           )}
-          {visibleDepartments.map((d) => (
+          {departments.map((d) => (
             <SelectItem key={d.id} value={d.id}>
               {d.name}
             </SelectItem>
