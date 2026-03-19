@@ -9,6 +9,7 @@ export interface AttendanceInfo {
   assigned_to: string | null;
   opened_at: string;
   closed_at: string | null;
+  department_id: string | null;
 }
 
 /**
