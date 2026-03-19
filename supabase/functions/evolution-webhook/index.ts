@@ -1524,20 +1524,16 @@ async function handleUraResponse(
     .update(updatePayload)
     .eq('id', att.id);
 
-  // Route conversation to department: set department_id + current_instance_id
+  // Route conversation to department: set department_id ONLY (instance stays sticky)
   if (selectedDept) {
-    const convUpdate: Record<string, any> = {
-      department_id: selectedDept.id,
-      updated_at: nowIso,
-    };
-    if (selectedDept.default_instance_id) {
-      convUpdate.current_instance_id = selectedDept.default_instance_id;
-    }
     await supabase
       .from('whatsapp_conversations')
-      .update(convUpdate)
+      .update({
+        department_id: selectedDept.id,
+        updated_at: nowIso,
+      })
       .eq('id', conversationId);
-    console.log(`[ura] Department routed: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId} instance=${selectedDept.default_instance_id || 'none'}`);
+    console.log(`[ura] Department routed: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId} (instance NOT changed — sticky)`);
   } else {
     console.log(`[ura] Option selected: ${deptName} (option ${optionNumber}) att=${att.id} conv=${conversationId}`);
   }
