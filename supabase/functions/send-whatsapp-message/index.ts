@@ -132,13 +132,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Instance resolution priority (STICKY — never change the WhatsApp number):
-    // 1) explicit instanceId from request
-    // 2) conversation.current_instance_id (set once on first message, never changed)
-    // 3) conversation.instance_id (original inbound instance)
-    // 4) last received message's instance
-    // 5) any connected instance for tenant
-    let sendInstanceId = body.instanceId || conversation.current_instance_id || conversation.instance_id || null;
+    // Instance resolution: conversation.instance_id IS the definitive channel.
+    // For existing conversations, ALWAYS use instance_id (never department default).
+    // explicit instanceId override only for special cases (e.g. admin change-instance).
+    let sendInstanceId = body.instanceId || conversation.instance_id || null;
     
     if (!sendInstanceId) {
       // Fallback: find the instance of the last received message in this conversation

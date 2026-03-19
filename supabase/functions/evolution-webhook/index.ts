@@ -425,7 +425,6 @@ async function findOrCreateConversation(
         contact_id: contactId,
         status: 'active',
         tenant_id: tenantId,
-        current_instance_id: instanceId, // STICKY: set on creation
       })
       .select('id')
       .single();
