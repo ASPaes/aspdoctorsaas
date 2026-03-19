@@ -31,6 +31,7 @@ interface Props {
   conversation: ConversationWithContact | null;
   onClose?: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
+  onDepartmentTransferred?: () => void;
 }
 
 type DeleteMode = 'panel_only' | 'everyone';
