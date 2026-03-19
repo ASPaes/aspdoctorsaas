@@ -19,6 +19,7 @@ interface TransferDialogProps {
   onOpenChange: (open: boolean) => void;
   conversationId: string;
   currentAssignee: string | null;
+  onDepartmentTransferred?: () => void;
 }
 
 function useFuncionariosLookup() {
