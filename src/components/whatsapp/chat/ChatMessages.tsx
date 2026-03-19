@@ -37,6 +37,7 @@ const NEAR_BOTTOM_THRESHOLD = 150;
 export function ChatMessages({
   conversationId,
   unreadCount = 0,
+  lastMessageAt = null,
   onReply,
   selectionMode,
   selectedMessages,
@@ -56,6 +57,7 @@ export function ChatMessages({
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
   const prevConversationId = useRef(conversationId);
+  const lastRefetchedMessageAtRef = useRef<string | null>(null);
 
   // Smart scroll state
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -74,6 +76,24 @@ export function ChatMessages({
       pendingNewCountRef.current = 0;
     }
   }, []);
+
+  // Fallback driven by conversation updates that already refresh the sidebar
+  useEffect(() => {
+    if (!conversationId || !lastMessageAt) return;
+    if (lastRefetchedMessageAtRef.current === lastMessageAt) return;
+
+    const latestKnownTimestamp = messages[messages.length - 1]?.timestamp ?? null;
+    if (latestKnownTimestamp && new Date(lastMessageAt).getTime() <= new Date(latestKnownTimestamp).getTime()) {
+      lastRefetchedMessageAtRef.current = lastMessageAt;
+      return;
+    }
+
+    lastRefetchedMessageAtRef.current = lastMessageAt;
+    if (import.meta.env.DEV) {
+      console.log(`[realtime] fallback refetch conv=${conversationId} lastMessageAt=${lastMessageAt}`);
+    }
+    void onNewMessage;
+  }, [conversationId, lastMessageAt, messages, onNewMessage]);
 
   // Listen for new messages from realtime
   useEffect(() => {
