@@ -69,7 +69,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const { data: departments = [] } = useDepartments();
   const { transferConversation, transferToDepartment, isTransferring, isTransferringDepartment } = useConversationAssignment();
 
-  const isAdminOrHead = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const availableUsers = tenantUsers.filter(u =>
     u.user_id !== currentAssignee && u.status === "ativo"
