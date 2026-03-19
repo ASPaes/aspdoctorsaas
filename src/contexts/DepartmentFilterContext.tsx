@@ -13,7 +13,7 @@ interface DepartmentFilterContextValue {
   /** instance_ids for the selected department. null = no filter (all). */
   filteredInstanceIds: string[] | null;
   selectedDepartment: SupportDepartment | null;
-  /** The department the current user belongs to (from membership) */
+  /** The department the current user belongs to (from funcionarios.department_id) */
   userDepartmentId: string | null;
   /** Whether the current user can see all departments */
   canSeeAllDepartments: boolean;
@@ -44,54 +44,71 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
   }, []);
 
   const { data: departments = [], isLoading } = useSupportDepartments();
-  const { data: userDepartmentId } = useUserDepartment();
+  const { data: userDepartmentId, isLoading: userDeptLoading } = useUserDepartment();
 
-  // Auto-select user's department as default if nothing stored yet
+  const canSeeAllDepartments = !!isAdmin;
+
+  // Auto-select department on first load
   useEffect(() => {
     if (defaultApplied) return;
-    if (userDepartmentId === undefined) return; // still loading
+    // Wait for both departments list and user department to load
+    if (userDepartmentId === undefined && userDeptLoading) return;
+    if (departments.length === 0 && isLoading) return;
 
-    const stored = localStorage.getItem(STORAGE_KEY);
-    // If nothing stored OR stored value is invalid, apply default
-    if (!stored || !departments.find((d) => d.id === stored)) {
+    if (canSeeAllDepartments) {
+      // Admin: use stored value or null (= "Todos")
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored && departments.find((d) => d.id === stored)) {
+        setSelectedDepartmentIdRaw(stored);
+      } else {
+        setSelectedDepartmentIdRaw(null);
+      }
+    } else {
+      // Non-admin: force to user's department, ignore stored value
       if (userDepartmentId && departments.find((d) => d.id === userDepartmentId)) {
-        setSelectedDepartmentId(userDepartmentId);
+        setSelectedDepartmentIdRaw(userDepartmentId);
+        try { localStorage.setItem(STORAGE_KEY, userDepartmentId); } catch {}
       }
     }
     setDefaultApplied(true);
-  }, [userDepartmentId, departments, defaultApplied, setSelectedDepartmentId]);
+  }, [userDepartmentId, userDeptLoading, departments, isLoading, defaultApplied, canSeeAllDepartments]);
 
-  const { data: instanceIds } = useDepartmentInstances(selectedDepartmentId);
-
-  // If selected department no longer exists in the list, clear selection
-  const validSelectedId = useMemo(() => {
-    if (!selectedDepartmentId) return null;
-    if (departments.find((d) => d.id === selectedDepartmentId)) return selectedDepartmentId;
+  // For non-admin: always force to their department (even if they somehow change it)
+  const effectiveSelectedId = useMemo(() => {
+    if (canSeeAllDepartments) {
+      // Admin: validate stored selection
+      if (!selectedDepartmentId) return null;
+      if (departments.find((d) => d.id === selectedDepartmentId)) return selectedDepartmentId;
+      return null;
+    }
+    // Non-admin: always their department
+    if (userDepartmentId && departments.find((d) => d.id === userDepartmentId)) {
+      return userDepartmentId;
+    }
     return null;
-  }, [selectedDepartmentId, departments]);
+  }, [selectedDepartmentId, departments, canSeeAllDepartments, userDepartmentId]);
 
-  // Non-admin users can only see their own department
-  const canSeeAllDepartments = !!isAdmin;
+  const { data: instanceIds } = useDepartmentInstances(effectiveSelectedId);
 
   const selectedDepartment = useMemo(
-    () => departments.find((d) => d.id === validSelectedId) ?? null,
-    [departments, validSelectedId]
+    () => departments.find((d) => d.id === effectiveSelectedId) ?? null,
+    [departments, effectiveSelectedId]
   );
 
-  const filteredInstanceIds = validSelectedId ? (instanceIds ?? null) : null;
+  const filteredInstanceIds = effectiveSelectedId ? (instanceIds ?? null) : null;
 
   const value = useMemo(
     () => ({
       departments,
       isLoading,
-      selectedDepartmentId: validSelectedId,
+      selectedDepartmentId: effectiveSelectedId,
       setSelectedDepartmentId,
       filteredInstanceIds,
       selectedDepartment,
       userDepartmentId: userDepartmentId ?? null,
       canSeeAllDepartments,
     }),
-    [departments, isLoading, validSelectedId, setSelectedDepartmentId, filteredInstanceIds, selectedDepartment, userDepartmentId, canSeeAllDepartments]
+    [departments, isLoading, effectiveSelectedId, setSelectedDepartmentId, filteredInstanceIds, selectedDepartment, userDepartmentId, canSeeAllDepartments]
   );
 
   return (
