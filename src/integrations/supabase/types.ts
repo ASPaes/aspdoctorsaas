@@ -2380,6 +2380,7 @@ export type Database = {
           category: string | null
           contact_id: string
           created_at: string
+          department_id: string | null
           id: string
           instance_id: string | null
           is_last_message_from_me: boolean
@@ -2399,6 +2400,7 @@ export type Database = {
           category?: string | null
           contact_id: string
           created_at?: string
+          department_id?: string | null
           id?: string
           instance_id?: string | null
           is_last_message_from_me?: boolean
@@ -2418,6 +2420,7 @@ export type Database = {
           category?: string | null
           contact_id?: string
           created_at?: string
+          department_id?: string | null
           id?: string
           instance_id?: string | null
           is_last_message_from_me?: boolean
@@ -2438,6 +2441,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
             referencedColumns: ["id"]
           },
           {
@@ -3295,6 +3305,7 @@ export type Database = {
             }
             Returns: string
           }
+      current_department_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       decrypt_api_key: {
         Args: { p_encrypted: string; p_encryption_key: string }
@@ -3353,6 +3364,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      is_admin_or_head: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
