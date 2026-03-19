@@ -16,8 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
-import UsuariosTab from "@/components/configuracoes/UsuariosTab";
-import AprovacaoAcessosTab from "@/components/configuracoes/AprovacaoAcessosTab";
+import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
 import { useSearchParams } from "react-router-dom";
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import { InstanceSetupCollapsible } from "@/components/configuracoes/whatsapp/InstanceSetupCollapsible";
@@ -25,12 +24,10 @@ import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList
 import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstanceDialog";
 import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
-import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
-import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
-import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
+import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -52,8 +49,6 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
-          <TabsTrigger value="equipe">Equipe</TabsTrigger>
-          <TabsTrigger value="setores">Setores</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
         </TabsList>
 
@@ -82,14 +77,6 @@ function WhatsAppSettingsContent() {
 
         <TabsContent value="atribuicao" className="mt-4">
           <AssignmentRulesManager />
-        </TabsContent>
-
-        <TabsContent value="equipe" className="mt-4">
-          <TeamTab />
-        </TabsContent>
-
-        <TabsContent value="setores" className="mt-4">
-          <SetoresTab />
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
@@ -175,12 +162,11 @@ export default function Configuracoes() {
       </div>
 
       <Tabs defaultValue={isAdmin ? defaultTab : "percentuais"}>
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="percentuais">Percentuais</TabsTrigger>
           <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
-          {isAdmin && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="aprovacoes">Aprovação de Acessos</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="acessos">🔐 Acessos & Equipe</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
           <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
@@ -235,14 +221,8 @@ export default function Configuracoes() {
         </TabsContent>
 
         {isAdmin && (
-          <TabsContent value="usuarios">
-            <UsuariosTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="aprovacoes">
-            <AprovacaoAcessosTab />
+          <TabsContent value="acessos">
+            <AcessosEquipeTab />
           </TabsContent>
         )}
 
