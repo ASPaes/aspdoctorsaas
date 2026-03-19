@@ -680,8 +680,10 @@ export type Database = {
           support_inactivity_warning_template: string
           support_reopen_window_minutes: number
           support_send_inactivity_warning: boolean
+          support_ura_default_department_id: string | null
           support_ura_enabled: boolean
           support_ura_invalid_option_template: string
+          support_ura_timeout_minutes: number
           support_ura_welcome_template: string
           tenant_id: string | null
           updated_at: string
@@ -711,8 +713,10 @@ export type Database = {
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
           support_send_inactivity_warning?: boolean
+          support_ura_default_department_id?: string | null
           support_ura_enabled?: boolean
           support_ura_invalid_option_template?: string
+          support_ura_timeout_minutes?: number
           support_ura_welcome_template?: string
           tenant_id?: string | null
           updated_at?: string
@@ -742,8 +746,10 @@ export type Database = {
           support_inactivity_warning_template?: string
           support_reopen_window_minutes?: number
           support_send_inactivity_warning?: boolean
+          support_ura_default_department_id?: string | null
           support_ura_enabled?: boolean
           support_ura_invalid_option_template?: string
+          support_ura_timeout_minutes?: number
           support_ura_welcome_template?: string
           tenant_id?: string | null
           updated_at?: string
@@ -754,6 +760,13 @@ export type Database = {
           ura_welcome_template?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "configuracoes_support_ura_default_department_id_fkey"
+            columns: ["support_ura_default_department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "configuracoes_ura_default_department_id_fkey"
             columns: ["ura_default_department_id"]
