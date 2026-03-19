@@ -93,7 +93,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
   const { instances } = useWhatsAppInstances();
-  const { filteredInstanceIds } = useDepartmentFilter();
+  const { filteredInstanceIds, selectedDepartmentId } = useDepartmentFilter();
   const instanceMap = useMemo(() => {
     const map: Record<string, string> = {};
     instances.forEach((inst) => {
