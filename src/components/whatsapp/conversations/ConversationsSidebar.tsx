@@ -154,6 +154,21 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const filtered = useMemo(() => {
     let result = [...conversations];
 
+    // Department-based filtering: filter by attendance's department_id
+    // This is the authoritative filter when a department is selected
+    if (selectedDepartmentId) {
+      result = result.filter(c => {
+        const att = attendanceMap.get(c.id);
+        // Show if attendance belongs to this department
+        if (att?.department_id === selectedDepartmentId) return true;
+        // Also show if conversation's department_id matches (set by URA)
+        if ((c as any).department_id === selectedDepartmentId) return true;
+        // Show conversations without attendance that are on this department's instances
+        if (!att && filteredInstanceIds && filteredInstanceIds.includes(c.instance_id || '')) return true;
+        return false;
+      });
+    }
+
     // Non-admin visibility: only show conversations with attendance assigned to me, waiting (queue), or no attendance
     if (!isAdmin && user?.id) {
       result = result.filter(c => {
