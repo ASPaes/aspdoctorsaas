@@ -30,6 +30,11 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const isInQueue = effectiveStatus === "waiting" && !effectiveAssignedTo;
   const isInProgress = effectiveStatus === "in_progress";
 
+  // Department guard: user can only claim if conversation belongs to their department
+  const { userDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
+  const convDeptId = attendance?.department_id;
+  const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
+
   const handleClaim = () => {
     if (!user?.id) return;
     assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
