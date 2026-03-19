@@ -62,7 +62,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const [selectedDept, setSelectedDept] = useState("");
   const [reason, setReason] = useState("");
   const { user } = useAuth();
-  const { data: profile } = useProfile();
+  const { data: profile } = useProfile(user?.id);
   const { data: tenantUsers = [] } = useTenantUsers();
   const { data: funcMap } = useFuncionariosLookup();
   const { data: departments = [] } = useDepartments();
