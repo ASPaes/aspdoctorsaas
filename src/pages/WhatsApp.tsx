@@ -26,6 +26,16 @@ function WhatsAppContent() {
     if (!selected) return;
 
     const recheckAccess = async () => {
+      // Optimistic: check React Query cache first for immediate update
+      const cachedEntry = queryClient.getQueriesData({ queryKey: ['whatsapp', 'conversations'] })
+        .flatMap(([, d]: any) => d?.conversations ?? [])
+        .find((c: any) => c.id === selected.id);
+
+      if (cachedEntry && (cachedEntry as any).last_message_at !== selected.last_message_at) {
+        setSelected(cachedEntry as unknown as ConversationWithContact);
+      }
+
+      // Confirm from DB
       const { data, error } = await supabase
         .from("whatsapp_conversations")
         .select("*, contact:whatsapp_contacts(*)")
