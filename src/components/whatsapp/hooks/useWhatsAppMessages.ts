@@ -275,11 +275,26 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           console.log(`[realtime] channel ${channelName} status: ${status}`);
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn(`[realtime] channel ${channelName} failed (${status}). Fallback will handle.`);
+          console.warn(`[realtime] channel ${channelName} failed (${status}). Scheduling retry...`);
+          retryCountRef.current += 1;
+          if (retryCountRef.current <= 3) {
+            const delay = retryCountRef.current * 3000;
+            setTimeout(() => {
+              if (!mountedRef.current) return;
+              supabase.removeChannel(channel);
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
+            }, delay);
+          }
+        }
+        if (status === 'SUBSCRIBED') {
+          retryCountRef.current = 0;
         }
       });
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      mountedRef.current = false;
+      supabase.removeChannel(channel);
+    };
   }, [conversationId, queryClient]);
 
   // ── Independent fallback: separate channel on whatsapp_conversations ──
