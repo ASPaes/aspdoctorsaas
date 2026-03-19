@@ -16,8 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
-import UsuariosTab from "@/components/configuracoes/UsuariosTab";
-import AprovacaoAcessosTab from "@/components/configuracoes/AprovacaoAcessosTab";
+import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
 import { useSearchParams } from "react-router-dom";
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import { InstanceSetupCollapsible } from "@/components/configuracoes/whatsapp/InstanceSetupCollapsible";
@@ -25,12 +24,10 @@ import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList
 import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstanceDialog";
 import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
-import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
-import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
-import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
+import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
