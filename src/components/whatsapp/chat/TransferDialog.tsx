@@ -19,6 +19,7 @@ interface TransferDialogProps {
   onOpenChange: (open: boolean) => void;
   conversationId: string;
   currentAssignee: string | null;
+  onDepartmentTransferred?: () => void;
 }
 
 function useFuncionariosLookup() {
@@ -56,7 +57,7 @@ function useDepartments() {
   });
 }
 
-export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee }: TransferDialogProps) {
+export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee, onDepartmentTransferred }: TransferDialogProps) {
   const [tab, setTab] = useState<string>("agent");
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
@@ -68,7 +69,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const { data: departments = [] } = useDepartments();
   const { transferConversation, transferToDepartment, isTransferring, isTransferringDepartment } = useConversationAssignment();
 
-  const isAdminOrHead = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const availableUsers = tenantUsers.filter(u =>
     u.user_id !== currentAssignee && u.status === "ativo"
@@ -91,7 +92,14 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
     if (!selectedDept) return;
     transferToDepartment(
       { conversationId, departmentId: selectedDept, reason: reason || undefined },
-      { onSuccess: () => { onOpenChange(false); setSelectedDept(""); setReason(""); } }
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          setSelectedDept("");
+          setReason("");
+          onDepartmentTransferred?.();
+        },
+      }
     );
   };
 

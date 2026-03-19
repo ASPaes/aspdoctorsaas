@@ -3,6 +3,7 @@ import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock } from "lucide-r
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -13,7 +14,7 @@ interface QueueIndicatorProps {
 }
 
 export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: QueueIndicatorProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
@@ -28,6 +29,11 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   // Only show as "queue" if status=waiting AND no one is assigned
   const isInQueue = effectiveStatus === "waiting" && !effectiveAssignedTo;
   const isInProgress = effectiveStatus === "in_progress";
+
+  // Department guard: user can only claim if conversation belongs to their department
+  const { userDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
+  const convDeptId = attendance?.department_id;
+  const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
 
   const handleClaim = () => {
     if (!user?.id) return;
@@ -48,7 +54,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const ChipIcon = chipConfig.icon;
 
   // Assumir button: only when in queue (waiting + no assigned_to)
-  const canClaim = isInQueue && !isAssignedToMe;
+  const canClaim = isInQueue && !isAssignedToMe && isInUserDepartment;
 
   return (
     <div className="flex items-center gap-1.5">

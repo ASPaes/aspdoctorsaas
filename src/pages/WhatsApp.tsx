@@ -132,7 +132,7 @@ function WhatsAppContent() {
     if (selected) {
       return (
         <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
-          <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} />
+          <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
         </div>
       );
     }
@@ -153,7 +153,7 @@ function WhatsAppContent() {
         </ResizablePanel>
         <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
         <ResizablePanel defaultSize={75}>
-          <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} />
+          <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

@@ -32,9 +32,10 @@ interface Props {
   showDetails: boolean;
   onClose?: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
+  onDepartmentTransferred?: () => void;
 }
 
-export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation }: Props) {
+export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
@@ -267,6 +268,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onOpenChange={setIsTransferOpen}
         conversationId={conversation.id}
         currentAssignee={conversation.assigned_to || null}
+        onDepartmentTransferred={onDepartmentTransferred}
       />
       <CreateCSTicketFromChat
         open={isManualTicketOpen}

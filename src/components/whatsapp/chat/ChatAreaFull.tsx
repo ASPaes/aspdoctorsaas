@@ -31,11 +31,12 @@ interface Props {
   conversation: ConversationWithContact | null;
   onClose?: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
+  onDepartmentTransferred?: () => void;
 }
 
 type DeleteMode = 'panel_only' | 'everyone';
 
-export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }: Props) {
+export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
 
@@ -217,6 +218,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }
           showDetails={showDetails}
           onClose={onClose}
           onNavigateToConversation={onNavigateToConversation}
+          onDepartmentTransferred={onDepartmentTransferred}
         />
         <ChatMessages
           conversationId={conversation.id}
