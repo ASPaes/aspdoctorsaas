@@ -244,7 +244,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Badge>
           )}
           <SentimentChip sentiment={sentimentData} />
-          {topicsData?.topics && topicsData.topics.length > 0 && (
+          {effectiveStatus !== "closed" && topicsData?.topics && topicsData.topics.length > 0 && (
             <TopicBadges topics={topicsData.topics} size="sm" showIcon={false} maxTopics={2} />
           )}
         </div>
