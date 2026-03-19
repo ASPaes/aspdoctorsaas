@@ -957,22 +957,25 @@ async function sendUraWelcome(
   attendanceCode?: string
 ): Promise<void> {
   try {
-    if (!supportConfig.support_ura_enabled) {
+    // Use new department-based URA (ura_enabled) with fallback to legacy (support_ura_enabled)
+    const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+    if (!uraEnabled) {
       console.log('[ura] URA disabled, skipping welcome message');
       return;
     }
 
-    // Fetch active support areas for this tenant
-    const { data: areas } = await supabase
-      .from('support_areas')
-      .select('id, nome')
+    // Fetch active support DEPARTMENTS for this tenant (replaces support_areas)
+    const { data: departments } = await supabase
+      .from('support_departments')
+      .select('id, name, default_instance_id')
       .eq('tenant_id', tenantId)
-      .eq('ativo', true)
-      .order('nome');
+      .eq('is_active', true)
+      .order('name');
 
-    // Build welcome message
+    // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
-    let welcomeText = (supportConfig.support_ura_welcome_template || '')
+    const template = supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '';
+    let welcomeText = template
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
 
@@ -980,14 +983,21 @@ async function sendUraWelcome(
     const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
 
     let fullMessage: string;
-    if (areas && areas.length > 0) {
-      // Append numbered options from support_areas
-      const optionsList = areas.map((a: any, i: number) => `${i + 1}. ${a.nome}`).join('\n');
-      fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
+    if (departments && departments.length > 0) {
+      // Build numbered options from support_departments
+      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n');
+      // Replace {options} placeholder if present, otherwise append
+      if (welcomeText.includes('{options}')) {
+        fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
+      } else {
+        fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
+      }
+      // Append close option
+      fullMessage += '\n0. Encerrar atendimento';
     } else {
-      // No support_areas — template already contains the options
+      // No departments — send template as-is
       fullMessage = `${codeHeader}${welcomeText}`;
-      console.log('[ura] No support_areas found, sending template as-is');
+      console.log('[ura] No support_departments found, sending template as-is');
     }
 
     // Send via Evolution API
@@ -1026,13 +1036,18 @@ async function sendUraWelcome(
       })
       .eq('id', conversationId);
 
-    // Mark attendance as URA sent
+    // Mark attendance as URA pending (new state machine)
     await supabase
       .from('support_attendances')
-      .update({ ura_sent_at: nowIso, updated_at: nowIso })
+      .update({
+        ura_sent_at: nowIso,
+        ura_state: 'pending',
+        ura_asked_at: nowIso,
+        updated_at: nowIso,
+      })
       .eq('id', attendanceId);
 
-    console.log(`[ura] Welcome message sent successfully conv=${conversationId} att=${attendanceId} msgId=${messageId}`);
+    console.log(`[ura] Welcome message sent successfully conv=${conversationId} att=${attendanceId} msgId=${messageId} ura_state=pending`);
   } catch (err) {
     console.error('[ura] Error sending URA welcome:', err);
   }
