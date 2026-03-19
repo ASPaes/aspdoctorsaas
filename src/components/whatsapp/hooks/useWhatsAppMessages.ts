@@ -130,6 +130,8 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
       return ((data ?? []) as Array<Partial<Message> & Record<string, any>>).map(normalizeMessage);
     },
     enabled: !!conversationId,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
