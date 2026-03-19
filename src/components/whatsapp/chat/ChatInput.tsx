@@ -20,10 +20,11 @@ interface Props {
   conversationId: string;
   replyTo?: Message | null;
   onCancelReply?: () => void;
+  initialMessage?: string;
 }
 
-export function ChatInput({ conversationId, replyTo, onCancelReply }: Props) {
-  const [message, setMessage] = useState("");
+export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage }: Props) {
+  const [message, setMessage] = useState(initialMessage || "");
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
