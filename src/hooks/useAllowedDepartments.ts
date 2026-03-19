@@ -31,7 +31,6 @@ export function useAllowedDepartments() {
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       if (isAdmin) {
-        // Admin: all active departments
         const { data, error } = await supabase
           .from("support_departments")
           .select("id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id")
@@ -42,7 +41,7 @@ export function useAllowedDepartments() {
         return (data ?? []) as AllowedDepartment[];
       }
 
-      // Regular user: only departments via membership
+      // Regular user: departments via membership + filter active departments
       const { data, error } = await supabase
         .from("support_department_members")
         .select(`
@@ -53,19 +52,20 @@ export function useAllowedDepartments() {
         `)
         .eq("tenant_id", tid!)
         .eq("user_id", user!.id)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .eq("support_departments.is_active", true);
 
       if (error) throw error;
 
       const departments: AllowedDepartment[] = [];
       for (const row of data ?? []) {
         const dept = row.support_departments as unknown as AllowedDepartment;
-        if (dept && dept.is_active) {
+        if (dept) {
           departments.push(dept);
         }
       }
 
-      // Deduplicate by id
+      // Deduplicate
       const seen = new Set<string>();
       return departments.filter((d) => {
         if (seen.has(d.id)) return false;
