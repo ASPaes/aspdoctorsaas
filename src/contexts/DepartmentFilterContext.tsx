@@ -1,18 +1,19 @@
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from "react";
-import { useSupportDepartments, useDepartmentInstances, type SupportDepartment } from "@/components/whatsapp/hooks/useSupportDepartments";
+import { useAllowedDepartments, type AllowedDepartment } from "@/hooks/useAllowedDepartments";
+import { useDepartmentInstances } from "@/components/whatsapp/hooks/useSupportDepartments";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 
 const STORAGE_KEY = "whatsapp-selected-department";
 
 interface DepartmentFilterContextValue {
-  departments: SupportDepartment[];
+  departments: AllowedDepartment[];
   isLoading: boolean;
   selectedDepartmentId: string | null;
   setSelectedDepartmentId: (id: string | null) => void;
   /** instance_ids for the selected department. null = no filter (all). */
   filteredInstanceIds: string[] | null;
-  selectedDepartment: SupportDepartment | null;
+  selectedDepartment: AllowedDepartment | null;
   /** The department the current user belongs to (from funcionarios.department_id) */
   userDepartmentId: string | null;
   /** Whether the current user can see all departments */
@@ -43,7 +44,8 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
     } catch {}
   }, []);
 
-  const { data: departments = [], isLoading } = useSupportDepartments();
+  // useAllowedDepartments already returns role-filtered list
+  const { data: departments = [], isLoading } = useAllowedDepartments();
   const { data: userDepartmentId, isLoading: userDeptLoading } = useUserDepartment();
 
   const canSeeAllDepartments = !!isAdmin;
@@ -51,7 +53,6 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
   // Auto-select department on first load
   useEffect(() => {
     if (defaultApplied) return;
-    // Wait for both departments list and user department to load
     if (userDepartmentId === undefined && userDeptLoading) return;
     if (departments.length === 0 && isLoading) return;
 
@@ -68,23 +69,30 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
       if (userDepartmentId && departments.find((d) => d.id === userDepartmentId)) {
         setSelectedDepartmentIdRaw(userDepartmentId);
         try { localStorage.setItem(STORAGE_KEY, userDepartmentId); } catch {}
+      } else if (departments.length > 0) {
+        // Fallback: first allowed department
+        setSelectedDepartmentIdRaw(departments[0].id);
+        try { localStorage.setItem(STORAGE_KEY, departments[0].id); } catch {}
       }
     }
     setDefaultApplied(true);
   }, [userDepartmentId, userDeptLoading, departments, isLoading, defaultApplied, canSeeAllDepartments]);
 
-  // For non-admin: always force to their department (even if they somehow change it)
+  // For non-admin: always force to their allowed departments
   const effectiveSelectedId = useMemo(() => {
     if (canSeeAllDepartments) {
-      // Admin: validate stored selection
       if (!selectedDepartmentId) return null;
       if (departments.find((d) => d.id === selectedDepartmentId)) return selectedDepartmentId;
       return null;
     }
-    // Non-admin: always their department
+    // Non-admin: must be one of their allowed departments
+    if (selectedDepartmentId && departments.find((d) => d.id === selectedDepartmentId)) {
+      return selectedDepartmentId;
+    }
     if (userDepartmentId && departments.find((d) => d.id === userDepartmentId)) {
       return userDepartmentId;
     }
+    if (departments.length > 0) return departments[0].id;
     return null;
   }, [selectedDepartmentId, departments, canSeeAllDepartments, userDepartmentId]);
 
