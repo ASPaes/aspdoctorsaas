@@ -31,7 +31,6 @@ export const useWhatsAppSend = () => {
       // Generate a stable temp ID for this specific send
       const tempId = `temp-${Date.now()}-${++tempCounter}`;
 
-      await queryClient.cancelQueries({ queryKey: ['whatsapp', 'messages', newMessage.conversationId] });
       const previousMessages = queryClient.getQueryData<Message[]>(['whatsapp', 'messages', newMessage.conversationId]);
 
       // Generate a local preview URL for base64 media
