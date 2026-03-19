@@ -259,14 +259,50 @@ export default function SetoresTab() {
 
   const updateFuncDeptMutation = useMutation({
     mutationFn: async ({ funcId, deptId }: { funcId: number; deptId: string | null }) => {
+      if (!tid) throw new Error("Tenant não identificado");
+
+      // 1) Update funcionarios.department_id
       const { error } = await supabase
         .from("funcionarios")
         .update({ department_id: deptId })
         .eq("id", funcId);
       if (error) throw error;
+
+      // 2) Find user_id linked to this funcionario via profiles
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("funcionario_id", funcId)
+        .eq("tenant_id", tid)
+        .maybeSingle();
+
+      const userId = profileRow?.user_id;
+      if (!userId) return; // No linked profile, skip membership sync
+
+      // 3) Remove all existing memberships for this user in this tenant
+      await supabase
+        .from("support_department_members")
+        .delete()
+        .eq("user_id", userId)
+        .eq("tenant_id", tid);
+
+      // 4) Insert new membership if a department was selected
+      if (deptId) {
+        const { error: insertErr } = await supabase
+          .from("support_department_members")
+          .insert({
+            tenant_id: tid,
+            department_id: deptId,
+            user_id: userId,
+            is_active: true,
+          });
+        if (insertErr) throw insertErr;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["funcionarios_setores"] });
+      queryClient.invalidateQueries({ queryKey: ["support_department_members"] });
+      queryClient.invalidateQueries({ queryKey: ["user-department-membership"] });
       toast({ title: "Setor do funcionário atualizado" });
     },
     onError: (err: any) => {
