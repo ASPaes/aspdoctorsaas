@@ -3421,6 +3421,47 @@ export type Database = {
               tenant_id: string
             }[]
           }
+      get_my_access_context: {
+        Args: never
+        Returns: {
+          department_id: string
+          department_is_active: boolean
+          department_name: string
+          funcionario_email: string
+          funcionario_id: number
+          funcionario_nome: string
+          is_super_admin: boolean
+          role: string
+          tenant_id: string
+          user_id: string
+        }[]
+      }
+      get_tenant_access_users: {
+        Args: never
+        Returns: {
+          department_id: string
+          department_is_active: boolean
+          department_name: string
+          email: string
+          funcionario_ativo: boolean
+          funcionario_email: string
+          funcionario_id: number
+          funcionario_nome: string
+          is_super_admin: boolean
+          role: string
+          status: string
+          user_id: string
+        }[]
+      }
+      get_tenant_departments: {
+        Args: never
+        Returns: {
+          default_instance_id: string
+          id: string
+          is_active: boolean
+          name: string
+        }[]
+      }
       get_tenant_users_with_email: {
         Args: { p_tenant_id: string }
         Returns: {

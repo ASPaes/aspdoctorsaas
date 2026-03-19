@@ -16,17 +16,18 @@ export interface AllowedDepartment {
 
 /**
  * Returns the departments the current user is allowed to see:
- * - admin / super_admin: all active departments in the tenant
- * - regular user: only departments where they have a membership in support_department_members
+ * - admin / head / super_admin: all active departments in the tenant
+ * - regular user: only the single department from funcionarios.department_id
  */
 export function useAllowedDepartments() {
   const { user, profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const funcionarioId = profile?.funcionario_id;
 
   return useQuery<AllowedDepartment[]>({
-    queryKey: ["allowed_departments", tid, user?.id, isAdmin],
+    queryKey: ["allowed_departments", tid, user?.id, isAdmin, funcionarioId],
     enabled: !!user?.id && !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
@@ -41,37 +42,28 @@ export function useAllowedDepartments() {
         return (data ?? []) as AllowedDepartment[];
       }
 
-      // Regular user: departments via membership + filter active departments
-      const { data, error } = await supabase
-        .from("support_department_members")
-        .select(`
-          department_id,
-          support_departments!inner (
-            id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id
-          )
-        `)
+      // Regular user: get department from funcionarios.department_id
+      if (!funcionarioId) return [];
+
+      const { data: func } = await supabase
+        .from("funcionarios")
+        .select("department_id")
+        .eq("id", funcionarioId)
         .eq("tenant_id", tid!)
-        .eq("user_id", user!.id)
+        .maybeSingle();
+
+      const deptId = func?.department_id;
+      if (!deptId) return [];
+
+      const { data, error } = await supabase
+        .from("support_departments")
+        .select("id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id")
+        .eq("id", deptId)
         .eq("is_active", true)
-        .eq("support_departments.is_active", true);
+        .maybeSingle();
 
       if (error) throw error;
-
-      const departments: AllowedDepartment[] = [];
-      for (const row of data ?? []) {
-        const dept = row.support_departments as unknown as AllowedDepartment;
-        if (dept) {
-          departments.push(dept);
-        }
-      }
-
-      // Deduplicate
-      const seen = new Set<string>();
-      return departments.filter((d) => {
-        if (seen.has(d.id)) return false;
-        seen.add(d.id);
-        return true;
-      });
+      return data ? [data as AllowedDepartment] : [];
     },
   });
 }
