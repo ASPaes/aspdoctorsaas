@@ -190,6 +190,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation }
         <ChatMessages
           conversationId={conversation.id}
           unreadCount={conversation.unread_count ?? 0}
+          lastMessageAt={conversation.last_message_at ?? null}
           onReply={setReplyTo}
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}

@@ -14,6 +14,7 @@ import { ArrowRightLeft, ChevronDown } from "lucide-react";
 interface Props {
   conversationId: string;
   unreadCount?: number;
+  lastMessageAt?: string | null;
   onReply?: (msg: Message) => void;
   selectionMode?: boolean;
   selectedMessages?: Set<string>;
