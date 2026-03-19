@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +15,7 @@ import { ArrowRightLeft, ChevronDown } from "lucide-react";
 interface Props {
   conversationId: string;
   unreadCount?: number;
+  lastMessageAt?: string | null;
   onReply?: (msg: Message) => void;
   selectionMode?: boolean;
   selectedMessages?: Set<string>;
@@ -36,6 +38,7 @@ const NEAR_BOTTOM_THRESHOLD = 150;
 export function ChatMessages({
   conversationId,
   unreadCount = 0,
+  lastMessageAt = null,
   onReply,
   selectionMode,
   selectedMessages,
@@ -51,10 +54,12 @@ export function ChatMessages({
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useAppTimezone();
+  const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
   const prevConversationId = useRef(conversationId);
+  const lastRefetchedMessageAtRef = useRef<string | null>(null);
 
   // Smart scroll state
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -73,6 +78,24 @@ export function ChatMessages({
       pendingNewCountRef.current = 0;
     }
   }, []);
+
+  // Fallback driven by conversation updates that already refresh the sidebar
+  useEffect(() => {
+    if (!conversationId || !lastMessageAt) return;
+    if (lastRefetchedMessageAtRef.current === lastMessageAt) return;
+
+    const latestKnownTimestamp = messages[messages.length - 1]?.timestamp ?? null;
+    if (latestKnownTimestamp && new Date(lastMessageAt).getTime() <= new Date(latestKnownTimestamp).getTime()) {
+      lastRefetchedMessageAtRef.current = lastMessageAt;
+      return;
+    }
+
+    lastRefetchedMessageAtRef.current = lastMessageAt;
+    if (import.meta.env.DEV) {
+      console.log(`[realtime] fallback refetch conv=${conversationId} lastMessageAt=${lastMessageAt}`);
+    }
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
+  }, [conversationId, lastMessageAt, messages, queryClient]);
 
   // Listen for new messages from realtime
   useEffect(() => {
