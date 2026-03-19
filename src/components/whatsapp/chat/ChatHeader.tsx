@@ -35,7 +35,7 @@ interface Props {
   onDepartmentTransferred?: () => void;
 }
 
-export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation }: Props) {
+export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
