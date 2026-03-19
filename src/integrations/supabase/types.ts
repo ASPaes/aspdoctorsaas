@@ -685,6 +685,11 @@ export type Database = {
           support_ura_welcome_template: string
           tenant_id: string | null
           updated_at: string
+          ura_default_department_id: string | null
+          ura_enabled: boolean
+          ura_invalid_option_template: string
+          ura_timeout_minutes: number
+          ura_welcome_template: string
         }
         Insert: {
           chat_timezone?: string
@@ -711,6 +716,11 @@ export type Database = {
           support_ura_welcome_template?: string
           tenant_id?: string | null
           updated_at?: string
+          ura_default_department_id?: string | null
+          ura_enabled?: boolean
+          ura_invalid_option_template?: string
+          ura_timeout_minutes?: number
+          ura_welcome_template?: string
         }
         Update: {
           chat_timezone?: string
@@ -737,8 +747,21 @@ export type Database = {
           support_ura_welcome_template?: string
           tenant_id?: string | null
           updated_at?: string
+          ura_default_department_id?: string | null
+          ura_enabled?: boolean
+          ura_invalid_option_template?: string
+          ura_timeout_minutes?: number
+          ura_welcome_template?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "configuracoes_ura_default_department_id_fkey"
+            columns: ["ura_default_department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_assignments: {
         Row: {
@@ -1630,6 +1653,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           created_from: string | null
+          department_id: string | null
           first_response_at: string | null
           handle_seconds: number
           handoffs_count: number
@@ -1646,10 +1670,14 @@ export type Database = {
           status: string
           tenant_id: string
           updated_at: string
+          ura_asked_at: string | null
+          ura_completed_at: string | null
           ura_human_fallback: boolean
           ura_invalid_count: number
           ura_option_selected: number | null
+          ura_selected_option: number | null
           ura_sent_at: string | null
+          ura_state: string
           wait_seconds: number
         }
         Insert: {
@@ -1671,6 +1699,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           created_from?: string | null
+          department_id?: string | null
           first_response_at?: string | null
           handle_seconds?: number
           handoffs_count?: number
@@ -1687,10 +1716,14 @@ export type Database = {
           status?: string
           tenant_id: string
           updated_at?: string
+          ura_asked_at?: string | null
+          ura_completed_at?: string | null
           ura_human_fallback?: boolean
           ura_invalid_count?: number
           ura_option_selected?: number | null
+          ura_selected_option?: number | null
           ura_sent_at?: string | null
+          ura_state?: string
           wait_seconds?: number
         }
         Update: {
@@ -1712,6 +1745,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           created_from?: string | null
+          department_id?: string | null
           first_response_at?: string | null
           handle_seconds?: number
           handoffs_count?: number
@@ -1728,10 +1762,14 @@ export type Database = {
           status?: string
           tenant_id?: string
           updated_at?: string
+          ura_asked_at?: string | null
+          ura_completed_at?: string | null
           ura_human_fallback?: boolean
           ura_invalid_count?: number
           ura_option_selected?: number | null
+          ura_selected_option?: number | null
           ura_sent_at?: string | null
+          ura_state?: string
           wait_seconds?: number
         }
         Relationships: [
@@ -1782,6 +1820,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
             referencedColumns: ["id"]
           },
           {
@@ -2380,6 +2425,7 @@ export type Database = {
           category: string | null
           contact_id: string
           created_at: string
+          current_instance_id: string | null
           department_id: string | null
           id: string
           instance_id: string | null
@@ -2400,6 +2446,7 @@ export type Database = {
           category?: string | null
           contact_id: string
           created_at?: string
+          current_instance_id?: string | null
           department_id?: string | null
           id?: string
           instance_id?: string | null
@@ -2420,6 +2467,7 @@ export type Database = {
           category?: string | null
           contact_id?: string
           created_at?: string
+          current_instance_id?: string | null
           department_id?: string | null
           id?: string
           instance_id?: string | null
@@ -2441,6 +2489,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_current_instance_id_fkey"
+            columns: ["current_instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
           {
@@ -3362,6 +3417,14 @@ export type Database = {
           role: string
           status: string
           user_id: string
+        }[]
+      }
+      get_ura_departments: {
+        Args: never
+        Returns: {
+          default_instance_id: string
+          id: string
+          name: string
         }[]
       }
       is_admin_or_head: { Args: never; Returns: boolean }
