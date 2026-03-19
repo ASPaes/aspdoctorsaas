@@ -138,6 +138,15 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     for (const conv of conversations) {
       const att = attendanceMap.get(conv.id);
       if (!att) continue;
+
+      // Filter by department when a department is selected
+      if (selectedDepartmentId) {
+        const attDeptMatch = att.department_id === selectedDepartmentId;
+        const convDeptMatch = (conv as any).department_id === selectedDepartmentId;
+        const instanceMatch = filteredInstanceIds && filteredInstanceIds.includes(conv.instance_id || '');
+        if (!attDeptMatch && !convDeptMatch && !(instanceMatch && !att.department_id)) continue;
+      }
+
       // For non-admin, skip conversations not assigned to them (except waiting/unassigned)
       if (!isAdmin && user?.id) {
         if (att.status === "in_progress" && att.assigned_to !== user.id) continue;
@@ -149,7 +158,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     }
 
     return { inProgress, waiting, closed };
-  }, [conversations, attendanceMap, isAdmin, user?.id]);
+  }, [conversations, attendanceMap, isAdmin, user?.id, selectedDepartmentId, filteredInstanceIds]);
 
   const filtered = useMemo(() => {
     let result = [...conversations];
