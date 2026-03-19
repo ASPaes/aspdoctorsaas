@@ -150,7 +150,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const [confirmReject, setConfirmReject] = useState<{ userId: string; email: string } | null>(null);
 
   // Fetch users via RPC
-  const { data: users = [], isLoading: usersLoading } = useQuery<AccessUser[]>({
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<AccessUser[]>({
     queryKey: ["tenant-access-users", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
@@ -158,11 +158,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       if (error) throw error;
       return (data ?? []) as AccessUser[];
     },
-    meta: {
-      onError: (err: any) => {
-        toast({ title: "Erro ao carregar usuários", description: err?.message ?? "Erro desconhecido", variant: "destructive" });
-      },
-    },
+    retry: 1,
   });
 
   // Fetch departments for dropdown
