@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,13 @@ import { Separator } from "@/components/ui/separator";
 import { Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NumericInput } from "@/components/ui/numeric-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const schema = z.object({
   // Atendimento
@@ -39,6 +45,8 @@ const schema = z.object({
   support_ura_enabled: z.boolean(),
   support_ura_welcome_template: z.string().min(1, "Obrigatório"),
   support_ura_invalid_option_template: z.string().min(1, "Obrigatório"),
+  support_ura_timeout_minutes: z.number().min(1).max(60),
+  support_ura_default_department_id: z.string().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -67,19 +75,38 @@ export default function AtendimentoCsatTab() {
       support_ura_enabled: false,
       support_ura_welcome_template: "",
       support_ura_invalid_option_template: "",
+      support_ura_timeout_minutes: 2,
+      support_ura_default_department_id: null,
     },
+  });
+
+  // Fetch active departments for the default department selector
+  const { data: departments = [] } = useQuery({
+    queryKey: ["support_departments_active", tid],
+    queryFn: async () => {
+      let q = supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!tid,
   });
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["configuracoes-atendimento", tid],
     queryFn: async () => {
       let q = supabase.from("configuracoes").select(
-        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template"
+        "id, support_reopen_window_minutes, support_auto_close_inactivity_minutes, support_send_inactivity_warning, support_inactivity_warning_before_minutes, support_inactivity_warning_template, support_csat_enabled, support_csat_prompt_template, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template, support_ura_enabled, support_ura_welcome_template, support_ura_invalid_option_template, support_ura_timeout_minutes, support_ura_default_department_id"
       );
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q.limit(1).maybeSingle();
       if (error) throw error;
-      return data;
+      return data as any;
     },
   });
 
@@ -102,6 +129,8 @@ export default function AtendimentoCsatTab() {
         support_ura_enabled: config.support_ura_enabled,
         support_ura_welcome_template: config.support_ura_welcome_template,
         support_ura_invalid_option_template: config.support_ura_invalid_option_template,
+        support_ura_timeout_minutes: config.support_ura_timeout_minutes ?? 2,
+        support_ura_default_department_id: config.support_ura_default_department_id ?? null,
       });
     }
   }, [config]);
@@ -111,7 +140,7 @@ export default function AtendimentoCsatTab() {
       if (!config?.id) throw new Error("Configuração não encontrada");
       const { error } = await supabase
         .from("configuracoes")
-        .update(values)
+        .update(values as any)
         .eq("id", config.id);
       if (error) throw error;
     },
@@ -324,7 +353,7 @@ export default function AtendimentoCsatTab() {
           <CardHeader>
             <CardTitle>URA (Menu Inicial)</CardTitle>
             <CardDescription>
-              Menu de opções enviado automaticamente na primeira mensagem do cliente.
+              Menu de opções enviado automaticamente na primeira mensagem do cliente para roteamento por setor.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -332,7 +361,7 @@ export default function AtendimentoCsatTab() {
               <FormItem className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
                   <FormLabel>URA ativa</FormLabel>
-                  <FormDescription>Enviar menu de opções automaticamente.</FormDescription>
+                  <FormDescription>Enviar menu de opções automaticamente ao cliente na primeira mensagem.</FormDescription>
                 </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -342,13 +371,56 @@ export default function AtendimentoCsatTab() {
 
             {uraEnabled && (
               <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="support_ura_timeout_minutes" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Timeout da URA (min)</FormLabel>
+                      <FormControl>
+                        <NumericInput value={field.value} onChange={field.onChange} placeholder="2" suffix="min" />
+                      </FormControl>
+                      <FormDescription>Tempo máximo para o cliente responder. Após expirar, encaminha para o setor padrão.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="support_ura_default_department_id" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Setor Padrão (fallback)</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value ?? "none"}
+                          onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o setor padrão" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Nenhum (usar fallback geral)</SelectItem>
+                            {departments.map((d) => (
+                              <SelectItem key={d.id} value={d.id}>
+                                {d.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormDescription>Setor para onde encaminhar se o cliente não responder ou a URA expirar.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                <Separator />
+
                 <FormField control={form.control} name="support_ura_welcome_template" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Mensagem de boas-vindas</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={4} placeholder="Mensagem com as opções do menu" />
                     </FormControl>
-                    <FormDescription>Variáveis: {"{{customer_name}}"}</FormDescription>
+                    <FormDescription>
+                      Variáveis: {"{{customer_name}}"}, {"{{options}}"} (lista automática de setores numerados)
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -359,6 +431,9 @@ export default function AtendimentoCsatTab() {
                     <FormControl>
                       <Textarea {...field} rows={2} placeholder="Mensagem quando o cliente envia opção inválida" />
                     </FormControl>
+                    <FormDescription>
+                      Variáveis: {"{{options}}"} (reenvia a lista de opções)
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
