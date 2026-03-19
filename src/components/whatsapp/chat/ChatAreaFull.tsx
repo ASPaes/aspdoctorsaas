@@ -218,6 +218,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           showDetails={showDetails}
           onClose={onClose}
           onNavigateToConversation={onNavigateToConversation}
+          onDepartmentTransferred={onDepartmentTransferred}
         />
         <ChatMessages
           conversationId={conversation.id}
