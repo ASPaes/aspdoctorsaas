@@ -98,12 +98,21 @@ export const useWhatsAppSend = () => {
         queryClient.setQueryData(['whatsapp', 'messages', newMessage.conversationId], context.previousMessages);
       }
     },
-    onSettled: (_data, _error, variables) => {
-      // Delayed invalidation to reconcile temp message with real DB row.
-      // Gives realtime INSERT a chance to arrive first; acts as fallback.
+    onSettled: (data, _error, variables) => {
+      // Se a Edge Function retornou a mensagem salva, reconcilia direto no cache
+      // sem invalidar (evita sobrescrever mensagens que chegaram via Realtime)
+      if (data?.message) {
+        const realMessage = normalizeMessage(data.message);
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', variables.conversationId],
+          (old: Message[] | undefined) => mergeMessage(old ?? [], realMessage)
+        );
+        return;
+      }
+      // Fallback: se não veio dado real, invalida após delay para garantir consistência
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
-      }, 2000);
+      }, 3000);
     },
   });
 
