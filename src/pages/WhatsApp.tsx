@@ -33,13 +33,17 @@ function WhatsAppContent() {
         filter: `id=eq.${selected.id}`,
       }, async () => {
         // Re-fetch the full conversation with contact join
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("whatsapp_conversations")
           .select("*, contact:whatsapp_contacts(*)")
           .eq("id", selected.id)
           .single();
         if (data) {
           setSelected(data as unknown as ConversationWithContact);
+        } else if (error) {
+          // RLS blocked — user lost access (e.g. department transfer)
+          setSelected(null);
+          toast.info("Conversa transferida para outro setor.");
         }
       })
       .subscribe();
