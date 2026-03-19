@@ -54,6 +54,7 @@ export function ChatMessages({
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useAppTimezone();
+  const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
@@ -93,8 +94,8 @@ export function ChatMessages({
     if (import.meta.env.DEV) {
       console.log(`[realtime] fallback refetch conv=${conversationId} lastMessageAt=${lastMessageAt}`);
     }
-    void onNewMessage;
-  }, [conversationId, lastMessageAt, messages, onNewMessage]);
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
+  }, [conversationId, lastMessageAt, messages, queryClient]);
 
   // Listen for new messages from realtime
   useEffect(() => {
