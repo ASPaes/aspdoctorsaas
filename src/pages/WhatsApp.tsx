@@ -21,9 +21,24 @@ function WhatsAppContent() {
   const { instances } = useWhatsAppInstances();
   const queryClient = useQueryClient();
 
-  // Keep selected conversation in sync with latest data from query cache
+  // Keep selected conversation in sync; detect RLS loss (department transfer)
   useEffect(() => {
     if (!selected) return;
+
+    const recheckAccess = async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_conversations")
+        .select("*, contact:whatsapp_contacts(*)")
+        .eq("id", selected.id)
+        .single();
+      if (data) {
+        setSelected(data as unknown as ConversationWithContact);
+      } else if (error) {
+        setSelected(null);
+        toast.info("Conversa transferida para outro setor.");
+      }
+    };
+
     const channel = supabase
       .channel(`selected-conv-sync-${selected.id}`)
       .on("postgres_changes", {
@@ -31,20 +46,14 @@ function WhatsAppContent() {
         schema: "public",
         table: "whatsapp_conversations",
         filter: `id=eq.${selected.id}`,
-      }, async () => {
-        // Re-fetch the full conversation with contact join
-        const { data, error } = await supabase
-          .from("whatsapp_conversations")
-          .select("*, contact:whatsapp_contacts(*)")
-          .eq("id", selected.id)
-          .single();
-        if (data) {
-          setSelected(data as unknown as ConversationWithContact);
-        } else if (error) {
-          // RLS blocked — user lost access (e.g. department transfer)
-          setSelected(null);
-          toast.info("Conversa transferida para outro setor.");
-        }
+      }, recheckAccess)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "support_attendances",
+      }, (payload) => {
+        const row = (payload.new || payload.old) as any;
+        if (row?.conversation_id === selected.id) recheckAccess();
       })
       .subscribe();
 
