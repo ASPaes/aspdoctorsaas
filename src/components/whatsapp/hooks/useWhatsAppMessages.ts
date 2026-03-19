@@ -297,38 +297,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     };
   }, [conversationId, queryClient]);
 
-  // ── Independent fallback: separate channel on whatsapp_conversations ──
-  // If the messages channel fails (CHANNEL_ERROR), this still works because
-  // the sidebar's conversation updates use a simpler subscription that succeeds.
-  const fallbackUidRef = useRef(Math.random().toString(36).slice(2, 10));
-  const lastFallbackRef = useRef(0);
-
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const fbChannel = supabase
-      .channel(`msgs-fb-${conversationId.slice(0, 8)}-${fallbackUidRef.current}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'whatsapp_conversations',
-        filter: `id=eq.${conversationId}`,
-      }, () => {
-        const now = Date.now();
-        if (now - lastFallbackRef.current > 3000) {
-          lastFallbackRef.current = now;
-          if (import.meta.env.DEV) {
-            console.log(`[realtime] independent fallback refetch conv=${conversationId}`);
-          }
-          queryClient.invalidateQueries({
-            queryKey: ['whatsapp', 'messages', conversationId],
-          });
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(fbChannel); };
-  }, [conversationId, queryClient]);
 
   return { messages, isLoading, error, onNewMessage };
 };
