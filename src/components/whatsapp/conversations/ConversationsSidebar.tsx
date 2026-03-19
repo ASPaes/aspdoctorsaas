@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -259,11 +260,24 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     return result;
   }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, selectedDepartmentId, filteredInstanceIds]);
 
-  const handleCreated = (convId: string) => {
+  const handleCreated = useCallback(async (convId: string) => {
     setForcedConvId(convId);
+    // Try from cache first
     const conv = conversations.find(c => c.id === convId);
-    if (conv) onSelect(conv);
-  };
+    if (conv) {
+      onSelect(conv);
+      return;
+    }
+    // Fetch directly — the query cache may not have it yet
+    const { data } = await supabase
+      .from("whatsapp_conversations")
+      .select("*, contact:whatsapp_contacts(*)")
+      .eq("id", convId)
+      .single();
+    if (data) {
+      onSelect(data as unknown as ConversationWithContact);
+    }
+  }, [conversations, onSelect]);
 
   const handleSelect = (conv: ConversationWithContact) => {
     onSelect(conv);
