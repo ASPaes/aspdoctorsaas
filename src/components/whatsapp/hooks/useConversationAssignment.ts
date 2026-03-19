@@ -142,22 +142,11 @@ export const useConversationAssignment = () => {
       if (!user) throw new Error('Usuário não autenticado');
 
       // Get the department's default_instance_id
-      const { data: dept } = await supabase
-        .from('support_departments')
-        .select('id, default_instance_id')
-        .eq('id', departmentId)
-        .single();
-
-      if (!dept) throw new Error('Setor não encontrado');
-
-      // Update conversation: department + instance + unassign
+      // Update conversation: department only (NEVER change instance — sticky)
       const convUpdate: Record<string, any> = {
         department_id: departmentId,
         assigned_to: null,
       };
-      if (dept.default_instance_id) {
-        convUpdate.current_instance_id = dept.default_instance_id;
-      }
       const { error: convErr } = await supabase
         .from('whatsapp_conversations')
         .update(convUpdate)

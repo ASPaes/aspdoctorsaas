@@ -415,19 +415,6 @@ async function findOrCreateConversation(
 
     if (existingConversation) {
       console.log('[evolution-webhook] Conversation found (instance-scoped):', existingConversation.id);
-      // STICKY: ensure current_instance_id is set (only once, never overwritten)
-      const { data: convData } = await supabase
-        .from('whatsapp_conversations')
-        .select('current_instance_id')
-        .eq('id', existingConversation.id)
-        .single();
-      if (convData && !convData.current_instance_id) {
-        await supabase
-          .from('whatsapp_conversations')
-          .update({ current_instance_id: instanceId })
-          .eq('id', existingConversation.id);
-        console.log(`[evolution-webhook] STICKY: set current_instance_id=${instanceId} for conv=${existingConversation.id}`);
-      }
       return existingConversation.id;
     }
 
@@ -438,7 +425,6 @@ async function findOrCreateConversation(
         contact_id: contactId,
         status: 'active',
         tenant_id: tenantId,
-        current_instance_id: instanceId, // STICKY: set on creation
       })
       .select('id')
       .single();

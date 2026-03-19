@@ -63,13 +63,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     },
   });
 
-  // Resolve current instance name
-  const currentInstanceId = (conversation as any).current_instance_id;
-  const currentInstance = useMemo(
-    () => instances.find((i) => i.id === currentInstanceId),
-    [instances, currentInstanceId]
-  );
-
   // Department context
   const { selectedDepartment } = useDepartmentFilter();
   const conversationInstance = useMemo(
@@ -236,23 +229,18 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           {convDepartment && (
             <Badge variant="outline" className="text-[10px] h-4 gap-1 border-primary/30 text-primary">
               <Building2 className="h-2.5 w-2.5" />
-              {convDepartment.name}
+              Setor: {convDepartment.name}
             </Badge>
-          )}
-          {currentInstance && (
-            <span className="text-[10px] text-muted-foreground">
-              via {currentInstance.display_name || currentInstance.instance_name}
-            </span>
           )}
           {!convDepartment && selectedDepartment && (
             <Badge variant="outline" className="text-[10px] h-4 gap-1">
               <Building2 className="h-2.5 w-2.5" />
-              {selectedDepartment.name}
+              Setor: {selectedDepartment.name}
             </Badge>
           )}
-          {conversationInstance && hasMultipleInstances && !currentInstance && (
+          {conversationInstance && hasMultipleInstances && (
             <Badge variant="secondary" className="text-[10px] h-4">
-              {conversationInstance.display_name || conversationInstance.instance_name}
+              Canal: {conversationInstance.display_name || conversationInstance.instance_name}
             </Badge>
           )}
           <SentimentChip sentiment={sentimentData} />
