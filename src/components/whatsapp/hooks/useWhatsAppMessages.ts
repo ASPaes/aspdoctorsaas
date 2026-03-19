@@ -194,6 +194,8 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 
   // ── Realtime: single channel with filtered subscription ──
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+  const retryCountRef = useRef(0);
+  const mountedRef = useRef(true);
 
   // Notify callback for new messages (used by ChatMessages for smart scroll)
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
