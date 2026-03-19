@@ -150,7 +150,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const [confirmReject, setConfirmReject] = useState<{ userId: string; email: string } | null>(null);
 
   // Fetch users via RPC
-  const { data: users = [], isLoading: usersLoading } = useQuery<AccessUser[]>({
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<AccessUser[]>({
     queryKey: ["tenant-access-users", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
@@ -158,6 +158,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       if (error) throw error;
       return (data ?? []) as AccessUser[];
     },
+    retry: 1,
   });
 
   // Fetch departments for dropdown
@@ -313,6 +314,18 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full" />
       </div>
+    );
+  }
+
+  if (usersError) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="py-6">
+          <p className="text-destructive text-sm">
+            Erro ao carregar usuários: {(usersError as any)?.message ?? "Erro desconhecido"}
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
