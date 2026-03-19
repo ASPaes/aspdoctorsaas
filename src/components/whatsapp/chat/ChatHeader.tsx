@@ -46,6 +46,30 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
 
+  // Fetch department name from conversation.department_id
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const convDeptId = (conversation as any).department_id;
+  const { data: convDepartment } = useQuery({
+    queryKey: ["conv-department", convDeptId],
+    enabled: !!convDeptId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("id", convDeptId)
+        .single();
+      return data;
+    },
+  });
+
+  // Resolve current instance name
+  const currentInstanceId = (conversation as any).current_instance_id;
+  const currentInstance = useMemo(
+    () => instances.find((i) => i.id === currentInstanceId),
+    [instances, currentInstanceId]
+  );
+
   // Department context
   const { selectedDepartment } = useDepartmentFilter();
   const conversationInstance = useMemo(
