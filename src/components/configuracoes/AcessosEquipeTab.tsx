@@ -317,6 +317,18 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     );
   }
 
+  if (usersError) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="py-6">
+          <p className="text-destructive text-sm">
+            Erro ao carregar usuários: {(usersError as any)?.message ?? "Erro desconhecido"}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
