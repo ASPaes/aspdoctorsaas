@@ -92,7 +92,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   };
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
   const { instances } = useWhatsAppInstances();
   const { filteredInstanceIds, selectedDepartmentId } = useDepartmentFilter();
   const instanceMap = useMemo(() => {

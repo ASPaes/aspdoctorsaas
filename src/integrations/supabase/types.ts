@@ -3375,6 +3375,7 @@ export type Database = {
           }
       current_department_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
+      current_user_department_id: { Args: never; Returns: string }
       decrypt_api_key: {
         Args: { p_encrypted: string; p_encryption_key: string }
         Returns: string
