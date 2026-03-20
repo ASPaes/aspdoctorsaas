@@ -20,6 +20,7 @@ function WhatsAppContent() {
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
   const queryClient = useQueryClient();
+  const { selectedDepartment } = useDepartmentFilter();
 
   // Keep selected conversation in sync; detect RLS loss (department transfer)
   useEffect(() => {
