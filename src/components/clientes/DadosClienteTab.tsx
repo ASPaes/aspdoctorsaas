@@ -235,12 +235,22 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const whatsappDigits = (whatsappValue ?? "").replace(/\D/g, "");
   const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
 
+  const whatsappContatoDigits = (whatsappContatoValue ?? "").replace(/\D/g, "");
+  const canOpenWhatsAppContato = !!whatsappContatoDigits && !!clienteId;
+
   const handleOpenWhatsApp = useCallback(() => {
     if (!whatsappDigits || !clienteId || !onNavigate) return;
     const normalizedPhone = normalizeBRPhone(whatsappValue ?? "");
     const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
     onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
   }, [whatsappValue, whatsappDigits, clienteId, form, onNavigate]);
+
+  const handleOpenWhatsAppContato = useCallback(() => {
+    if (!whatsappContatoDigits || !clienteId || !onNavigate) return;
+    const normalizedPhone = normalizeBRPhone(whatsappContatoValue ?? "");
+    const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
+    onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
+  }, [whatsappContatoValue, whatsappContatoDigits, clienteId, form, onNavigate]);
 
   return (
     <div className="space-y-6">
