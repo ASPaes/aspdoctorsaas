@@ -99,7 +99,7 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   const fieldLabels: Record<string, string> = {
     cnpj: "CNPJ",
     email: "E-mail",
-    telefone_whatsapp: "WhatsApp",
+    telefone_whatsapp: "WhatsApp Financeiro",
     data_venda: "Data Venda",
     funcionario_id: "Funcionário",
     origem_venda_id: "Origem",
