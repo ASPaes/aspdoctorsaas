@@ -12,6 +12,7 @@ import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { DepartmentFilterProvider, useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
@@ -20,7 +21,8 @@ function WhatsAppContent() {
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
   const queryClient = useQueryClient();
-  const { selectedDepartment, userDepartmentId, departments } = useDepartmentFilter();
+  const { selectedDepartment, departments, isLoading: departmentsLoading } = useDepartmentFilter();
+  const { data: userDepartmentId, isLoading: userDepartmentLoading } = useUserDepartment();
 
   // Keep selected conversation in sync; detect RLS loss (department transfer)
   useEffect(() => {
@@ -87,11 +89,12 @@ function WhatsAppContent() {
     didCaptureRef.current = true;
   }
 
-  // Process captured params once instances are available
+  // Process captured params once instances and department context are available
   useEffect(() => {
     const params = pendingParamsRef.current;
     if (!params) return;
     if (!instances || instances.length === 0) return;
+    if (departmentsLoading || userDepartmentLoading) return;
 
     // Consume — only run once
     pendingParamsRef.current = null;
@@ -100,9 +103,9 @@ function WhatsAppContent() {
     setSearchParams({}, { replace: true });
 
     // Priority: selected department > user's own department > first instance
-    const userDept = userDepartmentId ? departments.find(d => d.id === userDepartmentId) : null;
+    const userDept = userDepartmentId ? departments.find((d) => d.id === userDepartmentId) : null;
     const deptDefaultId = selectedDepartment?.default_instance_id ?? userDept?.default_instance_id;
-    const instanceId = (deptDefaultId && instances.find(i => i.id === deptDefaultId))
+    const instanceId = (deptDefaultId && instances.find((i) => i.id === deptDefaultId))
       ? deptDefaultId
       : instances[0].id;
 
@@ -141,7 +144,16 @@ function WhatsAppContent() {
     }).catch(() => {
       toast.error("Erro ao criar conversa");
     });
-  }, [instances]);
+  }, [
+    instances,
+    departments,
+    departmentsLoading,
+    userDepartmentId,
+    userDepartmentLoading,
+    selectedDepartment?.default_instance_id,
+    setSearchParams,
+    createConversation,
+  ]);
 
   // Navigate to a conversation by ID (fetch full record with contact join)
   const handleNavigateToConversation = useCallback(async (conversationId: string) => {
