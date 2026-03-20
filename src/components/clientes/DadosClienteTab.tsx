@@ -398,7 +398,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         {/* Linha 4: Telefone WhatsApp [+btn] | Área Atuação | Segmento */}
         <FormField control={form.control} name="telefone_whatsapp" render={({ field }) => (
           <FormItem>
-            <FormLabel>Telefone WhatsApp *</FormLabel>
+            <FormLabel>WhatsApp Financeiro *</FormLabel>
             <div className="flex gap-2">
               <FormControl>
                 <PhoneInputBR
@@ -417,6 +417,40 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
                         size="icon"
                         className="shrink-0"
                         onClick={handleOpenWhatsApp}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Abrir conversa no chat</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="telefone_whatsapp_contato" render={({ field }) => (
+          <FormItem>
+            <FormLabel>WhatsApp de Contato</FormLabel>
+            <div className="flex gap-2">
+              <FormControl>
+                <PhoneInputBR
+                  value={field.value}
+                  onChange={field.onChange}
+                  showError
+                />
+              </FormControl>
+              {canOpenWhatsAppContato && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={handleOpenWhatsAppContato}
                       >
                         <MessageCircle className="h-4 w-4" />
                       </Button>
