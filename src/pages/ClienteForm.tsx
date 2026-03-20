@@ -43,6 +43,11 @@ const clienteSchema = z.object({
     const normalized = normalizeBRPhone(v);
     return isValidBRPhone(normalized);
   }, { message: "WhatsApp inválido. Use formato: (DD) NNNNN-NNNN" }),
+  telefone_whatsapp_contato: z.string().nullable().refine(v => {
+    if (!v) return true; // not required
+    const normalized = normalizeBRPhone(v);
+    return isValidBRPhone(normalized);
+  }, { message: "WhatsApp inválido. Use formato: (DD) NNNNN-NNNN" }),
   estado_id: z.number().nullable(),
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
@@ -94,7 +99,7 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   const fieldLabels: Record<string, string> = {
     cnpj: "CNPJ",
     email: "E-mail",
-    telefone_whatsapp: "WhatsApp",
+    telefone_whatsapp: "WhatsApp Financeiro",
     data_venda: "Data Venda",
     funcionario_id: "Funcionário",
     origem_venda_id: "Origem",
@@ -166,7 +171,7 @@ export default function ClienteForm() {
     defaultValues: {
       data_cadastro: new Date().toISOString().split("T")[0],
       razao_social: null, nome_fantasia: null, cnpj: null, email: "",
-      telefone_contato: null, telefone_whatsapp: null, estado_id: null, cidade_id: null,
+      telefone_contato: null, telefone_whatsapp: null, telefone_whatsapp_contato: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
       data_venda: null, funcionario_id: null, origem_venda_id: null, recorrencia: undefined as any,
       produto_id: null, observacao_negociacao: null,
@@ -275,6 +280,7 @@ export default function ClienteForm() {
       cnpj: c.cnpj, email: c.email ?? "",
       telefone_contato: c.telefone_contato ? formatBRPhone(normalizeBRPhone(c.telefone_contato)) : null,
       telefone_whatsapp: c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null,
+      telefone_whatsapp_contato: (c as any).telefone_whatsapp_contato ? formatBRPhone(normalizeBRPhone((c as any).telefone_whatsapp_contato)) : (c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null),
       estado_id: c.estado_id, cidade_id: c.cidade_id,
       area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
       observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
@@ -319,6 +325,7 @@ export default function ClienteForm() {
         ...values,
         email: values.email?.trim().toLowerCase() || null,
         telefone_whatsapp: values.telefone_whatsapp ? normalizeBRPhone(values.telefone_whatsapp) : null,
+        telefone_whatsapp_contato: values.telefone_whatsapp_contato ? normalizeBRPhone(values.telefone_whatsapp_contato) : null,
         telefone_contato: values.telefone_contato ? normalizeBRPhone(values.telefone_contato) : null,
         contato_fone: values.contato_fone ? normalizeBRPhone(values.contato_fone) : null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,

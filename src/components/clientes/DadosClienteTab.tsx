@@ -35,6 +35,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const { toast } = useToast();
   const whatsappValue = form.watch("telefone_whatsapp");
+  const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
@@ -234,12 +235,22 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const whatsappDigits = (whatsappValue ?? "").replace(/\D/g, "");
   const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
 
+  const whatsappContatoDigits = (whatsappContatoValue ?? "").replace(/\D/g, "");
+  const canOpenWhatsAppContato = !!whatsappContatoDigits && !!clienteId;
+
   const handleOpenWhatsApp = useCallback(() => {
     if (!whatsappDigits || !clienteId || !onNavigate) return;
     const normalizedPhone = normalizeBRPhone(whatsappValue ?? "");
     const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
     onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
   }, [whatsappValue, whatsappDigits, clienteId, form, onNavigate]);
+
+  const handleOpenWhatsAppContato = useCallback(() => {
+    if (!whatsappContatoDigits || !clienteId || !onNavigate) return;
+    const normalizedPhone = normalizeBRPhone(whatsappContatoValue ?? "");
+    const clienteName = form.getValues("nome_fantasia") || form.getValues("razao_social") || "";
+    onNavigate(`/whatsapp?phone=${normalizedPhone}&clienteId=${clienteId}&clienteName=${encodeURIComponent(clienteName)}`);
+  }, [whatsappContatoValue, whatsappContatoDigits, clienteId, form, onNavigate]);
 
   return (
     <div className="space-y-6">
@@ -351,7 +362,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       </div>
 
       {/* Restante dos campos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
 
         {/* Linha 3: Email (col-span-2) | Telefone Contato */}
         <div className="sm:col-span-2">
@@ -387,7 +398,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         {/* Linha 4: Telefone WhatsApp [+btn] | Área Atuação | Segmento */}
         <FormField control={form.control} name="telefone_whatsapp" render={({ field }) => (
           <FormItem>
-            <FormLabel>Telefone WhatsApp *</FormLabel>
+            <FormLabel>WhatsApp Financeiro *</FormLabel>
             <div className="flex gap-2">
               <FormControl>
                 <PhoneInputBR
@@ -406,6 +417,40 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
                         size="icon"
                         className="shrink-0"
                         onClick={handleOpenWhatsApp}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Abrir conversa no chat</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="telefone_whatsapp_contato" render={({ field }) => (
+          <FormItem>
+            <FormLabel>WhatsApp de Contato</FormLabel>
+            <div className="flex gap-2">
+              <FormControl>
+                <PhoneInputBR
+                  value={field.value}
+                  onChange={field.onChange}
+                  showError
+                />
+              </FormControl>
+              {canOpenWhatsAppContato && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={handleOpenWhatsAppContato}
                       >
                         <MessageCircle className="h-4 w-4" />
                       </Button>
@@ -450,7 +495,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
 
         {/* Linha 5: Observação (full width) */}
-        <div className="sm:col-span-2 md:col-span-3">
+        <div className="sm:col-span-2 md:col-span-4">
           <FormField control={form.control} name="observacao_cliente" render={({ field }) => (
             <FormItem>
               <FormLabel>Observação do Cliente</FormLabel>

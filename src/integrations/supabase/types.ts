@@ -431,6 +431,7 @@ export type Database = {
           segmento_id: number | null
           telefone_contato: string | null
           telefone_whatsapp: string | null
+          telefone_whatsapp_contato: string | null
           tenant_id: string | null
           unidade_base_id: number | null
           updated_at: string
@@ -485,6 +486,7 @@ export type Database = {
           segmento_id?: number | null
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
+          telefone_whatsapp_contato?: string | null
           tenant_id?: string | null
           unidade_base_id?: number | null
           updated_at?: string
@@ -539,6 +541,7 @@ export type Database = {
           segmento_id?: number | null
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
+          telefone_whatsapp_contato?: string | null
           tenant_id?: string | null
           unidade_base_id?: number | null
           updated_at?: string
