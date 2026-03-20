@@ -99,7 +99,10 @@ function WhatsAppContent() {
     // Clear URL params
     setSearchParams({}, { replace: true });
 
-    const instanceId = instances[0].id;
+    const deptDefaultId = selectedDepartment?.default_instance_id;
+    const instanceId = (deptDefaultId && instances.find(i => i.id === deptDefaultId))
+      ? deptDefaultId
+      : instances[0].id;
 
     createConversation.mutateAsync({
       instanceId,
