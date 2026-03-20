@@ -362,7 +362,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       </div>
 
       {/* Restante dos campos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
 
         {/* Linha 3: Email (col-span-2) | Telefone Contato */}
         <div className="sm:col-span-2">
