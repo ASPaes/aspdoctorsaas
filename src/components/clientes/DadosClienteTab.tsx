@@ -495,7 +495,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
 
         {/* Linha 5: Observação (full width) */}
-        <div className="sm:col-span-2 md:col-span-3">
+        <div className="sm:col-span-2 md:col-span-4">
           <FormField control={form.control} name="observacao_cliente" render={({ field }) => (
             <FormItem>
               <FormLabel>Observação do Cliente</FormLabel>
