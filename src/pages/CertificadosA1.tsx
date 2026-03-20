@@ -7,7 +7,7 @@ import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
-import { maskPhone } from "@/lib/masks";
+import { formatBRPhone } from "@/lib/phoneBR";
 import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -388,7 +388,7 @@ export default function CertificadosA1() {
                       <div>{c.razao_social || "—"}</div>
                       {c.nome_fantasia && <div className="text-muted-foreground">{c.nome_fantasia}</div>}
                     </TableCell>
-                    <TableCell className="text-xs">{c.telefone_contato ? maskPhone(c.telefone_contato) : "—"}</TableCell>
+                    <TableCell className="text-xs">{c.telefone_contato ? formatBRPhone(c.telefone_contato) : "—"}</TableCell>
                     <TableCell className="text-xs">
                       {c.cert_a1_vencimento ? format(parseISO(c.cert_a1_vencimento), "dd/MM/yyyy") : "—"}
                     </TableCell>
