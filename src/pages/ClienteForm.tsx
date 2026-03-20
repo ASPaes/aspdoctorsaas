@@ -171,7 +171,7 @@ export default function ClienteForm() {
     defaultValues: {
       data_cadastro: new Date().toISOString().split("T")[0],
       razao_social: null, nome_fantasia: null, cnpj: null, email: "",
-      telefone_contato: null, telefone_whatsapp: null, estado_id: null, cidade_id: null,
+      telefone_contato: null, telefone_whatsapp: null, telefone_whatsapp_contato: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
       data_venda: null, funcionario_id: null, origem_venda_id: null, recorrencia: undefined as any,
       produto_id: null, observacao_negociacao: null,
