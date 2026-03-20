@@ -280,6 +280,7 @@ export default function ClienteForm() {
       cnpj: c.cnpj, email: c.email ?? "",
       telefone_contato: c.telefone_contato ? formatBRPhone(normalizeBRPhone(c.telefone_contato)) : null,
       telefone_whatsapp: c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null,
+      telefone_whatsapp_contato: (c as any).telefone_whatsapp_contato ? formatBRPhone(normalizeBRPhone((c as any).telefone_whatsapp_contato)) : (c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null),
       estado_id: c.estado_id, cidade_id: c.cidade_id,
       area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
       observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
