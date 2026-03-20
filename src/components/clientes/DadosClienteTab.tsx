@@ -35,6 +35,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const { toast } = useToast();
   const whatsappValue = form.watch("telefone_whatsapp");
+  const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
