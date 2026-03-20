@@ -99,7 +99,9 @@ function WhatsAppContent() {
     // Clear URL params
     setSearchParams({}, { replace: true });
 
-    const deptDefaultId = selectedDepartment?.default_instance_id;
+    // Priority: selected department > user's own department > first instance
+    const userDept = userDepartmentId ? departments.find(d => d.id === userDepartmentId) : null;
+    const deptDefaultId = selectedDepartment?.default_instance_id ?? userDept?.default_instance_id;
     const instanceId = (deptDefaultId && instances.find(i => i.id === deptDefaultId))
       ? deptDefaultId
       : instances[0].id;
