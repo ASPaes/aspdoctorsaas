@@ -388,7 +388,7 @@ export default function CertificadosA1() {
                       <div>{c.razao_social || "—"}</div>
                       {c.nome_fantasia && <div className="text-muted-foreground">{c.nome_fantasia}</div>}
                     </TableCell>
-                    <TableCell className="text-xs">{c.telefone_contato ? maskPhone(c.telefone_contato) : "—"}</TableCell>
+                    <TableCell className="text-xs">{c.telefone_contato ? formatBRPhone(c.telefone_contato) : "—"}</TableCell>
                     <TableCell className="text-xs">
                       {c.cert_a1_vencimento ? format(parseISO(c.cert_a1_vencimento), "dd/MM/yyyy") : "—"}
                     </TableCell>
