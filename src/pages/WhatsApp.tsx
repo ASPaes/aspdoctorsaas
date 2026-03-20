@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
+import { DepartmentFilterProvider, useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
@@ -20,6 +20,7 @@ function WhatsAppContent() {
   const createConversation = useCreateConversation();
   const { instances } = useWhatsAppInstances();
   const queryClient = useQueryClient();
+  const { selectedDepartment } = useDepartmentFilter();
 
   // Keep selected conversation in sync; detect RLS loss (department transfer)
   useEffect(() => {
@@ -98,7 +99,10 @@ function WhatsAppContent() {
     // Clear URL params
     setSearchParams({}, { replace: true });
 
-    const instanceId = instances[0].id;
+    const deptDefaultId = selectedDepartment?.default_instance_id;
+    const instanceId = (deptDefaultId && instances.find(i => i.id === deptDefaultId))
+      ? deptDefaultId
+      : instances[0].id;
 
     createConversation.mutateAsync({
       instanceId,
