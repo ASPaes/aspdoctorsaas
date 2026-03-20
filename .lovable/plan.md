@@ -1,46 +1,35 @@
 
 
-## Objetivo
-Implementar análise final consolidada de IA no encerramento do atendimento + geração de KB draft com validação do técnico.
+# Fix: Use Department's Default Instance for Chat Links
 
-## Status: ✅ Implementado
+## Problem
+When clicking the WhatsApp chat icon from Certificados A1 or Clientes, the system always uses `instances[0].id` (first instance in the list) regardless of the user's department. It should use the `default_instance_id` configured for the user's department.
 
-## Arquitetura
-
-### Fluxo de encerramento (1 chamada IA)
+## Root Cause
+In `src/pages/WhatsApp.tsx` line 101:
+```typescript
+const instanceId = instances[0].id;
 ```
-Encerramento
-  ├─ Verifica se já existe KB para esse attendance → skip se sim
-  ├─ Chama finalize-attendance (1 chamada IA consolidada)
-  │   └─ Retorna: sentiment, topics, summary, title, problem, solution, tags, suggested_area
-  ├─ Salva AI fields no support_attendances
-  ├─ Atualiza sentiment na whatsapp_sentiments
-  ├─ Atualiza topics no metadata da conversa
-  └─ Cria KB draft (status: 'draft')
+This ignores the department context entirely.
+
+## Solution
+**Single file change: `src/pages/WhatsApp.tsx`**
+
+Use `useDepartmentFilter()` to get `selectedDepartment` (which includes `default_instance_id`), then resolve the instance in priority order:
+
+1. `selectedDepartment.default_instance_id` (if exists and is in the instances list)
+2. `instances[0].id` (fallback)
+
+### Changes:
+1. Import `useDepartmentFilter` (already available since the component is wrapped in `DepartmentFilterProvider`)
+2. Call `const { selectedDepartment } = useDepartmentFilter();` inside `WhatsAppContent`
+3. Replace line 101 with instance resolution logic:
+```typescript
+const deptDefaultId = selectedDepartment?.default_instance_id;
+const instanceId = (deptDefaultId && instances.find(i => i.id === deptDefaultId))
+  ? deptDefaultId
+  : instances[0].id;
 ```
 
-### Fluxo do técnico
-```
-DetailsSidebar → Seção "Base de Conhecimento"
-  ├─ Mostra título + status do draft
-  ├─ Botão "Revisar" → abre KBEditDialog
-  ├─ Botão "Enviar" → muda status para pending_review
-  └─ KBEditDialog tem botão "Enviar para Aprovação"
-```
+No other files need changes — the department context and `default_instance_id` data are already in place.
 
-### Status do KB
-- `draft` → Rascunho (gerado pela IA)
-- `pending_review` → Validado pelo técnico, aguardando aprovação do admin
-- `approved` → Aprovado pelo admin
-
-## Arquivos alterados
-
-| Arquivo | Ação |
-|---|---|
-| `supabase/functions/finalize-attendance/index.ts` | **Novo** — Edge Function consolidada |
-| `src/components/whatsapp/hooks/useKBDraft.ts` | **Novo** — Hook para KB draft |
-| `src/components/whatsapp/hooks/useWhatsAppActions.ts` | Modificado — fire-and-forget para finalize-attendance |
-| `src/components/whatsapp/chat/DetailsSidebar.tsx` | Modificado — seção KB |
-| `src/components/configuracoes/KBTab.tsx` | Modificado — status pending_review |
-| `src/components/configuracoes/kb/KBEditDialog.tsx` | Modificado — status + botão aprovação |
-| `supabase/config.toml` | Modificado — finalize-attendance entry |
