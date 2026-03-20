@@ -43,6 +43,11 @@ const clienteSchema = z.object({
     const normalized = normalizeBRPhone(v);
     return isValidBRPhone(normalized);
   }, { message: "WhatsApp inválido. Use formato: (DD) NNNNN-NNNN" }),
+  telefone_whatsapp_contato: z.string().nullable().refine(v => {
+    if (!v) return true; // not required
+    const normalized = normalizeBRPhone(v);
+    return isValidBRPhone(normalized);
+  }, { message: "WhatsApp inválido. Use formato: (DD) NNNNN-NNNN" }),
   estado_id: z.number().nullable(),
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
