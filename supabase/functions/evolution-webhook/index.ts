@@ -1329,10 +1329,7 @@ async function sendDeferredClosureMessage(
       return;
     }
 
-    const code = att.attendance_code;
 
-    // Insert system message in timeline
-    await insertAttendanceSystemMessage(supabase, conversationId, tenantId, attendanceId, code, 'closed');
 
     // Send closure message to customer via WhatsApp
     const closureText = `✅ Atendimento *${code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;

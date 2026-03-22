@@ -288,25 +288,7 @@ async function sendDeferredClosureMessage(
   attendanceCode: string
 ): Promise<void> {
   try {
-    // Insert system message in timeline (idempotent)
-    const messageId = `system_att_closed_${attendanceId}`;
     const nowIso = new Date().toISOString();
-
-    await supabase.from('whatsapp_messages').upsert({
-      conversation_id: conversationId,
-      remote_jid: '',
-      message_id: messageId,
-      content: `🔒 Atendimento ${attendanceCode} encerrado com sucesso.`,
-      message_type: 'system',
-      is_from_me: false,
-      status: 'sent',
-      timestamp: nowIso,
-      tenant_id: tenantId,
-      metadata: { system: true, attendance_event: 'closed', attendance_id: attendanceId },
-    }, {
-      onConflict: 'tenant_id,message_id',
-      ignoreDuplicates: true,
-    });
 
     // Send closure message to customer
     const closureText = `✅ Atendimento *${attendanceCode}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
