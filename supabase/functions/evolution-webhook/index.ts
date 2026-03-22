@@ -886,32 +886,51 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         return;
       }
 
-      // Check if this message is a URA response BEFORE creating/reopening attendance
+      // --- BILLING SKIP URA: check if client is replying to a billing automation message ---
       const supportConfig = await getSupportConfig(supabase, tenantId);
-      const uraHandled = await handleUraResponse(
-        supabase, instanceCtx, conversationId, tenantId, content, supportConfig
-      );
+      const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
-      if (uraHandled) {
-        // URA consumed the message — just increment counter, skip attendance creation
-        // NOTE: If URA closed the attendance (option 0), do NOT reopen the conversation
-        incrementAttendanceCounter(supabase, conversationId, 'customer')
-          .catch(err => console.error('[evolution-webhook] increment error:', err));
-      } else {
-        // Normal flow: ensure attendance exists (reopen/new/ignore goodbye) then increment counter
-        ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
+      if (billingSkipResult.skip) {
+        // Billing response detected — create attendance directly in Financeiro, NO URA
+        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
+        ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billingSkipResult.departmentId!, billingSkipResult.clienteId)
           .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
-          .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
+          .catch(err => console.error('[cobrança] Erro ao criar atendimento financeiro:', err));
 
-        // Also reopen the conversation visually if it was closed (only for non-URA messages)
+        // Reopen conversation visually if closed
         supabase
           .from('whatsapp_conversations')
-          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .update({ status: 'active', department_id: billingSkipResult.departmentId, updated_at: new Date().toISOString() })
           .eq('id', conversationId)
           .eq('status', 'closed')
-          .then(({ error: reopenConvErr }: any) => {
-            if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
-          });
+          .then(({ error: e }: any) => { if (e) console.error('[cobrança] Erro ao reabrir conversa:', e); });
+      } else {
+        // Check if this message is a URA response BEFORE creating/reopening attendance
+        const uraHandled = await handleUraResponse(
+          supabase, instanceCtx, conversationId, tenantId, content, supportConfig
+        );
+
+        if (uraHandled) {
+          // URA consumed the message — just increment counter, skip attendance creation
+          // NOTE: If URA closed the attendance (option 0), do NOT reopen the conversation
+          incrementAttendanceCounter(supabase, conversationId, 'customer')
+            .catch(err => console.error('[evolution-webhook] increment error:', err));
+        } else {
+          // Normal flow: ensure attendance exists (reopen/new/ignore goodbye) then increment counter
+          ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
+            .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
+            .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
+
+          // Also reopen the conversation visually if it was closed (only for non-URA messages)
+          supabase
+            .from('whatsapp_conversations')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', conversationId)
+            .eq('status', 'closed')
+            .then(({ error: reopenConvErr }: any) => {
+              if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
+            });
+        }
       }
     } else {
       // Operator message sent via Evolution (e.g. from phone)
