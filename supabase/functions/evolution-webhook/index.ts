@@ -2420,7 +2420,7 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 }
 
 
-  if (req.method === 'OPTIONS') {
+  Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
