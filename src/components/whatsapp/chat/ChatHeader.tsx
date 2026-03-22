@@ -72,7 +72,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     [instances, conversation.instance_id]
   );
   const contact = conversation.contact;
-  const name = contact?.name || contact?.phone_number || "Desconhecido";
+  const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
 
   // Use attendance status as single source of truth for status display
   const { attendanceMap } = useAttendanceStatus([conversation.id]);
