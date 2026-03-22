@@ -958,7 +958,7 @@ async function sendUraWelcome(
 ): Promise<void> {
   try {
     // Use new department-based URA (ura_enabled) with fallback to legacy (support_ura_enabled)
-    const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
     if (!uraEnabled) {
       console.log('[ura] URA disabled, skipping welcome message');
       return;
@@ -974,7 +974,7 @@ async function sendUraWelcome(
 
     // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
-    const template = supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '';
+    const template = supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '';
     let welcomeText = template
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
@@ -1428,7 +1428,7 @@ async function handleUraResponse(
 
   const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
-  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '');
+  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '');
 
   // Invalid option
   if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
@@ -1451,7 +1451,7 @@ async function handleUraResponse(
     }
 
     // Send varied invalid message — use new template with {options} replacement
-    const invalidTemplate = supportConfig.ura_invalid_option_template || supportConfig.support_ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
+    const invalidTemplate = supportConfig.support_ura_invalid_option_template || supportConfig.ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
     let invalidMsg = invalidTemplate;
     if (hasDepartments && invalidMsg.includes('{options}')) {
       const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n') + '\n0. Encerrar atendimento';

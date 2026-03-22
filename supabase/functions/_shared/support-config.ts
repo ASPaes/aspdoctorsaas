@@ -60,7 +60,7 @@ const DEFAULTS: SupportConfig = {
     'Não entendi sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
 
   // URA v2 defaults
-  ura_enabled: true,
+  ura_enabled: false,
   ura_welcome_template:
     'Olá! 👋 Para te atender mais rápido, escolha um setor:\n{options}\n\nResponda apenas com o número. 😊',
   ura_invalid_option_template:
