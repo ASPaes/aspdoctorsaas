@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { normalizeBRPhone, coreDigits } from '@/lib/phoneBR';
 
 interface LinkedCliente {
   id: string;
@@ -83,6 +84,61 @@ export function useClienteLinkSuggestion(
         .update({ metadata: newMetadata })
         .eq('id', conversationId);
       if (error) throw error;
+
+      // --- Auto-create cliente_contatos if phone differs from principal ---
+      try {
+        // 1) Get contact_id from conversation
+        const { data: conv } = await supabase
+          .from('whatsapp_conversations')
+          .select('contact_id')
+          .eq('id', conversationId)
+          .single();
+        if (!conv?.contact_id) return;
+
+        // 2) Get contact phone + name
+        const { data: contact } = await supabase
+          .from('whatsapp_contacts')
+          .select('phone_number, name')
+          .eq('id', conv.contact_id)
+          .single();
+        if (!contact?.phone_number) return;
+
+        // 3) Get cliente principal phone + tenant
+        const { data: cliente } = await supabase
+          .from('clientes')
+          .select('telefone_whatsapp, tenant_id')
+          .eq('id', clienteId)
+          .single();
+        if (!cliente) return;
+
+        const contactDigits = normalizeBRPhone(contact.phone_number);
+        const mainDigits = normalizeBRPhone(cliente.telefone_whatsapp || '');
+        const contactCore = coreDigits(contact.phone_number);
+        const mainCore = coreDigits(cliente.telefone_whatsapp || '');
+
+        // Only create if different and valid
+        if (contactCore.length >= 10 && contactCore !== mainCore) {
+          // Check for existing
+          const { data: existing } = await supabase
+            .from('cliente_contatos')
+            .select('id')
+            .eq('cliente_id', clienteId)
+            .eq('fone', contactDigits)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabase.from('cliente_contatos').insert({
+              cliente_id: clienteId,
+              tenant_id: cliente.tenant_id,
+              nome: contact.name || contactDigits,
+              fone: contactDigits,
+            });
+            toast.info('Contato adicional registrado para este cliente.');
+          }
+        }
+      } catch (e) {
+        console.warn('[link-cliente] Erro ao criar contato adicional:', e);
+      }
     },
     onSuccess: () => {
       toast.success('Cliente vinculado com sucesso');
