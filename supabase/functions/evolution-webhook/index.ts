@@ -2248,7 +2248,178 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
   }
 }
 
-Deno.serve(async (req) => {
+/**
+ * Handle send.message events from Evolution API (outbound messages sent by automations like N8N).
+ * Persists the message in whatsapp_messages with is_from_me=true, updates conversation preview,
+ * but does NOT create support_attendances (attendance only opens when the client replies).
+ */
+async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabase: any) {
+  try {
+    const { instance, data } = payload;
+
+    // --- Resolve instance & tenant ---
+    let { data: instanceData } = await supabase
+      .from('whatsapp_instances')
+      .select('id, instance_name, instance_id_external, provider_type, status, tenant_id')
+      .eq('instance_name', instance)
+      .maybeSingle();
+
+    if (!instanceData) {
+      const { data: cloudInstance } = await supabase
+        .from('whatsapp_instances')
+        .select('id, instance_name, instance_id_external, provider_type, status, tenant_id')
+        .eq('instance_id_external', instance)
+        .maybeSingle();
+      instanceData = cloudInstance;
+    }
+
+    if (!instanceData) {
+      console.error('[evolution-webhook][send.message] Instance not found:', instance);
+      return;
+    }
+
+    const tenantId = instanceData.tenant_id;
+
+    // --- Extract fields from send.message payload ---
+    // Evolution send.message payload structure:
+    // data.key.remoteJid, data.key.fromMe, data.key.id (keyId)
+    // data.message.conversation / data.message.extendedTextMessage / etc
+    // data.messageTimestamp, data.pushName
+    const key = data?.key;
+    const message = data?.message;
+    const pushName = data?.pushName || data?.participant || '';
+    const messageTimestamp = data?.messageTimestamp
+      ? (typeof data.messageTimestamp === 'number'
+          ? data.messageTimestamp
+          : parseInt(data.messageTimestamp, 10))
+      : Math.floor(Date.now() / 1000);
+
+    if (!key?.remoteJid) {
+      console.warn('[evolution-webhook][send.message] No remoteJid in payload, skipping:', JSON.stringify(data).slice(0, 400));
+      return;
+    }
+
+    const messageId = key.id || data?.id || `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
+    console.log(`[evolution-webhook][send.message] phone=${phone} isGroup=${isGroup} messageId=${messageId} instance=${instance}`);
+
+    // --- Ensure contact exists ---
+    const contactId = await findOrCreateContact(
+      supabase,
+      instanceData.id,
+      phone,
+      pushName || phone,
+      isGroup,
+      true, // isFromMe
+      tenantId
+    );
+
+    if (!contactId) {
+      console.error('[evolution-webhook][send.message] Failed to find/create contact for phone:', phone);
+      return;
+    }
+
+    // --- Ensure conversation exists ---
+    const conversationId = await findOrCreateConversation(
+      supabase,
+      instanceData.id,
+      contactId,
+      tenantId
+    );
+
+    if (!conversationId) {
+      console.error('[evolution-webhook][send.message] Failed to find/create conversation');
+      return;
+    }
+
+    // --- Determine message type and content ---
+    let messageType = 'text';
+    let content = '';
+
+    if (message) {
+      messageType = getMessageType(message);
+      content = getMessageContent(message, messageType);
+    } else if (data?.text || data?.body || data?.content) {
+      // Some Evolution payloads put text directly
+      content = data.text || data.body || data.content || '';
+    }
+
+    if (!content && messageType === 'text') {
+      content = '';
+    }
+
+    const timestamp = new Date(messageTimestamp * 1000).toISOString();
+
+    // --- Dedupe upsert ---
+    const { data: savedMsg, error: msgError } = await supabase
+      .from('whatsapp_messages')
+      .upsert({
+        conversation_id: conversationId,
+        remote_jid: key.remoteJid,
+        message_id: messageId,
+        content,
+        message_type: messageType,
+        is_from_me: true,
+        status: 'sent',
+        timestamp,
+        tenant_id: tenantId,
+        instance_id: instanceData.id,
+        metadata: {
+          source: 'automation',
+          event: 'send.message',
+          instanceName: instance,
+        },
+      }, {
+        onConflict: 'tenant_id,message_id',
+        ignoreDuplicates: true,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (msgError) {
+      console.error('[evolution-webhook][send.message] Failed:', msgError);
+      return;
+    }
+
+    if (savedMsg) {
+      console.log(`[evolution-webhook][send.message] Saved message ok: message_id=${messageId}, conversation_id=${conversationId}, instance=${instance}, tenant=${tenantId}`);
+    } else {
+      console.log(`[evolution-webhook][send.message] Duplicate ignored: message_id=${messageId}`);
+      return; // Already exists, no need to update conversation preview
+    }
+
+    // --- Update conversation preview (no unread increment since is_from_me) ---
+    const { data: currentConv } = await supabase
+      .from('whatsapp_conversations')
+      .select('last_message_at')
+      .eq('id', conversationId)
+      .single();
+
+    const currentLastAt = currentConv?.last_message_at;
+    const isNewerOrEqual = !currentLastAt || timestamp >= currentLastAt;
+
+    if (isNewerOrEqual) {
+      const { error: updateError } = await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_at: timestamp,
+          last_message_preview: content.substring(0, 200) || '📤 Mensagem enviada',
+          is_last_message_from_me: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+
+      if (updateError) {
+        console.error('[evolution-webhook][send.message] Error updating conversation:', updateError);
+      }
+    }
+  } catch (error) {
+    console.error('[evolution-webhook][send.message] Fatal error:', error);
+  }
+}
+
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
