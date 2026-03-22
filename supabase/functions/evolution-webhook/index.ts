@@ -983,21 +983,15 @@ async function sendUraWelcome(
     const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
 
     let fullMessage: string;
-    if (departments && departments.length > 0) {
-      // Build numbered options from support_departments
+    if (departments && departments.length > 0 && welcomeText.includes('{options}')) {
+      // Template has {options} placeholder — inject department list dynamically
       const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n');
-      // Replace {options} placeholder if present, otherwise append
-      if (welcomeText.includes('{options}')) {
-        fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
-      } else {
-        fullMessage = `${codeHeader}${welcomeText}\n\n${optionsList}`;
-      }
-      // Append close option
+      fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
       fullMessage += '\n0. Encerrar atendimento';
     } else {
-      // No departments — send template as-is
+      // Template already contains its own options or no departments — send as-is
       fullMessage = `${codeHeader}${welcomeText}`;
-      console.log('[ura] No support_departments found, sending template as-is');
+      console.log('[ura] Sending template as-is (no {options} placeholder or no departments)');
     }
 
     // Send via Evolution API
@@ -1347,7 +1341,7 @@ async function handleUraResponse(
   supportConfig: any
 ): Promise<boolean> {
   // Use new department-based URA with fallback to legacy
-  const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+  const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
   if (!uraEnabled) return false;
 
   // Find active waiting attendance with URA pending state
