@@ -438,7 +438,10 @@ export default function AtendimentoCsatTab() {
                     <FormMessage />
                   </FormItem>
                 )} />
-              </>
+
+                <Separator />
+
+                <UraOptionsManager />
             )}
           </CardContent>
         </Card>
