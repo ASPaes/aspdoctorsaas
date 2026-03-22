@@ -268,7 +268,8 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 function patchConversationPreview(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
-  msg: Message
+  msg: Message,
+  isViewing = false
 ) {
   queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
     if (!old?.conversations) return old;
