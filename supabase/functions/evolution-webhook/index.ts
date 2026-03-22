@@ -986,8 +986,8 @@ async function sendUraWelcome(
 
     let fullMessage: string;
     if (departments && departments.length > 0 && welcomeText.includes('{options}')) {
-      // Template has {options} placeholder — inject department list dynamically
-      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n');
+      // Template has {options} placeholder — inject department list using ura_option_number
+      const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
       fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
       fullMessage += '\n0. Encerrar atendimento';
     } else {
