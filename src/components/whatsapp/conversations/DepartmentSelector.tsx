@@ -26,7 +26,7 @@ export function DepartmentSelector() {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-1.5 px-3 pb-2 cursor-default">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 cursor-default">
             <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground truncate">
               {dept?.name ?? "Sem setor"}
