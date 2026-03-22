@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
+import { formatBRPhone } from "@/lib/phoneBR";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
