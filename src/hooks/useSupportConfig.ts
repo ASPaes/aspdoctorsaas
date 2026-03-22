@@ -20,6 +20,8 @@ export interface SupportConfig {
   support_ura_enabled: boolean;
   support_ura_welcome_template: string;
   support_ura_invalid_option_template: string;
+  billing_skip_ura_enabled: boolean;
+  billing_skip_ura_minutes: number;
 }
 
 const DEFAULTS: SupportConfig = {
