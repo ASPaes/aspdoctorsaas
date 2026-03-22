@@ -159,7 +159,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
                 <>
                   <p className="text-sm font-medium truncate max-w-full" title={name}>{name}</p>
                   <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
-                    <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number}
+                    <Phone className="h-3 w-3 shrink-0" /> {contact?.phone_number ? formatBRPhone(contact.phone_number) : ""}
                   </p>
                   {contact?.notes && (
                     <p className="text-[10px] text-muted-foreground mt-1 whitespace-normal break-words" style={{ overflowWrap: 'anywhere' }}>

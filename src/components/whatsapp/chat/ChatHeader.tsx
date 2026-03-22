@@ -142,7 +142,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number ? formatBRPhone(contact.phone_number) : ""}</p>
           </div>
 
           {/* Primary actions — always visible */}

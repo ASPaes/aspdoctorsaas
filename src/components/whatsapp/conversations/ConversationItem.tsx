@@ -18,7 +18,7 @@ interface Props {
 
 export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance }: Props) {
   const contact = conv.contact;
-  const name = contact?.name || contact?.phone_number || "Desconhecido";
+  const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const { sentiment } = useWhatsAppSentiment(conv.id);
   const { timezone } = useAppTimezone();
   const sentimentData = sentiment as any;
