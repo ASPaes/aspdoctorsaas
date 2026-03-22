@@ -958,7 +958,7 @@ async function sendUraWelcome(
 ): Promise<void> {
   try {
     // Use new department-based URA (ura_enabled) with fallback to legacy (support_ura_enabled)
-    const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
     if (!uraEnabled) {
       console.log('[ura] URA disabled, skipping welcome message');
       return;
