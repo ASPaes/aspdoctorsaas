@@ -10,6 +10,7 @@ export interface AttendanceInfo {
   opened_at: string;
   closed_at: string | null;
   department_id: string | null;
+  created_from: string | null;
 }
 
 /**
