@@ -1499,8 +1499,8 @@ async function handleUraResponse(
 
   // Valid option — assign department + route instance
   const nowIso = new Date().toISOString();
-  const selectedDept = hasDepartments ? departments[optionNumber - 1] : null;
-  const deptName = selectedDept?.name || `Opção ${optionNumber}`;
+  const selectedDept = hasDepartments ? deptByNumber.get(optionNumber) : null;
+  const deptName = selectedDept ? (selectedDept.ura_label || selectedDept.name) : `Opção ${optionNumber}`;
 
   const updatePayload: Record<string, any> = {
     ura_option_selected: optionNumber,
