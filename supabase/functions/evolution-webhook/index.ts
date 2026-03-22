@@ -2366,7 +2366,8 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
         tenant_id: tenantId,
         instance_id: instanceData.id,
         metadata: {
-          source: 'automation',
+          source: instanceData.instance_name?.toLowerCase().includes('financ') ? 'billing_automation' : 'automation',
+          kind: instanceData.instance_name?.toLowerCase().includes('financ') ? 'cobranca' : 'general',
           event: 'send.message',
           instanceName: instance,
         },
