@@ -154,23 +154,6 @@ export const useWhatsAppActions = () => {
 
               // Only send closure message immediately if CSAT is NOT enabled
               if (!csatEnabled) {
-                const msgId = `system_att_closed_${activeAtt.id}`;
-                await supabase.from('whatsapp_messages' as any).upsert({
-                  conversation_id: conversationId,
-                  remote_jid: '',
-                  message_id: msgId,
-                  content: `🔒 Atendimento ${activeAtt.attendance_code} encerrado com sucesso.`,
-                  message_type: 'system',
-                  is_from_me: false,
-                  status: 'sent',
-                  timestamp: now.toISOString(),
-                  tenant_id: profile.tenant_id,
-                  metadata: { system: true, attendance_event: 'closed', attendance_id: activeAtt.id },
-                }, {
-                  onConflict: 'tenant_id,message_id',
-                  ignoreDuplicates: true,
-                });
-
                 try {
                   const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
                   await supabase.functions.invoke('send-whatsapp-message', {
