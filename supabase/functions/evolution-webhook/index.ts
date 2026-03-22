@@ -1414,13 +1414,15 @@ async function handleUraResponse(
     return true;
   }
 
-  // --- 2. Validate numeric option using support_departments ---
+  // --- 2. Validate numeric option using support_departments with ura_option_number ---
   const { data: departments } = await supabase
     .from('support_departments')
-    .select('id, name, default_instance_id')
+    .select('id, name, default_instance_id, ura_option_number, ura_label, show_in_ura')
     .eq('tenant_id', tenantId)
     .eq('is_active', true)
-    .order('name');
+    .eq('show_in_ura', true)
+    .not('ura_option_number', 'is', null)
+    .order('ura_option_number');
 
   const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
