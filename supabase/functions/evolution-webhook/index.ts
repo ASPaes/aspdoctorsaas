@@ -1428,7 +1428,7 @@ async function handleUraResponse(
 
   const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
-  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '');
+  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '');
 
   // Invalid option
   if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
