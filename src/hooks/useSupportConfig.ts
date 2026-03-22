@@ -64,6 +64,8 @@ const SELECT_FIELDS = [
   'support_ura_enabled',
   'support_ura_welcome_template',
   'support_ura_invalid_option_template',
+  'billing_skip_ura_enabled',
+  'billing_skip_ura_minutes',
 ].join(', ');
 
 /**
