@@ -664,6 +664,8 @@ export type Database = {
       }
       configuracoes: {
         Row: {
+          billing_skip_ura_enabled: boolean
+          billing_skip_ura_minutes: number
           chat_timezone: string
           created_at: string
           custo_fixo_percentual: number
@@ -697,6 +699,8 @@ export type Database = {
           ura_welcome_template: string
         }
         Insert: {
+          billing_skip_ura_enabled?: boolean
+          billing_skip_ura_minutes?: number
           chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
@@ -730,6 +734,8 @@ export type Database = {
           ura_welcome_template?: string
         }
         Update: {
+          billing_skip_ura_enabled?: boolean
+          billing_skip_ura_minutes?: number
           chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
