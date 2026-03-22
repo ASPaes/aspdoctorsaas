@@ -190,7 +190,16 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           (old: Message[] | undefined) => mergeMessage(old ?? [], incoming)
         );
         newMessageCallbackRef.current?.(incoming);
-        patchConversationPreview(queryClient, conversationId, incoming);
+        // Conversa está aberta — não incrementar unread, apenas atualizar preview
+        patchConversationPreview(queryClient, conversationId, incoming, true);
+        // Zerar unread no banco (conversa visível)
+        if (!incoming.is_from_me) {
+          supabase
+            .from('whatsapp_conversations')
+            .update({ unread_count: 0 })
+            .eq('id', conversationId)
+            .then();
+        }
       })
       .on('postgres_changes', {
         event: 'UPDATE',
