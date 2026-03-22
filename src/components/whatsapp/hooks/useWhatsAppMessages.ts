@@ -283,7 +283,8 @@ function patchConversationPreview(
       last_message_preview: msg.content?.substring(0, 100) || patched[idx].last_message_preview,
       is_last_message_from_me: msg.is_from_me,
       isLastMessageFromMe: msg.is_from_me,
-      ...(msg.is_from_me ? {} : { unread_count: (patched[idx].unread_count || 0) + 1 }),
+      ...(msg.is_from_me || isViewing ? {} : { unread_count: (patched[idx].unread_count || 0) + 1 }),
+      ...(isViewing ? { unread_count: 0 } : {}),
     };
     patched.sort((a: any, b: any) => {
       const tA = a.last_message_at || a.created_at || '';
