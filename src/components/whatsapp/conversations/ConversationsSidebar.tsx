@@ -241,8 +241,21 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         });
         break;
       case "recent":
-      default:
+      default: {
+        // Pin waiting (queue) conversations to the top, then sort by recency
+        result.sort((a, b) => {
+          const aAtt = attendanceMap.get(a.id);
+          const bAtt = attendanceMap.get(b.id);
+          const aWaiting = aAtt?.status === "waiting" && !aAtt?.assigned_to;
+          const bWaiting = bAtt?.status === "waiting" && !bAtt?.assigned_to;
+          if (aWaiting && !bWaiting) return -1;
+          if (!aWaiting && bWaiting) return 1;
+          const aTime = a.last_message_at || a.created_at;
+          const bTime = b.last_message_at || b.created_at;
+          return new Date(bTime).getTime() - new Date(aTime).getTime();
+        });
         break;
+      }
     }
 
     // Force newly created conv to top
