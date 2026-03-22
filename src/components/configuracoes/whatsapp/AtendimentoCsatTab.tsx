@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Save, Loader2 } from "lucide-react";
+import UraOptionsManager from "./UraOptionsManager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NumericInput } from "@/components/ui/numeric-input";
 import {
@@ -437,6 +438,10 @@ export default function AtendimentoCsatTab() {
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <Separator />
+
+                <UraOptionsManager />
               </>
             )}
           </CardContent>

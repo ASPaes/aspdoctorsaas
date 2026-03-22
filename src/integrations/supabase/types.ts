@@ -2008,9 +2008,12 @@ export type Database = {
           is_active: boolean
           is_default_fallback: boolean
           name: string
+          show_in_ura: boolean
           slug: string
           tenant_id: string
           updated_at: string
+          ura_label: string | null
+          ura_option_number: number | null
         }
         Insert: {
           created_at?: string
@@ -2020,9 +2023,12 @@ export type Database = {
           is_active?: boolean
           is_default_fallback?: boolean
           name: string
+          show_in_ura?: boolean
           slug: string
           tenant_id: string
           updated_at?: string
+          ura_label?: string | null
+          ura_option_number?: number | null
         }
         Update: {
           created_at?: string
@@ -2032,9 +2038,12 @@ export type Database = {
           is_active?: boolean
           is_default_fallback?: boolean
           name?: string
+          show_in_ura?: boolean
           slug?: string
           tenant_id?: string
           updated_at?: string
+          ura_label?: string | null
+          ura_option_number?: number | null
         }
         Relationships: [
           {

@@ -964,13 +964,15 @@ async function sendUraWelcome(
       return;
     }
 
-    // Fetch active support DEPARTMENTS for this tenant (replaces support_areas)
+    // Fetch URA-visible departments using ura_option_number for stable ordering
     const { data: departments } = await supabase
       .from('support_departments')
-      .select('id, name, default_instance_id')
+      .select('id, name, default_instance_id, ura_option_number, ura_label, show_in_ura')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
-      .order('name');
+      .eq('show_in_ura', true)
+      .not('ura_option_number', 'is', null)
+      .order('ura_option_number');
 
     // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
@@ -984,8 +986,8 @@ async function sendUraWelcome(
 
     let fullMessage: string;
     if (departments && departments.length > 0 && welcomeText.includes('{options}')) {
-      // Template has {options} placeholder — inject department list dynamically
-      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n');
+      // Template has {options} placeholder — inject department list using ura_option_number
+      const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
       fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
       fullMessage += '\n0. Encerrar atendimento';
     } else {
@@ -1412,20 +1414,32 @@ async function handleUraResponse(
     return true;
   }
 
-  // --- 2. Validate numeric option using support_departments ---
+  // --- 2. Validate numeric option using support_departments with ura_option_number ---
   const { data: departments } = await supabase
     .from('support_departments')
-    .select('id, name, default_instance_id')
+    .select('id, name, default_instance_id, ura_option_number, ura_label, show_in_ura')
     .eq('tenant_id', tenantId)
     .eq('is_active', true)
-    .order('name');
+    .eq('show_in_ura', true)
+    .not('ura_option_number', 'is', null)
+    .order('ura_option_number');
 
   const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
-  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '');
+
+  // Build a map of ura_option_number -> department for quick lookup
+  const deptByNumber = new Map<number, any>();
+  if (hasDepartments) {
+    for (const d of departments) {
+      deptByNumber.set(d.ura_option_number, d);
+    }
+  }
+
+  // Valid numbers: 0 (close) or any ura_option_number that exists
+  const isValidOption = !isNaN(optionNumber) && (optionNumber === 0 || deptByNumber.has(optionNumber));
 
   // Invalid option
-  if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
+  if (!isValidOption) {
     const currentInvalid = (att.ura_invalid_count || 0) + 1;
     console.log(`[ura] Invalid option: "${trimmed}" (attempt ${currentInvalid}/4) conv=${conversationId}`);
 
@@ -1444,11 +1458,11 @@ async function handleUraResponse(
       return true;
     }
 
-    // Send varied invalid message — use new template with {options} replacement
+    // Send varied invalid message — use template with {options} replacement using ura_option_number
     const invalidTemplate = supportConfig.support_ura_invalid_option_template || supportConfig.ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
     let invalidMsg = invalidTemplate;
     if (hasDepartments && invalidMsg.includes('{options}')) {
-      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n') + '\n0. Encerrar atendimento';
+      const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n') + '\n0. Encerrar atendimento';
       invalidMsg = invalidMsg.replace('{options}', optionsList);
     }
     await sendAndPersistAutoMessage(
@@ -1485,8 +1499,8 @@ async function handleUraResponse(
 
   // Valid option — assign department + route instance
   const nowIso = new Date().toISOString();
-  const selectedDept = hasDepartments ? departments[optionNumber - 1] : null;
-  const deptName = selectedDept?.name || `Opção ${optionNumber}`;
+  const selectedDept = hasDepartments ? deptByNumber.get(optionNumber) : null;
+  const deptName = selectedDept ? (selectedDept.ura_label || selectedDept.name) : `Opção ${optionNumber}`;
 
   const updatePayload: Record<string, any> = {
     ura_option_selected: optionNumber,
