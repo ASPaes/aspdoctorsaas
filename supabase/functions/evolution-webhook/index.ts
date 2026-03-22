@@ -2313,6 +2313,9 @@ Deno.serve(async (req) => {
       case 'connection.update':
         await processConnectionUpdate(payload, supabase);
         break;
+      case 'send.message':
+        await processSendMessageEvent(payload, supabase);
+        break;
       default:
         console.log('[evolution-webhook] Unhandled event type:', payload.event);
     }
