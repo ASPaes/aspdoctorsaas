@@ -43,6 +43,8 @@ const DEFAULTS: SupportConfig = {
   support_ura_enabled: false,
   support_ura_welcome_template: 'Olá {{customer_name}}! 👋 Para te direcionar melhor, escolha uma opção:',
   support_ura_invalid_option_template: 'Não entendi sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
+  billing_skip_ura_enabled: true,
+  billing_skip_ura_minutes: 60,
 };
 
 const SELECT_FIELDS = [
