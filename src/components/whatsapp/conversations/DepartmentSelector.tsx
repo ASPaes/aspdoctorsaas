@@ -40,7 +40,7 @@ export function DepartmentSelector() {
 
   // Admin: full dropdown with "Todos" option
   return (
-    <div className="flex items-center gap-1.5 px-3 pb-2">
+    <div className="flex items-center gap-1.5 px-3 py-1.5">
       <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <Select
         value={selectedDepartmentId ?? "all"}
