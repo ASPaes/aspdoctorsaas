@@ -20,6 +20,8 @@ export interface SupportConfig {
   support_ura_enabled: boolean;
   support_ura_welcome_template: string;
   support_ura_invalid_option_template: string;
+  billing_skip_ura_enabled: boolean;
+  billing_skip_ura_minutes: number;
 }
 
 const DEFAULTS: SupportConfig = {
@@ -41,6 +43,8 @@ const DEFAULTS: SupportConfig = {
   support_ura_enabled: false,
   support_ura_welcome_template: 'Olá {{customer_name}}! 👋 Para te direcionar melhor, escolha uma opção:',
   support_ura_invalid_option_template: 'Não entendi sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
+  billing_skip_ura_enabled: true,
+  billing_skip_ura_minutes: 60,
 };
 
 const SELECT_FIELDS = [
@@ -60,6 +64,8 @@ const SELECT_FIELDS = [
   'support_ura_enabled',
   'support_ura_welcome_template',
   'support_ura_invalid_option_template',
+  'billing_skip_ura_enabled',
+  'billing_skip_ura_minutes',
 ].join(', ');
 
 /**

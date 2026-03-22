@@ -886,32 +886,51 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         return;
       }
 
-      // Check if this message is a URA response BEFORE creating/reopening attendance
+      // --- BILLING SKIP URA: check if client is replying to a billing automation message ---
       const supportConfig = await getSupportConfig(supabase, tenantId);
-      const uraHandled = await handleUraResponse(
-        supabase, instanceCtx, conversationId, tenantId, content, supportConfig
-      );
+      const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
-      if (uraHandled) {
-        // URA consumed the message — just increment counter, skip attendance creation
-        // NOTE: If URA closed the attendance (option 0), do NOT reopen the conversation
-        incrementAttendanceCounter(supabase, conversationId, 'customer')
-          .catch(err => console.error('[evolution-webhook] increment error:', err));
-      } else {
-        // Normal flow: ensure attendance exists (reopen/new/ignore goodbye) then increment counter
-        ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
+      if (billingSkipResult.skip) {
+        // Billing response detected — create attendance directly in Financeiro, NO URA
+        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
+        ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billingSkipResult.departmentId!, billingSkipResult.clienteId)
           .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
-          .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
+          .catch(err => console.error('[cobrança] Erro ao criar atendimento financeiro:', err));
 
-        // Also reopen the conversation visually if it was closed (only for non-URA messages)
+        // Reopen conversation visually if closed
         supabase
           .from('whatsapp_conversations')
-          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .update({ status: 'active', department_id: billingSkipResult.departmentId, updated_at: new Date().toISOString() })
           .eq('id', conversationId)
           .eq('status', 'closed')
-          .then(({ error: reopenConvErr }: any) => {
-            if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
-          });
+          .then(({ error: e }: any) => { if (e) console.error('[cobrança] Erro ao reabrir conversa:', e); });
+      } else {
+        // Check if this message is a URA response BEFORE creating/reopening attendance
+        const uraHandled = await handleUraResponse(
+          supabase, instanceCtx, conversationId, tenantId, content, supportConfig
+        );
+
+        if (uraHandled) {
+          // URA consumed the message — just increment counter, skip attendance creation
+          // NOTE: If URA closed the attendance (option 0), do NOT reopen the conversation
+          incrementAttendanceCounter(supabase, conversationId, 'customer')
+            .catch(err => console.error('[evolution-webhook] increment error:', err));
+        } else {
+          // Normal flow: ensure attendance exists (reopen/new/ignore goodbye) then increment counter
+          ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
+            .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
+            .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
+
+          // Also reopen the conversation visually if it was closed (only for non-URA messages)
+          supabase
+            .from('whatsapp_conversations')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', conversationId)
+            .eq('status', 'closed')
+            .then(({ error: reopenConvErr }: any) => {
+              if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
+            });
+        }
       }
     } else {
       // Operator message sent via Evolution (e.g. from phone)
@@ -2248,6 +2267,219 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
   }
 }
 
+// =====================================================================
+// BILLING SKIP URA — helpers
+// =====================================================================
+
+interface BillingCheckResult {
+  skip: boolean;
+  departmentId?: string;
+  clienteId?: string | null;
+  minutesAgo?: number;
+}
+
+/**
+ * Verifica se o cliente está respondendo a uma mensagem de cobrança recente.
+ * Se sim, retorna { skip: true, departmentId, clienteId }.
+ */
+async function checkBillingSkipUra(
+  supabase: any,
+  conversationId: string,
+  tenantId: string,
+  supportConfig: any,
+  phone: string
+): Promise<BillingCheckResult> {
+  try {
+    const enabled = supportConfig.billing_skip_ura_enabled ?? true;
+    if (!enabled) {
+      console.log('[cobrança] billing_skip_ura_enabled=false, seguindo fluxo normal');
+      return { skip: false };
+    }
+
+    const windowMinutes = supportConfig.billing_skip_ura_minutes ?? 60;
+    const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+
+    // Buscar última mensagem de cobrança (is_from_me=true, source=billing_automation) nesta conversa
+    const { data: billingMsg } = await supabase
+      .from('whatsapp_messages')
+      .select('id, created_at, metadata')
+      .eq('conversation_id', conversationId)
+      .eq('tenant_id', tenantId)
+      .eq('is_from_me', true)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Filtrar por metadata source=billing_automation
+    const billingHit = billingMsg?.find((m: any) =>
+      m.metadata?.source === 'billing_automation' && m.metadata?.kind === 'cobranca'
+    );
+
+    if (!billingHit) {
+      console.log(`[cobrança] Nenhuma cobrança recente (janela=${windowMinutes}min) na conv=${conversationId}`);
+      return { skip: false };
+    }
+
+    const minutesAgo = (Date.now() - new Date(billingHit.created_at).getTime()) / (1000 * 60);
+    console.log(`[cobrança] Cobrança encontrada há ${minutesAgo.toFixed(1)} min (janela=${windowMinutes}min) conv=${conversationId}`);
+
+    // Buscar setor Financeiro do tenant
+    const { data: financeiroDept } = await supabase
+      .from('support_departments')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .ilike('name', '%financ%')
+      .limit(1)
+      .maybeSingle();
+
+    if (!financeiroDept) {
+      console.warn('[cobrança] Setor Financeiro não encontrado para tenant=' + tenantId + ', seguindo fluxo normal');
+      return { skip: false };
+    }
+
+    // Tentar vincular ao cliente pelo telefone (whatsapp financeiro)
+    let clienteId: string | null = null;
+    if (phone) {
+      const phoneSuffix = phone.length >= 10 ? phone.slice(-10) : phone;
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('cancelado', false)
+        .or(`telefone_whatsapp.ilike.%${phoneSuffix},telefone_whatsapp_contato.ilike.%${phoneSuffix},telefone_contato.ilike.%${phoneSuffix}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (cliente) {
+        clienteId = cliente.id;
+        console.log(`[cobrança] Cliente vinculado: ${clienteId} (telefone sufixo=${phoneSuffix})`);
+      } else {
+        console.log(`[cobrança] Cliente não encontrado pelo telefone sufixo=${phoneSuffix}`);
+      }
+    }
+
+    return {
+      skip: true,
+      departmentId: financeiroDept.id,
+      clienteId,
+      minutesAgo,
+    };
+  } catch (err) {
+    console.error('[cobrança] Erro na verificação de cobrança:', err);
+    return { skip: false };
+  }
+}
+
+/**
+ * Cria atendimento direto no setor Financeiro (sem URA).
+ */
+async function ensureAttendanceForBilling(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+  departmentId: string,
+  clienteId?: string | null
+): Promise<void> {
+  try {
+    // Checar se já existe atendimento ativo
+    const { data: activeAtt } = await supabase
+      .from('support_attendances')
+      .select('id, status, department_id')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+
+    if (activeAtt) {
+      if (activeAtt.department_id !== departmentId) {
+        await supabase
+          .from('support_attendances')
+          .update({ department_id: departmentId, updated_at: new Date().toISOString() })
+          .eq('id', activeAtt.id);
+        console.log(`[cobrança] Atendimento existente ${activeAtt.id} movido para Financeiro`);
+      }
+      if (clienteId) {
+        await supabase
+          .from('support_attendances')
+          .update({ cliente_id: clienteId })
+          .eq('id', activeAtt.id);
+      }
+      return;
+    }
+
+    // Checar reopen
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    const reopenWindow = supportConfig.support_reopen_window_minutes;
+
+    const { data: lastClosed } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at, status, attendance_code')
+      .eq('conversation_id', conversationId)
+      .in('status', ['closed', 'inactive_closed'])
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
+    const diffMinutes = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
+
+    if (lastClosed && diffMinutes <= reopenWindow && lastClosed.status === 'closed') {
+      await supabase
+        .from('support_attendances')
+        .update({
+          status: 'waiting',
+          department_id: departmentId,
+          cliente_id: clienteId || undefined,
+          reopened_at: nowIso,
+          reopened_from: 'customer',
+          created_from: 'billing_automation',
+          updated_at: nowIso,
+        })
+        .eq('id', lastClosed.id);
+      console.log(`[cobrança] REOPEN atendimento ${lastClosed.id} no Financeiro`);
+      return;
+    }
+
+    // Criar novo atendimento no Financeiro
+    const { data: newAtt, error: createErr } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        department_id: departmentId,
+        cliente_id: clienteId || null,
+        status: 'waiting',
+        opened_at: nowIso,
+        created_from: 'billing_automation',
+        ura_state: 'none',
+      })
+      .select('id, attendance_code')
+      .single();
+
+    if (createErr) {
+      console.error('[cobrança] Erro ao criar atendimento:', createErr);
+    } else {
+      console.log(`[cobrança] NOVO atendimento ${newAtt.id} code=${newAtt.attendance_code} no Financeiro, cliente=${clienteId || 'n/a'}`);
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+        .catch(err => console.error('[cobrança] Erro na msg de sistema:', err));
+    }
+
+    // Atualizar department_id na conversa
+    await supabase
+      .from('whatsapp_conversations')
+      .update({ department_id: departmentId, updated_at: nowIso })
+      .eq('id', conversationId);
+
+  } catch (err) {
+    console.error('[cobrança] Erro inesperado:', err);
+  }
+}
+
 /**
  * Handle send.message events from Evolution API (outbound messages sent by automations like N8N).
  * Persists the message in whatsapp_messages with is_from_me=true, updates conversation preview,
@@ -2366,7 +2598,8 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
         tenant_id: tenantId,
         instance_id: instanceData.id,
         metadata: {
-          source: 'automation',
+          source: instanceData.instance_name?.toLowerCase().includes('financ') ? 'billing_automation' : 'automation',
+          kind: instanceData.instance_name?.toLowerCase().includes('financ') ? 'cobranca' : 'general',
           event: 'send.message',
           instanceName: instance,
         },

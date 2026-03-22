@@ -10,6 +10,7 @@ export interface AttendanceInfo {
   opened_at: string;
   closed_at: string | null;
   department_id: string | null;
+  created_from: string | null;
 }
 
 /**
@@ -47,7 +48,7 @@ export function useAttendanceStatus(
       const { data: activeRows } = await supabase
         .from("support_attendances")
         .select(
-          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id"
+          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from"
         )
         .in("conversation_id", conversationIds)
         .in("status", ["waiting", "in_progress"])
@@ -66,6 +67,7 @@ export function useAttendanceStatus(
               opened_at: row.opened_at,
               closed_at: row.closed_at,
               department_id: row.department_id,
+              created_from: row.created_from || null,
             });
           }
         }
@@ -78,7 +80,7 @@ export function useAttendanceStatus(
           const { data: closedRows } = await supabase
             .from("support_attendances")
             .select(
-              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id"
+              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from"
             )
             .in("conversation_id", missingIds)
             .in("status", ["closed", "inactive_closed"])
@@ -94,6 +96,7 @@ export function useAttendanceStatus(
                   opened_at: row.opened_at,
                   closed_at: row.closed_at,
                   department_id: row.department_id,
+                  created_from: row.created_from || null,
                 });
               }
             }
@@ -124,6 +127,7 @@ export function useAttendanceStatus(
         opened_at: row.opened_at,
         closed_at: row.closed_at,
         department_id: row.department_id,
+        created_from: row.created_from || null,
       };
 
       // setQueriesData updates ALL matching queries regardless of their specific key

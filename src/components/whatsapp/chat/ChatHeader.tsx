@@ -130,6 +130,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </Button>
               <Badge variant={statusVariant as any} className="text-[10px] h-4 shrink-0 whitespace-nowrap">{statusLabel}</Badge>
+              {attendance?.created_from === 'billing_automation' && (
+                <Badge variant="outline" className="text-[10px] h-4 shrink-0 whitespace-nowrap border-amber-500 text-amber-600 dark:text-amber-400">
+                  💰 Cobrança
+                </Badge>
+              )}
               {assignedOperatorName && (
                 <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
                   Técnico: {assignedOperatorName}

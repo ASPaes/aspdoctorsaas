@@ -32,6 +32,10 @@ export interface SupportConfig {
   ura_invalid_option_template: string;
   ura_timeout_minutes: number;
   ura_default_department_id: string | null;
+
+  // Billing skip URA
+  billing_skip_ura_enabled: boolean;
+  billing_skip_ura_minutes: number;
 }
 
 /** Defaults matching the DB column defaults exactly */
@@ -67,6 +71,10 @@ const DEFAULTS: SupportConfig = {
     'Não entendi sua opção 😅\nPor favor, responda com um número válido:\n{options}',
   ura_timeout_minutes: 2,
   ura_default_department_id: null,
+
+  // Billing skip URA
+  billing_skip_ura_enabled: true,
+  billing_skip_ura_minutes: 60,
 };
 
 const SELECT_FIELDS = [
@@ -92,6 +100,9 @@ const SELECT_FIELDS = [
   'ura_invalid_option_template',
   'ura_timeout_minutes',
   'ura_default_department_id',
+  // Billing skip URA
+  'billing_skip_ura_enabled',
+  'billing_skip_ura_minutes',
 ].join(', ');
 
 /**
