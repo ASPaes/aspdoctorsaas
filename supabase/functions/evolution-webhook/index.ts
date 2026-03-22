@@ -1341,7 +1341,7 @@ async function handleUraResponse(
   supportConfig: any
 ): Promise<boolean> {
   // Use new department-based URA with fallback to legacy
-  const uraEnabled = supportConfig.ura_enabled ?? supportConfig.support_ura_enabled;
+  const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
   if (!uraEnabled) return false;
 
   // Find active waiting attendance with URA pending state
