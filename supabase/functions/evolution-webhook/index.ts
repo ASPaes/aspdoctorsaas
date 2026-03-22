@@ -1426,10 +1426,20 @@ async function handleUraResponse(
 
   const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
-  const maxOption = hasDepartments ? departments.length : extractMaxOptionFromTemplate(supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '');
+
+  // Build a map of ura_option_number -> department for quick lookup
+  const deptByNumber = new Map<number, any>();
+  if (hasDepartments) {
+    for (const d of departments) {
+      deptByNumber.set(d.ura_option_number, d);
+    }
+  }
+
+  // Valid numbers: 0 (close) or any ura_option_number that exists
+  const isValidOption = !isNaN(optionNumber) && (optionNumber === 0 || deptByNumber.has(optionNumber));
 
   // Invalid option
-  if (isNaN(optionNumber) || optionNumber < 0 || optionNumber > maxOption) {
+  if (!isValidOption) {
     const currentInvalid = (att.ura_invalid_count || 0) + 1;
     console.log(`[ura] Invalid option: "${trimmed}" (attempt ${currentInvalid}/4) conv=${conversationId}`);
 
@@ -1448,11 +1458,11 @@ async function handleUraResponse(
       return true;
     }
 
-    // Send varied invalid message — use new template with {options} replacement
+    // Send varied invalid message — use template with {options} replacement using ura_option_number
     const invalidTemplate = supportConfig.support_ura_invalid_option_template || supportConfig.ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
     let invalidMsg = invalidTemplate;
     if (hasDepartments && invalidMsg.includes('{options}')) {
-      const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n') + '\n0. Encerrar atendimento';
+      const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n') + '\n0. Encerrar atendimento';
       invalidMsg = invalidMsg.replace('{options}', optionsList);
     }
     await sendAndPersistAutoMessage(
