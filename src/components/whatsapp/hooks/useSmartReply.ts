@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -15,6 +16,8 @@ export interface SmartReplyResponse {
 
 export const useSmartReply = (conversationId: string | null) => {
   const queryClient = useQueryClient();
+  const lastInvalidatedRef = useRef<number>(0);
+  const MIN_INTERVAL_MS = 30_000; // mínimo 30s entre invalidações para economizar tokens
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['smart-replies', conversationId],
@@ -25,9 +28,32 @@ export const useSmartReply = (conversationId: string | null) => {
       return data as SmartReplyResponse;
     },
     enabled: !!conversationId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     retry: 1,
   });
+
+  // Escuta mensagens novas do cliente para invalidar sugestões
+  useEffect(() => {
+    if (!conversationId) return;
+    const channel = supabase
+      .channel(`smart-reply-trigger-${conversationId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'whatsapp_messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        const msg = payload.new as any;
+        // Só invalida quando chega mensagem do cliente (não do agente)
+        if (msg.is_from_me) return;
+        const now = Date.now();
+        if (now - lastInvalidatedRef.current < MIN_INTERVAL_MS) return;
+        lastInvalidatedRef.current = now;
+        queryClient.invalidateQueries({ queryKey: ['smart-replies', conversationId] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [conversationId, queryClient]);
 
   const refreshMutation = useMutation({
     mutationFn: async () => {
@@ -38,6 +64,7 @@ export const useSmartReply = (conversationId: string | null) => {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['smart-replies', conversationId], data);
+      lastInvalidatedRef.current = Date.now();
       toast.success('Novas sugestões geradas!');
     },
     onError: (error: any) => {
