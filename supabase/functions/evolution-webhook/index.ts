@@ -964,13 +964,15 @@ async function sendUraWelcome(
       return;
     }
 
-    // Fetch active support DEPARTMENTS for this tenant (replaces support_areas)
+    // Fetch URA-visible departments using ura_option_number for stable ordering
     const { data: departments } = await supabase
       .from('support_departments')
-      .select('id, name, default_instance_id')
+      .select('id, name, default_instance_id, ura_option_number, ura_label, show_in_ura')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
-      .order('name');
+      .eq('show_in_ura', true)
+      .not('ura_option_number', 'is', null)
+      .order('ura_option_number');
 
     // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
