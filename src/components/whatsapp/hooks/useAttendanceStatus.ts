@@ -127,6 +127,7 @@ export function useAttendanceStatus(
         opened_at: row.opened_at,
         closed_at: row.closed_at,
         department_id: row.department_id,
+        created_from: row.created_from || null,
       };
 
       // setQueriesData updates ALL matching queries regardless of their specific key
