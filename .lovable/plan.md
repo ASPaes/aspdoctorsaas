@@ -1,35 +1,39 @@
 
 
-# Fix: Use Department's Default Instance for Chat Links
+# Root Cause: Wrong URA Template Being Used
 
 ## Problem
-When clicking the WhatsApp chat icon from Certificados A1 or Clientes, the system always uses `instances[0].id` (first instance in the list) regardless of the user's department. It should use the `default_instance_id` configured for the user's department.
+There are **two sets of URA columns** in the `configuracoes` table:
 
-## Root Cause
-In `src/pages/WhatsApp.tsx` line 101:
+1. **`support_ura_welcome_template`** — the one edited in the UI (AtendimentoCsatTab). This is what the user configured with their custom text.
+2. **`ura_welcome_template`** — a "v2" column with a hardcoded default: `'Olá! 👋 Para te atender mais rápido, escolha um setor:\n{options}\n\nResponda apenas com o número. 😊'`
+
+The webhook code (line 977) prioritizes `ura_welcome_template` first:
 ```typescript
-const instanceId = instances[0].id;
-```
-This ignores the department context entirely.
-
-## Solution
-**Single file change: `src/pages/WhatsApp.tsx`**
-
-Use `useDepartmentFilter()` to get `selectedDepartment` (which includes `default_instance_id`), then resolve the instance in priority order:
-
-1. `selectedDepartment.default_instance_id` (if exists and is in the instances list)
-2. `instances[0].id` (fallback)
-
-### Changes:
-1. Import `useDepartmentFilter` (already available since the component is wrapped in `DepartmentFilterProvider`)
-2. Call `const { selectedDepartment } = useDepartmentFilter();` inside `WhatsAppContent`
-3. Replace line 101 with instance resolution logic:
-```typescript
-const deptDefaultId = selectedDepartment?.default_instance_id;
-const instanceId = (deptDefaultId && instances.find(i => i.id === deptDefaultId))
-  ? deptDefaultId
-  : instances[0].id;
+const template = supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '';
 ```
 
-No other files need changes — the department context and `default_instance_id` data are already in place.
+Since `ura_welcome_template` always has a non-empty default value in the DB, the user's custom `support_ura_welcome_template` is **never used**.
+
+Same issue applies to `ura_enabled` (defaults to `true`) overriding `support_ura_enabled`.
+
+## Solution — Consolidate to single set of fields
+
+**File: `supabase/functions/evolution-webhook/index.ts`**
+
+1. Swap priority on line 961: use `support_ura_enabled` first (the one the UI controls)
+2. Swap priority on line 977: use `support_ura_welcome_template` first
+3. Swap priority on line 1431: use `support_ura_welcome_template` for max option extraction
+4. Same for invalid option template references
+
+Specifically change:
+- `supportConfig.ura_enabled ?? supportConfig.support_ura_enabled` → `supportConfig.support_ura_enabled ?? supportConfig.ura_enabled`
+- `supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template` → `supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template`
+- Same pattern for `invalid_option_template`
+
+**File: `supabase/functions/_shared/support-config.ts`**
+
+Update the `ura_enabled` default from `true` to `false` so it doesn't override the UI-controlled `support_ura_enabled` when no explicit value is set.
+
+No other files change. The UI already reads/writes the correct `support_ura_*` fields.
 
