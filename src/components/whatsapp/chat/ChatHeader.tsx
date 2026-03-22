@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatBRPhone } from "@/lib/phoneBR";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -71,7 +72,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     [instances, conversation.instance_id]
   );
   const contact = conversation.contact;
-  const name = contact?.name || contact?.phone_number || "Desconhecido";
+  const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
 
   // Use attendance status as single source of truth for status display
   const { attendanceMap } = useAttendanceStatus([conversation.id]);
@@ -141,7 +142,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number ? formatBRPhone(contact.phone_number) : ""}</p>
           </div>
 
           {/* Primary actions — always visible */}

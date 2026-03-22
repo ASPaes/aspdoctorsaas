@@ -74,6 +74,20 @@ export function formatBRPhone(normalized: string): string {
 }
 
 /**
+ * Returns "core" digits (without 55 prefix) for comparison purposes.
+ * Normalizes first, then strips leading 55.
+ */
+export function coreDigits(input: string): string {
+  const normalized = normalizeBRPhone(input);
+  return normalized.startsWith("55") ? normalized.slice(2) : normalized;
+}
+
+/** Alias for backward compatibility */
+export const normalizePhoneDigits = normalizeBRPhone;
+/** Alias for backward compatibility */
+export const formatBrazilPhone = formatBRPhone;
+
+/**
  * Applies live mask to phone input as the user types.
  * Returns the masked display string. Max 13 digits (55 + DDD + 9-digit number).
  */
