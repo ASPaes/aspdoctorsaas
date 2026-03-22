@@ -376,10 +376,12 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       </div>
 
       {/* Department Selector */}
-      <DepartmentSelector />
+      <div className="border-b border-border/40">
+        <DepartmentSelector />
+      </div>
 
       {/* Quick Pills */}
-      <div className="pt-2">
+      <div className="pt-1.5">
         <QuickPills
           active={activePill}
           onChange={setActivePill}
