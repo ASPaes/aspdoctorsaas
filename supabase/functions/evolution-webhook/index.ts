@@ -1451,7 +1451,7 @@ async function handleUraResponse(
     }
 
     // Send varied invalid message — use new template with {options} replacement
-    const invalidTemplate = supportConfig.ura_invalid_option_template || supportConfig.support_ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
+    const invalidTemplate = supportConfig.support_ura_invalid_option_template || supportConfig.ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
     let invalidMsg = invalidTemplate;
     if (hasDepartments && invalidMsg.includes('{options}')) {
       const optionsList = departments.map((d: any, i: number) => `${i + 1}. ${d.name}`).join('\n') + '\n0. Encerrar atendimento';
