@@ -974,7 +974,7 @@ async function sendUraWelcome(
 
     // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
-    const template = supportConfig.ura_welcome_template || supportConfig.support_ura_welcome_template || '';
+    const template = supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '';
     let welcomeText = template
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
