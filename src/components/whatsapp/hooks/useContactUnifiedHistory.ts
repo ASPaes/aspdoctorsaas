@@ -205,6 +205,11 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     });
   }, [allConvIds, convMetaMap, filters.departmentIds, filters.instanceIds, filters.assignedTo, filters.status]);
 
+  // Debug: log query state
+  if (import.meta.env.DEV) {
+    console.log("[unified-history] contactId:", contactId, "enabled:", enabled, "filteredConvIds:", filteredConvIds.length, "allConvIds:", allConvIds.length, "convQueryStatus:", conversationsQuery.status, "convQueryData:", !!conversationsQuery.data);
+  }
+
   const messagesQuery = useQuery({
     queryKey: [
       "contact-unified-messages",
@@ -219,6 +224,8 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     staleTime: 30_000,
     queryFn: async () => {
       if (filteredConvIds.length === 0) return [];
+
+      console.log("[unified-history] fetching messages for", filteredConvIds.length, "conversations, from:", effectiveDateFrom.toISOString());
 
       let q = supabase
         .from("whatsapp_messages")
@@ -238,6 +245,8 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
 
       const { data, error } = await q;
       if (error) throw error;
+
+      console.log("[unified-history] messages fetched:", data?.length ?? 0);
 
       if ((data?.length ?? 0) < PAGE_SIZE) {
         setHasMore(false);
