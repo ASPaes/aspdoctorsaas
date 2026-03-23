@@ -147,15 +147,16 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                   <FormItem>
                     <div className="flex items-center gap-1.5">
                       <FormLabel>Tipo de Provedor</FormLabel>
-                      <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-[250px]"><p>Selecione <strong>Self-Hosted</strong> se instalou o Evolution em seu servidor. <strong>Cloud</strong> se usa Evolution Cloud.</p></TooltipContent>
+                       <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[250px]"><p><strong>Self-Hosted</strong>: Evolution API em seu servidor. <strong>Cloud</strong>: Evolution Cloud. <strong>Meta Cloud</strong>: WhatsApp Business Cloud API oficial.</p></TooltipContent>
                       </Tooltip>
                     </div>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={(val) => { field.onChange(val); setConnectionTested(false); }} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="self_hosted">Evolution API Self-Hosted</SelectItem>
                         <SelectItem value="cloud">Evolution API Cloud</SelectItem>
+                        <SelectItem value="meta_cloud">Meta Cloud API (Oficial)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
