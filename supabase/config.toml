@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.send-meta-message]
 verify_jwt = false
+
+[functions.diagnose-contact-history]
+verify_jwt = false
