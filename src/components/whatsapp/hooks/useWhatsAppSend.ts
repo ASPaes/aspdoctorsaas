@@ -16,24 +16,77 @@ interface SendMessageParams {
 
 let tempCounter = 0;
 
+/**
+ * Resolve which Edge Function to call based on the conversation's instance provider_type.
+ * Looks up the instance from the query cache first, then falls back to a DB query.
+ */
+async function resolveEdgeFunction(
+  conversationId: string,
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<string> {
+  // Try to find instance_id from conversations cache
+  const convCaches = queryClient.getQueriesData<any>({ queryKey: ['whatsapp', 'conversations'] });
+  let instanceId: string | null = null;
+
+  for (const [, cacheData] of convCaches) {
+    if (!cacheData?.conversations) continue;
+    const conv = cacheData.conversations.find((c: any) => c.id === conversationId);
+    if (conv?.instance_id) {
+      instanceId = conv.instance_id;
+      break;
+    }
+  }
+
+  if (!instanceId) {
+    // Fallback: fetch from DB
+    const { data } = await supabase
+      .from('whatsapp_conversations')
+      .select('instance_id')
+      .eq('id', conversationId)
+      .single();
+    instanceId = data?.instance_id || null;
+  }
+
+  if (!instanceId) return 'send-whatsapp-message';
+
+  // Check instance cache
+  const instanceCaches = queryClient.getQueriesData<any[]>({ queryKey: ['whatsapp', 'instances'] });
+  for (const [, instances] of instanceCaches) {
+    if (!Array.isArray(instances)) continue;
+    const inst = instances.find((i: any) => i.id === instanceId);
+    if (inst) {
+      return inst.provider_type === 'meta_cloud' ? 'send-meta-message' : 'send-whatsapp-message';
+    }
+  }
+
+  // Fallback: fetch instance from DB
+  const { data: inst } = await supabase
+    .from('whatsapp_instances')
+    .select('provider_type')
+    .eq('id', instanceId)
+    .single();
+
+  return inst?.provider_type === 'meta_cloud' ? 'send-meta-message' : 'send-whatsapp-message';
+}
+
 export const useWhatsAppSend = () => {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (params: SendMessageParams) => {
-      const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
+      const fnName = await resolveEdgeFunction(params.conversationId, queryClient);
+      console.log(`[useWhatsAppSend] Routing to ${fnName} for conversation ${params.conversationId}`);
+      const { data, error } = await supabase.functions.invoke(fnName, {
         body: params,
       });
       if (error) throw error;
       return data;
     },
     onMutate: async (newMessage) => {
-      // Generate a stable temp ID for this specific send
       const tempId = `temp-${Date.now()}-${++tempCounter}`;
 
       const previousMessages = queryClient.getQueryData<Message[]>(['whatsapp', 'messages', newMessage.conversationId]);
 
-      // Generate a local preview URL for base64 media
       let optimisticMediaUrl = newMessage.mediaUrl ?? null;
       if (!optimisticMediaUrl && newMessage.mediaBase64) {
         const base64Data = newMessage.mediaBase64.startsWith('data:')
@@ -68,7 +121,6 @@ export const useWhatsAppSend = () => {
         (old: Message[] = []) => [...old, optimisticMessage]
       );
 
-      // Optimistically update conversation's last_message_at for instant sidebar reorder
       queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
         if (!old?.conversations) return old;
         const patched = old.conversations.map((c: any) =>
@@ -82,7 +134,6 @@ export const useWhatsAppSend = () => {
               }
             : c
         );
-        // Re-sort
         patched.sort((a: any, b: any) => {
           const tA = a.last_message_at || a.created_at || '';
           const tB = b.last_message_at || b.created_at || '';
@@ -99,8 +150,6 @@ export const useWhatsAppSend = () => {
       }
     },
     onSettled: (data, _error, variables) => {
-      // Se a Edge Function retornou a mensagem salva, reconcilia direto no cache
-      // sem invalidar (evita sobrescrever mensagens que chegaram via Realtime)
       if (data?.message) {
         const realMessage = normalizeMessage(data.message);
         queryClient.setQueryData(
@@ -109,7 +158,6 @@ export const useWhatsAppSend = () => {
         );
         return;
       }
-      // Fallback: se não veio dado real, invalida após delay para garantir consistência
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
       }, 3000);
