@@ -289,7 +289,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
               <DialogTitle className="flex items-center gap-2">
                 <Check className="h-5 w-5 text-green-500" />Instância criada com sucesso!
               </DialogTitle>
-              <DialogDescription>Configure o webhook na Evolution API</DialogDescription>
+              <DialogDescription>{lastCreatedProviderType === 'meta_cloud' ? 'Configure o webhook no Meta Developer' : 'Configure o webhook na Evolution API'}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <Alert>
@@ -302,14 +302,25 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                       <Button size="sm" variant="outline" onClick={copyWebhookUrl}><Copy className="h-4 w-4" /></Button>
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <strong>Events:</strong>
-                    <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-                      <li>MESSAGES_UPSERT</li>
-                      <li>MESSAGES_UPDATE</li>
-                      <li>CONNECTION_UPDATE</li>
-                    </ul>
-                  </div>
+                  {lastCreatedProviderType === 'meta_cloud' ? (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">No <strong>Meta Developer → WhatsApp → Configuration</strong>:</p>
+                      <ol className="list-decimal list-inside text-sm space-y-1">
+                        <li>Cole a URL acima em <strong>Callback URL</strong></li>
+                        <li>Use o <strong>Verify Token</strong> que você acabou de cadastrar</li>
+                        <li>Assine os campos: <strong>messages</strong></li>
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <strong>Events:</strong>
+                      <ul className="list-disc list-inside text-sm mt-1 space-y-1">
+                        <li>MESSAGES_UPSERT</li>
+                        <li>MESSAGES_UPDATE</li>
+                        <li>CONNECTION_UPDATE</li>
+                      </ul>
+                    </div>
+                  )}
                 </AlertDescription>
               </Alert>
               <Button onClick={handleClose} className="w-full">Fechar</Button>
