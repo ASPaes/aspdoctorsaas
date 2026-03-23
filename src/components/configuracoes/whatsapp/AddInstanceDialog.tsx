@@ -60,6 +60,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
     defaultValues: {
       display_name: "", instance_name: "", instance_id_external: "",
       api_url: "", api_key: "", provider_type: "self_hosted",
+      meta_phone_number_id: "", meta_access_token: "", meta_verify_token: "",
     },
   });
 
