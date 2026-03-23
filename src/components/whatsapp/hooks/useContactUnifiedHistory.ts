@@ -262,10 +262,14 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     }
   }, [messages]);
 
+  // When conversations loaded but messages query just enabled and hasn't resolved yet
+  const messagesNotReady = filteredConvIds.length > 0 && !messagesQuery.data && !messagesQuery.isError;
+  const effectiveLoading = conversationsQuery.isLoading || messagesQuery.isLoading || messagesNotReady;
+
   return {
     messages: filteredMessages,
     convMetaMap,
-    isLoading: conversationsQuery.isLoading || messagesQuery.isLoading,
+    isLoading: effectiveLoading,
     isFetching: conversationsQuery.isFetching || messagesQuery.isFetching,
     filters,
     updateFilter,
