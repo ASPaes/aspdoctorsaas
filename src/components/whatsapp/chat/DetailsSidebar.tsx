@@ -493,15 +493,14 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           )}
         </div>
       </div>
-      {/* Contact History Modal */}
+      {/* Contact History Unified Modal */}
       {isAdminOrHead && (
-        <ContactHistoryModal
+        <ContactHistoryUnifiedModal
           open={historyOpen}
           onOpenChange={setHistoryOpen}
           contactId={contact?.id || ""}
           contactName={name}
           contactPhone={contact?.phone_number || ""}
-          onNavigateToConversation={onNavigateToConversation}
         />
       )}
     </div>
