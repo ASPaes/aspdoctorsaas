@@ -255,6 +255,7 @@ async function processMessage(
   msg: any,
   isFromMe: boolean,
   metaTimestamp: number | null,
+  accessToken: string | null,
 ) {
   const messageId = msg.id;
   if (!messageId) {
@@ -332,6 +333,32 @@ async function processMessage(
     console.log(`${LOG} Message saved: message_id=${messageId}, conversation_id=${conversationId}, instance_id=${instanceId}, tenant_id=${tenantId}`);
   } else {
     console.log(`${LOG} Duplicate ignored: message_id=${messageId}`);
+  }
+
+  // ── Download and store media if present ────────────────────────────
+  if (savedMsg && mediaMeta?.meta_media_id && accessToken) {
+    const { storagePath } = await downloadAndUploadMetaMedia(
+      supabase,
+      accessToken,
+      mediaMeta.meta_media_id,
+      mediaMeta.mime_type || 'application/octet-stream',
+      tenantId,
+      instanceId,
+      conversationId,
+      messageId,
+      mediaMeta.filename,
+    );
+
+    if (storagePath) {
+      await supabase
+        .from('whatsapp_messages')
+        .update({
+          media_path: storagePath,
+          media_url: storagePath, // UI uses media_path for signed URL generation
+        })
+        .eq('id', savedMsg.id);
+      console.log(`${LOG} Media path updated on message: ${savedMsg.id}`);
+    }
   }
 
   // Update conversation preview
