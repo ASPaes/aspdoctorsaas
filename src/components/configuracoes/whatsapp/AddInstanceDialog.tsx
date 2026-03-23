@@ -100,12 +100,20 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
 
   const onSubmit = async (values: FormValues) => {
     try {
+      const isMeta = values.provider_type === 'meta_cloud';
       await createInstance.mutateAsync({
         display_name: values.display_name,
         instance_name: values.instance_name,
         instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : undefined,
-        api_url: values.api_url, api_key: values.api_key,
+        api_url: isMeta ? '' : values.api_url,
+        api_key: isMeta ? '' : values.api_key,
         provider_type: values.provider_type,
+        // Meta Cloud specific fields
+        ...(isMeta && {
+          meta_phone_number_id: values.meta_phone_number_id,
+          meta_access_token: values.meta_access_token,
+          meta_verify_token: values.meta_verify_token,
+        }),
       });
       setShowWebhookInstructions(true);
       form.reset();
