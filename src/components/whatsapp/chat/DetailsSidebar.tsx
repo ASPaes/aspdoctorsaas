@@ -184,6 +184,19 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             )}
           </div>
 
+          {/* History button — Admin/Head only */}
+          {isAdminOrHead && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs gap-1.5"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="h-3.5 w-3.5" />
+              Histórico do Contato
+            </Button>
+          )}
+
           {/* ─── Cliente Link ─── */}
           <ClienteLinkCard conversation={conversation} />
 
