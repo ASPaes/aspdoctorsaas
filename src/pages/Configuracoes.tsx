@@ -91,7 +91,9 @@ export default function Configuracoes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const defaultTab = searchParams.get("tab") || "percentuais";
+  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios"];
+  const rawTab = searchParams.get("tab") || "percentuais";
+  const defaultTab = (!isAdmin && ADMIN_ONLY_TABS.includes(rawTab)) ? "percentuais" : rawTab;
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
