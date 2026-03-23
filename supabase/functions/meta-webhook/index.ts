@@ -57,7 +57,7 @@ function extractContent(msg: any): string {
   return '';
 }
 
-// ── Build media metadata (no download yet — will be handled later) ──
+// ── Build media metadata ─────────────────────────────────────────────
 function extractMediaMeta(msg: any): Record<string, any> | null {
   if (!msg) return null;
   const t = msg.type;
@@ -71,6 +71,80 @@ function extractMediaMeta(msg: any): Record<string, any> | null {
     filename: media.filename || null,
     sha256: media.sha256 || null,
   };
+}
+
+// ── Download media from Meta Graph API and upload to Supabase Storage ─
+async function downloadAndUploadMetaMedia(
+  supabase: any,
+  accessToken: string,
+  mediaId: string,
+  mimetype: string,
+  tenantId: string,
+  instanceId: string,
+  conversationId: string,
+  messageId: string,
+  filename: string | null,
+): Promise<{ storagePath: string | null }> {
+  try {
+    // Step 1: Get media URL from Graph API
+    console.log(`${LOG} Fetching media URL for media_id=${mediaId}`);
+    const metaResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!metaResp.ok) {
+      console.error(`${LOG} Failed to get media URL: ${metaResp.status} ${await metaResp.text()}`);
+      return { storagePath: null };
+    }
+
+    const metaData = await metaResp.json();
+    const mediaUrl = metaData.url;
+    if (!mediaUrl) {
+      console.error(`${LOG} No url in media response`);
+      return { storagePath: null };
+    }
+
+    // Step 2: Download the binary content
+    console.log(`${LOG} Downloading media binary from Meta CDN`);
+    const downloadResp = await fetch(mediaUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!downloadResp.ok) {
+      console.error(`${LOG} Failed to download media: ${downloadResp.status}`);
+      return { storagePath: null };
+    }
+
+    const mediaBytes = new Uint8Array(await downloadResp.arrayBuffer());
+    const blob = new Blob([mediaBytes], { type: mimetype });
+
+    // Step 3: Build storage path (mirrors Evolution pattern)
+    const ext = filename
+      ? filename.split('.').pop()?.toLowerCase() || mimetype.split('/')[1]?.split(';')[0] || 'bin'
+      : mimetype.split('/')[1]?.split(';')[0] || 'bin';
+    const storageFilename = `${Date.now()}-${mediaId}.${ext}`;
+    const storagePath = `${tenantId}/${instanceId}/${conversationId}/${storageFilename}`;
+
+    // Step 4: Upload to Supabase Storage
+    console.log(`${LOG} Uploading media to storage: ${storagePath}`);
+    const { error: uploadError } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(storagePath, blob, {
+        contentType: mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error(`${LOG} Storage upload error:`, uploadError);
+      return { storagePath: null };
+    }
+
+    console.log(`${LOG} Media uploaded: ${storagePath}`);
+    return { storagePath };
+  } catch (error) {
+    console.error(`${LOG} Error in downloadAndUploadMetaMedia:`, error);
+    return { storagePath: null };
+  }
 }
 
 // ── Find or create contact ───────────────────────────────────────────
