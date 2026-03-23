@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
 import { UseFormReturn } from "react-hook-form";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,13 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Users, Loader2, MessageCircle, X, Search, Star, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { maskCNPJ, maskCPF, maskCEP } from "@/lib/masks";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useContactDiagnosis, type SavedEvaluation } from "@/components/whatsapp/hooks/useContactDiagnosis";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
 
 interface Props {
@@ -673,6 +677,107 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           onOpenChange={setContatosOpen}
         />
       )}
+
+      {/* Avaliações de Atendimento */}
+      {clienteId && <AvaliacoesSection clienteId={clienteId} />}
     </div>
+  );
+}
+
+// ─── Avaliações de Atendimento Section ───
+function AvaliacoesSection({ clienteId }: { clienteId: string }) {
+  const { evaluations, isLoadingEvaluations } = useContactDiagnosis(clienteId);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (isLoadingEvaluations) return null;
+  if (evaluations.length === 0) return null;
+
+  const sentimentLabel = (s: string | null) => {
+    switch (s) {
+      case "positive": return "😊 Positivo";
+      case "negative": return "😟 Negativo";
+      default: return "😐 Neutro";
+    }
+  };
+
+  return (
+    <>
+      <Separator className="my-6" />
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Avaliações de Atendimento IA</h3>
+          <span className="text-xs text-muted-foreground">({evaluations.length})</span>
+        </div>
+
+        <div className="space-y-2">
+          {evaluations.map((ev) => (
+            <Collapsible key={ev.id} open={expandedId === ev.id} onOpenChange={(open) => setExpandedId(open ? ev.id : null)}>
+              <div className="border border-border rounded-lg">
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 rounded-lg transition-colors text-left">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-3 w-3 ${star <= (ev.nota ?? 0) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs">{sentimentLabel(ev.sentimento)}</span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[200px]">{ev.resumo}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] text-muted-foreground">
+                        {format(new Date(ev.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                      {expandedId === ev.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </div>
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+                    <p className="text-xs text-foreground/90 whitespace-pre-wrap">{ev.resumo}</p>
+
+                    {ev.pontos_chave && ev.pontos_chave.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Pontos-chave</span>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {ev.pontos_chave.map((p, i) => (
+                            <li key={i} className="text-[11px] text-foreground/80">• {p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {ev.itens_acao && ev.itens_acao.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Itens de Ação</span>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {ev.itens_acao.map((a, i) => (
+                            <li key={i} className="text-[11px] text-foreground/80">→ {a}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 text-[10px] text-muted-foreground pt-1">
+                      {ev.total_mensagens > 0 && <span>{ev.total_mensagens} mensagens</span>}
+                      {ev.total_conversas > 0 && <span>{ev.total_conversas} conversas</span>}
+                      {ev.periodo_inicio && ev.periodo_fim && (
+                        <span>
+                          {format(new Date(ev.periodo_inicio), "dd/MM/yy")} – {format(new Date(ev.periodo_fim), "dd/MM/yy")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
