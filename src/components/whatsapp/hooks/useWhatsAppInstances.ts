@@ -78,12 +78,15 @@ export const useWhatsAppInstances = () => {
 
   const updateInstance = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      const { api_url, api_key, provider_type, instance_id_external, ...instanceUpdates } = updates;
+      const { api_url, api_key, provider_type, instance_id_external,
+              meta_phone_number_id, meta_access_token, meta_verify_token,
+              ...instanceUpdates } = updates;
 
       const finalUpdates = {
         ...instanceUpdates,
         ...(provider_type && { provider_type }),
         ...(instance_id_external !== undefined && { instance_id_external }),
+        ...(meta_phone_number_id !== undefined && { meta_phone_number_id }),
       };
 
       const { data, error: instanceError } = await (supabase
@@ -95,11 +98,17 @@ export const useWhatsAppInstances = () => {
 
       if (instanceError) throw instanceError;
 
-      if (api_url || api_key) {
+      const secretsUpdate: any = {};
+      if (api_url) secretsUpdate.api_url = api_url;
+      if (api_key) secretsUpdate.api_key = api_key;
+      if (meta_access_token !== undefined) secretsUpdate.meta_access_token = meta_access_token;
+      if (meta_verify_token !== undefined) secretsUpdate.meta_verify_token = meta_verify_token;
+
+      if (Object.keys(secretsUpdate).length > 0) {
         const { error: secretsError } = await (supabase
           .from('whatsapp_instance_secrets') as any)
           .upsert(
-            { instance_id: id, ...(api_url && { api_url }), ...(api_key && { api_key }) },
+            { instance_id: id, ...secretsUpdate },
             { onConflict: 'instance_id' }
           );
         if (secretsError) throw secretsError;
