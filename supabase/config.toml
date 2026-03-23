@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.finalize-attendance]
 verify_jwt = false
+
+[functions.meta-webhook]
+verify_jwt = false

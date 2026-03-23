@@ -2559,6 +2559,8 @@ export type Database = {
           created_at: string
           id: string
           instance_id: string
+          meta_access_token: string | null
+          meta_verify_token: string | null
           tenant_id: string
           updated_at: string
         }
@@ -2568,6 +2570,8 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id: string
+          meta_access_token?: string | null
+          meta_verify_token?: string | null
           tenant_id: string
           updated_at?: string
         }
@@ -2577,6 +2581,8 @@ export type Database = {
           created_at?: string
           id?: string
           instance_id?: string
+          meta_access_token?: string | null
+          meta_verify_token?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -2604,6 +2610,9 @@ export type Database = {
           id: string
           instance_id_external: string | null
           instance_name: string
+          meta_business_id: string | null
+          meta_phone_number_id: string | null
+          meta_waba_id: string | null
           phone_number: string | null
           provider_type: string
           status: string
@@ -2617,6 +2626,9 @@ export type Database = {
           id?: string
           instance_id_external?: string | null
           instance_name: string
+          meta_business_id?: string | null
+          meta_phone_number_id?: string | null
+          meta_waba_id?: string | null
           phone_number?: string | null
           provider_type?: string
           status?: string
@@ -2630,6 +2642,9 @@ export type Database = {
           id?: string
           instance_id_external?: string | null
           instance_name?: string
+          meta_business_id?: string | null
+          meta_phone_number_id?: string | null
+          meta_waba_id?: string | null
           phone_number?: string | null
           provider_type?: string
           status?: string
