@@ -54,7 +54,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionTested, setConnectionTested] = useState(false);
   const [showWebhookInstructions, setShowWebhookInstructions] = useState(false);
-
+  const [lastCreatedProviderType, setLastCreatedProviderType] = useState<string>('self_hosted');
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
