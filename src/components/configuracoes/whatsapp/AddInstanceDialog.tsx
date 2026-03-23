@@ -24,9 +24,22 @@ const formSchema = z.object({
   display_name: z.string().min(1, "Nome obrigatório"),
   instance_name: z.string().min(1, "Nome da instância obrigatório").regex(/^[a-zA-Z0-9_-]+$/, "Apenas letras, números, _ e -"),
   instance_id_external: z.string().optional(),
-  api_url: z.string().url("URL inválida"),
-  api_key: z.string().min(1, "Token/API Key obrigatório"),
-  provider_type: z.enum(["self_hosted", "cloud"]),
+  api_url: z.string().url("URL inválida").or(z.literal("")),
+  api_key: z.string().min(1, "Token/API Key obrigatório").or(z.literal("")),
+  provider_type: z.enum(["self_hosted", "cloud", "meta_cloud"]),
+  // Meta Cloud specific
+  meta_phone_number_id: z.string().optional(),
+  meta_access_token: z.string().optional(),
+  meta_verify_token: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.provider_type !== 'meta_cloud') {
+    if (!data.api_url) ctx.addIssue({ code: 'custom', path: ['api_url'], message: 'URL inválida' });
+    if (!data.api_key) ctx.addIssue({ code: 'custom', path: ['api_key'], message: 'Token/API Key obrigatório' });
+  } else {
+    if (!data.meta_phone_number_id) ctx.addIssue({ code: 'custom', path: ['meta_phone_number_id'], message: 'Phone Number ID obrigatório' });
+    if (!data.meta_access_token) ctx.addIssue({ code: 'custom', path: ['meta_access_token'], message: 'Access Token obrigatório' });
+    if (!data.meta_verify_token) ctx.addIssue({ code: 'custom', path: ['meta_verify_token'], message: 'Verify Token obrigatório' });
+  }
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -41,12 +54,13 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionTested, setConnectionTested] = useState(false);
   const [showWebhookInstructions, setShowWebhookInstructions] = useState(false);
-
+  const [lastCreatedProviderType, setLastCreatedProviderType] = useState<string>('self_hosted');
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       display_name: "", instance_name: "", instance_id_external: "",
       api_url: "", api_key: "", provider_type: "self_hosted",
+      meta_phone_number_id: "", meta_access_token: "", meta_verify_token: "",
     },
   });
 
@@ -86,13 +100,22 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
 
   const onSubmit = async (values: FormValues) => {
     try {
+      const isMeta = values.provider_type === 'meta_cloud';
       await createInstance.mutateAsync({
         display_name: values.display_name,
         instance_name: values.instance_name,
         instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : undefined,
-        api_url: values.api_url, api_key: values.api_key,
+        api_url: isMeta ? '' : values.api_url,
+        api_key: isMeta ? '' : values.api_key,
         provider_type: values.provider_type,
+        // Meta Cloud specific fields
+        ...(isMeta && {
+          meta_phone_number_id: values.meta_phone_number_id,
+          meta_access_token: values.meta_access_token,
+          meta_verify_token: values.meta_verify_token,
+        }),
       });
+      setLastCreatedProviderType(values.provider_type);
       setShowWebhookInstructions(true);
       form.reset();
       setConnectionTested(false);
@@ -107,7 +130,8 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
     onOpenChange(false);
   };
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+  const metaWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook`;
+  const webhookUrl = lastCreatedProviderType === 'meta_cloud' ? metaWebhookUrl : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
   const copyWebhookUrl = () => { navigator.clipboard.writeText(webhookUrl); toast.success("URL copiada!"); };
 
   return (
@@ -117,7 +141,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
           <>
             <DialogHeader>
               <DialogTitle>Nova Instância</DialogTitle>
-              <DialogDescription>Adicione uma nova instância da Evolution API</DialogDescription>
+              <DialogDescription>Adicione uma nova instância WhatsApp</DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -125,15 +149,16 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                   <FormItem>
                     <div className="flex items-center gap-1.5">
                       <FormLabel>Tipo de Provedor</FormLabel>
-                      <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-[250px]"><p>Selecione <strong>Self-Hosted</strong> se instalou o Evolution em seu servidor. <strong>Cloud</strong> se usa Evolution Cloud.</p></TooltipContent>
+                       <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[250px]"><p><strong>Self-Hosted</strong>: Evolution API em seu servidor. <strong>Cloud</strong>: Evolution Cloud. <strong>Meta Cloud</strong>: WhatsApp Business Cloud API oficial.</p></TooltipContent>
                       </Tooltip>
                     </div>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={(val) => { field.onChange(val); setConnectionTested(false); }} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="self_hosted">Evolution API Self-Hosted</SelectItem>
                         <SelectItem value="cloud">Evolution API Cloud</SelectItem>
+                        <SelectItem value="meta_cloud">Meta Cloud API (Oficial)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -176,30 +201,81 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                   )} />
                 )}
 
-                <FormField control={form.control} name="api_url" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL da API</FormLabel>
-                    <FormControl>
-                      <Input placeholder={providerType === 'cloud' ? "https://api.evoapicloud.com" : "https://api.evolution.com"} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                {/* Evolution fields (self_hosted / cloud) */}
+                {providerType !== 'meta_cloud' && (
+                  <>
+                    <FormField control={form.control} name="api_url" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL da API</FormLabel>
+                        <FormControl>
+                          <Input placeholder={providerType === 'cloud' ? "https://api.evoapicloud.com" : "https://api.evolution.com"} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
 
-                <FormField control={form.control} name="api_key" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{providerType === 'cloud' ? 'Token da Instância' : 'API Key'}</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                    <FormField control={form.control} name="api_key" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{providerType === 'cloud' ? 'Token da Instância' : 'API Key'}</FormLabel>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </>
+                )}
+
+                {/* Meta Cloud fields */}
+                {providerType === 'meta_cloud' && (
+                  <>
+                    <FormField control={form.control} name="meta_phone_number_id" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>Phone Number ID</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>ID do número de telefone no Meta Business. Encontre em: Meta Developer → WhatsApp → Getting Started.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input placeholder="123456789012345" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="meta_access_token" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>Access Token (Permanente)</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>Token permanente da Meta. Gere em: Meta Developer → System Users → Generate Token.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="meta_verify_token" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>Verify Token</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>Token usado para validar o webhook da Meta. Escolha qualquer string secreta e use a mesma na configuração do webhook no Meta Developer.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input placeholder="meu-token-secreto" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </>
+                )}
 
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
-                    {isTestingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : connectionTested ? <Check className="mr-2 h-4 w-4" /> : null}
-                    Testar Conexão
-                  </Button>
-                  <Button type="submit" disabled={!connectionTested || createInstance.isPending} className="ml-auto">
+                  {providerType !== 'meta_cloud' && (
+                    <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
+                      {isTestingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : connectionTested ? <Check className="mr-2 h-4 w-4" /> : null}
+                      Testar Conexão
+                    </Button>
+                  )}
+                  <Button type="submit" disabled={providerType !== 'meta_cloud' ? (!connectionTested || createInstance.isPending) : createInstance.isPending} className="ml-auto">
                     {createInstance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Salvar
                   </Button>
@@ -213,7 +289,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
               <DialogTitle className="flex items-center gap-2">
                 <Check className="h-5 w-5 text-green-500" />Instância criada com sucesso!
               </DialogTitle>
-              <DialogDescription>Configure o webhook na Evolution API</DialogDescription>
+              <DialogDescription>{lastCreatedProviderType === 'meta_cloud' ? 'Configure o webhook no Meta Developer' : 'Configure o webhook na Evolution API'}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <Alert>
@@ -226,14 +302,25 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                       <Button size="sm" variant="outline" onClick={copyWebhookUrl}><Copy className="h-4 w-4" /></Button>
                     </div>
                   </div>
-                  <div className="mt-4">
-                    <strong>Events:</strong>
-                    <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-                      <li>MESSAGES_UPSERT</li>
-                      <li>MESSAGES_UPDATE</li>
-                      <li>CONNECTION_UPDATE</li>
-                    </ul>
-                  </div>
+                  {lastCreatedProviderType === 'meta_cloud' ? (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">No <strong>Meta Developer → WhatsApp → Configuration</strong>:</p>
+                      <ol className="list-decimal list-inside text-sm space-y-1">
+                        <li>Cole a URL acima em <strong>Callback URL</strong></li>
+                        <li>Use o <strong>Verify Token</strong> que você acabou de cadastrar</li>
+                        <li>Assine os campos: <strong>messages</strong></li>
+                      </ol>
+                    </div>
+                  ) : (
+                    <div className="mt-4">
+                      <strong>Events:</strong>
+                      <ul className="list-disc list-inside text-sm mt-1 space-y-1">
+                        <li>MESSAGES_UPSERT</li>
+                        <li>MESSAGES_UPDATE</li>
+                        <li>CONNECTION_UPDATE</li>
+                      </ul>
+                    </div>
+                  )}
                 </AlertDescription>
               </Alert>
               <Button onClick={handleClose} className="w-full">Fechar</Button>
