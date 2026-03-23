@@ -25,11 +25,12 @@ export interface ConversationMeta {
   assignedTo: string | null;
   assignedToName: string | null;
   attendanceStatus: string | null;
+  attendanceCode: string | null;
 }
 
 export interface UnifiedHistoryFilters {
-  departmentId: string | null;
-  instanceId: string | null;
+  departmentIds: string[];
+  instanceIds: string[];
   status: string | null;
   dateFrom: Date | null;
   dateTo: Date | null;
@@ -38,8 +39,8 @@ export interface UnifiedHistoryFilters {
 }
 
 const DEFAULT_FILTERS: UnifiedHistoryFilters = {
-  departmentId: null,
-  instanceId: null,
+  departmentIds: [],
+  instanceIds: [],
   status: null,
   dateFrom: null,
   dateTo: null,
@@ -56,7 +57,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
   const [oldestTimestamp, setOldestTimestamp] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  // Reset pagination when filters change
   const resetPagination = useCallback(() => {
     setOldestTimestamp(null);
     setHasMore(true);
@@ -75,10 +75,9 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     resetPagination();
   }, [resetPagination]);
 
-  // Default date range: last 7 days
   const effectiveDateFrom = filters.dateFrom ?? new Date(Date.now() - DEFAULT_DAYS * 24 * 60 * 60 * 1000);
 
-  // Step 1: Fetch all conversations for this contact (lightweight)
+  // Step 1: Fetch all conversations + meta
   const conversationsQuery = useQuery({
     queryKey: ["contact-unified-conversations", contactId, tid],
     enabled: !!contactId && enabled,
@@ -86,7 +85,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     queryFn: async () => {
       if (!contactId) return { conversations: [], convMetaMap: new Map<string, ConversationMeta>(), departments: [] as { id: string; name: string }[], instances: [] as { id: string; name: string }[], agents: [] as { id: string; name: string }[] };
 
-      // 1. Conversations
       let convQ = supabase
         .from("whatsapp_conversations")
         .select("id, instance_id, status")
@@ -102,21 +100,20 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
 
       const convIds = conversations.map((c) => c.id);
 
-      // 2. Attendances (latest per conversation)
+      // Attendances with attendance_code
       const { data: attendances } = await supabase
         .from("support_attendances")
-        .select("conversation_id, status, department_id, assigned_to")
+        .select("conversation_id, status, department_id, assigned_to, attendance_code")
         .in("conversation_id", convIds)
         .order("opened_at", { ascending: false });
 
-      const attMap = new Map<string, { status: string; department_id: string | null; assigned_to: string | null }>();
+      const attMap = new Map<string, { status: string; department_id: string | null; assigned_to: string | null; attendance_code: string | null }>();
       for (const att of attendances || []) {
         if (!attMap.has(att.conversation_id)) {
-          attMap.set(att.conversation_id, att);
+          attMap.set(att.conversation_id, { status: att.status, department_id: att.department_id, assigned_to: att.assigned_to, attendance_code: att.attendance_code || null });
         }
       }
 
-      // 3. Collect unique IDs
       const deptIds = new Set<string>();
       const instIds = new Set<string>();
       const agentIds = new Set<string>();
@@ -127,7 +124,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
         if (conv.instance_id) instIds.add(conv.instance_id);
       }
 
-      // 4. Resolve names in parallel
       const [deptsRes, instsRes, agentsRes] = await Promise.all([
         deptIds.size > 0
           ? supabase.from("support_departments").select("id, name").in("id", Array.from(deptIds))
@@ -146,7 +142,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
       const instMap = new Map<string, string>();
       for (const i of (instsRes as any).data || []) instMap.set(i.id, i.display_name || i.instance_name);
 
-      // Resolve agent names via funcionarios
       const agentProfileMap = new Map<string, number>();
       for (const p of (agentsRes as any).data || []) {
         if (p.funcionario_id) agentProfileMap.set(p.user_id, p.funcionario_id);
@@ -166,7 +161,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
         }
       }
 
-      // 5. Build meta map
       const convMetaMap = new Map<string, ConversationMeta>();
       for (const conv of conversations) {
         const att = attMap.get(conv.id);
@@ -180,10 +174,10 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
           assignedTo: att?.assigned_to || null,
           assignedToName: att?.assigned_to ? agentNameMap.get(att.assigned_to) || null : null,
           attendanceStatus: att?.status || null,
+          attendanceCode: att?.attendance_code || null,
         });
       }
 
-      // Build filter options
       const departments = Array.from(deptMap.entries()).map(([id, name]) => ({ id, name }));
       const instances = Array.from(instMap.entries()).map(([id, name]) => ({ id, name }));
       const agents = Array.from(agentNameMap.entries()).map(([id, name]) => ({ id, name }));
@@ -195,14 +189,13 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
   const convMetaMap = conversationsQuery.data?.convMetaMap ?? new Map<string, ConversationMeta>();
   const allConvIds = conversationsQuery.data?.conversations.map((c) => c.id) ?? [];
 
-  // Apply conversation-level filters to get relevant conv IDs
   const filteredConvIds = useMemo(() => {
     if (allConvIds.length === 0) return [];
     return allConvIds.filter((cid) => {
       const meta = convMetaMap.get(cid);
       if (!meta) return false;
-      if (filters.departmentId && meta.departmentId !== filters.departmentId) return false;
-      if (filters.instanceId && meta.instance_id !== filters.instanceId) return false;
+      if (filters.departmentIds.length > 0 && (!meta.departmentId || !filters.departmentIds.includes(meta.departmentId))) return false;
+      if (filters.instanceIds.length > 0 && (!meta.instance_id || !filters.instanceIds.includes(meta.instance_id))) return false;
       if (filters.assignedTo && meta.assignedTo !== filters.assignedTo) return false;
       if (filters.status) {
         const effectiveStatus = meta.attendanceStatus || meta.status;
@@ -210,9 +203,8 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
       }
       return true;
     });
-  }, [allConvIds, convMetaMap, filters.departmentId, filters.instanceId, filters.assignedTo, filters.status]);
+  }, [allConvIds, convMetaMap, filters.departmentIds, filters.instanceIds, filters.assignedTo, filters.status]);
 
-  // Step 2: Fetch messages for filtered conversations
   const messagesQuery = useQuery({
     queryKey: [
       "contact-unified-messages",
@@ -257,7 +249,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
 
   const messages = messagesQuery.data ?? [];
 
-  // Apply search filter client-side
   const filteredMessages = useMemo(() => {
     if (!filters.searchText.trim()) return messages;
     const term = filters.searchText.toLowerCase();
@@ -266,7 +257,7 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
 
   const loadMore = useCallback(() => {
     if (messages.length > 0) {
-      const oldest = messages[0]; // ASC order, first is oldest
+      const oldest = messages[0];
       setOldestTimestamp(oldest.timestamp);
     }
   }, [messages]);
@@ -281,7 +272,6 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     clearFilters,
     hasMore,
     loadMore,
-    // Filter options
     departments: conversationsQuery.data?.departments ?? [],
     instances: conversationsQuery.data?.instances ?? [],
     agents: conversationsQuery.data?.agents ?? [],
