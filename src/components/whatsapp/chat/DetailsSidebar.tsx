@@ -31,9 +31,10 @@ import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
 interface Props {
   conversation: ConversationWithContact;
   onClose: () => void;
+  onNavigateToConversation?: (conversationId: string) => void;
 }
 
-export function DetailsSidebar({ conversation, onClose }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation }: Props) {
   const contact = conversation.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const { notes, createNote, deleteNote, isCreating } = useConversationNotes(conversation.id);
