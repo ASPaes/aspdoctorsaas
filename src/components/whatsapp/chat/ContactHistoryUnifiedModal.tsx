@@ -413,7 +413,7 @@ export function ContactHistoryUnifiedModal({
                         <CalendarIcon className="h-2.5 w-2.5 shrink-0" />
                         {filters.dateFrom
                           ? format(filters.dateFrom, "dd/MM/yy", { locale: ptBR })
-                          : "7 dias"}
+                          : "30 dias"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
