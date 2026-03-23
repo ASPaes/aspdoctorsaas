@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { ContactHistoryModal } from "./ContactHistoryModal";
+import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
