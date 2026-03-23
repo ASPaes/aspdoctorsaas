@@ -49,7 +49,7 @@ const DEFAULT_FILTERS: UnifiedHistoryFilters = {
 };
 
 const PAGE_SIZE = 500;
-const DEFAULT_DAYS = 7;
+const DEFAULT_DAYS = 60;
 
 export function useContactUnifiedHistory(contactId: string | null, enabled: boolean) {
   const { effectiveTenantId: tid } = useTenantFilter();
