@@ -275,6 +275,10 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
   const messagesNotReady = filteredConvIds.length > 0 && !messagesQuery.data && !messagesQuery.isError;
   const effectiveLoading = conversationsQuery.isLoading || messagesQuery.isLoading || messagesNotReady;
 
+  if (import.meta.env.DEV) {
+    console.log("[unified-history] msgQuery status:", messagesQuery.status, "data:", messagesQuery.data?.length, "enabled:", !!contactId && enabled && filteredConvIds.length > 0, "effectiveLoading:", effectiveLoading, "messagesNotReady:", messagesNotReady, "isFetching:", messagesQuery.isFetching);
+  }
+
   return {
     messages: filteredMessages,
     convMetaMap,
