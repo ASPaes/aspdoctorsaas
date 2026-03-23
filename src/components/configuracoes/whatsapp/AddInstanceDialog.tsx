@@ -199,30 +199,81 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                   )} />
                 )}
 
-                <FormField control={form.control} name="api_url" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL da API</FormLabel>
-                    <FormControl>
-                      <Input placeholder={providerType === 'cloud' ? "https://api.evoapicloud.com" : "https://api.evolution.com"} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                {/* Evolution fields (self_hosted / cloud) */}
+                {providerType !== 'meta_cloud' && (
+                  <>
+                    <FormField control={form.control} name="api_url" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>URL da API</FormLabel>
+                        <FormControl>
+                          <Input placeholder={providerType === 'cloud' ? "https://api.evoapicloud.com" : "https://api.evolution.com"} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
 
-                <FormField control={form.control} name="api_key" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{providerType === 'cloud' ? 'Token da Instância' : 'API Key'}</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                    <FormField control={form.control} name="api_key" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{providerType === 'cloud' ? 'Token da Instância' : 'API Key'}</FormLabel>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </>
+                )}
+
+                {/* Meta Cloud fields */}
+                {providerType === 'meta_cloud' && (
+                  <>
+                    <FormField control={form.control} name="meta_phone_number_id" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>Phone Number ID</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>ID do número de telefone no Meta Business. Encontre em: Meta Developer → WhatsApp → Getting Started.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input placeholder="123456789012345" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="meta_access_token" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>Access Token (Permanente)</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>Token permanente da Meta. Gere em: Meta Developer → System Users → Generate Token.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="meta_verify_token" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>Verify Token</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>Token usado para validar o webhook da Meta. Escolha qualquer string secreta e use a mesma na configuração do webhook no Meta Developer.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input placeholder="meu-token-secreto" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </>
+                )}
 
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
-                    {isTestingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : connectionTested ? <Check className="mr-2 h-4 w-4" /> : null}
-                    Testar Conexão
-                  </Button>
-                  <Button type="submit" disabled={!connectionTested || createInstance.isPending} className="ml-auto">
+                  {providerType !== 'meta_cloud' && (
+                    <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
+                      {isTestingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : connectionTested ? <Check className="mr-2 h-4 w-4" /> : null}
+                      Testar Conexão
+                    </Button>
+                  )}
+                  <Button type="submit" disabled={providerType !== 'meta_cloud' ? (!connectionTested || createInstance.isPending) : createInstance.isPending} className="ml-auto">
                     {createInstance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Salvar
                   </Button>

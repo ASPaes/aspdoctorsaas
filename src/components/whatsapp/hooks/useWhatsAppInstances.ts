@@ -33,7 +33,11 @@ export const useWhatsAppInstances = () => {
 
   const createInstance = useMutation({
     mutationFn: async (instance: any) => {
-      const { api_url, api_key, provider_type, instance_id_external, ...instanceData } = instance;
+      const { api_url, api_key, provider_type, instance_id_external,
+              meta_phone_number_id, meta_access_token, meta_verify_token,
+              ...instanceData } = instance;
+
+      const isMeta = provider_type === 'meta_cloud';
 
       const { data: instanceResult, error: instanceError } = await (supabase
         .from('whatsapp_instances') as any)
@@ -41,15 +45,26 @@ export const useWhatsAppInstances = () => {
           ...instanceData,
           provider_type: provider_type || 'self_hosted',
           instance_id_external: instance_id_external || null,
+          ...(isMeta && meta_phone_number_id ? { meta_phone_number_id } : {}),
         })
         .select()
         .single();
 
       if (instanceError) throw instanceError;
 
+      const secretsPayload: any = {
+        instance_id: instanceResult.id,
+        api_url: api_url || '',
+        api_key: api_key || '',
+      };
+      if (isMeta) {
+        secretsPayload.meta_access_token = meta_access_token || null;
+        secretsPayload.meta_verify_token = meta_verify_token || null;
+      }
+
       const { error: secretsError } = await (supabase
         .from('whatsapp_instance_secrets') as any)
-        .insert({ instance_id: instanceResult.id, api_url, api_key });
+        .insert(secretsPayload);
 
       if (secretsError) {
         await supabase.from('whatsapp_instances').delete().eq('id', instanceResult.id);
