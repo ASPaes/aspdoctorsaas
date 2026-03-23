@@ -77,7 +77,14 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
     resetPagination();
   }, [resetPagination]);
 
-  const effectiveDateFrom = filters.dateFrom ?? new Date(Date.now() - DEFAULT_DAYS * 24 * 60 * 60 * 1000);
+  // Stabilize effectiveDateFrom so queryKey doesn't change every render
+  const effectiveDateFrom = useMemo(() => {
+    if (filters.dateFrom) return filters.dateFrom;
+    const d = new Date();
+    d.setDate(d.getDate() - DEFAULT_DAYS);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [filters.dateFrom]);
 
   // Step 1: Fetch all conversations + meta
   const conversationsQuery = useQuery({
