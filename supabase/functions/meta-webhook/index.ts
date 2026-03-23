@@ -345,14 +345,33 @@ Deno.serve(async (req) => {
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
 
-    const verifyToken = Deno.env.get('META_VERIFY_TOKEN_GLOBAL');
+    if (mode !== 'subscribe' || !token || !challenge) {
+      console.warn(`${LOG} Webhook verification FAILED: missing params`);
+      return new Response('Forbidden', { status: 403 });
+    }
 
-    if (mode === 'subscribe' && token === verifyToken && challenge) {
-      console.log(`${LOG} Webhook verification OK`);
+    // Buscar token de verificação nas instâncias Meta Cloud (whatsapp_instance_secrets)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseVerify = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: matchingSecrets, error: secretsErr } = await supabaseVerify
+      .from('whatsapp_instance_secrets')
+      .select('instance_id, meta_verify_token')
+      .eq('meta_verify_token', token)
+      .limit(1);
+
+    if (secretsErr) {
+      console.error(`${LOG} Error querying verify tokens:`, secretsErr);
+      return new Response('Internal Server Error', { status: 500 });
+    }
+
+    if (matchingSecrets && matchingSecrets.length > 0) {
+      console.log(`${LOG} Webhook verification OK for instance_id=${matchingSecrets[0].instance_id}`);
       return new Response(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
     }
 
-    console.warn(`${LOG} Webhook verification FAILED: mode=${mode}, token_match=${token === verifyToken}`);
+    console.warn(`${LOG} Webhook verification FAILED: no matching verify_token found`);
     return new Response('Forbidden', { status: 403 });
   }
 

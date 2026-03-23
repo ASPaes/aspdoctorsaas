@@ -24,9 +24,22 @@ const formSchema = z.object({
   display_name: z.string().min(1, "Nome obrigatório"),
   instance_name: z.string().min(1, "Nome da instância obrigatório").regex(/^[a-zA-Z0-9_-]+$/, "Apenas letras, números, _ e -"),
   instance_id_external: z.string().optional(),
-  api_url: z.string().url("URL inválida"),
-  api_key: z.string().min(1, "Token/API Key obrigatório"),
-  provider_type: z.enum(["self_hosted", "cloud"]),
+  api_url: z.string().url("URL inválida").or(z.literal("")),
+  api_key: z.string().min(1, "Token/API Key obrigatório").or(z.literal("")),
+  provider_type: z.enum(["self_hosted", "cloud", "meta_cloud"]),
+  // Meta Cloud specific
+  meta_phone_number_id: z.string().optional(),
+  meta_access_token: z.string().optional(),
+  meta_verify_token: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.provider_type !== 'meta_cloud') {
+    if (!data.api_url) ctx.addIssue({ code: 'custom', path: ['api_url'], message: 'URL inválida' });
+    if (!data.api_key) ctx.addIssue({ code: 'custom', path: ['api_key'], message: 'Token/API Key obrigatório' });
+  } else {
+    if (!data.meta_phone_number_id) ctx.addIssue({ code: 'custom', path: ['meta_phone_number_id'], message: 'Phone Number ID obrigatório' });
+    if (!data.meta_access_token) ctx.addIssue({ code: 'custom', path: ['meta_access_token'], message: 'Access Token obrigatório' });
+    if (!data.meta_verify_token) ctx.addIssue({ code: 'custom', path: ['meta_verify_token'], message: 'Verify Token obrigatório' });
+  }
 });
 
 type FormValues = z.infer<typeof formSchema>;
