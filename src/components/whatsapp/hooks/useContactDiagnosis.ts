@@ -114,7 +114,7 @@ export function useContactDiagnosis(clienteId: string | null) {
 
       const { error } = await supabase
         .from("cliente_avaliacoes_atendimento")
-        .insert(payload);
+        .insert(payload as any);
 
       if (error) throw error;
     },
