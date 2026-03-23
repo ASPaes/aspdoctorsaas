@@ -238,7 +238,7 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
 
       let q = supabase
         .from("whatsapp_messages")
-        .select("id, conversation_id, content, message_type, is_from_me, timestamp, sender_name, media_url, media_mimetype")
+        .select("id, conversation_id, content, message_type, is_from_me, timestamp, sender_name, media_url, media_mimetype, sent_by_user_id")
         .in("conversation_id", filteredConvIds)
         .gte("timestamp", effectiveDateFrom.toISOString())
         .order("timestamp", { ascending: true })
@@ -261,7 +261,46 @@ export function useContactUnifiedHistory(contactId: string | null, enabled: bool
         setHasMore(false);
       }
 
-      return (data ?? []) as UnifiedMessage[];
+      // Resolve sent_by_user_id to names
+      const senderUserIds = new Set<string>();
+      for (const msg of data ?? []) {
+        if (msg.sent_by_user_id) senderUserIds.add(msg.sent_by_user_id);
+      }
+
+      const senderNameMap = new Map<string, string>();
+      if (senderUserIds.size > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, funcionario_id")
+          .in("user_id", Array.from(senderUserIds));
+
+        const funcIds = new Set<number>();
+        const uidToFuncId = new Map<string, number>();
+        for (const p of profiles ?? []) {
+          if (p.funcionario_id) {
+            funcIds.add(p.funcionario_id);
+            uidToFuncId.set(p.user_id, p.funcionario_id);
+          }
+        }
+
+        if (funcIds.size > 0) {
+          const { data: funcs } = await supabase
+            .from("funcionarios")
+            .select("id, nome")
+            .in("id", Array.from(funcIds));
+          const funcNameMap = new Map<number, string>();
+          for (const f of funcs ?? []) funcNameMap.set(f.id, f.nome);
+          for (const [uid, fid] of uidToFuncId) {
+            const nome = funcNameMap.get(fid);
+            if (nome) senderNameMap.set(uid, nome);
+          }
+        }
+      }
+
+      return (data ?? []).map((msg) => ({
+        ...msg,
+        sent_by_name: msg.sent_by_user_id ? senderNameMap.get(msg.sent_by_user_id) || msg.sender_name || null : null,
+      })) as UnifiedMessage[];
     },
   });
 
