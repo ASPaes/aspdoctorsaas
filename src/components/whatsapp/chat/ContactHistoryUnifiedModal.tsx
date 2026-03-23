@@ -637,6 +637,12 @@ function MessageRow({
             : "bg-muted text-foreground"
         )}
       >
+        {/* Technician name for sent messages */}
+        {message.is_from_me && message.sent_by_name && (
+          <span className="text-[10px] font-semibold text-primary block mb-0.5">
+            {message.sent_by_name}
+          </span>
+        )}
         {message.content ? (
           <p className="whitespace-pre-wrap break-words" style={{ overflowWrap: "anywhere" }}>
             <HighlightText text={message.content} search={searchText} />
