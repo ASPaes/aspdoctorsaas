@@ -13,6 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Loader2,
   Search,
@@ -26,6 +27,13 @@ import {
   User,
   ExternalLink,
   ArrowDown,
+  Sparkles,
+  Star,
+  Save,
+  AlertCircle,
+  CheckCircle2,
+  MinusCircle,
+  XCircle,
 } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +43,8 @@ import {
   type UnifiedMessage,
   type ConversationMeta,
 } from "../hooks/useContactUnifiedHistory";
+import { useContactDiagnosis, type DiagnosisResult } from "../hooks/useContactDiagnosis";
+import { useLinkedCliente } from "../hooks/useLinkedCliente";
 
 interface Props {
   open: boolean;
@@ -135,6 +145,56 @@ function MultiChipFilter({
   );
 }
 
+// ─── Sentiment helpers ───
+function sentimentEmoji(s: string) {
+  switch (s) {
+    case "positive": return "😊";
+    case "negative": return "😟";
+    default: return "😐";
+  }
+}
+function sentimentLabel(s: string) {
+  switch (s) {
+    case "positive": return "Positivo";
+    case "negative": return "Negativo";
+    default: return "Neutro";
+  }
+}
+function sentimentColor(s: string) {
+  switch (s) {
+    case "positive": return "text-green-600 dark:text-green-400";
+    case "negative": return "text-red-600 dark:text-red-400";
+    default: return "text-yellow-600 dark:text-yellow-400";
+  }
+}
+
+// ─── Star rating ───
+function StarRating({ value, onChange, readonly = false }: { value: number; onChange?: (v: number) => void; readonly?: boolean }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          disabled={readonly}
+          onClick={() => onChange?.(star)}
+          className={cn(
+            "transition-colors",
+            readonly ? "cursor-default" : "cursor-pointer hover:scale-110",
+          )}
+        >
+          <Star
+            className={cn(
+              "h-4 w-4",
+              star <= value ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/40"
+            )}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ContactHistoryUnifiedModal({
   open,
   onOpenChange,
@@ -163,13 +223,72 @@ export function ContactHistoryUnifiedModal({
     totalConversations,
   } = useContactUnifiedHistory(contactId, open && isAdminOrHead);
 
+  // Linked cliente for saving evaluations
+  const { data: linkedCliente } = useLinkedCliente(contactId, contactPhone);
+  const clienteId = linkedCliente?.id || null;
+
+  // Diagnosis
+  const { evaluations, generateDiagnosis, saveEvaluation } = useContactDiagnosis(clienteId);
+  const [diagnosis, setDiagnosis] = useState<DiagnosisResult | null>(null);
+  const [editedNota, setEditedNota] = useState<number>(3);
+  const [diagPanelOpen, setDiagPanelOpen] = useState(false);
+  const [evalAccordionOpen, setEvalAccordionOpen] = useState(false);
+
+  // Reset diagnosis when modal closes
+  useEffect(() => {
+    if (!open) {
+      setDiagnosis(null);
+      setDiagPanelOpen(false);
+    }
+  }, [open]);
+
+  const handleGenerateDiagnosis = useCallback(() => {
+    if (messages.length === 0) return;
+
+    // Format messages for the AI
+    const formatted = messages.map((m) => {
+      const time = format(new Date(m.timestamp), "dd/MM HH:mm");
+      const sender = m.is_from_me ? (m.sent_by_name || "Operador") : (m.sender_name || contactName || "Cliente");
+      const content = m.content || `[${m.message_type}]`;
+      return `[${time}] ${sender}: ${content}`;
+    });
+
+    generateDiagnosis.mutate(
+      { contactId, messages: formatted },
+      {
+        onSuccess: (result) => {
+          setDiagnosis(result);
+          setEditedNota(result.nota);
+          setDiagPanelOpen(true);
+        },
+      }
+    );
+  }, [messages, contactId, contactName, generateDiagnosis]);
+
+  const handleSaveEvaluation = useCallback(() => {
+    if (!diagnosis || !clienteId) return;
+
+    const timestamps = messages.map((m) => new Date(m.timestamp).getTime());
+    const periodoInicio = timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null;
+    const periodoFim = timestamps.length > 0 ? new Date(Math.max(...timestamps)).toISOString() : null;
+
+    saveEvaluation.mutate({
+      clienteId,
+      contactId,
+      diagnosis: { ...diagnosis, nota: editedNota },
+      periodoInicio,
+      periodoFim,
+      totalMensagens: messages.length,
+      totalConversas: totalConversations,
+    });
+  }, [diagnosis, clienteId, contactId, editedNota, messages, totalConversations, saveEvaluation]);
+
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  const [filtersVisible, setFiltersVisible] = useState(true); // desktop default open
+  const [filtersVisible, setFiltersVisible] = useState(true);
   const [initialScrollDone, setInitialScrollDone] = useState(false);
 
-  // Scroll to bottom on first load
   useEffect(() => {
     if (!isLoading && messages.length > 0 && !initialScrollDone) {
       requestAnimationFrame(() => {
@@ -179,7 +298,6 @@ export function ContactHistoryUnifiedModal({
     }
   }, [isLoading, messages.length, initialScrollDone]);
 
-  // Reset on modal close/open
   useEffect(() => {
     if (!open) setInitialScrollDone(false);
   }, [open]);
@@ -188,7 +306,6 @@ export function ContactHistoryUnifiedModal({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // Track scroll position for FAB
   const handleScroll = useCallback(() => {
     const el = scrollViewportRef.current;
     if (!el) return;
@@ -196,40 +313,29 @@ export function ContactHistoryUnifiedModal({
     setShowScrollDown(distFromBottom > 300);
   }, []);
 
-  // Group messages by conversation_id for conversation separators
   const enrichedGroups = useMemo(() => {
     if (messages.length === 0) return [];
-
     const result: Array<
       | { type: "conv-separator"; meta: ConversationMeta }
       | { type: "day"; date: string }
       | { type: "msg"; msg: UnifiedMessage }
     > = [];
-
     let currentConvId = "";
     let currentDate = "";
-
     for (const msg of messages) {
-      // Conversation separator
       if (msg.conversation_id !== currentConvId) {
         currentConvId = msg.conversation_id;
-        currentDate = ""; // reset date so day sep appears after conv sep
+        currentDate = "";
         const meta = convMetaMap.get(msg.conversation_id);
-        if (meta) {
-          result.push({ type: "conv-separator", meta });
-        }
+        if (meta) result.push({ type: "conv-separator", meta });
       }
-
-      // Day separator
       const day = format(new Date(msg.timestamp), "yyyy-MM-dd");
       if (day !== currentDate) {
         currentDate = day;
         result.push({ type: "day", date: day });
       }
-
       result.push({ type: "msg", msg });
     }
-
     return result;
   }, [messages, convMetaMap]);
 
@@ -270,6 +376,32 @@ export function ContactHistoryUnifiedModal({
                 <Badge variant="outline" className="text-[10px] h-5">
                   {messages.length} msg{messages.length !== 1 ? "s" : ""}
                 </Badge>
+
+                {/* Diagnóstico IA button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={handleGenerateDiagnosis}
+                      disabled={generateDiagnosis.isPending || messages.length === 0}
+                    >
+                      {generateDiagnosis.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      <span className="hidden sm:inline">Diagnóstico IA</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {messages.length === 0
+                      ? "Carregue mensagens primeiro"
+                      : "Gerar diagnóstico de atendimento com IA"}
+                  </TooltipContent>
+                </Tooltip>
+
                 {/* Mobile filters toggle */}
                 <Button
                   variant="outline"
@@ -297,7 +429,7 @@ export function ContactHistoryUnifiedModal({
           </div>
         ) : (
           <div className="flex flex-1 min-h-0 overflow-hidden">
-            {/* Filters sidebar — desktop always, mobile collapsible */}
+            {/* Filters sidebar */}
             <div
               className={cn(
                 "border-r border-border shrink-0 flex flex-col overflow-y-auto p-3 gap-2.5 transition-all duration-200",
@@ -336,41 +468,20 @@ export function ContactHistoryUnifiedModal({
                   className="pl-7 h-7 text-xs"
                 />
                 {filters.searchText && (
-                  <button
-                    onClick={() => updateFilter("searchText", "")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2"
-                  >
+                  <button onClick={() => updateFilter("searchText", "")} className="absolute right-2 top-1/2 -translate-y-1/2">
                     <X className="h-3 w-3 text-muted-foreground" />
                   </button>
                 )}
               </div>
 
-              {/* Department multi-select */}
-              <MultiChipFilter
-                label="Setor"
-                options={departments}
-                selected={filters.departmentIds}
-                onChange={(ids) => updateFilter("departmentIds", ids)}
-              />
-
-              {/* Instance multi-select */}
-              <MultiChipFilter
-                label="Instância"
-                options={instances}
-                selected={filters.instanceIds}
-                onChange={(ids) => updateFilter("instanceIds", ids)}
-              />
+              <MultiChipFilter label="Setor" options={departments} selected={filters.departmentIds} onChange={(ids) => updateFilter("departmentIds", ids)} />
+              <MultiChipFilter label="Instância" options={instances} selected={filters.instanceIds} onChange={(ids) => updateFilter("instanceIds", ids)} />
 
               {/* Status */}
               <div className="space-y-1">
                 <label className="text-[10px] font-medium text-muted-foreground">Status</label>
-                <Select
-                  value={filters.status ?? "__all__"}
-                  onValueChange={(v) => updateFilter("status", v === "__all__" ? null : v)}
-                >
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
+                <Select value={filters.status ?? "__all__"} onValueChange={(v) => updateFilter("status", v === "__all__" ? null : v)}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">Todos</SelectItem>
                     <SelectItem value="waiting">Na Fila</SelectItem>
@@ -382,22 +493,14 @@ export function ContactHistoryUnifiedModal({
                 </Select>
               </div>
 
-              {/* Agent */}
               {agents.length > 0 && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-medium text-muted-foreground">Técnico</label>
-                  <Select
-                    value={filters.assignedTo ?? "__all__"}
-                    onValueChange={(v) => updateFilter("assignedTo", v === "__all__" ? null : v)}
-                  >
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
+                  <Select value={filters.assignedTo ?? "__all__"} onValueChange={(v) => updateFilter("assignedTo", v === "__all__" ? null : v)}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__all__">Todos</SelectItem>
-                      {agents.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                      ))}
+                      {agents.map((a) => (<SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -411,18 +514,11 @@ export function ContactHistoryUnifiedModal({
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="w-full h-7 text-[10px] justify-start gap-0.5 px-1.5">
                         <CalendarIcon className="h-2.5 w-2.5 shrink-0" />
-                        {filters.dateFrom
-                          ? format(filters.dateFrom, "dd/MM/yy", { locale: ptBR })
-                          : "30 dias"}
+                        {filters.dateFrom ? format(filters.dateFrom, "dd/MM/yy", { locale: ptBR }) : "30 dias"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={filters.dateFrom ?? undefined}
-                        onSelect={(d) => updateFilter("dateFrom", d ?? null)}
-                        className="p-3 pointer-events-auto"
-                      />
+                      <Calendar mode="single" selected={filters.dateFrom ?? undefined} onSelect={(d) => updateFilter("dateFrom", d ?? null)} className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -432,51 +528,140 @@ export function ContactHistoryUnifiedModal({
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="w-full h-7 text-[10px] justify-start gap-0.5 px-1.5">
                         <CalendarIcon className="h-2.5 w-2.5 shrink-0" />
-                        {filters.dateTo
-                          ? format(filters.dateTo, "dd/MM/yy", { locale: ptBR })
-                          : "Agora"}
+                        {filters.dateTo ? format(filters.dateTo, "dd/MM/yy", { locale: ptBR }) : "Agora"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={filters.dateTo ?? undefined}
-                        onSelect={(d) => updateFilter("dateTo", d ?? null)}
-                        className="p-3 pointer-events-auto"
-                      />
+                      <Calendar mode="single" selected={filters.dateTo ?? undefined} onSelect={(d) => updateFilter("dateTo", d ?? null)} className="p-3 pointer-events-auto" />
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
+
+              {/* Previous evaluations accordion in sidebar */}
+              {evaluations.length > 0 && (
+                <Collapsible open={evalAccordionOpen} onOpenChange={setEvalAccordionOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full h-6 text-[10px] gap-1 justify-between px-1">
+                      <span>Avaliações ({evaluations.length})</span>
+                      {evalAccordionOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-1.5 mt-1">
+                      {evaluations.slice(0, 5).map((ev) => (
+                        <div key={ev.id} className="bg-muted/50 rounded p-1.5 text-[10px]">
+                          <div className="flex items-center justify-between">
+                            <StarRating value={ev.nota ?? 0} readonly />
+                            <span className="text-muted-foreground">
+                              {format(new Date(ev.created_at), "dd/MM/yy")}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground mt-0.5 line-clamp-2">{ev.resumo}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
 
             {/* Chat timeline */}
             <div className="flex-1 flex flex-col min-w-0 relative">
+              {/* Diagnosis panel */}
+              {diagnosis && diagPanelOpen && (
+                <div className="border-b border-border bg-muted/30 p-3 shrink-0 space-y-2 max-h-[40%] overflow-y-auto">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Diagnóstico IA</span>
+                      <span className={cn("text-sm font-medium", sentimentColor(diagnosis.sentimento))}>
+                        {sentimentEmoji(diagnosis.sentimento)} {sentimentLabel(diagnosis.sentimento)}
+                      </span>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setDiagPanelOpen(false)}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  <p className="text-xs text-foreground/90 whitespace-pre-wrap">{diagnosis.resumo}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {diagnosis.pontos_chave.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Pontos-chave</span>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {diagnosis.pontos_chave.map((p, i) => (
+                            <li key={i} className="text-[11px] flex items-start gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0 mt-0.5" />
+                              {p}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {diagnosis.itens_acao.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Itens de Ação</span>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {diagnosis.itens_acao.map((a, i) => (
+                            <li key={i} className="text-[11px] flex items-start gap-1">
+                              <AlertCircle className="h-3 w-3 text-yellow-500 shrink-0 mt-0.5" />
+                              {a}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nota + Save */}
+                  <div className="flex items-center gap-3 pt-1 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium text-muted-foreground">Nota:</span>
+                      <StarRating value={editedNota} onChange={setEditedNota} />
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            onClick={handleSaveEvaluation}
+                            disabled={!clienteId || saveEvaluation.isPending}
+                          >
+                            {saveEvaluation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Save className="h-3 w-3" />
+                            )}
+                            Registrar no Cliente
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!clienteId && (
+                        <TooltipContent side="bottom" className="text-xs">
+                          Contato não vinculado a um cliente
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </div>
+                </div>
+              )}
+
               {/* Load more */}
               {hasMore && messages.length > 0 && (
                 <div className="flex justify-center py-1.5 shrink-0 border-b border-border">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-[10px] gap-1 h-6"
-                    onClick={loadMore}
-                    disabled={isFetching}
-                  >
+                  <Button variant="ghost" size="sm" className="text-[10px] gap-1 h-6" onClick={loadMore} disabled={isFetching}>
                     {isFetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronUp className="h-3 w-3" />}
                     Carregar mais antigas
                   </Button>
                 </div>
               )}
 
-              <ScrollArea
-                className="flex-1 min-h-0"
-                onScrollCapture={handleScroll}
-              >
-                <div
-                  ref={scrollViewportRef}
-                  className="px-4 py-2"
-                  onScroll={handleScroll}
-                >
+              <ScrollArea className="flex-1 min-h-0" onScrollCapture={handleScroll}>
+                <div ref={scrollViewportRef} className="px-4 py-2" onScroll={handleScroll}>
                   {isLoading ? (
                     <div className="space-y-3 py-8">
                       {Array.from({ length: 6 }).map((_, i) => (
@@ -487,9 +672,7 @@ export function ContactHistoryUnifiedModal({
                     </div>
                   ) : messages.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-16">
-                      {filters.searchText
-                        ? "Nenhuma mensagem encontrada."
-                        : "Nenhuma mensagem no período."}
+                      {filters.searchText ? "Nenhuma mensagem encontrada." : "Nenhuma mensagem no período."}
                     </p>
                   ) : (
                     enrichedGroups.map((item, idx) => {
@@ -519,12 +702,7 @@ export function ContactHistoryUnifiedModal({
                         );
                       }
                       return (
-                        <MessageRow
-                          key={item.msg.id}
-                          message={item.msg}
-                          convMetaMap={convMetaMap}
-                          searchText={filters.searchText}
-                        />
+                        <MessageRow key={item.msg.id} message={item.msg} convMetaMap={convMetaMap} searchText={filters.searchText} />
                       );
                     })
                   )}
@@ -532,14 +710,8 @@ export function ContactHistoryUnifiedModal({
                 </div>
               </ScrollArea>
 
-              {/* Scroll to bottom FAB */}
               {showScrollDown && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="absolute bottom-4 right-4 h-8 w-8 rounded-full shadow-md z-10"
-                  onClick={scrollToBottom}
-                >
+                <Button variant="secondary" size="icon" className="absolute bottom-4 right-4 h-8 w-8 rounded-full shadow-md z-10" onClick={scrollToBottom}>
                   <ArrowDown className="h-4 w-4" />
                 </Button>
               )}
@@ -560,43 +732,27 @@ export function ContactHistoryUnifiedModal({
 }
 
 // ─── Conversation Separator ───
-function ConversationSeparator({
-  meta,
-  onOpen,
-}: {
-  meta: ConversationMeta;
-  onOpen?: () => void;
-}) {
+function ConversationSeparator({ meta, onOpen }: { meta: ConversationMeta; onOpen?: () => void }) {
   const effStatus = meta.attendanceStatus || meta.status;
   return (
     <div className="my-3 mx-auto max-w-[90%]">
       <div className="flex items-center gap-2 bg-muted/60 border border-border rounded-lg px-3 py-1.5">
         <div className="flex-1 flex items-center gap-1.5 flex-wrap min-w-0">
           {meta.attendanceCode ? (
-            <Badge variant="outline" className="text-[9px] h-4 px-1 font-mono shrink-0">
-              #{meta.attendanceCode}
-            </Badge>
+            <Badge variant="outline" className="text-[9px] h-4 px-1 font-mono shrink-0">#{meta.attendanceCode}</Badge>
           ) : (
             <span className="text-[9px] text-muted-foreground font-medium">Conversa</span>
           )}
-          <Badge variant={statusVariant(effStatus)} className="text-[9px] h-4 px-1 shrink-0">
-            {statusLabel(effStatus)}
-          </Badge>
+          <Badge variant={statusVariant(effStatus)} className="text-[9px] h-4 px-1 shrink-0">{statusLabel(effStatus)}</Badge>
           {meta.departmentName && (
             <Badge variant="outline" className="text-[9px] h-4 px-1 gap-0.5 border-primary/30 text-primary shrink-0">
-              <Building2 className="h-2 w-2" />
-              {meta.departmentName}
+              <Building2 className="h-2 w-2" />{meta.departmentName}
             </Badge>
           )}
-          {meta.instanceName && (
-            <Badge variant="secondary" className="text-[9px] h-4 px-1 shrink-0">
-              {meta.instanceName}
-            </Badge>
-          )}
+          {meta.instanceName && <Badge variant="secondary" className="text-[9px] h-4 px-1 shrink-0">{meta.instanceName}</Badge>}
           {meta.assignedToName && (
             <Badge variant="outline" className="text-[9px] h-4 px-1 gap-0.5 shrink-0">
-              <User className="h-2 w-2" />
-              {meta.assignedToName}
+              <User className="h-2 w-2" />{meta.assignedToName}
             </Badge>
           )}
         </div>
@@ -616,32 +772,13 @@ function ConversationSeparator({
 }
 
 // ─── Message Row ───
-function MessageRow({
-  message,
-  convMetaMap,
-  searchText,
-}: {
-  message: UnifiedMessage;
-  convMetaMap: Map<string, ConversationMeta>;
-  searchText: string;
-}) {
+function MessageRow({ message, convMetaMap, searchText }: { message: UnifiedMessage; convMetaMap: Map<string, ConversationMeta>; searchText: string }) {
   const time = format(new Date(message.timestamp), "HH:mm", { locale: ptBR });
-
   return (
     <div className={cn("flex mb-1", message.is_from_me ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[70%] rounded-lg px-2.5 py-1.5 text-xs",
-          message.is_from_me
-            ? "bg-primary/10 text-foreground"
-            : "bg-muted text-foreground"
-        )}
-      >
-        {/* Technician name for sent messages */}
+      <div className={cn("max-w-[70%] rounded-lg px-2.5 py-1.5 text-xs", message.is_from_me ? "bg-primary/10 text-foreground" : "bg-muted text-foreground")}>
         {message.is_from_me && message.sent_by_name && (
-          <span className="text-[10px] font-semibold text-primary block mb-0.5">
-            {message.sent_by_name}
-          </span>
+          <span className="text-[10px] font-semibold text-primary block mb-0.5">{message.sent_by_name}</span>
         )}
         {message.content ? (
           <p className="whitespace-pre-wrap break-words" style={{ overflowWrap: "anywhere" }}>
@@ -649,16 +786,11 @@ function MessageRow({
           </p>
         ) : (
           <p className="italic text-muted-foreground">
-            {message.message_type === "image"
-              ? "📷 Imagem"
-              : message.message_type === "audio"
-              ? "🎤 Áudio"
-              : message.message_type === "video"
-              ? "🎬 Vídeo"
-              : message.message_type === "document"
-              ? "📄 Documento"
-              : message.message_type === "sticker"
-              ? "🏷️ Sticker"
+            {message.message_type === "image" ? "📷 Imagem"
+              : message.message_type === "audio" ? "🎤 Áudio"
+              : message.message_type === "video" ? "🎬 Vídeo"
+              : message.message_type === "document" ? "📄 Documento"
+              : message.message_type === "sticker" ? "🏷️ Sticker"
               : `[${message.message_type}]`}
           </p>
         )}
