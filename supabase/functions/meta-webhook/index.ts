@@ -535,6 +535,19 @@ Deno.serve(async (req) => {
 
       console.log(`${LOG} Processing event: phone_number_id=${phoneNumberId}, instance_id=${instanceId}, tenant_id=${tenantId}`);
 
+      // Fetch access token for media downloads
+      let accessToken: string | null = null;
+      const { data: secrets } = await supabase
+        .from('whatsapp_instance_secrets')
+        .select('meta_access_token')
+        .eq('instance_id', instanceId)
+        .maybeSingle();
+      if (secrets?.meta_access_token) {
+        accessToken = secrets.meta_access_token;
+      } else {
+        console.warn(`${LOG} No meta_access_token found for instance_id=${instanceId}, media will not be downloaded`);
+      }
+
       // Build contact name map from contacts array
       const contactNameMap: Record<string, string> = {};
       for (const contact of value.contacts || []) {
@@ -551,7 +564,7 @@ Deno.serve(async (req) => {
         const contactName = contactNameMap[from] || from;
         const ts = msg.timestamp ? parseInt(msg.timestamp, 10) : null;
 
-        await processMessage(supabase, instanceId, tenantId, from, contactName, msg, false, ts);
+        await processMessage(supabase, instanceId, tenantId, from, contactName, msg, false, ts, accessToken);
       }
 
       // Process status updates
