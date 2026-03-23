@@ -9,7 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ContactHistoryModal } from "./ContactHistoryModal";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { CSTicketAlert } from "./CSTicketAlert";
 import { useConversationNotes } from "../hooks/useConversationNotes";
@@ -28,9 +31,10 @@ import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
 interface Props {
   conversation: ConversationWithContact;
   onClose: () => void;
+  onNavigateToConversation?: (conversationId: string) => void;
 }
 
-export function DetailsSidebar({ conversation, onClose }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation }: Props) {
   const contact = conversation.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const { notes, createNote, deleteNote, isCreating } = useConversationNotes(conversation.id);
@@ -40,6 +44,9 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
+  const { profile } = useAuth();
+
+  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const [newNote, setNewNote] = useState("");
   const [editingContact, setEditingContact] = useState(false);
@@ -47,6 +54,7 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
   const [sentimentExpanded, setSentimentExpanded] = useState(false);
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Collapsible section states
   const [topicsOpen, setTopicsOpen] = useState(true);
@@ -175,6 +183,19 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
               </Button>
             )}
           </div>
+
+          {/* History button — Admin/Head only */}
+          {isAdminOrHead && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs gap-1.5"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="h-3.5 w-3.5" />
+              Histórico do Contato
+            </Button>
+          )}
 
           {/* ─── Cliente Link ─── */}
           <ClienteLinkCard conversation={conversation} />
@@ -472,6 +493,17 @@ export function DetailsSidebar({ conversation, onClose }: Props) {
           )}
         </div>
       </div>
+      {/* Contact History Modal */}
+      {isAdminOrHead && (
+        <ContactHistoryModal
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          contactId={contact?.id || ""}
+          contactName={name}
+          contactPhone={contact?.phone_number || ""}
+          onNavigateToConversation={onNavigateToConversation}
+        />
+      )}
     </div>
   );
 }
