@@ -501,6 +501,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           contactId={contact?.id || ""}
           contactName={name}
           contactPhone={contact?.phone_number || ""}
+          onNavigateToConversation={onNavigateToConversation}
         />
       )}
     </div>
