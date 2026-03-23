@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
 import { UseFormReturn } from "react-hook-form";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,13 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, Loader2, MessageCircle, X, Search } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Users, Loader2, MessageCircle, X, Search, Star, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { maskCNPJ, maskCPF, maskCEP } from "@/lib/masks";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useContactDiagnosis, type SavedEvaluation } from "@/components/whatsapp/hooks/useContactDiagnosis";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
 
 interface Props {
