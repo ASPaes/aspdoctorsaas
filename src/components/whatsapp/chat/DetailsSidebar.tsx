@@ -44,6 +44,9 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
+  const { profile } = useAuth();
+
+  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const [newNote, setNewNote] = useState("");
   const [editingContact, setEditingContact] = useState(false);
@@ -51,6 +54,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [sentimentExpanded, setSentimentExpanded] = useState(false);
   const [contactName, setContactName] = useState(contact?.name || "");
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Collapsible section states
   const [topicsOpen, setTopicsOpen] = useState(true);
