@@ -115,6 +115,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
           meta_verify_token: values.meta_verify_token,
         }),
       });
+      setLastCreatedProviderType(values.provider_type);
       setShowWebhookInstructions(true);
       form.reset();
       setConnectionTested(false);
