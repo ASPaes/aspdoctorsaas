@@ -13,6 +13,8 @@ export interface UnifiedMessage {
   sender_name: string | null;
   media_url: string | null;
   media_mimetype: string | null;
+  sent_by_user_id: string | null;
+  sent_by_name: string | null;
 }
 
 export interface ConversationMeta {
