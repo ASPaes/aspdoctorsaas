@@ -91,15 +91,16 @@ export default function Configuracoes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios"];
-  const rawTab = searchParams.get("tab") || "percentuais";
-  const defaultTab = (!isAdmin && ADMIN_ONLY_TABS.includes(rawTab)) ? "percentuais" : rawTab;
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
   // Auth context for role-based UI
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+
+  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios"];
+  const rawTab = searchParams.get("tab") || "percentuais";
+  const defaultTab = (!isAdmin && ADMIN_ONLY_TABS.includes(rawTab)) ? "percentuais" : rawTab;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
