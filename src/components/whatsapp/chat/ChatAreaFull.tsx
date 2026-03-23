@@ -292,6 +292,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
         <DetailsSidebar
           conversation={conversation}
           onClose={() => setShowDetails(false)}
+          onNavigateToConversation={onNavigateToConversation}
         />
       )}
 
