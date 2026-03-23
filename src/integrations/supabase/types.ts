@@ -324,6 +324,75 @@ export type Database = {
           },
         ]
       }
+      cliente_avaliacoes_atendimento: {
+        Row: {
+          avaliado_por: string | null
+          cliente_id: string
+          contact_id: string | null
+          created_at: string
+          id: string
+          itens_acao: string[] | null
+          nota: number | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          pontos_chave: string[] | null
+          resumo: string
+          sentimento: string | null
+          tenant_id: string
+          total_conversas: number | null
+          total_mensagens: number | null
+        }
+        Insert: {
+          avaliado_por?: string | null
+          cliente_id: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          itens_acao?: string[] | null
+          nota?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          pontos_chave?: string[] | null
+          resumo: string
+          sentimento?: string | null
+          tenant_id: string
+          total_conversas?: number | null
+          total_mensagens?: number | null
+        }
+        Update: {
+          avaliado_por?: string | null
+          cliente_id?: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          itens_acao?: string[] | null
+          nota?: number | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          pontos_chave?: string[] | null
+          resumo?: string
+          sentimento?: string | null
+          tenant_id?: string
+          total_conversas?: number | null
+          total_mensagens?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_avaliacoes_atendimento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_avaliacoes_atendimento_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_contatos: {
         Row: {
           aniversario: string | null
