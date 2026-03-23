@@ -139,7 +139,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
           <>
             <DialogHeader>
               <DialogTitle>Nova Instância</DialogTitle>
-              <DialogDescription>Adicione uma nova instância da Evolution API</DialogDescription>
+              <DialogDescription>Adicione uma nova instância WhatsApp</DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
