@@ -130,7 +130,8 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
     onOpenChange(false);
   };
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+  const metaWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook`;
+  const webhookUrl = lastCreatedProviderType === 'meta_cloud' ? metaWebhookUrl : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
   const copyWebhookUrl = () => { navigator.clipboard.writeText(webhookUrl); toast.success("URL copiada!"); };
 
   return (
