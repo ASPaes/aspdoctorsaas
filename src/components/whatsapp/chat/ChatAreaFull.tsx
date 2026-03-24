@@ -16,6 +16,7 @@ import { EditContactModal } from "./EditContactModal";
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
+import { ShieldAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,7 +64,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   const deleteMutation = useDeleteMessages();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
   const { getSenderLabel } = useSenderMap();
   const { timezone } = useAppTimezone();
 
@@ -277,6 +279,11 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
                 <X className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+        ) : !isAccessActive ? (
+          <div className="border-t bg-destructive/10 px-4 py-3 flex items-center gap-2 text-sm text-destructive">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>Acesso não ativo — você não pode enviar mensagens. Fale com o administrador.</span>
           </div>
         ) : (
           <ChatInput
