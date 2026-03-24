@@ -817,7 +817,44 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <AccessStatusBadge status={u.access_status} />
+                        <Select
+                          value={u.access_status ?? "active"}
+                          onValueChange={(v) => {
+                            // Block activating user without funcionário link
+                            if (v === "active" && !u.funcionario_id) {
+                              sonnerToast.error("Não é possível ativar um usuário sem funcionário vinculado.");
+                              return;
+                            }
+                            const label = v === "active" ? "ativo" : v === "blocked" ? "bloqueado" : "pendente";
+                            const msg = v === "active"
+                              ? "Usuário poderá acessar o chat imediatamente."
+                              : `Usuário ficará ${label} e não poderá acessar o sistema.`;
+                            if (confirm(msg + " Confirma?")) {
+                              updateAccessMutation.mutate(
+                                { userId: u.user_id, newStatus: v },
+                                {
+                                  onSuccess: () => sonnerToast.success(`Acesso alterado para ${label}.`),
+                                }
+                              );
+                            }
+                          }}
+                          disabled={u.user_id === profile?.user_id || u.is_super_admin}
+                        >
+                          <SelectTrigger className="w-28 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">
+                              <span className="text-green-700">Ativo</span>
+                            </SelectItem>
+                            <SelectItem value="pending">
+                              <span className="text-yellow-700">Pendente</span>
+                            </SelectItem>
+                            <SelectItem value="blocked">
+                              <span className="text-red-700">Bloqueado</span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <Select
