@@ -41,6 +41,7 @@ export interface ConversationWithContact {
 export interface ConversationsFilters {
   instanceId?: string;
   instanceIds?: string[];
+  departmentId?: string;
   search?: string;
   status?: string;
   assignedTo?: string;
