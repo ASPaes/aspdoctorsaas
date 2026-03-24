@@ -5,13 +5,17 @@ import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import CrudTable, { type ColumnDef } from "@/components/CrudTable";
 
 function useDepartmentOptions() {
+  const { effectiveTenantId: tid } = useTenantFilter();
   const { data } = useQuery({
-    queryKey: ["departments_for_crud"],
+    queryKey: ["departments_for_crud", tid],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_tenant_departments");
+      let q = supabase.from("support_departments").select("id, name").eq("is_active", true).order("name");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []).map((d: any) => ({ value: d.id, label: d.name }));
     },
