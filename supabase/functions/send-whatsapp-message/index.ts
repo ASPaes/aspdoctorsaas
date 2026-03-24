@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     if (senderUid) {
       const { data: senderProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('access_status')
+        .select('access_status, funcionario_id')
         .eq('user_id', senderUid)
         .limit(1)
         .maybeSingle();
@@ -76,6 +76,14 @@ Deno.serve(async (req) => {
         console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
         return new Response(
           JSON.stringify({ error: 'Seu usuário está inativo e não pode enviar mensagens. Fale com o administrador.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!senderProfile?.funcionario_id) {
+        console.warn('[send-whatsapp-message] Blocked user without funcionario:', senderUid);
+        return new Response(
+          JSON.stringify({ error: 'Usuário sem funcionário vinculado. Vincule em Acessos & Equipe.' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
