@@ -139,13 +139,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       const att = attendanceMap.get(conv.id);
       if (!att) continue;
 
-      // Filter by department when a department is selected
-      if (selectedDepartmentId) {
-        const attDeptMatch = att.department_id === selectedDepartmentId;
-        const convDeptMatch = (conv as any).department_id === selectedDepartmentId;
-        const instanceMatch = filteredInstanceIds && filteredInstanceIds.includes(conv.instance_id || '');
-        if (!attDeptMatch && !convDeptMatch && !(instanceMatch && !att.department_id)) continue;
-      }
+      // Department filtering is now done at DB query level via department_id
+      // Only do secondary check for attendance department mismatch
+      if (selectedDepartmentId && att.department_id && att.department_id !== selectedDepartmentId) continue;
 
       // For non-admin, skip conversations not assigned to them (except waiting/unassigned)
       if (!isAdmin && user?.id) {
