@@ -33,9 +33,11 @@ interface CrudTableProps {
   selectQuery?: string;
   /** Column to order by */
   orderBy?: string;
+  /** Async validation before save. Return string to block with error message, or void/undefined to proceed. */
+  onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>;
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave }: CrudTableProps) {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
@@ -124,7 +126,7 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     setFormData({});
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const payload: Record<string, any> = {};
     columns.forEach((c) => {
       const val = formData[c.key];
@@ -136,6 +138,21 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
         payload[c.key] = val || null;
       }
     });
+
+    // Always include tenant_id on inserts so the DB trigger doesn't use current_tenant_id()
+    if (!editingRow && tid) {
+      payload.tenant_id = tid;
+    }
+
+    // Run custom validation if provided
+    if (onBeforeSave) {
+      const errorMsg = await onBeforeSave(payload, !!editingRow);
+      if (errorMsg) {
+        toast({ title: "Validação", description: errorMsg, variant: "destructive" });
+        return;
+      }
+    }
+
     saveMutation.mutate(payload);
   };
 
