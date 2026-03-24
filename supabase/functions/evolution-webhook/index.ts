@@ -393,6 +393,37 @@ async function applyAutoAssignment(
  * INSTANCE-SCOPED: Find or create conversation by tenant_id + instance_id + contact_id.
  * Each instance has its own conversation per contact.
  */
+/**
+ * Resolve the department that owns a given instance (via default_instance_id).
+ */
+async function resolveDepartmentForInstance(
+  supabase: any,
+  instanceId: string,
+  tenantId: string
+): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('support_departments')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('default_instance_id', instanceId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (data) {
+      console.log(`[evolution-webhook] Resolved department ${data.id} for instance ${instanceId}`);
+    }
+    return data?.id ?? null;
+  } catch (err) {
+    console.error('[evolution-webhook] Error resolving department for instance:', err);
+    return null;
+  }
+}
+
+/**
+ * INSTANCE-SCOPED: Find or create conversation by tenant_id + instance_id + contact_id.
+ * Each instance has its own conversation per contact.
+ * Automatically sets department_id based on the instance's owning department.
+ */
 async function findOrCreateConversation(
   supabase: any,
   instanceId: string,
@@ -403,7 +434,7 @@ async function findOrCreateConversation(
     // Search by tenant_id + instance_id + contact_id (per-instance conversation)
     const { data: existingConversation, error: findError } = await supabase
       .from('whatsapp_conversations')
-      .select('id')
+      .select('id, department_id')
       .eq('tenant_id', tenantId)
       .eq('instance_id', instanceId)
       .eq('contact_id', contactId)
@@ -415,8 +446,24 @@ async function findOrCreateConversation(
 
     if (existingConversation) {
       console.log('[evolution-webhook] Conversation found (instance-scoped):', existingConversation.id);
+
+      // Back-fill department_id if missing
+      if (!existingConversation.department_id) {
+        const deptId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
+        if (deptId) {
+          await supabase
+            .from('whatsapp_conversations')
+            .update({ department_id: deptId })
+            .eq('id', existingConversation.id);
+          console.log(`[evolution-webhook] Back-filled department_id=${deptId} on conversation ${existingConversation.id}`);
+        }
+      }
+
       return existingConversation.id;
     }
+
+    // Resolve department before creating
+    const departmentId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
 
     const { data: newConversation, error: createError } = await supabase
       .from('whatsapp_conversations')
@@ -425,6 +472,7 @@ async function findOrCreateConversation(
         contact_id: contactId,
         status: 'active',
         tenant_id: tenantId,
+        ...(departmentId ? { department_id: departmentId } : {}),
       })
       .select('id')
       .single();
@@ -434,7 +482,7 @@ async function findOrCreateConversation(
       return null;
     }
 
-    console.log('[evolution-webhook] Conversation created (instance-scoped):', newConversation.id);
+    console.log('[evolution-webhook] Conversation created (instance-scoped):', newConversation.id, 'department:', departmentId);
     
     await applyAutoAssignment(supabase, instanceId, newConversation.id, tenantId);
     
