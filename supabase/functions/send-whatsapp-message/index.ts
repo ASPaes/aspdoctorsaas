@@ -462,7 +462,7 @@ Deno.serve(async (req) => {
 
     // --- PARALLELIZED: save message + update conversation ---
     const [saveResult] = await Promise.all([
-      anonClient
+      supabase
         .from('whatsapp_messages')
         .insert({
           tenant_id: tenantId,
