@@ -115,9 +115,8 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { conversations, isLoading } = useWhatsAppConversations({
     search: search.trim() || undefined,
     instanceId: filters.instanceId,
-    // When a department is selected, don't filter by instanceIds at query level
-    // because conversations routed via URA may have a different instance_id.
-    // Department filtering happens client-side using attendanceMap.department_id.
+    // Filter by department_id directly at query level
+    departmentId: selectedDepartmentId || undefined,
     instanceIds: selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined),
     status: filters.status,
     assignedTo: resolvedAssignedTo,
@@ -140,13 +139,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       const att = attendanceMap.get(conv.id);
       if (!att) continue;
 
-      // Filter by department when a department is selected
-      if (selectedDepartmentId) {
-        const attDeptMatch = att.department_id === selectedDepartmentId;
-        const convDeptMatch = (conv as any).department_id === selectedDepartmentId;
-        const instanceMatch = filteredInstanceIds && filteredInstanceIds.includes(conv.instance_id || '');
-        if (!attDeptMatch && !convDeptMatch && !(instanceMatch && !att.department_id)) continue;
-      }
+      // Department filtering is now done at DB query level via department_id
+      // Only do secondary check for attendance department mismatch
+      if (selectedDepartmentId && att.department_id && att.department_id !== selectedDepartmentId) continue;
 
       // For non-admin, skip conversations not assigned to them (except waiting/unassigned)
       if (!isAdmin && user?.id) {
@@ -164,18 +159,14 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const filtered = useMemo(() => {
     let result = [...conversations];
 
-    // Department-based filtering: filter by attendance's department_id
-    // This is the authoritative filter when a department is selected
+    // Department filtering is done at DB query level via department_id.
+    // Only filter out conversations whose active attendance is in a different department.
     if (selectedDepartmentId) {
       result = result.filter(c => {
         const att = attendanceMap.get(c.id);
-        // Show if attendance belongs to this department
-        if (att?.department_id === selectedDepartmentId) return true;
-        // Also show if conversation's department_id matches (set by URA)
-        if ((c as any).department_id === selectedDepartmentId) return true;
-        // Show conversations without attendance that are on this department's instances
-        if (!att && filteredInstanceIds && filteredInstanceIds.includes(c.instance_id || '')) return true;
-        return false;
+        // If attendance has a department and it doesn't match, hide it
+        if (att?.department_id && att.department_id !== selectedDepartmentId) return false;
+        return true;
       });
     }
 
