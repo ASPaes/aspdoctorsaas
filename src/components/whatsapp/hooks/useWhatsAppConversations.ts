@@ -8,6 +8,7 @@ export interface ConversationWithContact {
   id: string;
   contact_id: string;
   instance_id: string | null;
+  department_id: string | null;
   status: string;
   category: string | null;
   priority: string | null;
