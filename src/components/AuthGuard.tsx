@@ -28,7 +28,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Profile exists – check access_status and status
+    // Profile exists – check access_status, status, and funcionario_id
     const accessStatus = profile.access_status ?? "active";
     const status = profile.status ?? "ativo";
 
@@ -42,7 +42,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // access_status === 'active' — if user is on a status page, send them to dashboard
+    // access_status is 'active' but no funcionario_id → pending (incomplete setup)
+    if (!profile.funcionario_id && !profile.is_super_admin) {
+      if (path !== "/access-pending") navigate("/access-pending", { replace: true });
+      return;
+    }
+
+    // Fully active — if user is on a status page, send them to dashboard
     if (ACCESS_STATUS_ROUTES.includes(path)) {
       navigate("/dashboard", { replace: true });
     }
