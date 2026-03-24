@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,7 +45,18 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<Record<string, any> | null>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const prevTidRef = useRef(tid);
 
+  // Close modal if tenant changes while it's open — prevents saving with stale select options
+  useEffect(() => {
+    if (prevTidRef.current !== tid) {
+      prevTidRef.current = tid;
+      if (dialogOpen) {
+        closeDialog();
+        toast({ title: "Tenant alterado", description: "O formulário foi fechado. Selecione o setor novamente." });
+      }
+    }
+  }, [tid, dialogOpen]);
   const { data: rows, isLoading } = useQuery({
     queryKey: [queryKey, tid],
     queryFn: async () => {
