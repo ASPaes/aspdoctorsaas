@@ -129,7 +129,7 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     columns.forEach((c) => {
       const val = formData[c.key];
       if (c.type === "select") {
-        payload[c.key] = val ? Number(val) : null;
+        payload[c.key] = val ? (c.valueType === "string" ? val : Number(val)) : null;
       } else if (c.type === "boolean") {
         payload[c.key] = !!val;
       } else {
