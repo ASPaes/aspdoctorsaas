@@ -64,6 +64,11 @@ export default function AccessPending() {
               )}
             </div>
           )}
+          {context && (
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span>Status: <strong>{context.role ?? "—"}</strong></span>
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Você receberá acesso assim que o administrador aprovar sua conta. Tente novamente mais tarde.
           </p>
