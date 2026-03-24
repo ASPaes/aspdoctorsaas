@@ -64,7 +64,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   const deleteMutation = useDeleteMessages();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
   const { getSenderLabel } = useSenderMap();
   const { timezone } = useAppTimezone();
 
