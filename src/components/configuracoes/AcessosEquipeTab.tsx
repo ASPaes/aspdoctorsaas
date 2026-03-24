@@ -156,54 +156,72 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const [resolveUser, setResolveUser] = useState<AccessUser | null>(null);
   const [resolveFuncId, setResolveFuncId] = useState<string>("");
 
-  // Fetch users via RPC
+  // Fetch users via RPC — pass tenant_id for super admin simulation
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<AccessUser[]>({
     queryKey: ["tenant-access-users", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("get_tenant_access_users");
-      if (error) throw error;
+      const { data, error } = await (supabase.rpc as any)("get_tenant_access_users", {
+        p_tenant_id: tenantId,
+      });
+      if (error) {
+        // Fallback: RPC may not accept p_tenant_id yet — call without it
+        if (error.message?.includes("p_tenant_id")) {
+          const { data: d2, error: e2 } = await (supabase.rpc as any)("get_tenant_access_users");
+          if (e2) throw e2;
+          return (d2 ?? []) as AccessUser[];
+        }
+        throw error;
+      }
       return (data ?? []) as AccessUser[];
     },
     retry: 1,
   });
 
-  // Fetch departments for dropdown
+  // Fetch departments for dropdown — filter by tenant
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["tenant-departments-list", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("get_tenant_departments");
+      const { data, error } = await supabase
+        .from("support_departments")
+        .select("id, name, is_active, default_instance_id")
+        .eq("tenant_id", tenantId!)
+        .order("name");
       if (error) throw error;
       return (data ?? []) as Department[];
     },
   });
 
-  // Fetch active funcionários for invite
+  // Fetch active funcionários for invite — filter by tenant
   const { data: funcionarios = [] } = useQuery<Funcionario[]>({
     queryKey: ["funcionarios-for-invite", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("funcionarios")
         .select("id, nome, email, cargo, ativo, department_id")
         .eq("ativo", true)
         .order("nome");
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Funcionario[];
     },
   });
 
-  // Fetch pending access_invites
+  // Fetch pending access_invites — filter by tenant
   const { data: pendingInvites = [] } = useQuery({
     queryKey: ["access-invites-pending", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("access_invites")
         .select("id, funcionario_id, email, status, invited_at, metadata")
         .eq("status", "pending")
         .order("invited_at", { ascending: false });
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -1027,15 +1045,17 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
   const [formFallback, setFormFallback] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  // Departments
+  // Departments — filter by tenant
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ["support_departments", tenantId],
     enabled: !!tenantId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("support_departments")
         .select("*")
         .order("name");
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
