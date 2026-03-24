@@ -76,7 +76,7 @@ export default function CadastrosTab() {
     },
   ];
 
-  const [syncing, setSyncing] = useState(false);
+
 
   const handleSync = async () => {
     setSyncing(true);
