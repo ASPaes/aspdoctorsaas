@@ -19,6 +19,8 @@ export interface ColumnDef {
   label: string;
   type?: "text" | "select" | "boolean";
   options?: { value: string | number; label: string }[];
+  /** For select type: "number" (default) or "string" (for UUIDs) */
+  valueType?: "number" | "string";
   /** Display transform for table cell */
   render?: (value: any, row: any) => string;
 }
@@ -127,7 +129,7 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     columns.forEach((c) => {
       const val = formData[c.key];
       if (c.type === "select") {
-        payload[c.key] = val ? Number(val) : null;
+        payload[c.key] = val ? (c.valueType === "string" ? val : Number(val)) : null;
       } else if (c.type === "boolean") {
         payload[c.key] = !!val;
       } else {
