@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_invites: {
+        Row: {
+          accepted_at: string | null
+          auth_user_id: string | null
+          created_at: string
+          email: string
+          funcionario_id: number
+          id: string
+          invited_at: string
+          invited_by: string | null
+          metadata: Json
+          resent_at: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          email: string
+          funcionario_id: number
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          metadata?: Json
+          resent_at?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string
+          funcionario_id?: number
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          metadata?: Json
+          resent_at?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_settings: {
         Row: {
           api_key_encrypted: string | null
@@ -3464,6 +3512,15 @@ export type Database = {
       accept_invite: { Args: { p_token: string }; Returns: undefined }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
+      create_access_invite: {
+        Args: {
+          p_access_status?: string
+          p_email: string
+          p_funcionario_id: number
+          p_role?: string
+        }
+        Returns: string
+      }
       create_tenant_for_new_user:
         | { Args: { p_nome: string }; Returns: string }
         | {
@@ -3541,17 +3598,15 @@ export type Database = {
       get_tenant_access_users: {
         Args: never
         Returns: {
+          access_status: string
           department_id: string
           department_is_active: boolean
           department_name: string
-          email: string
-          funcionario_ativo: boolean
           funcionario_email: string
           funcionario_id: number
           funcionario_nome: string
           is_super_admin: boolean
           role: string
-          status: string
           tenant_id: string
           user_id: string
         }[]
@@ -3586,6 +3641,7 @@ export type Database = {
         }[]
       }
       is_admin_or_head: { Args: never; Returns: boolean }
+      is_current_user_active: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
