@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1044,6 +1044,20 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
   const [formActive, setFormActive] = useState(true);
   const [formFallback, setFormFallback] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+
+  // Reset selection when tenant changes
+  const prevTenantRef = useRef(tenantId);
+  useEffect(() => {
+    if (prevTenantRef.current !== tenantId) {
+      prevTenantRef.current = tenantId;
+      setSelectedId(null);
+      setIsCreating(false);
+      setFormName("");
+      setFormDesc("");
+      setFormActive(true);
+      setFormFallback(false);
+    }
+  }, [tenantId]);
 
   // Departments — filter by tenant
   const { data: departments = [], isLoading } = useQuery({
