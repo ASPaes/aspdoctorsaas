@@ -3510,6 +3510,14 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { p_token: string }; Returns: undefined }
+      audit_log: {
+        Args: {
+          p_event_type: string
+          p_metadata?: Json
+          p_target_user_id: string
+        }
+        Returns: undefined
+      }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       create_access_invite: {
@@ -3650,6 +3658,7 @@ export type Database = {
         Returns: number
       }
       norm_txt: { Args: { t: string }; Returns: string }
+      require_active_profile: { Args: never; Returns: boolean }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       validate_invite_token: {
         Args: { p_token: string }
