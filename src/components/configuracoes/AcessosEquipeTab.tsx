@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -125,12 +125,60 @@ function slugify(text: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+const accessEquipeQueryKeys = {
+  users: (tenantId?: string) => ["tenant-access-users", tenantId] as const,
+  dropdownDepartments: (tenantId?: string) => ["tenant-departments-list", tenantId] as const,
+  inviteFuncionarios: (tenantId?: string) => ["funcionarios-for-invite", tenantId] as const,
+  pendingInvites: (tenantId?: string) => ["access-invites-pending", tenantId] as const,
+  pendingApprovals: (tenantId?: string) => ["pending-approvals", tenantId] as const,
+  departments: (tenantId?: string) => ["support_departments", tenantId] as const,
+  departmentInstances: (tenantId?: string, departmentId?: string | null) =>
+    ["support_department_instances", tenantId, departmentId] as const,
+};
+
+function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: string) {
+  queryClient.removeQueries({ queryKey: ["tenant-access-users"] });
+  queryClient.removeQueries({ queryKey: ["tenant-departments-list"] });
+  queryClient.removeQueries({ queryKey: ["funcionarios-for-invite"] });
+  queryClient.removeQueries({ queryKey: ["access-invites-pending"] });
+  queryClient.removeQueries({ queryKey: ["pending-approvals"] });
+  queryClient.removeQueries({ queryKey: ["support_departments"] });
+  queryClient.removeQueries({ queryKey: ["support_department_instances"] });
+
+  if (!tenantId) return;
+
+  queryClient.setQueryData(accessEquipeQueryKeys.users(tenantId), []);
+  queryClient.setQueryData(accessEquipeQueryKeys.dropdownDepartments(tenantId), []);
+  queryClient.setQueryData(accessEquipeQueryKeys.inviteFuncionarios(tenantId), []);
+  queryClient.setQueryData(accessEquipeQueryKeys.pendingInvites(tenantId), []);
+  queryClient.setQueryData(accessEquipeQueryKeys.pendingApprovals(tenantId), []);
+  queryClient.setQueryData(accessEquipeQueryKeys.departments(tenantId), []);
+}
+
 // ========== Main Component ==========
 
 export default function AcessosEquipeTab() {
   const { profile } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const queryClient = useQueryClient();
   const tenantId = tid || profile?.tenant_id;
+
+  const prevTenantRef = useRef(tenantId);
+  useEffect(() => {
+    if (prevTenantRef.current !== tenantId) {
+      prevTenantRef.current = tenantId;
+      resetAccessEquipeTenantQueries(queryClient, tenantId);
+
+      if (tenantId) {
+        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.dropdownDepartments(tenantId) });
+        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
+        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingInvites(tenantId) });
+        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId) });
+        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
+      }
+    }
+  }, [tenantId, queryClient]);
 
   return (
     <div className="space-y-8">
@@ -171,30 +219,86 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   // Fetch users via RPC — pass tenant_id for super admin simulation
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<AccessUser[]>({
-    queryKey: ["tenant-access-users", tenantId],
+    queryKey: accessEquipeQueryKeys.users(tenantId),
     enabled: !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("get_tenant_access_users", {
-        p_tenant_id: tenantId,
+      const [profilesRes, emailsRes, funcionariosRes, departmentsRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("user_id, role, is_super_admin, status, access_status, funcionario_id")
+          .eq("tenant_id", tenantId!)
+          .order("created_at"),
+        (supabase.rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! }),
+        supabase
+          .from("funcionarios")
+          .select("id, nome, email, ativo, department_id")
+          .eq("tenant_id", tenantId!),
+        supabase
+          .from("support_departments")
+          .select("id, name, is_active")
+          .eq("tenant_id", tenantId!),
+      ]);
+
+      if (profilesRes.error) throw profilesRes.error;
+      if (emailsRes.error) throw emailsRes.error;
+      if (funcionariosRes.error) throw funcionariosRes.error;
+      if (departmentsRes.error) throw departmentsRes.error;
+
+      const emailByUserId = new Map<string, string | null>(
+        ((emailsRes.data ?? []) as Array<{ user_id: string; email: string | null }>).map((row) => [
+          row.user_id,
+          row.email,
+        ])
+      );
+
+      const funcionarioById = new Map<number, Funcionario>(
+        ((funcionariosRes.data ?? []) as Funcionario[]).map((funcionario) => [funcionario.id, funcionario])
+      );
+
+      const departmentById = new Map<string, Department>(
+        ((departmentsRes.data ?? []) as Department[]).map((department) => [department.id, department])
+      );
+
+      return ((profilesRes.data ?? []) as Array<{
+        user_id: string;
+        role: string;
+        is_super_admin: boolean;
+        status: string;
+        access_status: string | null;
+        funcionario_id: number | null;
+      }>).map((profileRow) => {
+        const funcionario = profileRow.funcionario_id
+          ? funcionarioById.get(profileRow.funcionario_id) ?? null
+          : null;
+        const department = funcionario?.department_id
+          ? departmentById.get(funcionario.department_id) ?? null
+          : null;
+
+        return {
+          user_id: profileRow.user_id,
+          email: emailByUserId.get(profileRow.user_id) ?? funcionario?.email ?? null,
+          role: profileRow.role,
+          is_super_admin: profileRow.is_super_admin,
+          status: profileRow.status,
+          funcionario_id: profileRow.funcionario_id,
+          funcionario_nome: funcionario?.nome ?? null,
+          funcionario_email: funcionario?.email ?? null,
+          funcionario_ativo: funcionario?.ativo ?? null,
+          department_id: funcionario?.department_id ?? null,
+          department_name: department?.name ?? null,
+          department_is_active: department?.is_active ?? null,
+          access_status: profileRow.access_status,
+        };
       });
-      if (error) {
-        // Fallback: RPC may not accept p_tenant_id yet — call without it
-        if (error.message?.includes("p_tenant_id")) {
-          const { data: d2, error: e2 } = await (supabase.rpc as any)("get_tenant_access_users");
-          if (e2) throw e2;
-          return (d2 ?? []) as AccessUser[];
-        }
-        throw error;
-      }
-      return (data ?? []) as AccessUser[];
     },
-    retry: 1,
   });
 
   // Fetch departments for dropdown — filter by tenant
   const { data: departments = [] } = useQuery<Department[]>({
-    queryKey: ["tenant-departments-list", tenantId],
+    queryKey: accessEquipeQueryKeys.dropdownDepartments(tenantId),
     enabled: !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
@@ -208,8 +312,9 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   // Fetch active funcionários for invite — filter by tenant
   const { data: funcionarios = [] } = useQuery<Funcionario[]>({
-    queryKey: ["funcionarios-for-invite", tenantId],
+    queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId),
     enabled: !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
       let q = supabase
         .from("funcionarios")
@@ -225,8 +330,9 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   // Fetch pending access_invites — filter by tenant
   const { data: pendingInvites = [] } = useQuery({
-    queryKey: ["access-invites-pending", tenantId],
+    queryKey: accessEquipeQueryKeys.pendingInvites(tenantId),
     enabled: !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
       let q = supabase
         .from("access_invites")
@@ -242,8 +348,9 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   // Pending approvals
   const { data: pendingUsers = [] } = useQuery({
-    queryKey: ["pending-approvals", tenantId],
+    queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId),
     enabled: !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
@@ -302,12 +409,16 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   // Mutations
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const { error } = await supabase.from("profiles").update({ role }).eq("user_id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("user_id", userId)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant-users"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
       sonnerToast.success("Papel atualizado.");
     },
     onError: (err: any) => sonnerToast.error(err.message),
@@ -318,7 +429,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const { error } = await supabase
         .from("funcionarios")
         .update({ department_id: deptId })
-        .eq("id", funcId);
+        .eq("id", funcId)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
 
       const { data: profileRow } = await supabase
@@ -347,8 +459,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
-      queryClient.invalidateQueries({ queryKey: ["funcionarios_setores"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
       sonnerToast.success("Setor atualizado.");
     },
     onError: (err: any) => sonnerToast.error(err.message),
@@ -356,12 +468,16 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
-      const { error } = await supabase.from("profiles").update({ status }).eq("user_id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ status })
+        .eq("user_id", userId)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant-users"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
       sonnerToast.success("Status atualizado.");
     },
     onError: (err: any) => sonnerToast.error(err.message),
@@ -381,8 +497,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
     },
   });
 
@@ -399,8 +515,9 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["access-invites-pending"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingInvites(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
       sonnerToast.success("Convite enviado com sucesso!");
       setSelectedFuncId("");
       setShowInviteCard(false);
@@ -414,11 +531,12 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const { error } = await supabase
         .from("access_invites")
         .delete()
-        .eq("id", inviteId);
+        .eq("id", inviteId)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["access-invites-pending"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingInvites(tenantId) });
       sonnerToast.success("Convite cancelado.");
     },
     onError: (err: any) => sonnerToast.error(err.message),
@@ -430,13 +548,15 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const { error } = await supabase
         .from("profiles")
         .update({ funcionario_id: funcionarioId, access_status: "active" } as any)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant-users"] });
-      queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
       sonnerToast.success("Funcionário vinculado e acesso ativado com sucesso.");
       setResolveUser(null);
       setResolveFuncId("");
@@ -1074,8 +1194,9 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
 
   // Departments — filter by tenant
   const { data: departments = [], isLoading } = useQuery({
-    queryKey: ["support_departments", tenantId],
+    queryKey: accessEquipeQueryKeys.departments(tenantId),
     enabled: !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
       let q = supabase
         .from("support_departments")
@@ -1090,13 +1211,15 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
 
   // Linked instances for selected dept
   const { data: deptInstances = [] } = useQuery<DeptInstance[]>({
-    queryKey: ["support_department_instances", selectedId],
-    enabled: !!selectedId,
+    queryKey: accessEquipeQueryKeys.departmentInstances(tenantId, selectedId),
+    enabled: !!selectedId && !!tenantId,
+    placeholderData: [],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_department_instances")
         .select("*")
-        .eq("department_id", selectedId!);
+        .eq("department_id", selectedId!)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
       return (data ?? []) as DeptInstance[];
     },
@@ -1134,8 +1257,8 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["support_departments"] });
-      queryClient.invalidateQueries({ queryKey: ["tenant-departments-list"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.dropdownDepartments(tenantId) });
       toast({ title: "Setor salvo!" });
       setIsCreating(false);
     },
@@ -1152,12 +1275,14 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
           .from("support_department_instances")
           .delete()
           .eq("department_id", selectedId)
-          .eq("instance_id", instanceId);
+          .eq("instance_id", instanceId)
+          .eq("tenant_id", tenantId);
         if (selectedDept?.default_instance_id === instanceId) {
           await supabase
             .from("support_departments")
             .update({ default_instance_id: null })
-            .eq("id", selectedId);
+            .eq("id", selectedId)
+            .eq("tenant_id", tenantId);
         }
       } else {
         await supabase.from("support_department_instances").insert({
@@ -1168,8 +1293,10 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["support_department_instances", selectedId] });
-      queryClient.invalidateQueries({ queryKey: ["support_departments"] });
+      void queryClient.invalidateQueries({
+        queryKey: accessEquipeQueryKeys.departmentInstances(tenantId, selectedId),
+      });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
     },
   });
 
@@ -1179,11 +1306,12 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
       const { error } = await supabase
         .from("support_departments")
         .update({ default_instance_id: instanceId })
-        .eq("id", selectedId);
+        .eq("id", selectedId)
+        .eq("tenant_id", tenantId!);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["support_departments"] });
+      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
       toast({ title: "Instância padrão atualizada" });
     },
   });
