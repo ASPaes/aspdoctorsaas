@@ -137,7 +137,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       // --- PARALLELIZED: count + unread + waiting in a single Promise.all ---
       const buildBaseFilter = (q: any) => {
         if (tid) q = q.eq('tenant_id', tid);
-        if (filters?.instanceIds && filters.instanceIds.length > 0) {
+        if (filters?.departmentId) {
+          q = q.eq('department_id', filters.departmentId);
+        } else if (filters?.instanceIds && filters.instanceIds.length > 0) {
           q = q.in('instance_id', filters.instanceIds);
         } else if (filters?.instanceId) {
           q = q.eq('instance_id', filters.instanceId);
