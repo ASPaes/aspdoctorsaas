@@ -18,7 +18,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
-  const { attendanceMap } = useAttendanceStatus([conversationId]);
+  const { attendanceMap } = useAttendanceStatus([conversationId], true);
   const attendance = attendanceMap.get(conversationId);
 
   // Determine effective assignment from attendance (more accurate) or fallback to conversation prop

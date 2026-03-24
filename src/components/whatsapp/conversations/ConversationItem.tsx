@@ -74,6 +74,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-blue-500/50 text-blue-600 dark:text-blue-400">
         Em atend.
       </Badge>
+    ) : (attendance.status === "closed" || attendance.status === "inactive_closed") ? (
+      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-muted-foreground/50 text-muted-foreground">
+        Encerrado
+      </Badge>
     ) : null
   ) : null;
 
