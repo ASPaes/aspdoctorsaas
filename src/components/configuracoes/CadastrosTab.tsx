@@ -25,12 +25,31 @@ function useDepartmentOptions() {
 
 export default function CadastrosTab() {
   const [syncing, setSyncing] = useState(false);
+  const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
 
-  const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string }[] = [
+  // Validate department belongs to the effective tenant before saving funcionario
+  const validateFuncionario = async (payload: Record<string, any>, _isEdit: boolean): Promise<string | void> => {
+    const deptId = payload.department_id;
+    if (!deptId || !tid) return;
+
+    const { data, error } = await supabase
+      .from("support_departments")
+      .select("id")
+      .eq("id", deptId)
+      .eq("tenant_id", tid)
+      .maybeSingle();
+
+    if (error || !data) {
+      return "Setor inválido para este tenant. Verifique o tenant selecionado no topo ou escolha outro setor.";
+    }
+  };
+
+  const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void> }[] = [
     {
       value: "funcionarios", label: "Funcionários", table: "funcionarios", queryKey: "crud_funcionarios", orderBy: "nome",
       selectQuery: "*, support_departments:department_id(name)",
+      onBeforeSave: validateFuncionario,
       columns: [
         { key: "nome", label: "Nome" },
         { key: "cargo", label: "Cargo" },
@@ -120,6 +139,7 @@ export default function CadastrosTab() {
               columns={t.columns}
               orderBy={t.orderBy}
               selectQuery={t.selectQuery}
+              onBeforeSave={t.onBeforeSave}
             />
           </TabsContent>
         ))}
