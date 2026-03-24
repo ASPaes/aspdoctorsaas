@@ -3610,11 +3610,14 @@ export type Database = {
           department_id: string
           department_is_active: boolean
           department_name: string
+          email: string
+          funcionario_ativo: boolean
           funcionario_email: string
           funcionario_id: number
           funcionario_nome: string
           is_super_admin: boolean
           role: string
+          status: string
           tenant_id: string
           user_id: string
         }[]
