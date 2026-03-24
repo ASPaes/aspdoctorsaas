@@ -5,8 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import {
   useTenantInfo,
-  useTenantInvites,
-  useCreateInvite,
   useCancelInvite,
 } from "@/hooks/useTenantUsers";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
@@ -44,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -69,6 +68,9 @@ import {
   RotateCcw,
   ShieldAlert,
   Pencil,
+  AlertTriangle,
+  Mail,
+  Link2,
 } from "lucide-react";
 
 // ========== Types ==========
@@ -86,6 +88,7 @@ interface AccessUser {
   department_id: string | null;
   department_name: string | null;
   department_is_active: boolean | null;
+  access_status: string | null;
 }
 
 interface Department {
@@ -100,6 +103,15 @@ interface DeptInstance {
   department_id: string;
   instance_id: string;
   is_active: boolean;
+}
+
+interface Funcionario {
+  id: number;
+  nome: string;
+  email: string | null;
+  cargo: string | null;
+  ativo: boolean;
+  department_id: string | null;
 }
 
 // ========== Helpers ==========
@@ -135,19 +147,14 @@ export default function AcessosEquipeTab() {
 
 function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const { profile } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: tenant } = useTenantInfo();
-  const { data: invites = [], isLoading: invitesLoading } = useTenantInvites();
-  const createInvite = useCreateInvite();
-  const cancelInvite = useCancelInvite();
 
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("user");
-  const [editUser, setEditUser] = useState<AccessUser | null>(null);
-
-  // Pending approvals
+  const [selectedFuncId, setSelectedFuncId] = useState<string>("");
+  const [showInviteCard, setShowInviteCard] = useState(false);
   const [confirmReject, setConfirmReject] = useState<{ userId: string; email: string } | null>(null);
+  const [resolveUser, setResolveUser] = useState<AccessUser | null>(null);
+  const [resolveFuncId, setResolveFuncId] = useState<string>("");
 
   // Fetch users via RPC
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<AccessUser[]>({
@@ -172,9 +179,37 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
   });
 
-  const activeDepts = departments.filter((d) => d.is_active);
+  // Fetch active funcionários for invite
+  const { data: funcionarios = [] } = useQuery<Funcionario[]>({
+    queryKey: ["funcionarios-for-invite", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome, email, cargo, ativo, department_id")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Funcionario[];
+    },
+  });
 
-  // Pending users (access_status)
+  // Fetch pending access_invites
+  const { data: pendingInvites = [] } = useQuery({
+    queryKey: ["access-invites-pending", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("access_invites")
+        .select("id, funcionario_id, email, status, invited_at, metadata")
+        .eq("status", "pending")
+        .order("invited_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Pending approvals
   const { data: pendingUsers = [] } = useQuery({
     queryKey: ["pending-approvals", tenantId],
     enabled: !!tenantId,
@@ -198,6 +233,41 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
   });
 
+  const activeDepts = departments.filter((d) => d.is_active);
+
+  // Selected funcionário info
+  const selectedFunc = useMemo(
+    () => funcionarios.find((f) => String(f.id) === selectedFuncId),
+    [funcionarios, selectedFuncId]
+  );
+
+  // Check if funcionário already has a linked profile
+  const funcAlreadyLinked = useMemo(() => {
+    if (!selectedFunc) return false;
+    return users.some((u) => u.funcionario_id === selectedFunc.id);
+  }, [selectedFunc, users]);
+
+  // Check if there's a pending invite for this funcionário
+  const funcHasPendingInvite = useMemo(() => {
+    if (!selectedFunc) return false;
+    return pendingInvites.some((inv) => inv.funcionario_id === selectedFunc.id);
+  }, [selectedFunc, pendingInvites]);
+
+  // Funcionários available for invite (active, not yet linked to a profile, no pending invite)
+  const availableFuncionarios = useMemo(() => {
+    const linkedFuncIds = new Set(users.filter((u) => u.funcionario_id).map((u) => u.funcionario_id));
+    const pendingFuncIds = new Set(pendingInvites.map((inv) => inv.funcionario_id));
+    return funcionarios.filter(
+      (f) => !linkedFuncIds.has(f.id) && !pendingFuncIds.has(f.id)
+    );
+  }, [funcionarios, users, pendingInvites]);
+
+  // Department name helper
+  const getDeptName = (deptId: string | null) => {
+    if (!deptId) return "—";
+    return departments.find((d) => d.id === deptId)?.name ?? "—";
+  };
+
   // Mutations
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
@@ -220,7 +290,6 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         .eq("id", funcId);
       if (error) throw error;
 
-      // Sync support_department_members
       const { data: profileRow } = await supabase
         .from("profiles")
         .select("user_id")
@@ -286,27 +355,85 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
   });
 
+  // Invite via RPC create_access_invite
+  const createInviteMutation = useMutation({
+    mutationFn: async ({ funcionarioId, email }: { funcionarioId: number; email: string }) => {
+      const { data, error } = await (supabase.rpc as any)("create_access_invite", {
+        p_funcionario_id: funcionarioId,
+        p_email: email,
+        p_role: "user",
+        p_access_status: "ativo",
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["access-invites-pending"] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
+      sonnerToast.success("Convite enviado com sucesso!");
+      setSelectedFuncId("");
+      setShowInviteCard(false);
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
+  // Cancel access invite
+  const cancelAccessInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const { error } = await supabase
+        .from("access_invites")
+        .delete()
+        .eq("id", inviteId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["access-invites-pending"] });
+      sonnerToast.success("Convite cancelado.");
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
+  // Resolve unlinked user - link to funcionário
+  const linkFuncionarioMutation = useMutation({
+    mutationFn: async ({ userId, funcionarioId }: { userId: string; funcionarioId: number }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ funcionario_id: funcionarioId } as any)
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-users"] });
+      sonnerToast.success("Funcionário vinculado com sucesso.");
+      setResolveUser(null);
+      setResolveFuncId("");
+    },
+    onError: (err: any) => sonnerToast.error(err.message),
+  });
+
+  const handleSendInvite = () => {
+    if (!selectedFunc || !selectedFunc.email) return;
+    if (funcAlreadyLinked) {
+      sonnerToast.error("Este funcionário já possui usuário vinculado.");
+      return;
+    }
+    if (funcHasPendingInvite) {
+      sonnerToast.error("Já existe convite pendente para este funcionário.");
+      return;
+    }
+    createInviteMutation.mutate({
+      funcionarioId: selectedFunc.id,
+      email: selectedFunc.email,
+    });
+  };
+
   const activeCount = users.filter((u) => u.status === "ativo").length;
   const maxUsers = tenant?.max_users ?? 1;
   const canInvite = activeCount < maxUsers;
 
-  const handleInvite = () => {
-    if (!inviteEmail.trim() || !tenant) return;
-    createInvite.mutate(
-      { email: inviteEmail.trim(), role: inviteRole, tenantId: tenant.id },
-      {
-        onSuccess: (result) => {
-          if (result.accessStatus === "pending") {
-            sonnerToast.warning("Convite enviado. Aguardará aprovação.");
-          } else {
-            sonnerToast.success("Convite enviado!");
-          }
-          setInviteEmail("");
-        },
-        onError: (err: any) => sonnerToast.error(err.message),
-      }
-    );
-  };
+  // Users without funcionário link
+  const unlinkedUsers = users.filter((u) => !u.funcionario_id);
 
   if (usersLoading) {
     return (
@@ -335,13 +462,206 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Usuários
+            Usuários & Convites
           </h2>
           <p className="text-sm text-muted-foreground">
             {activeCount} ativos / {maxUsers} permitidos
           </p>
         </div>
+        <Button
+          size="sm"
+          onClick={() => setShowInviteCard(!showInviteCard)}
+          disabled={!canInvite}
+        >
+          <UserPlus className="h-4 w-4 mr-1" />
+          Convidar
+        </Button>
       </div>
+
+      {/* Invite Card - Funcionário-based */}
+      {showInviteCard && (
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Convidar Funcionário
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Selecione um funcionário cadastrado para enviar o convite de acesso ao sistema.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Funcionário select */}
+            <div className="space-y-1">
+              <Label className="text-xs">Funcionário</Label>
+              <Select value={selectedFuncId} onValueChange={setSelectedFuncId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um funcionário..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableFuncionarios.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      Nenhum funcionário disponível para convite
+                    </div>
+                  ) : (
+                    availableFuncionarios.map((f) => (
+                      <SelectItem key={f.id} value={String(f.id)}>
+                        <div className="flex items-center gap-2">
+                          <span>{f.nome}</span>
+                          {f.email ? (
+                            <span className="text-xs text-muted-foreground">({f.email})</span>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-500/30">
+                              Sem e-mail
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Details when funcionário selected */}
+            {selectedFunc && (
+              <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Convite vinculado ao Funcionário: <span className="text-foreground font-semibold">{selectedFunc.nome}</span>
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs text-muted-foreground">Email do convite</Label>
+                    {selectedFunc.email ? (
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                        {selectedFunc.email}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-yellow-600 flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Preencha o e-mail no cadastro do funcionário para convidar.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <Label className="text-xs text-muted-foreground">Setor</Label>
+                    <p className="text-sm">{getDeptName(selectedFunc.department_id)}</p>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <Label className="text-xs text-muted-foreground">Papel</Label>
+                    <p className="text-sm">
+                      <Badge variant="secondary">user</Badge>
+                    </p>
+                  </div>
+                </div>
+
+                {funcAlreadyLinked && (
+                  <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+                    <X className="h-3.5 w-3.5" />
+                    Este funcionário já possui usuário vinculado.
+                  </p>
+                )}
+                {funcHasPendingInvite && (
+                  <p className="text-xs text-yellow-600 flex items-center gap-1 mt-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Já existe convite pendente para este funcionário.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleSendInvite}
+                disabled={
+                  !selectedFunc ||
+                  !selectedFunc.email ||
+                  funcAlreadyLinked ||
+                  funcHasPendingInvite ||
+                  createInviteMutation.isPending
+                }
+                size="sm"
+              >
+                {createInviteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
+                Enviar Convite
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowInviteCard(false);
+                  setSelectedFuncId("");
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Access Invites */}
+      {pendingInvites.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Mail className="h-4 w-4 text-blue-500" />
+              Convites Pendentes ({pendingInvites.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {pendingInvites.map((inv) => {
+                const func = funcionarios.find((f) => f.id === inv.funcionario_id);
+                return (
+                  <div key={inv.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{func?.nome ?? `Func #${inv.funcionario_id}`}</span>
+                      <span className="text-muted-foreground">{inv.email}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(inv.metadata as any)?.role ?? "user"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground mr-2">
+                        {new Date(inv.invited_at).toLocaleDateString("pt-BR")}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => {
+                          const link = `${window.location.origin}/signup`;
+                          navigator.clipboard.writeText(link);
+                          sonnerToast.success("Link copiado!");
+                        }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => cancelAccessInviteMutation.mutate(inv.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pending Approvals */}
       {pendingUsers.length > 0 && (
@@ -418,164 +738,115 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                 <TableRow>
                   <TableHead>Nome</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Papel</TableHead>
                   <TableHead>Setor</TableHead>
+                  <TableHead>Papel</TableHead>
+                  <TableHead>Acesso</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.user_id}>
-                    <TableCell className="font-medium">
-                      {u.funcionario_nome ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {u.email ?? u.funcionario_email ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={u.role}
-                        onValueChange={(v) => updateRoleMutation.mutate({ userId: u.user_id, role: v })}
-                        disabled={u.user_id === profile?.user_id || u.is_super_admin}
-                      >
-                        <SelectTrigger className="w-24 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">admin</SelectItem>
-                          <SelectItem value="head">head</SelectItem>
-                          <SelectItem value="user">user</SelectItem>
-                          <SelectItem value="viewer">viewer</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      {u.funcionario_id ? (
+                {users.map((u) => {
+                  const isUnlinked = !u.funcionario_id;
+                  return (
+                    <TableRow key={u.user_id} className={isUnlinked ? "bg-yellow-500/5" : ""}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-1.5">
+                          {isUnlinked && (
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
+                          )}
+                          <span>{u.funcionario_nome ?? "—"}</span>
+                          {isUnlinked && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-yellow-700 border-yellow-500/40 bg-yellow-500/10 cursor-pointer hover:bg-yellow-500/20"
+                              onClick={() => {
+                                setResolveUser(u);
+                                setResolveFuncId("");
+                              }}
+                            >
+                              Sem vínculo
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {u.email ?? u.funcionario_email ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        {u.funcionario_id ? (
+                          <Select
+                            value={u.department_id ?? "none"}
+                            onValueChange={(v) =>
+                              updateDeptMutation.mutate({
+                                funcId: u.funcionario_id!,
+                                deptId: v === "none" ? null : v,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="w-36 h-8">
+                              <SelectValue placeholder="Sem setor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sem setor</SelectItem>
+                              {activeDepts.map((d) => (
+                                <SelectItem key={d.id} value={d.id}>
+                                  {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Select
-                          value={u.department_id ?? "none"}
-                          onValueChange={(v) =>
-                            updateDeptMutation.mutate({
-                              funcId: u.funcionario_id!,
-                              deptId: v === "none" ? null : v,
-                            })
-                          }
+                          value={u.role}
+                          onValueChange={(v) => updateRoleMutation.mutate({ userId: u.user_id, role: v })}
+                          disabled={u.user_id === profile?.user_id || u.is_super_admin}
                         >
-                          <SelectTrigger className="w-36 h-8">
-                            <SelectValue placeholder="Sem setor" />
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">Sem setor</SelectItem>
-                            {activeDepts.map((d) => (
-                              <SelectItem key={d.id} value={d.id}>
-                                {d.name}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="admin">admin</SelectItem>
+                            <SelectItem value="head">head</SelectItem>
+                            <SelectItem value="user">user</SelectItem>
+                            <SelectItem value="viewer">viewer</SelectItem>
                           </SelectContent>
                         </Select>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sem funcionário</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={u.status}
-                        onValueChange={(v) => updateStatusMutation.mutate({ userId: u.user_id, status: v })}
-                        disabled={u.user_id === profile?.user_id}
-                      >
-                        <SelectTrigger className="w-24 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ativo">ativo</SelectItem>
-                          <SelectItem value="inativo">inativo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <AccessStatusBadge status={u.access_status} />
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={u.status}
+                          onValueChange={(v) => {
+                            // Block activating user without funcionário link
+                            if (v === "ativo" && !u.funcionario_id) {
+                              sonnerToast.error("Não é possível ativar um usuário sem funcionário vinculado.");
+                              return;
+                            }
+                            updateStatusMutation.mutate({ userId: u.user_id, status: v });
+                          }}
+                          disabled={u.user_id === profile?.user_id}
+                        >
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ativo">ativo</SelectItem>
+                            <SelectItem value="inativo">inativo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Invite Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Convidar Membro</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-1">
-              <Label className="text-xs">Email</Label>
-              <Input
-                type="email"
-                placeholder="email@exemplo.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-              />
-            </div>
-            <div className="w-28 space-y-1">
-              <Label className="text-xs">Papel</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">admin</SelectItem>
-                  <SelectItem value="head">head</SelectItem>
-                  <SelectItem value="user">user</SelectItem>
-                  <SelectItem value="viewer">viewer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleInvite} disabled={!canInvite || createInvite.isPending || !inviteEmail.trim()}>
-              {createInvite.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-              Convidar
-            </Button>
-          </div>
-
-          {/* Pending invites */}
-          {invites.length > 0 && (
-            <div className="mt-4 space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Convites pendentes</p>
-              {invites.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between text-sm py-1">
-                  <div className="flex items-center gap-2">
-                    <span>{inv.email}</span>
-                    <Badge variant="secondary" className="text-xs">{inv.role}</Badge>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          `${window.location.origin}/signup?invite=${inv.token}`
-                        );
-                        sonnerToast.success("Link copiado!");
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() =>
-                        cancelInvite.mutate(inv.id, {
-                          onSuccess: () => sonnerToast.success("Convite cancelado."),
-                        })
-                      }
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -607,7 +878,97 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Resolve unlinked user dialog */}
+      <Dialog open={!!resolveUser} onOpenChange={(o) => !o && setResolveUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Resolver vínculo
+            </DialogTitle>
+            <DialogDescription>
+              O usuário <strong>{resolveUser?.email ?? resolveUser?.user_id}</strong> não está vinculado a nenhum funcionário.
+              Selecione um funcionário para vincular ou desative o acesso.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label className="text-sm">Vincular a funcionário</Label>
+              <Select value={resolveFuncId} onValueChange={setResolveFuncId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um funcionário..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {funcionarios
+                    .filter((f) => !users.some((u) => u.funcionario_id === f.id))
+                    .map((f) => (
+                      <SelectItem key={f.id} value={String(f.id)}>
+                        {f.nome} {f.email ? `(${f.email})` : ""}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (resolveUser) {
+                  updateStatusMutation.mutate(
+                    { userId: resolveUser.user_id, status: "inativo" },
+                    {
+                      onSuccess: () => {
+                        sonnerToast.success("Usuário desativado.");
+                        setResolveUser(null);
+                      },
+                    }
+                  );
+                }
+              }}
+            >
+              Desativar acesso
+            </Button>
+            <Button
+              disabled={!resolveFuncId || linkFuncionarioMutation.isPending}
+              onClick={() => {
+                if (resolveUser && resolveFuncId) {
+                  linkFuncionarioMutation.mutate({
+                    userId: resolveUser.user_id,
+                    funcionarioId: Number(resolveFuncId),
+                  });
+                }
+              }}
+            >
+              {linkFuncionarioMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Link2 className="h-4 w-4" />
+              Vincular
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// Access status badge helper
+function AccessStatusBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-xs text-muted-foreground">—</span>;
+  
+  const map: Record<string, { label: string; className: string }> = {
+    active: { label: "Ativo", className: "bg-green-500/10 text-green-700 border-green-500/30" },
+    ativo: { label: "Ativo", className: "bg-green-500/10 text-green-700 border-green-500/30" },
+    pending: { label: "Pendente", className: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30" },
+    blocked: { label: "Bloqueado", className: "bg-red-500/10 text-red-700 border-red-500/30" },
+  };
+
+  const info = map[status] ?? { label: status, className: "" };
+
+  return (
+    <Badge variant="outline" className={`text-xs ${info.className}`}>
+      {info.label}
+    </Badge>
   );
 }
 
@@ -950,7 +1311,7 @@ function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setConfirmDeactivate(false); saveMutation.mutate(); }}>
+            <AlertDialogAction onClick={() => saveMutation.mutate()}>
               Desativar
             </AlertDialogAction>
           </AlertDialogFooter>
