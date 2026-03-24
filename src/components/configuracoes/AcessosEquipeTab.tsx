@@ -398,14 +398,15 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     mutationFn: async ({ userId, funcionarioId }: { userId: string; funcionarioId: number }) => {
       const { error } = await supabase
         .from("profiles")
-        .update({ funcionario_id: funcionarioId } as any)
+        .update({ funcionario_id: funcionarioId, access_status: "active" } as any)
         .eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tenant-access-users"] });
       queryClient.invalidateQueries({ queryKey: ["tenant-users"] });
-      sonnerToast.success("Funcionário vinculado com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
+      sonnerToast.success("Funcionário vinculado e acesso ativado com sucesso.");
       setResolveUser(null);
       setResolveFuncId("");
     },

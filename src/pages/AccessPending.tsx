@@ -39,7 +39,7 @@ export default function AccessPending() {
           </div>
           <CardTitle>Acesso Pendente</CardTitle>
           <CardDescription>
-            Seu acesso está aguardando aprovação do administrador da empresa.
+            Seu usuário ainda não foi liberado pelo administrador do tenant.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -62,6 +62,11 @@ export default function AccessPending() {
                   <span>{context.department_name}</span>
                 </div>
               )}
+            </div>
+          )}
+          {context && (
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <span>Status: <strong>{context.role ?? "—"}</strong></span>
             </div>
           )}
           <p className="text-sm text-muted-foreground">
