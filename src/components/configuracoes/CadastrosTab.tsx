@@ -139,6 +139,7 @@ export default function CadastrosTab() {
               columns={t.columns}
               orderBy={t.orderBy}
               selectQuery={t.selectQuery}
+              onBeforeSave={t.onBeforeSave}
             />
           </TabsContent>
         ))}
