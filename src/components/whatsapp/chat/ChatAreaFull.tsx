@@ -280,6 +280,11 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
               </Button>
             </div>
           </div>
+        ) : !isAccessActive ? (
+          <div className="border-t bg-destructive/10 px-4 py-3 flex items-center gap-2 text-sm text-destructive">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>Acesso não ativo — você não pode enviar mensagens. Fale com o administrador.</span>
+          </div>
         ) : (
           <ChatInput
             conversationId={conversation.id}
