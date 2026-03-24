@@ -16,6 +16,7 @@ import { EditContactModal } from "./EditContactModal";
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
+import { ShieldAlert } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
