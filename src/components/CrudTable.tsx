@@ -19,6 +19,8 @@ export interface ColumnDef {
   label: string;
   type?: "text" | "select" | "boolean";
   options?: { value: string | number; label: string }[];
+  /** For select type: "number" (default) or "string" (for UUIDs) */
+  valueType?: "number" | "string";
   /** Display transform for table cell */
   render?: (value: any, row: any) => string;
 }
