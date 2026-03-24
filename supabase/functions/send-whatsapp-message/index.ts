@@ -54,6 +54,32 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+    // --- Guard: block inactive users ---
+    const senderUid = (claimsData.claims as any).sub as string | undefined;
+    if (senderUid) {
+      const { data: senderProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('access_status')
+        .eq('user_id', senderUid)
+        .limit(1)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('[send-whatsapp-message] Error fetching sender profile:', profileError);
+        return new Response(
+          JSON.stringify({ error: 'Não foi possível validar o usuário.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (senderProfile?.access_status !== 'ativo') {
+        console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
+        return new Response(
+          JSON.stringify({ error: 'Seu usuário está inativo e não pode enviar mensagens. Fale com o administrador.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     const body: SendMessageRequest = await req.json();
     console.log('[send-whatsapp-message] Request received:', { 
