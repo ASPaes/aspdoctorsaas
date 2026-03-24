@@ -156,6 +156,19 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   const [resolveUser, setResolveUser] = useState<AccessUser | null>(null);
   const [resolveFuncId, setResolveFuncId] = useState<string>("");
 
+  // Reset invite state when tenant changes
+  const prevTidRef = useRef(tenantId);
+  useEffect(() => {
+    if (prevTidRef.current !== tenantId) {
+      prevTidRef.current = tenantId;
+      setSelectedFuncId("");
+      setShowInviteCard(false);
+      setConfirmReject(null);
+      setResolveUser(null);
+      setResolveFuncId("");
+    }
+  }, [tenantId]);
+
   // Fetch users via RPC — pass tenant_id for super admin simulation
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<AccessUser[]>({
     queryKey: ["tenant-access-users", tenantId],
