@@ -9,9 +9,9 @@ interface Props {
 }
 
 const pills = [
-  { key: "all", label: "Todos" },
   { key: "in_progress", label: "Em andamento" },
   { key: "waiting", label: "Fila" },
+  { key: "all", label: "Todos" },
   { key: "closed", label: "Encerrados" },
 ];
 
