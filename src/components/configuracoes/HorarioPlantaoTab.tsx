@@ -233,12 +233,45 @@ export default function HorarioPlantaoTab() {
     setOcKeywords((prev) => prev.filter((k) => k !== kw));
   }, []);
 
+  // ── Validation helpers ──
+  const validateSlots = useCallback((): string | null => {
+    for (const day of DAY_KEYS) {
+      const d = bhSchedule[day];
+      if (!d.active) continue;
+      for (let i = 0; i < d.slots.length; i++) {
+        const s = d.slots[i];
+        if (s.start && s.end && s.start >= s.end) {
+          return `${DAY_LABELS[day]}, Turno ${i + 1}: início deve ser antes do fim.`;
+        }
+      }
+      if (d.slots.length === 2) {
+        const [a, b] = d.slots;
+        if (a.end && b.start && a.end > b.start) {
+          return `${DAY_LABELS[day]}: turnos se sobrepõem (Turno 1 termina ${a.end}, Turno 2 inicia ${b.start}).`;
+        }
+      }
+    }
+    return null;
+  }, [bhSchedule]);
+
   // ── Save handlers ──
   const handleSaveBH = () => {
+    const err = validateSlots();
+    if (err) {
+      toast({ title: "Erro de validação", description: err, variant: "destructive" });
+      return;
+    }
+    // Clean schedule: remove empty 2nd slots before saving
+    const cleanSchedule: BusinessHours = {};
+    for (const day of DAY_KEYS) {
+      const d = bhSchedule[day];
+      const validSlots = d.slots.filter((s) => s.start && s.end);
+      cleanSchedule[day] = { active: d.active, slots: validSlots.length > 0 ? validSlots : [{ ...DEFAULT_SLOT }] };
+    }
     saveBH.mutate({
       business_hours_enabled: bhEnabled,
       business_hours_timezone: bhTimezone,
-      business_hours: bhSchedule,
+      business_hours: cleanSchedule,
       business_hours_message: bhMessage || null,
     });
   };
