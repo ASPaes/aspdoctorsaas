@@ -924,18 +924,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         contactName: pushName || phone,
       };
 
-      // =====================================================================
-      // AUTO-REPLY FILTER (runs BEFORE CSAT / billing / URA / attendance)
-      // Blocks attendance creation for WhatsApp Business auto-replies
-      // received shortly after a billing automation message (cobrança).
-      // The message is already saved and preview/unread updated above.
-      //
-      // Manual test plan:
-      // 1) Send cobrança via N8N → saved with metadata.source='billing_automation' kind='cobranca'
-      // 2) Client auto-reply in < 30s → message appears in chat, NO support_attendances created
-      // 3) Client real message "quero negociar" after 30s → opens Financeiro attendance
-      // 4) Client message after 2h → normal URA flow
-      // =====================================================================
+      // 1. CSAT PRIMEIRO — antes de qualquer filtro
+      const csatHandled = await handleCsatResponse(
+        supabase, instanceCtx, conversationId, tenantId, content
+      );
+      if (csatHandled) {
+        console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
+        return;
+      }
+
+      // 2. AUTO-REPLY FILTER — só após confirmar que não é CSAT
       {
         const lastBillingAt = await getLastBillingMessageAt(supabase, conversationId, tenantId);
         if (lastBillingAt) {
@@ -946,71 +944,22 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
           if (secondsSinceBilling <= ignoreSeconds) {
             const isAutoReply = isLikelyBusinessAutoReplyPTBR(content);
-
             if (isAutoReply) {
-              console.log(`[cobranca][auto-reply] Ignorado: auto-resposta detectada em ${secondsSinceBilling.toFixed(1)}s após cobrança. conv=${conversationId} phone=${phone}`);
-
-              // Merge audit metadata onto the saved message
-              const autoReplyMeta = {
-                billing_context: true,
-                auto_reply: true,
-                auto_reply_reason: 'business_auto_reply_ptbr',
-                seconds_since_billing: Math.round(secondsSinceBilling),
-              };
-
-              const metaFilter = savedMsg?.id
-                ? { column: 'id', value: savedMsg.id }
-                : { column: 'message_id', value: key.id };
-
-              try {
-                const { data: existingRow } = await supabase
-                  .from('whatsapp_messages')
-                  .select('metadata')
-                  .eq('tenant_id', tenantId)
-                  .eq(metaFilter.column, metaFilter.value)
-                  .maybeSingle();
-
-                const mergedMeta = { ...(existingRow?.metadata || {}), ...autoReplyMeta };
-
-                await supabase
-                  .from('whatsapp_messages')
-                  .update({ metadata: mergedMeta })
-                  .eq('tenant_id', tenantId)
-                  .eq(metaFilter.column, metaFilter.value);
-              } catch (metaErr) {
-                console.error('[cobranca][auto-reply] Erro ao atualizar metadata:', metaErr);
-              }
-
-              // Return early — NO attendance, NO URA, NO CSAT, NO conversation reopen
+              console.log(`[cobranca][auto-reply] Ignorado: auto-resposta detectada em ${secondsSinceBilling.toFixed(1)}s após cobrança. conv=${conversationId}`);
               return;
-            } else {
-              console.log(`[cobranca][auto-reply] Não ignorado (human/finance signals ou conteúdo não bate). conv=${conversationId} sec=${secondsSinceBilling.toFixed(1)}`);
             }
           }
         }
       }
 
-      // --- CSAT: check if there's a pending CSAT survey for this conversation ---
-      const csatHandled = await handleCsatResponse(
-        supabase, instanceCtx, conversationId, tenantId, content
-      );
-      if (csatHandled) {
-        console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
-        return;
-      }
-
-      // --- BILLING SKIP URA: check if client is replying to a billing automation message ---
+      // 3. BILLING SKIP URA
       const supportConfig = await getSupportConfig(supabase, tenantId);
       const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
       if (billingSkipResult.skip) {
-        // Real customer response within billing window — open Financeiro attendance (skip URA)
-        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
         ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billingSkipResult.departmentId!, billingSkipResult.clienteId)
           .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
           .catch(err => console.error('[cobrança] Erro ao criar atendimento financeiro:', err));
-
-        // Reopen conversation visually if closed
         supabase
           .from('whatsapp_conversations')
           .update({ status: 'active', department_id: billingSkipResult.departmentId, updated_at: new Date().toISOString() })
@@ -1018,11 +967,9 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           .eq('status', 'closed')
           .then(({ error: e }: any) => { if (e) console.error('[cobrança] Erro ao reabrir conversa:', e); });
       } else {
-        // Check if this message is a URA response BEFORE creating/reopening attendance
         const uraHandled = await handleUraResponse(
           supabase, instanceCtx, conversationId, tenantId, content, supportConfig
         );
-
         if (uraHandled) {
           incrementAttendanceCounter(supabase, conversationId, 'customer')
             .catch(err => console.error('[evolution-webhook] increment error:', err));
@@ -1030,7 +977,6 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
             .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
             .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
-
           supabase
             .from('whatsapp_conversations')
             .update({ status: 'active', updated_at: new Date().toISOString() })
