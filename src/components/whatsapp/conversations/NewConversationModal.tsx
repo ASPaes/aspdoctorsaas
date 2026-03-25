@@ -16,6 +16,7 @@ import { maskCNPJ, maskPhoneBR, normalizePhoneBR } from "@/lib/masks";
 import { normalizeBRPhone, formatBRPhone, coreDigits } from "@/lib/phoneBR";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 
 interface ContactOption {
   label: string;
@@ -36,6 +37,7 @@ interface Props {
 export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName, initialInstanceId }: Props) {
   const { instances } = useWhatsAppInstances();
   const createConversation = useCreateConversation();
+  const { selectedDepartmentId } = useDepartmentFilter();
   const [instanceId, setInstanceId] = useState("");
   const [phone, setPhone] = useState(initialPhone || "");
   const [name, setName] = useState(initialName || "");
@@ -147,7 +149,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
 
     const cleanPhone = normalizePhoneBR(phone);
     createConversation.mutate(
-      { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone },
+      { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
       {
         onSuccess: (data) => {
           if (selectedCliente) {
