@@ -19,22 +19,69 @@ import { exportToCSV } from "@/utils/whatsapp/whatsappReportExport";
 const COLORS = ["hsl(var(--primary))", "hsl(var(--muted-foreground))", "hsl(var(--accent))", "hsl(var(--destructive))"];
 const SENTIMENT_COLORS: Record<string, string> = { positive: "#22c55e", neutral: "#94a3b8", negative: "#ef4444" };
 
-function MetricCard({ title, value, icon: Icon, subtitle, trend }: { title: string; value: string | number; icon: any; subtitle?: string; trend?: number }) {
+function MetricCard({
+  title, value, icon: Icon, subtitle, trend, sectorValue, unit = ""
+}: {
+  title: string;
+  value: string | number;
+  icon: any;
+  subtitle?: string;
+  trend?: number;
+  sectorValue?: number;
+  unit?: string;
+}) {
+  const numericValue = typeof value === "string"
+    ? parseFloat(value.replace(/[^0-9.]/g, ""))
+    : value;
+
+  const pct = sectorValue && sectorValue > 0
+    ? Math.round((numericValue / sectorValue) * 100)
+    : null;
+
+  const pctColor = pct === null ? "" :
+    pct >= 75 ? "text-green-500" :
+    pct >= 40 ? "text-amber-500" :
+    "text-red-500";
+
   return (
-    <Card>
+    <Card className="relative overflow-hidden">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
-            {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>}
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground font-medium truncate">{title}</p>
+            <p className="text-2xl font-bold mt-1 leading-none">{value}{unit}</p>
+            {subtitle && (
+              <p className="text-[10px] text-muted-foreground mt-1">{subtitle}</p>
+            )}
+            {trend !== undefined && trend !== 0 && (
+              <p className={`text-[10px] mt-1 ${trend > 0 ? "text-green-500" : "text-red-500"}`}>
+                {trend > 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(0)}% vs anterior
+              </p>
+            )}
           </div>
-          <Icon className="h-8 w-8 text-muted-foreground/30" />
+          <Icon className="h-8 w-8 text-muted-foreground/20 shrink-0 ml-2" />
         </div>
-        {trend !== undefined && trend !== 0 && (
-          <p className={`text-[10px] mt-1 ${trend > 0 ? "text-green-500" : "text-red-500"}`}>
-            {trend > 0 ? "+" : ""}{trend.toFixed(0)}% vs período anterior
-          </p>
+
+        {pct !== null && (
+          <div className="mt-3 pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-muted-foreground">Sua participação</span>
+              <span className={`text-[11px] font-semibold ${pctColor}`}>{pct}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  pct >= 75 ? "bg-green-500" :
+                  pct >= 40 ? "bg-amber-500" :
+                  "bg-red-500"
+                }`}
+                style={{ width: `${Math.min(pct, 100)}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Setor: {sectorValue?.toLocaleString("pt-BR")}{unit}
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -181,26 +228,38 @@ export default function WhatsAppRelatorio() {
         <>
           {/* KPIs Row 1 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard title="Total Conversas" value={metrics.total} icon={MessageSquare} trend={trendTotal} />
-            <MetricCard title="Ativas" value={metrics.active} icon={TrendingUp} />
-            <MetricCard title="Encerradas" value={metrics.closed} icon={CheckCircle2} />
-            <MetricCard title="Taxa Resolução" value={`${metrics.resolutionRate.toFixed(0)}%`} icon={BarChart3} />
+            <MetricCard title="Total Conversas" value={metrics.total} icon={MessageSquare} trend={trendTotal}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorTotal || undefined : undefined} />
+            <MetricCard title="Ativas" value={metrics.active} icon={TrendingUp}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorActive || undefined : undefined} />
+            <MetricCard title="Encerradas" value={metrics.closed} icon={CheckCircle2}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorClosed || undefined : undefined} />
+            <MetricCard title="Taxa Resolução" value={`${metrics.resolutionRate.toFixed(0)}%`} icon={BarChart3}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorResolutionRate || undefined : undefined} />
           </div>
 
           {/* KPIs Row 2 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard title="Mensagens Totais" value={metrics.totalMessages} icon={MessageSquare} />
-            <MetricCard title="Enviadas" value={metrics.sentMessages} icon={Send} />
-            <MetricCard title="Recebidas" value={metrics.receivedMessages} icon={Inbox} />
-            <MetricCard title="Contatos Únicos" value={metrics.uniqueContacts} icon={Users} />
+            <MetricCard title="Mensagens Totais" value={metrics.totalMessages} icon={MessageSquare}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorTotalMessages || undefined : undefined} />
+            <MetricCard title="Enviadas" value={metrics.sentMessages} icon={Send}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorSentMessages || undefined : undefined} />
+            <MetricCard title="Recebidas" value={metrics.receivedMessages} icon={Inbox}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorReceivedMessages || undefined : undefined} />
+            <MetricCard title="Contatos Únicos" value={metrics.uniqueContacts} icon={Users}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorUniqueContacts || undefined : undefined} />
           </div>
 
           {/* KPIs Row 3 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard title="Tempo Médio Resposta" value={`${metrics.avgResponseTimeMinutes.toFixed(0)} min`} icon={Clock} />
-            <MetricCard title="1ª Resposta" value={`${metrics.avgFirstResponseTimeMinutes.toFixed(0)} min`} icon={Clock} />
-            <MetricCard title="Msgs/Conversa" value={metrics.avgMessagesPerConversation.toFixed(1)} icon={BarChart3} />
-            <MetricCard title="Engajamento" value={`${metrics.engagementRate.toFixed(0)}%`} icon={SmilePlus} subtitle="Recebidas / Enviadas" />
+            <MetricCard title="Tempo Médio Resposta" value={`${metrics.avgResponseTimeMinutes.toFixed(0)}`} unit=" min" icon={Clock}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorAvgResponseTimeMinutes || undefined : undefined} />
+            <MetricCard title="1ª Resposta" value={`${metrics.avgFirstResponseTimeMinutes.toFixed(0)}`} unit=" min" icon={Clock}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorAvgFirstResponseTimeMinutes || undefined : undefined} />
+            <MetricCard title="Msgs/Conversa" value={metrics.avgMessagesPerConversation.toFixed(1)} icon={BarChart3}
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorAvgMessagesPerConversation || undefined : undefined} />
+            <MetricCard title="Engajamento" value={`${metrics.engagementRate.toFixed(0)}%`} icon={SmilePlus} subtitle="Recebidas / Enviadas"
+              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorEngagementRate || undefined : undefined} />
           </div>
 
           {/* Charts */}
