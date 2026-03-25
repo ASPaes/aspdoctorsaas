@@ -249,6 +249,12 @@ export default function Configuracoes() {
           </TabsContent>
         )}
 
+        {isAdmin && (
+          <TabsContent value="horario-plantao">
+            <HorarioPlantaoTab />
+          </TabsContent>
+        )}
+
         <TabsContent value="kb">
           <KBTab />
         </TabsContent>
