@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus } from "lucide-react";
@@ -41,6 +44,15 @@ function MetricCard({ title, value, icon: Icon, subtitle, trend }: { title: stri
 export default function WhatsAppRelatorio() {
   const navigate = useNavigate();
   const { instances } = useWhatsAppInstances();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const { selectedDepartmentId } = useDepartmentFilter();
+  const { data: userDepartmentId } = useUserDepartment();
+
+  // Para user não-admin: força filtro do seu setor e seu próprio agentId
+  const effectiveDepartmentId = isAdmin ? (selectedDepartmentId || undefined) : (userDepartmentId || undefined);
+  const effectiveAgentId = isAdmin ? undefined : (profile?.funcionario_id ? String(profile.funcionario_id) : undefined);
+
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfDay(subDays(new Date(), 30)),
     to: endOfDay(new Date()),
@@ -50,7 +62,9 @@ export default function WhatsAppRelatorio() {
   const filters: WhatsAppMetricsFilters = useMemo(() => ({
     dateRange,
     instanceId: instanceId || null,
-  }), [dateRange, instanceId]);
+    departmentId: effectiveDepartmentId || null,
+    agentId: effectiveAgentId || null,
+  }), [dateRange, instanceId, effectiveDepartmentId, effectiveAgentId]);
 
   const { data: metrics, isLoading } = useWhatsAppMetrics(filters);
 
@@ -88,17 +102,19 @@ export default function WhatsAppRelatorio() {
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!metrics}>
             <Download className="h-4 w-4 mr-1" /> Exportar
           </Button>
-          <Select value={instanceId || "all"} onValueChange={(v) => setInstanceId(v === "all" ? undefined : v)}>
-            <SelectTrigger className="h-9 w-44">
-              <SelectValue placeholder="Instância" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {instances.map((inst) => (
-                <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isAdmin && (
+            <Select value={instanceId || "all"} onValueChange={(v) => setInstanceId(v === "all" ? undefined : v)}>
+              <SelectTrigger className="h-9 w-44">
+                <SelectValue placeholder="Instância" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {instances.map((inst) => (
+                  <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <DateRangePicker
             label="Período"
             value={{ from: dateRange.from, to: dateRange.to }}
