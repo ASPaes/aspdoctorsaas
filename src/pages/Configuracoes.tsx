@@ -28,6 +28,7 @@ import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoC
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
+import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -106,7 +107,7 @@ export default function Configuracoes() {
 
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
-  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios"];
+  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios", "horario-plantao"];
   const rawTab = searchParams.get("tab") || "percentuais";
   const defaultTab = (!isAdmin && ADMIN_ONLY_TABS.includes(rawTab)) ? "percentuais" : rawTab;
 
@@ -180,6 +181,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="acessos">🔐 Acessos & Equipe</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="horario-plantao">Horário & Plantão</TabsTrigger>}
           <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
         </TabsList>
 
@@ -244,6 +246,12 @@ export default function Configuracoes() {
         {isAdmin && (
           <TabsContent value="ia">
             <AISettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="horario-plantao">
+            <HorarioPlantaoTab />
           </TabsContent>
         )}
 
