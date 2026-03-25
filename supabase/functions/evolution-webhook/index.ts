@@ -1001,6 +1001,354 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
 const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
+// =====================================================================
+// MISSING HELPERS (getLastBillingMessageAt / isLikelyBusinessAutoReplyPTBR)
+// =====================================================================
+
+async function getLastBillingMessageAt(
+  supabase: any,
+  conversationId: string,
+  tenantId: string
+): Promise<Date | null> {
+  try {
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString(); // 5 min window
+    const { data } = await supabase
+      .from('whatsapp_messages')
+      .select('created_at, metadata')
+      .eq('conversation_id', conversationId)
+      .eq('tenant_id', tenantId)
+      .eq('is_from_me', true)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const hit = (data || []).find((m: any) => {
+      const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+      return meta?.source === 'billing_automation' && meta?.kind === 'cobranca';
+    });
+
+    return hit ? new Date(hit.created_at) : null;
+  } catch (err) {
+    console.error('[getLastBillingMessageAt] Error:', err);
+    return null;
+  }
+}
+
+const AUTO_REPLY_PATTERNS = [
+  /mensagem\s+autom[aá]tica/i,
+  /resposta\s+autom[aá]tica/i,
+  /fora\s+do\s+(hor[aá]rio|expediente)/i,
+  /retornaremos/i,
+  /n[aã]o\s+estamos\s+dispon[ií]veis/i,
+  /atendimento\s+encerrado/i,
+  /hor[aá]rio\s+de\s+atendimento/i,
+  /funcionamento/i,
+  /segunda\s+a\s+sexta/i,
+  /seg\s+a\s+sex/i,
+];
+
+function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
+  if (!text || text.length < 10) return false;
+  const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return AUTO_REPLY_PATTERNS.some(p => p.test(normalized));
+}
+
+// =====================================================================
+// BUSINESS HOURS + OFF-HOURS + ON-CALL LOGIC
+// =====================================================================
+
+/**
+ * Check if the current moment is inside business hours for the tenant.
+ * Returns { inside: boolean, todaySchedule } with the active day's schedule.
+ */
+function checkBusinessHours(config: SupportConfig): {
+  inside: boolean;
+  todayStart: string | null;
+  todayEnd: string | null;
+} {
+  if (!config.business_hours_enabled) {
+    return { inside: true, todayStart: null, todayEnd: null };
+  }
+
+  const tz = config.business_hours_timezone || 'America/Sao_Paulo';
+  const now = new Date();
+
+  // Get day-of-week in the configured timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const weekday = parts.find(p => p.type === 'weekday')?.value?.toLowerCase() || '';
+  const hour = parts.find(p => p.type === 'hour')?.value || '00';
+  const minute = parts.find(p => p.type === 'minute')?.value || '00';
+  const currentTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+
+  const dayMap: Record<string, string> = {
+    mon: 'mon', tue: 'tue', wed: 'wed', thu: 'thu', fri: 'fri', sat: 'sat', sun: 'sun',
+  };
+  const dayKey = dayMap[weekday] || weekday;
+
+  const hours = config.business_hours || {};
+  const daySchedule = hours[dayKey];
+
+  if (!daySchedule || !daySchedule.active) {
+    console.log(`[business-hours] inside=false tz=${tz} day=${dayKey} (inactive)`);
+    return { inside: false, todayStart: null, todayEnd: null };
+  }
+
+  const inside = currentTime >= daySchedule.start && currentTime < daySchedule.end;
+  console.log(`[business-hours] inside=${inside} tz=${tz} day=${dayKey} current=${currentTime} range=${daySchedule.start}-${daySchedule.end}`);
+
+  return {
+    inside,
+    todayStart: daySchedule.start,
+    todayEnd: daySchedule.end,
+  };
+}
+
+/**
+ * Get conversation metadata (off-hours timestamps).
+ */
+async function getConversationMetadata(supabase: any, conversationId: string): Promise<Record<string, any>> {
+  const { data } = await supabase
+    .from('whatsapp_conversations')
+    .select('metadata')
+    .eq('id', conversationId)
+    .single();
+  return (data?.metadata && typeof data.metadata === 'object') ? data.metadata : {};
+}
+
+/**
+ * Update conversation metadata (merge).
+ */
+async function updateConversationMetadata(
+  supabase: any,
+  conversationId: string,
+  updates: Record<string, any>
+): Promise<void> {
+  const current = await getConversationMetadata(supabase, conversationId);
+  const merged = { ...current, ...updates };
+  await supabase
+    .from('whatsapp_conversations')
+    .update({ metadata: merged })
+    .eq('id', conversationId);
+}
+
+/**
+ * Format the business_hours_message with placeholders.
+ */
+function formatOffHoursMessage(template: string, start: string | null, end: string | null): string {
+  let msg = template;
+  msg = msg.replace(/\{\{start\}\}/g, start || '--:--');
+  msg = msg.replace(/\{\{end\}\}/g, end || '--:--');
+  return msg;
+}
+
+/**
+ * Format phone for display in oncall message: +55 (XX) XXXXX-XXXX
+ */
+function formatOncallPhone(digits: string): string {
+  if (!digits || digits.length < 10) return digits;
+  const clean = digits.replace(/\D/g, '');
+  if (clean.startsWith('55') && clean.length >= 12) {
+    const ddd = clean.slice(2, 4);
+    const num = clean.slice(4);
+    if (num.length === 9) return `+55 (${ddd}) ${num.slice(0, 5)}-${num.slice(5)}`;
+    if (num.length === 8) return `+55 (${ddd}) ${num.slice(0, 4)}-${num.slice(4)}`;
+  }
+  return clean;
+}
+
+/**
+ * Check if the customer's message matches oncall urgency keywords.
+ */
+function matchesUrgencyKeywords(text: string, keywords: string[]): boolean {
+  if (!keywords || keywords.length === 0) return false;
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  return keywords.some(kw => {
+    const normalizedKw = kw
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+    return normalizedKw && normalized.includes(normalizedKw);
+  });
+}
+
+/**
+ * Count customer messages in the off-hours escalation window.
+ */
+async function countOffHoursCustomerMessages(
+  supabase: any,
+  conversationId: string,
+  tenantId: string,
+  windowMinutes: number
+): Promise<{ count: number; firstAt: Date | null }> {
+  const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+  const { data } = await supabase
+    .from('whatsapp_messages')
+    .select('timestamp')
+    .eq('conversation_id', conversationId)
+    .eq('tenant_id', tenantId)
+    .eq('is_from_me', false)
+    .gte('timestamp', cutoff)
+    .order('timestamp', { ascending: true });
+
+  const msgs = data || [];
+  return {
+    count: msgs.length,
+    firstAt: msgs.length > 0 ? new Date(msgs[0].timestamp) : null,
+  };
+}
+
+/**
+ * Full off-hours handler: notice, AI reply, on-call escalation.
+ * Returns true if the off-hours flow consumed the message (no further processing needed).
+ */
+async function handleOffHoursMessage(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  content: string,
+  config: SupportConfig,
+  todayStart: string | null,
+  todayEnd: string | null
+): Promise<boolean> {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const meta = await getConversationMetadata(supabase, conversationId);
+
+  // ── 1. OFF-HOURS NOTICE (once per 30 min) ──
+  const NOTICE_COOLDOWN_MS = 30 * 60 * 1000;
+  const lastNotice = meta.off_hours_last_notice_at ? new Date(meta.off_hours_last_notice_at).getTime() : 0;
+  const shouldSendNotice = (now.getTime() - lastNotice) > NOTICE_COOLDOWN_MS;
+
+  if (shouldSendNotice && config.business_hours_message) {
+    const noticeText = formatOffHoursMessage(config.business_hours_message, todayStart, todayEnd);
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, noticeText, {
+      off_hours_notice: true,
+      source: 'off_hours',
+    });
+    await updateConversationMetadata(supabase, conversationId, { off_hours_last_notice_at: nowIso });
+    console.log(`[off-hours] notice_sent conv=${conversationId}`);
+  }
+
+  // ── 2. AI OFF-HOURS REPLY ──
+  if (config.business_hours_ai_enabled && config.business_hours_ai_prompt) {
+    const AI_COOLDOWN_MS = 30 * 1000; // 30 seconds between AI replies
+    const lastAi = meta.off_hours_last_ai_at ? new Date(meta.off_hours_last_ai_at).getTime() : 0;
+    const shouldReplyAI = (now.getTime() - lastAi) > AI_COOLDOWN_MS;
+
+    if (shouldReplyAI) {
+      try {
+        const aiConfig = await getAIConfig(tenantId, supabase);
+        if (aiConfig) {
+          // Fetch recent messages for context (last 10)
+          const { data: recentMsgs } = await supabase
+            .from('whatsapp_messages')
+            .select('content, is_from_me')
+            .eq('conversation_id', conversationId)
+            .order('timestamp', { ascending: false })
+            .limit(10);
+
+          const chatHistory = (recentMsgs || []).reverse().map((m: any) => ({
+            role: m.is_from_me ? 'assistant' : 'user',
+            content: m.content || '',
+          }));
+
+          // Fetch KB articles for context
+          let kbContext = '';
+          try {
+            const { data: kbArticles } = await supabase
+              .from('support_kb_articles')
+              .select('title, content')
+              .eq('tenant_id', tenantId)
+              .eq('is_active', true)
+              .limit(5);
+            if (kbArticles && kbArticles.length > 0) {
+              kbContext = '\n\nBase de Conhecimento:\n' + kbArticles.map((a: any) => `## ${a.title}\n${a.content}`).join('\n\n');
+            }
+          } catch { /* KB not available, proceed without */ }
+
+          const messages = [
+            { role: 'system', content: config.business_hours_ai_prompt + kbContext },
+            ...chatHistory,
+          ];
+
+          const aiReply = await callAI(aiConfig, messages);
+          if (aiReply && aiReply.trim()) {
+            await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiReply.trim(), {
+              off_hours_ai: true,
+              source: 'off_hours_ai',
+            });
+            await updateConversationMetadata(supabase, conversationId, { off_hours_last_ai_at: nowIso });
+            console.log(`[off-hours] ai_sent conv=${conversationId}`);
+          }
+        } else {
+          console.log(`[off-hours] AI config not available for tenant=${tenantId}, skipping AI reply`);
+        }
+      } catch (aiErr) {
+        console.error(`[off-hours] AI reply error conv=${conversationId}:`, aiErr);
+      }
+    }
+  }
+
+  // ── 3. ON-CALL ESCALATION ──
+  const phoneDigits = (config.oncall_phone_number || '').replace(/\D/g, '');
+  if (phoneDigits) {
+    // Check cooldown
+    const cooldownMs = (config.oncall_repeat_cooldown_minutes || 360) * 60 * 1000;
+    const lastOncall = meta.off_hours_oncall_notified_at ? new Date(meta.off_hours_oncall_notified_at).getTime() : 0;
+    const withinCooldown = (now.getTime() - lastOncall) < cooldownMs;
+
+    if (!withinCooldown) {
+      const { count, firstAt } = await countOffHoursCustomerMessages(
+        supabase, conversationId, tenantId,
+        config.oncall_escalation_window_minutes || 30
+      );
+
+      const elapsedSeconds = firstAt ? (now.getTime() - firstAt.getTime()) / 1000 : 0;
+      const minMsgs = config.oncall_min_customer_messages || 3;
+      const minElapsed = config.oncall_min_elapsed_seconds || 60;
+
+      const meetsMessageThreshold = count >= minMsgs;
+      const meetsTimeThreshold = elapsedSeconds >= minElapsed;
+
+      // Urgency detection
+      const hasUrgencyKeyword = matchesUrgencyKeywords(content, config.oncall_urgency_keywords || []);
+      // Spam-short detection: 3+ very short messages
+      const isSpamShort = count >= 3 && content.length <= 15;
+      const hasUrgency = hasUrgencyKeyword || isSpamShort;
+
+      if (meetsMessageThreshold && meetsTimeThreshold && hasUrgency) {
+        const formattedPhone = formatOncallPhone(phoneDigits);
+        const template = config.oncall_message_template ||
+          'Entendi sua urgência. 📞 Para atendimento de plantão, entre em contato no número: {{oncall_phone}}';
+        const oncallText = template.replace(/\{\{oncall_phone\}\}/g, formattedPhone);
+
+        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, oncallText, {
+          oncall_escalation: true,
+          source: 'oncall',
+        });
+        await updateConversationMetadata(supabase, conversationId, { off_hours_oncall_notified_at: nowIso });
+        console.log(`[off-hours] oncall_sent conv=${conversationId} msgs=${count} elapsed=${elapsedSeconds.toFixed(0)}s keyword=${hasUrgencyKeyword} spam=${isSpamShort}`);
+      }
+    }
+  }
+
+  // Off-hours flow consumed: do NOT open attendance
+  return true;
+}
+
 interface InstanceContext {
   apiUrl: string;
   apiKey: string;
