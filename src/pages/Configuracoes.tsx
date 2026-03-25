@@ -28,6 +28,7 @@ import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoC
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
+import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
