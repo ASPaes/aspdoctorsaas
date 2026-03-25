@@ -83,6 +83,7 @@ export default function Signup() {
           toast.error("Este email já possui conta. Verifique sua senha.");
           return;
         }
+        await refreshProfile();
         toast.success("Bem-vindo!");
         navigate("/dashboard");
         return;
@@ -94,7 +95,6 @@ export default function Signup() {
     }
 
     if (inviteId && signUpData.user) {
-      // Chama RPC para criar o profile e vincular ao tenant
       const { error: acceptError } = await (supabase.rpc as any)(
         "accept_access_invite",
         { p_invite_id: inviteId }
@@ -105,20 +105,7 @@ export default function Signup() {
         setLoading(false);
         return;
       }
-
-      // Aguarda o AuthContext carregar o profile (até 3s)
-      let attempts = 0;
-      while (attempts < 6) {
-        await new Promise((r) => setTimeout(r, 500));
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("user_id, access_status")
-          .eq("user_id", signUpData.user.id)
-          .maybeSingle();
-        if (p?.access_status === "active") break;
-        attempts++;
-      }
-
+      await refreshProfile();
       toast.success("Conta criada com sucesso! Bem-vindo.");
       navigate("/dashboard");
       return;
