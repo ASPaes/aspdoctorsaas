@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
