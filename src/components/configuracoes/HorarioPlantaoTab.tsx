@@ -150,19 +150,21 @@ export default function HorarioPlantaoTab() {
   // Hydrate from DB
   useEffect(() => {
     if (!config) return;
-    setBhEnabled(!!config.business_hours_enabled);
-    setBhTimezone(config.business_hours_timezone || "America/Sao_Paulo");
-    setBhSchedule(parseBusinessHours(config.business_hours));
-    setBhMessage(config.business_hours_message || "");
-    setAiEnabled(!!config.business_hours_ai_enabled);
-    setAiPrompt(config.business_hours_ai_prompt || "");
-    setOcPhoneDisplay(config.oncall_phone_number ? formatBRPhone(config.oncall_phone_number) : "");
-    setOcTemplate(config.oncall_message_template || "");
-    setOcWindowMin(config.oncall_escalation_window_minutes ?? 30);
-    setOcMinMsgs(config.oncall_min_customer_messages ?? 3);
-    setOcMinElapsed(config.oncall_min_elapsed_seconds ?? 60);
-    setOcCooldown(config.oncall_repeat_cooldown_minutes ?? 360);
-    setOcKeywords(parseKeywords(config.oncall_urgency_keywords));
+    const c = config as Record<string, any>;
+    setBhEnabled(!!c.business_hours_enabled);
+    setBhTimezone((c.business_hours_timezone as string) || "America/Sao_Paulo");
+    setBhSchedule(parseBusinessHours(c.business_hours));
+    setBhMessage((c.business_hours_message as string) || "");
+    setAiEnabled(!!c.business_hours_ai_enabled);
+    setAiPrompt((c.business_hours_ai_prompt as string) || "");
+    const phone = c.oncall_phone_number as string | null;
+    setOcPhoneDisplay(phone ? formatBRPhone(phone) : "");
+    setOcTemplate((c.oncall_message_template as string) || "");
+    setOcWindowMin((c.oncall_escalation_window_minutes as number) ?? 30);
+    setOcMinMsgs((c.oncall_min_customer_messages as number) ?? 3);
+    setOcMinElapsed((c.oncall_min_elapsed_seconds as number) ?? 60);
+    setOcCooldown((c.oncall_repeat_cooldown_minutes as number) ?? 360);
+    setOcKeywords(parseKeywords(c.oncall_urgency_keywords));
   }, [config]);
 
   // ── Mutations ──
