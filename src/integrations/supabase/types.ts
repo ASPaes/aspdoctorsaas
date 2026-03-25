@@ -226,6 +226,39 @@ export type Database = {
         }
         Relationships: []
       }
+      business_hours_exceptions: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          is_closed: boolean
+          name: string | null
+          tenant_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          is_closed?: boolean
+          name?: string | null
+          tenant_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          is_closed?: boolean
+          name?: string | null
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cac_despesas: {
         Row: {
           ativo: boolean
