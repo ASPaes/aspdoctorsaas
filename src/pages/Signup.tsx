@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AccessInviteInfo {
   email: string;
@@ -29,6 +30,7 @@ export default function Signup() {
   const [accessInvite, setAccessInvite] = useState<AccessInviteInfo | null>(null);
   const [inviteLoading, setInviteLoading] = useState(!!inviteId);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const { refreshProfile } = useAuth();
 
   // Validate access invite on mount
   useEffect(() => {
