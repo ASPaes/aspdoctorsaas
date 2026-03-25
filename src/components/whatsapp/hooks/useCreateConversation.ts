@@ -7,6 +7,7 @@ interface CreateConversationParams {
   contactName: string;
   profilePictureUrl?: string;
   clienteId?: string;
+  departmentId?: string;
 }
 
 export const useCreateConversation = () => {
@@ -72,7 +73,7 @@ export const useCreateConversation = () => {
       const metadata = params.clienteId ? { cliente_id: params.clienteId } : {};
       const { data: conversation, error: convError } = await (supabase
         .from('whatsapp_conversations') as any)
-        .insert({ instance_id: params.instanceId, contact_id: contact.id, status: 'active', unread_count: 0, metadata })
+        .insert({ instance_id: params.instanceId, contact_id: contact.id, status: 'active', unread_count: 0, metadata, department_id: params.departmentId || null })
         .select()
         .single();
 
