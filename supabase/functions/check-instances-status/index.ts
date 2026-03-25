@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function getEvolutionAuthHeaders(apiKey: string, providerType: string): Record<string, string> {
+function getEvolutionAuthHeaders(apiKey: string): Record<string, string> {
   return { apikey: apiKey };
 }
 
@@ -13,27 +13,24 @@ async function ensureWebhookConfigured(
   apiUrl: string,
   apiKey: string,
   instanceName: string,
-  webhookUrl: string,
-  providerType: string
+  webhookUrl: string
 ): Promise<{ ok: boolean; action: string }> {
   try {
-    const headers = getEvolutionAuthHeaders(apiKey, providerType);
+    const headers = getEvolutionAuthHeaders(apiKey);
 
-    // 1. Verificar webhook atual
+    // Verificar webhook atual
     const checkResp = await fetch(`${apiUrl}/webhook/find/${instanceName}`, { headers });
     if (checkResp.ok) {
       const current = await checkResp.json();
       const currentUrl = current?.url || current?.webhook?.url || '';
       const currentEnabled = current?.enabled ?? current?.webhook?.enabled ?? false;
-
-      // Se webhook já está correto e ativo, não precisa reconfigurar
       if (currentEnabled && currentUrl === webhookUrl) {
-        console.log(`[webhook-check] ${instanceName}: webhook OK (já configurado)`);
+        console.log(`[webhook-check] ${instanceName}: webhook OK`);
         return { ok: true, action: 'noop' };
       }
     }
 
-    // 2. Reconfigurar webhook
+    // Reconfigurar webhook
     console.log(`[webhook-check] ${instanceName}: reconfigurando webhook...`);
     const setResp = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
       method: 'POST',
@@ -56,14 +53,14 @@ async function ensureWebhookConfigured(
 
     if (!setResp.ok) {
       const err = await setResp.text();
-      console.error(`[webhook-check] ${instanceName}: erro ao reconfigurar webhook: ${err}`);
+      console.error(`[webhook-check] ${instanceName}: erro ao reconfigurar: ${err}`);
       return { ok: false, action: 'reconfigure_failed' };
     }
 
-    console.log(`[webhook-check] ${instanceName}: webhook reconfigurado com sucesso`);
+    console.log(`[webhook-check] ${instanceName}: webhook reconfigurado`);
     return { ok: true, action: 'reconfigured' };
   } catch (err) {
-    console.error(`[webhook-check] ${instanceName}: erro inesperado:`, err);
+    console.error(`[webhook-check] ${instanceName}: erro:`, err);
     return { ok: false, action: 'error' };
   }
 }
@@ -79,21 +76,17 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const webhookUrl = `${supabaseUrl}/functions/v1/evolution-webhook`;
 
-    console.log('[check-instances-status] Iniciando verificação de instâncias e webhooks');
+    console.log('[check-instances-status] Iniciando verificação');
 
     const { data: instances, error: instancesError } = await supabaseAdmin
       .from('whatsapp_instances')
-      .select('id, instance_name, provider_type, instance_id_external, webhook_url, status');
+      .select('id, instance_name, provider_type, instance_id_external');
 
     if (instancesError) {
-      console.error('[check-instances-status] Erro ao buscar instâncias:', instancesError);
       return new Response(JSON.stringify({ error: 'Failed to fetch instances' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    console.log(`[check-instances-status] Verificando ${instances?.length || 0} instâncias`);
 
     let updatedCount = 0;
     let webhookReconfigured = 0;
@@ -108,22 +101,20 @@ Deno.serve(async (req) => {
           .single();
 
         if (secretsError || !secrets) {
-          console.error(`[check-instances-status] Sem secrets para instância ${instance.id}`);
           errorCount++;
           continue;
         }
 
         const providerType = (instance as any).provider_type || 'self_hosted';
         const instanceIdExternal = (instance as any).instance_id_external;
-        const authHeaders = getEvolutionAuthHeaders(secrets.api_key, providerType);
         const instanceIdentifier = providerType === 'cloud' && instanceIdExternal
-          ? instanceIdExternal
-          : instance.instance_name;
+          ? instanceIdExternal : instance.instance_name;
+        const headers = getEvolutionAuthHeaders(secrets.api_key);
 
         // 1. Verificar status de conexão
         const response = await fetch(
           `${secrets.api_url}/instance/connectionState/${instanceIdentifier}`,
-          { headers: authHeaders }
+          { headers }
         );
 
         let newStatus = 'disconnected';
@@ -136,14 +127,10 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Atualizar status e garantir webhook_url no banco
+        // Atualizar status e webhook_url no banco
         await supabaseAdmin
           .from('whatsapp_instances')
-          .update({
-            status: newStatus,
-            webhook_url: webhookUrl,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ status: newStatus, webhook_url: webhookUrl, updated_at: new Date().toISOString() })
           .eq('id', instance.id);
 
         console.log(`[check-instances-status] ${instance.instance_name}: ${newStatus}`);
@@ -152,19 +139,10 @@ Deno.serve(async (req) => {
         // 2. Se conectada, verificar e reconfigurar webhook
         if (newStatus === 'connected') {
           const webhookResult = await ensureWebhookConfigured(
-            secrets.api_url,
-            secrets.api_key,
-            instanceIdentifier,
-            webhookUrl,
-            providerType
+            secrets.api_url, secrets.api_key, instanceIdentifier, webhookUrl
           );
-
-          if (webhookResult.action === 'reconfigured') {
-            webhookReconfigured++;
-          }
-          if (!webhookResult.ok) {
-            errorCount++;
-          }
+          if (webhookResult.action === 'reconfigured') webhookReconfigured++;
+          if (!webhookResult.ok) errorCount++;
         }
       } catch (error) {
         console.error(`[check-instances-status] Erro em ${instance.instance_name}:`, error);
@@ -175,12 +153,7 @@ Deno.serve(async (req) => {
     console.log(`[check-instances-status] Concluído: ${updatedCount} atualizadas, ${webhookReconfigured} webhooks reconfigurados, ${errorCount} erros`);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        updated: updatedCount,
-        webhooks_reconfigured: webhookReconfigured,
-        errors: errorCount,
-      }),
+      JSON.stringify({ success: true, updated: updatedCount, webhooks_reconfigured: webhookReconfigured, errors: errorCount }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
