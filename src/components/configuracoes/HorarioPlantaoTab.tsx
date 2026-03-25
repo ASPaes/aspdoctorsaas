@@ -134,6 +134,7 @@ function useSectionSave(sectionLabel: string) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
 export default function HorarioPlantaoTab() {
+  const { toast } = useToast();
   const { data: config, isLoading } = useConfigRow();
 
   // ── Section A: Business Hours ──
