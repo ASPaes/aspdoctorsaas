@@ -955,7 +955,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
       // 3. FETCH CONFIG + BUSINESS HOURS CHECK
       const supportConfig = await getSupportConfig(supabase, tenantId);
-      const bhResult = checkBusinessHours(supportConfig);
+      const bhResult = await checkBusinessHours(supportConfig, supabase, tenantId);
 
       // 4. OFF-HOURS AUTOMATIONS — fire-and-forget, never block the normal flow
       if (!bhResult.inside && supportConfig.business_hours_enabled) {
