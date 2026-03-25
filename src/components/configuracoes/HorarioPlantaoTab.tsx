@@ -134,6 +134,7 @@ function useSectionSave(sectionLabel: string) {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════
 export default function HorarioPlantaoTab() {
+  const { toast } = useToast();
   const { data: config, isLoading } = useConfigRow();
 
   // ── Section A: Business Hours ──
@@ -233,12 +234,45 @@ export default function HorarioPlantaoTab() {
     setOcKeywords((prev) => prev.filter((k) => k !== kw));
   }, []);
 
+  // ── Validation helpers ──
+  const validateSlots = useCallback((): string | null => {
+    for (const day of DAY_KEYS) {
+      const d = bhSchedule[day];
+      if (!d.active) continue;
+      for (let i = 0; i < d.slots.length; i++) {
+        const s = d.slots[i];
+        if (s.start && s.end && s.start >= s.end) {
+          return `${DAY_LABELS[day]}, Turno ${i + 1}: início deve ser antes do fim.`;
+        }
+      }
+      if (d.slots.length === 2) {
+        const [a, b] = d.slots;
+        if (a.end && b.start && a.end > b.start) {
+          return `${DAY_LABELS[day]}: turnos se sobrepõem (Turno 1 termina ${a.end}, Turno 2 inicia ${b.start}).`;
+        }
+      }
+    }
+    return null;
+  }, [bhSchedule]);
+
   // ── Save handlers ──
   const handleSaveBH = () => {
+    const err = validateSlots();
+    if (err) {
+      toast({ title: "Erro de validação", description: err, variant: "destructive" });
+      return;
+    }
+    // Clean schedule: remove empty 2nd slots before saving
+    const cleanSchedule: BusinessHours = {};
+    for (const day of DAY_KEYS) {
+      const d = bhSchedule[day];
+      const validSlots = d.slots.filter((s) => s.start && s.end);
+      cleanSchedule[day] = { active: d.active, slots: validSlots.length > 0 ? validSlots : [{ ...DEFAULT_SLOT }] };
+    }
     saveBH.mutate({
       business_hours_enabled: bhEnabled,
       business_hours_timezone: bhTimezone,
-      business_hours: bhSchedule,
+      business_hours: cleanSchedule,
       business_hours_message: bhMessage || null,
     });
   };
@@ -341,6 +375,9 @@ export default function HorarioPlantaoTab() {
                           </div>
                           {s.active && s.slots.map((slot, idx) => (
                             <div key={idx} className="flex items-center gap-2 ml-8">
+                              <span className="text-xs text-muted-foreground w-14 shrink-0">
+                                Turno {idx + 1}
+                              </span>
                               <Input
                                 type="time"
                                 value={slot.start}
@@ -361,6 +398,7 @@ export default function HorarioPlantaoTab() {
                                   size="icon"
                                   className="h-7 w-7 text-destructive"
                                   onClick={() => removeSlot(day, idx)}
+                                  title="Remover turno"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </Button>
