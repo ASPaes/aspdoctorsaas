@@ -19,23 +19,26 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Redirect based on profile / access_status
   useEffect(() => {
-    if (!user || isLoading || profileLoading) return;
+    if (!user || isLoading) return;
+
+    // Se o profile ainda está carregando, aguarda
+    if (profileLoading) return;
 
     const path = location.pathname;
 
-    // Se veio do signup via convite, aguarda o profile carregar
-    const fromInvite = document.referrer.includes("/signup") || 
-                       sessionStorage.getItem("from_invite") === "true";
-
-    // No profile yet → onboarding (mas não se acabou de fazer signup via convite)
+    // No profile yet → onboarding
+    // Mas aguarda 2s se veio de /signup para dar tempo ao trigger/RPC
     if (profile === null) {
-      if (!fromInvite && path !== "/onboarding") {
-        navigate("/onboarding", { replace: true });
+      const fromSignup = sessionStorage.getItem("from_invite") === "true";
+      if (fromSignup) {
+        // Não redireciona ainda — aguarda o profile ser carregado pelo onAuthStateChange
+        return;
       }
+      if (path !== "/onboarding") navigate("/onboarding", { replace: true });
       return;
     }
 
-    // Limpa flag de convite
+    // Profile carregado — limpa a flag
     sessionStorage.removeItem("from_invite");
 
     const accessStatus = profile.access_status ?? "active";
