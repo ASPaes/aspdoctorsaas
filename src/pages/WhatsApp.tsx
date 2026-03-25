@@ -28,22 +28,6 @@ function WhatsAppContent() {
   const { profile: authProfile } = useAuth();
   const isAdmin = authProfile?.role === "admin" || authProfile?.role === "head" || authProfile?.is_super_admin;
 
-  // Bloquear acesso se user não tem setor vinculado
-  if (!departmentsLoading && !isAdmin && departments.length === 0) {
-    return (
-      <div className="h-[calc(100vh-7rem)] flex items-center justify-center bg-background rounded-lg border border-border">
-        <div className="text-center max-w-md px-6">
-          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <ShieldAlert className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Acesso não configurado</h2>
-          <p className="text-muted-foreground">
-            Seu usuário ainda não está vinculado a um setor. Solicite ao administrador do sistema que configure seu acesso.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   // Keep selected conversation in sync; detect RLS loss (department transfer)
   useEffect(() => {
@@ -188,6 +172,23 @@ function WhatsAppContent() {
       setSelected(data as unknown as ConversationWithContact);
     }
   }, []);
+
+  // Bloquear acesso se user não tem setor vinculado
+  if (!departmentsLoading && !isAdmin && departments.length === 0) {
+    return (
+      <div className="h-[calc(100vh-7rem)] flex items-center justify-center bg-background rounded-lg border border-border">
+        <div className="text-center max-w-md px-6">
+          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <ShieldAlert className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Acesso não configurado</h2>
+          <p className="text-muted-foreground">
+            Seu usuário ainda não está vinculado a um setor. Solicite ao administrador do sistema que configure seu acesso.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Mobile: show either sidebar or chat
   if (isMobile) {
