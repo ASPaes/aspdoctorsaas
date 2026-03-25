@@ -4,7 +4,7 @@ import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus } from "lucide-react";
+import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus, Building2, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppMetrics, type WhatsAppMetricsFilters } from "@/components/whatsapp/hooks/useWhatsAppMetrics";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
@@ -46,12 +46,17 @@ export default function WhatsAppRelatorio() {
   const { instances } = useWhatsAppInstances();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
-  const { selectedDepartmentId } = useDepartmentFilter();
+  const { selectedDepartmentId, selectedDepartment } = useDepartmentFilter();
   const { data: userDepartmentId } = useUserDepartment();
+  const [agentFilter, setAgentFilter] = useState<"all" | "me">("me");
 
-  // Para user não-admin: força filtro do seu setor e seu próprio agentId
-  const effectiveDepartmentId = isAdmin ? (selectedDepartmentId || undefined) : (userDepartmentId || undefined);
-  const effectiveAgentId = isAdmin ? undefined : (profile?.funcionario_id ? String(profile.funcionario_id) : undefined);
+  const effectiveDepartmentId = isAdmin
+    ? (selectedDepartmentId || undefined)
+    : (userDepartmentId || undefined);
+
+  const effectiveAgentId = isAdmin
+    ? (agentFilter === "me" && profile?.funcionario_id ? String(profile.funcionario_id) : undefined)
+    : (profile?.funcionario_id ? String(profile.funcionario_id) : undefined);
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfDay(subDays(new Date(), 30)),
@@ -98,23 +103,65 @@ export default function WhatsAppRelatorio() {
           </Button>
           <h1 className="text-xl font-semibold">Relatório WhatsApp</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!metrics}>
             <Download className="h-4 w-4 mr-1" /> Exportar
           </Button>
+
+          {/* Filtro de visão: só meus dados ou todos (apenas admin) */}
           {isAdmin && (
+            <div className="inline-flex items-center h-9 rounded-md border border-border overflow-hidden">
+              <button
+                onClick={() => setAgentFilter("me")}
+                className={`flex items-center gap-1.5 px-3 h-full text-xs font-medium transition-colors ${
+                  agentFilter === "me"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <User className="h-3.5 w-3.5" />
+                Meus dados
+              </button>
+              <button
+                onClick={() => setAgentFilter("all")}
+                className={`flex items-center gap-1.5 px-3 h-full text-xs font-medium transition-colors ${
+                  agentFilter === "all"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                {selectedDepartment?.name ?? "Todos os setores"}
+              </button>
+            </div>
+          )}
+
+          {/* Filtro de instância: só admin vê */}
+          {isAdmin && agentFilter === "all" && (
             <Select value={instanceId || "all"} onValueChange={(v) => setInstanceId(v === "all" ? undefined : v)}>
               <SelectTrigger className="h-9 w-44">
                 <SelectValue placeholder="Instância" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">Todas instâncias</SelectItem>
                 {instances.map((inst) => (
                   <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
+
+          {/* Badge indicando contexto atual para não-admin */}
+          {!isAdmin && (
+            <div className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-muted text-xs text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5" />
+              {selectedDepartment?.name ?? "Seu setor"}
+              <span>·</span>
+              <User className="h-3.5 w-3.5" />
+              Seus dados
+            </div>
+          )}
+
           <DateRangePicker
             label="Período"
             value={{ from: dateRange.from, to: dateRange.to }}
