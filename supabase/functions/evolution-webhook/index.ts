@@ -988,59 +988,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         }
       }
     }
-
-      // --- CSAT: check if there's a pending CSAT survey for this conversation ---
-      const csatHandled = await handleCsatResponse(
-        supabase, instanceCtx, conversationId, tenantId, content
-      );
-      if (csatHandled) {
-        console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
-        return;
-      }
-
-      // --- BILLING SKIP URA: check if client is replying to a billing automation message ---
-      const supportConfig = await getSupportConfig(supabase, tenantId);
-      const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
-
-      if (billingSkipResult.skip) {
-        // Real customer response within billing window — open Financeiro attendance (skip URA)
-        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
-        ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billingSkipResult.departmentId!, billingSkipResult.clienteId)
-          .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
-          .catch(err => console.error('[cobrança] Erro ao criar atendimento financeiro:', err));
-
-        // Reopen conversation visually if closed
-        supabase
-          .from('whatsapp_conversations')
-          .update({ status: 'active', department_id: billingSkipResult.departmentId, updated_at: new Date().toISOString() })
-          .eq('id', conversationId)
-          .eq('status', 'closed')
-          .then(({ error: e }: any) => { if (e) console.error('[cobrança] Erro ao reabrir conversa:', e); });
-      } else {
-        // Check if this message is a URA response BEFORE creating/reopening attendance
-        const uraHandled = await handleUraResponse(
-          supabase, instanceCtx, conversationId, tenantId, content, supportConfig
-        );
-
-        if (uraHandled) {
-          incrementAttendanceCounter(supabase, conversationId, 'customer')
-            .catch(err => console.error('[evolution-webhook] increment error:', err));
-        } else {
-          ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
-            .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
-            .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
-
-          supabase
-            .from('whatsapp_conversations')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
-            .eq('id', conversationId)
-            .eq('status', 'closed')
-            .then(({ error: reopenConvErr }: any) => {
-              if (reopenConvErr) console.error('[evolution-webhook] Error reopening conversation:', reopenConvErr);
-            });
-        }
-      }
-    } else {
+ else {
       // Operator message sent via Evolution (e.g. from phone)
       ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
         .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
