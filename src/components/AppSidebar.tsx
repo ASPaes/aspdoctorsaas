@@ -23,7 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const ALL_NAV_ITEMS = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: true },
   { title: "Clientes", url: "/clientes", icon: Users, adminOnly: false },
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, adminOnly: false },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, adminOnly: false },
