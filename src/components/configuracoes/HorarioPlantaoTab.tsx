@@ -188,11 +188,37 @@ export default function HorarioPlantaoTab() {
   const saveOC = useSectionSave("Plantão");
 
   // ── Day schedule helpers ──
-  const updateDay = useCallback((day: string, field: keyof DaySchedule, value: unknown) => {
+  const updateDayActive = useCallback((day: string, active: boolean) => {
     setBhSchedule((prev) => ({
       ...prev,
-      [day]: { ...prev[day], [field]: value },
+      [day]: { ...prev[day], active },
     }));
+  }, []);
+
+  const updateSlot = useCallback((day: string, slotIndex: number, field: keyof TimeSlot, value: string) => {
+    setBhSchedule((prev) => {
+      const dayData = prev[day];
+      const newSlots = [...dayData.slots];
+      newSlots[slotIndex] = { ...newSlots[slotIndex], [field]: value };
+      return { ...prev, [day]: { ...dayData, slots: newSlots } };
+    });
+  }, []);
+
+  const addSlot = useCallback((day: string) => {
+    setBhSchedule((prev) => {
+      const dayData = prev[day];
+      if (dayData.slots.length >= 2) return prev; // Max 2 slots
+      return { ...prev, [day]: { ...dayData, slots: [...dayData.slots, { start: "13:00", end: "18:00" }] } };
+    });
+  }, []);
+
+  const removeSlot = useCallback((day: string, slotIndex: number) => {
+    setBhSchedule((prev) => {
+      const dayData = prev[day];
+      if (dayData.slots.length <= 1) return prev; // Keep at least 1
+      const newSlots = dayData.slots.filter((_, i) => i !== slotIndex);
+      return { ...prev, [day]: { ...dayData, slots: newSlots } };
+    });
   }, []);
 
   // ── Keyword helpers ──
