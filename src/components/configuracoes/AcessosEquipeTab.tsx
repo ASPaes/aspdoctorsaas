@@ -222,6 +222,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     queryKey: accessEquipeQueryKeys.users(tenantId),
     enabled: !!tenantId,
     placeholderData: [],
+    refetchOnMount: "always",
     queryFn: async () => {
       const [profilesRes, emailsRes, funcionariosRes, departmentsRes] = await Promise.all([
         supabase
@@ -299,6 +300,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     queryKey: accessEquipeQueryKeys.dropdownDepartments(tenantId),
     enabled: !!tenantId,
     placeholderData: [],
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
@@ -315,6 +317,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId),
     enabled: !!tenantId,
     placeholderData: [],
+    refetchOnMount: "always",
     queryFn: async () => {
       let q = supabase
         .from("funcionarios")
@@ -333,6 +336,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     queryKey: accessEquipeQueryKeys.pendingInvites(tenantId),
     enabled: !!tenantId,
     placeholderData: [],
+    refetchOnMount: "always",
     queryFn: async () => {
       let q = supabase
         .from("access_invites")
@@ -351,6 +355,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId),
     enabled: !!tenantId,
     placeholderData: [],
+    refetchOnMount: "always",
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
