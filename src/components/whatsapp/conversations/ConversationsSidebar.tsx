@@ -50,7 +50,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
   const [search, setSearch] = useState(saved?.search ?? "");
   const [showNewModal, setShowNewModal] = useState(false);
-  const [activePill, setActivePillRaw] = useState(saved?.activePill ?? "waiting");
+  const [activePill, setActivePillRaw] = useState("waiting");
   const [pillAutoSet, setPillAutoSet] = useState(false);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
   const [filters, setFiltersRaw] = useState<FiltersState>({
@@ -70,7 +70,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
   const setActivePill = (v: string) => {
     setActivePillRaw(v);
-    persist({ activePill: v });
   };
 
   const setFilters = (updater: FiltersState | ((prev: FiltersState) => FiltersState)) => {
