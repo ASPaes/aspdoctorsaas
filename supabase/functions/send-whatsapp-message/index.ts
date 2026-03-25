@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (senderProfile?.access_status !== 'ativo') {
+      if (senderProfile?.access_status !== 'ativo' && senderProfile?.access_status !== 'active') {
         console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
         return new Response(
           JSON.stringify({ error: 'Seu usuário está inativo e não pode enviar mensagens. Fale com o administrador.' }),
