@@ -181,6 +181,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="acessos">🔐 Acessos & Equipe</TabsTrigger>}
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="horario-plantao">Horário & Plantão</TabsTrigger>}
           <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
         </TabsList>
 
