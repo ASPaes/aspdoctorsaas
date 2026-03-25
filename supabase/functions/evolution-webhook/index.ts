@@ -953,8 +953,26 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         }
       }
 
-      // 3. BILLING SKIP URA
+      // 3. FETCH CONFIG + BUSINESS HOURS CHECK
       const supportConfig = await getSupportConfig(supabase, tenantId);
+      const bhResult = checkBusinessHours(supportConfig);
+
+      // 4. OFF-HOURS FLOW — if outside business hours, skip attendance/URA/billing
+      if (!bhResult.inside && supportConfig.business_hours_enabled) {
+        const offHandled = await handleOffHoursMessage(
+          supabase, instanceCtx, conversationId, tenantId, content,
+          supportConfig, bhResult.todayStart, bhResult.todayEnd
+        );
+        if (offHandled) {
+          console.log(`[off-hours] Flow consumed message for conv=${conversationId}, skipping attendance/URA/billing`);
+          // Still increment counter for analytics if an active attendance exists
+          incrementAttendanceCounter(supabase, conversationId, 'customer')
+            .catch(() => {/* no active attendance is fine */});
+          return;
+        }
+      }
+
+      // 5. BILLING SKIP URA (only during business hours)
       const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
       if (billingSkipResult.skip) {
@@ -968,6 +986,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           .eq('status', 'closed')
           .then(({ error: e }: any) => { if (e) console.error('[cobrança] Erro ao reabrir conversa:', e); });
       } else {
+        // 6. URA + ATTENDANCE (only during business hours)
         const uraHandled = await handleUraResponse(
           supabase, instanceCtx, conversationId, tenantId, content, supportConfig
         );
