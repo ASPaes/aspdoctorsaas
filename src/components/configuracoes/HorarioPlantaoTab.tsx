@@ -375,6 +375,9 @@ export default function HorarioPlantaoTab() {
                           </div>
                           {s.active && s.slots.map((slot, idx) => (
                             <div key={idx} className="flex items-center gap-2 ml-8">
+                              <span className="text-xs text-muted-foreground w-14 shrink-0">
+                                Turno {idx + 1}
+                              </span>
                               <Input
                                 type="time"
                                 value={slot.start}
@@ -395,6 +398,7 @@ export default function HorarioPlantaoTab() {
                                   size="icon"
                                   className="h-7 w-7 text-destructive"
                                   onClick={() => removeSlot(day, idx)}
+                                  title="Remover turno"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </Button>
