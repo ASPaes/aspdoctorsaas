@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const loadProfile = useCallback(async (userId: string) => {
     setProfileLoading(true);
@@ -64,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => loadProfile(session.user.id), 0);
         } else {
           setProfile(null);
+          setProfileLoading(false);
         }
       }
     );
@@ -76,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user?.id) {
         loadProfile(session.user.id);
+      } else {
+        setProfileLoading(false);
       }
     });
 
