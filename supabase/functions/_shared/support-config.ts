@@ -36,6 +36,23 @@ export interface SupportConfig {
   // Billing skip URA
   billing_skip_ura_enabled: boolean;
   billing_skip_ura_minutes: number;
+
+  // Business Hours
+  business_hours_enabled: boolean;
+  business_hours: Record<string, { active: boolean; start: string; end: string }>;
+  business_hours_timezone: string;
+  business_hours_message: string | null;
+  business_hours_ai_enabled: boolean;
+  business_hours_ai_prompt: string | null;
+
+  // On-call escalation
+  oncall_phone_number: string | null;
+  oncall_message_template: string | null;
+  oncall_escalation_window_minutes: number;
+  oncall_min_customer_messages: number;
+  oncall_min_elapsed_seconds: number;
+  oncall_repeat_cooldown_minutes: number;
+  oncall_urgency_keywords: string[];
 }
 
 /** Defaults matching the DB column defaults exactly */
@@ -75,6 +92,23 @@ const DEFAULTS: SupportConfig = {
   // Billing skip URA
   billing_skip_ura_enabled: true,
   billing_skip_ura_minutes: 60,
+
+  // Business Hours
+  business_hours_enabled: false,
+  business_hours: {},
+  business_hours_timezone: 'America/Sao_Paulo',
+  business_hours_message: null,
+  business_hours_ai_enabled: false,
+  business_hours_ai_prompt: null,
+
+  // On-call
+  oncall_phone_number: null,
+  oncall_message_template: null,
+  oncall_escalation_window_minutes: 30,
+  oncall_min_customer_messages: 3,
+  oncall_min_elapsed_seconds: 60,
+  oncall_repeat_cooldown_minutes: 360,
+  oncall_urgency_keywords: [],
 };
 
 const SELECT_FIELDS = [
@@ -103,6 +137,21 @@ const SELECT_FIELDS = [
   // Billing skip URA
   'billing_skip_ura_enabled',
   'billing_skip_ura_minutes',
+  // Business Hours
+  'business_hours_enabled',
+  'business_hours',
+  'business_hours_timezone',
+  'business_hours_message',
+  'business_hours_ai_enabled',
+  'business_hours_ai_prompt',
+  // On-call
+  'oncall_phone_number',
+  'oncall_message_template',
+  'oncall_escalation_window_minutes',
+  'oncall_min_customer_messages',
+  'oncall_min_elapsed_seconds',
+  'oncall_repeat_cooldown_minutes',
+  'oncall_urgency_keywords',
 ].join(', ');
 
 /**
@@ -135,6 +184,17 @@ export async function getSupportConfig(
     for (const key of Object.keys(DEFAULTS) as (keyof SupportConfig)[]) {
       if (data[key] !== null && data[key] !== undefined) {
         (merged as any)[key] = data[key];
+      }
+    }
+
+    // Ensure oncall_urgency_keywords is always an array
+    if (!Array.isArray(merged.oncall_urgency_keywords)) {
+      try {
+        merged.oncall_urgency_keywords = typeof merged.oncall_urgency_keywords === 'string'
+          ? JSON.parse(merged.oncall_urgency_keywords)
+          : [];
+      } catch {
+        merged.oncall_urgency_keywords = [];
       }
     }
 
