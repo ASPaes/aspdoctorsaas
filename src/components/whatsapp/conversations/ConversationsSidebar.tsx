@@ -249,14 +249,17 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         break;
       case "recent":
       default: {
-        // Pin waiting (queue) conversations to the top, then sort by recency
+        // When viewing "Todos", sort purely by recency; otherwise pin waiting to top
+        const pinWaiting = activePill !== "all";
         result.sort((a, b) => {
-          const aAtt = attendanceMap.get(a.id);
-          const bAtt = attendanceMap.get(b.id);
-          const aWaiting = aAtt?.status === "waiting" && !aAtt?.assigned_to;
-          const bWaiting = bAtt?.status === "waiting" && !bAtt?.assigned_to;
-          if (aWaiting && !bWaiting) return -1;
-          if (!aWaiting && bWaiting) return 1;
+          if (pinWaiting) {
+            const aAtt = attendanceMap.get(a.id);
+            const bAtt = attendanceMap.get(b.id);
+            const aWaiting = aAtt?.status === "waiting" && !aAtt?.assigned_to;
+            const bWaiting = bAtt?.status === "waiting" && !bAtt?.assigned_to;
+            if (aWaiting && !bWaiting) return -1;
+            if (!aWaiting && bWaiting) return 1;
+          }
           const aTime = a.last_message_at || a.created_at;
           const bTime = b.last_message_at || b.created_at;
           return new Date(bTime).getTime() - new Date(aTime).getTime();
