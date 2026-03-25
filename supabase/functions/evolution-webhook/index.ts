@@ -966,7 +966,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         console.log(`[off-hours] Automations dispatched for conv=${conversationId}, continuing normal flow`);
       }
 
-      // 5. BILLING SKIP URA (only during business hours)
+      // 5. BILLING SKIP URA
       const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
       if (billingSkipResult.skip) {
@@ -980,7 +980,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           .eq('status', 'closed')
           .then(({ error: e }: any) => { if (e) console.error('[cobrança] Erro ao reabrir conversa:', e); });
       } else {
-        // 6. URA + ATTENDANCE (only during business hours)
+        // 6. URA + ATTENDANCE
         const uraHandled = await handleUraResponse(
           supabase, instanceCtx, conversationId, tenantId, content, supportConfig
         );
