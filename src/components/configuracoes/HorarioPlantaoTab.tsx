@@ -436,6 +436,11 @@ export default function HorarioPlantaoTab() {
         </AccordionItem>
 
         {/* ════════════════════════════════════════════════════════════ */}
+        {/* SECTION A.2: HOLIDAYS / EXCEPTIONS                         */}
+        {/* ════════════════════════════════════════════════════════════ */}
+        <BusinessHoursExceptionsSection />
+
+        {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION B: AI OFF-HOURS                                    */}
         {/* ════════════════════════════════════════════════════════════ */}
         <AccordionItem value="ai" className="border rounded-lg">
