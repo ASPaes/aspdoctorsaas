@@ -994,6 +994,67 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
 const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
+// =====================================================================
+// BILLING AUTO-REPLY DETECTION
+// =====================================================================
+
+/** Normalize text for pattern matching: lowercase, strip accents, trim */
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+/**
+ * Detect if a message is likely a WhatsApp Business auto-reply
+ * (e.g. welcome message, out-of-hours notice).
+ * Returns { isAuto: true, reason } if detected, { isAuto: false } otherwise.
+ *
+ * Anti-false-positive: messages containing "?" or billing/negotiation keywords
+ * are NEVER considered auto-replies.
+ */
+function isLikelyBillingAutoReply(text: string): { isAuto: boolean; reason?: string } {
+  const n = normalizeForMatch(text);
+
+  // Anti-false-positive: interrogation → real question, not auto-reply
+  if (n.includes('?')) {
+    return { isAuto: false };
+  }
+
+  // Anti-false-positive: billing/negotiation keywords → real customer response
+  const billingKeywords = [
+    'boleto', 'pix', 'pagar', 'pagamento', 'valor', 'vencimento',
+    'linha digitavel', 'comprovante', 'atraso', 'negociar', 'parcelar',
+  ];
+  if (billingKeywords.some(kw => n.includes(kw))) {
+    return { isAuto: false };
+  }
+
+  // Pattern detection (PT-BR business auto-replies)
+  if (n.includes('agradece') && n.includes('contato')) {
+    return { isAuto: true, reason: 'business_welcome_thanks' };
+  }
+  if (n.includes('assim que possivel') && (n.includes('retornar') || n.includes('responder'))) {
+    return { isAuto: true, reason: 'business_will_return' };
+  }
+  if (n.includes('horario') && (n.includes('atendimento') || n.includes('funcionamento'))) {
+    return { isAuto: true, reason: 'business_welcome_hours' };
+  }
+  if (n.includes('segunda a sexta') || n.includes('sabado') || n.includes('domingo')) {
+    return { isAuto: true, reason: 'business_schedule_days' };
+  }
+  if (n.includes('mensagem automatica') || n.includes('resposta automatica') || (n.includes('auto') && n.includes('reply'))) {
+    return { isAuto: true, reason: 'explicit_auto_reply' };
+  }
+  if (n.includes('fora do horario') || n.includes('em breve retornaremos')) {
+    return { isAuto: true, reason: 'out_of_hours' };
+  }
+
+  return { isAuto: false };
+}
+
 /**
  * Ensure a support_attendance exists for an incoming customer message.
  * Rules:
@@ -2321,6 +2382,7 @@ interface BillingCheckResult {
   departmentId?: string;
   clienteId?: string | null;
   minutesAgo?: number;
+  billingMessageCreatedAt?: string;
 }
 
 /**
@@ -2409,6 +2471,7 @@ async function checkBillingSkipUra(
       departmentId: financeiroDept.id,
       clienteId,
       minutesAgo,
+      billingMessageCreatedAt: billingHit.created_at,
     };
   } catch (err) {
     console.error('[cobrança] Erro na verificação de cobrança:', err);
