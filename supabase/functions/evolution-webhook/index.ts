@@ -987,8 +987,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             });
         }
       }
-    }
- else {
+    } else {
       // Operator message sent via Evolution (e.g. from phone)
       ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
         .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
