@@ -957,19 +957,13 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const supportConfig = await getSupportConfig(supabase, tenantId);
       const bhResult = checkBusinessHours(supportConfig);
 
-      // 4. OFF-HOURS FLOW — if outside business hours, skip attendance/URA/billing
+      // 4. OFF-HOURS AUTOMATIONS — fire-and-forget, never block the normal flow
       if (!bhResult.inside && supportConfig.business_hours_enabled) {
-        const offHandled = await handleOffHoursMessage(
+        handleOffHoursMessage(
           supabase, instanceCtx, conversationId, tenantId, content,
           supportConfig, bhResult.todayStart, bhResult.todayEnd
-        );
-        if (offHandled) {
-          console.log(`[off-hours] Flow consumed message for conv=${conversationId}, skipping attendance/URA/billing`);
-          // Still increment counter for analytics if an active attendance exists
-          incrementAttendanceCounter(supabase, conversationId, 'customer')
-            .catch(() => {/* no active attendance is fine */});
-          return;
-        }
+        ).catch(err => console.error('[off-hours] automation error:', err));
+        console.log(`[off-hours] Automations dispatched for conv=${conversationId}, continuing normal flow`);
       }
 
       // 5. BILLING SKIP URA (only during business hours)
@@ -1230,7 +1224,7 @@ async function countOffHoursCustomerMessages(
 
 /**
  * Full off-hours handler: notice, AI reply, on-call escalation.
- * Returns true if the off-hours flow consumed the message (no further processing needed).
+ * Runs as fire-and-forget — never blocks the normal attendance/URA flow.
  */
 async function handleOffHoursMessage(
   supabase: any,
