@@ -44,7 +44,7 @@ function MetricCard({ title, value, icon: Icon, subtitle, trend }: { title: stri
 export default function WhatsAppRelatorio() {
   const navigate = useNavigate();
   const { instances } = useWhatsAppInstances();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
   const { selectedDepartmentId, selectedDepartment } = useDepartmentFilter();
   const { data: userDepartmentId } = useUserDepartment();
@@ -54,9 +54,10 @@ export default function WhatsAppRelatorio() {
     ? (selectedDepartmentId || undefined)
     : (userDepartmentId || undefined);
 
+  // Para user não-admin: filtra pelo seu próprio user_id (assigned_to usa auth user id)
   const effectiveAgentId = isAdmin
-    ? (agentFilter === "me" && profile?.funcionario_id ? String(profile.funcionario_id) : undefined)
-    : (profile?.funcionario_id ? String(profile.funcionario_id) : undefined);
+    ? (agentFilter === "me" && user?.id ? user.id : undefined)
+    : (user?.id ?? undefined);
 
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfDay(subDays(new Date(), 30)),
