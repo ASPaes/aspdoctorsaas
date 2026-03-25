@@ -47,6 +47,22 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
   const [formData, setFormData] = useState<Record<string, any>>({});
   const prevTidRef = useRef(tid);
 
+  const refreshDependentQueries = async () => {
+    const tasks: Promise<unknown>[] = [queryClient.invalidateQueries({ queryKey: [queryKey] })];
+
+    if (table === "funcionarios") {
+      queryClient.removeQueries({ queryKey: ["funcionarios-for-invite", tid] });
+      queryClient.removeQueries({ queryKey: ["tenant-access-users", tid] });
+
+      tasks.push(
+        queryClient.invalidateQueries({ queryKey: ["funcionarios-for-invite", tid] }),
+        queryClient.invalidateQueries({ queryKey: ["tenant-access-users", tid] }),
+      );
+    }
+
+    await Promise.all(tasks);
+  };
+
   // Close modal if tenant changes while it's open — prevents saving with stale select options
   useEffect(() => {
     if (prevTidRef.current !== tid) {
@@ -79,8 +95,8 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
         if (error) throw error;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+    onSuccess: async () => {
+      await refreshDependentQueries();
       toast({ title: editingRow ? "Atualizado!" : "Criado!", description: "Registro salvo com sucesso." });
       closeDialog();
     },
@@ -96,8 +112,8 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
       const { error } = await (supabase.from(table as any) as any).delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+    onSuccess: async () => {
+      await refreshDependentQueries();
       toast({ title: "Excluído!", description: "Registro removido." });
       setDeleteId(null);
     },
