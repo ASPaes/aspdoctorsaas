@@ -81,9 +81,8 @@ export default function Signup() {
           toast.error("Este email já possui conta. Verifique sua senha.");
           return;
         }
-        // Login feito — AuthGuard vai redirecionar automaticamente
-        toast.success("Bem-vindo de volta!");
-        setLoading(false);
+        toast.success("Bem-vindo!");
+        navigate("/dashboard");
         return;
       } else {
         setLoading(false);
@@ -92,13 +91,26 @@ export default function Signup() {
       }
     }
 
-    // Signup feito — AuthGuard vai redirecionar automaticamente
     if (inviteId) {
+      // Aguarda o trigger criar o profile (até 3s)
+      let attempts = 0;
+      while (attempts < 6) {
+        await new Promise((r) => setTimeout(r, 500));
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("user_id, access_status")
+          .eq("user_id", signUpData.user!.id)
+          .maybeSingle();
+        if (p?.access_status === "active") break;
+        attempts++;
+      }
       toast.success("Conta criada com sucesso! Bem-vindo.");
-    } else {
-      toast.success("Verifique seu email para confirmar o cadastro.");
+      navigate("/dashboard");
+      return;
     }
+
     setLoading(false);
+    toast.success("Verifique seu email para confirmar o cadastro.");
   };
 
   if (inviteLoading) {
