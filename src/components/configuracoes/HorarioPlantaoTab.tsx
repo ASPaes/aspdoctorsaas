@@ -16,6 +16,7 @@ import { NumericInput } from "@/components/ui/numeric-input";
 import { Badge } from "@/components/ui/badge";
 import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
 import { normalizeBRPhone, formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
+import BusinessHoursExceptionsSection from "./BusinessHoursExceptionsSection";
 
 // ─── Types ───────────────────────────────────────────────────────
 interface TimeSlot {
