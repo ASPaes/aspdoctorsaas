@@ -7,6 +7,7 @@ export interface WhatsAppMetricsFilters {
   dateRange: { from: Date; to: Date };
   instanceId?: string | null;
   agentId?: string | null;
+  departmentId?: string | null;
 }
 
 export interface WhatsAppMetrics {
@@ -78,7 +79,7 @@ export const useWhatsAppMetrics = (filters: WhatsAppMetricsFilters) => {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   return useQuery({
-    queryKey: ['whatsapp-metrics', filters.dateRange.from.toISOString(), filters.dateRange.to.toISOString(), filters.instanceId, filters.agentId, tid],
+    queryKey: ['whatsapp-metrics', filters.dateRange.from.toISOString(), filters.dateRange.to.toISOString(), filters.instanceId, filters.agentId, filters.departmentId, tid],
     queryFn: async () => {
       const { from, to } = filters.dateRange;
 
@@ -88,6 +89,7 @@ export const useWhatsAppMetrics = (filters: WhatsAppMetricsFilters) => {
         .lte('last_message_at', to.toISOString());
       if (tid) cq = cq.eq('tenant_id', tid);
       if (filters.instanceId) cq = cq.eq('instance_id', filters.instanceId);
+      if (filters.departmentId) cq = cq.eq('department_id', filters.departmentId);
       if (filters.agentId) cq = cq.eq('assigned_to', filters.agentId);
 
       const { data: conversations, error: convError } = await cq;
@@ -199,6 +201,7 @@ export const useWhatsAppMetrics = (filters: WhatsAppMetricsFilters) => {
         .lt('last_message_at', from.toISOString());
       if (tid) pq = pq.eq('tenant_id', tid);
       if (filters.instanceId) pq = pq.eq('instance_id', filters.instanceId);
+      if (filters.departmentId) pq = pq.eq('department_id', filters.departmentId);
       if (filters.agentId) pq = pq.eq('assigned_to', filters.agentId);
       const { data: prevConvs } = await pq;
       const pTotal = prevConvs?.length || 0;
