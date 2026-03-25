@@ -20,7 +20,7 @@ export type Database = {
           auth_user_id: string | null
           created_at: string
           email: string
-          funcionario_id: number
+          funcionario_id: number | null
           id: string
           invited_at: string
           invited_by: string | null
@@ -35,7 +35,7 @@ export type Database = {
           auth_user_id?: string | null
           created_at?: string
           email: string
-          funcionario_id: number
+          funcionario_id?: number | null
           id?: string
           invited_at?: string
           invited_by?: string | null
@@ -50,7 +50,7 @@ export type Database = {
           auth_user_id?: string | null
           created_at?: string
           email?: string
-          funcionario_id?: number
+          funcionario_id?: number | null
           id?: string
           invited_at?: string
           invited_by?: string | null

@@ -58,7 +58,8 @@ export default function Signup() {
     e.preventDefault();
     setLoading(true);
 
-    const { data: signUpData, error } = await supabase.auth.signUp({
+    // Tenta criar conta nova
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -67,24 +68,44 @@ export default function Signup() {
       },
     });
 
-    if (error) {
-      setLoading(false);
-      toast.error(error.message);
-      return;
+    let userId: string | null = null;
+
+    if (signUpError) {
+      // Se o usuário já existe, tenta fazer login com a senha fornecida
+      if (signUpError.message.toLowerCase().includes("already registered") || 
+          signUpError.message.toLowerCase().includes("already been registered")) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          setLoading(false);
+          toast.error("Este email já possui conta. Verifique sua senha.");
+          return;
+        }
+        userId = signInData.user?.id ?? null;
+      } else {
+        setLoading(false);
+        toast.error(signUpError.message);
+        return;
+      }
+    } else {
+      userId = signUpData.user?.id ?? null;
     }
 
-    if (inviteId && signUpData.user) {
+    // Se veio via convite, vincula ao tenant
+    if (inviteId && userId) {
       const { error: acceptError } = await (supabase.rpc as any)(
         "accept_access_invite",
         { p_invite_id: inviteId }
       );
       if (acceptError) {
         console.error("Error accepting access invite:", acceptError);
-        toast.error("Conta criada, mas houve erro ao vincular o convite. Contate o administrador.");
+        toast.error("Conta acessada, mas houve erro ao vincular o convite. Contate o administrador.");
         setLoading(false);
         return;
       }
-      toast.success("Conta criada com sucesso! Bem-vindo.");
+      toast.success("Acesso vinculado com sucesso! Bem-vindo.");
       navigate("/");
       return;
     }
