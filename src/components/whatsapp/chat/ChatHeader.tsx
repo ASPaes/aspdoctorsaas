@@ -79,19 +79,44 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
 
-  // Resolve assigned operator name
+  // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
   const { getSenderLabel } = useSenderMap();
+
+  // Find funcionario_id for fallback lookup
+  const assignedTo = attendance?.assigned_to;
+  const fallbackFuncId = useMemo(() => {
+    if (!assignedTo || !tenantUsers) return null;
+    const sender = getSenderLabel(assignedTo);
+    if (sender.name) return null; // senderMap already has it
+    const u = tenantUsers.find((tu) => tu.user_id === assignedTo);
+    return u?.funcionario_id ?? null;
+  }, [assignedTo, tenantUsers, getSenderLabel]);
+
+  const { data: fallbackFuncionario } = useQuery({
+    queryKey: ["funcionario-name", fallbackFuncId],
+    enabled: !!fallbackFuncId,
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("funcionarios")
+        .select("nome")
+        .eq("id", fallbackFuncId!)
+        .maybeSingle();
+      return data?.nome ?? null;
+    },
+  });
+
   const assignedOperatorName = useMemo(() => {
-    const assignedTo = attendance?.assigned_to;
     if (!assignedTo) return null;
     const sender = getSenderLabel(assignedTo);
     if (sender.name) return sender.name;
-    // Fallback to email prefix if no funcionario linked
+    if (fallbackFuncionario) return fallbackFuncionario;
+    // Last resort: email prefix
     if (!tenantUsers) return null;
     const u = tenantUsers.find((tu) => tu.user_id === assignedTo);
     return u?.email?.split("@")[0] || u?.email || null;
-  }, [attendance?.assigned_to, getSenderLabel, tenantUsers]);
+  }, [assignedTo, getSenderLabel, fallbackFuncionario, tenantUsers]);
 
   const effectiveStatus = useMemo(() => {
     if (attendance) {
