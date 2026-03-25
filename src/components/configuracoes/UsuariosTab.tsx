@@ -249,7 +249,7 @@ export default function UsuariosTab() {
                 <TableRow>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Expira em</TableHead>
+                  <TableHead>Convidado em</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
