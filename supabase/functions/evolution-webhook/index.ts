@@ -1065,51 +1065,81 @@ function normalizeForMatch(text: string): string {
 }
 
 /**
- * Detect if a message is likely a WhatsApp Business auto-reply
- * (e.g. welcome message, out-of-hours notice).
- * Returns { isAuto: true, reason } if detected, { isAuto: false } otherwise.
+ * Detect if a message is likely a WhatsApp Business auto-reply (PT-BR).
+ * Returns true for typical automated business responses.
  *
- * Anti-false-positive: messages containing "?" or billing/negotiation keywords
- * are NEVER considered auto-replies.
+ * Anti-false-positive: messages containing "?", billing keywords, or
+ * strong human-intent signals are NEVER considered auto-replies.
  */
-function isLikelyBillingAutoReply(text: string): { isAuto: boolean; reason?: string } {
+function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
   const n = normalizeForMatch(text);
 
-  // Anti-false-positive: interrogation → real question, not auto-reply
-  if (n.includes('?')) {
-    return { isAuto: false };
-  }
+  // --- Anti-false-positive: strong human/finance signals → NOT auto-reply ---
+  if (n.includes('?')) return false;
 
-  // Anti-false-positive: billing/negotiation keywords → real customer response
-  const billingKeywords = [
+  const humanKeywords = [
     'boleto', 'pix', 'pagar', 'pagamento', 'valor', 'vencimento',
     'linha digitavel', 'comprovante', 'atraso', 'negociar', 'parcelar',
+    'preciso', 'quero', 'me ajuda', 'nao entendi', 'por favor',
+    'estou devendo', 'esqueci de pagar', 'como faco',
   ];
-  if (billingKeywords.some(kw => n.includes(kw))) {
-    return { isAuto: false };
-  }
+  if (humanKeywords.some(kw => n.includes(kw))) return false;
 
-  // Pattern detection (PT-BR business auto-replies)
-  if (n.includes('agradece') && n.includes('contato')) {
-    return { isAuto: true, reason: 'business_welcome_thanks' };
-  }
-  if (n.includes('assim que possivel') && (n.includes('retornar') || n.includes('responder'))) {
-    return { isAuto: true, reason: 'business_will_return' };
-  }
-  if (n.includes('horario') && (n.includes('atendimento') || n.includes('funcionamento'))) {
-    return { isAuto: true, reason: 'business_welcome_hours' };
-  }
-  if (n.includes('segunda a sexta') || n.includes('sabado') || n.includes('domingo')) {
-    return { isAuto: true, reason: 'business_schedule_days' };
-  }
-  if (n.includes('mensagem automatica') || n.includes('resposta automatica') || (n.includes('auto') && n.includes('reply'))) {
-    return { isAuto: true, reason: 'explicit_auto_reply' };
-  }
-  if (n.includes('fora do horario') || n.includes('em breve retornaremos')) {
-    return { isAuto: true, reason: 'out_of_hours' };
-  }
+  // --- Auto-reply pattern detection (PT-BR) ---
+  if (n.includes('agradece') && n.includes('contato')) return true;
+  if (n.includes('agradece seu contato')) return true;
+  if ((n.includes('assim que possivel') || n.includes('em breve')) && (n.includes('retornar') || n.includes('responder') || n.includes('retornaremos'))) return true;
+  if (n.includes('horario') && (n.includes('atendimento') || n.includes('funcionamento'))) return true;
+  if (n.includes('nosso horario')) return true;
+  if (n.includes('segunda a sexta') || n.includes('seg a sex')) return true;
+  if (n.includes('sabado') || n.includes('domingo')) return true;
+  // Time patterns like "07:00", "19:00", "08h", "18h"
+  if (/\b\d{1,2}[h:]\d{0,2}\b/.test(n) && (n.includes('horario') || n.includes('atendimento') || n.includes('segunda') || n.includes('seg'))) return true;
+  if (n.includes('mensagem automatica') || n.includes('resposta automatica')) return true;
+  if (n.includes('auto') && n.includes('reply')) return true;
+  if (n.includes('fora do horario')) return true;
+  if (n.includes('em breve retornaremos')) return true;
 
-  return { isAuto: false };
+  return false;
+}
+
+/**
+ * Query the last billing automation message (cobrança) sent in this conversation.
+ * Returns the created_at timestamp or null if none found within a reasonable window.
+ */
+async function getLastBillingMessageAt(
+  supabase: any,
+  conversationId: string,
+  tenantId: string
+): Promise<Date | null> {
+  try {
+    // Look back up to 2 hours for billing messages
+    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+    const { data: msgs } = await supabase
+      .from('whatsapp_messages')
+      .select('created_at, metadata')
+      .eq('conversation_id', conversationId)
+      .eq('tenant_id', tenantId)
+      .eq('is_from_me', true)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (!msgs || msgs.length === 0) return null;
+
+    for (const m of msgs) {
+      const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+      if (meta?.source === 'billing_automation' && meta?.kind === 'cobranca') {
+        return new Date(m.created_at);
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error('[getLastBillingMessageAt] Error:', err);
+    return null;
+  }
 }
 
 /**
