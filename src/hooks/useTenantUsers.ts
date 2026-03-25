@@ -139,28 +139,24 @@ export function useCreateInvite() {
   return useMutation({
     mutationFn: async ({ email, role, tenantId }: { email: string; role: string; tenantId: string }) => {
       const normalizedEmail = email.trim().toLowerCase();
-      const emailDomain = normalizedEmail.split("@")[1] ?? "";
-      const allowedDomain = (profile?.allowed_domain ?? "").toLowerCase();
-      const accessStatus = allowedDomain && emailDomain === allowedDomain ? "active" : "pending";
+      const token = crypto.randomUUID();
 
-      // 1. Create invite record
       const { error: invErr } = await supabase
         .from("invites")
-        .insert({ email: normalizedEmail, role, tenant_id: tenantId });
+        .insert({ email: normalizedEmail, role, tenant_id: tenantId, token });
       if (invErr) throw invErr;
 
-      // 2. Audit event
       const { error: auditErr } = await supabase
         .from("audit_events")
         .insert({
           tenant_id: tenantId,
           actor_user_id: profile?.user_id,
           event_type: "INVITE_SENT",
-          metadata: { email: normalizedEmail, role, access_status: accessStatus, allowed_domain: allowedDomain },
+          metadata: { email: normalizedEmail, role },
         });
       if (auditErr) console.error("Audit error:", auditErr);
 
-      return { accessStatus };
+      return { token };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-invites"] }),
   });
