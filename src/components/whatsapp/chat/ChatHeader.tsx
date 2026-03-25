@@ -22,6 +22,7 @@ import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { TopicBadges } from "./TopicBadges";
+import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { supabase } from "@/integrations/supabase/client";
