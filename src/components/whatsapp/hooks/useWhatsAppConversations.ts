@@ -77,11 +77,30 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       let messageMatchIds: string[] = [];
       if (searchTerm && searchTerm.length >= 3) {
         const escaped = escapeLike(searchTerm);
-        const { data: msgMatches } = await supabase
+        let msgQuery = supabase
           .from('whatsapp_messages' as any)
           .select('conversation_id')
           .ilike('content', `%${escaped}%`)
           .limit(100);
+
+        // Sempre filtrar por tenant_id para não escanear o banco todo
+        if (tid) msgQuery = (msgQuery as any).eq('tenant_id', tid);
+
+        // Se houver filtro de departamento, restringir às conversas daquele setor
+        if (filters?.departmentId) {
+          const { data: deptConvIds } = await supabase
+            .from('whatsapp_conversations')
+            .select('id')
+            .eq('tenant_id', tid!)
+            .eq('department_id', filters.departmentId)
+            .limit(1000);
+          if (deptConvIds && deptConvIds.length > 0) {
+            const ids = deptConvIds.map((c: any) => c.id);
+            msgQuery = (msgQuery as any).in('conversation_id', ids);
+          }
+        }
+
+        const { data: msgMatches } = await msgQuery;
         if (msgMatches) {
           messageMatchIds = [...new Set((msgMatches as any[]).map((m: any) => m.conversation_id))];
         }
