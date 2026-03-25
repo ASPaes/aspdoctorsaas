@@ -91,19 +91,32 @@ export default function Signup() {
       }
     }
 
-    if (inviteId) {
-      // Aguarda o trigger criar o profile (até 3s)
+    if (inviteId && signUpData.user) {
+      // Chama RPC para criar o profile e vincular ao tenant
+      const { error: acceptError } = await (supabase.rpc as any)(
+        "accept_access_invite",
+        { p_invite_id: inviteId }
+      );
+      if (acceptError) {
+        console.error("Error accepting invite:", acceptError);
+        toast.error("Conta criada, mas erro ao vincular convite. Contate o administrador.");
+        setLoading(false);
+        return;
+      }
+
+      // Aguarda o AuthContext carregar o profile (até 3s)
       let attempts = 0;
       while (attempts < 6) {
         await new Promise((r) => setTimeout(r, 500));
         const { data: p } = await supabase
           .from("profiles")
           .select("user_id, access_status")
-          .eq("user_id", signUpData.user!.id)
+          .eq("user_id", signUpData.user.id)
           .maybeSingle();
         if (p?.access_status === "active") break;
         attempts++;
       }
+
       toast.success("Conta criada com sucesso! Bem-vindo.");
       navigate("/dashboard");
       return;
