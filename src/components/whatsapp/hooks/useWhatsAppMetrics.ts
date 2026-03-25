@@ -42,6 +42,18 @@ export interface WhatsAppMetrics {
     total: number; active: number; closed: number; archived: number;
     avgResponseTimeMinutes: number; resolutionRate: number; avgFirstResponseTimeMinutes: number;
   };
+  sectorTotal: number;
+  sectorActive: number;
+  sectorClosed: number;
+  sectorTotalMessages: number;
+  sectorSentMessages: number;
+  sectorReceivedMessages: number;
+  sectorUniqueContacts: number;
+  sectorAvgResponseTimeMinutes: number;
+  sectorResolutionRate: number;
+  sectorAvgFirstResponseTimeMinutes: number;
+  sectorAvgMessagesPerConversation: number;
+  sectorEngagementRate: number;
 }
 
 function calcResponseTimes(messagesByConv: Record<string, any[]>) {
@@ -209,6 +221,63 @@ export const useWhatsAppMetrics = (filters: WhatsAppMetricsFilters) => {
       const pClosed = prevConvs?.filter(c => c.status === 'closed').length || 0;
       const pArchived = prevConvs?.filter(c => c.status === 'archived').length || 0;
 
+      // Busca dados do setor inteiro para calcular percentuais
+      let sectorMetrics = {
+        sectorTotal: 0, sectorActive: 0, sectorClosed: 0,
+        sectorTotalMessages: 0, sectorSentMessages: 0, sectorReceivedMessages: 0,
+        sectorUniqueContacts: 0, sectorAvgResponseTimeMinutes: 0,
+        sectorResolutionRate: 0, sectorAvgFirstResponseTimeMinutes: 0,
+        sectorAvgMessagesPerConversation: 0, sectorEngagementRate: 0,
+      };
+
+      if (filters.agentId) {
+        let sq = supabase.from('whatsapp_conversations')
+          .select('id, status, last_message_at, contact_id, assigned_to')
+          .gte('last_message_at', from.toISOString())
+          .lte('last_message_at', to.toISOString());
+        if (tid) sq = sq.eq('tenant_id', tid);
+        if (filters.departmentId) sq = sq.eq('department_id', filters.departmentId);
+        if (filters.instanceId) sq = sq.eq('instance_id', filters.instanceId);
+
+        const { data: sectorConvs } = await sq;
+        const sTotal = sectorConvs?.length || 0;
+        const sClosed = sectorConvs?.filter(c => c.status === 'closed').length || 0;
+        const sUniqueContacts = new Set(sectorConvs?.map(c => c.contact_id)).size;
+        const sConvIds = sectorConvs?.map(c => c.id) || [];
+
+        let sMsgsByConv: Record<string, any[]> = {};
+        if (sConvIds.length > 0) {
+          const { data: sMsgs } = await (supabase.from('whatsapp_messages' as any))
+            .select('conversation_id, is_from_me, timestamp, message_type')
+            .in('conversation_id', sConvIds)
+            .order('timestamp', { ascending: true });
+          (sMsgs as any[] || []).forEach((m: any) => {
+            if (!sMsgsByConv[m.conversation_id]) sMsgsByConv[m.conversation_id] = [];
+            sMsgsByConv[m.conversation_id].push(m);
+          });
+        }
+
+        const sAllMsgs = Object.values(sMsgsByConv).flat();
+        const sSent = sAllMsgs.filter(m => m.is_from_me).length;
+        const sReceived = sAllMsgs.filter(m => !m.is_from_me).length;
+        const { avgResponse: sAvgResp, avgFirstResponse: sAvgFirst } = calcResponseTimes(sMsgsByConv);
+
+        sectorMetrics = {
+          sectorTotal: sTotal,
+          sectorActive: sectorConvs?.filter(c => c.status === 'active').length || 0,
+          sectorClosed: sClosed,
+          sectorTotalMessages: sAllMsgs.length,
+          sectorSentMessages: sSent,
+          sectorReceivedMessages: sReceived,
+          sectorUniqueContacts: sUniqueContacts,
+          sectorAvgResponseTimeMinutes: sAvgResp,
+          sectorResolutionRate: sTotal > 0 ? (sClosed / sTotal) * 100 : 0,
+          sectorAvgFirstResponseTimeMinutes: sAvgFirst,
+          sectorAvgMessagesPerConversation: sConvIds.length > 0 ? sAllMsgs.length / sConvIds.length : 0,
+          sectorEngagementRate: sSent > 0 ? (sReceived / sSent) * 100 : 0,
+        };
+      }
+
       return {
         total, active, closed, archived,
         avgResponseTimeMinutes: avgResponse,
@@ -226,6 +295,7 @@ export const useWhatsAppMetrics = (filters: WhatsAppMetricsFilters) => {
           avgResponseTimeMinutes: 0, resolutionRate: pTotal > 0 ? (pClosed / pTotal) * 100 : 0,
           avgFirstResponseTimeMinutes: 0,
         },
+        ...sectorMetrics,
       } as WhatsAppMetrics;
     },
     refetchInterval: 60000,
