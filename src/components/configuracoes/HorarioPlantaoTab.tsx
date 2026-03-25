@@ -85,7 +85,7 @@ function useConfigRow() {
         .eq("tenant_id", tid!)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as unknown as Record<string, unknown> | null;
     },
   });
 }
