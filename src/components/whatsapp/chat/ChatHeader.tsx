@@ -81,12 +81,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   // Resolve assigned operator name
   const { data: tenantUsers } = useTenantUsers();
+  const { getSenderLabel } = useSenderMap();
   const assignedOperatorName = useMemo(() => {
     const assignedTo = attendance?.assigned_to;
-    if (!assignedTo || !tenantUsers) return null;
+    if (!assignedTo) return null;
+    const sender = getSenderLabel(assignedTo);
+    if (sender.name) return sender.name;
+    // Fallback to email prefix if no funcionario linked
+    if (!tenantUsers) return null;
     const u = tenantUsers.find((tu) => tu.user_id === assignedTo);
     return u?.email?.split("@")[0] || u?.email || null;
-  }, [attendance?.assigned_to, tenantUsers]);
+  }, [attendance?.assigned_to, getSenderLabel, tenantUsers]);
 
   const effectiveStatus = useMemo(() => {
     if (attendance) {
