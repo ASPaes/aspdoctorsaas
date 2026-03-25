@@ -939,8 +939,65 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
       if (billingSkipResult.skip) {
-        // Billing response detected — create attendance directly in Financeiro, NO URA
-        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
+        // --- AUTO-REPLY DETECTION (within 15s of billing message) ---
+        const AUTO_REPLY_WINDOW_SECONDS = 15;
+        let secondsSinceBilling = Infinity;
+
+        if (billingSkipResult.billingMessageCreatedAt) {
+          const billingTs = new Date(billingSkipResult.billingMessageCreatedAt).getTime();
+          const msgTs = new Date(timestamp).getTime();
+          secondsSinceBilling = Math.max(0, (msgTs - billingTs) / 1000);
+        }
+
+        if (secondsSinceBilling <= AUTO_REPLY_WINDOW_SECONDS) {
+          const autoReplyCheck = isLikelyBillingAutoReply(content);
+
+          if (autoReplyCheck.isAuto) {
+            // AUTO-REPLY DETECTED — do NOT open attendance
+            console.log(`[cobrança][auto-reply] Ignorado atendimento. conv=${conversationId} sec=${secondsSinceBilling.toFixed(1)} reason=${autoReplyCheck.reason}`);
+
+            // Merge audit metadata onto the saved message
+            const autoReplyMeta = {
+              billing_context: true,
+              auto_reply: true,
+              auto_reply_reason: autoReplyCheck.reason,
+              seconds_since_billing: Math.round(secondsSinceBilling),
+            };
+
+            // Try to update the saved message metadata (merge safely)
+            const metaFilter = savedMsg?.id
+              ? { column: 'id', value: savedMsg.id }
+              : { column: 'message_id', value: key.id };
+
+            try {
+              const { data: existingRow } = await supabase
+                .from('whatsapp_messages')
+                .select('metadata')
+                .eq('tenant_id', tenantId)
+                .eq(metaFilter.column, metaFilter.value)
+                .maybeSingle();
+
+              const mergedMeta = { ...(existingRow?.metadata || {}), ...autoReplyMeta };
+
+              await supabase
+                .from('whatsapp_messages')
+                .update({ metadata: mergedMeta })
+                .eq('tenant_id', tenantId)
+                .eq(metaFilter.column, metaFilter.value);
+
+              console.log(`[cobrança][auto-reply] Metadata atualizada na mensagem (${metaFilter.column}=${metaFilter.value})`);
+            } catch (metaErr) {
+              console.error('[cobrança][auto-reply] Erro ao atualizar metadata:', metaErr);
+            }
+
+            // SKIP: do not call ensureAttendanceForBilling, handleUraResponse, or ensureAttendanceForIncomingMessage
+            // Message is already saved, unread_count already incremented, preview already updated.
+            return;
+          }
+        }
+
+        // Not an auto-reply — proceed with normal billing flow: open attendance in Financeiro
+        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min, ${secondsSinceBilling.toFixed(1)}s), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
         ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billingSkipResult.departmentId!, billingSkipResult.clienteId)
           .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
           .catch(err => console.error('[cobrança] Erro ao criar atendimento financeiro:', err));
