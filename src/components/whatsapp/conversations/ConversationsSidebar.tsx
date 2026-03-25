@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,8 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
   const [search, setSearch] = useState(saved?.search ?? "");
   const [showNewModal, setShowNewModal] = useState(false);
-  const [activePill, setActivePillRaw] = useState(saved?.activePill ?? "all");
+  const [activePill, setActivePillRaw] = useState(saved?.activePill ?? "waiting");
+  const [pillAutoSet, setPillAutoSet] = useState(false);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
   const [filters, setFiltersRaw] = useState<FiltersState>({
     sortBy: saved?.sortBy ?? "recent",
@@ -155,6 +156,22 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
     return { inProgress, waiting, closed };
   }, [conversations, attendanceMap, isAdmin, user?.id, selectedDepartmentId, filteredInstanceIds]);
+
+  // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
+  useEffect(() => {
+    if (pillAutoSet) return;
+    if (saved?.activePill) return; // respeita preferência salva
+    if (isLoading) return;
+    if (conversations.length === 0) return;
+
+    const hasInProgress = conversations.some(c => {
+      const att = attendanceMap.get(c.id);
+      return att?.status === "in_progress";
+    });
+
+    setActivePillRaw(hasInProgress ? "in_progress" : "waiting");
+    setPillAutoSet(true);
+  }, [isLoading, conversations, attendanceMap, pillAutoSet, saved?.activePill]);
 
   const filtered = useMemo(() => {
     let result = [...conversations];
