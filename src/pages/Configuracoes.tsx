@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import { InstanceSetupCollapsible } from "@/components/configuracoes/whatsapp/InstanceSetupCollapsible";
 import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList";
@@ -96,6 +96,14 @@ export default function Configuracoes() {
 
   // Auth context for role-based UI
   const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (profile && profile.role !== "admin" && !profile.is_super_admin) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [profile, navigate]);
+
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios"];
