@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters';
 import { useDashboardData } from '@/components/dashboard/hooks/useDashboardData';
@@ -14,9 +15,19 @@ import { DistribuicaoTab } from '@/components/dashboard/tabs/DistribuicaoTab';
 import { CSTab } from '@/components/dashboard/tabs/CSTab';
 import { CohortTab } from '@/components/dashboard/tabs/CohortTab';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
   const { filters, setFilters } = useDashboardFilters();
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+
+  useEffect(() => {
+    if (profile && !isAdmin) {
+      navigate("/whatsapp", { replace: true });
+    }
+  }, [profile, isAdmin, navigate]);
   const [tvMode, setTvMode] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
 
