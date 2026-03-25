@@ -783,11 +783,24 @@ export type Database = {
         Row: {
           billing_skip_ura_enabled: boolean
           billing_skip_ura_minutes: number
+          business_hours: Json
+          business_hours_ai_enabled: boolean
+          business_hours_ai_prompt: string | null
+          business_hours_enabled: boolean
+          business_hours_message: string | null
+          business_hours_timezone: string
           chat_timezone: string
           created_at: string
           custo_fixo_percentual: number
           id: number
           imposto_percentual: number
+          oncall_escalation_window_minutes: number
+          oncall_message_template: string | null
+          oncall_min_customer_messages: number
+          oncall_min_elapsed_seconds: number
+          oncall_phone_number: string | null
+          oncall_repeat_cooldown_minutes: number
+          oncall_urgency_keywords: Json
           support_auto_close_inactivity_minutes: number
           support_config: Json
           support_csat_enabled: boolean
@@ -818,11 +831,24 @@ export type Database = {
         Insert: {
           billing_skip_ura_enabled?: boolean
           billing_skip_ura_minutes?: number
+          business_hours?: Json
+          business_hours_ai_enabled?: boolean
+          business_hours_ai_prompt?: string | null
+          business_hours_enabled?: boolean
+          business_hours_message?: string | null
+          business_hours_timezone?: string
           chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          oncall_escalation_window_minutes?: number
+          oncall_message_template?: string | null
+          oncall_min_customer_messages?: number
+          oncall_min_elapsed_seconds?: number
+          oncall_phone_number?: string | null
+          oncall_repeat_cooldown_minutes?: number
+          oncall_urgency_keywords?: Json
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
           support_csat_enabled?: boolean
@@ -853,11 +879,24 @@ export type Database = {
         Update: {
           billing_skip_ura_enabled?: boolean
           billing_skip_ura_minutes?: number
+          business_hours?: Json
+          business_hours_ai_enabled?: boolean
+          business_hours_ai_prompt?: string | null
+          business_hours_enabled?: boolean
+          business_hours_message?: string | null
+          business_hours_timezone?: string
           chat_timezone?: string
           created_at?: string
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          oncall_escalation_window_minutes?: number
+          oncall_message_template?: string | null
+          oncall_min_customer_messages?: number
+          oncall_min_elapsed_seconds?: number
+          oncall_phone_number?: string | null
+          oncall_repeat_cooldown_minutes?: number
+          oncall_urgency_keywords?: Json
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
           support_csat_enabled?: boolean
