@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AccessInviteInfo {
   email: string;
@@ -29,6 +30,7 @@ export default function Signup() {
   const [accessInvite, setAccessInvite] = useState<AccessInviteInfo | null>(null);
   const [inviteLoading, setInviteLoading] = useState(!!inviteId);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const { refreshProfile } = useAuth();
 
   // Validate access invite on mount
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function Signup() {
           toast.error("Este email já possui conta. Verifique sua senha.");
           return;
         }
+        await refreshProfile();
         toast.success("Bem-vindo!");
         navigate("/dashboard");
         return;
@@ -92,7 +95,6 @@ export default function Signup() {
     }
 
     if (inviteId && signUpData.user) {
-      // Chama RPC para criar o profile e vincular ao tenant
       const { error: acceptError } = await (supabase.rpc as any)(
         "accept_access_invite",
         { p_invite_id: inviteId }
@@ -103,20 +105,7 @@ export default function Signup() {
         setLoading(false);
         return;
       }
-
-      // Aguarda o AuthContext carregar o profile (até 3s)
-      let attempts = 0;
-      while (attempts < 6) {
-        await new Promise((r) => setTimeout(r, 500));
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("user_id, access_status")
-          .eq("user_id", signUpData.user.id)
-          .maybeSingle();
-        if (p?.access_status === "active") break;
-        attempts++;
-      }
-
+      await refreshProfile();
       toast.success("Conta criada com sucesso! Bem-vindo.");
       navigate("/dashboard");
       return;
