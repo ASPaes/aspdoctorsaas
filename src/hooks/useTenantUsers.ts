@@ -18,11 +18,11 @@ export interface TenantInvite {
   id: string;
   email: string;
   role: string;
-  token: string;
-  expires_at: string;
-  used_at: string | null;
-  created_at: string;
+  status: string;
+  invited_at: string;
+  accepted_at: string | null;
   tenant_id: string;
+  funcionario_id: number | null;
 }
 
 export interface TenantInfo {
@@ -72,19 +72,17 @@ export function useTenantUsers() {
 
 export function useTenantInvites() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
   return useQuery<TenantInvite[]>({
     queryKey: ["tenant-invites", tid],
+    enabled: !!tid,
     queryFn: async () => {
-      const { data, error } = await tf(
-        supabase
-          .from("invites")
-          .select("*")
-          .is("used_at", null)
-          .gte("expires_at", new Date().toISOString())
-          .order("created_at", { ascending: false })
-          .limit(50)
-      );
+      const { data, error } = await supabase
+        .from("access_invites")
+        .select("*")
+        .eq("tenant_id", tid!)
+        .eq("status", "pending")
+        .order("invited_at", { ascending: false })
+        .limit(50);
       if (error) throw error;
       return data ?? [];
     },
@@ -139,11 +137,19 @@ export function useCreateInvite() {
   return useMutation({
     mutationFn: async ({ email, role, tenantId }: { email: string; role: string; tenantId: string }) => {
       const normalizedEmail = email.trim().toLowerCase();
-      const token = crypto.randomUUID();
 
-      const { error: invErr } = await supabase
-        .from("invites")
-        .insert({ email: normalizedEmail, role, tenant_id: tenantId, token });
+      const { data, error: invErr } = await supabase
+        .from("access_invites")
+        .insert({
+          email: normalizedEmail,
+          tenant_id: tenantId,
+          funcionario_id: null,
+          invited_by: profile?.user_id,
+          status: "pending",
+          metadata: { role },
+        })
+        .select("id")
+        .single();
       if (invErr) throw invErr;
 
       const { error: auditErr } = await supabase
@@ -156,7 +162,7 @@ export function useCreateInvite() {
         });
       if (auditErr) console.error("Audit error:", auditErr);
 
-      return { token };
+      return { token: data.id };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-invites"] }),
   });
@@ -192,7 +198,7 @@ export function useCancelInvite() {
   return useMutation({
     mutationFn: async (inviteId: string) => {
       const { error } = await supabase
-        .from("invites")
+        .from("access_invites")
         .delete()
         .eq("id", inviteId);
       if (error) throw error;
