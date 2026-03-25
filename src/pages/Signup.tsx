@@ -58,7 +58,6 @@ export default function Signup() {
     e.preventDefault();
     setLoading(true);
 
-    // Tenta criar conta nova
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -71,9 +70,10 @@ export default function Signup() {
     let userId: string | null = null;
 
     if (signUpError) {
-      // Se o usuário já existe, tenta fazer login com a senha fornecida
-      if (signUpError.message.toLowerCase().includes("already registered") || 
-          signUpError.message.toLowerCase().includes("already been registered")) {
+      if (
+        signUpError.message.toLowerCase().includes("already registered") ||
+        signUpError.message.toLowerCase().includes("already been registered")
+      ) {
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -93,20 +93,24 @@ export default function Signup() {
       userId = signUpData.user?.id ?? null;
     }
 
-    // Se veio via convite, vincula ao tenant
     if (inviteId && userId) {
-      const { error: acceptError } = await (supabase.rpc as any)(
-        "accept_access_invite",
-        { p_invite_id: inviteId }
-      );
-      if (acceptError) {
-        console.error("Error accepting access invite:", acceptError);
-        toast.error("Conta acessada, mas houve erro ao vincular o convite. Contate o administrador.");
-        setLoading(false);
-        return;
+      // Aguarda o profile ser criado pelo trigger (até 3 segundos)
+      let attempts = 0;
+      let profileReady = false;
+      while (attempts < 6 && !profileReady) {
+        await new Promise((r) => setTimeout(r, 500));
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("user_id, access_status")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (profileData?.access_status === "active") {
+          profileReady = true;
+        }
+        attempts++;
       }
-      toast.success("Acesso vinculado com sucesso! Bem-vindo.");
-      navigate("/");
+      toast.success("Conta criada com sucesso! Bem-vindo.");
+      navigate("/dashboard");
       return;
     }
 
