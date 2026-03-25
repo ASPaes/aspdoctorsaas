@@ -2588,31 +2588,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-async function processConnectionUpdate(payload: EvolutionWebhookPayload, supabase: any) {
-  try {
-    const { instance, data } = payload;
-    const state = data.state || data.connection;
-
-    console.log('[evolution-webhook] Connection update for:', instance, 'State:', state);
-
-    let status = 'disconnected';
-    if (state === 'open' || state === 'connected') status = 'connected';
-    else if (state === 'connecting') status = 'connecting';
-    else if (state === 'close' || state === 'closed') status = 'disconnected';
-
-    const { error } = await supabase
-      .from('whatsapp_instances')
-      .update({ status })
-      .eq('instance_name', instance);
-
-    if (error) {
-      console.error('[evolution-webhook] Error updating instance status:', error);
-    } else {
-      console.log('[evolution-webhook] Instance status updated to:', status);
-    }
-  } catch (error) {
-    console.error('[evolution-webhook] Error in processConnectionUpdate:', error);
-  }
-}
-
