@@ -78,13 +78,22 @@ export function useTenantInvites() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("access_invites")
-        .select("*")
+        .select("id, email, status, invited_at, accepted_at, tenant_id, funcionario_id, metadata")
         .eq("tenant_id", tid!)
         .eq("status", "pending")
         .order("invited_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).map((row) => ({
+        id: row.id,
+        email: row.email,
+        role: (row.metadata as any)?.role ?? "viewer",
+        status: row.status,
+        invited_at: row.invited_at,
+        accepted_at: row.accepted_at,
+        tenant_id: row.tenant_id,
+        funcionario_id: row.funcionario_id,
+      })) as TenantInvite[];
     },
   });
 }
