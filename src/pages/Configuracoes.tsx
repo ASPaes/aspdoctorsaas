@@ -107,7 +107,7 @@ export default function Configuracoes() {
 
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
-  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios"];
+  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios", "horario-plantao"];
   const rawTab = searchParams.get("tab") || "percentuais";
   const defaultTab = (!isAdmin && ADMIN_ONLY_TABS.includes(rawTab)) ? "percentuais" : rawTab;
 
