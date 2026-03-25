@@ -955,7 +955,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
       // 3. FETCH CONFIG + BUSINESS HOURS CHECK
       const supportConfig = await getSupportConfig(supabase, tenantId);
-      const bhResult = checkBusinessHours(supportConfig);
+      const bhResult = await checkBusinessHours(supportConfig, supabase, tenantId);
 
       // 4. OFF-HOURS AUTOMATIONS — fire-and-forget, never block the normal flow
       if (!bhResult.inside && supportConfig.business_hours_enabled) {
@@ -1074,11 +1074,15 @@ function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
  * Check if the current moment is inside business hours for the tenant.
  * Returns { inside: boolean, todaySchedule } with the active day's schedule.
  */
-function checkBusinessHours(config: SupportConfig): {
+async function checkBusinessHours(
+  config: SupportConfig,
+  supabase: any,
+  tenantId: string
+): Promise<{
   inside: boolean;
   todayStart: string | null;
   todayEnd: string | null;
-} {
+}> {
   if (!config.business_hours_enabled) {
     return { inside: true, todayStart: null, todayEnd: null };
   }
@@ -1086,7 +1090,7 @@ function checkBusinessHours(config: SupportConfig): {
   const tz = config.business_hours_timezone || 'America/Sao_Paulo';
   const now = new Date();
 
-  // Get day-of-week in the configured timezone
+  // Get day-of-week and current time in the configured timezone
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     weekday: 'short',
@@ -1100,6 +1104,29 @@ function checkBusinessHours(config: SupportConfig): {
   const minute = parts.find(p => p.type === 'minute')?.value || '00';
   const currentTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
 
+  // Compute today's date string (YYYY-MM-DD) in the configured timezone
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
+  const todayStr = dateFormatter.format(now);
+
+  // --- Exception check: holidays / collective leave ---
+  try {
+    const { data: exception } = await supabase
+      .from('business_hours_exceptions')
+      .select('id, name, type')
+      .eq('tenant_id', tenantId)
+      .eq('date', todayStr)
+      .eq('is_closed', true)
+      .maybeSingle();
+
+    if (exception) {
+      console.log(`[business-hours] inside=false tz=${tz} date=${todayStr} EXCEPTION type=${exception.type} name=${exception.name || '(sem nome)'}`);
+      return { inside: false, todayStart: null, todayEnd: null };
+    }
+  } catch (err) {
+    console.error('[business-hours] Error querying exceptions, proceeding with normal schedule:', err);
+  }
+
+  // --- Normal slot-based logic ---
   const dayMap: Record<string, string> = {
     mon: 'mon', tue: 'tue', wed: 'wed', thu: 'thu', fri: 'fri', sat: 'sat', sun: 'sun',
   };
