@@ -18,10 +18,14 @@ import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
 import { normalizeBRPhone, formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
 
 // ─── Types ───────────────────────────────────────────────────────
-interface DaySchedule {
-  active: boolean;
+interface TimeSlot {
   start: string;
   end: string;
+}
+
+interface DaySchedule {
+  active: boolean;
+  slots: TimeSlot[];
 }
 
 type BusinessHours = Record<string, DaySchedule>;
@@ -32,7 +36,8 @@ const DAY_LABELS: Record<string, string> = {
   fri: "Sexta", sat: "Sábado", sun: "Domingo",
 };
 
-const DEFAULT_DAY: DaySchedule = { active: false, start: "08:00", end: "18:00" };
+const DEFAULT_SLOT: TimeSlot = { start: "08:00", end: "18:00" };
+const DEFAULT_DAY: DaySchedule = { active: false, slots: [{ ...DEFAULT_SLOT }] };
 
 const TIMEZONES = [
   "America/Sao_Paulo", "America/Manaus", "America/Belem", "America/Bahia",
@@ -41,6 +46,7 @@ const TIMEZONES = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────
+/** Parse business_hours JSON with backward compat for old {start,end,active} format */
 function parseBusinessHours(raw: unknown): BusinessHours {
   const obj = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
   const result: BusinessHours = {};
@@ -48,13 +54,22 @@ function parseBusinessHours(raw: unknown): BusinessHours {
     const day = obj[key];
     if (day && typeof day === "object") {
       const d = day as Record<string, unknown>;
-      result[key] = {
-        active: !!d.active,
-        start: typeof d.start === "string" ? d.start : "08:00",
-        end: typeof d.end === "string" ? d.end : "18:00",
-      };
+      const active = !!d.active;
+      // New format with slots array
+      if (Array.isArray(d.slots) && d.slots.length > 0) {
+        const slots = (d.slots as Record<string, unknown>[]).map((s) => ({
+          start: typeof s.start === "string" ? s.start : "08:00",
+          end: typeof s.end === "string" ? s.end : "18:00",
+        }));
+        result[key] = { active, slots };
+      } else if (typeof d.start === "string" && typeof d.end === "string") {
+        // Backward compat: old {start, end, active} format → convert to slots
+        result[key] = { active, slots: [{ start: d.start, end: d.end }] };
+      } else {
+        result[key] = { active, slots: [{ ...DEFAULT_SLOT }] };
+      }
     } else {
-      result[key] = { ...DEFAULT_DAY };
+      result[key] = { active: false, slots: [{ ...DEFAULT_SLOT }] };
     }
   }
   return result;
