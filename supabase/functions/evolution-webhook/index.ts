@@ -924,12 +924,77 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         contactName: pushName || phone,
       };
 
+      // =====================================================================
+      // AUTO-REPLY FILTER (runs BEFORE CSAT / billing / URA / attendance)
+      // Blocks attendance creation for WhatsApp Business auto-replies
+      // received shortly after a billing automation message (cobrança).
+      // The message is already saved and preview/unread updated above.
+      //
+      // Manual test plan:
+      // 1) Send cobrança via N8N → saved with metadata.source='billing_automation' kind='cobranca'
+      // 2) Client auto-reply in < 30s → message appears in chat, NO support_attendances created
+      // 3) Client real message "quero negociar" after 30s → opens Financeiro attendance
+      // 4) Client message after 2h → normal URA flow
+      // =====================================================================
+      {
+        const lastBillingAt = await getLastBillingMessageAt(supabase, conversationId, tenantId);
+        if (lastBillingAt) {
+          const supportConfigEarly = await getSupportConfig(supabase, tenantId);
+          const ignoreSeconds = (supportConfigEarly as any).billing_auto_reply_ignore_seconds ?? 30;
+          const msgTs = new Date(timestamp).getTime();
+          const secondsSinceBilling = Math.max(0, (msgTs - lastBillingAt.getTime()) / 1000);
+
+          if (secondsSinceBilling <= ignoreSeconds) {
+            const isAutoReply = isLikelyBusinessAutoReplyPTBR(content);
+
+            if (isAutoReply) {
+              console.log(`[cobranca][auto-reply] Ignorado: auto-resposta detectada em ${secondsSinceBilling.toFixed(1)}s após cobrança. conv=${conversationId} phone=${phone}`);
+
+              // Merge audit metadata onto the saved message
+              const autoReplyMeta = {
+                billing_context: true,
+                auto_reply: true,
+                auto_reply_reason: 'business_auto_reply_ptbr',
+                seconds_since_billing: Math.round(secondsSinceBilling),
+              };
+
+              const metaFilter = savedMsg?.id
+                ? { column: 'id', value: savedMsg.id }
+                : { column: 'message_id', value: key.id };
+
+              try {
+                const { data: existingRow } = await supabase
+                  .from('whatsapp_messages')
+                  .select('metadata')
+                  .eq('tenant_id', tenantId)
+                  .eq(metaFilter.column, metaFilter.value)
+                  .maybeSingle();
+
+                const mergedMeta = { ...(existingRow?.metadata || {}), ...autoReplyMeta };
+
+                await supabase
+                  .from('whatsapp_messages')
+                  .update({ metadata: mergedMeta })
+                  .eq('tenant_id', tenantId)
+                  .eq(metaFilter.column, metaFilter.value);
+              } catch (metaErr) {
+                console.error('[cobranca][auto-reply] Erro ao atualizar metadata:', metaErr);
+              }
+
+              // Return early — NO attendance, NO URA, NO CSAT, NO conversation reopen
+              return;
+            } else {
+              console.log(`[cobranca][auto-reply] Não ignorado (human/finance signals ou conteúdo não bate). conv=${conversationId} sec=${secondsSinceBilling.toFixed(1)}`);
+            }
+          }
+        }
+      }
+
       // --- CSAT: check if there's a pending CSAT survey for this conversation ---
       const csatHandled = await handleCsatResponse(
         supabase, instanceCtx, conversationId, tenantId, content
       );
       if (csatHandled) {
-        // CSAT consumed the message — don't create attendance or reopen
         console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
         return;
       }
@@ -939,65 +1004,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
 
       if (billingSkipResult.skip) {
-        // --- AUTO-REPLY DETECTION (within 15s of billing message) ---
-        const AUTO_REPLY_WINDOW_SECONDS = 15;
-        let secondsSinceBilling = Infinity;
-
-        if (billingSkipResult.billingMessageCreatedAt) {
-          const billingTs = new Date(billingSkipResult.billingMessageCreatedAt).getTime();
-          const msgTs = new Date(timestamp).getTime();
-          secondsSinceBilling = Math.max(0, (msgTs - billingTs) / 1000);
-        }
-
-        if (secondsSinceBilling <= AUTO_REPLY_WINDOW_SECONDS) {
-          const autoReplyCheck = isLikelyBillingAutoReply(content);
-
-          if (autoReplyCheck.isAuto) {
-            // AUTO-REPLY DETECTED — do NOT open attendance
-            console.log(`[cobrança][auto-reply] Ignorado atendimento. conv=${conversationId} sec=${secondsSinceBilling.toFixed(1)} reason=${autoReplyCheck.reason}`);
-
-            // Merge audit metadata onto the saved message
-            const autoReplyMeta = {
-              billing_context: true,
-              auto_reply: true,
-              auto_reply_reason: autoReplyCheck.reason,
-              seconds_since_billing: Math.round(secondsSinceBilling),
-            };
-
-            // Try to update the saved message metadata (merge safely)
-            const metaFilter = savedMsg?.id
-              ? { column: 'id', value: savedMsg.id }
-              : { column: 'message_id', value: key.id };
-
-            try {
-              const { data: existingRow } = await supabase
-                .from('whatsapp_messages')
-                .select('metadata')
-                .eq('tenant_id', tenantId)
-                .eq(metaFilter.column, metaFilter.value)
-                .maybeSingle();
-
-              const mergedMeta = { ...(existingRow?.metadata || {}), ...autoReplyMeta };
-
-              await supabase
-                .from('whatsapp_messages')
-                .update({ metadata: mergedMeta })
-                .eq('tenant_id', tenantId)
-                .eq(metaFilter.column, metaFilter.value);
-
-              console.log(`[cobrança][auto-reply] Metadata atualizada na mensagem (${metaFilter.column}=${metaFilter.value})`);
-            } catch (metaErr) {
-              console.error('[cobrança][auto-reply] Erro ao atualizar metadata:', metaErr);
-            }
-
-            // SKIP: do not call ensureAttendanceForBilling, handleUraResponse, or ensureAttendanceForIncomingMessage
-            // Message is already saved, unread_count already incremented, preview already updated.
-            return;
-          }
-        }
-
-        // Not an auto-reply — proceed with normal billing flow: open attendance in Financeiro
-        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min, ${secondsSinceBilling.toFixed(1)}s), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
+        // Real customer response within billing window — open Financeiro attendance (skip URA)
+        console.log(`[cobrança] Resposta do cliente dentro da janela (${billingSkipResult.minutesAgo?.toFixed(1)} min), URA ignorada e atendimento aberto no Financeiro. conv=${conversationId}`);
         ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billingSkipResult.departmentId!, billingSkipResult.clienteId)
           .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
           .catch(err => console.error('[cobrança] Erro ao criar atendimento financeiro:', err));
@@ -1016,17 +1024,13 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         );
 
         if (uraHandled) {
-          // URA consumed the message — just increment counter, skip attendance creation
-          // NOTE: If URA closed the attendance (option 0), do NOT reopen the conversation
           incrementAttendanceCounter(supabase, conversationId, 'customer')
             .catch(err => console.error('[evolution-webhook] increment error:', err));
         } else {
-          // Normal flow: ensure attendance exists (reopen/new/ignore goodbye) then increment counter
           ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
             .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
             .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
 
-          // Also reopen the conversation visually if it was closed (only for non-URA messages)
           supabase
             .from('whatsapp_conversations')
             .update({ status: 'active', updated_at: new Date().toISOString() })
@@ -1039,7 +1043,6 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       }
     } else {
       // Operator message sent via Evolution (e.g. from phone)
-      // If no active attendance, create new one assigned to this operator
       ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
         .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
         .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
@@ -1051,81 +1054,10 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
 const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
-// =====================================================================
-// BILLING AUTO-REPLY DETECTION
-// =====================================================================
-
-/** Normalize text for pattern matching: lowercase, strip accents, trim */
-function normalizeForMatch(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-
-/**
- * Detect if a message is likely a WhatsApp Business auto-reply
- * (e.g. welcome message, out-of-hours notice).
- * Returns { isAuto: true, reason } if detected, { isAuto: false } otherwise.
- *
- * Anti-false-positive: messages containing "?" or billing/negotiation keywords
- * are NEVER considered auto-replies.
- */
-function isLikelyBillingAutoReply(text: string): { isAuto: boolean; reason?: string } {
-  const n = normalizeForMatch(text);
-
-  // Anti-false-positive: interrogation → real question, not auto-reply
-  if (n.includes('?')) {
-    return { isAuto: false };
-  }
-
-  // Anti-false-positive: billing/negotiation keywords → real customer response
-  const billingKeywords = [
-    'boleto', 'pix', 'pagar', 'pagamento', 'valor', 'vencimento',
-    'linha digitavel', 'comprovante', 'atraso', 'negociar', 'parcelar',
-  ];
-  if (billingKeywords.some(kw => n.includes(kw))) {
-    return { isAuto: false };
-  }
-
-  // Pattern detection (PT-BR business auto-replies)
-  if (n.includes('agradece') && n.includes('contato')) {
-    return { isAuto: true, reason: 'business_welcome_thanks' };
-  }
-  if (n.includes('assim que possivel') && (n.includes('retornar') || n.includes('responder'))) {
-    return { isAuto: true, reason: 'business_will_return' };
-  }
-  if (n.includes('horario') && (n.includes('atendimento') || n.includes('funcionamento'))) {
-    return { isAuto: true, reason: 'business_welcome_hours' };
-  }
-  if (n.includes('segunda a sexta') || n.includes('sabado') || n.includes('domingo')) {
-    return { isAuto: true, reason: 'business_schedule_days' };
-  }
-  if (n.includes('mensagem automatica') || n.includes('resposta automatica') || (n.includes('auto') && n.includes('reply'))) {
-    return { isAuto: true, reason: 'explicit_auto_reply' };
-  }
-  if (n.includes('fora do horario') || n.includes('em breve retornaremos')) {
-    return { isAuto: true, reason: 'out_of_hours' };
-  }
-
-  return { isAuto: false };
-}
-
-/**
- * Ensure a support_attendance exists for an incoming customer message.
- * Rules:
- * 1.1) If last closed attendance <= X min AND NOT inactive_closed: REOPEN same (waiting)
- *      - Preserve history: keep closed_at/closed_by/closed_reason
- *      - Set reopened_at=now(), reopened_from='customer'
- * 1.2) If > X min OR inactive_closed OR no previous: CREATE NEW (waiting, created_from='customer')
- * 1.3) If message is goodbye within Y min of close: IGNORE (no reopen/new)
- * If active attendance exists: just skip (counter incremented separately)
- */
 interface InstanceContext {
   apiUrl: string;
   apiKey: string;
-  instanceName: string; // Evolution identifier (instance_name or external id)
+  instanceName: string;
   providerType: string;
   remoteJid: string;
   contactName: string;
@@ -1142,14 +1074,12 @@ async function sendUraWelcome(
   attendanceCode?: string
 ): Promise<void> {
   try {
-    // Use new department-based URA (ura_enabled) with fallback to legacy (support_ura_enabled)
     const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
     if (!uraEnabled) {
       console.log('[ura] URA disabled, skipping welcome message');
       return;
     }
 
-    // Fetch URA-visible departments using ura_option_number for stable ordering
     const { data: departments } = await supabase
       .from('support_departments')
       .select('id, name, default_instance_id, ura_option_number, ura_label, show_in_ura')
@@ -1159,29 +1089,24 @@ async function sendUraWelcome(
       .not('ura_option_number', 'is', null)
       .order('ura_option_number');
 
-    // Build welcome message using ura_welcome_template (new) or support_ura_welcome_template (legacy)
     const customerName = instanceCtx.contactName || '';
     const template = supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '';
     let welcomeText = template
       .replace(/\{\{customer_name\}\}/g, customerName)
       .trim();
 
-    // Prepend attendance code header if available
     const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
 
     let fullMessage: string;
     if (departments && departments.length > 0 && welcomeText.includes('{options}')) {
-      // Template has {options} placeholder — inject department list using ura_option_number
       const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
       fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}`;
       fullMessage += '\n0. Encerrar atendimento';
     } else {
-      // Template already contains its own options or no departments — send as-is
       fullMessage = `${codeHeader}${welcomeText}`;
       console.log('[ura] Sending template as-is (no {options} placeholder or no departments)');
     }
 
-    // Send via Evolution API
     const sent = await sendEvolutionText(instanceCtx, fullMessage);
     if (!sent.ok) {
       console.error('[ura] Evolution API error sending URA welcome:', sent.error);
@@ -1191,7 +1116,6 @@ async function sendUraWelcome(
     const messageId = sent.messageId || `ura_${Date.now()}`;
     const nowIso = new Date().toISOString();
 
-    // Persist URA message in whatsapp_messages
     await supabase
       .from('whatsapp_messages')
       .insert({
@@ -1207,7 +1131,6 @@ async function sendUraWelcome(
         metadata: { ura: true },
       });
 
-    // Update conversation preview
     await supabase
       .from('whatsapp_conversations')
       .update({
@@ -1217,7 +1140,6 @@ async function sendUraWelcome(
       })
       .eq('id', conversationId);
 
-    // Mark attendance as URA pending (new state machine)
     await supabase
       .from('support_attendances')
       .update({
@@ -1234,9 +1156,6 @@ async function sendUraWelcome(
   }
 }
 
-/**
- * Helper to send a text message via Evolution API.
- */
 async function sendEvolutionText(
   ctx: InstanceContext,
   text: string
@@ -1268,8 +1187,6 @@ async function sendEvolutionText(
   return { ok: true, messageId: data.key?.id };
 }
 
-// --- Message pools for natural, varied responses ---
-
 const INVALID_OPTION_MESSAGES = [
   'Hmm, não consegui entender sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
   'Opa, não identifiquei a opção escolhida. Poderia enviar só o número correspondente? 🙏',
@@ -1295,12 +1212,11 @@ const HUMAN_INTENT_AFTER_RETRIES_MESSAGES = [
   'Tudo bem! Vou direcionar você para um atendente que pode te ajudar melhor. Aguarde!',
 ];
 
-/** Simple human-intent detector — checks for common phrases indicating desire to talk to a person */
 function detectsHumanIntent(text: string): boolean {
   const normalized = text
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // strip accents
+    .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
   const patterns = [
@@ -1315,22 +1231,10 @@ function detectsHumanIntent(text: string): boolean {
   return patterns.some(p => p.test(normalized));
 }
 
-/** Pick a random message from a pool */
 function pickRandom(pool: string[]): string {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-/**
- * Handle CSAT (Customer Satisfaction) response flow.
- * Checks if there's a pending CSAT survey for the conversation's closed attendance.
- * Returns true if the message was consumed by CSAT logic.
- *
- * Flow:
- * 1. Find pending CSAT where status='pending' (waiting for score)
- * 2. If score is valid → save, send thanks, optionally ask for reason
- * 3. If status='awaiting_reason' → save reason, close CSAT
- * 4. If CSAT has timed out → mark as expired, don't consume message
- */
 async function handleCsatResponse(
   supabase: any,
   instanceCtx: InstanceContext,
@@ -1339,7 +1243,6 @@ async function handleCsatResponse(
   messageContent: string
 ): Promise<boolean> {
   try {
-    // Find the attendance linked to this conversation that was recently closed
     const { data: closedAtt } = await supabase
       .from('support_attendances')
       .select('id')
@@ -1352,7 +1255,6 @@ async function handleCsatResponse(
 
     if (!closedAtt) return false;
 
-    // Find pending/awaiting_reason CSAT for this attendance
     const { data: csat } = await supabase
       .from('support_csat')
       .select('id, status, asked_at, score')
@@ -1363,30 +1265,25 @@ async function handleCsatResponse(
 
     if (!csat) return false;
 
-    // Get config for timeout and thresholds
     const supportConfig = await getSupportConfig(supabase, tenantId);
 
-    // Check timeout
     const askedAt = new Date(csat.asked_at);
     const now = new Date();
     const elapsedMinutes = (now.getTime() - askedAt.getTime()) / (1000 * 60);
 
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
-      // Expired — mark as expired
       await supabase
         .from('support_csat')
         .update({ status: 'expired', responded_at: new Date().toISOString() })
         .eq('id', csat.id);
       console.log(`[csat] CSAT expired (reactive) for att=${closedAtt.id} (${elapsedMinutes.toFixed(1)} min > ${supportConfig.support_csat_timeout_minutes} min)`);
 
-      // Send friendly timeout message
       const friendlyMsg = 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊';
       await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, friendlyMsg, {
         csat: true,
         csat_timeout: true,
       });
 
-      // Send deferred closure message
       await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
 
       return false;
@@ -1394,20 +1291,17 @@ async function handleCsatResponse(
 
     const trimmed = (messageContent || '').trim();
 
-    // --- Status: pending (waiting for score) ---
     if (csat.status === 'pending') {
       const scoreNum = parseInt(trimmed, 10);
       const minScore = supportConfig.support_csat_score_min;
       const maxScore = supportConfig.support_csat_score_max;
 
       if (isNaN(scoreNum) || scoreNum < minScore || scoreNum > maxScore) {
-        // Invalid score — send a gentle reminder and consume
         const reminder = `Por favor, envie apenas um número de ${minScore} a ${maxScore}.`;
         await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, reminder, { csat: true });
         return true;
       }
 
-      // Valid score — save it
       const nowIso = now.toISOString();
       const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
       const newStatus = needsReason ? 'awaiting_reason' : 'completed';
@@ -1423,42 +1317,33 @@ async function handleCsatResponse(
 
       console.log(`[csat] Score ${scoreNum} saved for att=${closedAtt.id} csat=${csat.id} -> ${newStatus}`);
 
-      // Send thanks message
-      const thanksTemplate = supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.';
-      await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, thanksTemplate, { csat: true, csat_thanks: true });
-
-      // If low score, ask for reason
       if (needsReason) {
-        const reasonTemplate = supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?';
-        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, reasonTemplate, { csat: true, csat_reason_prompt: true });
+        const reasonPrompt = supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?';
+        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, reasonPrompt, { csat: true });
       } else {
-        // High score — CSAT completed, send deferred closure message
+        const thanksMsg = supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.';
+        await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, thanksMsg, { csat: true });
         await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
       }
 
       return true;
     }
 
-    // --- Status: awaiting_reason ---
     if (csat.status === 'awaiting_reason') {
+      const nowIso = now.toISOString();
       await supabase
         .from('support_csat')
         .update({
           reason: trimmed,
           status: 'completed',
+          responded_at: nowIso,
         })
         .eq('id', csat.id);
 
       console.log(`[csat] Reason saved for csat=${csat.id}: "${trimmed.substring(0, 50)}"`);
 
-      // Send a final acknowledgment
-      await sendAndPersistAutoMessage(
-        supabase, instanceCtx, conversationId, tenantId,
-        'Obrigado pelo feedback! Vamos usar sua opinião para melhorar nosso atendimento. 🙏',
-        { csat: true, csat_reason_ack: true }
-      );
-
-      // Reason collected — CSAT completed, send deferred closure message
+      const thanksMsg = supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.';
+      await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, thanksMsg, { csat: true });
       await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
 
       return true;
@@ -1471,10 +1356,6 @@ async function handleCsatResponse(
   }
 }
 
-/**
- * Send the deferred closure message after CSAT flow completes or expires.
- * Inserts a system message in the timeline and sends a WhatsApp message to the customer.
- */
 async function sendDeferredClosureMessage(
   supabase: any,
   instanceCtx: InstanceContext,
@@ -1483,21 +1364,14 @@ async function sendDeferredClosureMessage(
   attendanceId: string
 ): Promise<void> {
   try {
-    // Get attendance_code
     const { data: att } = await supabase
       .from('support_attendances')
       .select('attendance_code')
       .eq('id', attendanceId)
       .single();
 
-    if (!att?.attendance_code) {
-      console.error(`[csat] Could not find attendance_code for att=${attendanceId}`);
-      return;
-    }
+    const code = att?.attendance_code || '';
 
-    const code = att.attendance_code;
-
-    // Send closure message to customer via WhatsApp
     const closureText = `✅ Atendimento *${code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
     await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, closureText, {
       system: true,
@@ -1512,10 +1386,6 @@ async function sendDeferredClosureMessage(
   }
 }
 
-/**
- * Handle an incoming customer message when the attendance is waiting + URA active.
- * Returns true if the message was consumed (URA response, waiting ack, human intent, etc.).
- */
 async function handleUraResponse(
   supabase: any,
   instanceCtx: InstanceContext,
@@ -1524,11 +1394,9 @@ async function handleUraResponse(
   messageContent: string,
   supportConfig: any
 ): Promise<boolean> {
-  // Use new department-based URA with fallback to legacy
   const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
   if (!uraEnabled) return false;
 
-  // Find active waiting attendance with URA pending state
   const { data: att } = await supabase
     .from('support_attendances')
     .select('id, attendance_code, ura_sent_at, ura_state, ura_asked_at, department_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to')
@@ -1539,13 +1407,9 @@ async function handleUraResponse(
 
   if (!att) return false;
 
-  // Only intercept if URA is pending (sent and waiting for response)
-  // Also handle legacy: ura_sent_at set but ura_state still 'none'
   const isUraPending = att.ura_state === 'pending' || (att.ura_sent_at && att.ura_state === 'none');
   if (!isUraPending && att.ura_state !== 'pending') {
-    // URA already completed or not started — check if department already assigned
     if (att.department_id || att.ura_option_selected !== null) {
-      // Already routed, just waiting for agent
       if (!att.assigned_to) {
         await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
         return true;
@@ -1554,22 +1418,18 @@ async function handleUraResponse(
     return false;
   }
 
-  // If already assigned to an agent, don't intercept — let normal chat flow handle it
   if (att.assigned_to) return false;
 
-  // If already fell back to human, send "waiting for agent" message
   if (att.ura_human_fallback) {
     await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
     return true;
   }
 
-  // If department already selected (valid URA choice made), send "waiting" message
   if (att.department_id || att.ura_option_selected !== null) {
     await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(WAITING_AGENT_MESSAGES));
     return true;
   }
 
-  // --- Check URA timeout ---
   const uraTimeoutMinutes = supportConfig.ura_timeout_minutes ?? 2;
   if (att.ura_asked_at) {
     const askedAt = new Date(att.ura_asked_at);
@@ -1577,26 +1437,21 @@ async function handleUraResponse(
     const elapsedMinutes = (now.getTime() - askedAt.getTime()) / (1000 * 60);
     if (elapsedMinutes > uraTimeoutMinutes) {
       console.log(`[ura] URA timed out (${elapsedMinutes.toFixed(1)} min > ${uraTimeoutMinutes} min) conv=${conversationId}`);
-      // Assign to default department
       await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig);
-      // Don't consume — let the message flow into normal attendance handling
       return false;
     }
   }
 
   const trimmed = (messageContent || '').trim();
 
-  // --- 1. Detect human intent ---
   if (detectsHumanIntent(trimmed)) {
     console.log(`[ura] Human intent detected: "${trimmed}" conv=${conversationId}`);
     await markHumanFallback(supabase, att.id);
-    // Assign default department for human fallback
     await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig);
     await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, pickRandom(HUMAN_FALLBACK_MESSAGES));
     return true;
   }
 
-  // --- 2. Validate numeric option using support_departments with ura_option_number ---
   const { data: departments } = await supabase
     .from('support_departments')
     .select('id, name, default_instance_id, ura_option_number, ura_label, show_in_ura')
@@ -1609,7 +1464,6 @@ async function handleUraResponse(
   const hasDepartments = departments && departments.length > 0;
   const optionNumber = parseInt(trimmed, 10);
 
-  // Build a map of ura_option_number -> department for quick lookup
   const deptByNumber = new Map<number, any>();
   if (hasDepartments) {
     for (const d of departments) {
@@ -1617,21 +1471,17 @@ async function handleUraResponse(
     }
   }
 
-  // Valid numbers: 0 (close) or any ura_option_number that exists
   const isValidOption = !isNaN(optionNumber) && (optionNumber === 0 || deptByNumber.has(optionNumber));
 
-  // Invalid option
   if (!isValidOption) {
     const currentInvalid = (att.ura_invalid_count || 0) + 1;
     console.log(`[ura] Invalid option: "${trimmed}" (attempt ${currentInvalid}/4) conv=${conversationId}`);
 
-    // Update counter
     await supabase
       .from('support_attendances')
       .update({ ura_invalid_count: currentInvalid, updated_at: new Date().toISOString() })
       .eq('id', att.id);
 
-    // After 4 invalid attempts, fallback to human + default department
     if (currentInvalid >= 4) {
       console.log(`[ura] Max retries reached (${currentInvalid}), fallback to human conv=${conversationId}`);
       await markHumanFallback(supabase, att.id);
@@ -1640,7 +1490,6 @@ async function handleUraResponse(
       return true;
     }
 
-    // Send varied invalid message — use template with {options} replacement using ura_option_number
     const invalidTemplate = supportConfig.support_ura_invalid_option_template || supportConfig.ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
     let invalidMsg = invalidTemplate;
     if (hasDepartments && invalidMsg.includes('{options}')) {
@@ -1655,7 +1504,6 @@ async function handleUraResponse(
     return true;
   }
 
-  // Option 0 = close attendance AND conversation
   if (optionNumber === 0) {
     const nowIso = new Date().toISOString();
     await supabase
@@ -1679,7 +1527,6 @@ async function handleUraResponse(
     return true;
   }
 
-  // Valid option — assign department + route instance
   const nowIso = new Date().toISOString();
   const selectedDept = hasDepartments ? deptByNumber.get(optionNumber) : null;
   const deptName = selectedDept ? (selectedDept.ura_label || selectedDept.name) : `Opção ${optionNumber}`;
@@ -1700,7 +1547,6 @@ async function handleUraResponse(
     .update(updatePayload)
     .eq('id', att.id);
 
-  // Route conversation to department: set department_id ONLY (instance stays sticky)
   if (selectedDept) {
     await supabase
       .from('whatsapp_conversations')
@@ -1724,10 +1570,6 @@ async function handleUraResponse(
   return true;
 }
 
-/**
- * Assign the default department (from config) to an attendance + conversation.
- * Used on URA timeout and human fallback.
- */
 async function assignDefaultDepartment(
   supabase: any,
   attendanceId: string,
@@ -1751,7 +1593,6 @@ async function assignDefaultDepartment(
   if (defaultDeptId) {
     attUpdate.department_id = defaultDeptId;
     convUpdate.department_id = defaultDeptId;
-    // NOTE: current_instance_id is NOT changed here — instance stays sticky
 
     const { data: dept } = await supabase
       .from('support_departments')
@@ -1768,7 +1609,6 @@ async function assignDefaultDepartment(
   await supabase.from('whatsapp_conversations').update(convUpdate).eq('id', conversationId);
 }
 
-/** Mark attendance as human-fallback: ready for human queue without URA completion */
 async function markHumanFallback(supabase: any, attendanceId: string): Promise<void> {
   const nowIso = new Date().toISOString();
   await supabase
@@ -1780,7 +1620,6 @@ async function markHumanFallback(supabase: any, attendanceId: string): Promise<v
     .eq('id', attendanceId);
 }
 
-/** Send a text message via Evolution API and persist it in whatsapp_messages + update conversation preview */
 async function sendAndPersistAutoMessage(
   supabase: any,
   instanceCtx: InstanceContext,
@@ -1814,11 +1653,6 @@ async function sendAndPersistAutoMessage(
   }).eq('id', conversationId);
 }
 
-/**
- * Insert a local-only system message into the chat history (NOT sent to WhatsApp).
- * Used for attendance lifecycle events (opened, closed, reopened).
- * Uses attendance_id in message_id to guarantee idempotency via unique constraint.
- */
 async function insertAttendanceSystemMessage(
   supabase: any,
   conversationId: string,
@@ -1856,13 +1690,9 @@ async function insertAttendanceSystemMessage(
   }
 }
 
-/**
- * Extract the highest numbered option from a URA template string.
- * E.g. "1 - Suporte\n2 - Financeiro\n0 - Encerrar" → 2 (ignores 0)
- */
 function extractMaxOptionFromTemplate(template: string): number {
   const matches = template.match(/^(\d+)\s*[-–.]/gm);
-  if (!matches) return 5; // fallback
+  if (!matches) return 5;
   let max = 0;
   for (const m of matches) {
     const n = parseInt(m, 10);
@@ -1880,7 +1710,6 @@ async function ensureAttendanceForIncomingMessage(
   instanceCtx?: InstanceContext
 ): Promise<void> {
   try {
-    // 1. Check for any active (non-closed) attendance
     const { data: activeAttendance } = await supabase
       .from('support_attendances')
       .select('id, status')
@@ -1894,13 +1723,10 @@ async function ensureAttendanceForIncomingMessage(
       return;
     }
 
-    // 2. Get config from dedicated columns (falls back to DB defaults)
     const supportConfig = await getSupportConfig(supabase, tenantId);
     const reopenWindowMinutes = supportConfig.support_reopen_window_minutes;
-    // Ignore goodbye window = half of reopen window (capped at 3 min) for backward compat
     const ignoreGoodbyeMinutes = Math.min(Math.floor(reopenWindowMinutes / 2), 3);
 
-    // 3. Find last closed attendance (both 'closed' and 'inactive_closed')
     const { data: lastClosed } = await supabase
       .from('support_attendances')
       .select('id, closed_at, status, closed_reason')
@@ -1915,7 +1741,6 @@ async function ensureAttendanceForIncomingMessage(
     const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
     const diffMinutes = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
 
-    // 1.3) Goodbye exception: if within ignore window and message is goodbye, skip
     if (messageContent && closedAt && diffMinutes <= ignoreGoodbyeMinutes) {
       const trimmed = (messageContent || '').trim();
       if (GOODBYE_PATTERNS.test(trimmed)) {
@@ -1924,10 +1749,7 @@ async function ensureAttendanceForIncomingMessage(
       }
     }
 
-    // 1.1) Within reopen window AND status is 'closed' (NOT inactive_closed): reopen same
-    //      STICKY: assign back to the last operator so it goes straight to "in_progress"
     if (lastClosed && diffMinutes <= reopenWindowMinutes && lastClosed.status === 'closed') {
-      // Fetch the last operator (assigned_to) from the closed attendance
       const { data: closedFull } = await supabase
         .from('support_attendances')
         .select('assigned_to, attendance_code')
@@ -1937,36 +1759,32 @@ async function ensureAttendanceForIncomingMessage(
       const lastOperator = closedFull?.assigned_to ?? null;
       const attCode = closedFull?.attendance_code ?? '';
 
-      // Reopen: sticky to last operator → in_progress; if no operator → waiting (queue)
-      const { error: reopenErr } = await supabase
+      const reopenUpdate: Record<string, any> = {
+        status: 'waiting',
+        reopened_at: nowIso,
+        reopened_from: 'customer',
+        updated_at: nowIso,
+      };
+
+      if (lastOperator) {
+        reopenUpdate.status = 'in_progress';
+        reopenUpdate.assigned_to = lastOperator;
+        reopenUpdate.assumed_at = nowIso;
+        console.log(`[attendance] STICKY REOPEN att=${lastClosed.id} → in_progress (operator=${lastOperator}) tenant=${tenantId} conv=${conversationId}`);
+      } else {
+        console.log(`[attendance] REOPEN att=${lastClosed.id} → waiting (no previous operator) tenant=${tenantId} conv=${conversationId}`);
+      }
+
+      await supabase
         .from('support_attendances')
-        .update({
-          status: lastOperator ? 'in_progress' : 'waiting',
-          assigned_to: lastOperator,
-          assumed_at: lastOperator ? nowIso : null,
-          reopened_at: nowIso,
-          reopened_from: 'customer',
-          // Reset metrics for the new session
-          wait_seconds: 0,
-          handle_seconds: 0,
-          updated_at: nowIso,
-        })
+        .update(reopenUpdate)
         .eq('id', lastClosed.id);
 
-      if (reopenErr) {
-        console.error('[attendance] Error reopening:', reopenErr);
-      } else {
-        console.log(`[attendance] REOPEN by customer att=${lastClosed.id} assigned_to=${lastOperator} status=${lastOperator ? 'in_progress' : 'waiting'} (${diffMinutes.toFixed(1)} min since close) tenant=${tenantId} conv=${conversationId}`);
-        // Insert system message for attendance reopened
-        if (attCode) {
-          insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
-            .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
-        }
-      }
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
+        .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
       return;
     }
 
-    // 1.2) Past reopen window, inactive_closed, or no previous: create new
     const { data: newAtt, error: createErr } = await supabase
       .from('support_attendances')
       .insert({
@@ -1975,35 +1793,30 @@ async function ensureAttendanceForIncomingMessage(
         contact_id: contactId,
         status: 'waiting',
         opened_at: nowIso,
-        opened_by: null,
         created_from: 'customer',
       })
       .select('id, attendance_code')
       .single();
 
     if (createErr) {
-      console.error('[attendance] Error creating new:', createErr);
-    } else {
-      console.log(`[attendance] NEW by customer att=${newAtt.id} code=${newAtt.attendance_code} (${diffMinutes === Infinity ? 'no previous' : diffMinutes.toFixed(1) + ' min since close'}) tenant=${tenantId} conv=${conversationId}`);
-      // Insert system message for attendance opened
-      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
-        .catch(err => console.error('[attendance] Error inserting system msg:', err));
-      // Fire-and-forget: send URA welcome message if enabled
-      if (instanceCtx) {
-        sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
-          .catch(err => console.error('[ura] Error in sendUraWelcome:', err));
-      }
+      console.error('[attendance] Error creating:', createErr);
+      return;
+    }
+
+    console.log(`[attendance] NEW att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
+
+    insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+      .catch(err => console.error('[attendance] Error inserting system msg:', err));
+
+    if (instanceCtx) {
+      sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
+        .catch(err => console.error('[attendance] Error sending URA welcome:', err));
     }
   } catch (err) {
     console.error('[attendance] Unexpected error:', err);
   }
 }
 
-/**
- * Ensure attendance exists when an OPERATOR sends a message.
- * If no active attendance → create new one as in_progress (operator-initiated).
- * If active attendance exists → skip (counter incremented separately).
- */
 async function ensureAttendanceForOperatorMessage(
   supabase: any,
   conversationId: string,
@@ -2025,8 +1838,6 @@ async function ensureAttendanceForOperatorMessage(
       return;
     }
 
-    // Cooldown: if the last attendance was closed < 30s ago, skip creating a new one.
-    // This prevents spurious attendances from system messages (CSAT, closure) or quick operator follow-ups.
     const OPERATOR_COOLDOWN_SECONDS = 30;
     const { data: lastClosed } = await supabase
       .from('support_attendances')
@@ -2045,7 +1856,6 @@ async function ensureAttendanceForOperatorMessage(
       }
     }
 
-    // No active attendance — create new one (operator-initiated)
     const nowIso = new Date().toISOString();
     const { data: newAtt, error: createErr } = await supabase
       .from('support_attendances')
@@ -2066,7 +1876,6 @@ async function ensureAttendanceForOperatorMessage(
       console.error('[attendance-operator] Error creating:', createErr);
     } else {
       console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
-      // Insert system message for attendance opened
       insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
         .catch(err => console.error('[attendance-operator] Error inserting system msg:', err));
     }
@@ -2075,9 +1884,6 @@ async function ensureAttendanceForOperatorMessage(
   }
 }
 
-/**
- * Increment msg_customer_count or msg_agent_count on the active attendance.
- */
 async function incrementAttendanceCounter(
   supabase: any,
   conversationId: string,
@@ -2114,10 +1920,6 @@ async function incrementAttendanceCounter(
   }
 }
 
-/**
- * Normalize remoteJid: strip ":digits" suffix before @lid
- * e.g. "314951...:26@lid" → "314951...@lid"
- */
 function normalizeRemoteJid(jid: string | null | undefined): string | null {
   if (!jid) return null;
   const trimmed = jid.trim();
@@ -2151,7 +1953,6 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
   try {
     const { instance, data } = payload;
 
-    // Evolution may send an array of updates or a single object
     const rawUpdates = Array.isArray(data) ? data : [data.update || data];
 
     const resolved = await resolveInstanceTenant(supabase, instance);
@@ -2174,7 +1975,6 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
         continue;
       }
 
-      // Map Evolution status to our status
       let status = 'sent';
       if (updates.status === 3 || updates.status === 'READ') status = 'read';
       else if (updates.status === 2 || updates.status === 'DELIVERY_ACK') status = 'delivered';
@@ -2212,7 +2012,6 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
           }
         }
       } else {
-        // Build update payload: status + optionally backfill remote_jid
         const updatePayload: Record<string, any> = { status };
         if (normalizedJid) {
           updatePayload.remote_jid = normalizedJid;
@@ -2232,7 +2031,6 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
           console.warn(`[evolution-webhook] Status update matched 0 rows: tenant=${tenantId} keyId=${waKeyId} internalId=${internalMessageId}`);
         } else {
           console.log(`[evolution-webhook] Status updated to ${status}: keyId=${waKeyId} rows=${count}`);
-          // Touch conversation updated_at so the fallback realtime listener triggers a refetch
           if (updatedRows && updatedRows.length > 0 && updatedRows[0].conversation_id) {
             await supabase
               .from('whatsapp_conversations')
@@ -2246,6 +2044,550 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     console.error('[evolution-webhook] Error in processMessageUpdate:', error);
   }
 }
+
+async function refreshConversationPreviewAfterRevoke(supabase: any, conversationId: string) {
+  try {
+    const { data: lastMsg } = await supabase
+      .from('whatsapp_messages')
+      .select('content, timestamp, is_from_me, message_type')
+      .eq('conversation_id', conversationId)
+      .not('delete_status', 'eq', 'revoked')
+      .not('message_type', 'eq', 'revoked')
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastMsg) {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_preview: (lastMsg.content || '').substring(0, 200),
+          last_message_at: lastMsg.timestamp,
+          is_last_message_from_me: lastMsg.is_from_me,
+        })
+        .eq('id', conversationId);
+    } else {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_preview: null,
+          last_message_at: null,
+          is_last_message_from_me: false,
+        })
+        .eq('id', conversationId);
+    }
+    console.log('[evolution-webhook] Conversation preview refreshed after revoke');
+  } catch (err) {
+    console.error('[evolution-webhook] Error refreshing conversation preview:', err);
+  }
+}
+
+async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: any) {
+  try {
+    const { data } = payload;
+    const message = data.message;
+    const revokedKeyId = message?.protocolMessage?.key?.id;
+
+    if (!revokedKeyId) {
+      console.warn('[evolution-webhook] REVOKE event but no protocolMessage.key.id found. Payload:', JSON.stringify(data).slice(0, 500));
+      return;
+    }
+
+    console.log('[evolution-webhook] Processing REVOKE for original messageId:', revokedKeyId);
+
+    const { data: existingMsg, error: fetchError } = await supabase
+      .from('whatsapp_messages')
+      .select('id, conversation_id, delete_status, media_url, content')
+      .eq('message_id', revokedKeyId)
+      .maybeSingle();
+
+    if (fetchError || !existingMsg) {
+      console.warn('[evolution-webhook] Revoked message not found in DB:', revokedKeyId);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('whatsapp_messages')
+      .update({
+        delete_status: 'revoked',
+        delete_scope: 'everyone',
+        deleted_at: new Date().toISOString(),
+        content: '',
+        message_type: 'revoked',
+        media_url: null,
+        media_path: null,
+        media_mimetype: null,
+        media_filename: null,
+        media_ext: null,
+        media_kind: null,
+        delete_error: null,
+      })
+      .eq('id', existingMsg.id);
+
+    if (updateError) {
+      console.error('[evolution-webhook] Error marking message as revoked:', updateError);
+    } else {
+      console.log('[evolution-webhook] ✅ Message confirmed revoked:', existingMsg.id);
+      if (existingMsg.conversation_id) {
+        await refreshConversationPreviewAfterRevoke(supabase, existingMsg.conversation_id);
+      }
+    }
+  } catch (error) {
+    console.error('[evolution-webhook] Error in processMessageRevoke:', error);
+  }
+}
+
+// =====================================================================
+// BILLING SKIP URA — helpers
+// =====================================================================
+
+interface BillingCheckResult {
+  skip: boolean;
+  departmentId?: string;
+  clienteId?: string | null;
+  minutesAgo?: number;
+  billingMessageCreatedAt?: string;
+}
+
+async function checkBillingSkipUra(
+  supabase: any,
+  conversationId: string,
+  tenantId: string,
+  supportConfig: any,
+  phone: string
+): Promise<BillingCheckResult> {
+  try {
+    const enabled = supportConfig.billing_skip_ura_enabled ?? true;
+    if (!enabled) {
+      console.log('[cobrança] billing_skip_ura_enabled=false, seguindo fluxo normal');
+      return { skip: false };
+    }
+
+    const windowMinutes = supportConfig.billing_skip_ura_minutes ?? 60;
+    const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+
+    const { data: billingMsg } = await supabase
+      .from('whatsapp_messages')
+      .select('id, created_at, metadata')
+      .eq('conversation_id', conversationId)
+      .eq('tenant_id', tenantId)
+      .eq('is_from_me', true)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const billingHit = (billingMsg || []).find((m: any) => {
+      const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+      return meta?.source === 'billing_automation' && meta?.kind === 'cobranca';
+    });
+
+    if (!billingHit) {
+      return { skip: false };
+    }
+
+    const minutesAgo = (Date.now() - new Date(billingHit.created_at).getTime()) / (1000 * 60);
+    console.log(`[cobrança] Cobrança encontrada há ${minutesAgo.toFixed(1)} min (janela=${windowMinutes} min)`);
+
+    const { data: financeiroDept } = await supabase
+      .from('support_departments')
+      .select('id, name')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .ilike('name', '%financ%')
+      .limit(1)
+      .maybeSingle();
+
+    if (!financeiroDept) {
+      console.warn('[cobrança] Setor Financeiro não encontrado para tenant=' + tenantId + ', seguindo fluxo normal');
+      return { skip: false };
+    }
+
+    let clienteId: string | null = null;
+    if (phone) {
+      const phoneSuffix = phone.length >= 10 ? phone.slice(-10) : phone;
+      const { data: cliente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('cancelado', false)
+        .or(`telefone_whatsapp.ilike.%${phoneSuffix},telefone_whatsapp_contato.ilike.%${phoneSuffix},telefone_contato.ilike.%${phoneSuffix}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (cliente) {
+        clienteId = cliente.id;
+        console.log(`[cobrança] Cliente vinculado: ${clienteId} (telefone sufixo=${phoneSuffix})`);
+      } else {
+        console.log(`[cobrança] Cliente não encontrado pelo telefone sufixo=${phoneSuffix}`);
+      }
+    }
+
+    return {
+      skip: true,
+      departmentId: financeiroDept.id,
+      clienteId,
+      minutesAgo,
+      billingMessageCreatedAt: billingHit.created_at,
+    };
+  } catch (err) {
+    console.error('[cobrança] Erro na verificação de cobrança:', err);
+    return { skip: false };
+  }
+}
+
+async function ensureAttendanceForBilling(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+  departmentId: string,
+  clienteId?: string | null
+): Promise<void> {
+  try {
+    const { data: activeAtt } = await supabase
+      .from('support_attendances')
+      .select('id, status, department_id')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+
+    if (activeAtt) {
+      if (activeAtt.department_id !== departmentId) {
+        await supabase
+          .from('support_attendances')
+          .update({ department_id: departmentId, updated_at: new Date().toISOString() })
+          .eq('id', activeAtt.id);
+        console.log(`[cobrança] Atendimento existente ${activeAtt.id} movido para Financeiro`);
+      }
+      if (clienteId) {
+        await supabase
+          .from('support_attendances')
+          .update({ cliente_id: clienteId })
+          .eq('id', activeAtt.id);
+      }
+      return;
+    }
+
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    const reopenWindow = supportConfig.support_reopen_window_minutes;
+
+    const { data: lastClosed } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at, status, attendance_code')
+      .eq('conversation_id', conversationId)
+      .in('status', ['closed', 'inactive_closed'])
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
+    const diffMinutes = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
+
+    if (lastClosed && diffMinutes <= reopenWindow && lastClosed.status === 'closed') {
+      await supabase
+        .from('support_attendances')
+        .update({
+          status: 'waiting',
+          department_id: departmentId,
+          cliente_id: clienteId || undefined,
+          reopened_at: nowIso,
+          reopened_from: 'customer',
+          created_from: 'billing_automation',
+          updated_at: nowIso,
+        })
+        .eq('id', lastClosed.id);
+      console.log(`[cobrança] REOPEN atendimento ${lastClosed.id} no Financeiro`);
+      return;
+    }
+
+    const { data: newAtt, error: createErr } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        department_id: departmentId,
+        cliente_id: clienteId || null,
+        status: 'waiting',
+        opened_at: nowIso,
+        created_from: 'billing_automation',
+        ura_state: 'none',
+      })
+      .select('id, attendance_code')
+      .single();
+
+    if (createErr) {
+      console.error('[cobrança] Erro ao criar atendimento:', createErr);
+    } else {
+      console.log(`[cobrança] NOVO atendimento ${newAtt.id} code=${newAtt.attendance_code} no Financeiro, cliente=${clienteId || 'n/a'}`);
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
+        .catch(err => console.error('[cobrança] Erro na msg de sistema:', err));
+    }
+
+    await supabase
+      .from('whatsapp_conversations')
+      .update({ department_id: departmentId, updated_at: nowIso })
+      .eq('id', conversationId);
+
+  } catch (err) {
+    console.error('[cobrança] Erro inesperado:', err);
+  }
+}
+
+async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabase: any) {
+  try {
+    const { instance, data } = payload;
+
+    let { data: instanceData } = await supabase
+      .from('whatsapp_instances')
+      .select('id, instance_name, instance_id_external, provider_type, status, tenant_id')
+      .eq('instance_name', instance)
+      .maybeSingle();
+
+    if (!instanceData) {
+      const { data: cloudInstance } = await supabase
+        .from('whatsapp_instances')
+        .select('id, instance_name, instance_id_external, provider_type, status, tenant_id')
+        .eq('instance_id_external', instance)
+        .maybeSingle();
+      instanceData = cloudInstance;
+    }
+
+    if (!instanceData) {
+      console.error('[evolution-webhook][send.message] Instance not found:', instance);
+      return;
+    }
+
+    const tenantId = instanceData.tenant_id;
+
+    const key = data?.key;
+    const message = data?.message;
+    const pushName = data?.pushName || data?.participant || '';
+    const messageTimestamp = data?.messageTimestamp
+      ? (typeof data.messageTimestamp === 'number'
+          ? data.messageTimestamp
+          : parseInt(data.messageTimestamp, 10))
+      : Math.floor(Date.now() / 1000);
+
+    if (!key?.remoteJid) {
+      console.warn('[evolution-webhook][send.message] No remoteJid in payload, skipping:', JSON.stringify(data).slice(0, 400));
+      return;
+    }
+
+    const messageId = key.id || data?.id || `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
+    console.log(`[evolution-webhook][send.message] phone=${phone} isGroup=${isGroup} messageId=${messageId} instance=${instance}`);
+
+    const contactId = await findOrCreateContact(
+      supabase,
+      instanceData.id,
+      phone,
+      pushName || phone,
+      isGroup,
+      true,
+      tenantId
+    );
+
+    if (!contactId) {
+      console.error('[evolution-webhook][send.message] Failed to find/create contact for phone:', phone);
+      return;
+    }
+
+    const conversationId = await findOrCreateConversation(
+      supabase,
+      instanceData.id,
+      contactId,
+      tenantId
+    );
+
+    if (!conversationId) {
+      console.error('[evolution-webhook][send.message] Failed to find/create conversation');
+      return;
+    }
+
+    let messageType = 'text';
+    let content = '';
+
+    if (message) {
+      messageType = getMessageType(message);
+      content = getMessageContent(message, messageType);
+    } else if (data?.text || data?.body || data?.content) {
+      content = data.text || data.body || data.content || '';
+    }
+
+    if (!content && messageType === 'text') {
+      content = '';
+    }
+
+    const timestamp = new Date(messageTimestamp * 1000).toISOString();
+
+    const { data: savedMsg, error: msgError } = await supabase
+      .from('whatsapp_messages')
+      .upsert({
+        conversation_id: conversationId,
+        remote_jid: key.remoteJid,
+        message_id: messageId,
+        content,
+        message_type: messageType,
+        is_from_me: true,
+        status: 'sent',
+        timestamp,
+        tenant_id: tenantId,
+        instance_id: instanceData.id,
+        metadata: {
+          source: instanceData.instance_name?.toLowerCase().includes('financ') ? 'billing_automation' : 'automation',
+          kind: instanceData.instance_name?.toLowerCase().includes('financ') ? 'cobranca' : 'general',
+          event: 'send.message',
+          instanceName: instance,
+        },
+      }, {
+        onConflict: 'tenant_id,message_id',
+        ignoreDuplicates: true,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (msgError) {
+      console.error('[evolution-webhook][send.message] Failed:', msgError);
+      return;
+    }
+
+    if (savedMsg) {
+      console.log(`[evolution-webhook][send.message] Saved message ok: message_id=${messageId}, conversation_id=${conversationId}, instance=${instance}, tenant=${tenantId}`);
+    } else {
+      console.log(`[evolution-webhook][send.message] Duplicate ignored: message_id=${messageId}`);
+      return;
+    }
+
+    const { data: currentConv } = await supabase
+      .from('whatsapp_conversations')
+      .select('last_message_at')
+      .eq('id', conversationId)
+      .single();
+
+    const currentLastAt = currentConv?.last_message_at;
+    const isNewerOrEqual = !currentLastAt || timestamp >= currentLastAt;
+
+    if (isNewerOrEqual) {
+      const { error: updateError } = await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_at: timestamp,
+          last_message_preview: content.substring(0, 200) || '📤 Mensagem enviada',
+          is_last_message_from_me: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+
+      if (updateError) {
+        console.error('[evolution-webhook][send.message] Error updating conversation:', updateError);
+      }
+    }
+  } catch (error) {
+    console.error('[evolution-webhook][send.message] Fatal error:', error);
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const webhookSecret = Deno.env.get('EVOLUTION_WEBHOOK_SECRET');
+    if (webhookSecret) {
+      const incomingSecret = req.headers.get('x-webhook-secret') || req.headers.get('apikey');
+      if (incomingSecret !== webhookSecret) {
+        console.warn('[evolution-webhook] Unauthorized request — invalid or missing webhook secret');
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const payload: EvolutionWebhookPayload = await req.json();
+    console.log('[evolution-webhook] Event received:', payload.event, 'Instance:', payload.instance);
+
+    switch (payload.event) {
+      case 'messages.upsert':
+        if (isRevokeMessage(payload.data?.message)) {
+          await processMessageRevoke(payload, supabase);
+        } else if (isEditedMessage(payload.data?.message)) {
+          await processMessageEdit(payload, supabase);
+        } else {
+          await processMessageUpsert(payload, supabase);
+        }
+        break;
+      case 'messages.update':
+        await processMessageUpdate(payload, supabase);
+        break;
+      case 'messages.delete': {
+        const deleteData = payload.data;
+        const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
+        if (deletedKeyId) {
+          const resolved = await resolveInstanceTenant(supabase, payload.instance);
+          if (resolved) {
+            const { data: delRows, error: delErr } = await supabase
+              .from('whatsapp_messages')
+              .update({
+                delete_status: 'revoked',
+                delete_scope: 'everyone',
+                deleted_at: new Date().toISOString(),
+                message_type: 'revoked',
+                content: '',
+                media_url: null,
+                media_path: null,
+                media_mimetype: null,
+                media_filename: null,
+                media_ext: null,
+                media_kind: null,
+                delete_error: null,
+              })
+              .eq('tenant_id', resolved.tenantId)
+              .eq('message_id', deletedKeyId)
+              .select('id, conversation_id');
+            console.log(`[evolution-webhook] messages.delete processed: keyId=${deletedKeyId} rows=${delRows?.length ?? 0}${delErr ? ' error=' + delErr.message : ''}`);
+            if (delRows && delRows.length > 0 && delRows[0].conversation_id) {
+              await refreshConversationPreviewAfterRevoke(supabase, delRows[0].conversation_id);
+            }
+          }
+        } else {
+          console.log('[evolution-webhook] messages.delete with no key id:', JSON.stringify(deleteData).slice(0, 300));
+        }
+        break;
+      }
+      case 'connection.update':
+        await processConnectionUpdate(payload, supabase);
+        break;
+      case 'send.message':
+        await processSendMessageEvent(payload, supabase);
+        break;
+      default:
+        console.log('[evolution-webhook] Unhandled event type:', payload.event);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, event: payload.event }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+  } catch (error) {
+    console.error('[evolution-webhook] Fatal error:', error);
+    
+    return new Response(
+      JSON.stringify({ success: false, error: String(error) }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+  }
+});
 
 async function processConnectionUpdate(payload: EvolutionWebhookPayload, supabase: any) {
   try {
