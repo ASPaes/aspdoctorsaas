@@ -316,30 +316,57 @@ export default function HorarioPlantaoTab() {
                     {DAY_KEYS.map((day) => {
                       const s = bhSchedule[day];
                       return (
-                        <div key={day} className="flex items-center gap-3 px-3 py-2">
-                          <Checkbox
-                            checked={s.active}
-                            onCheckedChange={(v) => updateDay(day, "active", !!v)}
-                            id={`day-${day}`}
-                          />
-                          <Label htmlFor={`day-${day}`} className="w-20 text-sm font-medium">
-                            {DAY_LABELS[day]}
-                          </Label>
-                          <Input
-                            type="time"
-                            value={s.start}
-                            onChange={(e) => updateDay(day, "start", e.target.value)}
-                            className="w-28"
-                            disabled={!s.active}
-                          />
-                          <span className="text-muted-foreground text-sm">às</span>
-                          <Input
-                            type="time"
-                            value={s.end}
-                            onChange={(e) => updateDay(day, "end", e.target.value)}
-                            className="w-28"
-                            disabled={!s.active}
-                          />
+                        <div key={day} className="px-3 py-2 space-y-1">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={s.active}
+                              onCheckedChange={(v) => updateDayActive(day, !!v)}
+                              id={`day-${day}`}
+                            />
+                            <Label htmlFor={`day-${day}`} className="w-20 text-sm font-medium">
+                              {DAY_LABELS[day]}
+                            </Label>
+                            {s.active && s.slots.length < 2 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="ml-auto h-7 text-xs"
+                                onClick={() => addSlot(day)}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Intervalo
+                              </Button>
+                            )}
+                          </div>
+                          {s.active && s.slots.map((slot, idx) => (
+                            <div key={idx} className="flex items-center gap-2 ml-8">
+                              <Input
+                                type="time"
+                                value={slot.start}
+                                onChange={(e) => updateSlot(day, idx, "start", e.target.value)}
+                                className="w-28"
+                              />
+                              <span className="text-muted-foreground text-sm">às</span>
+                              <Input
+                                type="time"
+                                value={slot.end}
+                                onChange={(e) => updateSlot(day, idx, "end", e.target.value)}
+                                className="w-28"
+                              />
+                              {s.slots.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => removeSlot(day, idx)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       );
                     })}
