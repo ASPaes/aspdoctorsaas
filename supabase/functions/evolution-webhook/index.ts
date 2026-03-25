@@ -1113,13 +1113,36 @@ function checkBusinessHours(config: SupportConfig): {
     return { inside: false, todayStart: null, todayEnd: null };
   }
 
-  const inside = currentTime >= daySchedule.start && currentTime < daySchedule.end;
-  console.log(`[business-hours] inside=${inside} tz=${tz} day=${dayKey} current=${currentTime} range=${daySchedule.start}-${daySchedule.end}`);
+  // Normalize to slots array (backward compat: old {start,end} → slots:[{start,end}])
+  let slots: { start: string; end: string }[] = [];
+  if (Array.isArray((daySchedule as any).slots) && (daySchedule as any).slots.length > 0) {
+    slots = (daySchedule as any).slots;
+  } else if (daySchedule.start && daySchedule.end) {
+    slots = [{ start: daySchedule.start, end: daySchedule.end }];
+  }
+
+  // Filter out incomplete/invalid slots
+  const validSlots = slots.filter(s => s.start && s.end && s.start < s.end);
+
+  if (validSlots.length === 0) {
+    console.log(`[business-hours] inside=false tz=${tz} day=${dayKey} (no valid slots)`);
+    return { inside: false, todayStart: null, todayEnd: null };
+  }
+
+  // Check if current time falls within ANY slot
+  const matchedSlot = validSlots.find(s => currentTime >= s.start && currentTime < s.end);
+  const inside = !!matchedSlot;
+
+  // For placeholder substitution, use the first and last slot boundaries
+  const firstStart = validSlots[0].start;
+  const lastEnd = validSlots[validSlots.length - 1].end;
+
+  console.log(`[business-hours] inside=${inside} tz=${tz} day=${dayKey} current=${currentTime} slots=${JSON.stringify(validSlots)}`);
 
   return {
     inside,
-    todayStart: daySchedule.start,
-    todayEnd: daySchedule.end,
+    todayStart: firstStart,
+    todayEnd: lastEnd,
   };
 }
 
