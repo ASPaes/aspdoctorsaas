@@ -22,13 +22,13 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Clientes", url: "/clientes", icon: Users },
-  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
-  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
-  { title: "Chat", url: "/whatsapp", icon: MessageCircle },
-  { title: "Configurações", url: "/configuracoes", icon: Settings },
+const ALL_NAV_ITEMS = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: false },
+  { title: "Clientes", url: "/clientes", icon: Users, adminOnly: false },
+  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, adminOnly: false },
+  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, adminOnly: false },
+  { title: "Chat", url: "/whatsapp", icon: MessageCircle, adminOnly: false },
+  { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: true },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -51,6 +51,8 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { signOut, profile, user, profileLoading } = useAuth();
   const isSuperAdmin = profile?.is_super_admin === true;
+  const isAdmin = isSuperAdmin || profile?.role === "admin";
+  const navItems = ALL_NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
