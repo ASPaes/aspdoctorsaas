@@ -796,9 +796,9 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => {
-                          const link = `${window.location.origin}/signup`;
+                          const link = `${window.location.origin}/signup?invite=${inv.id}`;
                           navigator.clipboard.writeText(link);
-                          sonnerToast.success("Link copiado!");
+                          sonnerToast.success("Link do convite copiado!");
                         }}
                       >
                         <Copy className="h-3.5 w-3.5" />

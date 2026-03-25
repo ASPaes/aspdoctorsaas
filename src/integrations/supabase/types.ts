@@ -3509,6 +3509,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_access_invite: {
+        Args: { p_invite_id: string }
+        Returns: undefined
+      }
       accept_invite: { Args: { p_token: string }; Returns: undefined }
       audit_log: {
         Args: {
@@ -3663,6 +3667,15 @@ export type Database = {
       norm_txt: { Args: { t: string }; Returns: string }
       require_active_profile: { Args: never; Returns: boolean }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
+      validate_access_invite: {
+        Args: { p_invite_id: string }
+        Returns: {
+          email: string
+          funcionario_id: number
+          role: string
+          tenant_id: string
+        }[]
+      }
       validate_invite_token: {
         Args: { p_token: string }
         Returns: {
