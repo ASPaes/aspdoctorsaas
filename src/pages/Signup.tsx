@@ -61,7 +61,10 @@ export default function Signup() {
     const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: inviteId ? { invite_token: inviteId } : undefined,
+      },
     });
 
     if (error) {
@@ -70,7 +73,6 @@ export default function Signup() {
       return;
     }
 
-    // If access invite, accept it via secure RPC
     if (inviteId && signUpData.user) {
       const { error: acceptError } = await (supabase.rpc as any)(
         "accept_access_invite",
@@ -82,15 +84,13 @@ export default function Signup() {
         setLoading(false);
         return;
       }
+      toast.success("Conta criada com sucesso! Bem-vindo.");
+      navigate("/");
+      return;
     }
 
     setLoading(false);
-
-    if (inviteId && accessInvite) {
-      toast.success("Conta criada com sucesso! Verifique seu email para confirmar.");
-    } else {
-      toast.success("Verifique seu email para confirmar o cadastro.");
-    }
+    toast.success("Verifique seu email para confirmar o cadastro.");
   };
 
   if (inviteLoading) {
