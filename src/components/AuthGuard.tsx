@@ -20,15 +20,24 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   // Redirect based on profile / access_status
   useEffect(() => {
     if (!user || isLoading || profileLoading) return;
+
     const path = location.pathname;
 
-    // No profile yet → onboarding
+    // Se veio do signup via convite, aguarda o profile carregar
+    const fromInvite = document.referrer.includes("/signup") || 
+                       sessionStorage.getItem("from_invite") === "true";
+
+    // No profile yet → onboarding (mas não se acabou de fazer signup via convite)
     if (profile === null) {
-      if (path !== "/onboarding") navigate("/onboarding", { replace: true });
+      if (!fromInvite && path !== "/onboarding") {
+        navigate("/onboarding", { replace: true });
+      }
       return;
     }
 
-    // Profile exists – check access_status, status, and funcionario_id
+    // Limpa flag de convite
+    sessionStorage.removeItem("from_invite");
+
     const accessStatus = profile.access_status ?? "active";
     const status = profile.status ?? "ativo";
 
@@ -42,8 +51,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-
-    // Fully active — if user is on a status page, send them to dashboard
+    // Fully active — se estiver em página de status, manda pro dashboard
     if (ACCESS_STATUS_ROUTES.includes(path)) {
       navigate("/dashboard", { replace: true });
     }

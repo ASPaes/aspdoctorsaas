@@ -95,6 +95,7 @@ export default function Signup() {
     }
 
     if (inviteId && signUpData.user) {
+      sessionStorage.setItem("from_invite", "true");
       const { error: acceptError } = await (supabase.rpc as any)(
         "accept_access_invite",
         { p_invite_id: inviteId }
