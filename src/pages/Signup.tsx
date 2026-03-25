@@ -67,14 +67,12 @@ export default function Signup() {
       },
     });
 
-    let userId: string | null = null;
-
     if (signUpError) {
       if (
         signUpError.message.toLowerCase().includes("already registered") ||
         signUpError.message.toLowerCase().includes("already been registered")
       ) {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -83,39 +81,24 @@ export default function Signup() {
           toast.error("Este email já possui conta. Verifique sua senha.");
           return;
         }
-        userId = signInData.user?.id ?? null;
+        // Login feito — AuthGuard vai redirecionar automaticamente
+        toast.success("Bem-vindo de volta!");
+        setLoading(false);
+        return;
       } else {
         setLoading(false);
         toast.error(signUpError.message);
         return;
       }
-    } else {
-      userId = signUpData.user?.id ?? null;
     }
 
-    if (inviteId && userId) {
-      // Aguarda o profile ser criado pelo trigger (até 3 segundos)
-      let attempts = 0;
-      let profileReady = false;
-      while (attempts < 6 && !profileReady) {
-        await new Promise((r) => setTimeout(r, 500));
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("user_id, access_status")
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (profileData?.access_status === "active") {
-          profileReady = true;
-        }
-        attempts++;
-      }
+    // Signup feito — AuthGuard vai redirecionar automaticamente
+    if (inviteId) {
       toast.success("Conta criada com sucesso! Bem-vindo.");
-      navigate("/dashboard");
-      return;
+    } else {
+      toast.success("Verifique seu email para confirmar o cadastro.");
     }
-
     setLoading(false);
-    toast.success("Verifique seu email para confirmar o cadastro.");
   };
 
   if (inviteLoading) {
