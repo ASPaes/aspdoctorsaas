@@ -331,7 +331,7 @@ export default function SettingsUsers() {
                     <TableCell>{inv.email}</TableCell>
                     <TableCell><Badge variant="secondary">{inv.role}</Badge></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(inv.expires_at).toLocaleDateString("pt-BR")}
+                      {new Date(inv.invited_at).toLocaleDateString("pt-BR")}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -340,7 +340,7 @@ export default function SettingsUsers() {
                           size="icon"
                           title="Copiar link do convite"
                           onClick={() => {
-                            const link = `${window.location.origin}/signup?invite=${inv.token}`;
+                            const link = `${window.location.origin}/signup?invite=${inv.id}`;
                             navigator.clipboard.writeText(link);
                             toast.success("Link copiado!");
                           }}
