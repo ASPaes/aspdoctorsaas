@@ -9,24 +9,15 @@ import { toast } from "sonner";
 export default function AgentPresenceOverlay() {
   const { status, isBlocked, presence, pauseReasons, startShift, setActive, extendPause } = useAgentPresence();
   const [loading, setLoading] = useState(false);
-  const [remaining, setRemaining] = useState(0);
   const [showExtend, setShowExtend] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(15);
 
-  // Countdown
-  useEffect(() => {
-    if (status !== "paused" || !presence?.pause_expected_end_at) {
-      setRemaining(0);
-      return;
-    }
-    const update = () => {
-      const diff = new Date(presence.pause_expected_end_at!).getTime() - Date.now();
-      setRemaining(Math.max(0, diff));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [status, presence?.pause_expected_end_at]);
+  // Pause timer with total/remaining/exceeded
+  const { pausedTotalMs, remainingMs, exceededMs, timerExpired } = usePauseTimer(
+    status,
+    presence?.pause_started_at,
+    presence?.pause_expected_end_at
+  );
 
   if (!isBlocked) return null;
 

@@ -52,8 +52,6 @@ export default function AgentPresenceBar() {
     isBlocked,
   } = useAgentPresence();
 
-  const [remaining, setRemaining] = useState<number>(0);
-  const [timerExpired, setTimerExpired] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // End-shift modal state
@@ -62,23 +60,12 @@ export default function AgentPresenceBar() {
   const [pendingCount, setPendingCount] = useState(0);
   const [releasing, setReleasing] = useState(false);
 
-  // Timer countdown
-  useEffect(() => {
-    if (status !== "paused" || !presence?.pause_expected_end_at) {
-      setRemaining(0);
-      setTimerExpired(false);
-      return;
-    }
-    const update = () => {
-      const end = new Date(presence.pause_expected_end_at!).getTime();
-      const diff = end - Date.now();
-      setRemaining(Math.max(0, diff));
-      setTimerExpired(diff <= 0);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [status, presence?.pause_expected_end_at]);
+  // Pause timer with total/remaining/exceeded
+  const { pausedTotalMs, remainingMs, exceededMs, timerExpired } = usePauseTimer(
+    status,
+    presence?.pause_started_at,
+    presence?.pause_expected_end_at
+  );
 
   const wrap = useCallback(
     async (fn: () => Promise<void>, successMsg?: string) => {
