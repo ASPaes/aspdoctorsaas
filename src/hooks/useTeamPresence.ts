@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,6 +18,7 @@ export interface TeamMemberPresence {
 export function useTeamPresence() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const { data: members = [], isLoading } = useQuery({
@@ -24,7 +26,6 @@ export function useTeamPresence() {
     enabled: !!tid && !!isAdmin,
     refetchInterval: 10_000,
     queryFn: async () => {
-      // 1. Get all presence records for tenant
       const { data: presenceRows, error: pErr } = await supabase
         .from("support_agent_presence")
         .select("user_id, status, pause_started_at, pause_expected_end_at, last_heartbeat_at, pause_reason_id")
@@ -32,11 +33,10 @@ export function useTeamPresence() {
       if (pErr) throw pErr;
       if (!presenceRows || presenceRows.length === 0) return [];
 
-      // 2. Get pause reason names
       const reasonIds = presenceRows
         .map((r) => r.pause_reason_id)
         .filter(Boolean) as string[];
-      
+
       let reasonMap: Record<string, string> = {};
       if (reasonIds.length > 0) {
         const { data: reasons } = await supabase
@@ -48,7 +48,6 @@ export function useTeamPresence() {
         }
       }
 
-      // 3. Get profile → funcionario mapping for names
       const userIds = presenceRows.map((r) => r.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
@@ -74,7 +73,6 @@ export function useTeamPresence() {
         (profiles || []).map((p) => [p.user_id, p.funcionario_id])
       );
 
-      // 4. Build result
       const result: TeamMemberPresence[] = presenceRows.map((row) => {
         const funcId = profileFuncMap[row.user_id];
         const func = funcId ? funcMap[funcId] : null;
@@ -90,13 +88,38 @@ export function useTeamPresence() {
         };
       });
 
-      // Sort: paused first, then active, then offline
       const statusOrder: Record<string, number> = { paused: 0, active: 1, offline: 2 };
       result.sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
 
       return result;
     },
   });
+
+  // Realtime subscription for instant updates across browsers
+  useEffect(() => {
+    if (!tid || !isAdmin) return;
+
+    const channel = supabase
+      .channel(`team-presence-${tid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "support_agent_presence",
+          filter: `tenant_id=eq.${tid}`,
+        },
+        () => {
+          // Refetch full query to resolve names/reasons properly
+          queryClient.invalidateQueries({ queryKey: ["team_presence", tid] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [tid, isAdmin, queryClient]);
 
   return { members, isLoading, isAdmin: !!isAdmin };
 }
