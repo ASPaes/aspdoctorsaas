@@ -925,7 +925,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         contactName: pushName || phone,
       };
 
-      // 0. BUSINESS HOURS — verificar horário antes de tudo (exceto salvar mensagem)
+      // 0. CSAT PRIMEIRO — antes de qualquer filtro
+      const csatHandled = await handleCsatResponse(
+        supabase, instanceCtx, conversationId, tenantId, content
+      );
+      if (csatHandled) {
+        console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
+        return;
+      }
+
+      // 1. BUSINESS HOURS — verificar horário (após CSAT)
       const supportConfigBH = await getSupportConfig(supabase, tenantId);
       if (supportConfigBH.business_hours_enabled) {
         const bhResult = await checkBusinessHours(
@@ -986,15 +995,6 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
           return;
         }
-      }
-
-      // 1. CSAT PRIMEIRO — antes de qualquer filtro
-      const csatHandled = await handleCsatResponse(
-        supabase, instanceCtx, conversationId, tenantId, content
-      );
-      if (csatHandled) {
-        console.log(`[evolution-webhook] CSAT consumed message for conv=${conversationId}`);
-        return;
       }
 
       // 2. AUTO-REPLY FILTER — só após confirmar que não é CSAT
