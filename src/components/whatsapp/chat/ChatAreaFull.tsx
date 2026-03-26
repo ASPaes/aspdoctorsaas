@@ -299,7 +299,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             initialMessage={initialGreeting}
-            disabled={isBlocked}
+            disabled={presenceBlocked}
           />
         )}
       </div>
