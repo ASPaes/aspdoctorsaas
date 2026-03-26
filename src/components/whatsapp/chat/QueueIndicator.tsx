@@ -4,8 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface QueueIndicatorProps {
   conversationId: string;
@@ -35,8 +37,14 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const convDeptId = attendance?.department_id;
   const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
 
+  const { isBlocked } = useAgentPresence();
+
   const handleClaim = () => {
     if (!user?.id) return;
+    if (isBlocked) {
+      toast.warning("Você precisa estar Ativo para assumir atendimentos.");
+      return;
+    }
     assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
   };
 
@@ -80,7 +88,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
           size="sm"
           className="h-7 text-xs gap-1.5 rounded-full"
           onClick={handleClaim}
-          disabled={isAssigning}
+          disabled={isAssigning || isBlocked}
         >
           {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
