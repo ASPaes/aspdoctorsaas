@@ -299,7 +299,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     }
 
     return result;
-  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, selectedDepartmentId, filteredInstanceIds]);
+  }, [conversations, activePill, filters.sortBy, forcedConvId, isAdmin, user?.id, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds]);
 
   const handleCreated = useCallback(async (convId: string) => {
     setForcedConvId(convId);
