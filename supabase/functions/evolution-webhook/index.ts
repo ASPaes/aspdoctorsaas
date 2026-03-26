@@ -986,7 +986,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             });
           }
 
-          // Check if conversation was already attended (out_of_hours_cleared_at set)
+          // Check if conversation was already attended (out_of_hours_cleared_at set OR attendance in_progress)
           // If so, skip sending auto-message — technician already responded
           const { data: convCheck } = await supabase
             .from('whatsapp_conversations')
@@ -994,8 +994,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .eq('id', conversationId)
             .single();
 
-          if (convCheck?.out_of_hours_cleared_at) {
-            console.log(`[business-hours] Conversa já atendida (cleared_at set), não enviar aviso conv=${conversationId}`);
+          const { data: activeAttCheck } = await supabase
+            .from('support_attendances')
+            .select('id')
+            .eq('conversation_id', conversationId)
+            .eq('status', 'in_progress')
+            .limit(1)
+            .maybeSingle();
+
+          if (convCheck?.out_of_hours_cleared_at || activeAttCheck) {
+            console.log(`[business-hours] Conversa já atendida (cleared=${!!convCheck?.out_of_hours_cleared_at} in_progress=${!!activeAttCheck}), não enviar aviso conv=${conversationId}`);
             return;
           }
 
@@ -1409,13 +1417,22 @@ async function checkBusinessHours(
       .eq('id', conversationId)
       .single();
 
-    if (!convBH?.out_of_hours_cleared_at) {
+    // Also check if there's an active attendance (in_progress)
+    const { data: activeAttBH } = await supabase
+      .from('support_attendances')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('status', 'in_progress')
+      .limit(1)
+      .maybeSingle();
+
+    if (convBH?.out_of_hours_cleared_at || activeAttBH) {
+      console.log(`[business-hours] Conversa já atendida (cleared_at=${!!convBH?.out_of_hours_cleared_at} att_in_progress=${!!activeAttBH}), pulando aviso conv=${conversationId}`);
+    } else {
       await sendBusinessHoursMessage(
         supabase, instanceCtx, conversationId, tenantId,
         supportConfig, dayKey, currentTime, businessHours
       );
-    } else {
-      console.log(`[business-hours] Conversa já atendida, pulando aviso automático conv=${conversationId}`);
     }
     return { inside: false };
 
