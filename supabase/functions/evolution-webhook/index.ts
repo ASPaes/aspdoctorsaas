@@ -934,63 +934,87 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         return;
       }
 
-      // 1. BUSINESS HOURS — verificar horário (após CSAT)
+      // 0. BUSINESS HOURS — verificar horário antes de tudo (exceto CSAT)
       const supportConfigBH = await getSupportConfig(supabase, tenantId);
       if (supportConfigBH.business_hours_enabled) {
         const bhResult = await checkBusinessHours(
           supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
         );
         if (!bhResult.inside) {
-          // Fora do horário — NÃO abre atendimento, NÃO dispara URA
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
-          // Colocar conversa em status 'active' para aparecer na Fila do time amanhã
+          // Colocar conversa como active para aparecer na fila amanhã
           await supabase
             .from('whatsapp_conversations')
             .update({ status: 'active', updated_at: new Date().toISOString() })
             .eq('id', conversationId);
 
-          // Criar atendimento em fila (waiting) se não existir um ativo
+          // Criar atendimento em fila se não existir
           const { data: existingAtt } = await supabase
             .from('support_attendances')
-            .select('id, status')
+            .select('id')
             .eq('conversation_id', conversationId)
             .in('status', ['waiting', 'in_progress'])
             .limit(1)
             .maybeSingle();
 
           if (!existingAtt) {
-            const nowIso = new Date().toISOString();
-            await supabase
-              .from('support_attendances')
-              .insert({
-                tenant_id: tenantId,
-                conversation_id: conversationId,
-                contact_id: contactId,
-                status: 'waiting',
-                opened_at: nowIso,
-                created_from: 'customer',
-                ura_state: 'none',
-              });
-            console.log(`[business-hours] Atendimento criado em fila (waiting) conv=${conversationId}`);
+            await supabase.from('support_attendances').insert({
+              tenant_id: tenantId,
+              conversation_id: conversationId,
+              contact_id: contactId,
+              status: 'waiting',
+              opened_at: new Date().toISOString(),
+              created_from: 'customer',
+              ura_state: 'none',
+            });
           }
 
-          // Verificar quantas mensagens o cliente enviou fora do horário (para reenvio a cada 2)
+          // Contar mensagens do cliente fora do horário nas últimas 8h
+          const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
           const { count: outsideCount } = await supabase
             .from('whatsapp_messages')
             .select('id', { count: 'exact', head: true })
             .eq('conversation_id', conversationId)
             .eq('tenant_id', tenantId)
             .eq('is_from_me', false)
-            .gte('created_at', new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()); // últimas 8h
+            .gte('created_at', cutoff8h);
 
-          // Reenviar aviso a cada 2 mensagens do cliente
-          const shouldResend = outsideCount && outsideCount % 2 === 0;
-          if (shouldResend) {
-            console.log(`[business-hours] Reenvio de aviso (${outsideCount} msgs) conv=${conversationId}`);
-            await checkBusinessHours(
-              supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
-            );
+          // Verificar última mensagem automática de horário enviada (cooldown de 10 min)
+          const cutoff10min = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+          const { data: lastBhMsg } = await supabase
+            .from('whatsapp_messages')
+            .select('id, created_at')
+            .eq('conversation_id', conversationId)
+            .eq('tenant_id', tenantId)
+            .eq('is_from_me', true)
+            .contains('metadata', { business_hours: true })
+            .gte('created_at', cutoff10min)
+            .limit(1)
+            .maybeSingle();
+
+          if (!lastBhMsg) {
+            // Sem mensagem de horário nos últimos 10 min — enviar aviso
+            if (!outsideCount || outsideCount <= 1) {
+              // Primeira mensagem: aviso completo (já enviado pelo checkBusinessHours acima)
+              console.log(`[business-hours] Primeira mensagem fora do horário conv=${conversationId}`);
+            } else {
+              // Mensagens seguintes: aviso curto e amigável
+              const shortMessages = [
+                'Ainda estamos fora do horário 🕐 Retornaremos assim que possível!',
+                'Sua mensagem foi registrada! Responderemos no início do expediente 😊',
+                'Fora do horário no momento, mas não se preocupe — sua mensagem está guardada! 📝',
+                'Obrigado pela mensagem! Nossa equipe responde a partir das 08:00 ⏰',
+              ];
+              const msg = shortMessages[Math.floor(Math.random() * shortMessages.length)];
+              await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, msg, {
+                business_hours: true,
+                outside_hours: true,
+                short_reply: true,
+              });
+            }
+          } else {
+            console.log(`[business-hours] Cooldown ativo (última msg há < 10min) conv=${conversationId}`);
           }
 
           return;
