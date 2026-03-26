@@ -52,6 +52,7 @@ export default function AgentPresenceButton() {
     endShift,
     fetchActiveAttendances,
     releaseToQueueAndEndShift,
+    keepAssignmentsAndEndShift,
   } = useAgentPresence();
 
   const [remaining, setRemaining] = useState(0);
@@ -122,6 +123,19 @@ export default function AgentPresenceButton() {
       setReleasing(false);
     }
   }, [releaseToQueueAndEndShift, pendingAttendanceIds, pendingCount]);
+
+  const handleKeepAndEnd = useCallback(async () => {
+    setReleasing(true);
+    try {
+      await keepAssignmentsAndEndShift(pendingAttendanceIds);
+      toast.success("Expediente encerrado. Atendimentos mantidos.");
+      setEndShiftModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao encerrar expediente");
+    } finally {
+      setReleasing(false);
+    }
+  }, [keepAssignmentsAndEndShift, pendingAttendanceIds]);
 
   const handlePauseConfirm = useCallback(async (reasonId: string, minutes: number) => {
     setLoading(true);
