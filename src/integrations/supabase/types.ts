@@ -1733,93 +1733,30 @@ export type Database = {
       }
       support_agent_presence: {
         Row: {
-          last_heartbeat_at: string | null
-          pause_expected_end_at: string | null
-          pause_reason_id: string | null
-          pause_started_at: string | null
-          shift_ended_at: string | null
-          shift_started_at: string | null
           status: string
           tenant_id: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          last_heartbeat_at?: string | null
-          pause_expected_end_at?: string | null
-          pause_reason_id?: string | null
-          pause_started_at?: string | null
-          shift_ended_at?: string | null
-          shift_started_at?: string | null
           status?: string
           tenant_id: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          last_heartbeat_at?: string | null
-          pause_expected_end_at?: string | null
-          pause_reason_id?: string | null
-          pause_started_at?: string | null
-          shift_ended_at?: string | null
-          shift_started_at?: string | null
           status?: string
           tenant_id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "support_agent_presence_pause_reason_id_fkey"
-            columns: ["pause_reason_id"]
-            isOneToOne: false
-            referencedRelation: "support_pause_reasons"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "support_agent_presence_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      support_agent_presence_events: {
-        Row: {
-          created_at: string
-          event_type: string
-          id: string
-          pause_reason_id: string | null
-          payload: Json | null
-          tenant_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          event_type: string
-          id?: string
-          pause_reason_id?: string | null
-          payload?: Json | null
-          tenant_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          event_type?: string
-          id?: string
-          pause_reason_id?: string | null
-          payload?: Json | null
-          tenant_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_agent_presence_events_pause_reason_id_fkey"
-            columns: ["pause_reason_id"]
-            isOneToOne: false
-            referencedRelation: "support_pause_reasons"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -2392,39 +2329,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      support_pause_reasons: {
-        Row: {
-          average_minutes: number
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          sort_order: number
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          average_minutes?: number
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          sort_order?: number
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          average_minutes?: number
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          sort_order?: number
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       support_tickets: {
         Row: {
