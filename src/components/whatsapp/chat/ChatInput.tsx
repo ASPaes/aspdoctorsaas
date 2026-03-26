@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, KeyboardEvent } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send, Mic } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { MediaUploadButton } from "./input/MediaUploadButton";
 import { AIComposerButton } from "./input/AIComposerButton";
@@ -12,6 +13,7 @@ import { ReplyPreview } from "./input/ReplyPreview";
 import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
+import { useAgentPresence } from "@/hooks/useAgentPresence";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import type { MediaSendParams } from "./input/types";
 import { toast } from "sonner";
@@ -30,6 +32,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMutation = useWhatsAppSend();
+  const { isBlocked } = useAgentPresence();
 
   const { macros, incrementUsage } = useWhatsAppMacros();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
@@ -130,29 +133,39 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       />
 
       <div className="p-4">
+        {isBlocked && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="text-xs text-center text-muted-foreground py-2 px-3 bg-muted/50 rounded-md mb-2 cursor-default">
+                Você precisa estar ATIVO para atender.
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Inicie seu expediente ou volte da pausa para enviar mensagens.</TooltipContent>
+          </Tooltip>
+        )}
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} />}
 
-          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending} />
-          <MediaUploadButton conversationId={conversationId} onSendMedia={handleSendMedia} disabled={sendMutation.isPending} />
-          <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending} />
+          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked} />
+          <MediaUploadButton conversationId={conversationId} onSendMedia={handleSendMedia} disabled={sendMutation.isPending || isBlocked} />
+          <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
 
           <Textarea
             ref={textareaRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Digite uma mensagem..."
+            placeholder={isBlocked ? "Você precisa estar ATIVO para atender." : "Digite uma mensagem..."}
             className="min-h-[44px] max-h-32 resize-none"
-            disabled={sendMutation.isPending}
+            disabled={sendMutation.isPending || isBlocked}
           />
 
           {message.trim() ? (
-            <Button onClick={handleSendText} size="icon" disabled={sendMutation.isPending}>
+            <Button onClick={handleSendText} size="icon" disabled={sendMutation.isPending || isBlocked}>
               <Send className="w-4 h-4" />
             </Button>
           ) : (
-            <Button onClick={() => setIsRecording(true)} size="icon" variant="outline" disabled={sendMutation.isPending}>
+            <Button onClick={() => setIsRecording(true)} size="icon" variant="outline" disabled={sendMutation.isPending || isBlocked}>
               <Mic className="w-4 h-4" />
             </Button>
           )}
