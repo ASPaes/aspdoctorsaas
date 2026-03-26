@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { MessageSquare, Trash2, Forward, X, EyeOff } from "lucide-react";
+import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import type { Message } from "../hooks/useWhatsAppMessages";
@@ -215,9 +215,12 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
-        {presenceBlocked && (
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] z-20 pointer-events-none" />
+      <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}>
+        {presenceBlocked && presenceStatus === "paused" && (
+          <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-1.5 text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-1.5 z-10 shrink-0">
+            <Pause className="h-3 w-3" />
+            Em pausa — leitura apenas
+          </div>
         )}
         <ChatHeader
           conversation={conversation}
