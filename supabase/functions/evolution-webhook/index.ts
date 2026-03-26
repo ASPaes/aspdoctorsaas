@@ -943,10 +943,27 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
-          // Colocar conversa como active para aparecer na fila amanhã
+          // Mark conversation with after_hours metadata
+          const nowIsoAH = new Date().toISOString();
+          const { data: convForMeta } = await supabase
+            .from('whatsapp_conversations')
+            .select('metadata')
+            .eq('id', conversationId)
+            .single();
+          const existingMeta = (convForMeta?.metadata && typeof convForMeta.metadata === 'object') ? convForMeta.metadata : {};
+
           await supabase
             .from('whatsapp_conversations')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .update({
+              status: 'active',
+              updated_at: nowIsoAH,
+              metadata: {
+                ...existingMeta,
+                after_hours: true,
+                after_hours_first_at: (existingMeta as any).after_hours_first_at || nowIsoAH,
+                after_hours_last_at: nowIsoAH,
+              },
+            })
             .eq('id', conversationId);
 
           // Criar atendimento em fila se não existir
