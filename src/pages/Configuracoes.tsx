@@ -63,6 +63,10 @@ function WhatsAppSettingsContent() {
           <AtendimentoCsatTab />
         </TabsContent>
 
+        <TabsContent value="pausas" className="mt-4">
+          <AttendancePauseReasonsTab />
+        </TabsContent>
+
         <TabsContent value="instancias" className="mt-4 space-y-4">
           <InstanceSetupCollapsible onOpenAddDialog={() => setAddDialogOpen(true)} />
           <div className="flex justify-end">
