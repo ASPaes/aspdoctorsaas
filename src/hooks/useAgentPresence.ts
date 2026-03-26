@@ -90,6 +90,14 @@ export function useAgentPresence() {
     queryClient.invalidateQueries({ queryKey: ["agent_presence", tid, userId] });
   }, [queryClient, tid, userId]);
 
+  /** Optimistically update presence cache to avoid stale timer rendering */
+  const optimisticUpdate = useCallback((patch: Partial<AgentPresence>) => {
+    queryClient.setQueryData(["agent_presence", tid, userId], (old: AgentPresence | null | undefined) => {
+      if (!old) return old;
+      return { ...old, ...patch };
+    });
+  }, [queryClient, tid, userId]);
+
   useEffect(() => {
     if (!tid || !userId) return;
     const channel = supabase
