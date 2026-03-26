@@ -989,7 +989,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .eq('tenant_id', tenantId)
             .eq('is_from_me', true)
             .gte('created_at', cutoff10min)
-            .ilike('content', '%horário%')
+            .eq('metadata->>outside_hours', 'true')
             .limit(1)
             .maybeSingle();
 
