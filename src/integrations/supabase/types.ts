@@ -2752,6 +2752,8 @@ export type Database = {
           last_message_at: string | null
           last_message_preview: string | null
           metadata: Json | null
+          opened_out_of_hours_at: string | null
+          out_of_hours_cleared_at: string | null
           priority: string | null
           sender_signature_mode: string
           sender_ticket_code: string | null
@@ -2773,6 +2775,8 @@ export type Database = {
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
+          opened_out_of_hours_at?: string | null
+          out_of_hours_cleared_at?: string | null
           priority?: string | null
           sender_signature_mode?: string
           sender_ticket_code?: string | null
@@ -2794,6 +2798,8 @@ export type Database = {
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
+          opened_out_of_hours_at?: string | null
+          out_of_hours_cleared_at?: string | null
           priority?: string | null
           sender_signature_mode?: string
           sender_ticket_code?: string | null
