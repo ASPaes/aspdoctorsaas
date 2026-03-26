@@ -88,6 +88,7 @@ export function useAgentPresence() {
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["agent_presence", tid, userId] });
+    queryClient.invalidateQueries({ queryKey: ["team_presence", tid] });
   }, [queryClient, tid, userId]);
 
   /** Optimistically update presence cache to avoid stale timer rendering */
