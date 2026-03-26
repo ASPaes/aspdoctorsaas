@@ -1265,7 +1265,10 @@ Regras obrigatórias:
 - No máximo 1 emoji
 - VARIE o texto — nunca repita mensagens anteriores`;
 
-        const aiMsg = await callAI(aiCfg, [{ role: 'user', content: prompt }]);
+        const aiMsg = await callAI(aiCfg, [
+          { role: 'system', content: 'Você agora está respondendo uma mensagem automática de horário de atendimento no WhatsApp. Responda APENAS com a mensagem final para o cliente, sem explicações adicionais, sem aspas, sem prefixos como "Mensagem:" ou "Resposta:". Máximo 3 linhas.' },
+          { role: 'user', content: prompt }
+        ]);
         if (aiMsg && aiMsg.trim().length > 0) {
           await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiMsg.trim(), {
             business_hours: true,
