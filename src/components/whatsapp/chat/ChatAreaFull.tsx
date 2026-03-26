@@ -215,7 +215,10 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+        {presenceBlocked && (
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] z-20 pointer-events-none" />
+        )}
         <ChatHeader
           conversation={conversation}
           onToggleDetails={() => setShowDetails(!showDetails)}
