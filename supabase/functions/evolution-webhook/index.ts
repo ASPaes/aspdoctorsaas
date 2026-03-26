@@ -1305,7 +1305,6 @@ async function checkBusinessHours(
     const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
     const businessHours = supportConfig.business_hours || {};
 
-    // Converter timestamp para o timezone configurado
     const msgDate = new Date(timestamp);
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: tz,
@@ -1330,68 +1329,31 @@ async function checkBusinessHours(
 
     console.log(`[business-hours] day=${dayKey} time=${currentTime} tz=${tz}`);
 
-    // --- Exception check: holidays / collective leave ---
-    const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: tz });
-    const todayStr = dateFormatter.format(msgDate);
-    try {
-      const { data: exception } = await supabase
-        .from('business_hours_exceptions')
-        .select('id, name, type')
-        .eq('tenant_id', tenantId)
-        .eq('date', todayStr)
-        .eq('is_closed', true)
-        .maybeSingle();
-
-      if (exception) {
-        console.log(`[business-hours] inside=false tz=${tz} date=${todayStr} EXCEPTION type=${exception.type} name=${exception.name || '(sem nome)'}`);
-        await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
-        return { inside: false };
-      }
-    } catch (err) {
-      console.error('[business-hours] Error querying exceptions, proceeding with normal schedule:', err);
-    }
-
     const dayConfig = businessHours[dayKey];
-
-    // Dia não configurado ou inativo
-    if (!dayConfig || !dayConfig.active) {
-      console.log(`[business-hours] Dia ${dayKey} inativo ou não configurado`);
-      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
-      return { inside: false };
-    }
-
-    // Verificar slots (suporta múltiplos slots: manhã e tarde)
-    const slots: { start: string; end: string }[] = dayConfig.slots || [];
-
-    // Compatibilidade com formato antigo { start, end }
-    if (slots.length === 0 && dayConfig.start && dayConfig.end) {
+    const slots: { start: string; end: string }[] = dayConfig?.slots || [];
+    if (dayConfig?.start && dayConfig?.end && slots.length === 0) {
       slots.push({ start: dayConfig.start, end: dayConfig.end });
     }
 
-    if (slots.length === 0) {
-      console.log(`[business-hours] Nenhum slot configurado para ${dayKey}`);
-      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
-      return { inside: false };
-    }
-
-    // Verificar se horário atual está dentro de algum slot
-    const isInsideSlot = slots.some(slot => {
-      return currentTime >= slot.start && currentTime <= slot.end;
-    });
+    const isInsideSlot = dayConfig?.active && slots.some(
+      (slot: any) => currentTime >= slot.start && currentTime <= slot.end
+    );
 
     if (isInsideSlot) {
-      console.log(`[business-hours] Dentro do horário: ${currentTime} está em um dos slots`);
+      console.log(`[business-hours] Dentro do horário: ${currentTime}`);
       return { inside: true };
     }
 
-    // Fora do horário
-    console.log(`[business-hours] Fora do horário: ${currentTime} não está em nenhum slot`);
-    await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
+    console.log(`[business-hours] Fora do horário: ${currentTime}`);
+    await sendBusinessHoursMessage(
+      supabase, instanceCtx, conversationId, tenantId,
+      supportConfig, dayKey, currentTime, businessHours
+    );
     return { inside: false };
 
   } catch (err) {
     console.error('[business-hours] Erro:', err);
-    return { inside: true }; // fallback: deixa passar em caso de erro
+    return { inside: true };
   }
 }
 
