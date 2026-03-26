@@ -50,8 +50,25 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
+  const queryClient = useQueryClient();
 
-  // Fetch department name from conversation.department_id
+  const isAfterHours = useMemo(() => {
+    const meta = conversation.metadata as Record<string, any> | null;
+    return meta?.after_hours === true || meta?.after_hours === 'true';
+  }, [conversation.metadata]);
+
+  const handleClearAfterHours = useCallback(async () => {
+    const meta = (conversation.metadata && typeof conversation.metadata === 'object') ? conversation.metadata : {};
+    await supabase
+      .from('whatsapp_conversations')
+      .update({
+        metadata: { ...meta, after_hours: false, after_hours_cleared_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversation.id);
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+  }, [conversation.id, conversation.metadata, queryClient]);
+
   const { effectiveTenantId: tid } = useTenantFilter();
   const convDeptId = (conversation as any).department_id;
   const { data: convDepartment } = useQuery({
