@@ -190,11 +190,15 @@ export function useAgentPresence() {
 
   const endShift = useCallback(async () => {
     if (!tid) return;
-    const { error } = await supabase.rpc("agent_presence_set_off", {
-      p_tenant_id: tid,
-    });
-    if (error) throw error;
-    invalidate();
+    try {
+      const { error } = await supabase.rpc("agent_presence_set_off", {
+        p_tenant_id: tid,
+      });
+      if (error) throw error;
+      invalidate();
+    } catch (err) {
+      throw err;
+    }
   }, [tid, invalidate]);
 
   const fetchActiveAttendances = useCallback(async (): Promise<{ count: number; ids: string[] }> => {
@@ -212,13 +216,38 @@ export function useAgentPresence() {
 
   const releaseToQueueAndEndShift = useCallback(async (_attendanceIds: string[]) => {
     if (!tid) return;
-    const { error } = await supabase.rpc("agent_presence_set_off_release_queue", {
-      p_tenant_id: tid,
-    });
-    if (error) throw error;
-    invalidate();
-    queryClient.invalidateQueries({ queryKey: ["whatsapp"] });
+    try {
+      const { error } = await supabase.rpc("agent_presence_set_off_release_queue", {
+        p_tenant_id: tid,
+      });
+      if (error) throw error;
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["whatsapp"] });
+    } catch (err) {
+      throw err;
+    }
   }, [tid, invalidate, queryClient]);
+
+  const keepAssignmentsAndEndShift = useCallback(async (attendanceIds: string[]) => {
+    if (!tid || !userId) return;
+    try {
+      // Log the event
+      await supabase.from("support_agent_presence_events").insert({
+        tenant_id: tid,
+        user_id: userId,
+        event_type: "shift_end_keep_assignments",
+        payload: { count: attendanceIds.length, attendance_ids: attendanceIds },
+      });
+      // Just set off without touching attendances
+      const { error } = await supabase.rpc("agent_presence_set_off", {
+        p_tenant_id: tid,
+      });
+      if (error) throw error;
+      invalidate();
+    } catch (err) {
+      throw err;
+    }
+  }, [tid, userId, invalidate]);
 
   const status: AgentStatus = (presence?.status as AgentStatus) ?? "off";
 
@@ -235,6 +264,7 @@ export function useAgentPresence() {
     endShift,
     fetchActiveAttendances,
     releaseToQueueAndEndShift,
+    keepAssignmentsAndEndShift,
     isBlocked: !isAdmin && status !== "active",
   };
 }
