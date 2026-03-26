@@ -187,53 +187,54 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const filtered = useMemo(() => {
     let result = [...conversations];
 
-    // Department filtering is done at DB query level via department_id.
-    // Only filter out conversations whose active attendance is in a different department.
-    if (selectedDepartmentId) {
+    // Department filtering (skip for after_hours which is tenant-wide)
+    if (selectedDepartmentId && activePill !== "after_hours") {
       result = result.filter(c => {
-        const att = attendanceMap.get(c.id);
-        // If attendance has a department and it doesn't match, hide it
-        if (att?.department_id && att.department_id !== selectedDepartmentId) return false;
+        const state = stateMap.get(c.id);
+        if (state?.department_id && state.department_id !== selectedDepartmentId) return false;
         return true;
       });
     }
 
-    // Non-admin visibility: only show conversations with attendance assigned to me, waiting (queue), or no attendance
+    // Non-admin visibility
     if (!isAdmin && user?.id) {
       result = result.filter(c => {
         const att = attendanceMap.get(c.id);
-        if (!att) return true; // No attendance = show (legacy conversation)
-        if (att.status === "waiting" && !att.assigned_to) return true; // Queue
-        if (att.assigned_to === user.id) return true; // Mine
+        if (!att) return true;
+        if (att.status === "waiting" && !att.assigned_to) return true;
+        if (att.assigned_to === user.id) return true;
         return false;
       });
     }
 
-    // Attendance-based pill filters
+    // Pill filters using centralized bucket logic
     if (activePill === "in_progress") {
       result = result.filter(c => {
-        const att = attendanceMap.get(c.id);
-        return att?.status === "in_progress";
+        const state = stateMap.get(c.id);
+        return state ? getConversationBucket(state) === "in_progress" : false;
       });
     } else if (activePill === "waiting") {
       result = result.filter(c => {
-        const att = attendanceMap.get(c.id);
-        return att?.status === "waiting" && !att?.assigned_to;
+        const state = stateMap.get(c.id);
+        return state ? getConversationBucket(state) === "waiting_in_hours" : false;
       });
     } else if (activePill === "after_hours") {
       result = result.filter(c => {
-        const convAny = c as any;
-        return !!convAny.opened_out_of_hours_at && !convAny.out_of_hours_cleared_at;
+        const state = stateMap.get(c.id);
+        return state ? getConversationBucket(state) === "waiting_out_of_hours" : false;
       });
     } else if (activePill === "closed") {
       result = result.filter(c => {
-        const att = attendanceMap.get(c.id);
-        if (!att || att.status !== "closed") return false;
-        // Non-admin: only show own closed
-        if (!isAdmin && user?.id && att.assigned_to !== user.id) return false;
+        const state = stateMap.get(c.id);
+        if (!state || getConversationBucket(state) !== "closed") return false;
+        if (!isAdmin && user?.id) {
+          const att = attendanceMap.get(c.id);
+          if (att && att.assigned_to !== user.id) return false;
+        }
         return true;
       });
     }
+    // "all" → no bucket filter (show all non-closed by default is already handled by query)
 
     // Sort
     switch (filters.sortBy) {
