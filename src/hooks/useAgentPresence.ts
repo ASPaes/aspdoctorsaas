@@ -124,14 +124,14 @@ export function useAgentPresence() {
   }, [tid, invalidate]);
 
   const setPaused = useCallback(
-    async (reasonId: string) => {
+    async (reasonId: string, minutes?: number) => {
       if (!tid) return;
       const reason = pauseReasons.find((r) => r.id === reasonId);
-      const avgMin = reason?.average_minutes ?? 15;
+      const finalMin = minutes ?? reason?.average_minutes ?? 15;
       const { error } = await supabase.rpc("agent_presence_set_pause", {
         p_tenant_id: tid,
         p_reason_id: reasonId,
-        p_minutes: avgMin,
+        p_minutes: finalMin,
       });
       if (error) throw error;
       invalidate();
@@ -139,13 +139,13 @@ export function useAgentPresence() {
     [tid, pauseReasons, invalidate]
   );
 
-  const extendPause = useCallback(async () => {
+  const extendPause = useCallback(async (minutes?: number) => {
     if (!tid || !presence?.pause_reason_id) return;
     const reason = pauseReasons.find((r) => r.id === presence.pause_reason_id);
-    const avgMin = reason?.average_minutes ?? 15;
+    const finalMin = minutes ?? reason?.average_minutes ?? 15;
     const { error } = await supabase.rpc("agent_presence_extend_pause", {
       p_tenant_id: tid,
-      p_minutes: avgMin,
+      p_minutes: finalMin,
     });
     if (error) throw error;
     invalidate();
