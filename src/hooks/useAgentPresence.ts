@@ -197,16 +197,16 @@ export function useAgentPresence() {
 
   const endShift = useCallback(async () => {
     if (!tid) return;
+    optimisticUpdate({ status: "offline", pause_reason_id: null, pause_started_at: null, pause_expected_end_at: null, shift_ended_at: new Date().toISOString() });
     try {
-      const { error } = await supabase.rpc("agent_presence_set_off", {
-        p_tenant_id: tid,
-      });
+      const { error } = await supabase.rpc("agent_presence_set_off", { p_tenant_id: tid });
       if (error) throw error;
       invalidate();
     } catch (err) {
+      invalidate(); // revert optimistic on error
       throw err;
     }
-  }, [tid, invalidate]);
+  }, [tid, invalidate, optimisticUpdate]);
 
   const fetchActiveAttendances = useCallback(async (): Promise<{ count: number; ids: string[] }> => {
     if (!tid || !userId) return { count: 0, ids: [] };
