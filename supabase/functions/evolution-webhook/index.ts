@@ -1356,7 +1356,7 @@ async function checkBusinessHours(
     // Dia não configurado ou inativo
     if (!dayConfig || !dayConfig.active) {
       console.log(`[business-hours] Dia ${dayKey} inativo ou não configurado`);
-      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
       return { inside: false };
     }
 
@@ -1370,7 +1370,7 @@ async function checkBusinessHours(
 
     if (slots.length === 0) {
       console.log(`[business-hours] Nenhum slot configurado para ${dayKey}`);
-      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
       return { inside: false };
     }
 
@@ -1386,7 +1386,7 @@ async function checkBusinessHours(
 
     // Fora do horário
     console.log(`[business-hours] Fora do horário: ${currentTime} não está em nenhum slot`);
-    await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+    await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
     return { inside: false };
 
   } catch (err) {
