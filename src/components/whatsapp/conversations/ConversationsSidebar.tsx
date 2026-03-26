@@ -113,15 +113,17 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
+  const isAfterHoursPill = activePill === "after_hours";
+
   const { conversations, isLoading } = useWhatsAppConversations({
     search: search.trim() || undefined,
-    instanceId: filters.instanceId,
-    // Filter by department_id directly at query level
-    departmentId: selectedDepartmentId || undefined,
-    instanceIds: selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined),
+    instanceId: isAfterHoursPill ? undefined : filters.instanceId,
+    // When viewing "Fora do horário", ignore department/instance filters to show all tenant conversations
+    departmentId: isAfterHoursPill ? undefined : (selectedDepartmentId || undefined),
+    instanceIds: isAfterHoursPill ? undefined : (selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined)),
     status: filters.status,
-    assignedTo: resolvedAssignedTo,
-    unassigned: resolvedUnassigned || undefined,
+    assignedTo: isAfterHoursPill ? undefined : resolvedAssignedTo,
+    unassigned: isAfterHoursPill ? undefined : (resolvedUnassigned || undefined),
     pageSize: 100,
     includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
