@@ -100,6 +100,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Antes de expirar, verificar se o cliente já respondeu via webhook
+        // mas o cron rodou antes do processamento
+        const { data: recentMsg } = await supabase
+          .from('whatsapp_messages')
+          .select('id, content, created_at')
+          .eq('tenant_id', csat.tenant_id)
+          .eq('is_from_me', false)
+          .gte('created_at', csat.asked_at)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        // Se existe mensagem do cliente APÓS o CSAT ser enviado,
+        // aguardar mais 2 minutos antes de expirar (dá tempo ao webhook processar)
+        if (recentMsg) {
+          const msgTime = new Date(recentMsg.created_at).getTime();
+          const gracePeriodEnd = new Date(msgTime + 2 * 60 * 1000);
+          if (now < gracePeriodEnd) {
+            console.log(`[${FUNCTION_NAME}] CSAT ${csat.id} tem resposta pendente do cliente (${recentMsg.content?.substring(0, 20)}), aguardando processamento do webhook...`);
+            continue;
+          }
+        }
+
         console.log(`[${FUNCTION_NAME}][${requestId}] CSAT ${csat.id} expired (asked_at=${csat.asked_at}, timeout=${config.timeoutMinutes}min)`);
 
         // Mark as expired
