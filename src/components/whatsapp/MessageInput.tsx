@@ -7,9 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   conversationId: string;
+  disabled?: boolean;
 }
 
-export function MessageInput({ conversationId }: Props) {
+export function MessageInput({ conversationId, disabled }: Props) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
