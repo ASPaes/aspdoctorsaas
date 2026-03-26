@@ -326,6 +326,14 @@ Deno.serve(async (req) => {
     // --- PRE-SEND: If agent is sending and no active attendance exists, create it and send opening notification BEFORE the agent's message ---
     let preCreatedAttendance: { id: string; attendance_code: string } | null = null;
     if (senderUserId && !body.systemMessage) {
+      // Mark first_agent_message_at for analytics (only if not already set)
+      const faMsgNow = new Date().toISOString();
+      await supabase
+        .from('whatsapp_conversations')
+        .update({ first_agent_message_at: faMsgNow, updated_at: faMsgNow })
+        .eq('id', body.conversationId)
+        .is('first_agent_message_at', null);
+
       const { data: existingAtt } = await supabase
         .from('support_attendances')
         .select('id')
