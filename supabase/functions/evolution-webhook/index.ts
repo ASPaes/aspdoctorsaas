@@ -2426,6 +2426,7 @@ async function ensureAttendanceForIncomingMessage(
 
       insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
         .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
+      clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
       return;
     }
 
