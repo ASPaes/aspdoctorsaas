@@ -7,11 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, User, Building2 } from "lucide-react";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-
 import { supabase } from "@/integrations/supabase/client";
 
 interface TransferDialogProps {
@@ -22,19 +20,22 @@ interface TransferDialogProps {
   onDepartmentTransferred?: () => void;
 }
 
-function useFuncionariosLookup() {
-  const { effectiveTenantId: tid } = useTenantFilter();
+function useTransferAgents() {
   return useQuery({
-    queryKey: ["funcionarios-lookup-map", tid],
-    enabled: !!tid,
+    queryKey: ["transfer-agents"],
+    staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("funcionarios")
-        .select("id, nome")
-        .eq("ativo", true)
-        .order("nome");
+      const { data, error } = await supabase.rpc("get_transfer_agents");
       if (error) throw error;
-      return new Map((data ?? []).map(f => [f.id, f.nome]));
+      return (data ?? []) as Array<{
+        user_id: string;
+        nome: string;
+        role: string;
+        status: string;
+        department_id: string | null;
+        department_name: string | null;
+        is_super_admin: boolean;
+      }>;
     },
   });
 }
@@ -65,22 +66,12 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const [selectedDept, setSelectedDept] = useState("");
   const [reason, setReason] = useState("");
   const { user } = useAuth();
-  
-  const { data: tenantUsers = [] } = useTenantUsers();
-  const { data: funcMap } = useFuncionariosLookup();
+
+  const { data: agents = [] } = useTransferAgents();
   const { data: departments = [] } = useDepartments();
   const { transferConversation, transferToDepartment, isTransferring, isTransferringDepartment } = useConversationAssignment();
 
-  
-
-  const availableUsers = tenantUsers.filter(u =>
-    u.user_id !== currentAssignee && u.status === "ativo"
-  );
-
-  const getDisplayName = (u: typeof tenantUsers[0]) => {
-    const funcName = u.funcionario_id ? funcMap?.get(u.funcionario_id) : null;
-    return funcName ?? u.email;
-  };
+  const availableAgents = agents.filter(a => a.user_id !== currentAssignee);
 
   const handleTransferAgent = () => {
     if (!selectedUser) return;
@@ -130,9 +121,9 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
                   <SelectValue placeholder="Selecione um agente..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableUsers.map((u) => (
-                    <SelectItem key={u.user_id} value={u.user_id}>
-                      {getDisplayName(u)} {u.user_id === user?.id ? "(eu)" : ""}
+                  {availableAgents.map((a) => (
+                    <SelectItem key={a.user_id} value={a.user_id}>
+                      {a.nome}{a.department_name ? ` — ${a.department_name}` : ""} {a.user_id === user?.id ? "(eu)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

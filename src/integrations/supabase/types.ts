@@ -3842,6 +3842,18 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_transfer_agents: {
+        Args: never
+        Returns: {
+          department_id: string
+          department_name: string
+          is_super_admin: boolean
+          nome: string
+          role: string
+          status: string
+          user_id: string
+        }[]
+      }
       get_ura_departments: {
         Args: never
         Returns: {
