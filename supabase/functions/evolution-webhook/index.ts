@@ -1147,6 +1147,148 @@ function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
 // BUSINESS HOURS + OFF-HOURS + ON-CALL LOGIC
 // =====================================================================
 
+// =====================================================================
+// BUSINESS HOURS CONTEXT RESOLVER
+// =====================================================================
+
+function resolveOutsideHoursContext(
+  dayKey: string,
+  currentTime: string,
+  businessHours: Record<string, any>
+): {
+  period: 'before_open' | 'lunch' | 'after_close' | 'weekend' | 'inactive_day';
+  nextSlotStart: string | null;
+  currentSlots: { start: string; end: string }[];
+} {
+  const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const dayConfig = businessHours[dayKey];
+
+  if (!dayConfig || !dayConfig.active) {
+    const currentIdx = dayOrder.indexOf(dayKey);
+    let nextStart: string | null = null;
+    for (let i = 1; i <= 7; i++) {
+      const nextDay = dayOrder[(currentIdx + i) % 7];
+      const nextDayConfig = businessHours[nextDay];
+      if (nextDayConfig?.active && nextDayConfig?.slots?.length > 0) {
+        nextStart = nextDayConfig.slots[0].start;
+        break;
+      }
+    }
+    return { period: 'weekend', nextSlotStart: nextStart, currentSlots: [] };
+  }
+
+  const slots: { start: string; end: string }[] = dayConfig.slots || [];
+  if (dayConfig.start && dayConfig.end && slots.length === 0) {
+    slots.push({ start: dayConfig.start, end: dayConfig.end });
+  }
+
+  if (slots.length === 0) return { period: 'inactive_day', nextSlotStart: null, currentSlots: [] };
+
+  const firstStart = slots[0].start;
+  const lastEnd = slots[slots.length - 1].end;
+
+  if (currentTime < firstStart) {
+    return { period: 'before_open', nextSlotStart: firstStart, currentSlots: slots };
+  }
+
+  if (currentTime > lastEnd) {
+    const currentIdx = dayOrder.indexOf(dayKey);
+    let nextStart: string | null = null;
+    for (let i = 1; i <= 7; i++) {
+      const nextDay = dayOrder[(currentIdx + i) % 7];
+      const nextDayConfig = businessHours[nextDay];
+      if (nextDayConfig?.active && nextDayConfig?.slots?.length > 0) {
+        nextStart = nextDayConfig.slots[0].start;
+        break;
+      }
+    }
+    return { period: 'after_close', nextSlotStart: nextStart, currentSlots: slots };
+  }
+
+  for (let i = 0; i < slots.length - 1; i++) {
+    if (currentTime > slots[i].end && currentTime < slots[i + 1].start) {
+      return { period: 'lunch', nextSlotStart: slots[i + 1].start, currentSlots: slots };
+    }
+  }
+
+  return { period: 'after_close', nextSlotStart: firstStart, currentSlots: slots };
+}
+
+async function sendBusinessHoursMessage(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  supportConfig: any,
+  dayKey: string,
+  currentTime: string,
+  businessHours: Record<string, any>
+): Promise<void> {
+  try {
+    const ctx = resolveOutsideHoursContext(dayKey, currentTime, businessHours);
+    const slots = ctx.currentSlots;
+    const firstStart = slots[0]?.start || '08:00';
+    const lastEnd = slots[slots.length - 1]?.end || '18:00';
+    const nextStart = ctx.nextSlotStart || firstStart;
+
+    // Tentar usar IA se disponível e habilitada
+    if (supportConfig.business_hours_ai_enabled) {
+      try {
+        const { getAIConfig, callAI } = await import('../_shared/ai-client.ts');
+        const aiCfg = await getAIConfig(tenantId, supabase);
+        if (aiCfg) {
+          const slotsDesc = slots.map((s: any) => `${s.start} às ${s.end}`).join(' e ');
+          let contextHint = '';
+          if (ctx.period === 'before_open') {
+            contextHint = `O cliente escreveu às ${currentTime}, antes da abertura às ${nextStart}.`;
+          } else if (ctx.period === 'lunch') {
+            contextHint = `O cliente escreveu às ${currentTime}, no intervalo entre turnos. Retornamos às ${nextStart}.`;
+          } else if (ctx.period === 'after_close') {
+            contextHint = `O cliente escreveu às ${currentTime}, após o encerramento do expediente. Retornamos às ${nextStart}.`;
+          } else if (ctx.period === 'weekend') {
+            contextHint = `O cliente escreveu num dia sem atendimento. Retornamos às ${nextStart}.`;
+          }
+
+          const prompt = `Você é um atendente virtual simpático. Escreva uma mensagem curta (máximo 3 linhas), amigável e contextual informando que estamos fora do horário de atendimento. ${contextHint} Horário de atendimento: ${slotsDesc}. Informe quando retornaremos. Não use saudação formal. Use emojis com moderação. Não invente informações.`;
+          const aiMsg = await callAI(aiCfg, [{ role: 'user', content: prompt }]);
+          if (aiMsg && aiMsg.trim().length > 0) {
+            await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiMsg.trim(), {
+              business_hours: true,
+              outside_hours: true,
+              ai_generated: true,
+            });
+            console.log(`[business-hours] Mensagem IA enviada conv=${conversationId}`);
+            return;
+          }
+        }
+      } catch (aiErr) {
+        console.log('[business-hours] IA indisponível, usando mensagem padrão:', aiErr);
+      }
+    }
+
+    // Fallback: template do banco com variáveis dinâmicas
+    const template = supportConfig.business_hours_message ||
+      'Olá! 👋 Nosso horário de atendimento é das {{slot1_start}} às {{slot1_end}} e das {{slot2_start}} às {{end}}. Sua mensagem foi registrada!';
+
+    const message = template
+      .replace(/\{\{start\}\}/g, firstStart)
+      .replace(/\{\{end\}\}/g, lastEnd)
+      .replace(/\{\{next_start\}\}/g, nextStart)
+      .replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart)
+      .replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '')
+      .replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '')
+      .replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
+
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, message, {
+      business_hours: true,
+      outside_hours: true,
+    });
+    console.log(`[business-hours] Mensagem padrão enviada conv=${conversationId}`);
+  } catch (err) {
+    console.error('[business-hours] Erro ao enviar mensagem:', err);
+  }
+}
+
 /**
  * Check if the current moment is inside business hours for the tenant.
  */
