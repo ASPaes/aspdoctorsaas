@@ -216,6 +216,14 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
         const att = attendanceMap.get(c.id);
         return att?.status === "waiting" && !att?.assigned_to;
       });
+    } else if (activePill === "after_hours") {
+      result = result.filter(c => {
+        const meta = c.metadata as Record<string, any> | null;
+        const isAfterHours = meta?.after_hours === true || meta?.after_hours === 'true';
+        const att = attendanceMap.get(c.id);
+        const notClosed = !att || att.status !== 'closed';
+        return isAfterHours && notClosed;
+      });
     } else if (activePill === "closed") {
       result = result.filter(c => {
         const att = attendanceMap.get(c.id);
