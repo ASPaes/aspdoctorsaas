@@ -186,6 +186,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   💰 Cobrança
                 </Badge>
               )}
+              {isAfterHours && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleClearAfterHours}
+                      className="inline-flex items-center gap-0.5 px-1.5 h-4 rounded-full text-[10px] font-medium shrink-0 whitespace-nowrap border border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                    >
+                      <Moon className="h-2.5 w-2.5" />
+                      Fora do horário
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Clique para marcar como tratado</TooltipContent>
+                </Tooltip>
               {assignedOperatorName && (
                 <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
                   Técnico: {assignedOperatorName}
