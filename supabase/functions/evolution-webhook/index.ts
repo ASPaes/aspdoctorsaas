@@ -940,7 +940,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         const bhResult = await checkBusinessHours(
           supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
         );
-        if (!bhResult.inside) {
+         if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
           // Mark conversation with opened_out_of_hours_at column (only if not already set)
@@ -984,6 +984,19 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
               created_from: 'customer',
               ura_state: 'none',
             });
+          }
+
+          // Check if conversation was already attended (out_of_hours_cleared_at set)
+          // If so, skip sending auto-message — technician already responded
+          const { data: convCheck } = await supabase
+            .from('whatsapp_conversations')
+            .select('out_of_hours_cleared_at')
+            .eq('id', conversationId)
+            .single();
+
+          if (convCheck?.out_of_hours_cleared_at) {
+            console.log(`[business-hours] Conversa já atendida (cleared_at set), não enviar aviso conv=${conversationId}`);
+            return;
           }
 
           // Contar mensagens do cliente fora do horário nas últimas 8h
@@ -1388,10 +1401,22 @@ async function checkBusinessHours(
     }
 
     console.log(`[business-hours] Fora do horário: ${currentTime}`);
-    await sendBusinessHoursMessage(
-      supabase, instanceCtx, conversationId, tenantId,
-      supportConfig, dayKey, currentTime, businessHours
-    );
+
+    // Check if conversation was already attended — skip auto-message if so
+    const { data: convBH } = await supabase
+      .from('whatsapp_conversations')
+      .select('out_of_hours_cleared_at')
+      .eq('id', conversationId)
+      .single();
+
+    if (!convBH?.out_of_hours_cleared_at) {
+      await sendBusinessHoursMessage(
+        supabase, instanceCtx, conversationId, tenantId,
+        supportConfig, dayKey, currentTime, businessHours
+      );
+    } else {
+      console.log(`[business-hours] Conversa já atendida, pulando aviso automático conv=${conversationId}`);
+    }
     return { inside: false };
 
   } catch (err) {
