@@ -130,9 +130,10 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
 
-  // Get attendance data for all loaded conversations
+  // Get attendance data for all loaded conversations (still used for ConversationItem display)
   const conversationIds = useMemo(() => conversations.map(c => c.id), [conversations]);
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
+  const { stateMap } = useConversationStates(conversationIds);
 
   // Compute pill counts
   const pillCounts = useMemo(() => {
