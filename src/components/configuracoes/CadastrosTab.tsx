@@ -97,6 +97,15 @@ export default function CadastrosTab() {
       value: "unidades_base", label: "Unidades Base", table: "unidades_base", queryKey: "crud_unidades_base", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
+    {
+      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", orderBy: "sort_order",
+      columns: [
+        { key: "name", label: "Nome" },
+        { key: "average_minutes", label: "Tempo médio (min)" },
+        { key: "sort_order", label: "Ordem" },
+        { key: "is_active", label: "Ativo", type: "boolean" },
+      ],
+    },
   ];
 
 
