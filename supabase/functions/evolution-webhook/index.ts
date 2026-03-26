@@ -1231,8 +1231,8 @@ async function sendBusinessHoursMessage(
     const lastEnd = slots[slots.length - 1]?.end || '18:00';
     const nextStart = ctx.nextSlotStart || firstStart;
 
-    // Tentar usar IA se disponível e habilitada
-    if (supportConfig.business_hours_ai_enabled) {
+    // Usar IA se o tenant tiver chave configurada (independente de business_hours_ai_enabled)
+    {
       try {
         const { getAIConfig, callAI } = await import('../_shared/ai-client.ts');
         const aiCfg = await getAIConfig(tenantId, supabase);
