@@ -2438,20 +2438,44 @@ async function ensureAttendanceForOperatorMessage(
       return;
     }
 
-    const OPERATOR_COOLDOWN_SECONDS = 30;
-    const { data: lastClosed } = await supabase
-      .from('support_attendances')
-      .select('id, closed_at')
-      .eq('conversation_id', conversationId)
-      .eq('status', 'closed')
-      .order('closed_at', { ascending: false })
+    // --- CSAT GUARD: don't create new attendance while CSAT survey is pending ---
+    const { data: pendingCsat } = await supabase
+      .from('support_csat')
+      .select('id, attendance_id')
+      .eq('tenant_id', tenantId)
+      .is('responded_at', null)
       .limit(1)
       .maybeSingle();
 
-    if (lastClosed?.closed_at) {
-      const closedAgo = (Date.now() - new Date(lastClosed.closed_at).getTime()) / 1000;
-      if (closedAgo < OPERATOR_COOLDOWN_SECONDS) {
-        console.log(`[attendance-operator] Cooldown active — last closed ${Math.round(closedAgo)}s ago (< ${OPERATOR_COOLDOWN_SECONDS}s). Skipping new attendance.`);
+    if (pendingCsat) {
+      // Verify it belongs to this conversation
+      const { data: csatAtt } = await supabase
+        .from('support_attendances')
+        .select('id')
+        .eq('id', pendingCsat.attendance_id)
+        .eq('conversation_id', conversationId)
+        .maybeSingle();
+
+      if (csatAtt) {
+        console.log(`[attendance-operator] CSAT pending for att=${pendingCsat.attendance_id} conv=${conversationId}. Skipping new attendance.`);
+        return;
+      }
+    }
+
+    const OPERATOR_COOLDOWN_SECONDS = 30;
+    const { data: lastAtt } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at, created_at, status')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastAtt) {
+      const refTime = lastAtt.closed_at || lastAtt.created_at;
+      const agoSeconds = (Date.now() - new Date(refTime).getTime()) / 1000;
+      if (agoSeconds < OPERATOR_COOLDOWN_SECONDS) {
+        console.log(`[attendance-operator] Cooldown active — last att ${lastAtt.id} (${lastAtt.status}) ${Math.round(agoSeconds)}s ago (< ${OPERATOR_COOLDOWN_SECONDS}s). Skipping new attendance.`);
         return;
       }
     }
