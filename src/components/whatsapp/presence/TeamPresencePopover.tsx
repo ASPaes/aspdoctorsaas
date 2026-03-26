@@ -64,7 +64,7 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
           <span className={`h-2 w-2 rounded-full shrink-0 ${cfg.dotClass}`} />
           <span className="text-sm font-medium truncate">{member.agent_name}</span>
           {heartbeatStale && member.status !== "offline" && (
-            <WifiOff className="h-3 w-3 text-destructive shrink-0" title="Sem sinal" />
+            <WifiOff className="h-3 w-3 text-destructive shrink-0" />
           )}
         </div>
 
