@@ -221,16 +221,22 @@ export default function AgentPresenceButton() {
             <AlertDialogTitle>Encerrar expediente</AlertDialogTitle>
             <AlertDialogDescription>
               Você tem <strong>{pendingCount}</strong> atendimento{pendingCount !== 1 ? "s" : ""} em andamento.
-              {pendingCount !== 1 ? " Eles serão devolvidos" : " Ele será devolvido"} para a fila.
+              O que deseja fazer?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={releasing}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmRelease} disabled={releasing}>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button onClick={handleConfirmRelease} disabled={releasing}>
               {releasing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Devolver para a fila e encerrar
-            </AlertDialogAction>
-          </AlertDialogFooter>
+            </Button>
+            <Button variant="outline" onClick={handleKeepAndEnd} disabled={releasing}>
+              {releasing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Deixar como está e encerrar
+            </Button>
+            <Button variant="ghost" onClick={() => setEndShiftModalOpen(false)} disabled={releasing}>
+              Cancelar
+            </Button>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </>
