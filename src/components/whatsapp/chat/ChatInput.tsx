@@ -54,6 +54,10 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [message, macros]);
 
   const handleSendText = useCallback(() => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
     const content = message.trim();
     if (!content || sendMutation.isPending) return;
 

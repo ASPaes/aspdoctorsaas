@@ -17,6 +17,7 @@ import { useSenderMap } from "../hooks/useSenderMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { ShieldAlert } from "lucide-react";
+import { useAgentPresence } from "@/hooks/useAgentPresence";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,7 @@ type DeleteMode = 'panel_only' | 'everyone';
 export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
 
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
@@ -213,7 +215,10 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
 
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
+        {presenceBlocked && (
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] z-20 pointer-events-none" />
+        )}
         <ChatHeader
           conversation={conversation}
           onToggleDetails={() => setShowDetails(!showDetails)}
