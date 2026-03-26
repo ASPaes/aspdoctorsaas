@@ -47,7 +47,6 @@ export default function AgentPresenceButton() {
     keepAssignmentsAndEndShift,
   } = useAgentPresence();
 
-  const [remaining, setRemaining] = useState(0);
   const [loading, setLoading] = useState(false);
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
 
@@ -57,20 +56,12 @@ export default function AgentPresenceButton() {
   const [pendingCount, setPendingCount] = useState(0);
   const [releasing, setReleasing] = useState(false);
 
-  // Countdown timer
-  useEffect(() => {
-    if (status !== "paused" || !presence?.pause_expected_end_at) {
-      setRemaining(0);
-      return;
-    }
-    const update = () => {
-      const diff = new Date(presence.pause_expected_end_at!).getTime() - Date.now();
-      setRemaining(Math.max(0, diff));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [status, presence?.pause_expected_end_at]);
+  // Pause timer with total/remaining/exceeded
+  const { pausedTotalMs, remainingMs, exceededMs, timerExpired } = usePauseTimer(
+    status,
+    presence?.pause_started_at,
+    presence?.pause_expected_end_at
+  );
 
   const wrap = useCallback(async (fn: () => Promise<void>, successMsg?: string) => {
     setLoading(true);
