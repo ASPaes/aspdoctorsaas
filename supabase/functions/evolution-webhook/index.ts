@@ -1931,9 +1931,7 @@ async function handleUraResponse(
       .eq('id', conversationId);
     console.log(`[ura] Customer chose to close attendance+conversation att=${att.id} conv=${conversationId}`);
     const code = att.attendance_code || '';
-    const closeText = code
-      ? `✅ Atendimento *${code}* encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. Estamos à disposição! 😊`
-      : '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!';
+    const closeText = `✅ Atendimento${code ? ` *${code}*` : ''} encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. Estamos à disposição! 😊`;
     await sendAndPersistAutoMessage(
       supabase, instanceCtx, conversationId, tenantId,
       closeText,
