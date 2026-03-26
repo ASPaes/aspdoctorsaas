@@ -1395,56 +1395,8 @@ async function checkBusinessHours(
   }
 }
 
-async function sendBusinessHoursMessage(
-  supabase: any,
-  instanceCtx: InstanceContext,
-  conversationId: string,
-  tenantId: string,
-  supportConfig: any,
-  currentTime: string
-): Promise<void> {
-  try {
-    // Montar horários do dia para exibir na mensagem
-    const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
-    const businessHours = supportConfig.business_hours || {};
-    const msgDate = new Date();
-    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' });
-    const weekdayMap: Record<string, string> = {
-      'Sun': 'sun', 'Mon': 'mon', 'Tue': 'tue',
-      'Wed': 'wed', 'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat',
-    };
-    const dayKey = weekdayMap[formatter.format(msgDate)] || '';
-    const dayConfig = businessHours[dayKey];
-    const slots: { start: string; end: string }[] = dayConfig?.slots || [];
 
-    // Backward compat
-    if (slots.length === 0 && dayConfig?.start && dayConfig?.end) {
-      slots.push({ start: dayConfig.start, end: dayConfig.end });
-    }
 
-    let horariosTexto = '';
-    if (slots.length > 0) {
-      horariosTexto = slots.map(s => `${s.start} às ${s.end}`).join(' e ');
-    }
-
-    const template = supportConfig.business_hours_message ||
-      'Olá! 👋 No momento estamos fora do horário de atendimento. Sua mensagem foi registrada e retornaremos em breve!';
-
-    const message = template
-      .replace(/\{\{start\}\}/g, slots[0]?.start || '')
-      .replace(/\{\{end\}\}/g, slots[slots.length - 1]?.end || '')
-      .replace(/\{\{horarios\}\}/g, horariosTexto);
-
-    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, message, {
-      business_hours: true,
-      outside_hours: true,
-    });
-
-    console.log(`[business-hours] Mensagem de fora do horário enviada conv=${conversationId}`);
-  } catch (err) {
-    console.error('[business-hours] Erro ao enviar mensagem:', err);
-  }
-}
 
 /**
  * Get conversation metadata (off-hours timestamps).
