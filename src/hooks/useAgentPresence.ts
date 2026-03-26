@@ -27,22 +27,6 @@ export interface PauseReason {
   sort_order: number;
 }
 
-async function logEvent(
-  tid: string,
-  userId: string,
-  eventType: string,
-  reasonId?: string | null,
-  payload?: Record<string, any>
-) {
-  await supabase.from("support_agent_presence_events").insert({
-    tenant_id: tid,
-    user_id: userId,
-    event_type: eventType,
-    pause_reason_id: reasonId || null,
-    payload: payload ?? null,
-  } as any);
-}
-
 export function useAgentPresence() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { user, profile } = useAuth();
@@ -64,6 +48,7 @@ export function useAgentPresence() {
       if (error) throw error;
       if (data) return data as unknown as AgentPresence;
 
+      // Row doesn't exist yet — create via RPC (set_active creates if needed, but we want "off")
       const { data: created, error: insertErr } = await supabase
         .from("support_agent_presence")
         .insert({ tenant_id: tid!, user_id: userId!, status: "off" })
@@ -118,100 +103,63 @@ export function useAgentPresence() {
     return () => { supabase.removeChannel(channel); };
   }, [tid, userId, invalidate]);
 
-  const updatePresence = useCallback(
-    async (payload: Partial<AgentPresence>) => {
-      if (!tid || !userId) return;
-      const { error } = await supabase
-        .from("support_agent_presence")
-        .update({ ...payload, updated_at: new Date().toISOString() } as any)
-        .eq("tenant_id", tid)
-        .eq("user_id", userId);
-      if (error) throw error;
-      invalidate();
-    },
-    [tid, userId, invalidate]
-  );
-
-  // ── Actions with event logging ──
+  // ── RPC-based actions ──
 
   const startShift = useCallback(async () => {
-    if (!tid || !userId) return;
-    await updatePresence({
-      status: "active" as AgentStatus,
-      shift_started_at: new Date().toISOString(),
-      shift_ended_at: null,
-      pause_reason_id: null,
-      pause_started_at: null,
-      pause_expected_end_at: null,
+    if (!tid) return;
+    const { error } = await supabase.rpc("agent_presence_set_active", {
+      p_tenant_id: tid,
     });
-    await logEvent(tid, userId, "shift_start");
-  }, [updatePresence, tid, userId]);
+    if (error) throw error;
+    invalidate();
+  }, [tid, invalidate]);
 
   const setActive = useCallback(async () => {
-    if (!tid || !userId) return;
-    const wasPaused = presence?.status === "paused";
-    await updatePresence({
-      status: "active" as AgentStatus,
-      pause_reason_id: null,
-      pause_started_at: null,
-      pause_expected_end_at: null,
+    if (!tid) return;
+    const { error } = await supabase.rpc("agent_presence_set_active", {
+      p_tenant_id: tid,
     });
-    if (wasPaused) {
-      await logEvent(tid, userId, "pause_end");
-    }
-  }, [updatePresence, tid, userId, presence?.status]);
+    if (error) throw error;
+    invalidate();
+  }, [tid, invalidate]);
 
   const setPaused = useCallback(
     async (reasonId: string) => {
-      if (!tid || !userId) return;
+      if (!tid) return;
       const reason = pauseReasons.find((r) => r.id === reasonId);
       const avgMin = reason?.average_minutes ?? 15;
-      const now = new Date();
-      const expectedEnd = new Date(now.getTime() + avgMin * 60_000);
-      await updatePresence({
-        status: "paused" as AgentStatus,
-        pause_reason_id: reasonId,
-        pause_started_at: now.toISOString(),
-        pause_expected_end_at: expectedEnd.toISOString(),
+      const { error } = await supabase.rpc("agent_presence_set_pause", {
+        p_tenant_id: tid,
+        p_reason_id: reasonId,
+        p_minutes: avgMin,
       });
-      await logEvent(tid, userId, "pause_start", reasonId, {
-        reason_name: reason?.name,
-        average_minutes: avgMin,
-      });
+      if (error) throw error;
+      invalidate();
     },
-    [updatePresence, pauseReasons, tid, userId]
+    [tid, pauseReasons, invalidate]
   );
 
   const extendPause = useCallback(async () => {
-    if (!tid || !userId || !presence?.pause_reason_id) return;
+    if (!tid || !presence?.pause_reason_id) return;
     const reason = pauseReasons.find((r) => r.id === presence.pause_reason_id);
     const avgMin = reason?.average_minutes ?? 15;
-    const now = new Date();
-    const expectedEnd = new Date(now.getTime() + avgMin * 60_000);
-    await updatePresence({
-      pause_started_at: now.toISOString(),
-      pause_expected_end_at: expectedEnd.toISOString(),
+    const { error } = await supabase.rpc("agent_presence_extend_pause", {
+      p_tenant_id: tid,
+      p_minutes: avgMin,
     });
-    await logEvent(tid, userId, "pause_extend", presence.pause_reason_id, {
-      reason_name: reason?.name,
-      average_minutes: avgMin,
-    });
-  }, [updatePresence, presence?.pause_reason_id, pauseReasons, tid, userId]);
+    if (error) throw error;
+    invalidate();
+  }, [tid, presence?.pause_reason_id, pauseReasons, invalidate]);
 
-  // Simple end shift (no attendances)
   const endShift = useCallback(async () => {
-    if (!tid || !userId) return;
-    await updatePresence({
-      status: "off" as AgentStatus,
-      shift_ended_at: new Date().toISOString(),
-      pause_reason_id: null,
-      pause_started_at: null,
-      pause_expected_end_at: null,
+    if (!tid) return;
+    const { error } = await supabase.rpc("agent_presence_set_off", {
+      p_tenant_id: tid,
     });
-    await logEvent(tid, userId, "shift_end");
-  }, [updatePresence, tid, userId]);
+    if (error) throw error;
+    invalidate();
+  }, [tid, invalidate]);
 
-  // ── Fetch active attendances count ──
   const fetchActiveAttendances = useCallback(async (): Promise<{ count: number; ids: string[] }> => {
     if (!tid || !userId) return { count: 0, ids: [] };
     const { data, error } = await supabase
@@ -225,43 +173,15 @@ export function useAgentPresence() {
     return { count: ids.length, ids };
   }, [tid, userId]);
 
-  // ── Release to queue + end shift ──
-  const releaseToQueueAndEndShift = useCallback(async (attendanceIds: string[]) => {
-    if (!tid || !userId) return;
-    const now = new Date().toISOString();
-
-    // Release attendances to queue
-    if (attendanceIds.length > 0) {
-      const { error } = await supabase
-        .from("support_attendances")
-        .update({
-          status: "waiting",
-          assigned_to: null,
-          assumed_at: null,
-          updated_at: now,
-        } as any)
-        .in("id", attendanceIds);
-      if (error) throw error;
-
-      await logEvent(tid, userId, "shift_end_release_to_queue", null, {
-        count: attendanceIds.length,
-        attendance_ids: attendanceIds,
-      });
-    }
-
-    // End shift
-    await updatePresence({
-      status: "off" as AgentStatus,
-      shift_ended_at: now,
-      pause_reason_id: null,
-      pause_started_at: null,
-      pause_expected_end_at: null,
+  const releaseToQueueAndEndShift = useCallback(async (_attendanceIds: string[]) => {
+    if (!tid) return;
+    const { error } = await supabase.rpc("agent_presence_set_off_release_queue", {
+      p_tenant_id: tid,
     });
-    await logEvent(tid, userId, "shift_end");
-
-    // Invalidate attendances queries so sidebar refreshes
+    if (error) throw error;
+    invalidate();
     queryClient.invalidateQueries({ queryKey: ["whatsapp"] });
-  }, [updatePresence, tid, userId, queryClient]);
+  }, [tid, invalidate, queryClient]);
 
   const status: AgentStatus = (presence?.status as AgentStatus) ?? "off";
 

@@ -3685,6 +3685,26 @@ export type Database = {
         Returns: undefined
       }
       accept_invite: { Args: { p_token: string }; Returns: undefined }
+      agent_presence_extend_pause: {
+        Args: { p_minutes: number; p_tenant_id: string }
+        Returns: undefined
+      }
+      agent_presence_set_active: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
+      agent_presence_set_off: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
+      agent_presence_set_off_release_queue: {
+        Args: { p_tenant_id: string }
+        Returns: Json
+      }
+      agent_presence_set_pause: {
+        Args: { p_minutes: number; p_reason_id: string; p_tenant_id: string }
+        Returns: undefined
+      }
       audit_log: {
         Args: {
           p_event_type: string
