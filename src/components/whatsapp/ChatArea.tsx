@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { MediaContent } from "./chat/MediaContent";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatTime as formatTzTime, formatDateLabel } from "@/lib/formatDateWithTimezone";
+import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
+import { useAgentPresence } from "@/hooks/useAgentPresence";
 
 interface Props {
   conversation: Conversation | null;
@@ -61,6 +63,7 @@ function groupByDateInline(messages: Message[], timezone: string): { date: strin
 export function ChatArea({ conversation }: Props) {
   const { data: messages = [], isLoading } = useMessages(conversation?.id ?? null);
   const { timezone } = useAppTimezone();
+  const { isBlocked } = useAgentPresence();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,7 +97,8 @@ export function ChatArea({ conversation }: Props) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+      <AgentPresenceOverlay />
       <ScrollArea className="h-full px-4 py-2">
         {isLoading ? (
           <div className="space-y-3 py-4">
@@ -127,7 +131,7 @@ export function ChatArea({ conversation }: Props) {
       </div>
 
       {/* Input */}
-      <MessageInput conversationId={conversation.id} />
+      <MessageInput conversationId={conversation.id} disabled={isBlocked} />
     </div>
   );
 }
