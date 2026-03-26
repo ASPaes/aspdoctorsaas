@@ -2452,6 +2452,7 @@ async function ensureAttendanceForIncomingMessage(
 
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
       .catch(err => console.error('[attendance] Error inserting system msg:', err));
+    clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
 
     if (instanceCtx) {
       sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
