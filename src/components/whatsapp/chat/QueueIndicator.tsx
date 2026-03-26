@@ -88,7 +88,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
           size="sm"
           className="h-7 text-xs gap-1.5 rounded-full"
           onClick={handleClaim}
-          disabled={isAssigning}
+          disabled={isAssigning || isBlocked}
         >
           {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
