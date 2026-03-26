@@ -136,9 +136,15 @@ export default function AgentPresenceButton() {
 
   if (presenceLoading || !presence) return null;
 
+  const pauseLabel = status === "paused"
+    ? timerExpired
+      ? `Excedido ${formatCountdown(exceededMs)}`
+      : `Pausado ${formatCountdown(remainingMs)}`
+    : "";
+
   const statusConfig: Record<AgentStatus, { label: string; dotClass: string; icon: React.ReactNode }> = {
     active: { label: "Ativo", dotClass: "bg-green-500", icon: <Zap className="h-3 w-3" /> },
-    paused: { label: `Pausado ${formatCountdown(remaining)}`, dotClass: "bg-yellow-500", icon: <Pause className="h-3 w-3" /> },
+    paused: { label: pauseLabel, dotClass: timerExpired ? "bg-red-500" : "bg-yellow-500", icon: <Pause className="h-3 w-3" /> },
     offline: { label: "Offline", dotClass: "bg-muted-foreground/50", icon: <LogOut className="h-3 w-3" /> },
   };
 
@@ -179,9 +185,18 @@ export default function AgentPresenceButton() {
                 <Play className="h-4 w-4 mr-2" /> Voltar ao ativo
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {remaining > 0 ? `Restante: ${formatCountdown(remaining)}` : "Tempo expirado"}
+              <DropdownMenuLabel className="text-xs text-muted-foreground flex flex-col gap-0.5 py-1">
+                <span className="flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  Pausado há: {formatCountdown(pausedTotalMs)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {timerExpired
+                    ? <span className="text-destructive">Excedido: {formatCountdown(exceededMs)}</span>
+                    : `Restante: ${formatCountdown(remainingMs)}`
+                  }
+                </span>
               </DropdownMenuLabel>
             </>
           )}
