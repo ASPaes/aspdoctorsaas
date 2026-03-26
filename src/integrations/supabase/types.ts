@@ -3689,6 +3689,10 @@ export type Database = {
         Args: { p_minutes: number; p_tenant_id: string }
         Returns: undefined
       }
+      agent_presence_heartbeat: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       agent_presence_set_active: {
         Args: { p_tenant_id: string }
         Returns: undefined
