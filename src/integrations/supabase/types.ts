@@ -1013,6 +1013,13 @@ export type Database = {
             foreignKeyName: "conversation_assignments_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversation_assignments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -2096,6 +2103,13 @@ export type Database = {
             foreignKeyName: "support_attendances_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "support_attendances_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -2156,6 +2170,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "support_attendances"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_csat_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["attendance_id"]
           },
         ]
       }
@@ -2394,6 +2415,13 @@ export type Database = {
             referencedRelation: "support_attendances"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "support_kb_articles_source_attendance_id_fkey"
+            columns: ["source_attendance_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["attendance_id"]
+          },
         ]
       }
       support_pause_reasons: {
@@ -2494,6 +2522,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "support_attendances"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_attendance_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["attendance_id"]
           },
           {
             foreignKeyName: "support_tickets_cliente_fkey"
@@ -2669,6 +2704,13 @@ export type Database = {
             foreignKeyName: "whatsapp_conversation_notes_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversation_notes_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -2726,6 +2768,13 @@ export type Database = {
             foreignKeyName: "whatsapp_conversation_summaries_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversation_summaries_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -2746,12 +2795,14 @@ export type Database = {
           created_at: string
           current_instance_id: string | null
           department_id: string | null
+          first_agent_message_at: string | null
           id: string
           instance_id: string | null
           is_last_message_from_me: boolean
           last_message_at: string | null
           last_message_preview: string | null
           metadata: Json | null
+          opened_out_of_hours: boolean
           opened_out_of_hours_at: string | null
           out_of_hours_cleared_at: string | null
           priority: string | null
@@ -2769,12 +2820,14 @@ export type Database = {
           created_at?: string
           current_instance_id?: string | null
           department_id?: string | null
+          first_agent_message_at?: string | null
           id?: string
           instance_id?: string | null
           is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
+          opened_out_of_hours?: boolean
           opened_out_of_hours_at?: string | null
           out_of_hours_cleared_at?: string | null
           priority?: string | null
@@ -2792,12 +2845,14 @@ export type Database = {
           created_at?: string
           current_instance_id?: string | null
           department_id?: string | null
+          first_agent_message_at?: string | null
           id?: string
           instance_id?: string | null
           is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
           metadata?: Json | null
+          opened_out_of_hours?: boolean
           opened_out_of_hours_at?: string | null
           out_of_hours_cleared_at?: string | null
           priority?: string | null
@@ -3049,6 +3104,13 @@ export type Database = {
             foreignKeyName: "whatsapp_message_edit_history_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_message_edit_history_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -3172,6 +3234,13 @@ export type Database = {
             foreignKeyName: "whatsapp_messages_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -3223,6 +3292,13 @@ export type Database = {
           tenant_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_reactions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
           {
             foreignKeyName: "whatsapp_reactions_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -3297,6 +3373,13 @@ export type Database = {
             foreignKeyName: "whatsapp_sentiment_analysis_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: true
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_sentiment_analysis_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -3362,6 +3445,13 @@ export type Database = {
             foreignKeyName: "whatsapp_sentiment_history_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_sentiment_history_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -3401,6 +3491,13 @@ export type Database = {
             foreignKeyName: "whatsapp_topics_history_conversation_id_fkey"
             columns: ["conversation_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_topics_history_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_conversations"
             referencedColumns: ["id"]
           },
@@ -3415,6 +3512,48 @@ export type Database = {
       }
     }
     Views: {
+      v_whatsapp_conversations_state: {
+        Row: {
+          attendance_assigned_to: string | null
+          attendance_id: string | null
+          attendance_opened_at: string | null
+          attendance_status: string | null
+          conversation_assigned_to: string | null
+          conversation_id: string | null
+          conversation_status: string | null
+          department_id: string | null
+          first_agent_message_at: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          opened_out_of_hours: boolean | null
+          opened_out_of_hours_at: string | null
+          tenant_id: string | null
+          unread_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_attendances_assigned_to_fkey"
+            columns: ["attendance_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_clientes_financeiro: {
         Row: {
           area_atuacao_id: number | null
