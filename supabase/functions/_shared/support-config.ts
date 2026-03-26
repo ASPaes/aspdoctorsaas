@@ -44,6 +44,7 @@ export interface SupportConfig {
   business_hours_message: string | null;
   business_hours_ai_enabled: boolean;
   business_hours_ai_prompt: string | null;
+  business_hours_outside_prompt: string | null;
 
   // On-call escalation
   oncall_phone_number: string | null;
@@ -100,6 +101,7 @@ const DEFAULTS: SupportConfig = {
   business_hours_message: null,
   business_hours_ai_enabled: false,
   business_hours_ai_prompt: null,
+  business_hours_outside_prompt: null,
 
   // On-call
   oncall_phone_number: null,
@@ -144,6 +146,7 @@ const SELECT_FIELDS = [
   'business_hours_message',
   'business_hours_ai_enabled',
   'business_hours_ai_prompt',
+  'business_hours_outside_prompt',
   // On-call
   'oncall_phone_number',
   'oncall_message_template',
