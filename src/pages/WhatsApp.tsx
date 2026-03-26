@@ -15,6 +15,8 @@ import { DepartmentFilterProvider, useDepartmentFilter } from "@/contexts/Depart
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldAlert } from "lucide-react";
+import AgentPresenceBar from "@/components/whatsapp/presence/AgentPresenceBar";
+import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
@@ -194,31 +196,43 @@ function WhatsAppContent() {
   if (isMobile) {
     if (selected) {
       return (
-        <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
-          <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+        <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
+          <AgentPresenceBar />
+          <div className="h-[calc(100%-theme(spacing.10))]">
+            <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+          </div>
+          <AgentPresenceOverlay />
         </div>
       );
     }
     return (
-      <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background">
-        <div className="w-full h-full">
-          <ConversationsSidebar selectedId={null} onSelect={setSelected} />
+      <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
+        <AgentPresenceBar />
+        <div className="h-[calc(100%-theme(spacing.10))]">
+          <div className="w-full h-full">
+            <ConversationsSidebar selectedId={null} onSelect={setSelected} />
+          </div>
         </div>
+        <AgentPresenceOverlay />
       </div>
     );
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background w-full max-w-full">
-      <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel defaultSize={25} minSize={24} maxSize={40}>
-          <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
-        </ResizablePanel>
-        <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
-        <ResizablePanel defaultSize={75}>
-          <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+    <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background w-full max-w-full relative flex flex-col">
+      <AgentPresenceBar />
+      <div className="flex-1 min-h-0">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanel defaultSize={25} minSize={24} maxSize={40}>
+            <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
+          </ResizablePanel>
+          <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
+          <ResizablePanel defaultSize={75}>
+            <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+      <AgentPresenceOverlay />
     </div>
   );
 }
