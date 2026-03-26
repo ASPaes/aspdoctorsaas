@@ -41,6 +41,7 @@ type DeleteMode = 'panel_only' | 'everyone';
 export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
 
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
