@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Plus, MessageSquare, BarChart3, Users, X } from "lucide-react";
+import AgentPresenceButton from "../presence/AgentPresenceButton";
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
