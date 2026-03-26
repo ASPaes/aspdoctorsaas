@@ -6,20 +6,23 @@ interface Props {
   inProgressCount: number;
   waitingCount: number;
   closedCount: number;
+  afterHoursCount: number;
 }
 
 const pills = [
   { key: "in_progress", label: "Em andamento" },
   { key: "waiting", label: "Fila" },
+  { key: "after_hours", label: "Fora do horário" },
   { key: "all", label: "Todos" },
   { key: "closed", label: "Encerrados" },
 ];
 
-export function QuickPills({ active, onChange, inProgressCount, waitingCount, closedCount }: Props) {
+export function QuickPills({ active, onChange, inProgressCount, waitingCount, closedCount, afterHoursCount }: Props) {
   const getCount = (key: string) => {
     if (key === "in_progress") return inProgressCount;
     if (key === "waiting") return waitingCount;
     if (key === "closed") return closedCount;
+    if (key === "after_hours") return afterHoursCount;
     return 0;
   };
 
