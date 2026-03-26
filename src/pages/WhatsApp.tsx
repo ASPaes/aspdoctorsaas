@@ -220,9 +220,9 @@ function WhatsAppContent() {
           <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
           <ResizablePanel defaultSize={75} className="relative h-full">
             <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <AgentPresenceOverlay />
           </ResizablePanel>
         </ResizablePanelGroup>
-      <AgentPresenceOverlay />
     </div>
   );
 }
