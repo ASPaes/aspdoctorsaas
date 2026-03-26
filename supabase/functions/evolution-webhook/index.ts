@@ -943,10 +943,27 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
-          // Colocar conversa como active para aparecer na fila amanhã
+          // Mark conversation with after_hours metadata
+          const nowIsoAH = new Date().toISOString();
+          const { data: convForMeta } = await supabase
+            .from('whatsapp_conversations')
+            .select('metadata')
+            .eq('id', conversationId)
+            .single();
+          const existingMeta = (convForMeta?.metadata && typeof convForMeta.metadata === 'object') ? convForMeta.metadata : {};
+
           await supabase
             .from('whatsapp_conversations')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .update({
+              status: 'active',
+              updated_at: nowIsoAH,
+              metadata: {
+                ...existingMeta,
+                after_hours: true,
+                after_hours_first_at: (existingMeta as any).after_hours_first_at || nowIsoAH,
+                after_hours_last_at: nowIsoAH,
+              },
+            })
             .eq('id', conversationId);
 
           // Criar atendimento em fila se não existir
@@ -2301,6 +2318,33 @@ function extractMaxOptionFromTemplate(template: string): number {
   return max || 5;
 }
 
+async function clearAfterHoursMetadata(supabase: any, conversationId: string): Promise<void> {
+  try {
+    const { data: conv } = await supabase
+      .from('whatsapp_conversations')
+      .select('metadata')
+      .eq('id', conversationId)
+      .single();
+    const meta = (conv?.metadata && typeof conv.metadata === 'object') ? conv.metadata : {};
+    if ((meta as any).after_hours) {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          metadata: {
+            ...meta,
+            after_hours: false,
+            after_hours_cleared_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+      console.log(`[after-hours] Cleared after_hours flag for conv=${conversationId}`);
+    }
+  } catch (err) {
+    console.error('[after-hours] Error clearing metadata:', err);
+  }
+}
+
 async function ensureAttendanceForIncomingMessage(
   supabase: any,
   conversationId: string,
@@ -2382,6 +2426,7 @@ async function ensureAttendanceForIncomingMessage(
 
       insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
         .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
+      clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
       return;
     }
 
@@ -2407,6 +2452,7 @@ async function ensureAttendanceForIncomingMessage(
 
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
       .catch(err => console.error('[attendance] Error inserting system msg:', err));
+    clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
 
     if (instanceCtx) {
       sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
@@ -2502,6 +2548,7 @@ async function ensureAttendanceForOperatorMessage(
       console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
       insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
         .catch(err => console.error('[attendance-operator] Error inserting system msg:', err));
+      clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
     }
   } catch (err) {
     console.error('[attendance-operator] Unexpected error:', err);

@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2 } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -50,8 +50,25 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
+  const queryClient = useQueryClient();
 
-  // Fetch department name from conversation.department_id
+  const isAfterHours = useMemo(() => {
+    const meta = conversation.metadata as Record<string, any> | null;
+    return meta?.after_hours === true || meta?.after_hours === 'true';
+  }, [conversation.metadata]);
+
+  const handleClearAfterHours = useCallback(async () => {
+    const meta = (conversation.metadata && typeof conversation.metadata === 'object') ? conversation.metadata : {};
+    await supabase
+      .from('whatsapp_conversations')
+      .update({
+        metadata: { ...meta, after_hours: false, after_hours_cleared_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversation.id);
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+  }, [conversation.id, conversation.metadata, queryClient]);
+
   const { effectiveTenantId: tid } = useTenantFilter();
   const convDeptId = (conversation as any).department_id;
   const { data: convDepartment } = useQuery({
@@ -168,6 +185,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <Badge variant="outline" className="text-[10px] h-4 shrink-0 whitespace-nowrap border-amber-500 text-amber-600 dark:text-amber-400">
                   💰 Cobrança
                 </Badge>
+              )}
+              {isAfterHours && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleClearAfterHours}
+                      className="inline-flex items-center gap-0.5 px-1.5 h-4 rounded-full text-[10px] font-medium shrink-0 whitespace-nowrap border border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                    >
+                      <Moon className="h-2.5 w-2.5" />
+                      Fora do horário
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Clique para marcar como tratado</TooltipContent>
+                </Tooltip>
               )}
               {assignedOperatorName && (
                 <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
