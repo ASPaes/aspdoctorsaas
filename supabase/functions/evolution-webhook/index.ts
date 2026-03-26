@@ -925,6 +925,24 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         contactName: pushName || phone,
       };
 
+      // 0. BUSINESS HOURS — verificar horário antes de tudo (exceto salvar mensagem)
+      const supportConfigBH = await getSupportConfig(supabase, tenantId);
+      if (supportConfigBH.business_hours_enabled) {
+        const bhResult = await checkBusinessHours(
+          supportConfigBH, supabase, tenantId
+        );
+        if (!bhResult.inside) {
+          // Fora do horário: mensagem já salva, disparar automações off-hours
+          handleOffHoursMessage(
+            supabase, instanceCtx, conversationId, tenantId, content,
+            supportConfigBH, bhResult.todayStart, bhResult.todayEnd
+          ).catch(err => console.error('[off-hours] automation error:', err));
+          // NÃO abre atendimento, NÃO dispara URA
+          console.log(`[business-hours] Fora do horário — sem atendimento/URA conv=${conversationId}`);
+          return;
+        }
+      }
+
       // 1. CSAT PRIMEIRO — antes de qualquer filtro
       const csatHandled = await handleCsatResponse(
         supabase, instanceCtx, conversationId, tenantId, content
