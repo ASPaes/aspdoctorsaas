@@ -1401,10 +1401,22 @@ async function checkBusinessHours(
     }
 
     console.log(`[business-hours] Fora do horário: ${currentTime}`);
-    await sendBusinessHoursMessage(
-      supabase, instanceCtx, conversationId, tenantId,
-      supportConfig, dayKey, currentTime, businessHours
-    );
+
+    // Check if conversation was already attended — skip auto-message if so
+    const { data: convBH } = await supabase
+      .from('whatsapp_conversations')
+      .select('out_of_hours_cleared_at')
+      .eq('id', conversationId)
+      .single();
+
+    if (!convBH?.out_of_hours_cleared_at) {
+      await sendBusinessHoursMessage(
+        supabase, instanceCtx, conversationId, tenantId,
+        supportConfig, dayKey, currentTime, businessHours
+      );
+    } else {
+      console.log(`[business-hours] Conversa já atendida, pulando aviso automático conv=${conversationId}`);
+    }
     return { inside: false };
 
   } catch (err) {
