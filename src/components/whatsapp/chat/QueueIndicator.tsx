@@ -37,8 +37,14 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const convDeptId = attendance?.department_id;
   const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
 
+  const { isBlocked } = useAgentPresence();
+
   const handleClaim = () => {
     if (!user?.id) return;
+    if (isBlocked) {
+      toast.warning("Você precisa estar Ativo para assumir atendimentos.");
+      return;
+    }
     assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
   };
 
