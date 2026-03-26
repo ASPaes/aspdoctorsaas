@@ -218,7 +218,7 @@ function WhatsAppContent() {
             <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
           </ResizablePanel>
           <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
-          <ResizablePanel defaultSize={75}>
+          <ResizablePanel defaultSize={75} className="relative h-full">
             <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
           </ResizablePanel>
         </ResizablePanelGroup>
