@@ -943,28 +943,27 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
-          // Mark conversation with after_hours metadata
+          // Mark conversation with opened_out_of_hours_at column (only if not already set)
           const nowIsoAH = new Date().toISOString();
-          const { data: convForMeta } = await supabase
-            .from('whatsapp_conversations')
-            .select('metadata')
-            .eq('id', conversationId)
-            .single();
-          const existingMeta = (convForMeta?.metadata && typeof convForMeta.metadata === 'object') ? convForMeta.metadata : {};
-
           await supabase
             .from('whatsapp_conversations')
             .update({
               status: 'active',
               updated_at: nowIsoAH,
-              metadata: {
-                ...existingMeta,
-                after_hours: true,
-                after_hours_first_at: (existingMeta as any).after_hours_first_at || nowIsoAH,
-                after_hours_last_at: nowIsoAH,
-              },
+              opened_out_of_hours_at: nowIsoAH,
             })
-            .eq('id', conversationId);
+            .eq('id', conversationId)
+            .is('opened_out_of_hours_at', null);
+
+          // Also update if already set (to refresh updated_at) but don't overwrite opened_out_of_hours_at
+          await supabase
+            .from('whatsapp_conversations')
+            .update({
+              status: 'active',
+              updated_at: nowIsoAH,
+            })
+            .eq('id', conversationId)
+            .not('opened_out_of_hours_at', 'is', null);
 
           // Criar atendimento em fila se não existir
           const { data: existingAtt } = await supabase
@@ -2318,30 +2317,25 @@ function extractMaxOptionFromTemplate(template: string): number {
   return max || 5;
 }
 
-async function clearAfterHoursMetadata(supabase: any, conversationId: string): Promise<void> {
+async function clearAfterHoursFlag(supabase: any, conversationId: string): Promise<void> {
   try {
-    const { data: conv } = await supabase
+    const nowIso = new Date().toISOString();
+    const { data: updated } = await supabase
       .from('whatsapp_conversations')
-      .select('metadata')
+      .update({
+        out_of_hours_cleared_at: nowIso,
+        updated_at: nowIso,
+      })
       .eq('id', conversationId)
-      .single();
-    const meta = (conv?.metadata && typeof conv.metadata === 'object') ? conv.metadata : {};
-    if ((meta as any).after_hours) {
-      await supabase
-        .from('whatsapp_conversations')
-        .update({
-          metadata: {
-            ...meta,
-            after_hours: false,
-            after_hours_cleared_at: new Date().toISOString(),
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId);
-      console.log(`[after-hours] Cleared after_hours flag for conv=${conversationId}`);
+      .not('opened_out_of_hours_at', 'is', null)
+      .is('out_of_hours_cleared_at', null)
+      .select('id')
+      .maybeSingle();
+    if (updated) {
+      console.log(`[after-hours] Cleared out_of_hours for conv=${conversationId}`);
     }
   } catch (err) {
-    console.error('[after-hours] Error clearing metadata:', err);
+    console.error('[after-hours] Error clearing flag:', err);
   }
 }
 
