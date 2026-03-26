@@ -1409,13 +1409,22 @@ async function checkBusinessHours(
       .eq('id', conversationId)
       .single();
 
-    if (!convBH?.out_of_hours_cleared_at) {
+    // Also check if there's an active attendance (in_progress)
+    const { data: activeAttBH } = await supabase
+      .from('support_attendances')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('status', 'in_progress')
+      .limit(1)
+      .maybeSingle();
+
+    if (convBH?.out_of_hours_cleared_at || activeAttBH) {
+      console.log(`[business-hours] Conversa já atendida (cleared_at=${!!convBH?.out_of_hours_cleared_at} att_in_progress=${!!activeAttBH}), pulando aviso conv=${conversationId}`);
+    } else {
       await sendBusinessHoursMessage(
         supabase, instanceCtx, conversationId, tenantId,
         supportConfig, dayKey, currentTime, businessHours
       );
-    } else {
-      console.log(`[business-hours] Conversa já atendida, pulando aviso automático conv=${conversationId}`);
     }
     return { inside: false };
 
