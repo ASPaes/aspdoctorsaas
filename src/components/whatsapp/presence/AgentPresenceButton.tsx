@@ -156,7 +156,7 @@ export default function AgentPresenceButton() {
   const statusConfig: Record<AgentStatus, { label: string; dotClass: string; icon: React.ReactNode }> = {
     active: { label: "Ativo", dotClass: "bg-green-500", icon: <Zap className="h-3 w-3" /> },
     paused: { label: `Pausado ${formatCountdown(remaining)}`, dotClass: "bg-yellow-500", icon: <Pause className="h-3 w-3" /> },
-    off: { label: "Offline", dotClass: "bg-muted-foreground/50", icon: <LogOut className="h-3 w-3" /> },
+    offline: { label: "Offline", dotClass: "bg-muted-foreground/50", icon: <LogOut className="h-3 w-3" /> },
   };
 
   const cfg = statusConfig[status];

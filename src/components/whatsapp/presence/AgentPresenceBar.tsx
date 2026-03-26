@@ -139,7 +139,7 @@ export default function AgentPresenceBar() {
   const statusConfig: Record<AgentStatus, { label: string; variant: "default" | "secondary" | "outline"; icon: React.ReactNode }> = {
     active: { label: "Ativo", variant: "default", icon: <Zap className="h-3 w-3" /> },
     paused: { label: "Em pausa", variant: "secondary", icon: <Pause className="h-3 w-3" /> },
-    off: { label: "Offline", variant: "outline", icon: <LogOut className="h-3 w-3" /> },
+    offline: { label: "Offline", variant: "outline", icon: <LogOut className="h-3 w-3" /> },
   };
 
   const cfg = statusConfig[status];
