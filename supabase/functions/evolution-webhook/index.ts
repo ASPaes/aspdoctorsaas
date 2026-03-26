@@ -929,16 +929,61 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       const supportConfigBH = await getSupportConfig(supabase, tenantId);
       if (supportConfigBH.business_hours_enabled) {
         const bhResult = await checkBusinessHours(
-          supportConfigBH, supabase, tenantId
+          supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
         );
         if (!bhResult.inside) {
-          // Fora do horário: mensagem já salva, disparar automações off-hours
-          handleOffHoursMessage(
-            supabase, instanceCtx, conversationId, tenantId, content,
-            supportConfigBH, bhResult.todayStart, bhResult.todayEnd
-          ).catch(err => console.error('[off-hours] automation error:', err));
-          // NÃO abre atendimento, NÃO dispara URA
-          console.log(`[business-hours] Fora do horário — sem atendimento/URA conv=${conversationId}`);
+          // Fora do horário — NÃO abre atendimento, NÃO dispara URA
+          console.log(`[business-hours] Fora do horário conv=${conversationId}`);
+
+          // Colocar conversa em status 'active' para aparecer na Fila do time amanhã
+          await supabase
+            .from('whatsapp_conversations')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
+
+          // Criar atendimento em fila (waiting) se não existir um ativo
+          const { data: existingAtt } = await supabase
+            .from('support_attendances')
+            .select('id, status')
+            .eq('conversation_id', conversationId)
+            .in('status', ['waiting', 'in_progress'])
+            .limit(1)
+            .maybeSingle();
+
+          if (!existingAtt) {
+            const nowIso = new Date().toISOString();
+            await supabase
+              .from('support_attendances')
+              .insert({
+                tenant_id: tenantId,
+                conversation_id: conversationId,
+                contact_id: contactId,
+                status: 'waiting',
+                opened_at: nowIso,
+                created_from: 'customer',
+                ura_state: 'none',
+              });
+            console.log(`[business-hours] Atendimento criado em fila (waiting) conv=${conversationId}`);
+          }
+
+          // Verificar quantas mensagens o cliente enviou fora do horário (para reenvio a cada 2)
+          const { count: outsideCount } = await supabase
+            .from('whatsapp_messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('conversation_id', conversationId)
+            .eq('tenant_id', tenantId)
+            .eq('is_from_me', false)
+            .gte('created_at', new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()); // últimas 8h
+
+          // Reenviar aviso a cada 2 mensagens do cliente
+          const shouldResend = outsideCount && outsideCount % 2 === 0;
+          if (shouldResend) {
+            console.log(`[business-hours] Reenvio de aviso (${outsideCount} msgs) conv=${conversationId}`);
+            await checkBusinessHours(
+              supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
+            );
+          }
+
           return;
         }
       }
@@ -1083,9 +1128,13 @@ function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
  * Returns { inside: boolean, todaySchedule } with the active day's schedule.
  */
 async function checkBusinessHours(
-  config: SupportConfig,
   supabase: any,
-  tenantId: string
+  _instanceCtx: any,
+  _conversationId: string,
+  tenantId: string,
+  _content: string,
+  _timestamp: string,
+  config: SupportConfig
 ): Promise<{
   inside: boolean;
   todayStart: string | null;
