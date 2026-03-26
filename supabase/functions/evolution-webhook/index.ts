@@ -989,7 +989,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .eq('tenant_id', tenantId)
             .eq('is_from_me', true)
             .gte('created_at', cutoff10min)
-            .filter('metadata->>outside_hours', 'eq', 'true')
+            .ilike('content', '%horário%')
             .limit(1)
             .maybeSingle();
 
@@ -1253,21 +1253,23 @@ async function sendBusinessHoursMessage(
           const hour = parseInt(currentTime.split(':')[0], 10);
           const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
-          const prompt = `Você é um atendente virtual de uma empresa de software. Escreva uma mensagem CURTA (máximo 3 linhas) em português brasileiro, amigável e variada (nunca repita o mesmo texto), informando que estamos fora do horário de atendimento.
+          const basePrompt = supportConfig.business_hours_outside_prompt ||
+            'Você é um atendente virtual de uma empresa de software. Escreva uma mensagem CURTA (máximo 3 linhas) em português brasileiro, amigável e SEMPRE variada (nunca repita o mesmo texto), informando que estamos fora do horário de atendimento.';
+
+          const prompt = `${basePrompt}
 
 Contexto: ${contextHint}
-Saudação correta para o horário: ${greeting}
+Saudação correta: ${greeting}
 Horário de atendimento: ${slotsDesc}
 Próximo atendimento: ${nextStart}
 
-Regras:
-- Use "${greeting}!" para iniciar
-- Informe o horário de atendimento completo: ${slotsDesc}
-- Diga quando retornaremos: ${nextStart}
+Regras obrigatórias:
+- Inicie com "${greeting}!"
+- Mencione o horário: ${slotsDesc}
+- Informe o retorno: ${nextStart}
 - Máximo 3 linhas
-- Use no máximo 1 emoji
-- Varie o texto a cada mensagem para não parecer robótico
-- Não invente informações além das fornecidas`;
+- No máximo 1 emoji
+- VARIE o texto — nunca repita mensagens anteriores`;
           const aiMsg = await callAI(aiCfg, [{ role: 'user', content: prompt }]);
           if (aiMsg && aiMsg.trim().length > 0) {
             await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiMsg.trim(), {
