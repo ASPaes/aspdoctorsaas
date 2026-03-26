@@ -3152,6 +3152,9 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
         console.error('[evolution-webhook][send.message] Error updating conversation:', updateError);
       }
     }
+
+    // Clear out-of-hours flag when operator sends a message
+    clearAfterHoursFlag(supabase, conversationId).catch(() => {});
   } catch (error) {
     console.error('[evolution-webhook][send.message] Fatal error:', error);
   }
