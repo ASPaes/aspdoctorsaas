@@ -2420,7 +2420,7 @@ async function ensureAttendanceForIncomingMessage(
 
       insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened')
         .catch(err => console.error('[attendance] Error inserting reopen system msg:', err));
-      clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
+      clearAfterHoursFlag(supabase, conversationId).catch(() => {});
       return;
     }
 
@@ -2446,7 +2446,7 @@ async function ensureAttendanceForIncomingMessage(
 
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
       .catch(err => console.error('[attendance] Error inserting system msg:', err));
-    clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
+    clearAfterHoursFlag(supabase, conversationId).catch(() => {});
 
     if (instanceCtx) {
       sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
@@ -2542,7 +2542,7 @@ async function ensureAttendanceForOperatorMessage(
       console.log(`[attendance-operator] NEW by operator att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
       insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
         .catch(err => console.error('[attendance-operator] Error inserting system msg:', err));
-      clearAfterHoursMetadata(supabase, conversationId).catch(() => {});
+      clearAfterHoursFlag(supabase, conversationId).catch(() => {});
     }
   } catch (err) {
     console.error('[attendance-operator] Unexpected error:', err);
