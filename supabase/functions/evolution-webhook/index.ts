@@ -980,18 +980,22 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .eq('is_from_me', false)
             .gte('created_at', cutoff8h);
 
-          // Verificar última mensagem automática de horário enviada (cooldown de 10 min)
+          // Cooldown: buscar última mensagem de horário via filtro JSONB correto
           const cutoff10min = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-          const { data: lastBhMsg } = await supabase
+          const { data: bhMsgs } = await supabase
             .from('whatsapp_messages')
-            .select('id, created_at')
+            .select('id, created_at, metadata')
             .eq('conversation_id', conversationId)
             .eq('tenant_id', tenantId)
             .eq('is_from_me', true)
             .gte('created_at', cutoff10min)
-            .eq('metadata->>outside_hours', 'true')
-            .limit(1)
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          const lastBhMsg = (bhMsgs || []).find((m: any) => {
+            const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata;
+            return meta?.outside_hours === true;
+          });
 
           if (!lastBhMsg) {
             // Sem mensagem de horário nos últimos 10 min — enviar aviso
