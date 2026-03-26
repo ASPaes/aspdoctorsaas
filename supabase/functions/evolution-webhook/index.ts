@@ -1344,7 +1344,7 @@ async function checkBusinessHours(
 
       if (exception) {
         console.log(`[business-hours] inside=false tz=${tz} date=${todayStr} EXCEPTION type=${exception.type} name=${exception.name || '(sem nome)'}`);
-        await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+        await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
         return { inside: false };
       }
     } catch (err) {
