@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 
+/** Allowed presence statuses — must match DB check constraint */
 export type AgentStatus = "active" | "paused" | "offline";
 
 export interface AgentPresence {
