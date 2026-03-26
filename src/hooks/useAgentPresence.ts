@@ -153,21 +153,19 @@ export function useAgentPresence() {
 
   const startShift = useCallback(async () => {
     if (!tid) return;
-    const { error } = await supabase.rpc("agent_presence_set_active", {
-      p_tenant_id: tid,
-    });
+    optimisticUpdate({ status: "active", pause_reason_id: null, pause_started_at: null, pause_expected_end_at: null, shift_started_at: new Date().toISOString(), shift_ended_at: null });
+    const { error } = await supabase.rpc("agent_presence_set_active", { p_tenant_id: tid });
     if (error) throw error;
     invalidate();
-  }, [tid, invalidate]);
+  }, [tid, invalidate, optimisticUpdate]);
 
   const setActive = useCallback(async () => {
     if (!tid) return;
-    const { error } = await supabase.rpc("agent_presence_set_active", {
-      p_tenant_id: tid,
-    });
+    optimisticUpdate({ status: "active", pause_reason_id: null, pause_started_at: null, pause_expected_end_at: null });
+    const { error } = await supabase.rpc("agent_presence_set_active", { p_tenant_id: tid });
     if (error) throw error;
     invalidate();
-  }, [tid, invalidate]);
+  }, [tid, invalidate, optimisticUpdate]);
 
   const setPaused = useCallback(
     async (reasonId: string, minutes?: number) => {
