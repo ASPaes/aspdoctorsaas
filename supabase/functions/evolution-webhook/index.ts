@@ -1395,7 +1395,7 @@ async function checkBusinessHours(
     // Check if conversation was already attended — skip auto-message if so
     const { data: convBH } = await supabase
       .from('whatsapp_conversations')
-      .select('out_of_hours_cleared_at')
+      .select('out_of_hours_cleared_at, first_agent_message_at')
       .eq('id', conversationId)
       .single();
 
@@ -1408,8 +1408,8 @@ async function checkBusinessHours(
       .limit(1)
       .maybeSingle();
 
-    if (convBH?.out_of_hours_cleared_at || activeAttBH) {
-      console.log(`[business-hours] Conversa já atendida (cleared_at=${!!convBH?.out_of_hours_cleared_at} att_in_progress=${!!activeAttBH}), pulando aviso conv=${conversationId}`);
+    if (convBH?.out_of_hours_cleared_at || convBH?.first_agent_message_at || activeAttBH) {
+      console.log(`[business-hours] Conversa já atendida (cleared_at=${!!convBH?.out_of_hours_cleared_at} first_agent=${!!convBH?.first_agent_message_at} att_in_progress=${!!activeAttBH}), pulando aviso conv=${conversationId}`);
     } else {
       await sendBusinessHoursMessage(
         supabase, instanceCtx, conversationId, tenantId,
