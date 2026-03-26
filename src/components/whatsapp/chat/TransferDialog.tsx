@@ -11,7 +11,7 @@ import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-import { useProfile } from "@/hooks/useProfile";
+
 import { supabase } from "@/integrations/supabase/client";
 
 interface TransferDialogProps {
@@ -65,7 +65,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const [selectedDept, setSelectedDept] = useState("");
   const [reason, setReason] = useState("");
   const { user } = useAuth();
-  const { data: profile } = useProfile(user?.id);
+  
   const { data: tenantUsers = [] } = useTenantUsers();
   const { data: funcMap } = useFuncionariosLookup();
   const { data: departments = [] } = useDepartments();
