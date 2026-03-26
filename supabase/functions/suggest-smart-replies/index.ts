@@ -51,7 +51,7 @@ serve(async (req) => {
 
     if (!convData) {
       return new Response(JSON.stringify({ error: "Conversation not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
