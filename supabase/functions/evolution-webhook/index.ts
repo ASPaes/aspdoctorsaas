@@ -1930,10 +1930,10 @@ async function handleUraResponse(
       .update({ status: 'closed', updated_at: nowIso })
       .eq('id', conversationId);
     console.log(`[ura] Customer chose to close attendance+conversation att=${att.id} conv=${conversationId}`);
-    const code = att.attendance_code || '';
+    const code = att.attendance_code || att.seq_number ? `${String(att.seq_number).padStart(4,'0')}/${att.ano}` : '';
     const closeText = code
       ? `✅ Atendimento *${code}* encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. Estamos à disposição! 😊`
-      : '✅ Atendimento encerrado. Se precisar de algo, envie uma nova mensagem!';
+      : '✅ Atendimento encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. Estamos à disposição! 😊';
     await sendAndPersistAutoMessage(
       supabase, instanceCtx, conversationId, tenantId,
       closeText,
