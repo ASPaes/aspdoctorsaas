@@ -73,9 +73,18 @@ export default function AgentPresenceOverlay() {
         )}
 
         {status === "paused" && (
-          <div className="flex items-center justify-center gap-1.5 text-2xl font-mono text-foreground mb-4">
-            <Clock className="h-5 w-5 text-muted-foreground" />
-            {remaining > 0 ? formatCountdown(remaining) : "Expirado"}
+          <div className="space-y-1 mb-4">
+            <div className="flex items-center justify-center gap-1.5 text-sm font-mono text-muted-foreground">
+              <Timer className="h-4 w-4" />
+              Pausado há: {formatCountdown(pausedTotalMs)}
+            </div>
+            <div className="flex items-center justify-center gap-1.5 text-2xl font-mono text-foreground">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              {timerExpired
+                ? <span className="text-destructive">Excedido: {formatCountdown(exceededMs)}</span>
+                : `Restante: ${formatCountdown(remainingMs)}`
+              }
+            </div>
           </div>
         )}
 

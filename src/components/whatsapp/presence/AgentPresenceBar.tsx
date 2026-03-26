@@ -141,13 +141,20 @@ export default function AgentPresenceBar() {
 
         {/* Pause info */}
         {status === "paused" && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {currentReasonName && (
               <span className="hidden sm:inline">• {currentReasonName}</span>
             )}
             <span className="flex items-center gap-1 font-mono">
+              <Timer className="h-3 w-3" />
+              {formatCountdown(pausedTotalMs)}
+            </span>
+            <span className="flex items-center gap-1 font-mono">
               <Clock className="h-3 w-3" />
-              {timerExpired ? "Expirado" : formatCountdown(remaining)}
+              {timerExpired
+                ? <span className="text-destructive">Excedido: {formatCountdown(exceededMs)}</span>
+                : `Restante: ${formatCountdown(remainingMs)}`
+              }
             </span>
           </div>
         )}
