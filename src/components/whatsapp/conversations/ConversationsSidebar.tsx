@@ -369,6 +369,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
               <TooltipContent>Relatórios</TooltipContent>
             </Tooltip>
             <ConversationFiltersPopover filters={filters} onChange={setFilters} />
+            <AgentPresenceButton />
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>
               <Plus className="h-4 w-4" />
             </Button>
