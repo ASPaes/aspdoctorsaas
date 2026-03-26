@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type AgentStatus = "active" | "paused" | "off";
+export type AgentStatus = "active" | "paused" | "offline";
 
 export interface AgentPresence {
   user_id: string;
@@ -48,10 +48,10 @@ export function useAgentPresence() {
       if (error) throw error;
       if (data) return data as unknown as AgentPresence;
 
-      // Row doesn't exist yet — create via RPC (set_active creates if needed, but we want "off")
+      // Row doesn't exist yet — create with "offline"
       const { data: created, error: insertErr } = await supabase
         .from("support_agent_presence")
-        .insert({ tenant_id: tid!, user_id: userId!, status: "off" })
+        .insert({ tenant_id: tid!, user_id: userId!, status: "offline" })
         .select()
         .single();
       if (insertErr) {
@@ -249,7 +249,7 @@ export function useAgentPresence() {
     }
   }, [tid, userId, invalidate]);
 
-  const status: AgentStatus = (presence?.status as AgentStatus) ?? "off";
+  const status: AgentStatus = (presence?.status as AgentStatus) ?? "offline";
 
   return {
     presence,
