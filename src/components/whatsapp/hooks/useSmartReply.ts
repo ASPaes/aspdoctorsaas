@@ -14,6 +14,24 @@ export interface SmartReplyResponse {
   error?: string;
 }
 
+const isConversationNotFoundError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const maybeError = error as { message?: string; context?: { status?: number; statusText?: string } };
+  return (
+    maybeError.context?.status === 404 ||
+    maybeError.message?.includes('Conversation not found') ||
+    maybeError.message?.includes('404') ||
+    false
+  );
+};
+
+const getFallbackResponse = (): SmartReplyResponse => ({
+  suggestions: [],
+  context: null,
+  error: 'conversation_not_found',
+});
+
 export const useSmartReply = (conversationId: string | null) => {
   const queryClient = useQueryClient();
   const lastInvalidatedRef = useRef<number>(0);
@@ -24,7 +42,10 @@ export const useSmartReply = (conversationId: string | null) => {
     queryFn: async (): Promise<SmartReplyResponse> => {
       if (!conversationId) throw new Error('No conversation selected');
       const { data, error } = await supabase.functions.invoke('suggest-smart-replies', { body: { conversationId } });
-      if (error) throw error;
+      if (error) {
+        if (isConversationNotFoundError(error)) return getFallbackResponse();
+        throw error;
+      }
       return data as SmartReplyResponse;
     },
     enabled: !!conversationId,
@@ -59,15 +80,21 @@ export const useSmartReply = (conversationId: string | null) => {
     mutationFn: async () => {
       if (!conversationId) throw new Error('No conversation selected');
       const { data, error } = await supabase.functions.invoke('suggest-smart-replies', { body: { conversationId } });
-      if (error) throw error;
+      if (error) {
+        if (isConversationNotFoundError(error)) return getFallbackResponse();
+        throw error;
+      }
       return data as SmartReplyResponse;
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['smart-replies', conversationId], data);
       lastInvalidatedRef.current = Date.now();
-      toast.success('Novas sugestões geradas!');
+      if (data.error !== 'conversation_not_found') {
+        toast.success('Novas sugestões geradas!');
+      }
     },
     onError: (error: any) => {
+      if (isConversationNotFoundError(error)) return;
       if (error.message?.includes('Rate limit')) toast.error('Muitas requisições. Aguarde um momento.');
       else toast.error('Erro ao gerar novas sugestões.');
     },
