@@ -1125,109 +1125,159 @@ function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
 
 /**
  * Check if the current moment is inside business hours for the tenant.
- * Returns { inside: boolean, todaySchedule } with the active day's schedule.
  */
 async function checkBusinessHours(
   supabase: any,
-  _instanceCtx: any,
-  _conversationId: string,
+  instanceCtx: InstanceContext,
+  conversationId: string,
   tenantId: string,
-  _content: string,
-  _timestamp: string,
-  config: SupportConfig
-): Promise<{
-  inside: boolean;
-  todayStart: string | null;
-  todayEnd: string | null;
-}> {
-  if (!config.business_hours_enabled) {
-    return { inside: true, todayStart: null, todayEnd: null };
-  }
-
-  const tz = config.business_hours_timezone || 'America/Sao_Paulo';
-  const now = new Date();
-
-  // Get day-of-week and current time in the configured timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(now);
-  const weekday = parts.find(p => p.type === 'weekday')?.value?.toLowerCase() || '';
-  const hour = parts.find(p => p.type === 'hour')?.value || '00';
-  const minute = parts.find(p => p.type === 'minute')?.value || '00';
-  const currentTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
-
-  // Compute today's date string (YYYY-MM-DD) in the configured timezone
-  const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
-  const todayStr = dateFormatter.format(now);
-
-  // --- Exception check: holidays / collective leave ---
+  content: string,
+  timestamp: string,
+  supportConfig: any
+): Promise<{ inside: boolean }> {
   try {
-    const { data: exception } = await supabase
-      .from('business_hours_exceptions')
-      .select('id, name, type')
-      .eq('tenant_id', tenantId)
-      .eq('date', todayStr)
-      .eq('is_closed', true)
-      .maybeSingle();
+    const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
+    const businessHours = supportConfig.business_hours || {};
 
-    if (exception) {
-      console.log(`[business-hours] inside=false tz=${tz} date=${todayStr} EXCEPTION type=${exception.type} name=${exception.name || '(sem nome)'}`);
-      return { inside: false, todayStart: null, todayEnd: null };
+    // Converter timestamp para o timezone configurado
+    const msgDate = new Date(timestamp);
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(msgDate);
+    const weekdayMap: Record<string, string> = {
+      'Sun': 'sun', 'Mon': 'mon', 'Tue': 'tue',
+      'Wed': 'wed', 'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat',
+    };
+
+    const weekdayPart = parts.find(p => p.type === 'weekday')?.value || '';
+    const hourPart = parts.find(p => p.type === 'hour')?.value || '00';
+    const minutePart = parts.find(p => p.type === 'minute')?.value || '00';
+
+    const dayKey = weekdayMap[weekdayPart] || '';
+    const currentTime = `${hourPart.padStart(2, '0')}:${minutePart.padStart(2, '0')}`;
+
+    console.log(`[business-hours] day=${dayKey} time=${currentTime} tz=${tz}`);
+
+    // --- Exception check: holidays / collective leave ---
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: tz });
+    const todayStr = dateFormatter.format(msgDate);
+    try {
+      const { data: exception } = await supabase
+        .from('business_hours_exceptions')
+        .select('id, name, type')
+        .eq('tenant_id', tenantId)
+        .eq('date', todayStr)
+        .eq('is_closed', true)
+        .maybeSingle();
+
+      if (exception) {
+        console.log(`[business-hours] inside=false tz=${tz} date=${todayStr} EXCEPTION type=${exception.type} name=${exception.name || '(sem nome)'}`);
+        await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+        return { inside: false };
+      }
+    } catch (err) {
+      console.error('[business-hours] Error querying exceptions, proceeding with normal schedule:', err);
     }
+
+    const dayConfig = businessHours[dayKey];
+
+    // Dia não configurado ou inativo
+    if (!dayConfig || !dayConfig.active) {
+      console.log(`[business-hours] Dia ${dayKey} inativo ou não configurado`);
+      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+      return { inside: false };
+    }
+
+    // Verificar slots (suporta múltiplos slots: manhã e tarde)
+    const slots: { start: string; end: string }[] = dayConfig.slots || [];
+
+    // Compatibilidade com formato antigo { start, end }
+    if (slots.length === 0 && dayConfig.start && dayConfig.end) {
+      slots.push({ start: dayConfig.start, end: dayConfig.end });
+    }
+
+    if (slots.length === 0) {
+      console.log(`[business-hours] Nenhum slot configurado para ${dayKey}`);
+      await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+      return { inside: false };
+    }
+
+    // Verificar se horário atual está dentro de algum slot
+    const isInsideSlot = slots.some(slot => {
+      return currentTime >= slot.start && currentTime <= slot.end;
+    });
+
+    if (isInsideSlot) {
+      console.log(`[business-hours] Dentro do horário: ${currentTime} está em um dos slots`);
+      return { inside: true };
+    }
+
+    // Fora do horário
+    console.log(`[business-hours] Fora do horário: ${currentTime} não está em nenhum slot`);
+    await sendBusinessHoursMessage(supabase, instanceCtx, conversationId, tenantId, supportConfig, currentTime);
+    return { inside: false };
+
   } catch (err) {
-    console.error('[business-hours] Error querying exceptions, proceeding with normal schedule:', err);
+    console.error('[business-hours] Erro:', err);
+    return { inside: true }; // fallback: deixa passar em caso de erro
   }
+}
 
-  // --- Normal slot-based logic ---
-  const dayMap: Record<string, string> = {
-    mon: 'mon', tue: 'tue', wed: 'wed', thu: 'thu', fri: 'fri', sat: 'sat', sun: 'sun',
-  };
-  const dayKey = dayMap[weekday] || weekday;
+async function sendBusinessHoursMessage(
+  supabase: any,
+  instanceCtx: InstanceContext,
+  conversationId: string,
+  tenantId: string,
+  supportConfig: any,
+  currentTime: string
+): Promise<void> {
+  try {
+    // Montar horários do dia para exibir na mensagem
+    const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
+    const businessHours = supportConfig.business_hours || {};
+    const msgDate = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' });
+    const weekdayMap: Record<string, string> = {
+      'Sun': 'sun', 'Mon': 'mon', 'Tue': 'tue',
+      'Wed': 'wed', 'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat',
+    };
+    const dayKey = weekdayMap[formatter.format(msgDate)] || '';
+    const dayConfig = businessHours[dayKey];
+    const slots: { start: string; end: string }[] = dayConfig?.slots || [];
 
-  const hours = config.business_hours || {};
-  const daySchedule = hours[dayKey];
+    // Backward compat
+    if (slots.length === 0 && dayConfig?.start && dayConfig?.end) {
+      slots.push({ start: dayConfig.start, end: dayConfig.end });
+    }
 
-  if (!daySchedule || !daySchedule.active) {
-    console.log(`[business-hours] inside=false tz=${tz} day=${dayKey} (inactive)`);
-    return { inside: false, todayStart: null, todayEnd: null };
+    let horariosTexto = '';
+    if (slots.length > 0) {
+      horariosTexto = slots.map(s => `${s.start} às ${s.end}`).join(' e ');
+    }
+
+    const template = supportConfig.business_hours_message ||
+      'Olá! 👋 No momento estamos fora do horário de atendimento. Sua mensagem foi registrada e retornaremos em breve!';
+
+    const message = template
+      .replace(/\{\{start\}\}/g, slots[0]?.start || '')
+      .replace(/\{\{end\}\}/g, slots[slots.length - 1]?.end || '')
+      .replace(/\{\{horarios\}\}/g, horariosTexto);
+
+    await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, message, {
+      business_hours: true,
+      outside_hours: true,
+    });
+
+    console.log(`[business-hours] Mensagem de fora do horário enviada conv=${conversationId}`);
+  } catch (err) {
+    console.error('[business-hours] Erro ao enviar mensagem:', err);
   }
-
-  // Normalize to slots array (backward compat: old {start,end} → slots:[{start,end}])
-  let slots: { start: string; end: string }[] = [];
-  if (Array.isArray((daySchedule as any).slots) && (daySchedule as any).slots.length > 0) {
-    slots = (daySchedule as any).slots;
-  } else if (daySchedule.start && daySchedule.end) {
-    slots = [{ start: daySchedule.start, end: daySchedule.end }];
-  }
-
-  // Filter out incomplete/invalid slots
-  const validSlots = slots.filter(s => s.start && s.end && s.start < s.end);
-
-  if (validSlots.length === 0) {
-    console.log(`[business-hours] inside=false tz=${tz} day=${dayKey} (no valid slots)`);
-    return { inside: false, todayStart: null, todayEnd: null };
-  }
-
-  // Check if current time falls within ANY slot
-  const matchedSlot = validSlots.find(s => currentTime >= s.start && currentTime < s.end);
-  const inside = !!matchedSlot;
-
-  // For placeholder substitution, use the first and last slot boundaries
-  const firstStart = validSlots[0].start;
-  const lastEnd = validSlots[validSlots.length - 1].end;
-
-  console.log(`[business-hours] inside=${inside} tz=${tz} day=${dayKey} current=${currentTime} slots=${JSON.stringify(validSlots)}`);
-
-  return {
-    inside,
-    todayStart: firstStart,
-    todayEnd: lastEnd,
-  };
 }
 
 /**
