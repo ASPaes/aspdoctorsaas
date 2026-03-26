@@ -135,16 +135,23 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     let inProgress = 0;
     let waiting = 0;
     let closed = 0;
+    let afterHours = 0;
 
     for (const conv of conversations) {
+      // After hours count: metadata.after_hours = true AND not closed
+      const meta = conv.metadata as Record<string, any> | null;
+      if (meta?.after_hours === true || meta?.after_hours === 'true') {
+        const att = attendanceMap.get(conv.id);
+        if (!att || att.status !== 'closed') {
+          afterHours++;
+        }
+      }
+
       const att = attendanceMap.get(conv.id);
       if (!att) continue;
 
-      // Department filtering is now done at DB query level via department_id
-      // Only do secondary check for attendance department mismatch
       if (selectedDepartmentId && att.department_id && att.department_id !== selectedDepartmentId) continue;
 
-      // For non-admin, skip conversations not assigned to them (except waiting/unassigned)
       if (!isAdmin && user?.id) {
         if (att.status === "in_progress" && att.assigned_to !== user.id) continue;
         if (att.status === "closed" && att.assigned_to !== user.id) continue;
@@ -154,7 +161,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       else if (att.status === "closed") closed++;
     }
 
-    return { inProgress, waiting, closed };
+    return { inProgress, waiting, closed, afterHours };
   }, [conversations, attendanceMap, isAdmin, user?.id, selectedDepartmentId, filteredInstanceIds]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
