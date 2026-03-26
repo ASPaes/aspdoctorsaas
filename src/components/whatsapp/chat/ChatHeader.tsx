@@ -199,6 +199,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="text-xs">Clique para marcar como tratado</TooltipContent>
                 </Tooltip>
+              )}
               {assignedOperatorName && (
                 <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
                   Técnico: {assignedOperatorName}
