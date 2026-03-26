@@ -49,6 +49,7 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
+          <TabsTrigger value="pausas">Pausas</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
