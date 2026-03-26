@@ -821,6 +821,7 @@ export type Database = {
           business_hours_ai_prompt: string | null
           business_hours_enabled: boolean
           business_hours_message: string | null
+          business_hours_outside_prompt: string | null
           business_hours_timezone: string
           chat_timezone: string
           created_at: string
@@ -869,6 +870,7 @@ export type Database = {
           business_hours_ai_prompt?: string | null
           business_hours_enabled?: boolean
           business_hours_message?: string | null
+          business_hours_outside_prompt?: string | null
           business_hours_timezone?: string
           chat_timezone?: string
           created_at?: string
@@ -917,6 +919,7 @@ export type Database = {
           business_hours_ai_prompt?: string | null
           business_hours_enabled?: boolean
           business_hours_message?: string | null
+          business_hours_outside_prompt?: string | null
           business_hours_timezone?: string
           chat_timezone?: string
           created_at?: string
