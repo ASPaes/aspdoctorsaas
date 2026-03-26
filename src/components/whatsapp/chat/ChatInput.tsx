@@ -71,6 +71,10 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [message, conversationId, sendMutation, replyTo, onCancelReply]);
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
     sendMutation.mutate(
       { conversationId, content: params.content, messageType: params.messageType, mediaUrl: params.mediaUrl, mediaBase64: params.mediaBase64, mediaMimetype: params.mediaMimetype, fileName: params.fileName },
       {
