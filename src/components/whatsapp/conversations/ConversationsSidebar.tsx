@@ -138,13 +138,10 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     let afterHours = 0;
 
     for (const conv of conversations) {
-      // After hours count: metadata.after_hours = true AND not closed
-      const meta = conv.metadata as Record<string, any> | null;
-      if (meta?.after_hours === true || meta?.after_hours === 'true') {
-        const att = attendanceMap.get(conv.id);
-        if (!att || att.status !== 'closed') {
-          afterHours++;
-        }
+      // After hours count: opened_out_of_hours_at set AND out_of_hours_cleared_at not set
+      const convAny = conv as any;
+      if (convAny.opened_out_of_hours_at && !convAny.out_of_hours_cleared_at) {
+        afterHours++;
       }
 
       const att = attendanceMap.get(conv.id);
@@ -218,11 +215,8 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       });
     } else if (activePill === "after_hours") {
       result = result.filter(c => {
-        const meta = c.metadata as Record<string, any> | null;
-        const isAfterHours = meta?.after_hours === true || meta?.after_hours === 'true';
-        const att = attendanceMap.get(c.id);
-        const notClosed = !att || att.status !== 'closed';
-        return isAfterHours && notClosed;
+        const convAny = c as any;
+        return !!convAny.opened_out_of_hours_at && !convAny.out_of_hours_cleared_at;
       });
     } else if (activePill === "closed") {
       result = result.filter(c => {
