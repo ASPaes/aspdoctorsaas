@@ -103,7 +103,7 @@ export function useAgentPresence() {
     return () => { supabase.removeChannel(channel); };
   }, [tid, userId, invalidate]);
 
-  // ── Auto-activate on mount + heartbeat every 25s ──
+  // ── Auto-activate only if no record exists + heartbeat every 30s ──
   const didAutoActivateRef = useRef(false);
 
   useEffect(() => {
@@ -111,10 +111,22 @@ export function useAgentPresence() {
 
     if (!didAutoActivateRef.current) {
       didAutoActivateRef.current = true;
-      supabase.rpc("agent_presence_set_active", { p_tenant_id: tid })
-        .then(({ error }) => {
-          if (error) console.warn("[presence] auto-activate failed:", error.message);
-          else invalidate();
+      // Check if presence record already exists before activating
+      supabase
+        .from("support_agent_presence")
+        .select("status")
+        .eq("tenant_id", tid)
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          // Only auto-activate if no record exists or status is null/empty
+          if (!data || !data.status) {
+            supabase.rpc("agent_presence_set_active", { p_tenant_id: tid })
+              .then(({ error }) => {
+                if (error) console.warn("[presence] auto-activate failed:", error.message);
+                else invalidate();
+              });
+          }
         });
     }
 
@@ -123,7 +135,7 @@ export function useAgentPresence() {
         .then(({ error }) => {
           if (error) console.warn("[presence] heartbeat failed:", error.message);
         });
-    }, 25_000);
+    }, 30_000);
 
     return () => clearInterval(interval);
   }, [tid, userId, invalidate]);
