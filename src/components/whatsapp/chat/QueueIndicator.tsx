@@ -4,8 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface QueueIndicatorProps {
   conversationId: string;
