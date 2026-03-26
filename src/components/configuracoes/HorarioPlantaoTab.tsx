@@ -93,7 +93,7 @@ function useConfigRow() {
         .from("configuracoes")
         .select(
           "business_hours_enabled, business_hours, business_hours_timezone, business_hours_message, " +
-          "business_hours_ai_enabled, business_hours_ai_prompt, " +
+          "business_hours_ai_enabled, business_hours_ai_prompt, business_hours_outside_prompt, " +
           "oncall_phone_number, oncall_message_template, oncall_escalation_window_minutes, " +
           "oncall_min_customer_messages, oncall_min_elapsed_seconds, oncall_repeat_cooldown_minutes, " +
           "oncall_urgency_keywords"
@@ -149,6 +149,7 @@ export default function HorarioPlantaoTab() {
     return h;
   });
   const [bhMessage, setBhMessage] = useState("");
+  const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
 
   // ── Section B: AI off-hours ──
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -172,6 +173,7 @@ export default function HorarioPlantaoTab() {
     setBhTimezone((c.business_hours_timezone as string) || "America/Sao_Paulo");
     setBhSchedule(parseBusinessHours(c.business_hours));
     setBhMessage((c.business_hours_message as string) || "");
+    setBhOutsidePrompt((c.business_hours_outside_prompt as string) || "");
     setAiEnabled(!!c.business_hours_ai_enabled);
     setAiPrompt((c.business_hours_ai_prompt as string) || "");
     const phone = c.oncall_phone_number as string | null;
@@ -275,6 +277,7 @@ export default function HorarioPlantaoTab() {
       business_hours_timezone: bhTimezone,
       business_hours: cleanSchedule,
       business_hours_message: bhMessage || null,
+      business_hours_outside_prompt: bhOutsidePrompt || null,
     });
   };
 
@@ -423,6 +426,21 @@ export default function HorarioPlantaoTab() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Placeholders disponíveis: <code className="text-xs">{"{{start}}"}</code> e <code className="text-xs">{"{{end}}"}</code>
+                  </p>
+                </div>
+
+                {/* Outside hours AI prompt */}
+                <div className="space-y-1.5">
+                  <Label>Prompt da IA para mensagem fora do horário</Label>
+                  <Textarea
+                    value={bhOutsidePrompt}
+                    onChange={(e) => setBhOutsidePrompt(e.target.value)}
+                    rows={4}
+                    placeholder="Ex: Você é um atendente virtual simpático. Escreva uma mensagem curta e amigável informando que estamos fora do horário. Use a saudação correta pelo horário ({{greeting}}). Horário: {{slots}}. Retorno: {{next_start}}."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Usado quando o tenant possui IA configurada. Deixe em branco para usar o prompt padrão.
+                    Variáveis disponíveis: <code className="text-xs">{"{{greeting}}"}</code>, <code className="text-xs">{"{{slots}}"}</code>, <code className="text-xs">{"{{next_start}}"}</code>, <code className="text-xs">{"{{slot1_start}}"}</code>, <code className="text-xs">{"{{slot1_end}}"}</code>, <code className="text-xs">{"{{slot2_start}}"}</code>, <code className="text-xs">{"{{slot2_end}}"}</code>
                   </p>
                 </div>
               </>
