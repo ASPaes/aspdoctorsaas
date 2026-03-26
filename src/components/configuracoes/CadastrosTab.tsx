@@ -101,9 +101,9 @@ export default function CadastrosTab() {
       value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", orderBy: "sort_order",
       columns: [
         { key: "name", label: "Nome" },
-        { key: "average_minutes", label: "Tempo médio (min)", type: "number" as const },
-        { key: "sort_order", label: "Ordem", type: "number" as const },
-        { key: "is_active", label: "Ativo", type: "boolean" as const },
+        { key: "average_minutes", label: "Tempo médio (min)" },
+        { key: "sort_order", label: "Ordem" },
+        { key: "is_active", label: "Ativo", type: "boolean" },
       ],
     },
   ];
