@@ -63,8 +63,8 @@ function groupByDateInline(messages: Message[], timezone: string): { date: strin
 export function ChatArea({ conversation }: Props) {
   const { data: messages = [], isLoading } = useMessages(conversation?.id ?? null);
   const { timezone } = useAppTimezone();
-  const { isBlocked } = useAgentPresence();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { isBlocked } = useAgentPresence();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
