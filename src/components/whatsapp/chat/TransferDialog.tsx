@@ -46,11 +46,13 @@ function useDepartments() {
     enabled: !!tid,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("support_departments")
         .select("id, name, is_active")
         .eq("is_active", true)
         .order("name");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -69,7 +71,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const { data: departments = [] } = useDepartments();
   const { transferConversation, transferToDepartment, isTransferring, isTransferringDepartment } = useConversationAssignment();
 
-  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  
 
   const availableUsers = tenantUsers.filter(u =>
     u.user_id !== currentAssignee && u.status === "ativo"
@@ -115,11 +117,9 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
             <TabsTrigger value="agent" className="gap-1.5">
               <User className="h-3.5 w-3.5" /> Agente
             </TabsTrigger>
-            {isAdminOrHead && (
-              <TabsTrigger value="department" className="gap-1.5">
-                <Building2 className="h-3.5 w-3.5" /> Setor
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="department" className="gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Setor
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="agent" className="space-y-4 pt-2">
@@ -140,28 +140,26 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
             </div>
           </TabsContent>
 
-          {isAdminOrHead && (
-            <TabsContent value="department" className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label>Transferir para setor</Label>
-                <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um setor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                A conversa será desvinculada do agente atual e voltará para a fila do setor selecionado.
-              </p>
-            </TabsContent>
-          )}
+          <TabsContent value="department" className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label>Transferir para setor</Label>
+              <Select value={selectedDept} onValueChange={setSelectedDept}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um setor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A conversa será desvinculada do agente atual e voltará para a fila do setor selecionado.
+            </p>
+          </TabsContent>
         </Tabs>
 
         <div className="space-y-2">
