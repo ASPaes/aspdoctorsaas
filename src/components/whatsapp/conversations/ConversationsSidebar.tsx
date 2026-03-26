@@ -135,7 +135,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
   const { stateMap } = useConversationStates(conversationIds);
 
-  // Compute pill counts
+  // Compute pill counts using centralized bucket logic
   const pillCounts = useMemo(() => {
     let inProgress = 0;
     let waiting = 0;
@@ -143,28 +143,30 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     let afterHours = 0;
 
     for (const conv of conversations) {
-      // After hours count: opened_out_of_hours_at set AND out_of_hours_cleared_at not set
-      const convAny = conv as any;
-      if (convAny.opened_out_of_hours_at && !convAny.out_of_hours_cleared_at) {
-        afterHours++;
-      }
+      const state = stateMap.get(conv.id);
+      if (!state) continue;
 
-      const att = attendanceMap.get(conv.id);
-      if (!att) continue;
+      // Department filter for counts
+      if (selectedDepartmentId && state.department_id && state.department_id !== selectedDepartmentId) continue;
 
-      if (selectedDepartmentId && att.department_id && att.department_id !== selectedDepartmentId) continue;
-
+      // Non-admin visibility
       if (!isAdmin && user?.id) {
-        if (att.status === "in_progress" && att.assigned_to !== user.id) continue;
-        if (att.status === "closed" && att.assigned_to !== user.id) continue;
+        const att = attendanceMap.get(conv.id);
+        if (att && att.status === "in_progress" && att.assigned_to !== user.id) continue;
+        if (att && (att.status === "closed" || att.status === "inactive_closed") && att.assigned_to !== user.id) continue;
       }
-      if (att.status === "in_progress") inProgress++;
-      else if (att.status === "waiting") waiting++;
-      else if (att.status === "closed") closed++;
+
+      const bucket = getConversationBucket(state);
+      switch (bucket) {
+        case "in_progress": inProgress++; break;
+        case "waiting_in_hours": waiting++; break;
+        case "waiting_out_of_hours": afterHours++; break;
+        case "closed": closed++; break;
+      }
     }
 
     return { inProgress, waiting, closed, afterHours };
-  }, [conversations, attendanceMap, isAdmin, user?.id, selectedDepartmentId, filteredInstanceIds]);
+  }, [conversations, stateMap, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
