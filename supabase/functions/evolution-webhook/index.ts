@@ -1044,6 +1044,12 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         }
       }
 
+      // --- THIRD-PARTY URA DETECTION: ignorar menus automáticos de outros sistemas ---
+      if (isLikelyThirdPartyURA(content)) {
+        console.log(`[ura-detection] Mensagem ignorada (URA de terceiro detectada) conv=${conversationId}`);
+        return;
+      }
+
       // 3. FETCH CONFIG (business hours already checked above, reuse for billing/URA)
       const supportConfig = supportConfigBH;
 
