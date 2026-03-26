@@ -1109,6 +1109,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       }
     } else {
       // Operator message sent via Evolution (e.g. from phone)
+      // Mark first_agent_message_at for analytics (only if not already set)
+      const nowIsoOp = new Date().toISOString();
+      supabase
+        .from('whatsapp_conversations')
+        .update({ first_agent_message_at: nowIsoOp, updated_at: nowIsoOp })
+        .eq('id', conversationId)
+        .is('first_agent_message_at', null)
+        .then(() => {})
+        .catch((err: any) => console.error('[evolution-webhook] Error setting first_agent_message_at:', err));
+
       ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
         .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
         .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
