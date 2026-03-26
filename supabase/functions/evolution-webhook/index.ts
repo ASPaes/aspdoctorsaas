@@ -940,22 +940,23 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         const bhResult = await checkBusinessHours(
           supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
         );
-         if (!bhResult.inside) {
+          if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
-          // Mark conversation with opened_out_of_hours_at column (only if not already set)
+          // Mark conversation as originated out of hours (only if not already set)
           const nowIsoAH = new Date().toISOString();
           await supabase
             .from('whatsapp_conversations')
             .update({
               status: 'active',
               updated_at: nowIsoAH,
+              opened_out_of_hours: true,
               opened_out_of_hours_at: nowIsoAH,
             })
             .eq('id', conversationId)
             .is('opened_out_of_hours_at', null);
 
-          // Also update if already set (to refresh updated_at) but don't overwrite opened_out_of_hours_at
+          // Also refresh updated_at if already marked (don't overwrite opened_out_of_hours_at)
           await supabase
             .from('whatsapp_conversations')
             .update({
@@ -965,32 +966,14 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .eq('id', conversationId)
             .not('opened_out_of_hours_at', 'is', null);
 
-          // Criar atendimento em fila se não existir
-          const { data: existingAtt } = await supabase
-            .from('support_attendances')
-            .select('id')
-            .eq('conversation_id', conversationId)
-            .in('status', ['waiting', 'in_progress'])
-            .limit(1)
-            .maybeSingle();
+          // Do NOT create attendance for off-hours messages — leave them unattended
+          // so they appear in the "Fora do horário" filter
 
-          if (!existingAtt) {
-            await supabase.from('support_attendances').insert({
-              tenant_id: tenantId,
-              conversation_id: conversationId,
-              contact_id: contactId,
-              status: 'waiting',
-              opened_at: new Date().toISOString(),
-              created_from: 'customer',
-              ura_state: 'none',
-            });
-          }
-
-          // Check if conversation was already attended (out_of_hours_cleared_at set OR attendance in_progress)
-          // If so, skip sending auto-message — technician already responded
+          // Check if a technician already responded (first_agent_message_at set)
+          // or if there's an active attendance — if so, skip auto-message
           const { data: convCheck } = await supabase
             .from('whatsapp_conversations')
-            .select('out_of_hours_cleared_at')
+            .select('first_agent_message_at, out_of_hours_cleared_at')
             .eq('id', conversationId)
             .single();
 
@@ -998,26 +981,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .from('support_attendances')
             .select('id')
             .eq('conversation_id', conversationId)
-            .eq('status', 'in_progress')
+            .in('status', ['waiting', 'in_progress'])
             .limit(1)
             .maybeSingle();
 
-          if (convCheck?.out_of_hours_cleared_at || activeAttCheck) {
-            console.log(`[business-hours] Conversa já atendida (cleared=${!!convCheck?.out_of_hours_cleared_at} in_progress=${!!activeAttCheck}), não enviar aviso conv=${conversationId}`);
+          if (convCheck?.first_agent_message_at || convCheck?.out_of_hours_cleared_at || activeAttCheck) {
+            console.log(`[business-hours] Conversa já atendida (first_agent=${!!convCheck?.first_agent_message_at} cleared=${!!convCheck?.out_of_hours_cleared_at} att=${!!activeAttCheck}), não enviar aviso conv=${conversationId}`);
             return;
           }
 
-          // Contar mensagens do cliente fora do horário nas últimas 8h
-          const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
-          const { count: outsideCount } = await supabase
-            .from('whatsapp_messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('conversation_id', conversationId)
-            .eq('tenant_id', tenantId)
-            .eq('is_from_me', false)
-            .gte('created_at', cutoff8h);
-
-          // Cooldown: buscar última mensagem de horário via filtro JSONB correto
+          // Cooldown: check if we already sent an out-of-hours notice in the last 10 min
           const cutoff10min = new Date(Date.now() - 10 * 60 * 1000).toISOString();
           const { data: bhMsgs } = await supabase
             .from('whatsapp_messages')
@@ -1035,12 +1008,21 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           });
 
           if (!lastBhMsg) {
-            // Sem mensagem de horário nos últimos 10 min — enviar aviso
+            // Count client messages outside hours in last 8h to vary response
+            const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString();
+            const { count: outsideCount } = await supabase
+              .from('whatsapp_messages')
+              .select('id', { count: 'exact', head: true })
+              .eq('conversation_id', conversationId)
+              .eq('tenant_id', tenantId)
+              .eq('is_from_me', false)
+              .gte('created_at', cutoff8h);
+
             if (!outsideCount || outsideCount <= 1) {
-              // Primeira mensagem: aviso completo (já enviado pelo checkBusinessHours acima)
+              // First message: full notice (already sent by checkBusinessHours above)
               console.log(`[business-hours] Primeira mensagem fora do horário conv=${conversationId}`);
             } else {
-              // Mensagens seguintes: aviso curto e amigável
+              // Subsequent messages: short friendly reply
               const shortMessages = [
                 'Ainda estamos fora do horário 🕐 Retornaremos assim que possível!',
                 'Sua mensagem foi registrada! Responderemos no início do expediente 😊',
@@ -1127,6 +1109,16 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       }
     } else {
       // Operator message sent via Evolution (e.g. from phone)
+      // Mark first_agent_message_at for analytics (only if not already set)
+      const nowIsoOp = new Date().toISOString();
+      supabase
+        .from('whatsapp_conversations')
+        .update({ first_agent_message_at: nowIsoOp, updated_at: nowIsoOp })
+        .eq('id', conversationId)
+        .is('first_agent_message_at', null)
+        .then(() => {})
+        .catch((err: any) => console.error('[evolution-webhook] Error setting first_agent_message_at:', err));
+
       ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
         .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
         .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
@@ -1413,7 +1405,7 @@ async function checkBusinessHours(
     // Check if conversation was already attended — skip auto-message if so
     const { data: convBH } = await supabase
       .from('whatsapp_conversations')
-      .select('out_of_hours_cleared_at')
+      .select('out_of_hours_cleared_at, first_agent_message_at')
       .eq('id', conversationId)
       .single();
 
@@ -1426,8 +1418,8 @@ async function checkBusinessHours(
       .limit(1)
       .maybeSingle();
 
-    if (convBH?.out_of_hours_cleared_at || activeAttBH) {
-      console.log(`[business-hours] Conversa já atendida (cleared_at=${!!convBH?.out_of_hours_cleared_at} att_in_progress=${!!activeAttBH}), pulando aviso conv=${conversationId}`);
+    if (convBH?.out_of_hours_cleared_at || convBH?.first_agent_message_at || activeAttBH) {
+      console.log(`[business-hours] Conversa já atendida (cleared_at=${!!convBH?.out_of_hours_cleared_at} first_agent=${!!convBH?.first_agent_message_at} att_in_progress=${!!activeAttBH}), pulando aviso conv=${conversationId}`);
     } else {
       await sendBusinessHoursMessage(
         supabase, instanceCtx, conversationId, tenantId,
