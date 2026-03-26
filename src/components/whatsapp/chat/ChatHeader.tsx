@@ -27,6 +27,7 @@ import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAgentPresence } from "@/hooks/useAgentPresence";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -48,6 +49,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
+  const { isBlocked: presenceBlocked } = useAgentPresence();
 
   // Fetch department name from conversation.department_id
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -178,11 +180,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
           {/* Primary actions — always visible */}
           <div className="flex items-center gap-0.5 shrink-0">
-            <QueueIndicator
-              conversationId={conversation.id}
-              assignedTo={conversation.assigned_to || null}
-              onTransferClick={() => setIsTransferOpen(true)}
-            />
+            {presenceBlocked ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] text-muted-foreground px-2 cursor-default">Fique ATIVO para atender</span>
+                </TooltipTrigger>
+                <TooltipContent>Inicie seu expediente ou volte da pausa.</TooltipContent>
+              </Tooltip>
+            ) : (
+              <QueueIndicator
+                conversationId={conversation.id}
+                assignedTo={conversation.assigned_to || null}
+                onTransferClick={() => setIsTransferOpen(true)}
+              />
+            )}
 
             {/* Analisar sentimento — visible button */}
             <Tooltip>
