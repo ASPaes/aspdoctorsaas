@@ -943,39 +943,54 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
-          // Mark conversation as originated out of hours (only if not already set)
+          // Fetch current conversation state to decide how to handle
           const nowIsoAH = new Date().toISOString();
-          await supabase
+          const { data: convCurrent } = await supabase
             .from('whatsapp_conversations')
-            .update({
-              status: 'active',
-              updated_at: nowIsoAH,
-              opened_out_of_hours: true,
-              opened_out_of_hours_at: nowIsoAH,
-            })
+            .select('status, opened_out_of_hours, opened_out_of_hours_at, out_of_hours_cleared_at, first_agent_message_at')
             .eq('id', conversationId)
-            .is('opened_out_of_hours_at', null);
+            .single();
 
-          // Also refresh updated_at if already marked (don't overwrite opened_out_of_hours_at)
-          await supabase
-            .from('whatsapp_conversations')
-            .update({
-              status: 'active',
-              updated_at: nowIsoAH,
-            })
-            .eq('id', conversationId)
-            .not('opened_out_of_hours_at', 'is', null);
+          const wasClosed = convCurrent?.status === 'closed';
+          const isNewOffHoursCycle = wasClosed || !convCurrent?.opened_out_of_hours_at;
+
+          if (isNewOffHoursCycle) {
+            // New off-hours cycle: reset all tracking fields
+            console.log(`[business-hours] Novo ciclo fora do horário (wasClosed=${wasClosed}) conv=${conversationId}`);
+            await supabase
+              .from('whatsapp_conversations')
+              .update({
+                status: 'active',
+                updated_at: nowIsoAH,
+                opened_out_of_hours: true,
+                opened_out_of_hours_at: nowIsoAH,
+                out_of_hours_cleared_at: null,
+                first_agent_message_at: null,
+              })
+              .eq('id', conversationId);
+          } else {
+            // Ongoing off-hours cycle: just ensure active status
+            await supabase
+              .from('whatsapp_conversations')
+              .update({
+                status: 'active',
+                updated_at: nowIsoAH,
+              })
+              .eq('id', conversationId);
+          }
 
           // Do NOT create attendance for off-hours messages — leave them unattended
           // so they appear in the "Fora do horário" filter
 
-          // Check if a technician already responded (first_agent_message_at set)
-          // or if there's an active attendance — if so, skip auto-message
-          const { data: convCheck } = await supabase
-            .from('whatsapp_conversations')
-            .select('first_agent_message_at, out_of_hours_cleared_at')
-            .eq('id', conversationId)
-            .single();
+          // Re-check after potential reset: if conversation still has agent response in THIS cycle, skip auto-message
+          const { data: convCheck } = isNewOffHoursCycle
+            ? { data: null } // Just reset, so no agent yet
+            : await supabase
+                .from('whatsapp_conversations')
+                .select('first_agent_message_at, out_of_hours_cleared_at')
+                .eq('id', conversationId)
+                .single()
+                .then(r => r);
 
           const { data: activeAttCheck } = await supabase
             .from('support_attendances')
@@ -986,7 +1001,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .maybeSingle();
 
           if (convCheck?.first_agent_message_at || convCheck?.out_of_hours_cleared_at || activeAttCheck) {
-            console.log(`[business-hours] Conversa já atendida (first_agent=${!!convCheck?.first_agent_message_at} cleared=${!!convCheck?.out_of_hours_cleared_at} att=${!!activeAttCheck}), não enviar aviso conv=${conversationId}`);
+            console.log(`[business-hours] Conversa já atendida neste ciclo (first_agent=${!!convCheck?.first_agent_message_at} cleared=${!!convCheck?.out_of_hours_cleared_at} att=${!!activeAttCheck}), não enviar aviso conv=${conversationId}`);
             return;
           }
 
