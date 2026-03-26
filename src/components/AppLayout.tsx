@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TenantSelector } from "@/components/TenantSelector";
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";
+import TeamPresencePopover from "@/components/whatsapp/presence/TeamPresencePopover";
 
 export default function AppLayout() {
   const location = useLocation();
@@ -18,6 +19,7 @@ export default function AppLayout() {
             <div className="flex items-center gap-2">
               <SidebarTrigger />
               {isWhatsApp && <AgentPresenceButton />}
+              {isWhatsApp && <TeamPresencePopover />}
             </div>
             <div className="flex items-center gap-3">
               <TenantSelector />
