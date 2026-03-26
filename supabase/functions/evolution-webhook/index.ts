@@ -925,6 +925,24 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         contactName: pushName || phone,
       };
 
+      // 0. BUSINESS HOURS — verificar horário antes de tudo (exceto salvar mensagem)
+      const supportConfigBH = await getSupportConfig(supabase, tenantId);
+      if (supportConfigBH.business_hours_enabled) {
+        const bhResult = await checkBusinessHours(
+          supportConfigBH, supabase, tenantId
+        );
+        if (!bhResult.inside) {
+          // Fora do horário: mensagem já salva, disparar automações off-hours
+          handleOffHoursMessage(
+            supabase, instanceCtx, conversationId, tenantId, content,
+            supportConfigBH, bhResult.todayStart, bhResult.todayEnd
+          ).catch(err => console.error('[off-hours] automation error:', err));
+          // NÃO abre atendimento, NÃO dispara URA
+          console.log(`[business-hours] Fora do horário — sem atendimento/URA conv=${conversationId}`);
+          return;
+        }
+      }
+
       // 1. CSAT PRIMEIRO — antes de qualquer filtro
       const csatHandled = await handleCsatResponse(
         supabase, instanceCtx, conversationId, tenantId, content
@@ -953,18 +971,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         }
       }
 
-      // 3. FETCH CONFIG + BUSINESS HOURS CHECK
-      const supportConfig = await getSupportConfig(supabase, tenantId);
-      const bhResult = await checkBusinessHours(supportConfig, supabase, tenantId);
-
-      // 4. OFF-HOURS AUTOMATIONS — fire-and-forget, never block the normal flow
-      if (!bhResult.inside && supportConfig.business_hours_enabled) {
-        handleOffHoursMessage(
-          supabase, instanceCtx, conversationId, tenantId, content,
-          supportConfig, bhResult.todayStart, bhResult.todayEnd
-        ).catch(err => console.error('[off-hours] automation error:', err));
-        console.log(`[off-hours] Automations dispatched for conv=${conversationId}, continuing normal flow`);
-      }
+      // 3. FETCH CONFIG (business hours already checked above, reuse for billing/URA)
+      const supportConfig = supportConfigBH;
 
       // 5. BILLING SKIP URA
       const billingSkipResult = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
