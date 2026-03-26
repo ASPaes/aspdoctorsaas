@@ -407,6 +407,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           inProgressCount={pillCounts.inProgress}
           waitingCount={pillCounts.waiting}
           closedCount={pillCounts.closed}
+          afterHoursCount={pillCounts.afterHours}
         />
       </div>
 
