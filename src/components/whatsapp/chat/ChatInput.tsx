@@ -23,16 +23,18 @@ interface Props {
   replyTo?: Message | null;
   onCancelReply?: () => void;
   initialMessage?: string;
+  disabled?: boolean;
 }
 
-export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage }: Props) {
+export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled }: Props) {
   const [message, setMessage] = useState(initialMessage || "");
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMutation = useWhatsAppSend();
-  const { isBlocked } = useAgentPresence();
+  const { isBlocked: presenceBlocked } = useAgentPresence();
+  const isBlocked = presenceBlocked || !!disabled;
 
   const { macros, incrementUsage } = useWhatsAppMacros();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
