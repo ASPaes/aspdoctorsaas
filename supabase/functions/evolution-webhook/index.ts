@@ -1128,9 +1128,13 @@ function isLikelyBusinessAutoReplyPTBR(text: string): boolean {
  * Returns { inside: boolean, todaySchedule } with the active day's schedule.
  */
 async function checkBusinessHours(
-  config: SupportConfig,
   supabase: any,
-  tenantId: string
+  _instanceCtx: any,
+  _conversationId: string,
+  tenantId: string,
+  _content: string,
+  _timestamp: string,
+  config: SupportConfig
 ): Promise<{
   inside: boolean;
   todayStart: string | null;
