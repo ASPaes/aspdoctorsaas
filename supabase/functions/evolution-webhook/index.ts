@@ -1230,33 +1230,27 @@ async function sendBusinessHoursMessage(
     const firstStart = slots[0]?.start || '08:00';
     const lastEnd = slots[slots.length - 1]?.end || '18:00';
     const nextStart = ctx.nextSlotStart || firstStart;
+    const slotsDesc = slots.length > 0
+      ? slots.map((s: any) => `${s.start} às ${s.end}`).join(' e ')
+      : `${firstStart} às ${lastEnd}`;
+    const hour = parseInt(currentTime.split(':')[0], 10);
+    const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
-    // Usar IA se o tenant tiver chave configurada (independente de business_hours_ai_enabled)
-    {
-      try {
-        const { getAIConfig, callAI } = await import('../_shared/ai-client.ts');
-        const aiCfg = await getAIConfig(tenantId, supabase);
-        if (aiCfg) {
-          const slotsDesc = slots.map((s: any) => `${s.start} às ${s.end}`).join(' e ');
-          let contextHint = '';
-          if (ctx.period === 'before_open') {
-            contextHint = `O cliente escreveu às ${currentTime}, antes da abertura às ${nextStart}.`;
-          } else if (ctx.period === 'lunch') {
-            contextHint = `O cliente escreveu às ${currentTime}, no intervalo entre turnos. Retornamos às ${nextStart}.`;
-          } else if (ctx.period === 'after_close') {
-            contextHint = `O cliente escreveu às ${currentTime}, após o encerramento do expediente. Retornamos às ${nextStart}.`;
-          } else if (ctx.period === 'weekend') {
-            contextHint = `O cliente escreveu num dia sem atendimento. Retornamos às ${nextStart}.`;
-          }
+    let contextHint = '';
+    if (ctx.period === 'before_open') contextHint = `O cliente escreveu às ${currentTime}, antes da abertura às ${nextStart}.`;
+    else if (ctx.period === 'lunch') contextHint = `O cliente escreveu às ${currentTime}, no intervalo entre turnos. Retornamos às ${nextStart}.`;
+    else if (ctx.period === 'after_close') contextHint = `O cliente escreveu às ${currentTime}, após o encerramento. Retornamos às ${nextStart}.`;
+    else if (ctx.period === 'weekend') contextHint = `O cliente escreveu num dia sem atendimento. Retornamos às ${nextStart}.`;
 
-          // Determinar período do dia para saudação correta
-          const hour = parseInt(currentTime.split(':')[0], 10);
-          const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    // Tentar usar IA se o tenant tiver chave configurada (independente de business_hours_ai_enabled)
+    try {
+      const { getAIConfig, callAI } = await import('../_shared/ai-client.ts');
+      const aiCfg = await getAIConfig(tenantId, supabase);
+      if (aiCfg) {
+        const basePrompt = supportConfig.business_hours_outside_prompt ||
+          'Você é um atendente virtual de uma empresa de software. Escreva uma mensagem CURTA (máximo 3 linhas) em português brasileiro, amigável e SEMPRE variada (nunca repita o mesmo texto), informando que estamos fora do horário de atendimento.';
 
-          const basePrompt = supportConfig.business_hours_outside_prompt ||
-            'Você é um atendente virtual de uma empresa de software. Escreva uma mensagem CURTA (máximo 3 linhas) em português brasileiro, amigável e SEMPRE variada (nunca repita o mesmo texto), informando que estamos fora do horário de atendimento.';
-
-          const prompt = `${basePrompt}
+        const prompt = `${basePrompt}
 
 Contexto: ${contextHint}
 Saudação correta: ${greeting}
@@ -1270,20 +1264,20 @@ Regras obrigatórias:
 - Máximo 3 linhas
 - No máximo 1 emoji
 - VARIE o texto — nunca repita mensagens anteriores`;
-          const aiMsg = await callAI(aiCfg, [{ role: 'user', content: prompt }]);
-          if (aiMsg && aiMsg.trim().length > 0) {
-            await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiMsg.trim(), {
-              business_hours: true,
-              outside_hours: true,
-              ai_generated: true,
-            });
-            console.log(`[business-hours] Mensagem IA enviada conv=${conversationId}`);
-            return;
-          }
+
+        const aiMsg = await callAI(aiCfg, [{ role: 'user', content: prompt }]);
+        if (aiMsg && aiMsg.trim().length > 0) {
+          await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiMsg.trim(), {
+            business_hours: true,
+            outside_hours: true,
+            ai_generated: true,
+          });
+          console.log(`[business-hours] Mensagem IA enviada conv=${conversationId}`);
+          return;
         }
-      } catch (aiErr) {
-        console.log('[business-hours] IA indisponível, usando mensagem padrão:', aiErr);
       }
+    } catch (aiErr) {
+      console.log('[business-hours] IA indisponível, usando mensagem padrão:', aiErr);
     }
 
     // Fallback: template do banco com variáveis dinâmicas
