@@ -187,7 +187,7 @@ export default function AgentPresenceBar() {
         {/* Normal actions */}
         {!(status === "paused" && timerExpired) && (
           <div className="flex items-center gap-1 ml-auto">
-            {status === "off" && (
+            {status === "offline" && (
               <Button size="sm" variant="default" className="h-7 text-xs" disabled={loading}
                 onClick={() => wrap(startShift, "Expediente iniciado!")}>
                 <Play className="h-3 w-3 mr-1" />Iniciar expediente

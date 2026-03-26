@@ -172,7 +172,7 @@ export default function AgentPresenceButton() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-52">
-          {status === "off" && (
+          {status === "offline" && (
             <DropdownMenuItem onClick={() => wrap(startShift, "Expediente iniciado!")}>
               <Play className="h-4 w-4 mr-2" /> Iniciar expediente
             </DropdownMenuItem>

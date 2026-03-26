@@ -44,7 +44,7 @@ export default function AgentPresenceOverlay() {
   const handleAction = async () => {
     setLoading(true);
     try {
-      if (status === "off") {
+      if (status === "offline") {
         await startShift();
         toast.success("Expediente iniciado!");
       } else {
@@ -79,7 +79,7 @@ export default function AgentPresenceOverlay() {
         </div>
 
         <h3 className="text-lg font-semibold text-foreground mb-1">
-          {status === "off" ? "Expediente não iniciado" : "Você está em pausa"}
+          {status === "offline" ? "Expediente não iniciado" : "Você está em pausa"}
         </h3>
 
         {status === "paused" && currentReasonName && (
@@ -95,7 +95,7 @@ export default function AgentPresenceOverlay() {
           </div>
         )}
 
-        {status === "off" && (
+        {status === "offline" && (
           <p className="text-sm text-muted-foreground mb-5">
             Inicie seu expediente para atender conversas.
           </p>
@@ -104,7 +104,7 @@ export default function AgentPresenceOverlay() {
         <div className="space-y-2">
           <Button onClick={handleAction} disabled={loading} className="w-full">
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-            {status === "off" ? "Iniciar expediente" : "Voltar ao ativo"}
+            {status === "offline" ? "Iniciar expediente" : "Voltar ao ativo"}
           </Button>
 
           {status === "paused" && !showExtend && (
