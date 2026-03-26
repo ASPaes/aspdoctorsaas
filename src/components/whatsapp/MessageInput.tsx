@@ -7,9 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   conversationId: string;
+  disabled?: boolean;
 }
 
-export function MessageInput({ conversationId }: Props) {
+export function MessageInput({ conversationId, disabled }: Props) {
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -17,7 +18,7 @@ export function MessageInput({ conversationId }: Props) {
 
   const handleSend = useCallback(() => {
     const content = text.trim();
-    if (!content || sendMutation.isPending) return;
+    if (!content || sendMutation.isPending || disabled) return;
 
     sendMutation.mutate(
       { conversationId, content },
@@ -31,7 +32,7 @@ export function MessageInput({ conversationId }: Props) {
         },
       }
     );
-  }, [text, conversationId, sendMutation, toast]);
+  }, [text, conversationId, sendMutation, toast, disabled]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -50,12 +51,13 @@ export function MessageInput({ conversationId }: Props) {
           onKeyDown={handleKeyDown}
           placeholder="Digite uma mensagem..."
           className="min-h-[40px] max-h-[120px] resize-none"
+          disabled={disabled}
           rows={1}
         />
         <Button
           size="icon"
           onClick={handleSend}
-          disabled={!text.trim() || sendMutation.isPending}
+          disabled={!text.trim() || sendMutation.isPending || disabled}
           className="shrink-0"
         >
           {sendMutation.isPending ? (
