@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useAgentPresence, type AgentStatus } from "@/hooks/useAgentPresence";
+import { usePauseTimer, formatCountdown } from "@/hooks/usePauseTimer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,9 +17,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import {
   Play,
@@ -28,17 +26,11 @@ import {
   LogOut,
   Zap,
   Loader2,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AgentPauseModal } from "./AgentPauseModal";
-
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "00:00";
-  const totalSeconds = Math.ceil(ms / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 export default function AgentPresenceButton() {
   const {
@@ -55,7 +47,6 @@ export default function AgentPresenceButton() {
     keepAssignmentsAndEndShift,
   } = useAgentPresence();
 
-  const [remaining, setRemaining] = useState(0);
   const [loading, setLoading] = useState(false);
   const [pauseModalOpen, setPauseModalOpen] = useState(false);
 
@@ -65,20 +56,12 @@ export default function AgentPresenceButton() {
   const [pendingCount, setPendingCount] = useState(0);
   const [releasing, setReleasing] = useState(false);
 
-  // Countdown timer
-  useEffect(() => {
-    if (status !== "paused" || !presence?.pause_expected_end_at) {
-      setRemaining(0);
-      return;
-    }
-    const update = () => {
-      const diff = new Date(presence.pause_expected_end_at!).getTime() - Date.now();
-      setRemaining(Math.max(0, diff));
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [status, presence?.pause_expected_end_at]);
+  // Pause timer with total/remaining/exceeded
+  const { pausedTotalMs, remainingMs, exceededMs, timerExpired } = usePauseTimer(
+    status,
+    presence?.pause_started_at,
+    presence?.pause_expected_end_at
+  );
 
   const wrap = useCallback(async (fn: () => Promise<void>, successMsg?: string) => {
     setLoading(true);
@@ -153,9 +136,15 @@ export default function AgentPresenceButton() {
 
   if (presenceLoading || !presence) return null;
 
+  const pauseLabel = status === "paused"
+    ? timerExpired
+      ? `Excedido ${formatCountdown(exceededMs)}`
+      : `Pausado ${formatCountdown(remainingMs)}`
+    : "";
+
   const statusConfig: Record<AgentStatus, { label: string; dotClass: string; icon: React.ReactNode }> = {
     active: { label: "Ativo", dotClass: "bg-green-500", icon: <Zap className="h-3 w-3" /> },
-    paused: { label: `Pausado ${formatCountdown(remaining)}`, dotClass: "bg-yellow-500", icon: <Pause className="h-3 w-3" /> },
+    paused: { label: pauseLabel, dotClass: timerExpired ? "bg-red-500" : "bg-yellow-500", icon: <Pause className="h-3 w-3" /> },
     offline: { label: "Offline", dotClass: "bg-muted-foreground/50", icon: <LogOut className="h-3 w-3" /> },
   };
 
@@ -196,9 +185,18 @@ export default function AgentPresenceButton() {
                 <Play className="h-4 w-4 mr-2" /> Voltar ao ativo
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {remaining > 0 ? `Restante: ${formatCountdown(remaining)}` : "Tempo expirado"}
+              <DropdownMenuLabel className="text-xs text-muted-foreground flex flex-col gap-0.5 py-1">
+                <span className="flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  Pausado há: {formatCountdown(pausedTotalMs)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {timerExpired
+                    ? <span className="text-destructive">Excedido: {formatCountdown(exceededMs)}</span>
+                    : `Restante: ${formatCountdown(remainingMs)}`
+                  }
+                </span>
               </DropdownMenuLabel>
             </>
           )}

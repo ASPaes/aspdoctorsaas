@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useAgentPresence, type AgentStatus } from "@/hooks/useAgentPresence";
+import { usePauseTimer, formatCountdown } from "@/hooks/usePauseTimer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,16 +30,10 @@ import {
   RotateCcw,
   Zap,
   Loader2,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "00:00";
-  const totalSeconds = Math.ceil(ms / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 export default function AgentPresenceBar() {
   const {
@@ -57,8 +52,6 @@ export default function AgentPresenceBar() {
     isBlocked,
   } = useAgentPresence();
 
-  const [remaining, setRemaining] = useState<number>(0);
-  const [timerExpired, setTimerExpired] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // End-shift modal state
@@ -67,23 +60,12 @@ export default function AgentPresenceBar() {
   const [pendingCount, setPendingCount] = useState(0);
   const [releasing, setReleasing] = useState(false);
 
-  // Timer countdown
-  useEffect(() => {
-    if (status !== "paused" || !presence?.pause_expected_end_at) {
-      setRemaining(0);
-      setTimerExpired(false);
-      return;
-    }
-    const update = () => {
-      const end = new Date(presence.pause_expected_end_at!).getTime();
-      const diff = end - Date.now();
-      setRemaining(Math.max(0, diff));
-      setTimerExpired(diff <= 0);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [status, presence?.pause_expected_end_at]);
+  // Pause timer with total/remaining/exceeded
+  const { pausedTotalMs, remainingMs, exceededMs, timerExpired } = usePauseTimer(
+    status,
+    presence?.pause_started_at,
+    presence?.pause_expected_end_at
+  );
 
   const wrap = useCallback(
     async (fn: () => Promise<void>, successMsg?: string) => {
@@ -159,13 +141,20 @@ export default function AgentPresenceBar() {
 
         {/* Pause info */}
         {status === "paused" && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {currentReasonName && (
               <span className="hidden sm:inline">• {currentReasonName}</span>
             )}
             <span className="flex items-center gap-1 font-mono">
+              <Timer className="h-3 w-3" />
+              {formatCountdown(pausedTotalMs)}
+            </span>
+            <span className="flex items-center gap-1 font-mono">
               <Clock className="h-3 w-3" />
-              {timerExpired ? "Expirado" : formatCountdown(remaining)}
+              {timerExpired
+                ? <span className="text-destructive">Excedido: {formatCountdown(exceededMs)}</span>
+                : `Restante: ${formatCountdown(remainingMs)}`
+              }
             </span>
           </div>
         )}
