@@ -63,13 +63,24 @@ export function AgentPauseModal({ open, onOpenChange, pauseReasons, onConfirm, l
                 <SelectValue placeholder="Selecione um motivo..." />
               </SelectTrigger>
               <SelectContent>
-                {pauseReasons.map(r => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name}
-                  </SelectItem>
-                ))}
+                {pauseReasons.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                    Nenhum motivo cadastrado.
+                  </div>
+                ) : (
+                  pauseReasons.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
+            {pauseReasons.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Peça para um admin cadastrar em Configurações → Cadastros → Motivos de Pausa.
+              </p>
+            )}
             {selectedReason && (
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="h-3 w-3" />
