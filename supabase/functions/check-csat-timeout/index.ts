@@ -100,26 +100,33 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Antes de expirar, verificar se o cliente já respondeu via webhook
-        // mas o cron rodou antes do processamento
-        const { data: recentMsg } = await supabase
-          .from('whatsapp_messages')
-          .select('id, content, created_at')
-          .eq('tenant_id', csat.tenant_id)
-          .eq('is_from_me', false)
-          .gte('created_at', csat.asked_at)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
+        // Verificar se cliente já respondeu mas webhook ainda não processou
+        // Buscar mensagem do cliente após o CSAT ser enviado
+        const { data: attConv } = await supabase
+          .from('support_attendances')
+          .select('conversation_id')
+          .eq('id', csat.attendance_id)
+          .single();
 
-        // Se existe mensagem do cliente APÓS o CSAT ser enviado,
-        // aguardar mais 2 minutos antes de expirar (dá tempo ao webhook processar)
-        if (recentMsg) {
-          const msgTime = new Date(recentMsg.created_at).getTime();
-          const gracePeriodEnd = new Date(msgTime + 2 * 60 * 1000);
-          if (now < gracePeriodEnd) {
-            console.log(`[${FUNCTION_NAME}] CSAT ${csat.id} tem resposta pendente do cliente (${recentMsg.content?.substring(0, 20)}), aguardando processamento do webhook...`);
-            continue;
+        if (attConv?.conversation_id) {
+          const { data: recentMsg } = await supabase
+            .from('whatsapp_messages')
+            .select('id, content, created_at')
+            .eq('conversation_id', attConv.conversation_id)
+            .eq('tenant_id', csat.tenant_id)
+            .eq('is_from_me', false)
+            .gte('created_at', csat.asked_at)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (recentMsg) {
+            const msgTime = new Date(recentMsg.created_at).getTime();
+            const gracePeriodEnd = new Date(msgTime + 3 * 60 * 1000);
+            if (now < gracePeriodEnd) {
+              console.log(`[${FUNCTION_NAME}] CSAT ${csat.id} tem resposta pendente do cliente, aguardando webhook...`);
+              continue;
+            }
           }
         }
 
