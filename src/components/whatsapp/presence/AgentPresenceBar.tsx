@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useAgentPresence, type AgentStatus } from "@/hooks/useAgentPresence";
+import { usePauseTimer, formatCountdown } from "@/hooks/usePauseTimer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,16 +30,10 @@ import {
   RotateCcw,
   Zap,
   Loader2,
+  Timer,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "00:00";
-  const totalSeconds = Math.ceil(ms / 1000);
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 export default function AgentPresenceBar() {
   const {
