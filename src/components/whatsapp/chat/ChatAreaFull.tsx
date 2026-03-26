@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { MessageSquare, Trash2, Forward, X, EyeOff } from "lucide-react";
+import { MessageSquare, Trash2, Forward, X, EyeOff, Pause } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import type { Message } from "../hooks/useWhatsAppMessages";
