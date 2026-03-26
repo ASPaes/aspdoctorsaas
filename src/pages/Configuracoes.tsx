@@ -26,6 +26,7 @@ import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
+import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
@@ -48,6 +49,7 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
+          <TabsTrigger value="pausas">Pausas</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
@@ -59,6 +61,10 @@ function WhatsAppSettingsContent() {
 
         <TabsContent value="atendimento" className="mt-4">
           <AtendimentoCsatTab />
+        </TabsContent>
+
+        <TabsContent value="pausas" className="mt-4">
+          <AttendancePauseReasonsTab />
         </TabsContent>
 
         <TabsContent value="instancias" className="mt-4 space-y-4">

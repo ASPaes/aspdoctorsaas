@@ -9,9 +9,13 @@ import AssignmentTab from "@/components/whatsapp/settings/AssignmentTab";
 import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
+import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function WhatsAppSettings() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   return (
     <div className="space-y-6">
@@ -26,6 +30,7 @@ export default function WhatsAppSettings() {
         <TabsList>
           <TabsTrigger value="instances">Instâncias</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
+          {isAdmin && <TabsTrigger value="pausas">Pausas</TabsTrigger>}
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="assignment">Atribuição</TabsTrigger>
           <TabsTrigger value="team">Equipe</TabsTrigger>
@@ -39,6 +44,12 @@ export default function WhatsAppSettings() {
         <TabsContent value="atendimento" className="mt-4">
           <AtendimentoCsatTab />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="pausas" className="mt-4">
+            <AttendancePauseReasonsTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="macros" className="mt-4">
           <MacrosTab />
