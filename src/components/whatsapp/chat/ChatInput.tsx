@@ -23,9 +23,10 @@ interface Props {
   replyTo?: Message | null;
   onCancelReply?: () => void;
   initialMessage?: string;
+  disabled?: boolean;
 }
 
-export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage }: Props) {
+export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled }: Props) {
   const [message, setMessage] = useState(initialMessage || "");
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
