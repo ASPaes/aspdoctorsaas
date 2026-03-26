@@ -988,8 +988,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
             .eq('conversation_id', conversationId)
             .eq('tenant_id', tenantId)
             .eq('is_from_me', true)
-            .contains('metadata', { business_hours: true })
             .gte('created_at', cutoff10min)
+            .filter('metadata->>outside_hours', 'eq', 'true')
             .limit(1)
             .maybeSingle();
 
