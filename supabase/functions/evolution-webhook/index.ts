@@ -2318,6 +2318,33 @@ function extractMaxOptionFromTemplate(template: string): number {
   return max || 5;
 }
 
+async function clearAfterHoursMetadata(supabase: any, conversationId: string): Promise<void> {
+  try {
+    const { data: conv } = await supabase
+      .from('whatsapp_conversations')
+      .select('metadata')
+      .eq('id', conversationId)
+      .single();
+    const meta = (conv?.metadata && typeof conv.metadata === 'object') ? conv.metadata : {};
+    if ((meta as any).after_hours) {
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          metadata: {
+            ...meta,
+            after_hours: false,
+            after_hours_cleared_at: new Date().toISOString(),
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+      console.log(`[after-hours] Cleared after_hours flag for conv=${conversationId}`);
+    }
+  } catch (err) {
+    console.error('[after-hours] Error clearing metadata:', err);
+  }
+}
+
 async function ensureAttendanceForIncomingMessage(
   supabase: any,
   conversationId: string,
