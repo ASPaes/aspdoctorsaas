@@ -33,7 +33,8 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sendMutation = useWhatsAppSend();
-  const { isBlocked } = useAgentPresence();
+  const { isBlocked: presenceBlocked } = useAgentPresence();
+  const isBlocked = presenceBlocked || !!disabled;
 
   const { macros, incrementUsage } = useWhatsAppMacros();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
