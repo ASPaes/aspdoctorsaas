@@ -1249,7 +1249,25 @@ async function sendBusinessHoursMessage(
             contextHint = `O cliente escreveu num dia sem atendimento. Retornamos às ${nextStart}.`;
           }
 
-          const prompt = `Você é um atendente virtual simpático. Escreva uma mensagem curta (máximo 3 linhas), amigável e contextual informando que estamos fora do horário de atendimento. ${contextHint} Horário de atendimento: ${slotsDesc}. Informe quando retornaremos. Não use saudação formal. Use emojis com moderação. Não invente informações.`;
+          // Determinar período do dia para saudação correta
+          const hour = parseInt(currentTime.split(':')[0], 10);
+          const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+
+          const prompt = `Você é um atendente virtual de uma empresa de software. Escreva uma mensagem CURTA (máximo 3 linhas) em português brasileiro, amigável e variada (nunca repita o mesmo texto), informando que estamos fora do horário de atendimento.
+
+Contexto: ${contextHint}
+Saudação correta para o horário: ${greeting}
+Horário de atendimento: ${slotsDesc}
+Próximo atendimento: ${nextStart}
+
+Regras:
+- Use "${greeting}!" para iniciar
+- Informe o horário de atendimento completo: ${slotsDesc}
+- Diga quando retornaremos: ${nextStart}
+- Máximo 3 linhas
+- Use no máximo 1 emoji
+- Varie o texto a cada mensagem para não parecer robótico
+- Não invente informações além das fornecidas`;
           const aiMsg = await callAI(aiCfg, [{ role: 'user', content: prompt }]);
           if (aiMsg && aiMsg.trim().length > 0) {
             await sendAndPersistAutoMessage(supabase, instanceCtx, conversationId, tenantId, aiMsg.trim(), {
