@@ -1378,6 +1378,36 @@ async function checkBusinessHours(
   }
 }
 
+/**
+ * Detecta se uma mensagem recebida parece ser uma URA/bot de outro sistema
+ * (ex: menu numerado automático de WhatsApp Business de terceiros).
+ * Evita "briga de URAs" onde nosso sistema responde ao menu do cliente.
+ */
+function isLikelyThirdPartyURA(content: string): boolean {
+  if (!content || content.trim().length === 0) return false;
+
+  const n = content
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Detectar menu numerado (3+ opções numeradas na mesma mensagem)
+  const numberedLines = (n.match(/^\s*\d+\s*[-.)]\s*.+/gm) || []).length;
+  if (numberedLines >= 3) return true;
+
+  // Detectar padrões típicos de URA de WhatsApp Business
+  if (n.includes('escolha uma opcao') || n.includes('escolha a opcao')) return true;
+  if (n.includes('por favor, escolha') || n.includes('por favor escolha')) return true;
+  if (n.includes('selecione uma opcao') || n.includes('selecione a opcao')) return true;
+  if (n.includes('responda com o numero') || n.includes('responda apenas com o numero')) return true;
+  if (n.includes('digite o numero da opcao') || n.includes('para falar com')) return true;
+  if ((n.includes('menu') || n.includes('opcoes')) && numberedLines >= 2) return true;
+
+  return false;
+}
+
 
 
 
