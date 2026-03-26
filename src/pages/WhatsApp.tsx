@@ -15,6 +15,8 @@ import { DepartmentFilterProvider, useDepartmentFilter } from "@/contexts/Depart
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldAlert } from "lucide-react";
+import AgentPresenceBar from "@/components/whatsapp/presence/AgentPresenceBar";
+import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
