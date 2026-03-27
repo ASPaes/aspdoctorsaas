@@ -14,6 +14,13 @@ export interface SmartReplyResponse {
   error?: string;
 }
 
+const isSmartReplyResponse = (value: unknown): value is SmartReplyResponse => {
+  if (!value || typeof value !== 'object') return false;
+
+  const maybeResponse = value as { suggestions?: unknown };
+  return Array.isArray(maybeResponse.suggestions);
+};
+
 const isConversationNotFoundError = (error: unknown) => {
   if (!error || typeof error !== 'object') return false;
 
@@ -32,6 +39,32 @@ const getFallbackResponse = (): SmartReplyResponse => ({
   error: 'conversation_not_found',
 });
 
+const extractFallbackFromError = (error: unknown): SmartReplyResponse | null => {
+  if (!error || typeof error !== 'object') return null;
+
+  const maybeError = error as {
+    context?: { body?: unknown };
+    body?: unknown;
+    message?: string;
+  };
+
+  const directBody = maybeError.context?.body ?? maybeError.body;
+  if (isSmartReplyResponse(directBody)) return directBody;
+
+  const message = maybeError.message;
+  if (!message) return null;
+
+  const jsonStart = message.indexOf('{');
+  if (jsonStart === -1) return null;
+
+  try {
+    const parsed = JSON.parse(message.slice(jsonStart));
+    return isSmartReplyResponse(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export const useSmartReply = (conversationId: string | null) => {
   const queryClient = useQueryClient();
   const lastInvalidatedRef = useRef<number>(0);
@@ -44,16 +77,9 @@ export const useSmartReply = (conversationId: string | null) => {
       const { data, error } = await supabase.functions.invoke('suggest-smart-replies', { body: { conversationId } });
       if (error) {
         if (isConversationNotFoundError(error)) return getFallbackResponse();
-        // If the response includes suggestions (e.g. 429 rate limit), use them as fallback
         if (data?.suggestions) return data as SmartReplyResponse;
-        // Supabase SDK may put the parsed body inside the error object itself
-        const errBody = (error as any)?.context?.body || (error as any)?.body;
-        if (errBody?.suggestions) return errBody as SmartReplyResponse;
-        // Try parsing error message as JSON (some SDK versions serialize the body there)
-        try {
-          const parsed = JSON.parse((error as any).message || '');
-          if (parsed?.suggestions) return parsed as SmartReplyResponse;
-        } catch { /* not JSON, ignore */ }
+        const fallback = extractFallbackFromError(error);
+        if (fallback) return fallback;
         throw error;
       }
       return data as SmartReplyResponse;
@@ -92,6 +118,9 @@ export const useSmartReply = (conversationId: string | null) => {
       const { data, error } = await supabase.functions.invoke('suggest-smart-replies', { body: { conversationId } });
       if (error) {
         if (isConversationNotFoundError(error)) return getFallbackResponse();
+        if (data?.suggestions) return data as SmartReplyResponse;
+        const fallback = extractFallbackFromError(error);
+        if (fallback) return fallback;
         throw error;
       }
       return data as SmartReplyResponse;
