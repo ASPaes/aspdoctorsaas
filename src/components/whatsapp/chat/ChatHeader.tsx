@@ -201,6 +201,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 shrink-0"
+                    onClick={isLinked ? onToggleDetails : onToggleDetails}
+                    title={isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                  >
+                    {isLinked ? (
+                      <Link2 className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                </TooltipContent>
+              </Tooltip>
               {!(conversation.opened_out_of_hours && statusLabel === 'Encerrada' && (!attendance || attendance.status !== 'in_progress')) && (
                 <Badge variant={statusVariant as any} className={`text-[10px] h-4 shrink-0 whitespace-nowrap ${statusLabel === 'Fora do horário' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : ''}`}>{statusLabel}</Badge>
               )}
