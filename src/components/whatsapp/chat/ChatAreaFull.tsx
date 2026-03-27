@@ -295,6 +295,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           </div>
         ) : (
           <ChatInput
+            key={`chat-input-${conversation.id}`}
             conversationId={conversation.id}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
