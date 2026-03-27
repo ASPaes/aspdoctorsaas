@@ -146,13 +146,25 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     return conversation.status;
   }, [attendance, conversation.status]);
 
-  const statusLabel = effectiveStatus === "waiting" ? "Na Fila"
-    : effectiveStatus === "in_progress" ? "Em Atendimento"
-    : effectiveStatus === "closed" ? "Encerrada"
-    : effectiveStatus === "active" ? "Ativa"
-    : effectiveStatus === "archived" ? "Arquivada"
-    : conversation.status;
-  const statusVariant = (effectiveStatus === "waiting" || effectiveStatus === "in_progress" || effectiveStatus === "active") ? "default" : "secondary";
+  let computedStatusLabel: string;
+  let computedStatusVariant: string;
+
+  // Fora do horário tem prioridade se não houver técnico ativo
+  if (conversation.opened_out_of_hours && (!attendance || (attendance.status !== 'in_progress' && !attendance.assigned_to))) {
+    computedStatusLabel = 'Fora do horário';
+    computedStatusVariant = 'outline';
+  } else {
+    computedStatusLabel = effectiveStatus === "waiting" ? "Na Fila"
+      : effectiveStatus === "in_progress" ? "Em Atendimento"
+      : effectiveStatus === "closed" ? "Encerrada"
+      : effectiveStatus === "active" ? "Ativa"
+      : effectiveStatus === "archived" ? "Arquivada"
+      : conversation.status;
+    computedStatusVariant = (effectiveStatus === "waiting" || effectiveStatus === "in_progress" || effectiveStatus === "active") ? "default" : "secondary";
+  }
+
+  const statusLabel = computedStatusLabel;
+  const statusVariant = computedStatusVariant;
 
   return (
     <div className="shrink-0">
