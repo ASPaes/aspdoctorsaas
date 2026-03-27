@@ -53,6 +53,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const queryClient = useQueryClient();
 
+  // Client link status
+  const metadata = (conversation.metadata || {}) as Record<string, unknown>;
+  const phoneNumber = conversation.contact?.phone_number || "";
+  const { linkedCliente, isLinked } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata);
+  const linkedClienteName = isLinked && linkedCliente
+    ? (linkedCliente.nome_fantasia || linkedCliente.razao_social || `#${linkedCliente.codigo_sequencial}`)
+    : null;
+
   const isAfterHours = useMemo(() => {
     const convAny = conversation as any;
     return !!convAny.opened_out_of_hours_at && !convAny.out_of_hours_cleared_at;
