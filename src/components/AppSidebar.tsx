@@ -200,6 +200,12 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
           <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Preferências" onClick={() => setPrefsOpen(true)}>
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Preferências</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sair">
               <button onClick={handleLogout} className="flex w-full items-center gap-2">
                 <LogOut className="h-4 w-4" />

@@ -132,17 +132,33 @@ Deno.serve(async (req) => {
         if (!senderUserId) return { label: '', name: '', role: null };
         const { data: profile } = await supabase
           .from('profiles')
-          .select('funcionario_id')
+          .select('funcionario_id, tenant_id')
           .eq('user_id', senderUserId)
           .maybeSingle();
         if (!profile?.funcionario_id) return { label: '', name: '', role: null };
-        const { data: func } = await supabase
-          .from('funcionarios')
-          .select('nome, cargo')
-          .eq('id', profile.funcionario_id)
-          .maybeSingle();
+
+        // Fetch funcionario + user_preferences.signature_name in parallel
+        const [funcResult, prefResult] = await Promise.all([
+          supabase
+            .from('funcionarios')
+            .select('nome, cargo')
+            .eq('id', profile.funcionario_id)
+            .maybeSingle(),
+          supabase
+            .from('user_preferences')
+            .select('signature_name')
+            .eq('tenant_id', profile.tenant_id!)
+            .eq('user_id', senderUserId)
+            .is('department_id', null)
+            .maybeSingle(),
+        ]);
+
+        const func = funcResult.data;
         if (!func?.nome) return { label: '', name: '', role: null };
-        return { label: `*${func.nome}*`, name: func.nome, role: func.cargo || null };
+
+        // Prefer signature_name from preferences, fallback to funcionario nome
+        const displayName = prefResult.data?.signature_name || func.nome;
+        return { label: `*${displayName}*`, name: displayName, role: func.cargo || null };
       })(),
     ]);
 
