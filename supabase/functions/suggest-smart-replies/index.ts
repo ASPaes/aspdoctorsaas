@@ -149,8 +149,8 @@ CONTEXTO: Cliente: ${contactName}. Última mensagem: "${lastClientMessage.conten
         return new Response(JSON.stringify({ error: "ai_key_invalid", message: "Chave de API inválida.", suggestions: defaultSuggestions }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (msg.includes("429")) {
-        return new Response(JSON.stringify({ error: "rate_limit", suggestions: defaultSuggestions }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ ok: true, rate_limited: true, error: "rate_limit", suggestions: defaultSuggestions }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       console.error("[suggest-smart-replies] AI error:", aiError);
