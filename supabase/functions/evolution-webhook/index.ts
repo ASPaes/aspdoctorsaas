@@ -974,6 +974,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
               .from('whatsapp_conversations')
               .update({
                 status: 'active',
+                opened_out_of_hours: true,
+                opened_out_of_hours_at: nowIsoAH,
                 updated_at: nowIsoAH,
               })
               .eq('id', conversationId);
