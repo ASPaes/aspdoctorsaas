@@ -65,21 +65,48 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const timeStr = formatTime(conv.last_message_at);
 
-  const attendanceBadge = attendance ? (
-    attendance.status === "waiting" ? (
-      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
-        Fila
-      </Badge>
-    ) : attendance.status === "in_progress" ? (
-      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-blue-500/50 text-blue-600 dark:text-blue-400">
-        Em atend.
-      </Badge>
-    ) : (attendance.status === "closed" || attendance.status === "inactive_closed") ? (
-      <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-muted-foreground/50 text-muted-foreground">
-        Encerrado
-      </Badge>
-    ) : null
-  ) : null;
+  const isOutOfHours = (conv as any).opened_out_of_hours === true;
+
+  const attendanceBadge = (() => {
+    // Fora do horário sem técnico → badge especial
+    if (isOutOfHours && (!attendance || attendance.status === 'waiting') && !attendance?.assigned_to) {
+      return (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
+          Fora do horário
+        </Badge>
+      );
+    }
+    if (!attendance) return null;
+    if (attendance.status === "waiting") {
+      return (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
+          Fila
+        </Badge>
+      );
+    }
+    if (attendance.status === "in_progress") {
+      return (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-blue-500/50 text-blue-600 dark:text-blue-400">
+          Em atend.
+        </Badge>
+      );
+    }
+    if (attendance.status === "closed" || attendance.status === "inactive_closed") {
+      if (isOutOfHours) {
+        return (
+          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
+            Fora do horário
+          </Badge>
+        );
+      }
+      return (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-muted-foreground/50 text-muted-foreground">
+          Encerrado
+        </Badge>
+      );
+    }
+    return null;
+  })();
 
   return (
     <button
