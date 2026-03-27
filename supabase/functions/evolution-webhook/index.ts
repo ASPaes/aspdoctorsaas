@@ -961,6 +961,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
           // Fetch current conversation state to decide how to handle
           const nowIsoAH = new Date().toISOString();
+          const msgIso = timestamp; // use real message timestamp, not processing time
           const { data: convCurrent } = await supabase
             .from('whatsapp_conversations')
             .select('status, opened_out_of_hours, opened_out_of_hours_at, out_of_hours_cleared_at, first_agent_message_at')
@@ -979,19 +980,18 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
                 status: 'active',
                 updated_at: nowIsoAH,
                 opened_out_of_hours: true,
-                opened_out_of_hours_at: nowIsoAH,
+                opened_out_of_hours_at: msgIso,
                 out_of_hours_cleared_at: null,
                 first_agent_message_at: null,
               })
               .eq('id', conversationId);
           } else {
-            // Ongoing off-hours cycle: just ensure active status
+            // Ongoing off-hours cycle: just ensure active status (preserve original opened_out_of_hours_at)
             await supabase
               .from('whatsapp_conversations')
               .update({
                 status: 'active',
                 opened_out_of_hours: true,
-                opened_out_of_hours_at: nowIsoAH,
                 updated_at: nowIsoAH,
               })
               .eq('id', conversationId);
