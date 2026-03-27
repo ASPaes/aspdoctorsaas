@@ -66,9 +66,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const timeStr = formatTime(conv.last_message_at);
 
   const isOutOfHours = conv.opened_out_of_hours === true;
+  const isWaitingWithoutAgent = !attendance || (attendance.status === 'waiting' && !attendance.assigned_to);
 
   const attendanceBadge = (() => {
-    if (isOutOfHours && (!attendance || (attendance.status !== 'in_progress' && !attendance.assigned_to))) {
+    if (isOutOfHours && isWaitingWithoutAgent) {
       return (
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
           Fora do horário
@@ -91,13 +92,6 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       );
     }
     if (attendance.status === "closed" || attendance.status === "inactive_closed") {
-      if (isOutOfHours) {
-        return (
-          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
-            Fora do horário
-          </Badge>
-        );
-      }
       return (
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-muted-foreground/50 text-muted-foreground">
           Encerrado
