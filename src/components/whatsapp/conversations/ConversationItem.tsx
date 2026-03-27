@@ -65,11 +65,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const timeStr = formatTime(conv.last_message_at);
 
-  const isOutOfHours = (conv as any).opened_out_of_hours === true;
+  const isOutOfHours = conv.opened_out_of_hours === true;
 
   const attendanceBadge = (() => {
-    // Fora do horário sem técnico → badge especial
-    if (isOutOfHours && (!attendance || attendance.status === 'waiting') && !attendance?.assigned_to) {
+    if (isOutOfHours && (!attendance || (attendance.status !== 'in_progress' && !attendance.assigned_to))) {
       return (
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
           Fora do horário
