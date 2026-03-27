@@ -4,7 +4,7 @@ import { formatBRPhone } from "@/lib/phoneBR";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -21,6 +21,7 @@ import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
+import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -51,6 +52,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const queryClient = useQueryClient();
+
+  // Client link status
+  const metadata = (conversation.metadata || {}) as Record<string, unknown>;
+  const phoneNumber = conversation.contact?.phone_number || "";
+  const { linkedCliente, isLinked } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata);
+  const linkedClienteName = isLinked && linkedCliente
+    ? (linkedCliente.nome_fantasia || linkedCliente.razao_social || `#${linkedCliente.codigo_sequencial}`)
+    : null;
 
   const isAfterHours = useMemo(() => {
     const convAny = conversation as any;
@@ -192,6 +201,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0 shrink-0"
+                    onClick={isLinked ? onToggleDetails : onToggleDetails}
+                    title={isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                  >
+                    {isLinked ? (
+                      <Link2 className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                </TooltipContent>
+              </Tooltip>
               {!(conversation.opened_out_of_hours && statusLabel === 'Encerrada' && (!attendance || attendance.status !== 'in_progress')) && (
                 <Badge variant={statusVariant as any} className={`text-[10px] h-4 shrink-0 whitespace-nowrap ${statusLabel === 'Fora do horário' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : ''}`}>{statusLabel}</Badge>
               )}
