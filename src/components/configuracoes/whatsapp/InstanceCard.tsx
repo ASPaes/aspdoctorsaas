@@ -134,6 +134,23 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               </Button>
             </div>
           </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <div className="space-y-0.5">
+              <Label htmlFor={`ignore-groups-${instance.id}`} className="text-sm cursor-pointer">
+                Ignorar mensagens de grupos
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Mensagens de grupos (@g.us) não serão importadas
+              </p>
+            </div>
+            <Switch
+              id={`ignore-groups-${instance.id}`}
+              checked={instance.ignore_group_messages !== false}
+              onCheckedChange={handleToggleIgnoreGroups}
+            />
+          </div>
+          </div>
         </CardContent>
 
         <CardFooter className="flex gap-2">
