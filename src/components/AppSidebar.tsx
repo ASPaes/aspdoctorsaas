@@ -1,4 +1,6 @@
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal } from "lucide-react";
+import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,6 +52,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const navigate = useNavigate();
   const { signOut, profile, user, profileLoading } = useAuth();
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const isSuperAdmin = profile?.is_super_admin === true;
   const isAdmin = isSuperAdmin || profile?.role === "admin";
   const navItems = ALL_NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
@@ -199,6 +202,12 @@ export function AppSidebar() {
             </SidebarMenuItem>
           )}
           <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Preferências" onClick={() => setPrefsOpen(true)}>
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Preferências</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sair">
               <button onClick={handleLogout} className="flex w-full items-center gap-2">
                 <LogOut className="h-4 w-4" />
@@ -208,6 +217,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <UserPreferencesDialog open={prefsOpen} onOpenChange={setPrefsOpen} />
     </Sidebar>
   );
 }
