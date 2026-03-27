@@ -1,4 +1,5 @@
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
