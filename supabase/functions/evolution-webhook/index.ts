@@ -1971,7 +1971,7 @@ async function handleCsatResponse(
 
       await sendDeferredClosureMessage(supabase, instanceCtx, conversationId, tenantId, closedAtt.id);
 
-      return false;
+      return true;
     }
 
     const trimmed = (messageContent || '').trim();
