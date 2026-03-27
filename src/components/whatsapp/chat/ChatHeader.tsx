@@ -149,8 +149,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   let computedStatusLabel: string;
   let computedStatusVariant: string;
 
-  // Fora do horário tem prioridade se não houver técnico ativo
-  if (conversation.opened_out_of_hours && (!attendance || (attendance.status !== 'in_progress' && !attendance.assigned_to))) {
+  // Fora do horário: só quando waiting sem técnico
+  if (conversation.opened_out_of_hours && (!attendance || (attendance.status === 'waiting' && !attendance.assigned_to))) {
     computedStatusLabel = 'Fora do horário';
     computedStatusVariant = 'outline';
   } else {
