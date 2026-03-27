@@ -177,38 +177,43 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   return (
     <div className="shrink-0">
-      <div className="border-b border-border bg-background px-3 py-2">
+      <div className="border-b border-border bg-background px-3 py-1.5">
         {/* Row 1: Identity + primary actions */}
-        <div className="flex items-center gap-2 min-h-[40px]">
+        <div className="flex items-center gap-2 min-h-[36px]">
 
           {/* Close (mobile) */}
           {onClose && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden shrink-0" onClick={onClose}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden shrink-0" onClick={onClose} aria-label="Fechar chat">
               <X className="h-4 w-4" />
             </Button>
           )}
 
           {/* Avatar */}
-          <Avatar className="h-9 w-9 shrink-0">
+          <Avatar className="h-8 w-8 shrink-0">
             {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
-            <AvatarFallback className="text-xs font-medium">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
+            <AvatarFallback className="text-[10px] font-medium">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
 
-          {/* Name + status */}
+          {/* Name + phone */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <p className="text-sm font-semibold truncate min-w-0">{name}</p>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} title="Editar contato">
-                <Pencil className="h-3 w-3 text-muted-foreground" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} aria-label="Editar contato">
+                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Editar contato</TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-5 w-5 p-0 shrink-0"
-                    onClick={isLinked ? onToggleDetails : onToggleDetails}
-                    title={isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
+                    onClick={onToggleDetails}
+                    aria-label={isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
                   >
                     {isLinked ? (
                       <Link2 className="h-3 w-3 text-green-500" />
@@ -221,38 +226,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   {isLinked ? `Vinculado ao cliente: ${linkedClienteName}` : "Contato sem cliente vinculado"}
                 </TooltipContent>
               </Tooltip>
-              {!(conversation.opened_out_of_hours && statusLabel === 'Encerrada' && (!attendance || attendance.status !== 'in_progress')) && (
-                <Badge variant={statusVariant as any} className={`text-[10px] h-4 shrink-0 whitespace-nowrap ${statusLabel === 'Fora do horário' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : ''}`}>{statusLabel}</Badge>
-              )}
-              {attendance?.created_from === 'billing_automation' && (
-                <Badge variant="outline" className="text-[10px] h-4 shrink-0 whitespace-nowrap border-amber-500 text-amber-600 dark:text-amber-400">
-                  💰 Cobrança
-                </Badge>
-              )}
-              {isAfterHours && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={handleClearAfterHours}
-                      className="inline-flex items-center gap-0.5 px-1.5 h-4 rounded-full text-[10px] font-medium shrink-0 whitespace-nowrap border border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
-                    >
-                      <Moon className="h-2.5 w-2.5" />
-                      Fora do horário
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">Clique para marcar como tratado</TooltipContent>
-                </Tooltip>
-              )}
-              {assignedOperatorName && (
-                <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
-                  Técnico: {assignedOperatorName}
+              {contact?.phone_number && (
+                <span className="text-[11px] text-muted-foreground truncate hidden sm:inline ml-1">
+                  {formatBRPhone(contact.phone_number)}
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">{contact?.phone_number ? formatBRPhone(contact.phone_number) : ""}</p>
           </div>
 
-          {/* Primary actions — always visible */}
+          {/* Primary actions */}
           <div className="flex items-center gap-0.5 shrink-0">
             {presenceBlocked ? (
               <Tooltip>
@@ -269,25 +251,24 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               />
             )}
 
-            {/* Analisar sentimento — visible button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={analyze} disabled={isAnalyzing}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={analyze} disabled={isAnalyzing} aria-label="Analisar sentimento">
                   <Brain className={`h-4 w-4 ${isAnalyzing ? "animate-spin" : ""}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
             </Tooltip>
 
-            {/* Encerrar conversa — visible button */}
             {conversation.status === "active" && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}
+                    aria-label="Encerrar conversa"
                   >
                     <XCircle className="h-4 w-4" />
                   </Button>
@@ -296,11 +277,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {/* Reabrir — visible when closed */}
             {(conversation.status === "closed" || conversation.status === "archived") && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => reopenConversation(conversation.id)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => reopenConversation(conversation.id)} aria-label="Reabrir conversa">
                     <RotateCcw className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
@@ -310,17 +290,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggleDetails}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onToggleDetails} aria-label="Detalhes">
                   <PanelRightOpen className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Detalhes</TooltipContent>
             </Tooltip>
 
-            {/* Menu de ações secundárias */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Mais ações">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -346,26 +325,63 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           </div>
         </div>
 
-        {/* Row 2: Context chips — wraps naturally */}
-        <div className="flex items-center gap-1.5 flex-wrap mt-1 pl-12">
+        {/* Row 2: Context chips — single line, overflow hidden */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 pl-10">
           <SignatureControl conversationId={conversation.id} />
+
+          {!(conversation.opened_out_of_hours && statusLabel === 'Encerrada' && (!attendance || attendance.status !== 'in_progress')) && (
+            <Badge variant={statusVariant as any} className={`text-[10px] h-4 shrink-0 whitespace-nowrap ${statusLabel === 'Fora do horário' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : ''}`}>
+              {statusLabel}
+            </Badge>
+          )}
+
           {convDepartment && (
-            <Badge variant="outline" className="text-[10px] h-4 gap-1 border-primary/30 text-primary">
+            <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-primary/30 text-primary">
               <Building2 className="h-2.5 w-2.5" />
-              Setor: {convDepartment.name}
+              {convDepartment.name}
             </Badge>
           )}
           {!convDepartment && selectedDepartment && (
-            <Badge variant="outline" className="text-[10px] h-4 gap-1">
+            <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap">
               <Building2 className="h-2.5 w-2.5" />
-              Setor: {selectedDepartment.name}
+              {selectedDepartment.name}
             </Badge>
           )}
+
           {conversationInstance && hasMultipleInstances && (
-            <Badge variant="secondary" className="text-[10px] h-4">
-              Canal: {conversationInstance.display_name || conversationInstance.instance_name}
+            <Badge variant="secondary" className="text-[10px] h-4 shrink-0 whitespace-nowrap">
+              {conversationInstance.display_name || conversationInstance.instance_name}
             </Badge>
           )}
+
+          {assignedOperatorName && (
+            <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
+              Técnico: {assignedOperatorName}
+            </span>
+          )}
+
+          {attendance?.created_from === 'billing_automation' && (
+            <Badge variant="outline" className="text-[10px] h-4 shrink-0 whitespace-nowrap border-amber-500 text-amber-600 dark:text-amber-400">
+              💰 Cobrança
+            </Badge>
+          )}
+
+          {isAfterHours && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleClearAfterHours}
+                  className="inline-flex items-center gap-0.5 px-1.5 h-4 rounded-full text-[10px] font-medium shrink-0 whitespace-nowrap border border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                  aria-label="Marcar fora do horário como tratado"
+                >
+                  <Moon className="h-2.5 w-2.5" />
+                  Fora do horário
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Clique para marcar como tratado</TooltipContent>
+            </Tooltip>
+          )}
+
           <SentimentChip sentiment={sentimentData} />
         </div>
       </div>
