@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -41,6 +41,50 @@ const safeParseResponse = (data: unknown): SmartReplyResponse => {
   };
 };
 
+const extractFallbackFromError = (error: unknown): SmartReplyResponse | null => {
+  if (!error || typeof error !== 'object') return null;
+  try {
+    const errBody = (error as any)?.context?.body ?? (error as any)?.body;
+    if (errBody) {
+      const parsed = safeParseResponse(errBody);
+      if (parsed.suggestions.length > 0) return parsed;
+    }
+    const msg = typeof (error as any)?.message === 'string' ? (error as any).message : '';
+    const jsonStart = msg.indexOf('{');
+    if (jsonStart >= 0) {
+      const parsed = safeParseResponse(JSON.parse(msg.slice(jsonStart)));
+      if (parsed.suggestions.length > 0) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+async function fetchSmartReplies(conversationId: string): Promise<SmartReplyResponse> {
+  try {
+    const { data, error } = await supabase.functions.invoke('suggest-smart-replies', {
+      body: { conversationId },
+    });
+
+    if (error) {
+      console.warn('[useSmartReply] invoke error:', error);
+      if (data) {
+        const parsed = safeParseResponse(data);
+        if (parsed.suggestions.length > 0) return parsed;
+      }
+      const fallback = extractFallbackFromError(error);
+      if (fallback) return fallback;
+      return { suggestions: [], rateLimited: false };
+    }
+
+    return safeParseResponse(data);
+  } catch (err) {
+    console.warn('[useSmartReply] unexpected error:', err);
+    return { suggestions: [], rateLimited: false };
+  }
+}
+
 const MIN_INTERVAL_MS = 30_000;
 const DEBOUNCE_MS = 600;
 
@@ -48,70 +92,19 @@ export const useSmartReply = (conversationId: string | null) => {
   const queryClient = useQueryClient();
   const lastInvalidatedRef = useRef<number>(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const requestIdRef = useRef(0);
 
-  const fetchSuggestions = useCallback(async (): Promise<SmartReplyResponse> => {
-    if (!conversationId) return { suggestions: [], rateLimited: false };
-
-    const myRequestId = ++requestIdRef.current;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('suggest-smart-replies', {
-        body: { conversationId },
-      });
-
-      // Stale request — discard
-      if (myRequestId !== requestIdRef.current) {
-        return { suggestions: [], rateLimited: false };
-      }
-
-      // Even if invoke reports an error, try to extract suggestions from data or error body
-      if (error) {
-        console.warn('[useSmartReply] invoke error:', error);
-
-        // Try extracting from data (Supabase sometimes returns data alongside error)
-        if (data) {
-          const parsed = safeParseResponse(data);
-          if (parsed.suggestions.length > 0) return parsed;
-        }
-
-        // Try extracting from error body/message
-        try {
-          const errBody = (error as any)?.context?.body ?? (error as any)?.body;
-          if (errBody) {
-            const parsed = safeParseResponse(errBody);
-            if (parsed.suggestions.length > 0) return parsed;
-          }
-          const msg = typeof (error as any)?.message === 'string' ? (error as any).message : '';
-          const jsonStart = msg.indexOf('{');
-          if (jsonStart >= 0) {
-            const parsed = safeParseResponse(JSON.parse(msg.slice(jsonStart)));
-            if (parsed.suggestions.length > 0) return parsed;
-          }
-        } catch {
-          // ignore parse failures
-        }
-
-        // Return empty — no throw
-        return { suggestions: [], rateLimited: false };
-      }
-
-      return safeParseResponse(data);
-    } catch (err) {
-      console.warn('[useSmartReply] unexpected error:', err);
-      return { suggestions: [], rateLimited: false };
-    }
-  }, [conversationId]);
-
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['smart-replies', conversationId],
-    queryFn: fetchSuggestions,
+    queryFn: () => {
+      if (!conversationId) return Promise.resolve({ suggestions: [], rateLimited: false } as SmartReplyResponse);
+      return fetchSmartReplies(conversationId);
+    },
     enabled: !!conversationId,
     staleTime: 2 * 60 * 1000,
-    retry: false, // Don't retry — avoid hammering the API
+    retry: false,
   });
 
-  // Listen for new client messages to debounced-invalidate suggestions
+  // Listen for new client messages to debounced-invalidate
   useEffect(() => {
     if (!conversationId) return;
     const channel = supabase
@@ -128,7 +121,6 @@ export const useSmartReply = (conversationId: string | null) => {
         const now = Date.now();
         if (now - lastInvalidatedRef.current < MIN_INTERVAL_MS) return;
 
-        // Debounce
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
           lastInvalidatedRef.current = Date.now();
@@ -144,7 +136,10 @@ export const useSmartReply = (conversationId: string | null) => {
   }, [conversationId, queryClient]);
 
   const refreshMutation = useMutation({
-    mutationFn: fetchSuggestions,
+    mutationFn: () => {
+      if (!conversationId) return Promise.resolve({ suggestions: [], rateLimited: false } as SmartReplyResponse);
+      return fetchSmartReplies(conversationId);
+    },
     onSuccess: (result) => {
       queryClient.setQueryData(['smart-replies', conversationId], result);
       lastInvalidatedRef.current = Date.now();
@@ -153,22 +148,18 @@ export const useSmartReply = (conversationId: string | null) => {
       }
     },
     onError: () => {
-      // Never crash — silently fail
       console.warn('[useSmartReply] refresh failed');
     },
   });
 
-  const suggestions = data?.suggestions ?? [];
-  const rateLimited = data?.rateLimited ?? false;
-
   return {
-    suggestions,
+    suggestions: data?.suggestions ?? [],
     context: data?.context ?? null,
     isLoading,
     isRefreshing: refreshMutation.isPending,
     refresh: () => refreshMutation.mutate(),
-    rateLimited,
-    error: null as Error | null, // Never expose errors to UI
+    rateLimited: data?.rateLimited ?? false,
+    error: null as Error | null,
     refetch,
   };
 };
