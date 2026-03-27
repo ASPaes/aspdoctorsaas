@@ -25,6 +25,7 @@ interface Instance {
   tenant_id: string;
   webhook_url: string | null;
   updated_at: string;
+  ignore_group_messages?: boolean;
 }
 
 interface InstanceCardProps {
