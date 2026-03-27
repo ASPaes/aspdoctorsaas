@@ -13,9 +13,10 @@ interface QueueIndicatorProps {
   conversationId: string;
   assignedTo: string | null;
   onTransferClick: () => void;
+  assignedOperatorName?: string | null;
 }
 
-export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: QueueIndicatorProps) {
+export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
@@ -52,11 +53,11 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick }: 
   const chipConfig = isInQueue
     ? { icon: Users, label: "Na fila", className: "bg-warning/10 text-warning border-warning/20" }
     : isAssignedToMe && isInProgress
-      ? { icon: User, label: "Comigo", className: "bg-primary/10 text-primary border-primary/20" }
+      ? { icon: User, label: assignedOperatorName ? `Comigo • ${assignedOperatorName}` : "Comigo", className: "bg-primary/10 text-primary border-primary/20" }
       : isAssignedToMe
-        ? { icon: Clock, label: "Comigo (fila)", className: "bg-primary/10 text-primary border-primary/20" }
+        ? { icon: Clock, label: assignedOperatorName ? `Comigo • ${assignedOperatorName}` : "Comigo (fila)", className: "bg-primary/10 text-primary border-primary/20" }
         : effectiveAssignedTo
-          ? { icon: UserCheck, label: "Atribuída", className: "bg-accent/10 text-accent border-accent/20" }
+          ? { icon: UserCheck, label: assignedOperatorName ? `Atribuída • ${assignedOperatorName}` : "Atribuída", className: "bg-accent/10 text-accent border-accent/20" }
           : { icon: Users, label: "Sem atendimento", className: "bg-muted text-muted-foreground border-border" };
 
   const ChipIcon = chipConfig.icon;
