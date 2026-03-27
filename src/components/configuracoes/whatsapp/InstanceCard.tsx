@@ -33,9 +33,21 @@ interface InstanceCardProps {
 }
 
 export const InstanceCard = ({ instance }: InstanceCardProps) => {
-  const { testConnection, deleteInstance } = useWhatsAppInstances();
+  const { testConnection, deleteInstance, updateInstance } = useWhatsAppInstances();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+
+  const handleToggleIgnoreGroups = async (checked: boolean) => {
+    try {
+      await updateInstance.mutateAsync({
+        id: instance.id,
+        updates: { ignore_group_messages: checked },
+      });
+      toast.success(checked ? "Mensagens de grupo serão ignoradas" : "Mensagens de grupo serão processadas");
+    } catch {
+      toast.error("Erro ao atualizar configuração");
+    }
+  };
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
 
