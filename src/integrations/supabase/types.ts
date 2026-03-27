@@ -837,6 +837,7 @@ export type Database = {
           oncall_urgency_keywords: Json
           support_auto_close_inactivity_minutes: number
           support_config: Json
+          support_csat_confirm_before_close: boolean | null
           support_csat_enabled: boolean
           support_csat_prompt_template: string
           support_csat_reason_prompt_template: string
@@ -886,6 +887,7 @@ export type Database = {
           oncall_urgency_keywords?: Json
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
+          support_csat_confirm_before_close?: boolean | null
           support_csat_enabled?: boolean
           support_csat_prompt_template?: string
           support_csat_reason_prompt_template?: string
@@ -935,6 +937,7 @@ export type Database = {
           oncall_urgency_keywords?: Json
           support_auto_close_inactivity_minutes?: number
           support_config?: Json
+          support_csat_confirm_before_close?: boolean | null
           support_csat_enabled?: boolean
           support_csat_prompt_template?: string
           support_csat_reason_prompt_template?: string

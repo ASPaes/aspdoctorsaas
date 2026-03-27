@@ -44,6 +44,8 @@ export const useSmartReply = (conversationId: string | null) => {
       const { data, error } = await supabase.functions.invoke('suggest-smart-replies', { body: { conversationId } });
       if (error) {
         if (isConversationNotFoundError(error)) return getFallbackResponse();
+        // If the response includes suggestions (e.g. 429 rate limit), use them
+        if (data?.suggestions) return data as SmartReplyResponse;
         throw error;
       }
       return data as SmartReplyResponse;
