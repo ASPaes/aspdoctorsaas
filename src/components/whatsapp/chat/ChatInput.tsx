@@ -1,15 +1,15 @@
-import { useState, useRef, useCallback, useEffect, KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, KeyboardEvent, DragEvent, ClipboardEvent } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic } from "lucide-react";
+import { Send, Mic, Paperclip } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
-import { MediaUploadButton } from "./input/MediaUploadButton";
 import { AIComposerButton } from "./input/AIComposerButton";
 import { AudioRecorder } from "./input/AudioRecorder";
 import { MacroSuggestions } from "./input/MacroSuggestions";
 import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
+import { AttachmentChip } from "./input/AttachmentChip";
 import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
