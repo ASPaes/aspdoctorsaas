@@ -97,12 +97,12 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
       ) : (
         <Button
           variant="outline"
-          size="sm"
-          className="h-7 text-xs gap-1.5 rounded-full"
+          size="icon"
+          className="h-7 w-7 rounded-full"
           onClick={onTransferClick}
+          aria-label="Transferir"
         >
           <ArrowRightLeft className="h-3 w-3" />
-          <span className="hidden md:inline">Transferir</span>
         </Button>
       )}
     </div>
