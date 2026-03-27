@@ -1609,6 +1609,112 @@ export type Database = {
           },
         ]
       }
+      notification_recipients: {
+        Row: {
+          delivered_at: string
+          dismissed_at: string | null
+          id: string
+          notification_id: string
+          read_at: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          delivered_at?: string
+          dismissed_at?: string | null
+          id?: string
+          notification_id: string
+          read_at?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          delivered_at?: string
+          dismissed_at?: string | null
+          id?: string
+          notification_id?: string
+          read_at?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notif_recipients_notification_fk"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notif_recipients_tenant_fk"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notif_recipients_user_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json
+          severity: string
+          tenant_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          action_url?: string | null
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          severity?: string
+          tenant_id: string
+          title: string
+          type?: string
+        }
+        Update: {
+          action_url?: string | null
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          severity?: string
+          tenant_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_created_by_fk"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "notifications_tenant_fk"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       origens_venda: {
         Row: {
           id: number
@@ -2610,6 +2716,67 @@ export type Database = {
           tenant_id?: string | null
         }
         Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          id: string
+          prefer_department_overrides: boolean
+          signature_name: string | null
+          sound_enabled: boolean
+          tenant_id: string
+          updated_at: string
+          user_id: string
+          visual_notifications_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          prefer_department_overrides?: boolean
+          signature_name?: string | null
+          sound_enabled?: boolean
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+          visual_notifications_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          prefer_department_overrides?: boolean
+          signature_name?: string | null
+          sound_enabled?: boolean
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+          visual_notifications_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_department_fk"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_preferences_tenant_fk"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_preferences_user_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       whatsapp_contacts: {
         Row: {
@@ -3894,6 +4061,10 @@ export type Database = {
         Args: { p_encrypted: string; p_encryption_key: string }
         Returns: string
       }
+      dismiss_notification: {
+        Args: { p_recipient_id: string }
+        Returns: undefined
+      }
       email_domain: { Args: { email: string }; Returns: string }
       encrypt_api_key: {
         Args: { p_encryption_key: string; p_key: string }
@@ -3948,6 +4119,15 @@ export type Database = {
           role: string
           tenant_id: string
           user_id: string
+        }[]
+      }
+      get_my_preferences: {
+        Args: { p_department_id?: string }
+        Returns: {
+          prefer_department_overrides: boolean
+          signature_name: string
+          sound_enabled: boolean
+          visual_notifications_enabled: boolean
         }[]
       }
       get_tenant_access_users: {
@@ -4015,6 +4195,10 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
+      mark_notification_read: {
+        Args: { p_recipient_id: string }
+        Returns: undefined
+      }
       next_support_attendance_seq: {
         Args: { p_tenant: string }
         Returns: number
