@@ -93,14 +93,17 @@ export const useSmartReply = (conversationId: string | null) => {
   const lastInvalidatedRef = useRef<number>(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const canRun = !!conversationId;
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['smart-replies', conversationId],
+    queryKey: ['smart-replies', conversationId ?? '__none__'],
     queryFn: () => {
       if (!conversationId) return Promise.resolve({ suggestions: [], rateLimited: false } as SmartReplyResponse);
       return fetchSmartReplies(conversationId);
     },
-    enabled: !!conversationId,
+    enabled: canRun,
     staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 
