@@ -248,6 +248,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 conversationId={conversation.id}
                 assignedTo={conversation.assigned_to || null}
                 onTransferClick={() => setIsTransferOpen(true)}
+                assignedOperatorName={assignedOperatorName}
               />
             )}
 
@@ -354,11 +355,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Badge>
           )}
 
-          {assignedOperatorName && (
-            <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
-              Técnico: {assignedOperatorName}
-            </span>
-          )}
 
           {attendance?.created_from === 'billing_automation' && (
             <Badge variant="outline" className="text-[10px] h-4 shrink-0 whitespace-nowrap border-amber-500 text-amber-600 dark:text-amber-400">
