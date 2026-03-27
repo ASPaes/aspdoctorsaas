@@ -2957,6 +2957,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          ignore_group_messages: boolean
           instance_id_external: string | null
           instance_name: string
           meta_business_id: string | null
@@ -2973,6 +2974,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          ignore_group_messages?: boolean
           instance_id_external?: string | null
           instance_name: string
           meta_business_id?: string | null
@@ -2989,6 +2991,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          ignore_group_messages?: boolean
           instance_id_external?: string | null
           instance_name?: string
           meta_business_id?: string | null
