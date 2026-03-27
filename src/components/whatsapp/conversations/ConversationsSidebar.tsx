@@ -227,26 +227,16 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       });
     }
 
-    // Pill filters using centralized bucket logic
+    // Pill filters using centralized bucket logic (with fallback)
     if (activePill === "in_progress") {
-      result = result.filter(c => {
-        const state = stateMap.get(c.id);
-        return state ? getConversationBucket(state) === "in_progress" : false;
-      });
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "in_progress");
     } else if (activePill === "waiting") {
-      result = result.filter(c => {
-        const state = stateMap.get(c.id);
-        return state ? getConversationBucket(state) === "waiting_in_hours" : false;
-      });
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
-      result = result.filter(c => {
-        const state = stateMap.get(c.id);
-        return state ? getConversationBucket(state) === "waiting_out_of_hours" : false;
-      });
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
     } else if (activePill === "closed") {
       result = result.filter(c => {
-        const state = stateMap.get(c.id);
-        if (!state || getConversationBucket(state) !== "closed") return false;
+        if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
         if (!isAdmin && user?.id) {
           const att = attendanceMap.get(c.id);
           if (att && att.assigned_to !== user.id) return false;
