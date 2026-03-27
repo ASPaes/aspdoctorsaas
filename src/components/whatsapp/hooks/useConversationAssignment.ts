@@ -14,7 +14,7 @@ export const useConversationAssignment = () => {
 
       const { data: conversation } = await supabase
         .from('whatsapp_conversations')
-        .select('assigned_to')
+        .select('assigned_to, tenant_id, department_id, whatsapp_contacts(name)')
         .eq('id', conversationId)
         .single();
 
@@ -50,6 +50,27 @@ export const useConversationAssignment = () => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', activeAtt.id);
+      }
+
+      // Create notification for the assigned user
+      if (conversation?.tenant_id && assignedTo !== user.id) {
+        const contactName = (conversation as any).whatsapp_contacts?.name || 'Contato';
+        let deptName = '';
+        if (conversation.department_id) {
+          const { data: dept } = await supabase.from('support_departments').select('name').eq('id', conversation.department_id).maybeSingle();
+          deptName = dept?.name || '';
+        }
+        createNotificationForUser({
+          tenantId: conversation.tenant_id,
+          recipientUserId: assignedTo,
+          type: 'chat_assignment',
+          severity: 'info',
+          title: 'Novo atendimento atribuído',
+          body: [contactName, deptName].filter(Boolean).join(' • '),
+          actionUrl: `/whatsapp?conversationId=${conversationId}`,
+          metadata: { conversation_id: conversationId, department_id: conversation.department_id, assigned_by: user.id, reason },
+          createdBy: user.id,
+        });
       }
 
       return { conversationId, assignedTo };
