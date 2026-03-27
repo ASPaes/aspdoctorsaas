@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TenantSelector } from "@/components/TenantSelector";
+import { NotificationBell } from "@/components/NotificationBell";
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";
 import TeamPresencePopover from "@/components/whatsapp/presence/TeamPresencePopover";
 
@@ -22,6 +23,7 @@ export default function AppLayout() {
               {isWhatsApp && <TeamPresencePopover />}
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <TenantSelector />
               <ThemeToggle />
             </div>
