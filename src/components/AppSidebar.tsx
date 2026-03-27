@@ -217,6 +217,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <UserPreferencesDialog open={prefsOpen} onOpenChange={setPrefsOpen} />
     </Sidebar>
   );
 }
