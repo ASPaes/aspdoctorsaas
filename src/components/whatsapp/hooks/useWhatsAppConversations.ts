@@ -250,6 +250,13 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       }, () => {
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_attendances',
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
