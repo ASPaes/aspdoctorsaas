@@ -21,6 +21,8 @@ export interface ConversationWithContact {
   metadata: Record<string, any> | null;
   tenant_id: string;
   is_last_message_from_me: boolean;
+  opened_out_of_hours?: boolean;
+  opened_out_of_hours_at?: string | null;
   sender_signature_mode?: string;
   sender_ticket_code?: string | null;
   contact: {
