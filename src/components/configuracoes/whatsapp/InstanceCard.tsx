@@ -150,7 +150,6 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               onCheckedChange={handleToggleIgnoreGroups}
             />
           </div>
-          </div>
         </CardContent>
 
         <CardFooter className="flex gap-2">
