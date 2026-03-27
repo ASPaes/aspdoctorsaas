@@ -10,7 +10,7 @@ import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
-import { useConversationTopics } from "../hooks/useConversationTopics";
+
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { Badge } from "@/components/ui/badge";
 import { EditContactModal } from "./EditContactModal";
@@ -21,7 +21,7 @@ import { ChangeInstanceDialog } from "./ChangeInstanceDialog";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
-import { TopicBadges } from "./TopicBadges";
+
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
@@ -42,7 +42,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
-  const { data: topicsData } = useConversationTopics(conversation.id);
+  
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
@@ -338,9 +338,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Badge>
           )}
           <SentimentChip sentiment={sentimentData} />
-          {effectiveStatus !== "closed" && topicsData?.topics && topicsData.topics.length > 0 && (
-            <TopicBadges topics={topicsData.topics} size="sm" showIcon={false} maxTopics={2} />
-          )}
         </div>
       </div>
 
