@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -23,6 +25,7 @@ interface Instance {
   tenant_id: string;
   webhook_url: string | null;
   updated_at: string;
+  ignore_group_messages?: boolean;
 }
 
 interface InstanceCardProps {
@@ -30,9 +33,21 @@ interface InstanceCardProps {
 }
 
 export const InstanceCard = ({ instance }: InstanceCardProps) => {
-  const { testConnection, deleteInstance } = useWhatsAppInstances();
+  const { testConnection, deleteInstance, updateInstance } = useWhatsAppInstances();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+
+  const handleToggleIgnoreGroups = async (checked: boolean) => {
+    try {
+      await updateInstance.mutateAsync({
+        id: instance.id,
+        updates: { ignore_group_messages: checked },
+      });
+      toast.success(checked ? "Mensagens de grupo serão ignoradas" : "Mensagens de grupo serão processadas");
+    } catch {
+      toast.error("Erro ao atualizar configuração");
+    }
+  };
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
 
@@ -118,6 +133,22 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
+            <div className="space-y-0.5">
+              <Label htmlFor={`ignore-groups-${instance.id}`} className="text-sm cursor-pointer">
+                Ignorar mensagens de grupos
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Mensagens de grupos (@g.us) não serão importadas
+              </p>
+            </div>
+            <Switch
+              id={`ignore-groups-${instance.id}`}
+              checked={instance.ignore_group_messages !== false}
+              onCheckedChange={handleToggleIgnoreGroups}
+            />
           </div>
         </CardContent>
 

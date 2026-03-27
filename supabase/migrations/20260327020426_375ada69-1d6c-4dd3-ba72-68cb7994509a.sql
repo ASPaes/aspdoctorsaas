@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_instances ADD COLUMN IF NOT EXISTS ignore_group_messages boolean NOT NULL DEFAULT true;

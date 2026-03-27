@@ -708,6 +708,22 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     console.log('[evolution-webhook] Normalized phone:', phone, 'isGroup:', isGroup);
 
+    // --- GROUP MESSAGE FILTER ---
+    if (isGroup) {
+      const { data: instCfg } = await supabase
+        .from('whatsapp_instances')
+        .select('ignore_group_messages')
+        .eq('id', instanceData.id)
+        .single();
+
+      const ignoreGroups = instCfg?.ignore_group_messages ?? true;
+
+      if (ignoreGroups) {
+        console.log(`[group-skip] ignored group message instance=${instanceData.instance_name} remoteJid=${key.remoteJid} messageId=${key.id || 'n/a'}`);
+        return;
+      }
+    }
+
     const payloadIsFromMe = getPayloadIsFromMe(data);
 
     const contactId = await findOrCreateContact(
