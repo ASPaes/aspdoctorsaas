@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,17 +16,46 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Download, Upload, CheckCircle2, AlertTriangle, XCircle, FileSpreadsheet, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import {
+  Download,
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  FileSpreadsheet,
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  Info,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { CLIENTE_IMPORT_HEADERS, downloadTemplateCsv } from "./clienteImportTemplate";
+import { useQueryClient } from "@tanstack/react-query";
+import { normalizeBRPhone } from "@/lib/phoneBR";
 import { cn } from "@/lib/utils";
+import {
+  CLIENTE_IMPORT_HEADERS,
+  REQUIRED_FIELDS,
+  RECORRENCIA_VALIDA,
+  FK_FIELDS,
+  downloadTemplateCsv,
+} from "./clienteImportTemplate";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -35,7 +64,7 @@ import { cn } from "@/lib/utils";
 interface ParsedRow {
   values: Record<string, string>;
   valid: boolean;
-  error?: string;
+  errors: string[];
 }
 
 interface ImportResult {
@@ -43,6 +72,7 @@ interface ImportResult {
   skipped: number;
   failed: number;
   failReasons: string[];
+  autoCreated: Record<string, number>;
 }
 
 interface Props {
@@ -50,15 +80,16 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
+type ColumnMapping = Record<string, string>; // systemCol -> fileCol
+
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
+/*  CSV Helpers                                                        */
 /* ------------------------------------------------------------------ */
 
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
-
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') {
@@ -68,7 +99,7 @@ function parseCsvLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if (ch === "," && !inQuotes) {
+    } else if ((ch === "," || ch === ";") && !inQuotes) {
       result.push(current.trim());
       current = "";
     } else {
@@ -77,16 +108,6 @@ function parseCsvLine(line: string): string[] {
   }
   result.push(current.trim());
   return result;
-}
-
-function validateRow(values: Record<string, string>): string | null {
-  const razao = (values.razao_social ?? "").trim();
-  const fantasia = (values.nome_fantasia ?? "").trim();
-  const cnpj = (values.cnpj ?? "").trim();
-
-  if (!razao && !fantasia) return "razao_social ou nome_fantasia é obrigatório";
-  if (!cnpj) return "cnpj é obrigatório";
-  return null;
 }
 
 function toNullableString(v: string | undefined): string | null {
@@ -105,15 +126,82 @@ function toNullableDate(v: string | undefined): string | null {
   return v.trim();
 }
 
+function normalizeForCompare(s: string): string {
+  return s.toLowerCase().replace(/[_\s-]/g, "");
+}
+
+function validateRow(values: Record<string, string>): string[] {
+  const errors: string[] = [];
+  const razao = (values.razao_social ?? "").trim();
+  const fantasia = (values.nome_fantasia ?? "").trim();
+  if (!razao && !fantasia) errors.push("razao_social ou nome_fantasia é obrigatório");
+
+  for (const field of REQUIRED_FIELDS) {
+    const val = (values[field] ?? "").trim();
+    if (!val) errors.push(`Campo obrigatório vazio: ${field}`);
+  }
+
+  const rec = (values.recorrencia ?? "").trim().toLowerCase();
+  if (rec && !RECORRENCIA_VALIDA.includes(rec)) {
+    errors.push(`recorrencia inválida: "${rec}". Use: ${RECORRENCIA_VALIDA.join(", ")}`);
+  }
+
+  return errors;
+}
+
+const HEADER_LABELS: Record<string, string> = {
+  cnpj: "CNPJ",
+  razao_social: "Razão Social",
+  nome_fantasia: "Nome Fantasia",
+  email: "Email",
+  telefone_whatsapp: "Tel. WhatsApp",
+  telefone_whatsapp_contato: "Tel. WhatsApp Contato",
+  telefone_contato: "Tel. Contato",
+  data_cadastro: "Data Cadastro",
+  unidade_base: "Unidade Base",
+  area_atuacao: "Área de Atuação",
+  segmento: "Segmento",
+  observacao_cliente: "Observação",
+  cep: "CEP",
+  estado: "Estado (UF)",
+  cidade: "Cidade",
+  endereco: "Endereço",
+  numero: "Número",
+  bairro: "Bairro",
+  contato_nome: "Nome do Contato",
+  contato_cpf: "CPF do Contato",
+  contato_fone: "Fone do Contato",
+  contato_aniversario: "Aniversário Contato",
+  data_venda: "Data da Venda",
+  data_ativacao: "Data de Ativação",
+  funcionario: "Funcionário",
+  produto: "Produto",
+  fornecedor: "Fornecedor",
+  origem_venda: "Origem da Venda",
+  modelo_contrato: "Modelo de Contrato",
+  recorrencia: "Recorrência",
+  codigo_fornecedor: "Cód. Fornecedor",
+  link_portal_fornecedor: "Link Portal Fornecedor",
+  mensalidade: "Mensalidade",
+  valor_ativacao: "Valor Ativação",
+  forma_pagamento_mensalidade: "Forma Pgto Mensalidade",
+  forma_pagamento_ativacao: "Forma Pgto Ativação",
+  custo_operacao: "Custo Operação",
+  imposto_percentual: "Imposto (%)",
+  custo_fixo_percentual: "Custo Fixo (%)",
+  observacao_negociacao: "Obs. Negociação",
+};
+
 /* ------------------------------------------------------------------ */
-/*  Stepper indicator                                                  */
+/*  Step Indicator                                                     */
 /* ------------------------------------------------------------------ */
 
 function StepIndicator({ current }: { current: number }) {
   const steps = [
     { num: 1, label: "Template" },
     { num: 2, label: "Upload" },
-    { num: 3, label: "Resultado" },
+    { num: 3, label: "Relacionados" },
+    { num: 4, label: "Importar" },
   ];
 
   return (
@@ -155,33 +243,80 @@ function StepIndicator({ current }: { current: number }) {
 
 export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
+  const [rawLines, setRawLines] = useState<string[][]>([]);
+  const [fileHeaders, setFileHeaders] = useState<string[]>([]);
+  const [headersMatch, setHeadersMatch] = useState(false);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
+
+  // Step 3 - FK state
+  const [fkData, setFkData] = useState<Record<string, { id: number | string; nome: string }[]>>({});
+  const [fkAutoCreate, setFkAutoCreate] = useState<Record<string, boolean>>({});
+  const [fkLoading, setFkLoading] = useState(false);
+
+  // Step 4 - import state
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [result, setResult] = useState<ImportResult | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const validRows = rows.filter((r) => r.valid);
-  const errorRows = rows.filter((r) => !r.valid);
+  const validRows = useMemo(() => rows.filter((r) => r.valid), [rows]);
+  const errorRows = useMemo(() => rows.filter((r) => !r.valid), [rows]);
 
   /* ---------- Reset ---------- */
   const resetAll = useCallback(() => {
     setStep(1);
+    setRawLines([]);
+    setFileHeaders([]);
+    setHeadersMatch(false);
+    setColumnMapping({});
     setRows([]);
     setFileError(null);
+    setFkData({});
+    setFkAutoCreate({});
+    setFkLoading(false);
     setImporting(false);
     setImportProgress({ current: 0, total: 0 });
     setResult(null);
   }, []);
 
+  /* ---------- Build rows from raw data + mapping ---------- */
+  const buildRows = useCallback(
+    (dataLines: string[][], mapping: ColumnMapping) => {
+      const parsed: ParsedRow[] = [];
+      for (const cols of dataLines) {
+        const values: Record<string, string> = {};
+        for (const sysCol of CLIENTE_IMPORT_HEADERS) {
+          const fileCol = mapping[sysCol];
+          if (fileCol && fileCol !== "__unmapped__") {
+            const fileIdx = fileHeaders.indexOf(fileCol);
+            values[sysCol] = fileIdx >= 0 ? (cols[fileIdx] ?? "") : "";
+          } else {
+            values[sysCol] = "";
+          }
+        }
+        const errs = validateRow(values);
+        parsed.push({ values, valid: errs.length === 0, errors: errs });
+      }
+      setRows(parsed);
+    },
+    [fileHeaders]
+  );
+
   /* ---------- Parse file ---------- */
   const processFile = useCallback((file: File) => {
     setFileError(null);
     setRows([]);
+    setRawLines([]);
+    setFileHeaders([]);
+    setHeadersMatch(false);
+    setColumnMapping({});
 
     if (!file.name.toLowerCase().endsWith(".csv")) {
       setFileError("Selecione um arquivo .csv");
@@ -190,11 +325,14 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
+      let text = e.target?.result as string;
       if (!text) {
         setFileError("Arquivo vazio");
         return;
       }
+
+      // Remove BOM if present
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
 
       const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
       if (lines.length < 2) {
@@ -203,47 +341,141 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       }
 
       const headerLine = parseCsvLine(lines[0]);
-      const headersMatch = headerLine.length === CLIENTE_IMPORT_HEADERS.length &&
-        headerLine.every((h, i) => h.trim().toLowerCase() === CLIENTE_IMPORT_HEADERS[i].toLowerCase());
+      const dataLines = lines.slice(1).map(parseCsvLine);
 
-      if (!headersMatch) {
-        setFileError(
-          "O arquivo não é compatível com o template. Baixe o modelo correto e tente novamente."
+      setFileHeaders(headerLine);
+      setRawLines(dataLines);
+
+      // Check exact match
+      const exact =
+        headerLine.length === CLIENTE_IMPORT_HEADERS.length &&
+        headerLine.every(
+          (h, i) => normalizeForCompare(h) === normalizeForCompare(CLIENTE_IMPORT_HEADERS[i])
         );
-        return;
-      }
 
-      const parsed: ParsedRow[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCsvLine(lines[i]);
-        const values: Record<string, string> = {};
-        CLIENTE_IMPORT_HEADERS.forEach((h, idx) => {
-          values[h] = cols[idx] ?? "";
+      if (exact) {
+        setHeadersMatch(true);
+        // Auto mapping
+        const mapping: ColumnMapping = {};
+        CLIENTE_IMPORT_HEADERS.forEach((col, idx) => {
+          mapping[col] = headerLine[idx];
         });
-        const err = validateRow(values);
-        parsed.push({ values, valid: !err, error: err ?? undefined });
-      }
+        setColumnMapping(mapping);
 
-      setRows(parsed);
-      setStep(2);
+        // Build rows immediately
+        const parsed: ParsedRow[] = [];
+        for (const cols of dataLines) {
+          const values: Record<string, string> = {};
+          CLIENTE_IMPORT_HEADERS.forEach((h, idx) => {
+            values[h] = cols[idx] ?? "";
+          });
+          const errs = validateRow(values);
+          parsed.push({ values, valid: errs.length === 0, errors: errs });
+        }
+        setRows(parsed);
+      } else {
+        // Try auto-mapping by name similarity
+        const mapping: ColumnMapping = {};
+        for (const sysCol of CLIENTE_IMPORT_HEADERS) {
+          const normalized = normalizeForCompare(sysCol);
+          const match = headerLine.find(
+            (h) => normalizeForCompare(h) === normalized
+          );
+          mapping[sysCol] = match ?? "__unmapped__";
+        }
+        setColumnMapping(mapping);
+      }
     };
 
     reader.onerror = () => setFileError("Erro ao ler o arquivo.");
     reader.readAsText(file, "UTF-8");
   }, []);
 
-  /* ---------- Drag & drop ---------- */
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file) processFile(file);
+  /* ---------- Mapping helpers ---------- */
+  const mappedRequiredCount = useMemo(() => {
+    let count = 0;
+    for (const field of REQUIRED_FIELDS) {
+      if (columnMapping[field] && columnMapping[field] !== "__unmapped__") count++;
+    }
+    // Also need razao_social or nome_fantasia
+    return count;
+  }, [columnMapping]);
+
+  const totalRequired = REQUIRED_FIELDS.length;
+
+  const handleMappingContinue = useCallback(() => {
+    buildRows(rawLines, columnMapping);
+    setStep(3);
+  }, [rawLines, columnMapping, buildRows]);
+
+  /* ---------- Step 3: Load FK data ---------- */
+  const activeFkFields = useMemo(() => {
+    return FK_FIELDS.filter((fk) => {
+      return rows.some((r) => (r.values[fk.csvColumn] ?? "").trim() !== "");
+    });
+  }, [rows]);
+
+  const fkUniqueValues = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    for (const fk of activeFkFields) {
+      const unique = new Set<string>();
+      for (const row of rows) {
+        const val = (row.values[fk.csvColumn] ?? "").trim();
+        if (val) unique.add(val);
+      }
+      result[fk.csvColumn] = Array.from(unique);
+    }
+    return result;
+  }, [activeFkFields, rows]);
+
+  const loadFkData = useCallback(async () => {
+    setFkLoading(true);
+    try {
+      const promises = activeFkFields.map(async (fk) => {
+        const { data } = await supabase
+          .from(fk.table as any)
+          .select(`id, ${fk.searchField}`)
+          .limit(1000);
+        return { key: fk.csvColumn, data: (data ?? []).map((d: any) => ({ id: d.id, nome: d[fk.searchField] })) };
+      });
+
+      const results = await Promise.all(promises);
+      const map: Record<string, { id: number | string; nome: string }[]> = {};
+      for (const r of results) {
+        map[r.key] = r.data;
+      }
+      setFkData(map);
+
+      // Initialize auto-create switches
+      const autoCreate: Record<string, boolean> = {};
+      for (const fk of activeFkFields) {
+        autoCreate[fk.csvColumn] = false;
+      }
+      setFkAutoCreate(autoCreate);
+    } catch (err) {
+      console.error("Error loading FK data", err);
+      toast.error("Erro ao carregar dados de referência.");
+    }
+    setFkLoading(false);
+  }, [activeFkFields]);
+
+  useEffect(() => {
+    if (step === 3 && activeFkFields.length > 0) {
+      loadFkData();
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fkValueStatus = useCallback(
+    (csvColumn: string, value: string): boolean => {
+      const existing = fkData[csvColumn] ?? [];
+      return existing.some(
+        (e) => normalizeForCompare(e.nome) === normalizeForCompare(value)
+      );
     },
-    [processFile]
+    [fkData]
   );
 
-  /* ---------- Import ---------- */
+  /* ---------- Step 4: Import ---------- */
   const handleImport = useCallback(async () => {
     const tenantId = profile?.tenant_id;
     if (!tenantId) {
@@ -253,8 +485,78 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (validRows.length === 0) return;
 
     setImporting(true);
-    setStep(3);
+    setStep(4);
 
+    const autoCreated: Record<string, number> = {};
+
+    // --- Resolve estado IDs ---
+    const estadoSiglas = new Set<string>();
+    for (const row of validRows) {
+      const sigla = (row.values.estado ?? "").trim().toUpperCase();
+      if (sigla) estadoSiglas.add(sigla);
+    }
+    let estadoMap: Record<string, number> = {};
+    if (estadoSiglas.size > 0) {
+      const { data: estados } = await supabase
+        .from("estados")
+        .select("id, sigla")
+        .in("sigla", Array.from(estadoSiglas));
+      for (const e of estados ?? []) {
+        estadoMap[e.sigla.toUpperCase()] = e.id;
+      }
+    }
+
+    // --- Resolve cidade IDs ---
+    let cidadeMap: Record<string, number> = {};
+    const cidadeNames = new Set<string>();
+    for (const row of validRows) {
+      const nome = (row.values.cidade ?? "").trim();
+      if (nome) cidadeNames.add(nome.toLowerCase());
+    }
+    if (cidadeNames.size > 0) {
+      const { data: cidades } = await supabase
+        .from("cidades")
+        .select("id, nome, estado_id")
+        .limit(5000);
+      for (const c of cidades ?? []) {
+        cidadeMap[c.nome.toLowerCase() + "_" + c.estado_id] = c.id;
+      }
+    }
+
+    // --- Resolve FK IDs (with auto-create) ---
+    const fkResolvedMaps: Record<string, Record<string, number | string>> = {};
+
+    for (const fk of activeFkFields) {
+      const existing = fkData[fk.csvColumn] ?? [];
+      const map: Record<string, number | string> = {};
+      for (const e of existing) {
+        map[normalizeForCompare(e.nome)] = e.id;
+      }
+
+      // Check for missing values that need auto-creation
+      const uniqueVals = fkUniqueValues[fk.csvColumn] ?? [];
+      for (const val of uniqueVals) {
+        const key = normalizeForCompare(val);
+        if (!map[key] && fkAutoCreate[fk.csvColumn]) {
+          // Auto-create
+          const insertPayload: any = { [fk.searchField]: val.trim() };
+          if (fk.tenantScoped) insertPayload.tenant_id = tenantId;
+          const { data: created, error: createErr } = await supabase
+            .from(fk.table as any)
+            .insert(insertPayload)
+            .select("id")
+            .single();
+          if (created && !createErr) {
+            map[key] = (created as any).id;
+            autoCreated[fk.label] = (autoCreated[fk.label] ?? 0) + 1;
+          }
+        }
+      }
+
+      fkResolvedMaps[fk.csvColumn] = map;
+    }
+
+    // --- Batch insert ---
     const BATCH_SIZE = 50;
     const batches: ParsedRow[][] = [];
     for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
@@ -270,27 +572,87 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     for (let b = 0; b < batches.length; b++) {
       setImportProgress({ current: b + 1, total: batches.length });
 
-      const payload = batches[b].map((r) => ({
-        tenant_id: tenantId,
-        cancelado: false,
-        razao_social: toNullableString(r.values.razao_social),
-        nome_fantasia: toNullableString(r.values.nome_fantasia),
-        cnpj: r.values.cnpj.trim(),
-        email: toNullableString(r.values.email),
-        telefone_whatsapp: toNullableString(r.values.telefone_whatsapp),
-        telefone_contato: toNullableString(r.values.telefone_contato),
-        contato_nome: toNullableString(r.values.contato_nome),
-        contato_fone: toNullableString(r.values.contato_fone),
-        cep: toNullableString(r.values.cep),
-        endereco: toNullableString(r.values.endereco),
-        numero: toNullableString(r.values.numero),
-        bairro: toNullableString(r.values.bairro),
-        mensalidade: toNullableFloat(r.values.mensalidade),
-        valor_ativacao: toNullableFloat(r.values.valor_ativacao),
-        data_venda: toNullableDate(r.values.data_venda),
-        data_ativacao: toNullableDate(r.values.data_ativacao),
-        observacao_cliente: toNullableString(r.values.observacao_cliente),
-      }));
+      const payload = batches[b].map((r) => {
+        const v = r.values;
+
+        // Resolve FKs
+        const resolveFk = (csvCol: string): number | null => {
+          const val = (v[csvCol] ?? "").trim();
+          if (!val) return null;
+          const map = fkResolvedMaps[csvCol];
+          if (!map) return null;
+          const id = map[normalizeForCompare(val)];
+          return typeof id === "number" ? id : id ? Number(id) : null;
+        };
+
+        // Resolve estado/cidade
+        const estadoSigla = (v.estado ?? "").trim().toUpperCase();
+        const estadoId = estadoSigla ? (estadoMap[estadoSigla] ?? null) : null;
+        const cidadeNome = (v.cidade ?? "").trim().toLowerCase();
+        const cidadeId = cidadeNome && estadoId
+          ? (cidadeMap[cidadeNome + "_" + estadoId] ?? null)
+          : null;
+
+        // Normalize phones
+        const safePhone = (val: string | undefined): string | null => {
+          if (!val || val.trim() === "") return null;
+          try {
+            return normalizeBRPhone(val.trim());
+          } catch {
+            return val.trim().replace(/\D/g, "");
+          }
+        };
+
+        const impostoRaw = toNullableFloat(v.imposto_percentual);
+        const custoFixoRaw = toNullableFloat(v.custo_fixo_percentual);
+
+        return {
+          tenant_id: tenantId,
+          cancelado: false,
+          cnpj: v.cnpj.trim(),
+          razao_social: toNullableString(v.razao_social),
+          nome_fantasia: toNullableString(v.nome_fantasia),
+          email: toNullableString(v.email),
+          telefone_whatsapp: safePhone(v.telefone_whatsapp),
+          telefone_whatsapp_contato: safePhone(v.telefone_whatsapp_contato),
+          telefone_contato: safePhone(v.telefone_contato),
+          data_cadastro: toNullableDate(v.data_cadastro),
+          observacao_cliente: toNullableString(v.observacao_cliente),
+          cep: toNullableString(v.cep),
+          estado_id: estadoId,
+          cidade_id: cidadeId,
+          endereco: toNullableString(v.endereco),
+          numero: toNullableString(v.numero),
+          bairro: toNullableString(v.bairro),
+          contato_nome: toNullableString(v.contato_nome),
+          contato_cpf: toNullableString(v.contato_cpf),
+          contato_fone: safePhone(v.contato_fone),
+          contato_aniversario: toNullableDate(v.contato_aniversario),
+          data_venda: toNullableDate(v.data_venda),
+          data_ativacao: toNullableDate(v.data_ativacao),
+          recorrencia: (RECORRENCIA_VALIDA.includes((v.recorrencia ?? "").trim().toLowerCase())
+            ? (v.recorrencia ?? "").trim().toLowerCase()
+            : null) as "mensal" | "anual" | "semestral" | "semanal" | null,
+          codigo_fornecedor: toNullableString(v.codigo_fornecedor),
+          link_portal_fornecedor: toNullableString(v.link_portal_fornecedor),
+          mensalidade: toNullableFloat(v.mensalidade),
+          valor_ativacao: toNullableFloat(v.valor_ativacao),
+          custo_operacao: toNullableFloat(v.custo_operacao),
+          imposto_percentual: impostoRaw !== null ? impostoRaw / 100 : null,
+          custo_fixo_percentual: custoFixoRaw !== null ? custoFixoRaw / 100 : null,
+          observacao_negociacao: toNullableString(v.observacao_negociacao),
+          unidade_base_id: resolveFk("unidade_base"),
+          area_atuacao_id: resolveFk("area_atuacao"),
+          segmento_id: resolveFk("segmento"),
+          funcionario_id: resolveFk("funcionario"),
+          produto_id: resolveFk("produto"),
+          fornecedor_id: resolveFk("fornecedor"),
+          origem_venda_id: resolveFk("origem_venda"),
+          modelo_contrato_id: resolveFk("modelo_contrato"),
+          forma_pagamento_mensalidade_id: resolveFk("forma_pagamento_mensalidade"),
+          forma_pagamento_ativacao_id: resolveFk("forma_pagamento_ativacao"),
+        };
+      });
 
       const { error } = await supabase.from("clientes").insert(payload);
 
@@ -307,55 +669,83 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       skipped: errorRows.length,
       failed,
       failReasons,
+      autoCreated,
     });
     setImporting(false);
-  }, [profile?.tenant_id, validRows, errorRows.length]);
+
+    if (imported > 0) {
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    }
+  }, [profile?.tenant_id, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient]);
+
+  /* ---------- Drag & drop ---------- */
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) processFile(file);
+    },
+    [processFile]
+  );
 
   /* ---------- Render ---------- */
-  const previewRows = rows.slice(0, 10);
-  const hiddenCount = rows.length > 10 ? rows.length - 10 : 0;
+  const previewRows = rows.slice(0, 5);
 
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (importing) return; // block close during import
+        if (importing) return;
         if (!v) resetAll();
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Importar Clientes</DialogTitle>
         </DialogHeader>
 
         <StepIndicator current={step} />
 
-        {/* ===================== STEP 1 ===================== */}
+        {/* ===================== STEP 1 — Template ===================== */}
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="text-base font-semibold">Baixe o modelo de planilha</h3>
             <p className="text-sm text-muted-foreground">
-              Use o arquivo abaixo como base. Não altere os nomes das colunas.
+              Use o arquivo modelo como base. Campos de tabelas relacionadas (Produto, Fornecedor, etc.)
+              devem ser preenchidos com o <strong>nome exato</strong> cadastrado no sistema — o sistema
+              fará a busca automática.
             </p>
 
-            <div className="rounded-md border p-4 space-y-2 text-sm">
-              <p className="font-medium">Campos obrigatórios:</p>
-              <ul className="list-disc ml-5 space-y-1 text-muted-foreground">
-                <li>
-                  <span className="text-foreground font-medium">razao_social</span> ou{" "}
-                  <span className="text-foreground font-medium">nome_fantasia</span> (pelo menos um)
-                </li>
-                <li>
-                  <span className="text-foreground font-medium">cnpj</span>
-                </li>
-              </ul>
-              <p className="font-medium mt-3">Campos opcionais:</p>
-              <p className="text-muted-foreground">
-                email, telefone_whatsapp, telefone_contato, contato_nome, contato_fone, cep,
-                endereco, numero, bairro, mensalidade, valor_ativacao, data_venda, data_ativacao,
-                observacao_cliente
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Required fields card */}
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="font-medium text-sm flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4 text-destructive" /> Campos Obrigatórios
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-0.5 ml-1">
+                  {REQUIRED_FIELDS.map((f) => (
+                    <li key={f}>• {HEADER_LABELS[f] ?? f}</li>
+                  ))}
+                  <li className="text-foreground font-medium mt-1">
+                    + razao_social ou nome_fantasia (pelo menos um)
+                  </li>
+                </ul>
+              </div>
+
+              {/* FK fields card */}
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="font-medium text-sm flex items-center gap-1">
+                  <Info className="w-4 h-4 text-primary" /> Campos de Tabelas Relacionadas
+                </p>
+                <p className="text-xs text-muted-foreground">Preencha com o nome exato:</p>
+                <ul className="text-xs text-muted-foreground space-y-0.5 ml-1">
+                  {FK_FIELDS.map((fk) => (
+                    <li key={fk.csvColumn}>• {fk.label}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2">
@@ -364,35 +754,27 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 Baixar template CSV
               </Button>
               <Button variant="link" onClick={() => setStep(2)} className="gap-1">
-                Já tenho o arquivo, pular para upload
-                <ArrowRight className="w-4 h-4" />
+                Já tenho o arquivo →
               </Button>
             </div>
           </div>
         )}
 
-        {/* ===================== STEP 2 ===================== */}
-        {step === 2 && rows.length === 0 && (
+        {/* ===================== STEP 2 — Upload ===================== */}
+        {step === 2 && fileHeaders.length === 0 && (
           <div className="space-y-4">
             <div
               className={cn(
                 "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-                dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/50"
+                dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
               )}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-sm font-medium">
-                Arraste o arquivo CSV aqui ou clique para selecionar
-              </p>
+              <p className="text-sm font-medium">Arraste o arquivo CSV aqui ou clique para selecionar</p>
               <p className="text-xs text-muted-foreground mt-1">Apenas arquivos .csv</p>
               <input
                 ref={fileInputRef}
@@ -415,22 +797,236 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             )}
 
             <Button variant="outline" onClick={() => setStep(1)} className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Voltar
+              <ArrowLeft className="w-4 h-4" /> Voltar
             </Button>
           </div>
         )}
 
-        {step === 2 && rows.length > 0 && (
+        {/* Headers match — show success */}
+        {step === 2 && headersMatch && fileHeaders.length > 0 && (
           <div className="space-y-4">
-            <div className="rounded-md border overflow-auto max-h-72">
+            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 p-3 rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+              <CheckCircle2 className="w-5 h-5" />
+              Arquivo compatível — {rawLines.length} linhas detectadas
+            </div>
+            <div className="flex gap-2 justify-between">
+              <Button variant="outline" onClick={() => { setFileHeaders([]); setRawLines([]); setHeadersMatch(false); }} className="gap-2">
+                <ArrowLeft className="w-4 h-4" /> Trocar arquivo
+              </Button>
+              <Button onClick={() => { buildRows(rawLines, columnMapping); setStep(3); }} className="gap-2">
+                Continuar <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Headers don't match — column mapping */}
+        {step === 2 && !headersMatch && fileHeaders.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold">Mapeie as colunas do seu arquivo</h3>
+            <p className="text-sm text-muted-foreground">
+              As colunas do seu arquivo não correspondem exatamente ao template.
+              Associe cada coluna do sistema à coluna do seu arquivo.
+            </p>
+
+            <div className="rounded-md border overflow-auto max-h-96">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Coluna do sistema</TableHead>
+                    <TableHead>Coluna no seu arquivo</TableHead>
+                    <TableHead className="w-24">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {CLIENTE_IMPORT_HEADERS.map((sysCol) => {
+                    const isRequired =
+                      REQUIRED_FIELDS.includes(sysCol) ||
+                      sysCol === "razao_social" ||
+                      sysCol === "nome_fantasia";
+                    const mapped = columnMapping[sysCol];
+                    const isMapped = mapped && mapped !== "__unmapped__";
+
+                    return (
+                      <TableRow key={sysCol}>
+                        <TableCell className="text-sm font-medium">
+                          {HEADER_LABELS[sysCol] ?? sysCol}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={mapped ?? "__unmapped__"}
+                            onValueChange={(val) =>
+                              setColumnMapping((prev) => ({ ...prev, [sysCol]: val }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__unmapped__">— não mapear —</SelectItem>
+                              {fileHeaders.map((h) => (
+                                <SelectItem key={h} value={h}>
+                                  {h}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          {isRequired ? (
+                            <Badge variant={isMapped ? "default" : "destructive"} className="text-[10px]">
+                              {isMapped ? "OK" : "Obrigatório"}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px]">Opcional</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {mappedRequiredCount} de {totalRequired} campos obrigatórios mapeados
+            </p>
+
+            <div className="flex gap-2 justify-between">
+              <Button variant="outline" onClick={() => { setFileHeaders([]); setRawLines([]); }} className="gap-2">
+                <ArrowLeft className="w-4 h-4" /> Trocar arquivo
+              </Button>
+              <Button
+                onClick={handleMappingContinue}
+                disabled={mappedRequiredCount < totalRequired}
+                className="gap-2"
+              >
+                Continuar <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== STEP 3 — FK Config ===================== */}
+        {step === 3 && (
+          <div className="space-y-4">
+            {activeFkFields.length === 0 ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Nenhum campo de tabela relacionada encontrado no CSV. Prosseguindo...
+                </p>
+                <div className="flex gap-2 justify-between">
+                  <Button variant="outline" onClick={() => setStep(2)} className="gap-2">
+                    <ArrowLeft className="w-4 h-4" /> Voltar
+                  </Button>
+                  <Button onClick={() => setStep(4)} className="gap-2">
+                    Continuar <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            ) : fkLoading ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Carregando dados de referência...
+              </div>
+            ) : (
+              <>
+                <h3 className="text-base font-semibold">Configurar campos relacionados</h3>
+                <p className="text-sm text-muted-foreground">
+                  Para cada campo abaixo, o sistema buscará os valores no cadastro. Defina o que fazer quando um valor não for encontrado.
+                </p>
+
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {activeFkFields.map((fk) => {
+                    const uniqueVals = fkUniqueValues[fk.csvColumn] ?? [];
+                    const hasAnyMissing = uniqueVals.some((v) => !fkValueStatus(fk.csvColumn, v));
+
+                    return (
+                      <div key={fk.csvColumn} className="rounded-md border p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{fk.label}</span>
+                          {hasAnyMissing && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Auto-cadastrar?</span>
+                              <Switch
+                                checked={fkAutoCreate[fk.csvColumn] ?? false}
+                                onCheckedChange={(v) =>
+                                  setFkAutoCreate((prev) => ({ ...prev, [fk.csvColumn]: v }))
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {uniqueVals.map((val) => {
+                            const exists = fkValueStatus(fk.csvColumn, val);
+                            return (
+                              <TooltipProvider key={val}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                                        exists
+                                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                                      )}
+                                    >
+                                      {exists ? (
+                                        <CheckCircle2 className="w-3 h-3" />
+                                      ) : (
+                                        <XCircle className="w-3 h-3" />
+                                      )}
+                                      {val}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <p className="text-xs">
+                                      {exists ? "Encontrado no cadastro" : "Não encontrado"}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })}
+                        </div>
+                        {hasAnyMissing && fkAutoCreate[fk.csvColumn] && (
+                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            <Info className="w-3 h-3" />
+                            Novos registros serão criados com o tenant_id do seu tenant.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2 justify-between">
+                  <Button variant="outline" onClick={() => setStep(2)} className="gap-2">
+                    <ArrowLeft className="w-4 h-4" /> Voltar
+                  </Button>
+                  <Button onClick={() => setStep(4)} className="gap-2">
+                    Continuar <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ===================== STEP 4 — Preview / Import / Result ===================== */}
+        {step === 4 && !importing && !result && (
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold">Preview e Importação</h3>
+
+            <div className="rounded-md border overflow-auto max-h-64">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8">#</TableHead>
                     <TableHead>Razão Social</TableHead>
-                    <TableHead>Nome Fantasia</TableHead>
                     <TableHead>CNPJ</TableHead>
+                    <TableHead>Produto</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -442,12 +1038,12 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     >
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell className="text-sm truncate max-w-[140px]">
-                        {row.values.razao_social || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm truncate max-w-[120px]">
-                        {row.values.nome_fantasia || "—"}
+                        {row.values.razao_social || row.values.nome_fantasia || "—"}
                       </TableCell>
                       <TableCell className="text-sm">{row.values.cnpj || "—"}</TableCell>
+                      <TableCell className="text-sm truncate max-w-[100px]">
+                        {row.values.produto || "—"}
+                      </TableCell>
                       <TableCell>
                         {row.valid ? (
                           <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -457,8 +1053,12 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                               <TooltipTrigger asChild>
                                 <AlertTriangle className="w-4 h-4 text-destructive cursor-help" />
                               </TooltipTrigger>
-                              <TooltipContent side="left">
-                                <p className="text-xs">{row.error}</p>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <ul className="text-xs space-y-0.5">
+                                  {row.errors.map((e, i) => (
+                                    <li key={i}>• {e}</li>
+                                  ))}
+                                </ul>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -482,23 +1082,15 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </span>
             </div>
 
-            {hiddenCount > 0 && (
+            {rows.length > 5 && (
               <p className="text-xs text-muted-foreground">
-                + {hiddenCount} linhas não exibidas no preview
+                + {rows.length - 5} linhas não exibidas no preview
               </p>
             )}
 
             <div className="flex gap-2 justify-between">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setRows([]);
-                  setFileError(null);
-                }}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Voltar
+              <Button variant="outline" onClick={() => setStep(3)} className="gap-2">
+                <ArrowLeft className="w-4 h-4" /> Voltar
               </Button>
               <Button
                 onClick={handleImport}
@@ -512,70 +1104,68 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {/* ===================== STEP 3 ===================== */}
-        {step === 3 && (
-          <div className="space-y-4">
-            {importing ? (
-              <div className="space-y-3 py-4">
-                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Importando lote {importProgress.current} de {importProgress.total}...
-                </div>
-                <Progress
-                  value={
-                    importProgress.total > 0
-                      ? (importProgress.current / importProgress.total) * 100
-                      : 0
-                  }
-                  className="h-2"
-                />
-                <p className="text-xs text-center text-muted-foreground">
-                  Não feche esta janela durante a importação.
-                </p>
-              </div>
-            ) : result ? (
-              <div className="space-y-3 py-2">
-                {result.imported > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
-                    <CheckCircle2 className="w-5 h-5" />
-                    {result.imported} clientes importados com sucesso
-                  </div>
-                )}
-                {result.skipped > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
-                    <AlertTriangle className="w-5 h-5" />
-                    {result.skipped} linhas ignoradas por erro de validação
-                  </div>
-                )}
-                {result.failed > 0 && (
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-destructive">
-                      <XCircle className="w-5 h-5" />
-                      {result.failed} linhas com falha ao salvar
-                    </div>
-                    {result.failReasons.map((r, i) => (
-                      <p key={i} className="text-xs text-muted-foreground ml-7">
-                        {r}
-                      </p>
-                    ))}
-                  </div>
-                )}
+        {step === 4 && importing && (
+          <div className="space-y-3 py-4">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Importando lote {importProgress.current} de {importProgress.total}...
+            </div>
+            <Progress
+              value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}
+              className="h-2"
+            />
+            <p className="text-xs text-center text-muted-foreground">
+              Não feche esta janela durante a importação.
+            </p>
+          </div>
+        )}
 
-                <div className="flex gap-2 pt-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      resetAll();
-                    }}
-                    className="gap-2"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    Importar outro arquivo
-                  </Button>
-                  <Button onClick={() => onOpenChange(false)}>Fechar</Button>
-                </div>
+        {step === 4 && !importing && result && (
+          <div className="space-y-3 py-2">
+            {result.imported > 0 && (
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                <CheckCircle2 className="w-5 h-5" />
+                {result.imported} clientes importados com sucesso
               </div>
-            ) : null}
+            )}
+            {result.skipped > 0 && (
+              <div className="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
+                <AlertTriangle className="w-5 h-5" />
+                {result.skipped} linhas ignoradas por erro de validação
+              </div>
+            )}
+            {result.failed > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <XCircle className="w-5 h-5" />
+                  {result.failed} linhas com falha ao salvar
+                </div>
+                {result.failReasons.map((r, i) => (
+                  <p key={i} className="text-xs text-muted-foreground ml-7">{r}</p>
+                ))}
+              </div>
+            )}
+            {Object.keys(result.autoCreated).length > 0 && (
+              <div className="flex items-start gap-2 text-sm text-blue-700 dark:text-blue-400">
+                <Info className="w-5 h-5 shrink-0 mt-0.5" />
+                <span>
+                  Registros criados automaticamente:{" "}
+                  {Object.entries(result.autoCreated)
+                    .map(([label, count]) => `${label} (${count})`)
+                    .join(", ")}
+                </span>
+              </div>
+            )}
+
+            <Separator />
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" onClick={resetAll} className="gap-2">
+                <FileSpreadsheet className="w-4 h-4" />
+                Importar outro arquivo
+              </Button>
+              <Button onClick={() => onOpenChange(false)}>Fechar</Button>
+            </div>
           </div>
         )}
       </DialogContent>
