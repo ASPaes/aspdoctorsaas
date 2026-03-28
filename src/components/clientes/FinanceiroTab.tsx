@@ -165,7 +165,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
 
           <FormField control={form.control} name="dia_vencimento_mrr" render={({ field }) => (
             <FormItem>
-              <FormLabel>Vencimento MRR</FormLabel>
+              <FormLabel>Dia do Vencimento</FormLabel>
               <FormControl>
                 <Input
                   type="number"
