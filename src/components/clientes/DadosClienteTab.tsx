@@ -42,6 +42,15 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const whatsappValue = form.watch("telefone_whatsapp");
   const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
 
+  // Auto-detect tipo_pessoa from existing CNPJ/CPF value
+  const cnpjValue = form.watch("cnpj");
+  useEffect(() => {
+    const digits = (cnpjValue ?? "").replace(/\D/g, "");
+    if (digits.length === 11) setTipoPessoa("fisica");
+    else if (digits.length >= 14) setTipoPessoa("juridica");
+  }, []); // only on mount
+  const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
+
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
   const [matrizNome, setMatrizNome] = useState<string | null>(null);
