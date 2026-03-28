@@ -17,6 +17,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'email',                      // * E-mail principal do cliente
   'telefone_whatsapp',          // * WhatsApp Financeiro — formato: (DD) NNNNN-NNNN
   'unidade_base',               // * Unidade Base — nome da unidade (FK: unidades_base)
+  'tipo_pessoa',                //   Tipo de pessoa: juridica | fisica (padrão: juridica)
   'area_atuacao',               //   Área de Atuação — nome da área (FK: areas_atuacao)
   'segmento',                   //   Segmento de mercado (FK: segmentos)
   'observacao_cliente',         //   Observações gerais sobre o cliente
@@ -28,6 +29,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'endereco',                   //   Logradouro (rua, av, etc.)
   'numero',                     //   Número do endereço
   'bairro',                     //   Bairro
+  'complemento',                //   Complemento do endereço (sala, andar, bloco...)
 
   // ── SEÇÃO 3: Contato Principal ────────────────────────────────────────────
   'contato_nome',               //   Nome do contato principal
@@ -40,6 +42,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'produto',                    // * Produto contratado (FK: produtos)
   'recorrencia',                // * Recorrência — valores: mensal | anual | semestral | semanal
   'valor_ativacao',             // * Valor de Ativação — número decimal (ex: 499.90)
+  'dia_vencimento_mrr',         //   Dia do mês para vencimento da mensalidade (ex: 5, 10, 15)
   'mensalidade',                // * Mensalidade/MRR — número decimal (ex: 299.90)
   'custo_operacao',             // * Custo Operação (custo com fornecedor) — número decimal
   'imposto_percentual',         // * Imposto — número de 0 a 100 (ex: 6 = 6%)
@@ -74,6 +77,7 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'contato@empresa.com',
   '(11) 99999-0000',
   'Sede',
+  'juridica',
   'Tecnologia',
   'Pequenas Empresas',
   'Cliente indicado por parceiro',
@@ -84,6 +88,7 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'Av. Paulista',
   '1000',
   'Bela Vista',
+  'Sala 42',
   // Contato Principal
   'João Silva',
   '123.456.789-00',
@@ -94,6 +99,7 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'Plano Pro',
   'mensal',
   '499.90',
+  '10',
   '299.90',
   '150.00',
   '6',
@@ -279,6 +285,7 @@ export const HEADER_LABELS: Record<string, string> = {
   email: 'E-mail',
   telefone_whatsapp: 'Tel. WhatsApp',
   unidade_base: 'Unidade Base',
+  tipo_pessoa: 'Tipo de Pessoa (juridica/fisica)',
   area_atuacao: 'Área de Atuação',
   segmento: 'Segmento',
   observacao_cliente: 'Observação do Cliente',
@@ -289,6 +296,7 @@ export const HEADER_LABELS: Record<string, string> = {
   endereco: 'Endereço',
   numero: 'Número',
   bairro: 'Bairro',
+  complemento: 'Complemento',
   // Contato
   contato_nome: 'Nome do Contato',
   contato_cpf: 'CPF do Contato',
@@ -299,6 +307,7 @@ export const HEADER_LABELS: Record<string, string> = {
   produto: 'Produto',
   recorrencia: 'Recorrência',
   valor_ativacao: 'Valor de Ativação',
+  dia_vencimento_mrr: 'Dia Vencimento MRR',
   mensalidade: 'Mensalidade / MRR',
   custo_operacao: 'Custo Operação',
   imposto_percentual: 'Imposto (%)',
@@ -330,6 +339,7 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   email:                      { section: 'Cliente', why: 'Canal principal de comunicação. Usado em notificações automáticas e relatórios.' },
   telefone_whatsapp:          { section: 'Cliente', why: 'Número vinculado ao WhatsApp financeiro. Habilita o atendimento via chat no sistema.' },
   unidade_base:               { section: 'Cliente', why: 'Define qual unidade da sua empresa atende este cliente. Essencial para segmentação de relatórios.' },
+  tipo_pessoa:                { section: 'Cliente', why: 'Define se é pessoa jurídica (CNPJ 14 dígitos) ou física (CPF 11 dígitos). Não obrigatório — o sistema detecta automaticamente pelo número de dígitos do campo CNPJ/CPF.' },
   area_atuacao:               { section: 'Cliente', why: 'Setor de mercado do cliente. Permite análises de MRR e churn por vertical.' },
   segmento:                   { section: 'Cliente', why: 'Classificação do porte ou tipo do cliente. Usado em análises de expansão e retenção.' },
   observacao_cliente:         { section: 'Cliente', why: 'Informações adicionais relevantes sobre o cliente.' },
@@ -339,6 +349,7 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   endereco:                   { section: 'Endereço', why: 'Logradouro completo para correspondências e contratos.' },
   numero:                     { section: 'Endereço', why: 'Número do endereço.' },
   bairro:                     { section: 'Endereço', why: 'Bairro para complementar o endereço.' },
+  complemento:                { section: 'Endereço', why: 'Complemento do endereço como sala, andar ou bloco.' },
   contato_nome:               { section: 'Contato', why: 'Pessoa responsável pelo relacionamento. Usado nos atendimentos e comunicações.' },
   contato_cpf:                { section: 'Contato', why: 'CPF do contato principal para documentação e contratos.' },
   contato_fone:               { section: 'Contato', why: 'Telefone do contato para atendimento.' },
@@ -347,6 +358,7 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   produto:                    { section: 'Produto/Contrato', why: 'O que foi vendido ao cliente. Base para análise de MRR por produto.' },
   recorrencia:                { section: 'Produto/Contrato', why: 'Periodicidade do pagamento. Define o ciclo de cobrança e o cálculo de MRR anualizado.' },
   valor_ativacao:             { section: 'Produto/Contrato', why: 'Receita única da ativação. Compõe o cálculo de receita total e CAC.' },
+  dia_vencimento_mrr:         { section: 'Produto/Contrato', why: 'Dia do mês em que vence a mensalidade recorrente (ex: 5, 10, 15). Usado para controle de cobrança.' },
   mensalidade:                { section: 'Produto/Contrato', why: 'MRR do cliente. É a principal métrica de crescimento recorrente do negócio.' },
   custo_operacao:             { section: 'Produto/Contrato', why: 'Custo direto com o fornecedor. Necessário para calcular a margem de contribuição (MC%).' },
   imposto_percentual:         { section: 'Produto/Contrato', why: 'Percentual de impostos sobre o faturamento. Impacta no cálculo da MC% líquida.' },

@@ -219,6 +219,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [duplicatas, setDuplicatas] = useState<{ cnpj: string; razao_social: string | null }[]>([]);
+  const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -241,6 +243,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setImporting(false);
     setImportProgress({ current: 0, total: 0 });
     setResult(null);
+    setDuplicatas([]);
+    setDuplicataAcao(null);
   }, []);
 
   /* ---------- Build rows from raw data + mapping ---------- */
@@ -432,23 +436,51 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     [fkData]
   );
 
-  /* ---------- Step 4: Import ---------- */
-  const handleImport = useCallback(async () => {
+  /* ---------- Step 4: Import (core logic) ---------- */
+  const handleImportWithRows = useCallback(async (rowsToImport: ParsedRow[]) => {
     const tenantId = profile?.tenant_id;
     if (!tenantId) {
       toast.error("Não foi possível identificar o tenant. Faça login novamente.");
       return;
     }
-    if (validRows.length === 0) return;
+    if (rowsToImport.length === 0) return;
 
     setImporting(true);
     setStep(4);
 
     const autoCreated: Record<string, number> = {};
 
+    // --- Verificação de duplicatas ---
+    const cnpjsDoCSV = rowsToImport
+      .map(r => (r.values.cnpj ?? '').trim().replace(/\D/g, ''))
+      .filter(Boolean);
+
+    let duplicatasEncontradas: { cnpj: string; razao_social: string | null }[] = [];
+
+    if (cnpjsDoCSV.length > 0 && !duplicataAcao) {
+      const { data: existentes } = await supabase
+        .from('clientes')
+        .select('cnpj, razao_social, nome_fantasia')
+        .eq('tenant_id', tenantId)
+        .in('cnpj', cnpjsDoCSV);
+
+      if (existentes && existentes.length > 0) {
+        duplicatasEncontradas = existentes.map(e => ({
+          cnpj: e.cnpj ?? '',
+          razao_social: e.razao_social || e.nome_fantasia || null,
+        }));
+      }
+    }
+
+    if (duplicatasEncontradas.length > 0) {
+      setDuplicatas(duplicatasEncontradas);
+      setImporting(false);
+      return;
+    }
+
     // --- Resolve estado IDs ---
     const estadoSiglas = new Set<string>();
-    for (const row of validRows) {
+    for (const row of rowsToImport) {
       const sigla = (row.values.estado ?? "").trim().toUpperCase();
       if (sigla) estadoSiglas.add(sigla);
     }
@@ -466,7 +498,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     // --- Resolve cidade IDs ---
     let cidadeMap: Record<string, number> = {};
     const cidadeNames = new Set<string>();
-    for (const row of validRows) {
+    for (const row of rowsToImport) {
       const nome = (row.values.cidade ?? "").trim();
       if (nome) cidadeNames.add(nome.toLowerCase());
     }
@@ -490,12 +522,10 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         map[normalizeForCompare(e.nome)] = e.id;
       }
 
-      // Check for missing values that need auto-creation
       const uniqueVals = fkUniqueValues[fk.csvColumn] ?? [];
       for (const val of uniqueVals) {
         const key = normalizeForCompare(val);
         if (!map[key] && fkAutoCreate[fk.csvColumn]) {
-          // Auto-create
           const insertPayload: any = { [fk.searchField]: val.trim() };
           if (fk.tenantScoped) insertPayload.tenant_id = tenantId;
           const { data: created, error: createErr } = await supabase
@@ -516,8 +546,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     // --- Batch insert ---
     const BATCH_SIZE = 50;
     const batches: ParsedRow[][] = [];
-    for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
-      batches.push(validRows.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < rowsToImport.length; i += BATCH_SIZE) {
+      batches.push(rowsToImport.slice(i, i + BATCH_SIZE));
     }
 
     setImportProgress({ current: 0, total: batches.length });
@@ -532,7 +562,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       const payload = batches[b].map((r) => {
         const v = r.values;
 
-        // Resolve FKs
         const resolveFk = (csvCol: string): number | null => {
           const val = (v[csvCol] ?? "").trim();
           if (!val) return null;
@@ -542,7 +571,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           return typeof id === "number" ? id : id ? Number(id) : null;
         };
 
-        // Resolve estado/cidade
         const estadoSigla = (v.estado ?? "").trim().toUpperCase();
         const estadoId = estadoSigla ? (estadoMap[estadoSigla] ?? null) : null;
         const cidadeNome = (v.cidade ?? "").trim().toLowerCase();
@@ -550,7 +578,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           ? (cidadeMap[cidadeNome + "_" + estadoId] ?? null)
           : null;
 
-        // Normalize phones
         const safePhone = (val: string | undefined): string | null => {
           if (!val || val.trim() === "") return null;
           try {
@@ -585,6 +612,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           endereco: toNullableString(v.endereco),
           numero: toNullableString(v.numero),
           bairro: toNullableString(v.bairro),
+          complemento: toNullableString(v.complemento),
           contato_nome: toNullableString(v.contato_nome),
           contato_cpf: toNullableString(v.contato_cpf),
           contato_fone: safePhone(v.contato_fone),
@@ -598,6 +626,10 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           link_portal_fornecedor: toNullableString(v.link_portal_fornecedor),
           mensalidade: toNullableFloat(v.mensalidade),
           valor_ativacao: toNullableFloat(v.valor_ativacao),
+          dia_vencimento_mrr: (() => {
+            const n = parseInt(v.dia_vencimento_mrr ?? '', 10);
+            return isNaN(n) || n < 1 || n > 31 ? null : n;
+          })(),
           custo_operacao: toNullableFloat(v.custo_operacao),
           imposto_percentual: impostoRaw !== null ? impostoRaw / 100 : null,
           custo_fixo_percentual: custoFixoRaw !== null ? custoFixoRaw / 100 : null,
@@ -633,11 +665,33 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       autoCreated,
     });
     setImporting(false);
+    setDuplicataAcao(null);
 
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     }
-  }, [profile?.tenant_id, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient]);
+  }, [profile?.tenant_id, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataAcao]);
+
+  const handleImport = useCallback(async () => {
+    await handleImportWithRows(validRows);
+  }, [handleImportWithRows, validRows]);
+
+  const handleConfirmarDuplicatas = useCallback(async (acao: 'pular' | 'cancelar') => {
+    if (acao === 'cancelar') {
+      setDuplicatas([]);
+      setImporting(false);
+      setStep(4);
+      return;
+    }
+    const cnpjsDuplicados = new Set(duplicatas.map(d => d.cnpj.replace(/\D/g, '')));
+    const rowsSemDuplicatas = validRows.filter(r => {
+      const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
+      return !cnpjsDuplicados.has(cnpj);
+    });
+    setDuplicatas([]);
+    setDuplicataAcao('pular');
+    await handleImportWithRows(rowsSemDuplicatas);
+  }, [duplicatas, validRows, handleImportWithRows]);
 
   /* ---------- Drag & drop ---------- */
   const handleDrop = useCallback(
@@ -1060,13 +1114,55 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {duplicatas.length > 0 && (
+              <div className="rounded-md border border-yellow-400/50 bg-yellow-50 dark:bg-yellow-900/20 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+                      {duplicatas.length} registro{duplicatas.length > 1 ? 's' : ''} já {duplicatas.length > 1 ? 'existem' : 'existe'} no sistema
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                      Os seguintes CNPJs/CPFs já estão cadastrados. O que deseja fazer?
+                    </p>
+                  </div>
+                </div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {duplicatas.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
+                      <span className="font-mono">{d.cnpj}</span>
+                      {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleConfirmarDuplicatas('pular')}
+                    className="border-yellow-400 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-100"
+                  >
+                    Pular duplicatas e importar o restante
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleConfirmarDuplicatas('cancelar')}
+                    className="text-yellow-800 dark:text-yellow-300"
+                  >
+                    Cancelar importação
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 justify-between">
               <Button variant="outline" onClick={() => setStep(3)} className="gap-2">
                 <ArrowLeft className="w-4 h-4" /> Voltar
               </Button>
               <Button
                 onClick={handleImport}
-                disabled={validRows.length === 0}
+                disabled={validRows.length === 0 || duplicatas.length > 0}
                 className="gap-2"
               >
                 Importar {validRows.length} clientes
