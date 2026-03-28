@@ -92,7 +92,9 @@ const clienteSchema = z.object({
   cep: z.string().nullable(),
   endereco: z.string().nullable(),
   numero: z.string().nullable(),
+  complemento: z.string().nullable(),
   bairro: z.string().nullable(),
+  dia_vencimento_mrr: z.number().nullable(),
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
