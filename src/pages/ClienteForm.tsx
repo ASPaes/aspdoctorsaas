@@ -32,7 +32,11 @@ const clienteSchema = z.object({
   data_cadastro: z.string().nullable(),
   razao_social: z.string().nullable(),
   nome_fantasia: z.string().nullable(),
-  cnpj: z.string().nullable().refine(v => !!v && v.replace(/\D/g, "").length >= 14, { message: "CNPJ obrigatório" }),
+  cnpj: z.string().nullable().refine(v => {
+    if (!v) return false;
+    const digits = v.replace(/\D/g, "").length;
+    return digits === 11 || digits >= 14;
+  }, { message: "CNPJ ou CPF obrigatório" }),
   email: z.preprocess(
     (v) => (typeof v === "string" ? v.toLowerCase().trim() : v),
     z.string().min(1, "E-mail obrigatório").email("E-mail inválido")
@@ -97,7 +101,7 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   const values = form.watch();
   
   const fieldLabels: Record<string, string> = {
-    cnpj: "CNPJ",
+    cnpj: "CNPJ/CPF",
     email: "E-mail",
     telefone_whatsapp: "WhatsApp Financeiro",
     data_venda: "Data Venda",
