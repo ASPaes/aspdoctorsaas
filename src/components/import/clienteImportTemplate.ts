@@ -358,6 +358,7 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   produto:                    { section: 'Produto/Contrato', why: 'O que foi vendido ao cliente. Base para análise de MRR por produto.' },
   recorrencia:                { section: 'Produto/Contrato', why: 'Periodicidade do pagamento. Define o ciclo de cobrança e o cálculo de MRR anualizado.' },
   valor_ativacao:             { section: 'Produto/Contrato', why: 'Receita única da ativação. Compõe o cálculo de receita total e CAC.' },
+  dia_vencimento_mrr:         { section: 'Produto/Contrato', why: 'Dia do mês em que vence a mensalidade recorrente (ex: 5, 10, 15). Usado para controle de cobrança.' },
   mensalidade:                { section: 'Produto/Contrato', why: 'MRR do cliente. É a principal métrica de crescimento recorrente do negócio.' },
   custo_operacao:             { section: 'Produto/Contrato', why: 'Custo direto com o fornecedor. Necessário para calcular a margem de contribuição (MC%).' },
   imposto_percentual:         { section: 'Produto/Contrato', why: 'Percentual de impostos sobre o faturamento. Impacta no cálculo da MC% líquida.' },
