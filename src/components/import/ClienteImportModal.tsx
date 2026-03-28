@@ -1114,13 +1114,55 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {duplicatas.length > 0 && (
+              <div className="rounded-md border border-yellow-400/50 bg-yellow-50 dark:bg-yellow-900/20 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+                      {duplicatas.length} registro{duplicatas.length > 1 ? 's' : ''} já {duplicatas.length > 1 ? 'existem' : 'existe'} no sistema
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                      Os seguintes CNPJs/CPFs já estão cadastrados. O que deseja fazer?
+                    </p>
+                  </div>
+                </div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {duplicatas.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
+                      <span className="font-mono">{d.cnpj}</span>
+                      {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleConfirmarDuplicatas('pular')}
+                    className="border-yellow-400 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-100"
+                  >
+                    Pular duplicatas e importar o restante
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleConfirmarDuplicatas('cancelar')}
+                    className="text-yellow-800 dark:text-yellow-300"
+                  >
+                    Cancelar importação
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2 justify-between">
               <Button variant="outline" onClick={() => setStep(3)} className="gap-2">
                 <ArrowLeft className="w-4 h-4" /> Voltar
               </Button>
               <Button
                 onClick={handleImport}
-                disabled={validRows.length === 0}
+                disabled={validRows.length === 0 || duplicatas.length > 0}
                 className="gap-2"
               >
                 Importar {validRows.length} clientes
