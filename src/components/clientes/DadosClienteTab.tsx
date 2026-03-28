@@ -37,9 +37,18 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [tipoPessoa, setTipoPessoa] = useState<"juridica" | "fisica">("juridica");
   const { toast } = useToast();
   const whatsappValue = form.watch("telefone_whatsapp");
   const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
+
+  // Auto-detect tipo_pessoa from existing CNPJ/CPF value
+  const cnpjValue = form.watch("cnpj");
+  useEffect(() => {
+    const digits = (cnpjValue ?? "").replace(/\D/g, "");
+    if (digits.length === 11) setTipoPessoa("fisica");
+    else if (digits.length >= 14) setTipoPessoa("juridica");
+  }, []); // only on mount
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
@@ -170,7 +179,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     }
   }, [estados, form, toast]);
 
-  const handleCnpjChange = useCallback(async (maskedValue: string) => {
+  const handleCnpjCpfChange = useCallback(async (maskedValue: string) => {
+    if (tipoPessoa === "fisica") {
+      const masked = maskCPF(maskedValue);
+      form.setValue("cnpj", masked);
+      return;
+    }
+    // Jurídica — CNPJ com auto-fill
     const masked = maskCNPJ(maskedValue);
     form.setValue("cnpj", masked);
     const digits = masked.replace(/\D/g, "");
@@ -189,7 +204,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       if (data.nome_fantasia) form.setValue("nome_fantasia", data.nome_fantasia);
       if (data.email) form.setValue("email", data.email);
 
-      // Telefone: ddd_telefone_1 vem como "1133334444"
       if (data.ddd_telefone_1) {
         const phoneDig = data.ddd_telefone_1.replace(/\D/g, "");
         if (phoneDig.length >= 10) {
@@ -198,12 +212,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         }
       }
 
-      // Endereço direto
       if (data.logradouro) form.setValue("endereco", data.logradouro);
       if (data.numero) form.setValue("numero", data.numero);
       if (data.bairro) form.setValue("bairro", data.bairro);
 
-      // Estado e cidade
       if (data.uf) {
         const estado = estados.find((e) => e.sigla === data.uf);
         if (estado) {
@@ -222,7 +234,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         }
       }
 
-      // CEP por último (dispara auto-fill de endereço se os campos acima não vieram)
       if (data.cep) {
         const cepFormatted = maskCEP(data.cep.toString().replace(/\D/g, ""));
         form.setValue("cep", cepFormatted);
@@ -234,7 +245,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     } finally {
       setCnpjLoading(false);
     }
-  }, [estados, form, toast]);
+  }, [estados, form, toast, tipoPessoa]);
 
   const whatsappDigits = (whatsappValue ?? "").replace(/\D/g, "");
   const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
@@ -259,8 +270,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   return (
     <div className="space-y-6">
       {/* ── Dados Cadastrais ── */}
-      {/* Linha 1: Cod.Seq | Data Cadastro | Unidade Base | CNPJ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Linha 1: Cod.Seq | Data Cadastro | Unidade Base | Tipo Pessoa + CNPJ/CPF */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[auto_1fr_1fr_auto_1fr] gap-4">
         <FormItem>
           <FormLabel>Cód. Seq.</FormLabel>
           <Input
@@ -294,15 +305,31 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
+        <FormItem>
+          <FormLabel>Tipo</FormLabel>
+          <Select value={tipoPessoa} onValueChange={(v: "juridica" | "fisica") => {
+            setTipoPessoa(v);
+            form.setValue("cnpj", "");
+          }}>
+            <SelectTrigger className="w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="juridica">Jurídica</SelectItem>
+              <SelectItem value="fisica">Física</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormItem>
+
         <FormField control={form.control} name="cnpj" render={({ field }) => (
           <FormItem>
-            <FormLabel>CNPJ *</FormLabel>
+            <FormLabel>CNPJ/CPF *</FormLabel>
             <FormControl>
               <div className="relative">
                 <Input
-                  placeholder="00.000.000/0000-00"
+                  placeholder={tipoPessoa === "fisica" ? "000.000.000-00" : "00.000.000/0000-00"}
                   value={field.value ?? ""}
-                  onChange={(e) => handleCnpjChange(e.target.value)}
+                  onChange={(e) => handleCnpjCpfChange(e.target.value)}
                 />
                 {cnpjLoading && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
               </div>
