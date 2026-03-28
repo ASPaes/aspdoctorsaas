@@ -77,6 +77,7 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'contato@empresa.com',
   '(11) 99999-0000',
   'Sede',
+  'juridica',
   'Tecnologia',
   'Pequenas Empresas',
   'Cliente indicado por parceiro',
@@ -87,6 +88,7 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'Av. Paulista',
   '1000',
   'Bela Vista',
+  'Sala 42',
   // Contato Principal
   'João Silva',
   '123.456.789-00',
@@ -97,6 +99,7 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'Plano Pro',
   'mensal',
   '499.90',
+  '10',
   '299.90',
   '150.00',
   '6',
