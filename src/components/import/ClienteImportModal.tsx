@@ -219,6 +219,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [duplicatas, setDuplicatas] = useState<{ cnpj: string; razao_social: string | null }[]>([]);
+  const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -241,6 +243,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setImporting(false);
     setImportProgress({ current: 0, total: 0 });
     setResult(null);
+    setDuplicatas([]);
+    setDuplicataAcao(null);
   }, []);
 
   /* ---------- Build rows from raw data + mapping ---------- */
