@@ -540,7 +540,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       {/* ── Endereço ── */}
       <Separator />
       <h3 className="text-sm font-semibold">Endereço</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {/* Linha 1: CEP | Estado | Cidade */}
         <FormField control={form.control} name="cep" render={({ field }) => (
           <FormItem>
@@ -599,7 +599,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        {/* Linha 2: Endereço | Número | Bairro */}
+        {/* Linha 2: Endereço | Número | Complemento | Bairro */}
         <FormField control={form.control} name="endereco" render={({ field }) => (
           <FormItem>
             <FormLabel>Endereço</FormLabel>
@@ -611,7 +611,15 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <FormField control={form.control} name="numero" render={({ field }) => (
           <FormItem>
             <FormLabel>Número</FormLabel>
-            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormControl><Input {...field} value={field.value ?? ""} maxLength={15} className="max-w-[140px]" /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="complemento" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Complemento</FormLabel>
+            <FormControl><Input {...field} value={field.value ?? ""} placeholder="Sala, Andar, Bloco..." /></FormControl>
             <FormMessage />
           </FormItem>
         )} />

@@ -1,4 +1,5 @@
 import { UseFormReturn } from "react-hook-form";
+import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -157,6 +158,26 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
               <FormLabel>Custo Fixo % *</FormLabel>
               <FormControl>
                 <NumericInput value={field.value} onChange={field.onChange} placeholder="0,00" decimals={2} suffix="%" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField control={form.control} name="dia_vencimento_mrr" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Vencimento MRR</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  placeholder="Dia"
+                  value={field.value ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    field.onChange(v ? Number(v) : null);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
