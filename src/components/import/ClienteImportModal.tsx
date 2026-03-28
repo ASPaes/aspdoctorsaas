@@ -54,6 +54,8 @@ import {
   REQUIRED_FIELDS,
   RECORRENCIA_VALIDA,
   FK_FIELDS,
+  HEADER_LABELS,
+  FIELD_DESCRIPTIONS,
   downloadTemplateCsv,
 } from "./clienteImportTemplate";
 
@@ -132,65 +134,20 @@ function normalizeForCompare(s: string): string {
 
 function validateRow(values: Record<string, string>): string[] {
   const errors: string[] = [];
-  const razao = (values.razao_social ?? "").trim();
-  const fantasia = (values.nome_fantasia ?? "").trim();
-  if (!razao && !fantasia) errors.push("razao_social ou nome_fantasia é obrigatório");
 
   for (const field of REQUIRED_FIELDS) {
     const val = (values[field] ?? "").trim();
-    if (!val) errors.push(`Campo obrigatório vazio: ${field}`);
+    if (!val) errors.push(`Campo obrigatório vazio: ${HEADER_LABELS[field] ?? field}`);
   }
 
   const rec = (values.recorrencia ?? "").trim().toLowerCase();
   if (rec && !RECORRENCIA_VALIDA.includes(rec)) {
-    errors.push(`recorrencia inválida: "${rec}". Use: ${RECORRENCIA_VALIDA.join(", ")}`);
+    errors.push(`Recorrência inválida: "${rec}". Use: ${RECORRENCIA_VALIDA.join(", ")}`);
   }
 
   return errors;
 }
 
-const HEADER_LABELS: Record<string, string> = {
-  cnpj: "CNPJ",
-  razao_social: "Razão Social",
-  nome_fantasia: "Nome Fantasia",
-  email: "Email",
-  telefone_whatsapp: "Tel. WhatsApp",
-  telefone_whatsapp_contato: "Tel. WhatsApp Contato",
-  telefone_contato: "Tel. Contato",
-  data_cadastro: "Data Cadastro",
-  unidade_base: "Unidade Base",
-  area_atuacao: "Área de Atuação",
-  segmento: "Segmento",
-  observacao_cliente: "Observação",
-  cep: "CEP",
-  estado: "Estado (UF)",
-  cidade: "Cidade",
-  endereco: "Endereço",
-  numero: "Número",
-  bairro: "Bairro",
-  contato_nome: "Nome do Contato",
-  contato_cpf: "CPF do Contato",
-  contato_fone: "Fone do Contato",
-  contato_aniversario: "Aniversário Contato",
-  data_venda: "Data da Venda",
-  data_ativacao: "Data de Ativação",
-  funcionario: "Funcionário",
-  produto: "Produto",
-  fornecedor: "Fornecedor",
-  origem_venda: "Origem da Venda",
-  modelo_contrato: "Modelo de Contrato",
-  recorrencia: "Recorrência",
-  codigo_fornecedor: "Cód. Fornecedor",
-  link_portal_fornecedor: "Link Portal Fornecedor",
-  mensalidade: "Mensalidade",
-  valor_ativacao: "Valor Ativação",
-  forma_pagamento_mensalidade: "Forma Pgto Mensalidade",
-  forma_pagamento_ativacao: "Forma Pgto Ativação",
-  custo_operacao: "Custo Operação",
-  imposto_percentual: "Imposto (%)",
-  custo_fixo_percentual: "Custo Fixo (%)",
-  observacao_negociacao: "Obs. Negociação",
-};
 
 /* ------------------------------------------------------------------ */
 /*  Step Indicator                                                     */
