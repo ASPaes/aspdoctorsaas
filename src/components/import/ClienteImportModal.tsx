@@ -681,29 +681,40 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Required fields card */}
-              <div className="rounded-md border p-3 space-y-2">
+              <div className="rounded-md border p-3 space-y-2 max-h-72 overflow-y-auto">
                 <p className="font-medium text-sm flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4 text-destructive" /> Campos Obrigatórios
                 </p>
-                <ul className="text-xs text-muted-foreground space-y-0.5 ml-1">
+                <ul className="text-xs space-y-1.5 ml-1">
                   {REQUIRED_FIELDS.map((f) => (
-                    <li key={f}>• {HEADER_LABELS[f] ?? f}</li>
+                    <li key={f}>
+                      <span className="font-medium text-foreground">{HEADER_LABELS[f] ?? f}</span>
+                      {FIELD_DESCRIPTIONS[f] && (
+                        <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">
+                          {FIELD_DESCRIPTIONS[f].why}
+                        </p>
+                      )}
+                    </li>
                   ))}
-                  <li className="text-foreground font-medium mt-1">
-                    + razao_social ou nome_fantasia (pelo menos um)
-                  </li>
                 </ul>
               </div>
 
               {/* FK fields card */}
-              <div className="rounded-md border p-3 space-y-2">
+              <div className="rounded-md border p-3 space-y-2 max-h-72 overflow-y-auto">
                 <p className="font-medium text-sm flex items-center gap-1">
                   <Info className="w-4 h-4 text-primary" /> Campos de Tabelas Relacionadas
                 </p>
                 <p className="text-xs text-muted-foreground">Preencha com o nome exato:</p>
-                <ul className="text-xs text-muted-foreground space-y-0.5 ml-1">
+                <ul className="text-xs space-y-1.5 ml-1">
                   {FK_FIELDS.map((fk) => (
-                    <li key={fk.csvColumn}>• {fk.label}</li>
+                    <li key={fk.csvColumn}>
+                      <span className="font-medium text-foreground">{fk.label}</span>
+                      {fk.description && (
+                        <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">
+                          {fk.description}
+                        </p>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>
