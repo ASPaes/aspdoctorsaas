@@ -540,8 +540,9 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       {/* ── Endereço ── */}
       <Separator />
       <h3 className="text-sm font-semibold">Endereço</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Linha 1: CEP | Estado | Cidade */}
+
+      {/* Linha 1: CEP | Estado | Cidade */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField control={form.control} name="cep" render={({ field }) => (
           <FormItem>
             <FormLabel>CEP</FormLabel>
@@ -598,12 +599,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormMessage />
           </FormItem>
         )} />
+      </div>
 
-        {/* Linha 2: Endereço | Número | Complemento | Bairro */}
+      {/* Linha 2: Endereço (largo) | Número (curto) */}
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-4">
         <FormField control={form.control} name="endereco" render={({ field }) => (
           <FormItem>
             <FormLabel>Endereço</FormLabel>
-            <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
+            <FormControl><Input {...field} value={field.value ?? ""} placeholder="Rua, Avenida, Travessa..." /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -611,11 +614,14 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <FormField control={form.control} name="numero" render={({ field }) => (
           <FormItem>
             <FormLabel>Número</FormLabel>
-            <FormControl><Input {...field} value={field.value ?? ""} maxLength={15} className="max-w-[140px]" /></FormControl>
+            <FormControl><Input {...field} value={field.value ?? ""} maxLength={15} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
+      </div>
 
+      {/* Linha 3: Complemento | Bairro */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField control={form.control} name="complemento" render={({ field }) => (
           <FormItem>
             <FormLabel>Complemento</FormLabel>
