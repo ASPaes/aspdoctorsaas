@@ -37,6 +37,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   const [contatosOpen, setContatosOpen] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [tipoPessoa, setTipoPessoa] = useState<"juridica" | "fisica">("juridica");
   const { toast } = useToast();
   const whatsappValue = form.watch("telefone_whatsapp");
   const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
