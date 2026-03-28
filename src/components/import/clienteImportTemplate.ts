@@ -307,6 +307,7 @@ export const HEADER_LABELS: Record<string, string> = {
   produto: 'Produto',
   recorrencia: 'Recorrência',
   valor_ativacao: 'Valor de Ativação',
+  dia_vencimento_mrr: 'Dia Vencimento MRR',
   mensalidade: 'Mensalidade / MRR',
   custo_operacao: 'Custo Operação',
   imposto_percentual: 'Imposto (%)',
