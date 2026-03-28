@@ -191,7 +191,8 @@ export default function ClienteForm() {
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
       unidade_base_id: null,
       matriz_id: null,
-      cep: null, endereco: null, numero: null, bairro: null,
+      cep: null, endereco: null, numero: null, complemento: null, bairro: null,
+      dia_vencimento_mrr: null,
     },
   });
 
@@ -320,7 +321,9 @@ export default function ClienteForm() {
       cep: (c as any).cep ?? null,
       endereco: (c as any).endereco ?? null,
       numero: (c as any).numero ?? null,
+      complemento: (c as any).complemento ?? null,
       bairro: (c as any).bairro ?? null,
+      dia_vencimento_mrr: (c as any).dia_vencimento_mrr ?? null,
     });
     // Clear any stale draft after loading DB data — user hasn't edited yet
     clearDraft();
