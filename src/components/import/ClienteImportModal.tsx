@@ -54,6 +54,8 @@ import {
   REQUIRED_FIELDS,
   RECORRENCIA_VALIDA,
   FK_FIELDS,
+  HEADER_LABELS,
+  FIELD_DESCRIPTIONS,
   downloadTemplateCsv,
 } from "./clienteImportTemplate";
 
@@ -132,65 +134,20 @@ function normalizeForCompare(s: string): string {
 
 function validateRow(values: Record<string, string>): string[] {
   const errors: string[] = [];
-  const razao = (values.razao_social ?? "").trim();
-  const fantasia = (values.nome_fantasia ?? "").trim();
-  if (!razao && !fantasia) errors.push("razao_social ou nome_fantasia é obrigatório");
 
   for (const field of REQUIRED_FIELDS) {
     const val = (values[field] ?? "").trim();
-    if (!val) errors.push(`Campo obrigatório vazio: ${field}`);
+    if (!val) errors.push(`Campo obrigatório vazio: ${HEADER_LABELS[field] ?? field}`);
   }
 
   const rec = (values.recorrencia ?? "").trim().toLowerCase();
   if (rec && !RECORRENCIA_VALIDA.includes(rec)) {
-    errors.push(`recorrencia inválida: "${rec}". Use: ${RECORRENCIA_VALIDA.join(", ")}`);
+    errors.push(`Recorrência inválida: "${rec}". Use: ${RECORRENCIA_VALIDA.join(", ")}`);
   }
 
   return errors;
 }
 
-const HEADER_LABELS: Record<string, string> = {
-  cnpj: "CNPJ",
-  razao_social: "Razão Social",
-  nome_fantasia: "Nome Fantasia",
-  email: "Email",
-  telefone_whatsapp: "Tel. WhatsApp",
-  telefone_whatsapp_contato: "Tel. WhatsApp Contato",
-  telefone_contato: "Tel. Contato",
-  data_cadastro: "Data Cadastro",
-  unidade_base: "Unidade Base",
-  area_atuacao: "Área de Atuação",
-  segmento: "Segmento",
-  observacao_cliente: "Observação",
-  cep: "CEP",
-  estado: "Estado (UF)",
-  cidade: "Cidade",
-  endereco: "Endereço",
-  numero: "Número",
-  bairro: "Bairro",
-  contato_nome: "Nome do Contato",
-  contato_cpf: "CPF do Contato",
-  contato_fone: "Fone do Contato",
-  contato_aniversario: "Aniversário Contato",
-  data_venda: "Data da Venda",
-  data_ativacao: "Data de Ativação",
-  funcionario: "Funcionário",
-  produto: "Produto",
-  fornecedor: "Fornecedor",
-  origem_venda: "Origem da Venda",
-  modelo_contrato: "Modelo de Contrato",
-  recorrencia: "Recorrência",
-  codigo_fornecedor: "Cód. Fornecedor",
-  link_portal_fornecedor: "Link Portal Fornecedor",
-  mensalidade: "Mensalidade",
-  valor_ativacao: "Valor Ativação",
-  forma_pagamento_mensalidade: "Forma Pgto Mensalidade",
-  forma_pagamento_ativacao: "Forma Pgto Ativação",
-  custo_operacao: "Custo Operação",
-  imposto_percentual: "Imposto (%)",
-  custo_fixo_percentual: "Custo Fixo (%)",
-  observacao_negociacao: "Obs. Negociação",
-};
 
 /* ------------------------------------------------------------------ */
 /*  Step Indicator                                                     */
@@ -608,7 +565,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
         return {
           tenant_id: tenantId,
-          cancelado: false,
+          cancelado: (v.cancelado ?? "").trim().toLowerCase() === "sim",
+          data_cancelamento: toNullableDate(v.data_cancelamento),
+          motivo_cancelamento_id: resolveFk("motivo_cancelamento"),
+          observacao_cancelamento: toNullableString(v.observacao_cancelamento),
+          cert_a1_vencimento: toNullableDate(v.cert_a1_vencimento),
           cnpj: v.cnpj.trim(),
           razao_social: toNullableString(v.razao_social),
           nome_fantasia: toNullableString(v.nome_fantasia),
@@ -720,29 +681,40 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Required fields card */}
-              <div className="rounded-md border p-3 space-y-2">
+              <div className="rounded-md border p-3 space-y-2 max-h-72 overflow-y-auto">
                 <p className="font-medium text-sm flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4 text-destructive" /> Campos Obrigatórios
                 </p>
-                <ul className="text-xs text-muted-foreground space-y-0.5 ml-1">
+                <ul className="text-xs space-y-1.5 ml-1">
                   {REQUIRED_FIELDS.map((f) => (
-                    <li key={f}>• {HEADER_LABELS[f] ?? f}</li>
+                    <li key={f}>
+                      <span className="font-medium text-foreground">{HEADER_LABELS[f] ?? f}</span>
+                      {FIELD_DESCRIPTIONS[f] && (
+                        <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">
+                          {FIELD_DESCRIPTIONS[f].why}
+                        </p>
+                      )}
+                    </li>
                   ))}
-                  <li className="text-foreground font-medium mt-1">
-                    + razao_social ou nome_fantasia (pelo menos um)
-                  </li>
                 </ul>
               </div>
 
               {/* FK fields card */}
-              <div className="rounded-md border p-3 space-y-2">
+              <div className="rounded-md border p-3 space-y-2 max-h-72 overflow-y-auto">
                 <p className="font-medium text-sm flex items-center gap-1">
                   <Info className="w-4 h-4 text-primary" /> Campos de Tabelas Relacionadas
                 </p>
                 <p className="text-xs text-muted-foreground">Preencha com o nome exato:</p>
-                <ul className="text-xs text-muted-foreground space-y-0.5 ml-1">
+                <ul className="text-xs space-y-1.5 ml-1">
                   {FK_FIELDS.map((fk) => (
-                    <li key={fk.csvColumn}>• {fk.label}</li>
+                    <li key={fk.csvColumn}>
+                      <span className="font-medium text-foreground">{fk.label}</span>
+                      {fk.description && (
+                        <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">
+                          {fk.description}
+                        </p>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>
