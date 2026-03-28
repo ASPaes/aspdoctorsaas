@@ -17,6 +17,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'email',                      // * E-mail principal do cliente
   'telefone_whatsapp',          // * WhatsApp Financeiro — formato: (DD) NNNNN-NNNN
   'unidade_base',               // * Unidade Base — nome da unidade (FK: unidades_base)
+  'tipo_pessoa',                //   Tipo de pessoa: juridica | fisica (padrão: juridica)
   'area_atuacao',               //   Área de Atuação — nome da área (FK: areas_atuacao)
   'segmento',                   //   Segmento de mercado (FK: segmentos)
   'observacao_cliente',         //   Observações gerais sobre o cliente
@@ -28,6 +29,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'endereco',                   //   Logradouro (rua, av, etc.)
   'numero',                     //   Número do endereço
   'bairro',                     //   Bairro
+  'complemento',                //   Complemento do endereço (sala, andar, bloco...)
 
   // ── SEÇÃO 3: Contato Principal ────────────────────────────────────────────
   'contato_nome',               //   Nome do contato principal
@@ -40,6 +42,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'produto',                    // * Produto contratado (FK: produtos)
   'recorrencia',                // * Recorrência — valores: mensal | anual | semestral | semanal
   'valor_ativacao',             // * Valor de Ativação — número decimal (ex: 499.90)
+  'dia_vencimento_mrr',         //   Dia do mês para vencimento da mensalidade (ex: 5, 10, 15)
   'mensalidade',                // * Mensalidade/MRR — número decimal (ex: 299.90)
   'custo_operacao',             // * Custo Operação (custo com fornecedor) — número decimal
   'imposto_percentual',         // * Imposto — número de 0 a 100 (ex: 6 = 6%)
