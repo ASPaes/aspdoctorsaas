@@ -11,7 +11,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus } from "lucide-react";
+import { Save, Loader2, Plus, Upload } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
@@ -30,6 +30,7 @@ import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePaus
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
+import ClienteImportModal from "@/components/import/ClienteImportModal";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -41,6 +42,8 @@ type FormValues = z.infer<typeof schema>;
 function WhatsAppSettingsContent() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [whatsappSubTab, setWhatsappSubTab] = useState("setup");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for future use
+  void 0; // placeholder
 
   return (
     <div className="space-y-4">
