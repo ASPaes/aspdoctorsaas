@@ -7,6 +7,7 @@ import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, parseISO } from "date-fns";
 import { cn, escapeLike } from "@/lib/utils";
+import { maskCNPJ, maskCPF } from "@/lib/masks";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -899,7 +900,7 @@ export default function Clientes() {
                     <div className="font-medium">{c.razao_social || "—"}</div>
                     {c.nome_fantasia && <div className="text-xs text-muted-foreground">{c.nome_fantasia}</div>}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{c.cnpj || "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{c.cnpj ? (c.cnpj.replace(/\D/g, "").length === 11 ? maskCPF(c.cnpj) : maskCNPJ(c.cnpj)) : "—"}</TableCell>
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
                   <TableCell>{getMrrAtual(c) > 0 ? `R$ ${getMrrAtual(c).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-xs">{c.data_ativacao ? format(parseISO(c.data_ativacao), "dd/MM/yyyy") : "—"}</TableCell>

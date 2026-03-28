@@ -26,6 +26,7 @@ import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
+import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
 
 const clienteSchema = z.object({
