@@ -11,7 +11,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus, Upload } from "lucide-react";
+import { Save, Loader2, Plus, Upload, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
@@ -270,27 +270,39 @@ export default function Configuracoes() {
           <KBTab />
         </TabsContent>
         <TabsContent value="importacao">
-          <Card className="max-w-lg">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                  <Upload className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle>Importar Clientes</CardTitle>
-                  <CardDescription>
-                    Importe sua base de clientes a partir de um arquivo CSV. Baixe o modelo, preencha com seus dados e faça o upload.
-                  </CardDescription>
-                </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
+                <Upload className="w-5 h-5 text-primary" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => setImportModalOpen(true)} className="gap-2">
-                <Upload className="w-4 h-4" />
-                Iniciar Importação
-              </Button>
-            </CardContent>
-          </Card>
+              <div>
+                <h2 className="text-lg font-semibold">Importação de Dados</h2>
+                <p className="text-sm text-muted-foreground">
+                  Importe sua base de clientes a partir de um arquivo CSV ou planilha.
+                </p>
+              </div>
+            </div>
+
+            <Card className="max-w-xl">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted shrink-0">
+                    <Users className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-medium">Importar Clientes</p>
+                    <p className="text-xs text-muted-foreground">
+                      Importe clientes em massa via CSV. Suporte a mapeamento de colunas e criação automática de registros relacionados.
+                    </p>
+                    <Button onClick={() => setImportModalOpen(true)} className="gap-2 mt-3" size="sm">
+                      <Upload className="w-4 h-4" />
+                      Iniciar Importação
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
           <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
         </TabsContent>
       </Tabs>
