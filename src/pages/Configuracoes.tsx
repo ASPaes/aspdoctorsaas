@@ -106,6 +106,7 @@ export default function Configuracoes() {
 
   // Auth context for role-based UI
   const { profile } = useAuth();
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -192,6 +193,7 @@ export default function Configuracoes() {
           {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
           {isAdmin && <TabsTrigger value="horario-plantao">Horário & Plantão</TabsTrigger>}
           <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
+          <TabsTrigger value="importacao">Importação de Dados</TabsTrigger>
         </TabsList>
 
         <TabsContent value="percentuais">
@@ -266,6 +268,30 @@ export default function Configuracoes() {
 
         <TabsContent value="kb">
           <KBTab />
+        </TabsContent>
+        <TabsContent value="importacao">
+          <Card className="max-w-lg">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
+                  <Upload className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Importar Clientes</CardTitle>
+                  <CardDescription>
+                    Importe sua base de clientes a partir de um arquivo CSV. Baixe o modelo, preencha com seus dados e faça o upload.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => setImportModalOpen(true)} className="gap-2">
+                <Upload className="w-4 h-4" />
+                Iniciar Importação
+              </Button>
+            </CardContent>
+          </Card>
+          <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
         </TabsContent>
       </Tabs>
     </div>
