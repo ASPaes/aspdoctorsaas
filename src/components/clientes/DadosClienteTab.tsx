@@ -179,7 +179,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     }
   }, [estados, form, toast]);
 
-  const handleCnpjChange = useCallback(async (maskedValue: string) => {
+  const handleCnpjCpfChange = useCallback(async (maskedValue: string) => {
+    if (tipoPessoa === "fisica") {
+      const masked = maskCPF(maskedValue);
+      form.setValue("cnpj", masked);
+      return;
+    }
+    // Jurídica — CNPJ com auto-fill
     const masked = maskCNPJ(maskedValue);
     form.setValue("cnpj", masked);
     const digits = masked.replace(/\D/g, "");
@@ -198,7 +204,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       if (data.nome_fantasia) form.setValue("nome_fantasia", data.nome_fantasia);
       if (data.email) form.setValue("email", data.email);
 
-      // Telefone: ddd_telefone_1 vem como "1133334444"
       if (data.ddd_telefone_1) {
         const phoneDig = data.ddd_telefone_1.replace(/\D/g, "");
         if (phoneDig.length >= 10) {
@@ -207,12 +212,10 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         }
       }
 
-      // Endereço direto
       if (data.logradouro) form.setValue("endereco", data.logradouro);
       if (data.numero) form.setValue("numero", data.numero);
       if (data.bairro) form.setValue("bairro", data.bairro);
 
-      // Estado e cidade
       if (data.uf) {
         const estado = estados.find((e) => e.sigla === data.uf);
         if (estado) {
@@ -231,7 +234,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         }
       }
 
-      // CEP por último (dispara auto-fill de endereço se os campos acima não vieram)
       if (data.cep) {
         const cepFormatted = maskCEP(data.cep.toString().replace(/\D/g, ""));
         form.setValue("cep", cepFormatted);
@@ -243,7 +245,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     } finally {
       setCnpjLoading(false);
     }
-  }, [estados, form, toast]);
+  }, [estados, form, toast, tipoPessoa]);
 
   const whatsappDigits = (whatsappValue ?? "").replace(/\D/g, "");
   const canOpenWhatsApp = !!whatsappDigits && !!clienteId;
