@@ -285,6 +285,7 @@ export const HEADER_LABELS: Record<string, string> = {
   email: 'E-mail',
   telefone_whatsapp: 'Tel. WhatsApp',
   unidade_base: 'Unidade Base',
+  tipo_pessoa: 'Tipo de Pessoa (juridica/fisica)',
   area_atuacao: 'Área de Atuação',
   segmento: 'Segmento',
   observacao_cliente: 'Observação do Cliente',
@@ -295,6 +296,7 @@ export const HEADER_LABELS: Record<string, string> = {
   endereco: 'Endereço',
   numero: 'Número',
   bairro: 'Bairro',
+  complemento: 'Complemento',
   // Contato
   contato_nome: 'Nome do Contato',
   contato_cpf: 'CPF do Contato',
