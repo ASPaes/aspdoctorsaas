@@ -270,8 +270,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
   return (
     <div className="space-y-6">
       {/* ── Dados Cadastrais ── */}
-      {/* Linha 1: Cod.Seq | Data Cadastro | Unidade Base | CNPJ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Linha 1: Cod.Seq | Data Cadastro | Unidade Base | Tipo Pessoa + CNPJ/CPF */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[auto_1fr_1fr_auto_1fr] gap-4">
         <FormItem>
           <FormLabel>Cód. Seq.</FormLabel>
           <Input
@@ -305,15 +305,31 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
+        <FormItem>
+          <FormLabel>Tipo</FormLabel>
+          <Select value={tipoPessoa} onValueChange={(v: "juridica" | "fisica") => {
+            setTipoPessoa(v);
+            form.setValue("cnpj", "");
+          }}>
+            <SelectTrigger className="w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="juridica">Jurídica</SelectItem>
+              <SelectItem value="fisica">Física</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormItem>
+
         <FormField control={form.control} name="cnpj" render={({ field }) => (
           <FormItem>
-            <FormLabel>CNPJ *</FormLabel>
+            <FormLabel>CNPJ/CPF *</FormLabel>
             <FormControl>
               <div className="relative">
                 <Input
-                  placeholder="00.000.000/0000-00"
+                  placeholder={tipoPessoa === "fisica" ? "000.000.000-00" : "00.000.000/0000-00"}
                   value={field.value ?? ""}
-                  onChange={(e) => handleCnpjChange(e.target.value)}
+                  onChange={(e) => handleCnpjCpfChange(e.target.value)}
                 />
                 {cnpjLoading && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
               </div>
