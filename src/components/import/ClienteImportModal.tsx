@@ -630,7 +630,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           contato_aniversario: toNullableDate(v.contato_aniversario),
           data_venda: toNullableDate(v.data_venda),
           data_ativacao: toNullableDate(v.data_ativacao),
-          recorrencia: (v.recorrencia ?? "").trim().toLowerCase() || null,
+          recorrencia: (RECORRENCIA_VALIDA.includes((v.recorrencia ?? "").trim().toLowerCase())
+            ? (v.recorrencia ?? "").trim().toLowerCase()
+            : null) as "mensal" | "anual" | "semestral" | "semanal" | null,
           codigo_fornecedor: toNullableString(v.codigo_fornecedor),
           link_portal_fornecedor: toNullableString(v.link_portal_fornecedor),
           mensalidade: toNullableFloat(v.mensalidade),
