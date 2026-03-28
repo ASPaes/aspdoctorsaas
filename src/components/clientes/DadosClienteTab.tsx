@@ -49,7 +49,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
     if (digits.length === 11) setTipoPessoa("fisica");
     else if (digits.length >= 14) setTipoPessoa("juridica");
   }, []); // only on mount
-  const whatsappContatoValue = form.watch("telefone_whatsapp_contato");
 
   // Matriz lookup state
   const [matrizSearch, setMatrizSearch] = useState("");
