@@ -855,7 +855,7 @@ export default function Clientes() {
               {([
                 ["codigo_sequencial", "Cód. Seq."],
                 ["razao_social", "Razão Social / Fantasia"],
-                ["cnpj", "CNPJ"],
+                ["cnpj", "CNPJ/CPF"],
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR Atual"],
                 ["data_ativacao", "Dt. Ativação"],

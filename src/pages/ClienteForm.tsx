@@ -118,7 +118,7 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   const missingFields: string[] = [];
 
   // Check required fields
-  if (!values.cnpj || values.cnpj.replace(/\D/g, "").length < 14) missingFields.push(fieldLabels.cnpj);
+  if (!values.cnpj || (values.cnpj.replace(/\D/g, "").length !== 11 && values.cnpj.replace(/\D/g, "").length < 14)) missingFields.push(fieldLabels.cnpj);
   if (!values.email) missingFields.push(fieldLabels.email);
   if (!values.telefone_whatsapp || !isValidBRPhone(normalizeBRPhone(values.telefone_whatsapp))) missingFields.push(fieldLabels.telefone_whatsapp);
   if (!values.data_venda) missingFields.push(fieldLabels.data_venda);
@@ -281,7 +281,7 @@ export default function ClienteForm() {
     const c = clienteQuery.data;
     form.reset({
       data_cadastro: c.data_cadastro, razao_social: c.razao_social, nome_fantasia: c.nome_fantasia,
-      cnpj: c.cnpj, email: c.email ?? "",
+      cnpj: c.cnpj ? (c.cnpj.replace(/\D/g, "").length === 11 ? maskCPF(c.cnpj) : maskCNPJ(c.cnpj)) : null, email: c.email ?? "",
       telefone_contato: c.telefone_contato ? formatBRPhone(normalizeBRPhone(c.telefone_contato)) : null,
       telefone_whatsapp: c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null,
       telefone_whatsapp_contato: (c as any).telefone_whatsapp_contato ? formatBRPhone(normalizeBRPhone((c as any).telefone_whatsapp_contato)) : (c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null),
