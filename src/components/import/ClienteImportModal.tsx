@@ -565,7 +565,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
         return {
           tenant_id: tenantId,
-          cancelado: false,
+          cancelado: (v.cancelado ?? "").trim().toLowerCase() === "sim",
+          data_cancelamento: toNullableDate(v.data_cancelamento),
+          motivo_cancelamento_id: resolveFk("motivo_cancelamento"),
+          observacao_cancelamento: toNullableString(v.observacao_cancelamento),
+          cert_a1_vencimento: toNullableDate(v.cert_a1_vencimento),
           cnpj: v.cnpj.trim(),
           razao_social: toNullableString(v.razao_social),
           nome_fantasia: toNullableString(v.nome_fantasia),
