@@ -544,6 +544,7 @@ export type Database = {
           cnpj: string | null
           codigo_fornecedor: string | null
           codigo_sequencial: number
+          complemento: string | null
           contato_aniversario: string | null
           contato_cpf: string | null
           contato_fone: string | null
@@ -555,6 +556,7 @@ export type Database = {
           data_cadastro: string | null
           data_cancelamento: string | null
           data_venda: string | null
+          dia_vencimento_mrr: number | null
           email: string | null
           endereco: string | null
           estado_id: number | null
@@ -599,6 +601,7 @@ export type Database = {
           cnpj?: string | null
           codigo_fornecedor?: string | null
           codigo_sequencial?: number
+          complemento?: string | null
           contato_aniversario?: string | null
           contato_cpf?: string | null
           contato_fone?: string | null
@@ -610,6 +613,7 @@ export type Database = {
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_venda?: string | null
+          dia_vencimento_mrr?: number | null
           email?: string | null
           endereco?: string | null
           estado_id?: number | null
@@ -654,6 +658,7 @@ export type Database = {
           cnpj?: string | null
           codigo_fornecedor?: string | null
           codigo_sequencial?: number
+          complemento?: string | null
           contato_aniversario?: string | null
           contato_cpf?: string | null
           contato_fone?: string | null
@@ -665,6 +670,7 @@ export type Database = {
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_venda?: string | null
+          dia_vencimento_mrr?: number | null
           email?: string | null
           endereco?: string | null
           estado_id?: number | null
