@@ -135,7 +135,22 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
 
 // ── Gera conteúdo CSV do template ─────────────────────────────────────────────
 export function gerarTemplateCsv(): string {
+  const instrucoes = [
+    '# INSTRUÇÕES DE PREENCHIMENTO:',
+    '# - Não altere os nomes das colunas da linha abaixo',
+    '# - Campos de data devem estar no formato YYYY-MM-DD (ex: 2024-01-15)',
+    '# - Campos FK devem conter o NOME exato cadastrado no sistema (ex: Boleto Bancário)',
+    '# - CNPJ: somente números sem pontos barras ou traços (ex: 12345678000199)',
+    '# - CPF do contato: somente números (ex: 12345678901)',
+    '# - Telefones: formato (DD) NNNNN-NNNN (ex: (11) 99999-0000)',
+    '# - Campos de percentual: número de 0 a 100 (ex: 6 para 6%)',
+    '# - cancelado: use "sim" ou "nao"',
+    '# - recorrencia: use mensal | anual | semestral | semanal',
+    '# - matriz_codigo_sequencial: número inteiro do Cód. Seq. da empresa matriz',
+    '# - Remova estas linhas de instrução antes de importar',
+  ].join('\n');
   return [
+    instrucoes,
     CLIENTE_IMPORT_HEADERS.join(','),
     CLIENTE_IMPORT_EXAMPLE_ROW.join(','),
   ].join('\n');
@@ -143,13 +158,14 @@ export function gerarTemplateCsv(): string {
 
 // ── Download do template ──────────────────────────────────────────────────────
 export function downloadTemplateCsv() {
-  const bom = '\uFEFF'; // BOM UTF-8 — garante abertura correta no Excel
+  const bom = '\uFEFF';
   const conteudo = bom + gerarTemplateCsv();
   const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
+  const hoje = new Date().toISOString().slice(0, 10);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'template_importacao_clientes.csv';
+  link.download = `template_importacao_clientes_${hoje}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
