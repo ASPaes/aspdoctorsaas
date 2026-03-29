@@ -1,0 +1,1 @@
+UPDATE clientes SET cidade_id = 2310 WHERE id = 'd38cc032-7b2f-4334-a623-a4829328cc0f' AND codigo_sequencial = 851;
