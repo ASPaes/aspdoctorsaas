@@ -1161,20 +1161,41 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         }
       }
     } else {
-      // Operator message sent via Evolution (e.g. from phone)
-      // Mark first_agent_message_at for analytics (only if not already set)
+      // Mensagem enviada pelo operador/N8N (isFromMe = true)
       const nowIsoOp = new Date().toISOString();
-      supabase
-        .from('whatsapp_conversations')
-        .update({ first_agent_message_at: nowIsoOp, updated_at: nowIsoOp })
-        .eq('id', conversationId)
-        .is('first_agent_message_at', null)
-        .then(() => {})
-        .catch((err: any) => console.error('[evolution-webhook] Error setting first_agent_message_at:', err));
 
-      ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
-        .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
-        .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
+      // Verificar se a conversa tem interação prévia do cliente
+      const onlyOutbound = await isOutboundOnlyConversation(supabase, conversationId);
+
+      if (onlyOutbound) {
+        // Cobrança/automação sem resposta do cliente ainda
+        // Manter status 'closed', NÃO abrir atendimento
+        console.log(`[evolution-webhook] Mensagem outbound-only (N8N/cobrança) — sem atendimento conv=${conversationId}`);
+
+        // Garantir que a conversa está fechada
+        await supabase
+          .from('whatsapp_conversations')
+          .update({
+            status: 'closed',
+            updated_at: nowIsoOp,
+          })
+          .eq('id', conversationId)
+          .neq('status', 'closed');
+
+      } else {
+        // Operador humano respondendo conversa com histórico do cliente
+        supabase
+          .from('whatsapp_conversations')
+          .update({ first_agent_message_at: nowIsoOp, updated_at: nowIsoOp })
+          .eq('id', conversationId)
+          .is('first_agent_message_at', null)
+          .then(() => {})
+          .catch((err: any) => console.error('[evolution-webhook] Error setting first_agent_message_at:', err));
+
+        ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId, instanceData.id)
+          .then(() => incrementAttendanceCounter(supabase, conversationId, 'agent'))
+          .catch(err => console.error('[evolution-webhook] ensureAttendanceOperator/increment error:', err));
+      }
     }
   } catch (error) {
     console.error('[evolution-webhook] Error in processMessageUpsert:', error);
