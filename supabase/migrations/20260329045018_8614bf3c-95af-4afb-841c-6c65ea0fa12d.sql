@@ -1,0 +1,1 @@
+UPDATE clientes SET custo_fixo_percentual = 0.275 WHERE custo_fixo_percentual = 0.35;
