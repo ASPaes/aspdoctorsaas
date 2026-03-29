@@ -607,6 +607,24 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       fkResolvedMaps[fk.csvColumn] = map;
     }
 
+    // --- Resolve matriz_id por codigo_sequencial ---
+    const matrizCodigosUnicos = new Set<number>();
+    for (const row of rowsToImport) {
+      const cod = parseInt((row.values.matriz_codigo_sequencial ?? '').trim(), 10);
+      if (!isNaN(cod) && cod > 0) matrizCodigosUnicos.add(cod);
+    }
+    const matrizMap: Record<number, string> = {};
+    if (matrizCodigosUnicos.size > 0) {
+      const { data: matrizes } = await supabase
+        .from('clientes')
+        .select('id, codigo_sequencial')
+        .eq('tenant_id', tenantId)
+        .in('codigo_sequencial', Array.from(matrizCodigosUnicos));
+      for (const m of matrizes ?? []) {
+        matrizMap[(m as any).codigo_sequencial] = m.id;
+      }
+    }
+
     // --- Batch insert ---
     const BATCH_SIZE = 50;
     const batches: ParsedRow[][] = [];
@@ -661,6 +679,12 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           motivo_cancelamento_id: resolveFk("motivo_cancelamento"),
           observacao_cancelamento: toNullableString(v.observacao_cancelamento),
           cert_a1_vencimento: toNullableDate(v.cert_a1_vencimento),
+          cert_a1_ultima_venda_em: toNullableDate(v.cert_a1_ultima_venda_em),
+          matriz_id: (() => {
+            const cod = parseInt((v.matriz_codigo_sequencial ?? '').trim(), 10);
+            if (isNaN(cod) || cod <= 0) return null;
+            return matrizMap[cod] ?? null;
+          })(),
           cnpj: v.cnpj.trim(),
           razao_social: toNullableString(v.razao_social),
           nome_fantasia: toNullableString(v.nome_fantasia),
