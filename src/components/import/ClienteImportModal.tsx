@@ -553,48 +553,98 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       return;
     }
 
-    // --- Resolve estado IDs ---
-    const estadoSiglas = new Set<string>();
-    for (const row of rowsToImport) {
-      const sigla = (row.values.estado ?? "").trim().toUpperCase();
-      if (sigla) estadoSiglas.add(sigla);
-    }
-    let estadoMap: Record<string, number> = {};
-    if (estadoSiglas.size > 0) {
-      const { data: estados } = await supabase
-        .from("estados")
-        .select("id, sigla")
-        .in("sigla", Array.from(estadoSiglas));
-      for (const e of estados ?? []) {
-        estadoMap[e.sigla.toUpperCase()] = e.id;
-      }
+    // --- Resolve estado e cidade via CEP (ViaCEP) + fallback por nome ---
+    // Passo 1: carregar todos os estados do banco (leve, 27 registros)
+    const { data: estadosData } = await supabase
+      .from('estados')
+      .select('id, sigla, nome');
+    const estadosPorSigla: Record<string, number> = {};
+    for (const e of estadosData ?? []) {
+      estadosPorSigla[e.sigla.toUpperCase()] = e.id;
     }
 
-    // --- Resolve cidade IDs ---
-    // Estratégia 1: busca cidade pelo nome + estado (quando ambos disponíveis)
-    // Estratégia 2: busca só pelo nome (quando estado não informado)
-    let cidadeMap: Record<string, number> = {};
-    const cidadeNames = new Set<string>();
-    for (const row of rowsToImport) {
-      const nome = (row.values.cidade ?? '').trim();
-      if (nome) cidadeNames.add(nome);
+    // Passo 2: carregar todas as cidades do banco (necessário para lookup)
+    const { data: cidadesData } = await supabase
+      .from('cidades')
+      .select('id, nome, estado_id')
+      .limit(10000);
+
+    // Índice de cidades: chave = nome_normalizado + '_' + estado_id
+    // e também só por nome (fallback)
+    const cidadesPorChave: Record<string, number> = {};
+    const cidadesPorNome: Record<string, number> = {};
+    for (const c of cidadesData ?? []) {
+      const nNorm = normalizeForCompare(c.nome);
+      cidadesPorChave[nNorm + '_' + c.estado_id] = c.id;
+      if (!cidadesPorNome[nNorm]) cidadesPorNome[nNorm] = c.id;
     }
-    if (cidadeNames.size > 0) {
-      const { data: cidades } = await supabase
-        .from('cidades')
-        .select('id, nome, estado_id')
-        .limit(10000);
-      for (const c of cidades ?? []) {
-        const nomeNorm = normalizeForCompare(c.nome);
-        // Chave com estado (prioritária)
-        cidadeMap[nomeNorm + '_' + c.estado_id] = c.id;
-        // Chave só pelo nome (fallback sem estado)
-        if (!cidadeMap[nomeNorm]) {
-          cidadeMap[nomeNorm] = c.id;
+
+    // Passo 3: para cada linha, resolver estado_id e cidade_id
+    // Prioridade: CEP (ViaCEP) → UF+cidade do CSV → só cidade do CSV
+    type GeoResolved = { estadoId: number | null; cidadeId: number | null };
+    const geoCache: Record<string, GeoResolved> = {}; // cache por CEP limpo
+
+    const resolveGeo = async (
+      cepRaw: string,
+      estadoRaw: string,
+      cidadeRaw: string
+    ): Promise<GeoResolved> => {
+      const cepDigits = cepRaw.replace(/\D/g, '');
+
+      // Tentar cache primeiro
+      if (cepDigits.length === 8 && geoCache[cepDigits]) {
+        return geoCache[cepDigits];
+      }
+
+      // Tentar ViaCEP se CEP válido
+      if (cepDigits.length === 8) {
+        try {
+          const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.erro) {
+              const estadoId = estadosPorSigla[data.uf?.toUpperCase()] ?? null;
+              const cidadeNorm = normalizeForCompare(data.localidade ?? '');
+              const cidadeId = estadoId
+                ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
+                : (cidadesPorNome[cidadeNorm] ?? null);
+              const result: GeoResolved = { estadoId, cidadeId };
+              geoCache[cepDigits] = result;
+              return result;
+            }
+          }
+        } catch {
+          // ViaCEP falhou — continuar para fallback
         }
       }
-    }
 
+      // Fallback: usar UF e cidade informados no CSV
+      const estadoId = estadosPorSigla[(estadoRaw ?? '').trim().toUpperCase()] ?? null;
+      const cidadeNorm = normalizeForCompare(cidadeRaw ?? '');
+      const cidadeId = estadoId
+        ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
+        : (cidadesPorNome[cidadeNorm] ?? null);
+      const result: GeoResolved = { estadoId, cidadeId };
+      if (cepDigits.length === 8) geoCache[cepDigits] = result;
+      return result;
+    };
+
+    // Pré-resolver geo para todas as linhas em paralelo (máximo 10 simultâneos)
+    const geoResults: GeoResolved[] = new Array(rowsToImport.length).fill({ estadoId: null, cidadeId: null });
+    const BATCH_GEO = 10;
+    for (let i = 0; i < rowsToImport.length; i += BATCH_GEO) {
+      const slice = rowsToImport.slice(i, i + BATCH_GEO);
+      const resolved = await Promise.all(
+        slice.map(r => resolveGeo(
+          r.values.cep ?? '',
+          r.values.estado ?? '',
+          r.values.cidade ?? ''
+        ))
+      );
+      for (let j = 0; j < resolved.length; j++) {
+        geoResults[i + j] = resolved[j];
+      }
+    }
     // --- Resolve FK IDs (with auto-create) ---
     const fkResolvedMaps: Record<string, Record<string, number | string>> = {};
     for (const fk of activeFkFields) {
@@ -673,21 +723,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           return typeof id === "number" ? id : id ? Number(id) : null;
         };
 
-        const estadoSigla = (v.estado ?? "").trim().toUpperCase();
-        const estadoId = estadoSigla ? (estadoMap[estadoSigla] ?? null) : null;
-        const cidadeNomeNorm = normalizeForCompare(v.cidade ?? '');
-        const cidadeId = (() => {
-          if (!cidadeNomeNorm) return null;
-          // Tenta com estado primeiro (mais preciso)
-          if (estadoId && cidadeMap[cidadeNomeNorm + '_' + estadoId] !== undefined) {
-            return cidadeMap[cidadeNomeNorm + '_' + estadoId];
-          }
-          // Fallback: busca só pelo nome normalizado
-          if (cidadeMap[cidadeNomeNorm] !== undefined) {
-            return cidadeMap[cidadeNomeNorm];
-          }
-          return null;
-        })();
+        const _geoIdx = b * BATCH_SIZE + batches[b].indexOf(r);
+        const estadoId = geoResults[_geoIdx]?.estadoId ?? null;
+        const cidadeId = geoResults[_geoIdx]?.cidadeId ?? null;
 
         const safePhone = (val: string | undefined): string | null => {
           if (!val || val.trim() === "") return null;
