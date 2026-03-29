@@ -89,7 +89,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
 
           <FormField control={form.control} name="funcionario_id" render={({ field }) => (
             <FormItem>
-              <FormLabel>Funcionário (Consultor) *</FormLabel>
+              <FormLabel>Funcionário (Consultor)</FormLabel>
               <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
                 <SelectContent>
