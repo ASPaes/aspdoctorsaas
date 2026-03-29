@@ -970,7 +970,24 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         return;
       }
 
-      // 0. BUSINESS HOURS — verificar horário antes de tudo (exceto CSAT)
+      // Reabrir conversa fechada quando cliente responde
+      const { data: convStatusData } = await supabase
+        .from('whatsapp_conversations')
+        .select('status')
+        .eq('id', conversationId)
+        .single();
+
+      if (convStatusData?.status === 'closed') {
+        await supabase
+          .from('whatsapp_conversations')
+          .update({ status: 'active', updated_at: new Date().toISOString() })
+          .eq('id', conversationId);
+        console.log(`[evolution-webhook] Conversa reaberta por resposta do cliente conv=${conversationId}`);
+      }
+
+      // Verificar se instância usa skip_ura (ex: Financeiro — abre atendimento direto sem URA)
+      const skipUraForThisInstance = instanceData.skip_ura === true;
+
       const supportConfigBH = await getSupportConfig(supabase, tenantId);
       if (supportConfigBH.business_hours_enabled) {
         const bhResult = await checkBusinessHours(
@@ -1147,7 +1164,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
           incrementAttendanceCounter(supabase, conversationId, 'customer')
             .catch(err => console.error('[evolution-webhook] increment error:', err));
         } else {
-          ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx)
+          ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, instanceCtx, skipUraForThisInstance)
             .then(() => incrementAttendanceCounter(supabase, conversationId, 'customer'))
             .catch(err => console.error('[evolution-webhook] ensureAttendance/increment error:', err));
           supabase
@@ -2453,7 +2470,8 @@ async function ensureAttendanceForIncomingMessage(
   contactId: string,
   tenantId: string,
   messageContent?: string,
-  instanceCtx?: InstanceContext
+  instanceCtx?: InstanceContext,
+  skipUra: boolean = false
 ): Promise<void> {
   try {
     const { data: activeAttendance } = await supabase
@@ -2532,14 +2550,17 @@ async function ensureAttendanceForIncomingMessage(
       return;
     }
 
+    const newAttStatus = skipUra ? 'in_progress' : 'waiting';
+
     const { data: newAtt, error: createErr } = await supabase
       .from('support_attendances')
       .insert({
         tenant_id: tenantId,
         conversation_id: conversationId,
         contact_id: contactId,
-        status: 'waiting',
+        status: newAttStatus,
         opened_at: nowIso,
+        ...(skipUra ? { assumed_at: nowIso } : {}),
         created_from: 'customer',
       })
       .select('id, attendance_code')
@@ -2550,13 +2571,15 @@ async function ensureAttendanceForIncomingMessage(
       return;
     }
 
-    console.log(`[attendance] NEW att=${newAtt.id} code=${newAtt.attendance_code} tenant=${tenantId} conv=${conversationId}`);
+    console.log(`[attendance] NEW att=${newAtt.id} code=${newAtt.attendance_code} status=${newAttStatus} skipUra=${skipUra} tenant=${tenantId} conv=${conversationId}`);
 
     insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened')
       .catch(err => console.error('[attendance] Error inserting system msg:', err));
     clearAfterHoursFlag(supabase, conversationId).catch(() => {});
 
-    if (instanceCtx) {
+    if (skipUra) {
+      console.log(`[attendance] skip_ura=true — sem URA, atendimento direto conv=${conversationId}`);
+    } else if (instanceCtx) {
       sendUraWelcome(supabase, instanceCtx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code)
         .catch(err => console.error('[attendance] Error sending URA welcome:', err));
     }
