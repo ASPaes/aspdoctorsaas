@@ -611,22 +611,21 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`, {
           headers: { 'Accept': 'application/json' }
         });
-          if (res.ok) {
-            const data = await res.json();
-            if (!data.erro) {
-              const estadoId = estadosPorSigla[data.uf?.toUpperCase()] ?? null;
-              const cidadeNorm = normalizeForCompare(data.localidade ?? '');
-              const cidadeId = estadoId
-                ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
-                : (cidadesPorNome[cidadeNorm] ?? null);
-              const result: GeoResolved = { estadoId, cidadeId };
-              geoCache[cepDigits] = result;
-              return result;
-            }
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.erro) {
+            const estadoId = estadosPorSigla[data.uf?.toUpperCase()] ?? null;
+            const cidadeNorm = normalizeForCompare(data.localidade ?? '');
+            const cidadeId = estadoId
+              ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
+              : (cidadesPorNome[cidadeNorm] ?? null);
+            const result: GeoResolved = { estadoId, cidadeId };
+            geoCache[cepDigits] = result;
+            return result;
           }
-        } catch {
-          // ViaCEP falhou — continuar para fallback
         }
+      } catch {
+        // ViaCEP falhou — continuar para fallback
       }
 
       // Fallback: usar UF e cidade informados no CSV
