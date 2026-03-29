@@ -678,14 +678,14 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     // Resolve instance and tenant_id
     let { data: instanceData } = await supabase
       .from('whatsapp_instances')
-      .select('id, instance_name, instance_id_external, provider_type, status, tenant_id')
+      .select('id, instance_name, instance_id_external, provider_type, status, tenant_id, skip_ura')
       .eq('instance_name', instance)
       .maybeSingle();
 
     if (!instanceData) {
       const { data: cloudInstance } = await supabase
         .from('whatsapp_instances')
-        .select('id, instance_name, instance_id_external, provider_type, status, tenant_id')
+        .select('id, instance_name, instance_id_external, provider_type, status, tenant_id, skip_ura')
         .eq('instance_id_external', instance)
         .maybeSingle();
       instanceData = cloudInstance;
@@ -768,7 +768,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       supabase,
       instanceData.id,
       contactId,
-      tenantId
+      tenantId,
+      payloadIsFromMe
     );
 
     if (!conversationId) {
