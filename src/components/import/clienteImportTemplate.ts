@@ -355,6 +355,7 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   email:                      { section: 'Cliente', why: 'Canal principal de comunicação. Usado em notificações automáticas e relatórios.' },
   telefone_whatsapp:          { section: 'Cliente', why: 'Número vinculado ao WhatsApp financeiro. Habilita o atendimento via chat no sistema.' },
   unidade_base:               { section: 'Cliente', why: 'Define qual unidade da sua empresa atende este cliente. Essencial para segmentação de relatórios.' },
+  data_cadastro:              { section: 'Cliente', why: 'Data em que o cliente foi cadastrado. Obrigatória para calcular tempo de vida, cohort e relatórios históricos corretos.' },
   tipo_pessoa:                { section: 'Cliente', why: 'Define se é pessoa jurídica (CNPJ 14 dígitos) ou física (CPF 11 dígitos). Não obrigatório — o sistema detecta automaticamente pelo número de dígitos do campo CNPJ/CPF.' },
   area_atuacao:               { section: 'Cliente', why: 'Setor de mercado do cliente. Permite análises de MRR e churn por vertical.' },
   segmento:                   { section: 'Cliente', why: 'Classificação do porte ou tipo do cliente. Usado em análises de expansão e retenção.' },
