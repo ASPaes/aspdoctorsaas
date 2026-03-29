@@ -571,19 +571,27 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     }
 
     // --- Resolve cidade IDs ---
+    // Estratégia 1: busca cidade pelo nome + estado (quando ambos disponíveis)
+    // Estratégia 2: busca só pelo nome (quando estado não informado)
     let cidadeMap: Record<string, number> = {};
     const cidadeNames = new Set<string>();
     for (const row of rowsToImport) {
-      const nome = (row.values.cidade ?? "").trim();
-      if (nome) cidadeNames.add(nome.toLowerCase());
+      const nome = (row.values.cidade ?? '').trim();
+      if (nome) cidadeNames.add(nome);
     }
     if (cidadeNames.size > 0) {
       const { data: cidades } = await supabase
-        .from("cidades")
-        .select("id, nome, estado_id")
-        .limit(5000);
+        .from('cidades')
+        .select('id, nome, estado_id')
+        .limit(10000);
       for (const c of cidades ?? []) {
-        cidadeMap[c.nome.toLowerCase() + "_" + c.estado_id] = c.id;
+        const nomeNorm = normalizeForCompare(c.nome);
+        // Chave com estado (prioritária)
+        cidadeMap[nomeNorm + '_' + c.estado_id] = c.id;
+        // Chave só pelo nome (fallback sem estado)
+        if (!cidadeMap[nomeNorm]) {
+          cidadeMap[nomeNorm] = c.id;
+        }
       }
     }
 
@@ -667,10 +675,19 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
         const estadoSigla = (v.estado ?? "").trim().toUpperCase();
         const estadoId = estadoSigla ? (estadoMap[estadoSigla] ?? null) : null;
-        const cidadeNome = (v.cidade ?? "").trim().toLowerCase();
-        const cidadeId = cidadeNome && estadoId
-          ? (cidadeMap[cidadeNome + "_" + estadoId] ?? null)
-          : null;
+        const cidadeNomeNorm = normalizeForCompare(v.cidade ?? '');
+        const cidadeId = (() => {
+          if (!cidadeNomeNorm) return null;
+          // Tenta com estado primeiro (mais preciso)
+          if (estadoId && cidadeMap[cidadeNomeNorm + '_' + estadoId] !== undefined) {
+            return cidadeMap[cidadeNomeNorm + '_' + estadoId];
+          }
+          // Fallback: busca só pelo nome normalizado
+          if (cidadeMap[cidadeNomeNorm] !== undefined) {
+            return cidadeMap[cidadeNomeNorm];
+          }
+          return null;
+        })();
 
         const safePhone = (val: string | undefined): string | null => {
           if (!val || val.trim() === "") return null;
