@@ -354,7 +354,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       // Remove BOM if present
       if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
 
-      const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+      const lines = text
+        .split(/\r?\n/)
+        .filter((l) => l.trim() !== "" && !l.trim().startsWith("#"));
       if (lines.length < 2) {
         setFileError("O arquivo precisa ter pelo menos o cabeçalho e uma linha de dados.");
         return;
