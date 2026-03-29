@@ -22,6 +22,8 @@ export const CLIENTE_IMPORT_HEADERS = [
   'area_atuacao',               //   Área de Atuação — nome da área (FK: areas_atuacao)
   'segmento',                   //   Segmento de mercado (FK: segmentos)
   'observacao_cliente',         //   Observações gerais sobre o cliente
+  'telefone_contato',           //   Telefone fixo/contato
+  'telefone_whatsapp_contato',  //   WhatsApp do contato (diferente do financeiro)
 
   // ── SEÇÃO 2: Endereço ─────────────────────────────────────────────────────
   'cep',                        //   CEP — formato: 00000-000
