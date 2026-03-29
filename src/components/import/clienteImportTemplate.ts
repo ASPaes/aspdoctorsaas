@@ -17,10 +17,13 @@ export const CLIENTE_IMPORT_HEADERS = [
   'email',                      // * E-mail principal do cliente
   'telefone_whatsapp',          // * WhatsApp Financeiro — formato: (DD) NNNNN-NNNN
   'unidade_base',               // * Unidade Base — nome da unidade (FK: unidades_base)
+  'data_cadastro',              // * Data de Cadastro — formato: YYYY-MM-DD (obrigatório)
   'tipo_pessoa',                //   Tipo de pessoa: juridica | fisica (padrão: juridica)
   'area_atuacao',               //   Área de Atuação — nome da área (FK: areas_atuacao)
   'segmento',                   //   Segmento de mercado (FK: segmentos)
   'observacao_cliente',         //   Observações gerais sobre o cliente
+  'telefone_contato',           //   Telefone fixo/contato
+  'telefone_whatsapp_contato',  //   WhatsApp do contato (diferente do financeiro)
 
   // ── SEÇÃO 2: Endereço ─────────────────────────────────────────────────────
   'cep',                        //   CEP — formato: 00000-000
@@ -66,6 +69,8 @@ export const CLIENTE_IMPORT_HEADERS = [
 
   // ── SEÇÃO 6: Certificado Digital A1 (para calcular renovações e churn) ───
   'cert_a1_vencimento',         //   Data de vencimento do Certificado A1 — formato: YYYY-MM-DD
+  'cert_a1_ultima_venda_em',    //   Data da última venda do Cert A1 — formato: YYYY-MM-DD
+  'matriz_codigo_sequencial',   //   Código sequencial da empresa Matriz (número inteiro, ex: 42)
 ];
 
 // ── Linha de exemplo para o template ─────────────────────────────────────────
@@ -77,10 +82,13 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'contato@empresa.com',
   '(11) 99999-0000',
   'Sede',
+  '2024-01-10',
   'juridica',
   'Tecnologia',
   'Pequenas Empresas',
   'Cliente indicado por parceiro',
+  '(11) 3333-0000',
+  '(11) 98888-0000',
   // Endereço
   '01310-100',
   'SP',
@@ -120,6 +128,8 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   '',
   '',
   // Certificado A1
+  '',
+  '2024-06-01',
   '',
 ];
 
@@ -263,6 +273,7 @@ export const REQUIRED_FIELDS = [
   'email',
   'telefone_whatsapp',
   'unidade_base',
+  'data_cadastro',
   'data_venda',
   'produto',
   'recorrencia',
@@ -285,10 +296,13 @@ export const HEADER_LABELS: Record<string, string> = {
   email: 'E-mail',
   telefone_whatsapp: 'Tel. WhatsApp',
   unidade_base: 'Unidade Base',
+  data_cadastro: 'Data de Cadastro',
   tipo_pessoa: 'Tipo de Pessoa (juridica/fisica)',
   area_atuacao: 'Área de Atuação',
   segmento: 'Segmento',
   observacao_cliente: 'Observação do Cliente',
+  telefone_contato: 'Telefone Contato',
+  telefone_whatsapp_contato: 'WhatsApp do Contato',
   // Endereço
   cep: 'CEP',
   estado: 'Estado (UF)',
@@ -329,6 +343,8 @@ export const HEADER_LABELS: Record<string, string> = {
   observacao_cancelamento: 'Obs. do Cancelamento',
   // Certificado A1
   cert_a1_vencimento: 'Vencimento Cert. A1',
+  cert_a1_ultima_venda_em: 'Última Venda Cert. A1',
+  matriz_codigo_sequencial: 'Código da Matriz',
 };
 
 // ── Descrições de cada campo para exibir ao usuário no modal ─────────────────
@@ -339,10 +355,13 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   email:                      { section: 'Cliente', why: 'Canal principal de comunicação. Usado em notificações automáticas e relatórios.' },
   telefone_whatsapp:          { section: 'Cliente', why: 'Número vinculado ao WhatsApp financeiro. Habilita o atendimento via chat no sistema.' },
   unidade_base:               { section: 'Cliente', why: 'Define qual unidade da sua empresa atende este cliente. Essencial para segmentação de relatórios.' },
+  data_cadastro:              { section: 'Cliente', why: 'Data em que o cliente foi cadastrado. Obrigatória para calcular tempo de vida, cohort e relatórios históricos corretos.' },
   tipo_pessoa:                { section: 'Cliente', why: 'Define se é pessoa jurídica (CNPJ 14 dígitos) ou física (CPF 11 dígitos). Não obrigatório — o sistema detecta automaticamente pelo número de dígitos do campo CNPJ/CPF.' },
   area_atuacao:               { section: 'Cliente', why: 'Setor de mercado do cliente. Permite análises de MRR e churn por vertical.' },
   segmento:                   { section: 'Cliente', why: 'Classificação do porte ou tipo do cliente. Usado em análises de expansão e retenção.' },
   observacao_cliente:         { section: 'Cliente', why: 'Informações adicionais relevantes sobre o cliente.' },
+  telefone_contato:           { section: 'Cliente', why: 'Telefone fixo ou alternativo do cliente para contato direto.' },
+  telefone_whatsapp_contato:  { section: 'Cliente', why: 'WhatsApp do contato principal, diferente do WhatsApp financeiro. Usado para comunicações operacionais.' },
   cep:                        { section: 'Endereço', why: 'Localização do cliente. Útil para análises geográficas e emissão de documentos.' },
   estado:                     { section: 'Endereço', why: 'Estado do cliente. Sigla de 2 letras (ex: SP).' },
   cidade:                     { section: 'Endereço', why: 'Cidade do cliente para análises regionais.' },
@@ -378,4 +397,6 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   motivo_cancelamento:        { section: 'Cancelamento', why: 'Por que o cliente saiu. Dado crítico para ações de retenção e melhoria do produto.' },
   observacao_cancelamento:    { section: 'Cancelamento', why: 'Contexto adicional sobre o cancelamento.' },
   cert_a1_vencimento:         { section: 'Certificado A1', why: 'Data de vencimento do certificado digital. Permite alertas de renovação e evita churn por vencimento.' },
+  cert_a1_ultima_venda_em:    { section: 'Certificado A1', why: 'Data da última venda do certificado digital. Usado para calcular ciclo de renovação e projetar receita futura.' },
+  matriz_codigo_sequencial:   { section: 'Cliente', why: 'Código sequencial da empresa matriz. Vincula filiais à sua empresa-mãe para relatórios consolidados. Preencha com o número do Cód. Seq. da matriz (ex: 42).' },
 };
