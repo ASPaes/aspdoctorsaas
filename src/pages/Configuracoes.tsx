@@ -184,6 +184,26 @@ export default function Configuracoes() {
     },
   });
 
+  const bulkCustoFixo = useMutation({
+    mutationFn: async () => {
+      const valor = form.getValues("custo_fixo_percentual");
+      if (valor == null) throw new Error("Preencha o Custo Fixo antes de aplicar.");
+      const decimal = valor / 100;
+      const q = tid
+        ? supabase.from("clientes").update({ custo_fixo_percentual: decimal }).eq("tenant_id", tid)
+        : supabase.from("clientes").update({ custo_fixo_percentual: decimal });
+      const { error, count } = await q.select("id", { count: "exact", head: true });
+      if (error) throw error;
+      return count ?? 0;
+    },
+    onSuccess: (count) => {
+      toast({ title: "Base atualizada!", description: `Custo Fixo atualizado em ${count} clientes.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao atualizar base", description: err.message, variant: "destructive" });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
