@@ -253,9 +253,41 @@ export default function Configuracoes() {
                   <FormField control={form.control} name="custo_fixo_percentual" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Custo Fixo %</FormLabel>
-                      <FormControl>
-                        <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
-                      </FormControl>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
+                        </FormControl>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={bulkCustoFixo.isPending}>
+                                    {bulkCustoFixo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Atualizar toda a base?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Isso irá alterar o Custo Fixo de <strong>todos os clientes</strong> para <strong>{field.value?.toFixed(2).replace(".", ",")}%</strong>. Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => bulkCustoFixo.mutate()}>
+                                      Confirmar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Aplicar este percentual a todos os clientes</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <FormDescription>Ex: 8,00 para 8%</FormDescription>
                       <FormMessage />
                     </FormItem>
