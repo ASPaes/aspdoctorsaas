@@ -11,7 +11,24 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus, Upload, Users } from "lucide-react";
+import { Save, Loader2, Plus, Upload, Users, RefreshCw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
@@ -167,6 +184,24 @@ export default function Configuracoes() {
     },
   });
 
+  const bulkCustoFixo = useMutation({
+    mutationFn: async () => {
+      const valor = form.getValues("custo_fixo_percentual");
+      if (valor == null) throw new Error("Preencha o Custo Fixo antes de aplicar.");
+      const decimal = valor / 100;
+      let q = supabase.from("clientes").update({ custo_fixo_percentual: decimal }).not("id", "is", null);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { error } = await q;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Base atualizada!", description: `Custo Fixo aplicado a todos os clientes.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao atualizar base", description: err.message, variant: "destructive" });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -218,9 +253,41 @@ export default function Configuracoes() {
                   <FormField control={form.control} name="custo_fixo_percentual" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Custo Fixo %</FormLabel>
-                      <FormControl>
-                        <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
-                      </FormControl>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
+                        </FormControl>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={bulkCustoFixo.isPending}>
+                                    {bulkCustoFixo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Atualizar toda a base?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Isso irá alterar o Custo Fixo de <strong>todos os clientes</strong> para <strong>{field.value?.toFixed(2).replace(".", ",")}%</strong>. Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => bulkCustoFixo.mutate()}>
+                                      Confirmar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Aplicar este percentual a todos os clientes</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <FormDescription>Ex: 8,00 para 8%</FormDescription>
                       <FormMessage />
                     </FormItem>
