@@ -406,13 +406,32 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         }
         setRows(parsed);
       } else {
-        // Try auto-mapping by name similarity
+        // Try auto-mapping by name similarity with aliases
+        const COLUMN_ALIASES: Record<string, string[]> = {
+          estado:      ['uf', 'sigla', 'siglaestado', 'ufestado', 'estado'],
+          numero:      ['numerodoendereco', 'nro', 'num', 'numeroresidencia', 'numero'],
+          data_cadastro: ['datacadastro', 'datadecadastro', 'dtcadastro'],
+          data_venda:    ['datavenda', 'datadevendas', 'dtvenda'],
+          data_ativacao: ['dataativacao', 'datadeativacao', 'dtativacao'],
+          razao_social:  ['razaosocial', 'razao', 'razaosocialempresa'],
+          nome_fantasia: ['fantasia', 'nomefantasia'],
+          mensalidade:   ['mrr', 'mensalidade', 'valormensal', 'recorrente'],
+          custo_operacao:['custo', 'custooperacao', 'custooperacional'],
+          imposto_percentual: ['imposto', 'impostos', 'impostopercentual', 'aliquota'],
+          custo_fixo_percentual: ['custofixo', 'custofixopercentual', 'fixo'],
+          valor_ativacao: ['valorativacao', 'ativacao', 'valordeativacao'],
+          telefone_whatsapp: ['whatsapp', 'whatsappfinanceiro', 'telefonewhatsapp'],
+          telefone_contato: ['telefone', 'fone', 'telefonecontato'],
+          unidade_base: ['unidadebase', 'unidade'],
+          link_portal_fornecedor: ['linkfornecedor', 'link', 'linkportal', 'portal'],
+          codigo_fornecedor: ['idfornecedor', 'codigofornecedor', 'codigocliente'],
+        };
         const mapping: ColumnMapping = {};
         for (const sysCol of CLIENTE_IMPORT_HEADERS) {
           const normalized = normalizeForCompare(sysCol);
-          const match = headerLine.find(
-            (h) => normalizeForCompare(h) === normalized
-          );
+          const aliases = COLUMN_ALIASES[sysCol] ? [...COLUMN_ALIASES[sysCol]] : [normalized];
+          if (!aliases.includes(normalized)) aliases.push(normalized);
+          const match = headerLine.find(h => aliases.includes(normalizeForCompare(h)));
           mapping[sysCol] = match ?? "__unmapped__";
         }
         setColumnMapping(mapping);
@@ -589,51 +608,52 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       estadoRaw: string,
       cidadeRaw: string
     ): Promise<GeoResolved> => {
-      const cepDigits = (cepRaw ?? '').replace(/\D/g, '').padStart(0, '').slice(0, 8);
+      // Limpar CEP — aceita com ou sem máscara (33120483 ou 33120-483)
+      const cepDigits = (cepRaw ?? '').replace(/\D/g, '').slice(0, 8);
 
-      // Tentar cache primeiro
-      if (cepDigits.length === 8 && geoCache[cepDigits]) {
+      // Verificar cache
+      if (cepDigits.length === 8 && geoCache[cepDigits] !== undefined) {
         return geoCache[cepDigits];
       }
 
-      // CEP inválido — ir direto para fallback por UF + cidade do CSV
-      if (cepDigits.length !== 8) {
-        const estadoId = estadosPorSigla[(estadoRaw ?? '').trim().toUpperCase()] ?? null;
-        const cidadeNorm = normalizeForCompare(cidadeRaw ?? '');
-        const cidadeId = estadoId
-          ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
-          : (cidadesPorNome[cidadeNorm] ?? null);
-        return { estadoId, cidadeId };
-      }
-
-      // Tentar ViaCEP se CEP válido
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`, {
-          headers: { 'Accept': 'application/json' }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.erro) {
-            const estadoId = estadosPorSigla[data.uf?.toUpperCase()] ?? null;
-            const cidadeNorm = normalizeForCompare(data.localidade ?? '');
-            const cidadeId = estadoId
-              ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
-              : (cidadesPorNome[cidadeNorm] ?? null);
-            const result: GeoResolved = { estadoId, cidadeId };
-            geoCache[cepDigits] = result;
-            return result;
+      // Tentar ViaCEP se CEP tem 8 dígitos válidos
+      if (cepDigits.length === 8) {
+        try {
+          const res = await fetch(
+            `https://viacep.com.br/ws/${cepDigits}/json/`,
+            { headers: { Accept: 'application/json' } }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data && !data.erro && data.uf && data.localidade) {
+              const estadoId = estadosPorSigla[data.uf.toUpperCase()] ?? null;
+              const cidadeNorm = normalizeForCompare(data.localidade);
+              const cidadeId = estadoId
+                ? (cidadesPorChave[cidadeNorm + '_' + estadoId]
+                    ?? cidadesPorNome[cidadeNorm]
+                    ?? null)
+                : (cidadesPorNome[cidadeNorm] ?? null);
+              const result: GeoResolved = { estadoId, cidadeId };
+              geoCache[cepDigits] = result;
+              return result;
+            }
           }
+        } catch {
+          // ViaCEP indisponível — continuar para fallback
         }
-      } catch {
-        // ViaCEP falhou — continuar para fallback
       }
 
       // Fallback: usar UF e cidade informados no CSV
-      const estadoId = estadosPorSigla[(estadoRaw ?? '').trim().toUpperCase()] ?? null;
+      const ufNorm = (estadoRaw ?? '').trim().toUpperCase();
+      const estadoId = estadosPorSigla[ufNorm] ?? null;
       const cidadeNorm = normalizeForCompare(cidadeRaw ?? '');
-      const cidadeId = estadoId
-        ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
-        : (cidadesPorNome[cidadeNorm] ?? null);
+      const cidadeId = cidadeNorm
+        ? (estadoId
+            ? (cidadesPorChave[cidadeNorm + '_' + estadoId]
+                ?? cidadesPorNome[cidadeNorm]
+                ?? null)
+            : (cidadesPorNome[cidadeNorm] ?? null))
+        : null;
       const result: GeoResolved = { estadoId, cidadeId };
       if (cepDigits.length === 8) geoCache[cepDigits] = result;
       return result;
