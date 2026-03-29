@@ -136,12 +136,21 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
   if (values.imposto_percentual === null || values.imposto_percentual === undefined) missingFields.push("Imposto");
   if (values.custo_fixo_percentual === null || values.custo_fixo_percentual === undefined) missingFields.push("Custo Fixo");
 
-  if (missingFields.length === 0) return null;
+  if (missingFields.length === 0 && warningFields.length === 0) return null;
 
   return (
-    <p className="text-xs text-muted-foreground mt-1">
-      Campos obrigatórios pendentes: <span className="text-destructive font-medium">{missingFields.join(", ")}</span>
-    </p>
+    <div className="text-xs mt-1 space-y-0.5">
+      {missingFields.length > 0 && (
+        <p className="text-muted-foreground">
+          Campos obrigatórios pendentes: <span className="text-destructive font-medium">{missingFields.join(", ")}</span>
+        </p>
+      )}
+      {warningFields.length > 0 && (
+        <p className="text-muted-foreground">
+          Recomendado preencher: <span className="text-amber-600 dark:text-amber-400 font-medium">{warningFields.join(", ")}</span>
+        </p>
+      )}
+    </div>
   );
 }
 
