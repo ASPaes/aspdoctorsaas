@@ -581,16 +581,22 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="cidade_id" render={({ field }) => (
+        <FormField control={form.control} name="cidade_id" render={({ field }) => {
+          const cidadeValue = field.value?.toString() ?? "";
+          const cidadeInList = cidades.some(c => c.id.toString() === cidadeValue);
+          return (
           <FormItem>
             <FormLabel>Cidade</FormLabel>
             <Select
-              value={field.value?.toString() ?? ""}
+              value={cidadeValue}
               onValueChange={(v) => field.onChange(v ? Number(v) : null)}
               disabled={!form.watch("estado_id")}
             >
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione o estado primeiro..." /></SelectTrigger></FormControl>
               <SelectContent>
+                {cidadeValue && !cidadeInList && (
+                  <SelectItem value={cidadeValue} disabled>Carregando…</SelectItem>
+                )}
                 {cidades.map((c) => (
                   <SelectItem key={c.id} value={c.id.toString()}>{c.nome}</SelectItem>
                 ))}
@@ -598,7 +604,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             </Select>
             <FormMessage />
           </FormItem>
-        )} />
+          );
+        }} />
       </div>
 
       {/* Linha 2: Endereço (largo) | Número (curto) */}
