@@ -360,6 +360,8 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   area_atuacao:               { section: 'Cliente', why: 'Setor de mercado do cliente. Permite análises de MRR e churn por vertical.' },
   segmento:                   { section: 'Cliente', why: 'Classificação do porte ou tipo do cliente. Usado em análises de expansão e retenção.' },
   observacao_cliente:         { section: 'Cliente', why: 'Informações adicionais relevantes sobre o cliente.' },
+  telefone_contato:           { section: 'Cliente', why: 'Telefone fixo ou alternativo do cliente para contato direto.' },
+  telefone_whatsapp_contato:  { section: 'Cliente', why: 'WhatsApp do contato principal, diferente do WhatsApp financeiro. Usado para comunicações operacionais.' },
   cep:                        { section: 'Endereço', why: 'Localização do cliente. Útil para análises geográficas e emissão de documentos.' },
   estado:                     { section: 'Endereço', why: 'Estado do cliente. Sigla de 2 letras (ex: SP).' },
   cidade:                     { section: 'Endereço', why: 'Cidade do cliente para análises regionais.' },
