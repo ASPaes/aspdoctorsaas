@@ -3141,6 +3141,7 @@ export type Database = {
           meta_waba_id: string | null
           phone_number: string | null
           provider_type: string
+          skip_ura: boolean
           status: string
           tenant_id: string
           updated_at: string
@@ -3158,6 +3159,7 @@ export type Database = {
           meta_waba_id?: string | null
           phone_number?: string | null
           provider_type?: string
+          skip_ura?: boolean
           status?: string
           tenant_id: string
           updated_at?: string
@@ -3175,6 +3177,7 @@ export type Database = {
           meta_waba_id?: string | null
           phone_number?: string | null
           provider_type?: string
+          skip_ura?: boolean
           status?: string
           tenant_id?: string
           updated_at?: string
