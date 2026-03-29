@@ -189,15 +189,13 @@ export default function Configuracoes() {
       const valor = form.getValues("custo_fixo_percentual");
       if (valor == null) throw new Error("Preencha o Custo Fixo antes de aplicar.");
       const decimal = valor / 100;
-      const q = tid
-        ? supabase.from("clientes").update({ custo_fixo_percentual: decimal }).eq("tenant_id", tid)
-        : supabase.from("clientes").update({ custo_fixo_percentual: decimal });
-      const { error, count } = await q.select("id", { count: "exact", head: true });
+      let q = supabase.from("clientes").update({ custo_fixo_percentual: decimal }).not("id", "is", null);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { error } = await q;
       if (error) throw error;
-      return count ?? 0;
     },
-    onSuccess: (count) => {
-      toast({ title: "Base atualizada!", description: `Custo Fixo atualizado em ${count} clientes.` });
+    onSuccess: () => {
+      toast({ title: "Base atualizada!", description: `Custo Fixo aplicado a todos os clientes.` });
     },
     onError: (err: any) => {
       toast({ title: "Erro ao atualizar base", description: err.message, variant: "destructive" });
