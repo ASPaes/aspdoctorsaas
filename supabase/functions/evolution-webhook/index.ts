@@ -445,7 +445,8 @@ async function findOrCreateConversation(
   supabase: any,
   instanceId: string,
   contactId: string,
-  tenantId: string
+  tenantId: string,
+  isFromMe: boolean = false
 ): Promise<string | null> {
   try {
     // Search by tenant_id + instance_id + contact_id (per-instance conversation)
@@ -482,12 +483,14 @@ async function findOrCreateConversation(
     // Resolve department before creating
     const departmentId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
 
+    const initialStatus = isFromMe ? 'closed' : 'active';
+
     const { data: newConversation, error: createError } = await supabase
       .from('whatsapp_conversations')
       .insert({
         instance_id: instanceId,
         contact_id: contactId,
-        status: 'active',
+        status: initialStatus,
         tenant_id: tenantId,
         ...(departmentId ? { department_id: departmentId } : {}),
       })
