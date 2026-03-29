@@ -589,33 +589,43 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       estadoRaw: string,
       cidadeRaw: string
     ): Promise<GeoResolved> => {
-      const cepDigits = cepRaw.replace(/\D/g, '');
+      const cepDigits = (cepRaw ?? '').replace(/\D/g, '').padStart(0, '').slice(0, 8);
 
       // Tentar cache primeiro
       if (cepDigits.length === 8 && geoCache[cepDigits]) {
         return geoCache[cepDigits];
       }
 
+      // CEP inválido — ir direto para fallback por UF + cidade do CSV
+      if (cepDigits.length !== 8) {
+        const estadoId = estadosPorSigla[(estadoRaw ?? '').trim().toUpperCase()] ?? null;
+        const cidadeNorm = normalizeForCompare(cidadeRaw ?? '');
+        const cidadeId = estadoId
+          ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
+          : (cidadesPorNome[cidadeNorm] ?? null);
+        return { estadoId, cidadeId };
+      }
+
       // Tentar ViaCEP se CEP válido
-      if (cepDigits.length === 8) {
-        try {
-          const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
-          if (res.ok) {
-            const data = await res.json();
-            if (!data.erro) {
-              const estadoId = estadosPorSigla[data.uf?.toUpperCase()] ?? null;
-              const cidadeNorm = normalizeForCompare(data.localidade ?? '');
-              const cidadeId = estadoId
-                ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
-                : (cidadesPorNome[cidadeNorm] ?? null);
-              const result: GeoResolved = { estadoId, cidadeId };
-              geoCache[cepDigits] = result;
-              return result;
-            }
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.erro) {
+            const estadoId = estadosPorSigla[data.uf?.toUpperCase()] ?? null;
+            const cidadeNorm = normalizeForCompare(data.localidade ?? '');
+            const cidadeId = estadoId
+              ? (cidadesPorChave[cidadeNorm + '_' + estadoId] ?? cidadesPorNome[cidadeNorm] ?? null)
+              : (cidadesPorNome[cidadeNorm] ?? null);
+            const result: GeoResolved = { estadoId, cidadeId };
+            geoCache[cepDigits] = result;
+            return result;
           }
-        } catch {
-          // ViaCEP falhou — continuar para fallback
         }
+      } catch {
+        // ViaCEP falhou — continuar para fallback
       }
 
       // Fallback: usar UF e cidade informados no CSV
