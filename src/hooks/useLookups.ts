@@ -29,6 +29,7 @@ export function useLookups(estadoId?: number | null) {
       return data;
     },
     enabled: !!estadoId,
+    placeholderData: (prev) => prev,
   });
 
   const areasAtuacao = useQuery({
