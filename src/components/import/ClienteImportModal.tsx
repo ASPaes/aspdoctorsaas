@@ -128,8 +128,67 @@ function toNullableDate(v: string | undefined): string | null {
   return v.trim();
 }
 
+// Normaliza removendo acentos, maiúsculas e caracteres especiais
 function normalizeForCompare(s: string): string {
-  return s.toLowerCase().replace(/[_\s-]/g, "");
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '');
+}
+
+// Tokens com 3+ chars para matching semântico principal
+function _tokens(s: string): string[] {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,'').trim()
+    .split(/\s+/).filter(t => t.length >= 3);
+}
+
+// Todos os tokens incluindo curtos (para detectar conflitos tipo "A" vs "B")
+function _allToks(s: string): string[] {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,'').trim()
+    .split(/\s+/).filter(t => t.length >= 1);
+}
+
+/**
+ * Comparação aproximada entre valor do CSV e nome cadastrado no banco.
+ * Resolve: acentos, case, contenção parcial, palavras em ordem diferente.
+ */
+function isFuzzyMatch(csv: string, banco: string): boolean {
+  const na = normalizeForCompare(csv);
+  const nb = normalizeForCompare(banco);
+  if (!na || !nb) return false;
+
+  // 1. Exato normalizado compacto
+  if (na === nb) return true;
+
+  // 2. Contenção compacta total (um contém o outro inteiro)
+  if (na.includes(nb) || nb.includes(na)) return true;
+
+  const tc = _tokens(csv);
+  const tb = _tokens(banco);
+  const ac = _allToks(csv);
+  const ab = _allToks(banco);
+
+  // 3. CSV com 1 palavra original: token deve aparecer em algum token do banco
+  if (ac.length === 1 && tc.length === 1) {
+    return tb.some(t => t.includes(tc[0]) || tc[0].includes(t));
+  }
+
+  // 4. CSV com múltiplas palavras
+  if (ac.length > 1 && tc.length > 0 && tb.length > 0) {
+    if (!tc.every(c => tb.some(b => b.includes(c) || c.includes(b)))) return false;
+    const bSM = tb.filter(b => !tc.some(c => b.includes(c) || c.includes(b)));
+    const cSM = tc.filter(c => !tb.some(b => b.includes(c) || c.includes(b)));
+    if (bSM.length > 0 && cSM.length > 0) return false;
+    const sc = ac.filter(t => t.length <= 2);
+    const sb = ab.filter(t => t.length <= 2);
+    if (sc.length > 0 && sb.length > 0 && !sc.some(x => sb.includes(x))) return false;
+    return true;
+  }
+
+  return false;
 }
 
 function validateRow(values: Record<string, string>): string[] {
@@ -426,14 +485,18 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     }
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fkValueStatus = useCallback(
-    (csvColumn: string, value: string): boolean => {
+  // Retorna o registro encontrado no banco para um valor do CSV (fuzzy)
+  const fkFindMatch = useCallback(
+    (csvColumn: string, value: string): { id: number | string; nome: string } | undefined => {
       const existing = fkData[csvColumn] ?? [];
-      return existing.some(
-        (e) => normalizeForCompare(e.nome) === normalizeForCompare(value)
-      );
+      return existing.find(e => isFuzzyMatch(value, e.nome));
     },
     [fkData]
+  );
+
+  const fkValueStatus = useCallback(
+    (csvColumn: string, value: string): boolean => !!fkFindMatch(csvColumn, value),
+    [fkFindMatch]
   );
 
   /* ---------- Step 4: Import (core logic) ---------- */
@@ -514,32 +577,33 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     // --- Resolve FK IDs (with auto-create) ---
     const fkResolvedMaps: Record<string, Record<string, number | string>> = {};
-
     for (const fk of activeFkFields) {
       const existing = fkData[fk.csvColumn] ?? [];
-      const map: Record<string, number | string> = {};
-      for (const e of existing) {
-        map[normalizeForCompare(e.nome)] = e.id;
-      }
-
       const uniqueVals = fkUniqueValues[fk.csvColumn] ?? [];
+      const map: Record<string, number | string> = {};
+
       for (const val of uniqueVals) {
-        const key = normalizeForCompare(val);
-        if (!map[key] && fkAutoCreate[fk.csvColumn]) {
+        // Busca fuzzy: encontra o registro mais próximo no banco
+        const found = existing.find(e => isFuzzyMatch(val, e.nome));
+        if (found) {
+          map[normalizeForCompare(val)] = found.id;
+          continue;
+        }
+        // Não encontrado — auto-criar se switch ligado
+        if (fkAutoCreate[fk.csvColumn]) {
           const insertPayload: any = { [fk.searchField]: val.trim() };
           if (fk.tenantScoped) insertPayload.tenant_id = tenantId;
           const { data: created, error: createErr } = await supabase
             .from(fk.table as any)
             .insert(insertPayload)
-            .select("id")
+            .select('id')
             .single();
           if (created && !createErr) {
-            map[key] = (created as any).id;
+            map[normalizeForCompare(val)] = (created as any).id;
             autoCreated[fk.label] = (autoCreated[fk.label] ?? 0) + 1;
           }
         }
       }
-
       fkResolvedMaps[fk.csvColumn] = map;
     }
 
@@ -985,30 +1049,31 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {uniqueVals.map((val) => {
-                            const exists = fkValueStatus(fk.csvColumn, val);
+                            const match = fkFindMatch(fk.csvColumn, val);
+                            const exists = !!match;
+                            const isExact = exists && normalizeForCompare(match!.nome) === normalizeForCompare(val);
+                            const isFuzzy = exists && !isExact;
                             return (
                               <TooltipProvider key={val}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
-                                        exists
-                                          ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-                                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
-                                      )}
-                                    >
-                                      {exists ? (
-                                        <CheckCircle2 className="w-3 h-3" />
-                                      ) : (
-                                        <XCircle className="w-3 h-3" />
-                                      )}
+                                    <span className={cn(
+                                      "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full cursor-default",
+                                      isExact ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
+                                      isFuzzy ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
+                                                "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                                    )}>
+                                      {isExact  ? <CheckCircle2 className="w-3 h-3" /> :
+                                       isFuzzy  ? <AlertTriangle className="w-3 h-3" /> :
+                                                  <XCircle className="w-3 h-3" />}
                                       {val}
                                     </span>
                                   </TooltipTrigger>
                                   <TooltipContent side="top">
                                     <p className="text-xs">
-                                      {exists ? "Encontrado no cadastro" : "Não encontrado"}
+                                      {isExact  ? "Encontrado no cadastro" :
+                                       isFuzzy  ? `Será vinculado como: "${match!.nome}"` :
+                                                  "Não encontrado — será ignorado ou auto-cadastrado"}
                                     </p>
                                   </TooltipContent>
                                 </Tooltip>
