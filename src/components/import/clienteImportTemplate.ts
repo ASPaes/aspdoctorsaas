@@ -17,6 +17,7 @@ export const CLIENTE_IMPORT_HEADERS = [
   'email',                      // * E-mail principal do cliente
   'telefone_whatsapp',          // * WhatsApp Financeiro — formato: (DD) NNNNN-NNNN
   'unidade_base',               // * Unidade Base — nome da unidade (FK: unidades_base)
+  'data_cadastro',              // * Data de Cadastro — formato: YYYY-MM-DD (obrigatório)
   'tipo_pessoa',                //   Tipo de pessoa: juridica | fisica (padrão: juridica)
   'area_atuacao',               //   Área de Atuação — nome da área (FK: areas_atuacao)
   'segmento',                   //   Segmento de mercado (FK: segmentos)
@@ -66,6 +67,8 @@ export const CLIENTE_IMPORT_HEADERS = [
 
   // ── SEÇÃO 6: Certificado Digital A1 (para calcular renovações e churn) ───
   'cert_a1_vencimento',         //   Data de vencimento do Certificado A1 — formato: YYYY-MM-DD
+  'cert_a1_ultima_venda_em',    //   Data da última venda do Cert A1 — formato: YYYY-MM-DD
+  'matriz_codigo_sequencial',   //   Código sequencial da empresa Matriz (número inteiro, ex: 42)
 ];
 
 // ── Linha de exemplo para o template ─────────────────────────────────────────
@@ -77,10 +80,13 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   'contato@empresa.com',
   '(11) 99999-0000',
   'Sede',
+  '2024-01-10',
   'juridica',
   'Tecnologia',
   'Pequenas Empresas',
   'Cliente indicado por parceiro',
+  '(11) 3333-0000',
+  '(11) 98888-0000',
   // Endereço
   '01310-100',
   'SP',
