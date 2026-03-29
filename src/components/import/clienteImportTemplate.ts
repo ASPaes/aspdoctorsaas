@@ -129,6 +129,8 @@ export const CLIENTE_IMPORT_EXAMPLE_ROW = [
   '',
   // Certificado A1
   '',
+  '2024-06-01',
+  '',
 ];
 
 // ── Gera conteúdo CSV do template ─────────────────────────────────────────────
@@ -271,6 +273,7 @@ export const REQUIRED_FIELDS = [
   'email',
   'telefone_whatsapp',
   'unidade_base',
+  'data_cadastro',
   'data_venda',
   'produto',
   'recorrencia',
@@ -293,10 +296,13 @@ export const HEADER_LABELS: Record<string, string> = {
   email: 'E-mail',
   telefone_whatsapp: 'Tel. WhatsApp',
   unidade_base: 'Unidade Base',
+  data_cadastro: 'Data de Cadastro',
   tipo_pessoa: 'Tipo de Pessoa (juridica/fisica)',
   area_atuacao: 'Área de Atuação',
   segmento: 'Segmento',
   observacao_cliente: 'Observação do Cliente',
+  telefone_contato: 'Telefone Contato',
+  telefone_whatsapp_contato: 'WhatsApp do Contato',
   // Endereço
   cep: 'CEP',
   estado: 'Estado (UF)',
@@ -337,6 +343,8 @@ export const HEADER_LABELS: Record<string, string> = {
   observacao_cancelamento: 'Obs. do Cancelamento',
   // Certificado A1
   cert_a1_vencimento: 'Vencimento Cert. A1',
+  cert_a1_ultima_venda_em: 'Última Venda Cert. A1',
+  matriz_codigo_sequencial: 'Código da Matriz',
 };
 
 // ── Descrições de cada campo para exibir ao usuário no modal ─────────────────
@@ -386,4 +394,6 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   motivo_cancelamento:        { section: 'Cancelamento', why: 'Por que o cliente saiu. Dado crítico para ações de retenção e melhoria do produto.' },
   observacao_cancelamento:    { section: 'Cancelamento', why: 'Contexto adicional sobre o cancelamento.' },
   cert_a1_vencimento:         { section: 'Certificado A1', why: 'Data de vencimento do certificado digital. Permite alertas de renovação e evita churn por vencimento.' },
+  cert_a1_ultima_venda_em:    { section: 'Certificado A1', why: 'Data da última venda do certificado digital. Usado para calcular ciclo de renovação e projetar receita futura.' },
+  matriz_codigo_sequencial:   { section: 'Cliente', why: 'Código sequencial da empresa matriz. Vincula filiais à sua empresa-mãe para relatórios consolidados. Preencha com o número do Cód. Seq. da matriz (ex: 42).' },
 };
