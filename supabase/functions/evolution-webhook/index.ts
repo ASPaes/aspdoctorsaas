@@ -69,6 +69,22 @@ function getPayloadIsFromMe(data: any): boolean {
   );
 }
 
+/**
+ * Verifica se a conversa tem apenas mensagens outbound (sem resposta do cliente).
+ * Usado para identificar conversas de cobrança/N8N sem interação do cliente.
+ */
+async function isOutboundOnlyConversation(
+  supabase: any,
+  conversationId: string
+): Promise<boolean> {
+  const { count } = await supabase
+    .from('whatsapp_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .eq('is_from_me', false);
+  return (count ?? 0) === 0;
+}
+
 function getMessageContent(message: any, type: string): string {
   if (message.conversation) return message.conversation;
   if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
