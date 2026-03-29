@@ -60,7 +60,7 @@ const clienteSchema = z.object({
   modelo_contrato_id: z.number().nullable().refine(v => v !== null, { message: "Modelo de Contrato obrigatório" }),
   observacao_cliente: z.string().nullable(),
   data_venda: z.string().nullable().refine(v => !!v, { message: "Data da Venda obrigatória" }),
-  funcionario_id: z.number().nullable().refine(v => v !== null, { message: "Funcionário obrigatório" }),
+  funcionario_id: z.number().nullable(),
   origem_venda_id: z.number().nullable().refine(v => v !== null, { message: "Origem da Venda obrigatória" }),
   recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
   produto_id: z.number().nullable().refine(v => v !== null, { message: "Produto obrigatório" }),
@@ -69,10 +69,10 @@ const clienteSchema = z.object({
   fornecedor_id: z.number().nullable().refine(v => v !== null, { message: "Fornecedor obrigatório" }),
   codigo_fornecedor: z.string().nullable(),
   link_portal_fornecedor: z.string().nullable(),
-  valor_ativacao: z.number({ invalid_type_error: "Valor Ativação obrigatório" }).min(0, "Deve ser >= 0"),
-  forma_pagamento_ativacao_id: z.number().nullable().refine(v => v !== null, { message: "Forma Pgto Ativação obrigatória" }),
+  valor_ativacao: z.number().nullable(),
+  forma_pagamento_ativacao_id: z.number().nullable(),
   mensalidade: z.number({ invalid_type_error: "Mensalidade obrigatória" }).min(0, "Deve ser >= 0"),
-  forma_pagamento_mensalidade_id: z.number().nullable().refine(v => v !== null, { message: "Forma Pgto Mensalidade obrigatória" }),
+  forma_pagamento_mensalidade_id: z.number().nullable(),
   custo_operacao: z.number({ invalid_type_error: "Custo Operação obrigatório" }).min(0, "Deve ser >= 0"),
   imposto_percentual: z.number({ invalid_type_error: "Imposto obrigatório" }).min(0).max(100),
   custo_fixo_percentual: z.number({ invalid_type_error: "Custo Fixo obrigatório" }).min(0).max(100),
@@ -108,33 +108,30 @@ function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValue
     email: "E-mail",
     telefone_whatsapp: "WhatsApp Financeiro",
     data_venda: "Data Venda",
-    funcionario_id: "Funcionário",
     origem_venda_id: "Origem",
     recorrencia: "Recorrência",
     produto_id: "Produto",
     fornecedor_id: "Fornecedor",
     modelo_contrato_id: "Modelo Contrato",
-    forma_pagamento_ativacao_id: "Forma Pgto Ativação",
-    forma_pagamento_mensalidade_id: "Forma Pgto Mensalidade",
   };
 
   const missingFields: string[] = [];
+  const warningFields: string[] = [];
 
   // Check required fields
   if (!values.cnpj || (values.cnpj.replace(/\D/g, "").length !== 11 && values.cnpj.replace(/\D/g, "").length < 14)) missingFields.push(fieldLabels.cnpj);
   if (!values.email) missingFields.push(fieldLabels.email);
   if (!values.telefone_whatsapp || !isValidBRPhone(normalizeBRPhone(values.telefone_whatsapp))) missingFields.push(fieldLabels.telefone_whatsapp);
   if (!values.data_venda) missingFields.push(fieldLabels.data_venda);
-  if (!values.funcionario_id) missingFields.push(fieldLabels.funcionario_id);
   if (!values.origem_venda_id) missingFields.push(fieldLabels.origem_venda_id);
   if (!values.recorrencia) missingFields.push(fieldLabels.recorrencia);
   if (!values.produto_id) missingFields.push(fieldLabels.produto_id);
   if (!values.fornecedor_id) missingFields.push(fieldLabels.fornecedor_id);
   if (!values.modelo_contrato_id) missingFields.push(fieldLabels.modelo_contrato_id);
-  if (!values.forma_pagamento_ativacao_id) missingFields.push(fieldLabels.forma_pagamento_ativacao_id);
-  if (!values.forma_pagamento_mensalidade_id) missingFields.push(fieldLabels.forma_pagamento_mensalidade_id);
-  if (values.valor_ativacao === null || values.valor_ativacao === undefined) missingFields.push("Valor Ativação");
   if (values.mensalidade === null || values.mensalidade === undefined) missingFields.push("Mensalidade");
+
+  // Warning fields (not required but recommended)
+  if (values.valor_ativacao === null || values.valor_ativacao === undefined) warningFields.push("Valor Ativação");
   if (values.custo_operacao === null || values.custo_operacao === undefined) missingFields.push("Custo Operação");
   if (values.imposto_percentual === null || values.imposto_percentual === undefined) missingFields.push("Imposto");
   if (values.custo_fixo_percentual === null || values.custo_fixo_percentual === undefined) missingFields.push("Custo Fixo");
