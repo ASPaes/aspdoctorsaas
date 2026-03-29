@@ -572,70 +572,60 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       return;
     }
 
-    // --- Resolve estado e cidade via CEP (ViaCEP) + fallback por nome ---
-    // Passo 1: carregar todos os estados do banco (leve, 27 registros)
+    // --- Resolve estado e cidade ---
+    // Estratégia: CEP → ViaCEP → estado_id + cidade_id
+    // Fallback: UF do CSV → estado_id, cidade do CSV → cidade_id
+
+    // 1. Carregar estados (27 registros)
     const { data: estadosData } = await supabase
       .from('estados')
-      .select('id, sigla, nome');
+      .select('id, sigla');
     const estadosPorSigla: Record<string, number> = {};
     for (const e of estadosData ?? []) {
       estadosPorSigla[e.sigla.toUpperCase()] = e.id;
     }
 
-    // Passo 2: carregar todas as cidades do banco (necessário para lookup)
+    // 2. Carregar cidades (índice duplo: com estado e sem estado)
     const { data: cidadesData } = await supabase
       .from('cidades')
       .select('id, nome, estado_id')
       .limit(10000);
-
-    // Índice de cidades: chave = nome_normalizado + '_' + estado_id
-    // e também só por nome (fallback)
-    const cidadesPorChave: Record<string, number> = {};
-    const cidadesPorNome: Record<string, number> = {};
+    const cidadeComEstado: Record<string, number> = {};  // "nomenorm_estadoId" → id
+    const cidadeSoNome: Record<string, number> = {};     // "nomenorm" → id (primeiro encontrado)
     for (const c of cidadesData ?? []) {
-      const nNorm = normalizeForCompare(c.nome);
-      cidadesPorChave[nNorm + '_' + c.estado_id] = c.id;
-      if (!cidadesPorNome[nNorm]) cidadesPorNome[nNorm] = c.id;
+      const n = normalizeForCompare(c.nome);
+      cidadeComEstado[n + '_' + c.estado_id] = c.id;
+      if (!cidadeSoNome[n]) cidadeSoNome[n] = c.id;
     }
 
-    // Passo 3: para cada linha, resolver estado_id e cidade_id
-    // Prioridade: CEP (ViaCEP) → UF+cidade do CSV → só cidade do CSV
-    type GeoResolved = { estadoId: number | null; cidadeId: number | null };
-    const geoCache: Record<string, GeoResolved> = {}; // cache por CEP limpo
+    // 3. Função que resolve estado_id + cidade_id para uma linha do CSV
+    const resolveGeo = async (row: ParsedRow): Promise<{ estadoId: number | null; cidadeId: number | null }> => {
+      const cepDigits = (row.values.cep ?? '').replace(/\D/g, '').slice(0, 8);
+      const ufCSV = (row.values.estado ?? '').trim().toUpperCase();
+      const cidadeCSV = normalizeForCompare(row.values.cidade ?? '');
 
-    const resolveGeo = async (
-      cepRaw: string,
-      estadoRaw: string,
-      cidadeRaw: string
-    ): Promise<GeoResolved> => {
-      // Limpar CEP — aceita com ou sem máscara (33120483 ou 33120-483)
-      const cepDigits = (cepRaw ?? '').replace(/\D/g, '').slice(0, 8);
+      let estadoId: number | null = null;
+      let cidadeId: number | null = null;
 
-      // Verificar cache
-      if (cepDigits.length === 8 && geoCache[cepDigits] !== undefined) {
-        return geoCache[cepDigits];
-      }
-
-      // Tentar ViaCEP se CEP tem 8 dígitos válidos
+      // Tentar ViaCEP se CEP tem exatamente 8 dígitos
       if (cepDigits.length === 8) {
         try {
-          const res = await fetch(
-            `https://viacep.com.br/ws/${cepDigits}/json/`,
-            { headers: { Accept: 'application/json' } }
-          );
+          const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
           if (res.ok) {
             const data = await res.json();
-            if (data && !data.erro && data.uf && data.localidade) {
-              const estadoId = estadosPorSigla[data.uf.toUpperCase()] ?? null;
-              const cidadeNorm = normalizeForCompare(data.localidade);
-              const cidadeId = estadoId
-                ? (cidadesPorChave[cidadeNorm + '_' + estadoId]
-                    ?? cidadesPorNome[cidadeNorm]
-                    ?? null)
-                : (cidadesPorNome[cidadeNorm] ?? null);
-              const result: GeoResolved = { estadoId, cidadeId };
-              geoCache[cepDigits] = result;
-              return result;
+            if (data && !data.erro) {
+              const ufAPI = (data.uf ?? '').toUpperCase();
+              const localidadeNorm = normalizeForCompare(data.localidade ?? '');
+              estadoId = estadosPorSigla[ufAPI] ?? null;
+              if (estadoId) {
+                cidadeId = cidadeComEstado[localidadeNorm + '_' + estadoId]
+                  ?? cidadeSoNome[localidadeNorm]
+                  ?? null;
+              } else {
+                cidadeId = cidadeSoNome[localidadeNorm] ?? null;
+              }
+              // Retornar imediatamente se resolveu cidade
+              if (cidadeId) return { estadoId, cidadeId };
             }
           }
         } catch {
@@ -643,34 +633,26 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         }
       }
 
-      // Fallback: usar UF e cidade informados no CSV
-      const ufNorm = (estadoRaw ?? '').trim().toUpperCase();
-      const estadoId = estadosPorSigla[ufNorm] ?? null;
-      const cidadeNorm = normalizeForCompare(cidadeRaw ?? '');
-      const cidadeId = cidadeNorm
-        ? (estadoId
-            ? (cidadesPorChave[cidadeNorm + '_' + estadoId]
-                ?? cidadesPorNome[cidadeNorm]
-                ?? null)
-            : (cidadesPorNome[cidadeNorm] ?? null))
-        : null;
-      const result: GeoResolved = { estadoId, cidadeId };
-      if (cepDigits.length === 8) geoCache[cepDigits] = result;
-      return result;
+      // Fallback: usar UF + cidade diretamente do CSV
+      if (!estadoId && ufCSV) {
+        estadoId = estadosPorSigla[ufCSV] ?? null;
+      }
+      if (!cidadeId && cidadeCSV) {
+        cidadeId = estadoId
+          ? (cidadeComEstado[cidadeCSV + '_' + estadoId] ?? cidadeSoNome[cidadeCSV] ?? null)
+          : (cidadeSoNome[cidadeCSV] ?? null);
+      }
+
+      return { estadoId, cidadeId };
     };
 
-    // Pré-resolver geo para todas as linhas em paralelo (máximo 10 simultâneos)
-    const geoResults: GeoResolved[] = new Array(rowsToImport.length).fill({ estadoId: null, cidadeId: null });
-    const BATCH_GEO = 10;
-    for (let i = 0; i < rowsToImport.length; i += BATCH_GEO) {
-      const slice = rowsToImport.slice(i, i + BATCH_GEO);
-      const resolved = await Promise.all(
-        slice.map(r => resolveGeo(
-          r.values.cep ?? '',
-          r.values.estado ?? '',
-          r.values.cidade ?? ''
-        ))
-      );
+    // 4. Resolver geo para todas as linhas em paralelo (máx 5 simultâneos)
+    const geoResults: { estadoId: number | null; cidadeId: number | null }[] =
+      new Array(rowsToImport.length).fill({ estadoId: null, cidadeId: null });
+    const GEO_BATCH = 5;
+    for (let i = 0; i < rowsToImport.length; i += GEO_BATCH) {
+      const slice = rowsToImport.slice(i, i + GEO_BATCH);
+      const resolved = await Promise.all(slice.map(row => resolveGeo(row)));
       for (let j = 0; j < resolved.length; j++) {
         geoResults[i + j] = resolved[j];
       }
@@ -753,9 +735,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           return typeof id === "number" ? id : id ? Number(id) : null;
         };
 
-        const _geoIdx = b * BATCH_SIZE + batches[b].indexOf(r);
-        const estadoId = geoResults[_geoIdx]?.estadoId ?? null;
-        const cidadeId = geoResults[_geoIdx]?.cidadeId ?? null;
+        const _rowGlobalIdx = b * BATCH_SIZE + batches[b].indexOf(r);
+        const estadoId = geoResults[_rowGlobalIdx]?.estadoId ?? null;
+        const cidadeId = geoResults[_rowGlobalIdx]?.cidadeId ?? null;
 
         const safePhone = (val: string | undefined): string | null => {
           if (!val || val.trim() === "") return null;
