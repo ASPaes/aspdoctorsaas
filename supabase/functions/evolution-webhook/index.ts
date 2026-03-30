@@ -325,6 +325,33 @@ async function findOrCreateContact(
       .single();
 
     if (error) {
+      // Handle duplicate key — contact exists with different instance_id
+      if (error.code === '23505') {
+        console.log('[evolution-webhook] Contact duplicate detected, retrying lookup with instance_id...');
+        const { data: retryContact } = await supabase
+          .from('whatsapp_contacts')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('instance_id', instanceId)
+          .eq('phone_number', phoneNumber)
+          .maybeSingle();
+        if (retryContact) {
+          console.log(`[evolution-webhook] Found contact on retry: ${retryContact.id}`);
+          return retryContact.id;
+        }
+        // Also try without instance_id filter (cross-instance)
+        const { data: crossContact } = await supabase
+          .from('whatsapp_contacts')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .in('phone_number', [phoneNumber])
+          .limit(1)
+          .maybeSingle();
+        if (crossContact) {
+          console.log(`[evolution-webhook] Found cross-instance contact on retry: ${crossContact.id}`);
+          return crossContact.id;
+        }
+      }
       console.error('[evolution-webhook] Error creating contact:', error);
       return null;
     }
