@@ -142,7 +142,7 @@ export default function CadastrosTab() {
         </Button>
       </div>
 
-      <Tabs defaultValue="funcionarios">
+      <Tabs defaultValue="setores">
         <TabsList className="flex-wrap h-auto gap-1">
           {tabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
