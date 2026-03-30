@@ -85,6 +85,8 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     },
   });
 
+  const [saveAndNew, setSaveAndNew] = useState(false);
+
   const saveMutation = useMutation({
     mutationFn: async (payload: Record<string, any>) => {
       if (editingRow) {
@@ -98,9 +100,21 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     onSuccess: async () => {
       await refreshDependentQueries();
       toast({ title: editingRow ? "Atualizado!" : "Criado!", description: "Registro salvo com sucesso." });
-      closeDialog();
+      if (saveAndNew && !editingRow) {
+        // Reset form for a new record
+        const defaults: Record<string, any> = {};
+        columns.forEach((c) => {
+          defaults[c.key] = c.type === "boolean" ? true : "";
+        });
+        setFormData(defaults);
+        setEditingRow(null);
+        setSaveAndNew(false);
+      } else {
+        closeDialog();
+      }
     },
     onError: (err: any) => {
+      setSaveAndNew(false);
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     },
   });
