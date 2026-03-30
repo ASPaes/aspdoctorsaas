@@ -47,6 +47,15 @@ export default function CadastrosTab() {
 
   const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void> }[] = [
     {
+      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", orderBy: "name",
+      columns: [
+        { key: "name", label: "Nome" },
+        { key: "slug", label: "Slug" },
+        { key: "description", label: "Descrição" },
+        { key: "is_active", label: "Ativo", type: "boolean" },
+      ],
+    },
+    {
       value: "funcionarios", label: "Funcionários", table: "funcionarios", queryKey: "crud_funcionarios", orderBy: "nome",
       selectQuery: "*, support_departments:department_id(name)",
       onBeforeSave: validateFuncionario,
