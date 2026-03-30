@@ -60,11 +60,11 @@ serve(async (req) => {
     if (!aiConfig) {
       return new Response(
         JSON.stringify({
-          error: "ai_not_configured",
-          message: "Nenhuma IA configurada. Acesse Configurações > Inteligência Artificial.",
+          ok: true,
           suggestions: defaultSuggestions,
+          context: { contactName: (convData.contact as any)?.name || "Cliente", lastMessage: "" },
         }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
