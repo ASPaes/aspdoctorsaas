@@ -18,21 +18,46 @@ async function ensureWebhookConfigured(
   try {
     const headers = getEvolutionAuthHeaders(apiKey);
 
-    // Verificar webhook atual
+    const requiredEvents = [
+      'APPLICATION_STARTUP',
+      'MESSAGES_UPSERT',
+      'MESSAGES_UPDATE',
+      'MESSAGES_DELETE',
+      'SEND_MESSAGE',
+      'CONNECTION_UPDATE',
+    ];
+
+    // Verificar webhook atual (URL + habilitado + eventos obrigatórios)
     const checkResp = await fetch(`${apiUrl}/webhook/find/${instanceName}`, { headers });
     if (checkResp.ok) {
       const current = await checkResp.json();
       const currentUrl = current?.url || current?.webhook?.url || '';
       const currentEnabled = current?.enabled ?? current?.webhook?.enabled ?? false;
-      if (currentEnabled && currentUrl === webhookUrl) {
+      const currentByEvents = current?.webhookByEvents ?? current?.webhook_by_events ?? current?.webhook?.webhookByEvents ?? false;
+
+      const rawEvents = current?.events
+        || current?.event
+        || current?.webhook?.events
+        || current?.webhook?.event
+        || [];
+
+      const configuredEvents = (Array.isArray(rawEvents) ? rawEvents : [rawEvents])
+        .map((ev: any) => String(typeof ev === 'object' ? (ev?.event || ev?.name || '') : ev).toUpperCase().trim())
+        .filter(Boolean);
+
+      const hasAllRequiredEvents = requiredEvents.every((ev) => configuredEvents.includes(ev));
+
+      if (currentEnabled && currentUrl === webhookUrl && currentByEvents === false && hasAllRequiredEvents) {
         console.log(`[webhook-check] ${instanceName}: webhook OK`);
         return { ok: true, action: 'noop' };
       }
+
+      console.log(`[webhook-check] ${instanceName}: webhook incompleto (enabled=${currentEnabled} byEvents=${currentByEvents} hasAllEvents=${hasAllRequiredEvents}), reconfigurando...`);
     }
 
-    // Reconfigurar webhook
+    // Reconfigurar webhook (payload principal)
     console.log(`[webhook-check] ${instanceName}: reconfigurando webhook...`);
-    const setResp = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
+    let setResp = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -40,16 +65,32 @@ async function ensureWebhookConfigured(
         enabled: true,
         webhookByEvents: false,
         webhookBase64: false,
-        events: [
-          'APPLICATION_STARTUP',
-          'MESSAGES_UPSERT',
-          'MESSAGES_UPDATE',
-          'MESSAGES_DELETE',
-          'SEND_MESSAGE',
-          'CONNECTION_UPDATE',
-        ],
+        events: requiredEvents,
       }),
     });
+
+    // Fallback para versões Evolution que exigem propriedade "webhook"
+    if (!setResp.ok) {
+      const firstErr = await setResp.text();
+      if (firstErr.includes('instance requires property "webhook"')) {
+        setResp = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            webhook: {
+              url: webhookUrl,
+              enabled: true,
+              webhookByEvents: false,
+              webhookBase64: false,
+              events: requiredEvents,
+            },
+          }),
+        });
+      } else {
+        console.error(`[webhook-check] ${instanceName}: erro ao reconfigurar: ${firstErr}`);
+        return { ok: false, action: 'reconfigure_failed' };
+      }
+    }
 
     if (!setResp.ok) {
       const err = await setResp.text();
