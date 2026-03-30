@@ -297,10 +297,20 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
               </div>
             ))}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saveMutation.isPending}>
-              {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {!editingRow && (
+              <Button
+                variant="secondary"
+                onClick={() => { setSaveAndNew(true); handleSave(); }}
+                disabled={saveMutation.isPending}
+              >
+                {saveMutation.isPending && saveAndNew && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar e Novo
+              </Button>
+            )}
+            <Button onClick={() => { setSaveAndNew(false); handleSave(); }} disabled={saveMutation.isPending}>
+              {saveMutation.isPending && !saveAndNew && <Loader2 className="h-4 w-4 animate-spin" />}
               Salvar
             </Button>
           </DialogFooter>
