@@ -72,6 +72,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const searchTerm = filters?.search?.trim();
 
