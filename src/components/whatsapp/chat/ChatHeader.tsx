@@ -48,6 +48,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
