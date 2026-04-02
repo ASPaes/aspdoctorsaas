@@ -62,6 +62,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_alert_config: {
+        Row: {
+          admin_instance_name: string
+          admin_phone: string
+          check_interval_minutes: number
+          created_at: string | null
+          critical_threshold: number
+          id: string
+          updated_at: string | null
+          warning_threshold: number
+        }
+        Insert: {
+          admin_instance_name?: string
+          admin_phone?: string
+          check_interval_minutes?: number
+          created_at?: string | null
+          critical_threshold?: number
+          id?: string
+          updated_at?: string | null
+          warning_threshold?: number
+        }
+        Update: {
+          admin_instance_name?: string
+          admin_phone?: string
+          check_interval_minutes?: number
+          created_at?: string | null
+          critical_threshold?: number
+          id?: string
+          updated_at?: string | null
+          warning_threshold?: number
+        }
+        Relationships: []
+      }
+      ai_alert_log: {
+        Row: {
+          function_name: string
+          id: string
+          level: string
+          resolved_at: string | null
+          sent_at: string
+          tenant_id: string | null
+        }
+        Insert: {
+          function_name: string
+          id?: string
+          level: string
+          resolved_at?: string | null
+          sent_at?: string
+          tenant_id?: string | null
+        }
+        Update: {
+          function_name?: string
+          id?: string
+          level?: string
+          resolved_at?: string | null
+          sent_at?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       ai_rate_limit_config: {
         Row: {
           created_at: string | null
