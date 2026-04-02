@@ -7,6 +7,47 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function checkRateLimit(
+  supabase: any,
+  tenantId: string,
+  functionName: string
+): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  try {
+    const { data: configs } = await supabase
+      .from('ai_rate_limit_config')
+      .select('max_calls, window_seconds, tenant_id')
+      .eq('function_name', functionName)
+      .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      .order('tenant_id', { ascending: false, nullsFirst: false })
+      .limit(2);
+
+    const config = configs?.[0] ?? { max_calls: 10, window_seconds: 60 };
+    const windowSeconds = config.window_seconds;
+    const maxCalls = config.max_calls;
+    const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
+
+    const { count } = await supabase
+      .from('ai_usage_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('function_name', functionName)
+      .gte('called_at', windowStart);
+
+    if ((count ?? 0) >= maxCalls) {
+      return { allowed: false, retryAfterSeconds: windowSeconds };
+    }
+
+    supabase
+      .from('ai_usage_log')
+      .insert({ tenant_id: tenantId, function_name: functionName })
+      .then(() => {});
+
+    return { allowed: true };
+  } catch {
+    return { allowed: true };
+  }
+}
+
 const defaultSuggestions = [
   { text: "Olá! Como posso ajudá-lo(a) hoje?", tone: "formal" },
   { text: "Oi! Em que posso te ajudar? 😊", tone: "friendly" },
