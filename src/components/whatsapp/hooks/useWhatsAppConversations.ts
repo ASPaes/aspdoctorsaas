@@ -77,9 +77,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     queryFn: async () => {
       const searchTerm = filters?.search?.trim();
 
-      // If searching by message content (3+ chars), find matching conversation IDs first
+      // If searching by message content (4+ chars), find matching conversation IDs first
       let messageMatchIds: string[] = [];
-      if (searchTerm && searchTerm.length >= 3) {
+      if (searchTerm && searchTerm.length >= 4) {
         const escaped = escapeLike(searchTerm);
         let msgQuery = supabase
           .from('whatsapp_messages' as any)
@@ -116,10 +116,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .range(from, to);
 
-      if (searchTerm && searchTerm.length >= 2) {
-        const escaped = escapeLike(searchTerm);
-        query = (query as any).or(`last_message_preview.ilike.%${escaped}%`);
-      }
+
+
 
       if (tid) query = query.eq('tenant_id', tid);
       if (filters?.departmentId) {
@@ -151,8 +149,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
-      // Filtro client-side apenas para messageMatchIds (busca em conteúdo de mensagens)
-      if (searchTerm && messageMatchIds.length > 0) {
+      // Filtro client-side: nome, telefone, preview (rápido, dados já carregados)
+      if (searchTerm) {
         const s = searchTerm.toLowerCase();
         result = result.filter((c) => {
           const nameMatch = (c.contact?.name ?? '').toLowerCase().includes(s);
