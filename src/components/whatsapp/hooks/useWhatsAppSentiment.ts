@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const useWhatsAppSentiment = (conversationId: string | null) => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: sentiment, isLoading, error, refetch } = useQuery({
     queryKey: ['whatsapp', 'sentiment', conversationId],
@@ -24,10 +26,36 @@ export const useWhatsAppSentiment = (conversationId: string | null) => {
     mutationFn: async (params: { conversationId: string }) => {
       const { data, error } = await supabase.functions.invoke('analyze-whatsapp-sentiment', { body: params });
       if (error) throw error;
+      // Handle non-success responses from the function
+      if (data && !data.success) {
+        if (data.error === 'ai_not_configured') {
+          throw new Error('IA não configurada. Acesse Configurações > Inteligência Artificial.');
+        }
+        if (data.error === 'ai_key_invalid') {
+          throw new Error('Chave de API inválida. Verifique em Configurações > IA.');
+        }
+        if (data.error === 'rate_limit') {
+          throw new Error('Limite da API atingido. Tente novamente em instantes.');
+        }
+        if (data.message) {
+          throw new Error(data.message);
+        }
+      }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       if (conversationId) queryClient.invalidateQueries({ queryKey: ['whatsapp', 'sentiment', conversationId] });
+      if (data?.success) {
+        toast({ title: 'Análise concluída', description: 'Sentimento atualizado com sucesso.' });
+      }
+    },
+    onError: (err: any) => {
+      const msg = err?.message || 'Erro desconhecido ao analisar sentimento.';
+      toast({
+        title: 'Erro na análise de sentimento',
+        description: msg,
+        variant: 'destructive',
+      });
     },
   });
 

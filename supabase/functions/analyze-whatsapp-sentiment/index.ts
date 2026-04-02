@@ -57,7 +57,7 @@ serve(async (req) => {
           error: "ai_not_configured",
           message: "Nenhuma IA configurada para este tenant. Acesse Configurações > Inteligência Artificial para configurar.",
         }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -73,7 +73,7 @@ serve(async (req) => {
 
     if (!messages || messages.length < 3) {
       return new Response(
-        JSON.stringify({ success: false, message: "Mínimo 3 mensagens necessário para análise", messagesFound: messages?.length || 0 }),
+        JSON.stringify({ success: false, error: "insufficient_messages", message: `Mínimo 3 mensagens do cliente necessário para análise (encontradas: ${messages?.length || 0}).` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -134,13 +134,14 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
       result = JSON.parse(rawResult);
     } catch (aiError: any) {
       const msg = aiError.message || "";
+      console.error("[analyze-sentiment] AI error:", msg);
       if (msg.includes("401") || msg.includes("invalid_api_key")) {
-        return new Response(JSON.stringify({ success: false, error: "ai_key_invalid", message: "Chave de API inválida. Verifique em Configurações > Inteligência Artificial." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: false, error: "ai_key_invalid", message: "Chave de API inválida. Verifique em Configurações > Inteligência Artificial." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      if (msg.includes("429")) {
-        return new Response(JSON.stringify({ success: false, error: "rate_limit", message: "Limite da API atingido. Tente novamente em instantes." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("quota")) {
+        return new Response(JSON.stringify({ success: false, error: "rate_limit", message: "Limite/créditos da API esgotados. Verifique seu plano no provedor de IA." }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      throw aiError;
+      return new Response(JSON.stringify({ success: false, error: "ai_error", message: `Erro na IA: ${msg.substring(0, 200)}` }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (!["positive", "neutral", "negative"].includes(result.sentiment)) {
