@@ -116,10 +116,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .range(from, to);
 
-      if (searchTerm && searchTerm.length >= 2) {
-        const escaped = escapeLike(searchTerm);
-        query = (query as any).or(`last_message_preview.ilike.%${escaped}%`);
-      }
+
+
 
       if (tid) query = query.eq('tenant_id', tid);
       if (filters?.departmentId) {
