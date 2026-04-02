@@ -62,6 +62,44 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_rate_limit_config: {
+        Row: {
+          created_at: string | null
+          function_name: string
+          id: string
+          max_calls: number
+          tenant_id: string | null
+          updated_at: string | null
+          window_seconds: number
+        }
+        Insert: {
+          created_at?: string | null
+          function_name: string
+          id?: string
+          max_calls?: number
+          tenant_id?: string | null
+          updated_at?: string | null
+          window_seconds?: number
+        }
+        Update: {
+          created_at?: string | null
+          function_name?: string
+          id?: string
+          max_calls?: number
+          tenant_id?: string | null
+          updated_at?: string | null
+          window_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_rate_limit_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_settings: {
         Row: {
           api_key_encrypted: string | null
@@ -120,6 +158,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_usage_log: {
+        Row: {
+          called_at: string
+          function_name: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          called_at?: string
+          function_name: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          called_at?: string
+          function_name?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: []
       }
       areas_atuacao: {
         Row: {
@@ -4046,6 +4105,7 @@ export type Database = {
       }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
+      cleanup_ai_usage_log: { Args: never; Returns: undefined }
       create_access_invite: {
         Args: {
           p_access_status?: string

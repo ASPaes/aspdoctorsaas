@@ -7,6 +7,47 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function checkRateLimit(
+  supabase: any,
+  tenantId: string,
+  functionName: string
+): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  try {
+    const { data: configs } = await supabase
+      .from('ai_rate_limit_config')
+      .select('max_calls, window_seconds, tenant_id')
+      .eq('function_name', functionName)
+      .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      .order('tenant_id', { ascending: false, nullsFirst: false })
+      .limit(2);
+
+    const config = configs?.[0] ?? { max_calls: 10, window_seconds: 60 };
+    const windowSeconds = config.window_seconds;
+    const maxCalls = config.max_calls;
+    const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
+
+    const { count } = await supabase
+      .from('ai_usage_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('function_name', functionName)
+      .gte('called_at', windowStart);
+
+    if ((count ?? 0) >= maxCalls) {
+      return { allowed: false, retryAfterSeconds: windowSeconds };
+    }
+
+    supabase
+      .from('ai_usage_log')
+      .insert({ tenant_id: tenantId, function_name: functionName })
+      .then(() => {});
+
+    return { allowed: true };
+  } catch {
+    return { allowed: true };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -61,6 +102,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Tenant não encontrado" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const rateLimit = await checkRateLimit(supabase, convData.tenant_id, 'transcribe-whatsapp-audio');
+    if (!rateLimit.allowed) {
+      await supabase.from("whatsapp_messages").update({ transcription_status: "failed" }).eq("id", messageId);
+      return new Response(
+        JSON.stringify({
+          error: 'rate_limit_exceeded',
+          message: `Limite de uso de IA atingido. Tente novamente em ${rateLimit.retryAfterSeconds} segundos.`,
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const aiConfig = await getAIConfig(convData.tenant_id, supabase);
