@@ -754,6 +754,40 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     console.log('[evolution-webhook] Normalized phone:', phone, 'isGroup:', isGroup);
 
+    // --- GUARD: Comandos administrativos via WhatsApp ---
+    const ADMIN_PHONE = '5549991210660';
+    const messageText = (
+      message?.conversation ||
+      message?.extendedTextMessage?.text ||
+      ''
+    ).trim();
+    const senderNumber = (key.remoteJid || '').replace('@s.whatsapp.net', '').replace(/\D/g, '');
+    const isAdminCommand =
+      senderNumber.includes(ADMIN_PHONE) &&
+      (
+        messageText.toUpperCase().startsWith('LIMIT UP') ||
+        messageText.toUpperCase() === 'STATUS IA' ||
+        messageText.toUpperCase().startsWith('SNOOZE')
+      );
+
+    if (isAdminCommand) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      fetch(`${supabaseUrl}/functions/v1/ai-admin-commands`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        },
+        body: JSON.stringify({
+          senderPhone: senderNumber,
+          command: messageText,
+        }),
+      }).catch(err => console.error('[evolution-webhook] Erro ao processar comando admin:', err));
+
+      return;
+    }
+    // --- FIM DO GUARD ---
+
     // --- GROUP MESSAGE FILTER ---
     if (isGroup) {
       const { data: instCfg } = await supabase
