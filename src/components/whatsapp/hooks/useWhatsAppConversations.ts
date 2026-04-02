@@ -77,9 +77,9 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     queryFn: async () => {
       const searchTerm = filters?.search?.trim();
 
-      // If searching by message content (4+ chars), find matching conversation IDs first
+      // If searching by message content (disabled — threshold set very high)
       let messageMatchIds: string[] = [];
-      if (searchTerm && searchTerm.length >= 4) {
+      if (searchTerm && searchTerm.length >= 50) {
         const escaped = escapeLike(searchTerm);
         let msgQuery = supabase
           .from('whatsapp_messages' as any)
