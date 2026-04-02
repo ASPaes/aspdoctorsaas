@@ -196,13 +196,36 @@ REGRAS:
 - "topics": máximo 5
 - "suggested_area": escolha entre as áreas disponíveis ou null`;
 
-    const rawResult = await callAI(
-      { ...aiConfig, ...(aiConfig.provider === "openai" || aiConfig.provider === "custom" ? {} : {}) },
-      [
-        { role: "system", content: "Analista de suporte técnico. Responda apenas JSON válido, sem markdown." },
-        { role: "user", content: prompt },
-      ]
-    );
+    let rawResult: string;
+    try {
+      rawResult = await callAI(
+        { ...aiConfig, ...(aiConfig.provider === "openai" || aiConfig.provider === "custom" ? {} : {}) },
+        [
+          { role: "system", content: "Analista de suporte técnico. Responda apenas JSON válido, sem markdown." },
+          { role: "user", content: prompt },
+        ]
+      );
+    } catch (aiError: any) {
+      const msg = aiError?.message || "";
+      if (msg.includes("429") || msg.includes("insufficient_quota") || msg.includes("rate") || msg.includes("quota")) {
+        console.warn(`[${FUNCTION_NAME}][${requestId}] IA indisponível (quota/rate limit), criando KB básico`);
+        await supabase.from("support_kb_articles").insert({
+          tenant_id: att.tenant_id,
+          source_attendance_id: attendanceId,
+          title: "Atendimento (IA indisponível - sem créditos)",
+          problem: "",
+          solution: "",
+          tags: [],
+          area_id: att.area_id || null,
+          status: "draft",
+        });
+        return new Response(
+          JSON.stringify({ success: true, ai: false, reason: "ai_quota_exceeded" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw aiError;
+    }
 
     let result: any;
     try {
