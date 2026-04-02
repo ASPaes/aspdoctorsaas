@@ -4,6 +4,7 @@ import { formatBRPhone } from "@/lib/phoneBR";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
@@ -48,6 +49,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
@@ -268,7 +270,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => closeConversation({ conversationId: conversation.id, generateSummary: true })}
+                    onClick={() => setShowCloseModal(true)}
                     aria-label="Encerrar conversa"
                   >
                     <XCircle className="h-4 w-4" />
@@ -413,6 +415,44 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         conversation={conversation}
         onConversationChanged={onNavigateToConversation}
       />
+
+      {/* Modal de confirmação de encerramento */}
+      <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Encerrar atendimento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Deseja enviar a pesquisa de satisfação (CSAT) ao cliente ao encerrar?
+          </p>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowCloseModal(false);
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: false });
+              }}
+            >
+              ✅ Encerrar e enviar CSAT
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCloseModal(false);
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+              }}
+            >
+              ⬜ Encerrar sem CSAT
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowCloseModal(false)}
+            >
+              ❌ Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

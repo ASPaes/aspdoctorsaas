@@ -47,7 +47,7 @@ export const useWhatsAppActions = () => {
   });
 
   const closeMutation = useMutation({
-    mutationFn: async ({ conversationId, generateSummary }: { conversationId: string; generateSummary: boolean }) => {
+    mutationFn: async ({ conversationId, generateSummary, skipCsat }: { conversationId: string; generateSummary: boolean; skipCsat?: boolean }) => {
       // Fetch active attendance early so we can scope the summary
       const { data: activeAtt } = await supabase
         .from('support_attendances')
@@ -111,7 +111,7 @@ export const useWhatsAppActions = () => {
                   .eq('tenant_id', profile.tenant_id)
                   .maybeSingle();
 
-                if (config?.support_csat_enabled) {
+                if (config?.support_csat_enabled && !skipCsat) {
                   csatEnabled = true;
 
                   // Get contact name for template
