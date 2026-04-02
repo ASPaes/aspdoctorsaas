@@ -149,8 +149,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
-      // Filtro client-side apenas para messageMatchIds (busca em conteúdo de mensagens)
-      if (searchTerm && messageMatchIds.length > 0) {
+      // Filtro client-side: nome, telefone, preview (rápido, dados já carregados)
+      if (searchTerm) {
         const s = searchTerm.toLowerCase();
         result = result.filter((c) => {
           const nameMatch = (c.contact?.name ?? '').toLowerCase().includes(s);
