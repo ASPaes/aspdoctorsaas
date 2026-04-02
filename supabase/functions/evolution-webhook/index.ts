@@ -3404,6 +3404,50 @@ Deno.serve(async (req) => {
     const payload: EvolutionWebhookPayload = await req.json();
     console.log('[evolution-webhook] Event received:', payload.event, 'Instance:', payload.instance);
 
+    // --- GUARD: Comandos administrativos via WhatsApp ---
+    // Mensagens do número admin com comandos específicos não entram no fluxo normal
+    const ADMIN_PHONE_GUARD = '5549991210660';
+    const _rawJid = payload?.data?.key?.remoteJid || '';
+    const _senderNum = _rawJid
+      .replace('@s.whatsapp.net', '')
+      .replace('@g.us', '')
+      .replace(/\D/g, '');
+    const _msgText = (
+      payload?.data?.message?.conversation ||
+      payload?.data?.message?.extendedTextMessage?.text ||
+      ''
+    ).trim().toUpperCase();
+    const _isAdminCmd =
+      _senderNum.endsWith(ADMIN_PHONE_GUARD) &&
+      (_msgText.startsWith('LIMIT UP') ||
+       _msgText === 'STATUS IA' ||
+       _msgText.startsWith('SNOOZE'));
+
+    if (_isAdminCmd) {
+      const _supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      fetch(`${_supabaseUrl}/functions/v1/ai-admin-commands`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        },
+        body: JSON.stringify({
+          senderPhone: _senderNum,
+          command: (
+            payload?.data?.message?.conversation ||
+            payload?.data?.message?.extendedTextMessage?.text ||
+            ''
+          ).trim(),
+        }),
+      }).catch(err => console.error('[evolution-webhook] Erro ao processar comando admin:', err));
+
+      return new Response(JSON.stringify({ ok: true, handled: 'admin_command' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    // --- FIM DO GUARD ---
+
     switch (payload.event) {
       case 'messages.upsert':
         if (isRevokeMessage(payload.data?.message)) {
