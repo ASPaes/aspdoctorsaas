@@ -90,6 +90,18 @@ serve(async (req) => {
       });
     }
 
+    const rateLimit = await checkRateLimit(supabase, convData.tenant_id, 'analyze-whatsapp-sentiment');
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'rate_limit_exceeded',
+          message: `Limite de uso de IA atingido. Tente novamente em ${rateLimit.retryAfterSeconds} segundos.`,
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const aiConfig = await getAIConfig(convData.tenant_id, supabase);
     if (!aiConfig) {
       return new Response(
