@@ -73,7 +73,7 @@ serve(async (req) => {
 
     if (!messages || messages.length < 3) {
       return new Response(
-        JSON.stringify({ success: false, message: "Mínimo 3 mensagens necessário para análise", messagesFound: messages?.length || 0 }),
+        JSON.stringify({ success: false, error: "insufficient_messages", message: `Mínimo 3 mensagens do cliente necessário para análise (encontradas: ${messages?.length || 0}).` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
