@@ -414,6 +414,44 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         conversation={conversation}
         onConversationChanged={onNavigateToConversation}
       />
+
+      {/* Modal de confirmação de encerramento */}
+      <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Encerrar atendimento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Deseja enviar a pesquisa de satisfação (CSAT) ao cliente ao encerrar?
+          </p>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowCloseModal(false);
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: false });
+              }}
+            >
+              ✅ Encerrar e enviar CSAT
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCloseModal(false);
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+              }}
+            >
+              ⬜ Encerrar sem CSAT
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowCloseModal(false)}
+            >
+              ❌ Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

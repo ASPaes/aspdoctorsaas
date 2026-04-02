@@ -111,7 +111,7 @@ export const useWhatsAppActions = () => {
                   .eq('tenant_id', profile.tenant_id)
                   .maybeSingle();
 
-                if (config?.support_csat_enabled) {
+                if (config?.support_csat_enabled && !skipCsat) {
                   csatEnabled = true;
 
                   // Get contact name for template
