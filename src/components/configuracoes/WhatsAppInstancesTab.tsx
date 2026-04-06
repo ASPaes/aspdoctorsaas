@@ -10,6 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -51,25 +58,41 @@ interface Instance {
   created_at: string;
 }
 
-interface InstanceSecret {
-  id: string;
-  api_url: string;
-  api_key: string;
-}
-
 interface FormState {
   instance_name: string;
   display_name: string;
   api_url: string;
   api_key: string;
+  provider_type: "self_hosted" | "zapi" | "meta_cloud";
+  zapi_instance_id: string;
+  zapi_token: string;
+  meta_phone_number_id: string;
+  meta_access_token: string;
 }
 
-const EMPTY_FORM: FormState = { instance_name: "", display_name: "", api_url: "", api_key: "" };
+const EMPTY_FORM: FormState = {
+  instance_name: "",
+  display_name: "",
+  api_url: "",
+  api_key: "",
+  provider_type: "self_hosted",
+  zapi_instance_id: "",
+  zapi_token: "",
+  meta_phone_number_id: "",
+  meta_access_token: "",
+};
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   connected: { label: "Conectado", variant: "default" },
   disconnected: { label: "Desconectado", variant: "destructive" },
   connecting: { label: "Conectando...", variant: "secondary" },
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  self_hosted: "Evolution",
+  cloud: "Evolution",
+  zapi: "Z-API",
+  meta_cloud: "Meta Cloud",
 };
 
 export default function WhatsAppInstancesTab() {
@@ -82,6 +105,8 @@ export default function WhatsAppInstancesTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showZapiToken, setShowZapiToken] = useState(false);
+  const [showMetaToken, setShowMetaToken] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Instance | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
@@ -103,6 +128,8 @@ export default function WhatsAppInstancesTab() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setShowApiKey(false);
+    setShowZapiToken(false);
+    setShowMetaToken(false);
     setDialogOpen(true);
   };
 
@@ -110,10 +137,12 @@ export default function WhatsAppInstancesTab() {
   const openEdit = async (inst: Instance) => {
     setEditingId(inst.id);
     setShowApiKey(false);
+    setShowZapiToken(false);
+    setShowMetaToken(false);
     // Load secrets
-    const { data: secret } = await supabase
-      .from("whatsapp_instance_secrets")
-      .select("api_url, api_key")
+    const { data: secret } = await (supabase
+      .from("whatsapp_instance_secrets") as any)
+      .select("api_url, api_key, zapi_instance_id, zapi_token, meta_access_token")
       .eq("instance_id", inst.id)
       .maybeSingle();
     setForm({
@@ -121,6 +150,11 @@ export default function WhatsAppInstancesTab() {
       display_name: inst.display_name ?? "",
       api_url: secret?.api_url ?? "",
       api_key: secret?.api_key ?? "",
+      zapi_instance_id: secret?.zapi_instance_id ?? "",
+      zapi_token: secret?.zapi_token ?? "",
+      meta_phone_number_id: (inst as any).meta_phone_number_id ?? "",
+      meta_access_token: secret?.meta_access_token ?? "",
+      provider_type: (inst.provider_type as FormState["provider_type"]) ?? "self_hosted",
     });
     setDialogOpen(true);
   };
@@ -129,19 +163,46 @@ export default function WhatsAppInstancesTab() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!form.instance_name.trim()) throw new Error("Nome da instância é obrigatório");
-      if (!form.api_url.trim()) throw new Error("URL da API é obrigatória");
-      if (!form.api_key.trim()) throw new Error("API Key é obrigatória");
+
+      // Validate provider-specific fields
+      if (form.provider_type === "self_hosted") {
+        if (!form.api_url.trim()) throw new Error("URL da API é obrigatória");
+        if (!form.api_key.trim()) throw new Error("API Key é obrigatória");
+      } else if (form.provider_type === "zapi") {
+        if (!form.zapi_instance_id.trim()) throw new Error("ID da Instância Z-API é obrigatório");
+        if (!form.zapi_token.trim()) throw new Error("Token Z-API é obrigatório");
+      } else if (form.provider_type === "meta_cloud") {
+        if (!form.meta_phone_number_id.trim()) throw new Error("Phone Number ID é obrigatório");
+        if (!form.meta_access_token.trim()) throw new Error("Access Token é obrigatório");
+      }
 
       if (editingId) {
         // Update instance
-        const { error: instErr } = await supabase
-          .from("whatsapp_instances")
-          .update({
-            instance_name: form.instance_name.trim(),
-            display_name: form.display_name.trim() || null,
-          })
+        const instUpdate: any = {
+          instance_name: form.instance_name.trim(),
+          display_name: form.display_name.trim() || null,
+          provider_type: form.provider_type,
+        };
+        if (form.provider_type === "meta_cloud") {
+          instUpdate.meta_phone_number_id = form.meta_phone_number_id.trim();
+        }
+        const { error: instErr } = await (supabase
+          .from("whatsapp_instances") as any)
+          .update(instUpdate)
           .eq("id", editingId);
         if (instErr) throw instErr;
+
+        // Build secrets payload
+        const secretsPayload: any = {};
+        if (form.provider_type === "self_hosted") {
+          secretsPayload.api_url = form.api_url.trim();
+          secretsPayload.api_key = form.api_key.trim();
+        } else if (form.provider_type === "zapi") {
+          secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
+          secretsPayload.zapi_token = form.zapi_token.trim();
+        } else if (form.provider_type === "meta_cloud") {
+          secretsPayload.meta_access_token = form.meta_access_token.trim();
+        }
 
         // Upsert secrets
         const { data: existingSecret } = await supabase
@@ -151,44 +212,57 @@ export default function WhatsAppInstancesTab() {
           .maybeSingle();
 
         if (existingSecret) {
-          const { error: secErr } = await supabase
-            .from("whatsapp_instance_secrets")
-            .update({ api_url: form.api_url.trim(), api_key: form.api_key.trim() })
+          const { error: secErr } = await (supabase
+            .from("whatsapp_instance_secrets") as any)
+            .update(secretsPayload)
             .eq("instance_id", editingId);
           if (secErr) throw secErr;
         } else {
-          const { error: secErr } = await supabase
-            .from("whatsapp_instance_secrets")
+          const { error: secErr } = await (supabase
+            .from("whatsapp_instance_secrets") as any)
             .insert({
               instance_id: editingId,
               tenant_id: tid ?? (instances.find((i) => i.id === editingId) as any)?.tenant_id,
-              api_url: form.api_url.trim(),
-              api_key: form.api_key.trim(),
+              ...secretsPayload,
             });
           if (secErr) throw secErr;
         }
       } else {
         // Create instance
-        const { data: newInst, error: instErr } = await supabase
-          .from("whatsapp_instances")
-          .insert({
-            instance_name: form.instance_name.trim(),
-            display_name: form.display_name.trim() || null,
-            provider_type: "self_hosted",
-          } as any)
+        const instPayload: any = {
+          instance_name: form.instance_name.trim(),
+          display_name: form.display_name.trim() || null,
+          provider_type: form.provider_type,
+        };
+        if (form.provider_type === "meta_cloud") {
+          instPayload.meta_phone_number_id = form.meta_phone_number_id.trim();
+        }
+
+        const { data: newInst, error: instErr } = await (supabase
+          .from("whatsapp_instances") as any)
+          .insert(instPayload)
           .select("id, tenant_id")
           .single();
         if (instErr) throw instErr;
 
-        // Create secrets
-        const { error: secErr } = await supabase
-          .from("whatsapp_instance_secrets")
-          .insert({
-            instance_id: newInst.id,
-            tenant_id: newInst.tenant_id,
-            api_url: form.api_url.trim(),
-            api_key: form.api_key.trim(),
-          });
+        // Build secrets payload
+        const secretsPayload: any = {
+          instance_id: newInst.id,
+          tenant_id: newInst.tenant_id,
+        };
+        if (form.provider_type === "self_hosted") {
+          secretsPayload.api_url = form.api_url.trim();
+          secretsPayload.api_key = form.api_key.trim();
+        } else if (form.provider_type === "zapi") {
+          secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
+          secretsPayload.zapi_token = form.zapi_token.trim();
+        } else if (form.provider_type === "meta_cloud") {
+          secretsPayload.meta_access_token = form.meta_access_token.trim();
+        }
+
+        const { error: secErr } = await (supabase
+          .from("whatsapp_instance_secrets") as any)
+          .insert(secretsPayload);
         if (secErr) throw secErr;
       }
     },
@@ -205,7 +279,6 @@ export default function WhatsAppInstancesTab() {
   // ── Delete ──
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Delete secrets first
       await supabase.from("whatsapp_instance_secrets").delete().eq("instance_id", id);
       const { error } = await supabase.from("whatsapp_instances").delete().eq("id", id);
       if (error) throw error;
@@ -277,7 +350,7 @@ export default function WhatsAppInstancesTab() {
         <div>
           <h2 className="text-lg font-semibold">Instâncias WhatsApp</h2>
           <p className="text-sm text-muted-foreground">
-            Gerencie suas conexões com a Evolution API.
+            Gerencie suas conexões WhatsApp (Evolution API, Z-API ou Meta Cloud).
           </p>
         </div>
         <div className="flex gap-2">
@@ -298,7 +371,7 @@ export default function WhatsAppInstancesTab() {
             <Phone className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <CardTitle className="text-lg mb-1">Nenhuma instância cadastrada</CardTitle>
             <CardDescription>
-              Adicione sua primeira instância da Evolution API para começar a usar o WhatsApp.
+              Adicione sua primeira instância para começar a usar o WhatsApp.
             </CardDescription>
             <Button className="mt-4" onClick={openCreate}>
               <Plus className="h-4 w-4" />
@@ -310,6 +383,7 @@ export default function WhatsAppInstancesTab() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {instances.map((inst) => {
             const st = STATUS_MAP[inst.status] ?? { label: inst.status, variant: "outline" as const };
+            const providerLabel = PROVIDER_LABEL[inst.provider_type] ?? inst.provider_type;
             return (
               <Card key={inst.id}>
                 <CardHeader className="pb-3">
@@ -326,9 +400,14 @@ export default function WhatsAppInstancesTab() {
                       {st.label}
                     </Badge>
                   </div>
-                  {inst.display_name && (
-                    <CardDescription className="text-xs truncate">{inst.instance_name}</CardDescription>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {inst.display_name && (
+                      <CardDescription className="text-xs truncate">{inst.instance_name}</CardDescription>
+                    )}
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {providerLabel}
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent className="pt-0">
                   {inst.phone_number && (
@@ -373,6 +452,22 @@ export default function WhatsAppInstancesTab() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
+              <Label>Provider *</Label>
+              <Select
+                value={form.provider_type}
+                onValueChange={(v) => setForm((f) => ({ ...f, provider_type: v as FormState["provider_type"] }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self_hosted">Evolution API</SelectItem>
+                  <SelectItem value="zapi">Z-API</SelectItem>
+                  <SelectItem value="meta_cloud">Meta Cloud (Oficial)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label>Nome da Instância *</Label>
               <Input
                 placeholder="minha-instancia"
@@ -380,7 +475,7 @@ export default function WhatsAppInstancesTab() {
                 onChange={(e) => setForm((f) => ({ ...f, instance_name: e.target.value }))}
               />
               <p className="text-xs text-muted-foreground">
-                Deve corresponder ao nome configurado na Evolution API.
+                Identificador único da instância.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -391,34 +486,106 @@ export default function WhatsAppInstancesTab() {
                 onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>URL da Evolution API *</Label>
-              <Input
-                placeholder="https://evolution.meudominio.com"
-                value={form.api_url}
-                onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>API Key *</Label>
-              <div className="relative">
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  placeholder="sua-api-key"
-                  value={form.api_key}
-                  onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-10 w-10"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
+
+            {/* ── Provider-specific fields ── */}
+            {form.provider_type === "self_hosted" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>URL da Evolution API *</Label>
+                  <Input
+                    placeholder="https://evolution.meudominio.com"
+                    value={form.api_url}
+                    onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>API Key *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showApiKey ? "text" : "password"}
+                      placeholder="sua-api-key"
+                      value={form.api_key}
+                      onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                    >
+                      {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {form.provider_type === "zapi" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>ID da Instância Z-API *</Label>
+                  <Input
+                    placeholder="ID da instância no Z-API"
+                    value={form.zapi_instance_id}
+                    onChange={(e) => setForm((f) => ({ ...f, zapi_instance_id: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Token Z-API *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showZapiToken ? "text" : "password"}
+                      placeholder="seu-token-zapi"
+                      value={form.zapi_token}
+                      onChange={(e) => setForm((f) => ({ ...f, zapi_token: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10"
+                      onClick={() => setShowZapiToken(!showZapiToken)}
+                    >
+                      {showZapiToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {form.provider_type === "meta_cloud" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Phone Number ID *</Label>
+                  <Input
+                    placeholder="ID do número no Meta Business"
+                    value={form.meta_phone_number_id}
+                    onChange={(e) => setForm((f) => ({ ...f, meta_phone_number_id: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Access Token *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showMetaToken ? "text" : "password"}
+                      placeholder="token de acesso Meta"
+                      value={form.meta_access_token}
+                      onChange={(e) => setForm((f) => ({ ...f, meta_access_token: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10"
+                      onClick={() => setShowMetaToken(!showMetaToken)}
+                    >
+                      {showMetaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <DialogClose asChild>
