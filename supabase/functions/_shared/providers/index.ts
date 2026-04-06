@@ -198,7 +198,7 @@ class ZApiAdapter implements ProviderAdapter {
 
   async send(secrets: InstanceSecrets, _instance: InstanceInfo, msg: SendRequest): Promise<SendResult> {
     const base = this.getBaseUrl(secrets);
-    const headers = this.getHeaders();
+    const headers = this.getHeaders(secrets);
     const phone = msg.to.replace(/\D/g, '');
 
     let endpoint: string;
