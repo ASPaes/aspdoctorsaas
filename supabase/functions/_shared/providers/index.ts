@@ -11,6 +11,7 @@ export interface InstanceSecrets {
   zapi_instance_id?: string | null;
   zapi_token?: string | null;
   zapi_webhook_token?: string | null;
+  zapi_client_token?: string | null;
   // Meta Cloud
   meta_access_token?: string | null;
 }
