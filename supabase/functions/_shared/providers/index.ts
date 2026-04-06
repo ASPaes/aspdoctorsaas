@@ -179,8 +179,12 @@ class ZApiAdapter implements ProviderAdapter {
     return `https://api.z-api.io/instances/${secrets.zapi_instance_id}/token/${secrets.zapi_token}`;
   }
 
-  private getHeaders(): Record<string, string> {
-    return { 'Content-Type': 'application/json', 'Client-Token': 'YOUR_CLIENT_TOKEN_HERE' };
+  private getHeaders(secrets: InstanceSecrets): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (secrets.zapi_client_token) {
+      headers['Client-Token'] = secrets.zapi_client_token;
+    }
+    return headers;
   }
 
   async checkStatus(secrets: InstanceSecrets, _instance: InstanceInfo): Promise<ConnectionStatus> {
