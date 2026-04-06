@@ -11,6 +11,7 @@ export interface InstanceSecrets {
   zapi_instance_id?: string | null;
   zapi_token?: string | null;
   zapi_webhook_token?: string | null;
+  zapi_client_token?: string | null;
   // Meta Cloud
   meta_access_token?: string | null;
 }
@@ -178,13 +179,17 @@ class ZApiAdapter implements ProviderAdapter {
     return `https://api.z-api.io/instances/${secrets.zapi_instance_id}/token/${secrets.zapi_token}`;
   }
 
-  private getHeaders(): Record<string, string> {
-    return { 'Content-Type': 'application/json', 'Client-Token': 'YOUR_CLIENT_TOKEN_HERE' };
+  private getHeaders(secrets: InstanceSecrets): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (secrets.zapi_client_token) {
+      headers['Client-Token'] = secrets.zapi_client_token;
+    }
+    return headers;
   }
 
   async checkStatus(secrets: InstanceSecrets, _instance: InstanceInfo): Promise<ConnectionStatus> {
     const base = this.getBaseUrl(secrets);
-    const res = await fetch(`${base}/status`, { headers: this.getHeaders() });
+    const res = await fetch(`${base}/status`, { headers: this.getHeaders(secrets) });
     if (!res.ok) return { connected: false, error: await res.text() };
     const data = await res.json();
     const connected = data?.connected === true || data?.status === 'connected';
@@ -193,7 +198,7 @@ class ZApiAdapter implements ProviderAdapter {
 
   async send(secrets: InstanceSecrets, _instance: InstanceInfo, msg: SendRequest): Promise<SendResult> {
     const base = this.getBaseUrl(secrets);
-    const headers = this.getHeaders();
+    const headers = this.getHeaders(secrets);
     const phone = msg.to.replace(/\D/g, '');
 
     let endpoint: string;

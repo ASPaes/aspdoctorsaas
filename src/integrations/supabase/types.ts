@@ -3207,6 +3207,7 @@ export type Database = {
           meta_verify_token: string | null
           tenant_id: string
           updated_at: string
+          zapi_client_token: string | null
           zapi_instance_id: string | null
           zapi_token: string | null
           zapi_webhook_token: string | null
@@ -3221,6 +3222,7 @@ export type Database = {
           meta_verify_token?: string | null
           tenant_id: string
           updated_at?: string
+          zapi_client_token?: string | null
           zapi_instance_id?: string | null
           zapi_token?: string | null
           zapi_webhook_token?: string | null
@@ -3235,6 +3237,7 @@ export type Database = {
           meta_verify_token?: string | null
           tenant_id?: string
           updated_at?: string
+          zapi_client_token?: string | null
           zapi_instance_id?: string | null
           zapi_token?: string | null
           zapi_webhook_token?: string | null
