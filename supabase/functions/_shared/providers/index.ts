@@ -189,7 +189,7 @@ class ZApiAdapter implements ProviderAdapter {
 
   async checkStatus(secrets: InstanceSecrets, _instance: InstanceInfo): Promise<ConnectionStatus> {
     const base = this.getBaseUrl(secrets);
-    const res = await fetch(`${base}/status`, { headers: this.getHeaders() });
+    const res = await fetch(`${base}/status`, { headers: this.getHeaders(secrets) });
     if (!res.ok) return { connected: false, error: await res.text() };
     const data = await res.json();
     const connected = data?.connected === true || data?.status === 'connected';
