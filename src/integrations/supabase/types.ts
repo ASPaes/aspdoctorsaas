@@ -3207,6 +3207,9 @@ export type Database = {
           meta_verify_token: string | null
           tenant_id: string
           updated_at: string
+          zapi_instance_id: string | null
+          zapi_token: string | null
+          zapi_webhook_token: string | null
         }
         Insert: {
           api_key: string
@@ -3218,6 +3221,9 @@ export type Database = {
           meta_verify_token?: string | null
           tenant_id: string
           updated_at?: string
+          zapi_instance_id?: string | null
+          zapi_token?: string | null
+          zapi_webhook_token?: string | null
         }
         Update: {
           api_key?: string
@@ -3229,6 +3235,9 @@ export type Database = {
           meta_verify_token?: string | null
           tenant_id?: string
           updated_at?: string
+          zapi_instance_id?: string | null
+          zapi_token?: string | null
+          zapi_webhook_token?: string | null
         }
         Relationships: [
           {
