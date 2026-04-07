@@ -1,13 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { getAdapter } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-function getEvolutionAuthHeaders(apiKey: string, providerType: string): Record<string, string> {
-  return { apikey: apiKey };
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,128 +16,97 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // Validate JWT using Doctor SaaS pattern
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const anonClient = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const anonClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const token = authHeader.replace('Bearer ', '');
     const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const userId = claimsData.claims.sub;
-
-    // Check if user is tenant admin or super admin
-    const { data: profile, error: profileError } = await supabaseAdmin
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('is_super_admin, role')
       .eq('user_id', userId)
       .single();
 
-    if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (!profile.is_super_admin && profile.role !== 'admin') {
+    if (!profile || (!profile.is_super_admin && profile.role !== 'admin')) {
       return new Response(JSON.stringify({ error: 'Forbidden: admin access required' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const { instanceId } = await req.json();
     console.log('[test-instance-connection] Testing instance:', instanceId);
 
-    const { data: secrets, error: secretsError } = await supabaseAdmin
-      .from('whatsapp_instance_secrets')
-      .select('api_key, api_url')
-      .eq('instance_id', instanceId)
-      .single();
+    // Fetch instance + secrets in parallel
+    const [instanceResult, secretsResult] = await Promise.all([
+      supabaseAdmin
+        .from('whatsapp_instances')
+        .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id')
+        .eq('id', instanceId)
+        .single(),
+      supabaseAdmin
+        .from('whatsapp_instance_secrets')
+        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token')
+        .eq('instance_id', instanceId)
+        .single(),
+    ]);
 
-    if (secretsError || !secrets) {
-      return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const { data: instance, error: instanceError } = await supabaseAdmin
-      .from('whatsapp_instances')
-      .select('instance_name, provider_type, instance_id_external')
-      .eq('id', instanceId)
-      .single();
-
-    if (instanceError || !instance) {
+    if (instanceResult.error || !instanceResult.data) {
       return new Response(JSON.stringify({ error: 'Instance not found' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (secretsResult.error || !secretsResult.data) {
+      return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const providerType = (instance as any).provider_type || 'self_hosted';
-    const instanceIdExternal = (instance as any).instance_id_external;
+    const instance = instanceResult.data as any;
+    const secrets = secretsResult.data as any;
+    const providerType = instance.provider_type || 'self_hosted';
 
-    const instanceIdentifier = providerType === 'cloud' && instanceIdExternal
-      ? instanceIdExternal
-      : instance.instance_name;
+    console.log('[test-instance-connection] Provider:', providerType, 'Instance:', instance.instance_name);
 
-    console.log('[test-instance-connection] Testing with identifier:', instanceIdentifier);
-    const authHeaders = getEvolutionAuthHeaders(secrets.api_key, providerType);
-    
-    const response = await fetch(
-      `${secrets.api_url}/instance/connectionState/${instanceIdentifier}`,
-      { headers: authHeaders }
-    );
+    const adapter = getAdapter(providerType);
+    const status = await adapter.checkStatus(secrets, instance);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[test-instance-connection] Error:', errorText);
-      return new Response(JSON.stringify({ error: 'Connection test failed', details: errorText }), {
-        status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    console.log('[test-instance-connection] Status:', status);
 
-    const responseText = await response.text();
-    let data: any = {};
-    
-    if (responseText) {
-      try { data = JSON.parse(responseText); } catch (e) {
-        console.log('[test-instance-connection] Response is not JSON:', responseText);
-      }
-    }
-
-    let newStatus = 'disconnected';
-    if (!responseText || data.state === 'open' || data.instance?.state === 'open') {
-      newStatus = 'connected';
-    } else if (data.state === 'connecting') {
-      newStatus = 'connecting';
-    }
-
+    // Update status in DB
     await supabaseAdmin
       .from('whatsapp_instances')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .update({ status: status.connected ? 'connected' : 'disconnected', updated_at: new Date().toISOString() })
       .eq('id', instanceId);
 
-    console.log(`[test-instance-connection] Updated status to ${newStatus}`);
+    return new Response(
+      JSON.stringify({
+        connected: status.connected,
+        phoneNumber: status.phoneNumber,
+        state: status.state,
+        error: status.error,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
 
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
   } catch (error) {
     console.error('[test-instance-connection] Error:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   }
 });
