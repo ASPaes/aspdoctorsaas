@@ -16,67 +16,13 @@ interface SendMessageParams {
 
 let tempCounter = 0;
 
-/**
- * Resolve which Edge Function to call based on the conversation's instance provider_type.
- * Looks up the instance from the query cache first, then falls back to a DB query.
- */
-async function resolveEdgeFunction(
-  conversationId: string,
-  queryClient: ReturnType<typeof useQueryClient>,
-): Promise<string> {
-  // Try to find instance_id from conversations cache
-  const convCaches = queryClient.getQueriesData<any>({ queryKey: ['whatsapp', 'conversations'] });
-  let instanceId: string | null = null;
-
-  for (const [, cacheData] of convCaches) {
-    if (!cacheData?.conversations) continue;
-    const conv = cacheData.conversations.find((c: any) => c.id === conversationId);
-    if (conv?.instance_id) {
-      instanceId = conv.instance_id;
-      break;
-    }
-  }
-
-  if (!instanceId) {
-    // Fallback: fetch from DB
-    const { data } = await supabase
-      .from('whatsapp_conversations')
-      .select('instance_id')
-      .eq('id', conversationId)
-      .single();
-    instanceId = data?.instance_id || null;
-  }
-
-  if (!instanceId) return 'send-whatsapp-message';
-
-  // Check instance cache
-  const instanceCaches = queryClient.getQueriesData<any[]>({ queryKey: ['whatsapp', 'instances'] });
-  for (const [, instances] of instanceCaches) {
-    if (!Array.isArray(instances)) continue;
-    const inst = instances.find((i: any) => i.id === instanceId);
-    if (inst) {
-      return inst.provider_type === 'meta_cloud' ? 'send-meta-message' : 'send-whatsapp-message';
-    }
-  }
-
-  // Fallback: fetch instance from DB
-  const { data: inst } = await supabase
-    .from('whatsapp_instances')
-    .select('provider_type')
-    .eq('id', instanceId)
-    .single();
-
-  return inst?.provider_type === 'meta_cloud' ? 'send-meta-message' : 'send-whatsapp-message';
-}
-
 export const useWhatsAppSend = () => {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (params: SendMessageParams) => {
-      const fnName = await resolveEdgeFunction(params.conversationId, queryClient);
-      console.log(`[useWhatsAppSend] Routing to ${fnName} for conversation ${params.conversationId}`);
-      const { data, error } = await supabase.functions.invoke(fnName, {
+      console.log(`[useWhatsAppSend] Sending via send-whatsapp-message for conversation ${params.conversationId}`);
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
         body: params,
       });
       if (error) throw error;
