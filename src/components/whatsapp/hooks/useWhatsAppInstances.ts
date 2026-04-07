@@ -35,6 +35,7 @@ export const useWhatsAppInstances = () => {
     mutationFn: async (instance: any) => {
       const { api_url, api_key, provider_type, instance_id_external,
               meta_phone_number_id, meta_access_token, meta_verify_token,
+              zapi_instance_id, zapi_token, zapi_client_token,
               ...instanceData } = instance;
 
       const isMeta = provider_type === 'meta_cloud';
@@ -62,6 +63,13 @@ export const useWhatsAppInstances = () => {
         secretsPayload.meta_verify_token = meta_verify_token || null;
       }
 
+      const isZapi = provider_type === 'zapi';
+      if (isZapi) {
+        secretsPayload.zapi_instance_id = zapi_instance_id || null;
+        secretsPayload.zapi_token = zapi_token || null;
+        secretsPayload.zapi_client_token = zapi_client_token || null;
+      }
+
       const { error: secretsError } = await (supabase
         .from('whatsapp_instance_secrets') as any)
         .insert(secretsPayload);
@@ -80,6 +88,7 @@ export const useWhatsAppInstances = () => {
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
       const { api_url, api_key, provider_type, instance_id_external,
               meta_phone_number_id, meta_access_token, meta_verify_token,
+              zapi_instance_id, zapi_token, zapi_client_token,
               ...instanceUpdates } = updates;
 
       const finalUpdates = {
@@ -103,6 +112,9 @@ export const useWhatsAppInstances = () => {
       if (api_key) secretsUpdate.api_key = api_key;
       if (meta_access_token !== undefined) secretsUpdate.meta_access_token = meta_access_token;
       if (meta_verify_token !== undefined) secretsUpdate.meta_verify_token = meta_verify_token;
+      if (zapi_instance_id !== undefined) secretsUpdate.zapi_instance_id = zapi_instance_id;
+      if (zapi_token !== undefined) secretsUpdate.zapi_token = zapi_token;
+      if (zapi_client_token !== undefined) secretsUpdate.zapi_client_token = zapi_client_token;
 
       if (Object.keys(secretsUpdate).length > 0) {
         const { error: secretsError } = await (supabase
