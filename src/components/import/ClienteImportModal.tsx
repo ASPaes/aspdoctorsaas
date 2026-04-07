@@ -119,17 +119,19 @@ function toNullableString(v: string | undefined): string | null {
 
 function toNullableFloat(v: string | undefined): number | null {
   if (!v || v.trim() === "") return null;
-  // Remove símbolos monetários, espaços, % e caracteres não numéricos
-  // Suporta: "R$ 90,22", " R$  171,32 ", "8,00%", "35,00%", "90.22", "90,22"
-  let cleaned = v
-    .replace(/R\$\s*/gi, '')   // remove R$
-    .replace(/%/g, '')          // remove %
-    .replace(/\s/g, '')         // remove espaços
-    .replace(/\./g, '')         // remove pontos de milhar (ex: 1.000,00)
-    .replace(',', '.');         // troca vírgula decimal por ponto
-  // Caso edge: se após limpeza ficou vazio ou só traço (ex: "R$ -")
-  if (!cleaned || cleaned === '-' || cleaned === '') return null;
-  const n = parseFloat(cleaned);
+  let s = v.trim()
+    .replace(/R\$\s*/gi, '')
+    .replace(/%/g, '')
+    .replace(/\s/g, '');
+  if (!s || s === '-') return null;
+  // Se tem vírgula: formato BR (vírgula = decimal, ponto = milhar)
+  // Ex: "1.000,22" → remove pontos de milhar, troca vírgula por ponto
+  if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  }
+  // Se só tem ponto (sem vírgula): ponto é decimal — não mexer
+  // Ex: "3258.91" → usar direto
+  const n = parseFloat(s);
   return isNaN(n) ? null : n;
 }
 
