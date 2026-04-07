@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { getAdapter } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,10 +17,6 @@ interface SendMessageRequest {
   quotedMessageId?: string;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
-}
-
-function getEvolutionAuthHeaders(apiKey: string, _providerType: string): Record<string, string> {
-  return { apikey: apiKey };
 }
 
 Deno.serve(async (req) => {
@@ -221,42 +218,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch instance details
-    const { data: instanceData, error: instanceError } = await supabase
-      .from('whatsapp_instances')
-      .select('id, instance_name, provider_type, instance_id_external')
-      .eq('id', sendInstanceId)
-      .single();
+    // Fetch instance details + secrets in parallel
+    const [instanceResult, secretsResult] = await Promise.all([
+      supabase
+        .from('whatsapp_instances')
+        .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id')
+        .eq('id', sendInstanceId)
+        .single(),
+      supabase
+        .from('whatsapp_instance_secrets')
+        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token')
+        .eq('instance_id', sendInstanceId)
+        .single(),
+    ]);
 
-    if (instanceError || !instanceData) {
+    if (instanceResult.error || !instanceResult.data) {
       console.error('[send] Instance not found:', sendInstanceId);
       return new Response(JSON.stringify({ error: 'Instance not found' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const { data: secrets, error: secretsError } = await supabase
-      .from('whatsapp_instance_secrets')
-      .select('api_url, api_key')
-      .eq('instance_id', instanceData.id)
-      .single();
-
-    if (secretsError || !secrets) {
-      console.error('[send] Failed to fetch instance secrets:', secretsError);
+    if (secretsResult.error || !secretsResult.data) {
+      console.error('[send] Failed to fetch instance secrets:', secretsResult.error);
       return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const instanceName = instanceData.instance_name;
+    const instanceData = instanceResult.data as any;
+    const secrets = secretsResult.data as any;
     const providerType = instanceData.provider_type || 'self_hosted';
-    const instanceIdExternal = instanceData.instance_id_external;
 
-    const instanceIdentifier = providerType === 'cloud' && instanceIdExternal
-      ? instanceIdExternal
-      : instanceName;
-
-    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceName, 'Provider:', providerType);
+    console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceData.instance_name, 'Provider:', providerType);
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
@@ -327,17 +321,9 @@ Deno.serve(async (req) => {
       prefixedBody.content = signaturePrefix;
     }
 
-    // Use signed URL from storage if available, otherwise fall back to base64/mediaUrl
-    const mediaOverride = storageSignedUrl || undefined;
-    const { endpoint, requestBody } = buildEvolutionRequest(
-      secrets.api_url,
-      instanceIdentifier,
-      destinationNumber,
-      prefixedBody,
-      mediaOverride
-    );
-
-    const authHeaders = getEvolutionAuthHeaders(secrets.api_key, providerType);
+    // ── Montar SendRequest para o adapter ─────────────────────────
+    const mediaActualUrl = storageSignedUrl || body.mediaUrl || undefined;
+    const adapter = getAdapter(providerType);
 
     // --- PRE-SEND: If agent is sending and no active attendance exists, create it and send opening notification BEFORE the agent's message ---
     let preCreatedAttendance: { id: string; attendance_code: string } | null = null;
@@ -395,40 +381,35 @@ Deno.serve(async (req) => {
           preCreatedAttendance = newAtt;
           console.log(`[attendance] PRE-SEND NEW by agent att=${newAtt.id} code=${newAtt.attendance_code}`);
 
-          // Send opening notification to customer FIRST (before agent message)
+          // Send opening notification to customer FIRST (before agent message) via adapter
           try {
             const contactName = contact?.name || '';
             const openingText = contactName
               ? `Olá ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
               : `Olá, o atendimento ${newAtt.attendance_code} foi iniciado.`;
             const destNumber = getDestinationNumber(contact.phone_number);
-            const openEndpoint = `${secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '')}/message/sendText/${instanceIdentifier}`;
-            const openHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...authHeaders };
-            const openResp = await fetch(openEndpoint, {
-              method: 'POST',
-              headers: openHeaders,
-              body: JSON.stringify({ number: destNumber, text: openingText }),
+
+            const openResult = await adapter.send(secrets, instanceData, {
+              to: destNumber,
+              messageType: 'text',
+              content: openingText,
             });
-            if (openResp.ok) {
-              const openData = await openResp.json();
-              const openMsgId = openData.key?.id || `att_open_${Date.now()}`;
-              const openTimestamp = new Date(preNow.getTime() - 1000).toISOString();
-              await supabase.from('whatsapp_messages').upsert({
-                conversation_id: body.conversationId,
-                remote_jid: contact.phone_number,
-                message_id: openMsgId,
-                content: `✅ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
-                message_type: 'system',
-                is_from_me: true,
-                status: 'sent',
-                timestamp: openTimestamp,
-                tenant_id: tenantId,
-                metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
-              }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
-              console.log(`[send-whatsapp-message] Opening notification sent BEFORE agent message for att=${newAtt.id}`);
-            } else {
-              console.error('[send-whatsapp-message] Failed to send opening notification:', await openResp.text());
-            }
+
+            const openMsgId = openResult.messageId;
+            const openTimestamp = new Date(preNow.getTime() - 1000).toISOString();
+            await supabase.from('whatsapp_messages').upsert({
+              conversation_id: body.conversationId,
+              remote_jid: contact.phone_number,
+              message_id: openMsgId,
+              content: `✅ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
+              message_type: 'system',
+              is_from_me: true,
+              status: 'sent',
+              timestamp: openTimestamp,
+              tenant_id: tenantId,
+              metadata: { system: true, attendance_event: 'opened', attendance_id: newAtt.id },
+            }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+            console.log(`[send-whatsapp-message] Opening notification sent BEFORE agent message for att=${newAtt.id}`);
           } catch (openErr) {
             console.error('[send-whatsapp-message] Error sending opening notification:', openErr);
           }
@@ -442,24 +423,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --- Now send the agent's actual message ---
-    const evolutionResponse = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders },
-      body: JSON.stringify(requestBody),
-    });
+    // --- Now send the agent's actual message via adapter ---
+    const sendRequest = {
+      to: destinationNumber,
+      messageType: body.messageType,
+      content: prefixedBody.content,
+      mediaUrl: mediaActualUrl,
+      mediaBase64: (!mediaActualUrl && body.mediaBase64) ? body.mediaBase64 : undefined,
+      mediaMimetype: body.mediaMimetype,
+      fileName: body.fileName,
+      quotedMessageId: body.quotedMessageId,
+    };
 
-    if (!evolutionResponse.ok) {
-      const errorText = await evolutionResponse.text();
-      console.error('[send-whatsapp-message] Evolution API error:', errorText);
+    let sendResult: { messageId: string; raw: unknown };
+    try {
+      sendResult = await adapter.send(secrets, instanceData, sendRequest);
+    } catch (sendErr: any) {
+      console.error('[send-whatsapp-message] Erro no envio:', sendErr);
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to send message via Evolution API' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: sendErr.message || 'Failed to send message' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const evolutionData = await evolutionResponse.json();
-    const messageId = evolutionData.key?.id || `msg_${Date.now()}`;
+    const messageId = sendResult.messageId;
+    const evolutionData = sendResult.raw as any;
+
     const persistedIsFromMe = Boolean(
       evolutionData?.key?.fromMe ??
       evolutionData?.key?.from_me ??
@@ -468,13 +457,13 @@ Deno.serve(async (req) => {
     );
 
     let extractedMediaUrl: string | null = null;
-    if (body.messageType === 'audio' && evolutionData.message?.audioMessage?.url) {
+    if (body.messageType === 'audio' && evolutionData?.message?.audioMessage?.url) {
       extractedMediaUrl = evolutionData.message.audioMessage.url;
-    } else if (body.messageType === 'image' && evolutionData.message?.imageMessage?.url) {
+    } else if (body.messageType === 'image' && evolutionData?.message?.imageMessage?.url) {
       extractedMediaUrl = evolutionData.message.imageMessage.url;
-    } else if (body.messageType === 'video' && evolutionData.message?.videoMessage?.url) {
+    } else if (body.messageType === 'video' && evolutionData?.message?.videoMessage?.url) {
       extractedMediaUrl = evolutionData.message.videoMessage.url;
-    } else if (body.messageType === 'document' && evolutionData.message?.documentMessage?.url) {
+    } else if (body.messageType === 'document' && evolutionData?.message?.documentMessage?.url) {
       extractedMediaUrl = evolutionData.message.documentMessage.url;
     }
 
@@ -678,63 +667,6 @@ Deno.serve(async (req) => {
 function getDestinationNumber(phoneNumber: string): string {
   if (phoneNumber.includes('@lid')) return phoneNumber;
   return phoneNumber.replace(/\D/g, '');
-}
-
-function buildEvolutionRequest(
-  apiUrl: string,
-  instanceName: string,
-  number: string,
-  body: SendMessageRequest,
-  mediaUrlOverride?: string
-): { endpoint: string; requestBody: any } {
-  let baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-  baseUrl = baseUrl.replace(/\/manager$/, '');
-
-  switch (body.messageType) {
-    case 'text': {
-      const requestBody: any = { number, text: body.content };
-      if (body.quotedMessageId) {
-        requestBody.quoted = { key: { id: body.quotedMessageId } };
-      }
-      return { endpoint: `${baseUrl}/message/sendText/${instanceName}`, requestBody };
-    }
-
-    case 'audio': {
-      let audioData: string | undefined = mediaUrlOverride;
-      if (!audioData) {
-        if (body.mediaBase64) {
-          audioData = body.mediaBase64.startsWith('data:')
-            ? body.mediaBase64.split(',')[1] || ''
-            : body.mediaBase64;
-        } else if (body.mediaUrl) {
-          audioData = body.mediaUrl;
-        }
-      }
-      if (!audioData) throw new Error('Missing audio data');
-      return {
-        endpoint: `${baseUrl}/message/sendWhatsAppAudio/${instanceName}`,
-        requestBody: { number, audio: audioData },
-      };
-    }
-
-    case 'image':
-    case 'video':
-    case 'document': {
-      const mediaData = mediaUrlOverride || body.mediaUrl;
-      if (!mediaData) throw new Error('Missing media data for ' + body.messageType);
-      const requestBody: any = {
-        number,
-        mediatype: body.messageType,
-        media: mediaData,
-      };
-      if (body.content) requestBody.caption = body.content;
-      if (body.messageType === 'document' && body.fileName) requestBody.fileName = body.fileName;
-      return { endpoint: `${baseUrl}/message/sendMedia/${instanceName}`, requestBody };
-    }
-
-    default:
-      throw new Error(`Unsupported message type: ${body.messageType}`);
-  }
 }
 
 function getExtFromMime(mime: string): string {
