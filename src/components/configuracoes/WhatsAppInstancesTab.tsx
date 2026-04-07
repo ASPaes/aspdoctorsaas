@@ -147,7 +147,7 @@ export default function WhatsAppInstancesTab() {
     // Load secrets
     const { data: secret } = await (supabase
       .from("whatsapp_instance_secrets") as any)
-      .select("api_url, api_key, zapi_instance_id, zapi_token, meta_access_token")
+      .select("api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token")
       .eq("instance_id", inst.id)
       .maybeSingle();
     setForm({
