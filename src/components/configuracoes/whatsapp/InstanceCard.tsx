@@ -49,7 +49,14 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
     }
   };
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+  const webhookUrl = (() => {
+    const base = import.meta.env.VITE_SUPABASE_URL;
+    switch (instance.provider_type) {
+      case 'zapi':       return `${base}/functions/v1/zapi-webhook`;
+      case 'meta_cloud': return `${base}/functions/v1/meta-webhook`;
+      default:           return `${base}/functions/v1/evolution-webhook`;
+    }
+  })();
 
   const copyWebhookUrl = () => {
     navigator.clipboard.writeText(webhookUrl);

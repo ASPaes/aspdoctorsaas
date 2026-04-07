@@ -3198,8 +3198,8 @@ export type Database = {
       }
       whatsapp_instance_secrets: {
         Row: {
-          api_key: string
-          api_url: string
+          api_key: string | null
+          api_url: string | null
           created_at: string
           id: string
           instance_id: string
@@ -3213,8 +3213,8 @@ export type Database = {
           zapi_webhook_token: string | null
         }
         Insert: {
-          api_key: string
-          api_url: string
+          api_key?: string | null
+          api_url?: string | null
           created_at?: string
           id?: string
           instance_id: string
@@ -3228,8 +3228,8 @@ export type Database = {
           zapi_webhook_token?: string | null
         }
         Update: {
-          api_key?: string
-          api_url?: string
+          api_key?: string | null
+          api_url?: string | null
           created_at?: string
           id?: string
           instance_id?: string
