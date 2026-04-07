@@ -26,15 +26,21 @@ const formSchema = z.object({
   instance_id_external: z.string().optional(),
   api_url: z.string().url("URL inválida").or(z.literal("")),
   api_key: z.string().min(1, "Token/API Key obrigatório").or(z.literal("")),
-  provider_type: z.enum(["self_hosted", "cloud", "meta_cloud"]),
+  provider_type: z.enum(["self_hosted", "cloud", "meta_cloud", "zapi"]),
+  zapi_instance_id: z.string().optional(),
+  zapi_token: z.string().optional(),
+  zapi_client_token: z.string().optional(),
   // Meta Cloud specific
   meta_phone_number_id: z.string().optional(),
   meta_access_token: z.string().optional(),
   meta_verify_token: z.string().optional(),
 }).superRefine((data, ctx) => {
-  if (data.provider_type !== 'meta_cloud') {
+  if (data.provider_type === 'self_hosted' || data.provider_type === 'cloud') {
     if (!data.api_url) ctx.addIssue({ code: 'custom', path: ['api_url'], message: 'URL inválida' });
     if (!data.api_key) ctx.addIssue({ code: 'custom', path: ['api_key'], message: 'Token/API Key obrigatório' });
+  } else if (data.provider_type === 'zapi') {
+    if (!data.zapi_instance_id) ctx.addIssue({ code: 'custom', path: ['zapi_instance_id'], message: 'ID da instância Z-API obrigatório' });
+    if (!data.zapi_token) ctx.addIssue({ code: 'custom', path: ['zapi_token'], message: 'Token Z-API obrigatório' });
   } else {
     if (!data.meta_phone_number_id) ctx.addIssue({ code: 'custom', path: ['meta_phone_number_id'], message: 'Phone Number ID obrigatório' });
     if (!data.meta_access_token) ctx.addIssue({ code: 'custom', path: ['meta_access_token'], message: 'Access Token obrigatório' });
@@ -61,6 +67,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
       display_name: "", instance_name: "", instance_id_external: "",
       api_url: "", api_key: "", provider_type: "self_hosted",
       meta_phone_number_id: "", meta_access_token: "", meta_verify_token: "",
+      zapi_instance_id: "", zapi_token: "", zapi_client_token: "",
     },
   });
 
@@ -101,18 +108,23 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
   const onSubmit = async (values: FormValues) => {
     try {
       const isMeta = values.provider_type === 'meta_cloud';
+      const isZapi = values.provider_type === 'zapi';
       await createInstance.mutateAsync({
         display_name: values.display_name,
         instance_name: values.instance_name,
         instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : undefined,
-        api_url: isMeta ? '' : values.api_url,
-        api_key: isMeta ? '' : values.api_key,
+        api_url: (isMeta || isZapi) ? '' : values.api_url,
+        api_key: (isMeta || isZapi) ? '' : values.api_key,
         provider_type: values.provider_type,
-        // Meta Cloud specific fields
         ...(isMeta && {
           meta_phone_number_id: values.meta_phone_number_id,
           meta_access_token: values.meta_access_token,
           meta_verify_token: values.meta_verify_token,
+        }),
+        ...(isZapi && {
+          zapi_instance_id: values.zapi_instance_id,
+          zapi_token: values.zapi_token,
+          zapi_client_token: values.zapi_client_token,
         }),
       });
       setLastCreatedProviderType(values.provider_type);
@@ -131,7 +143,11 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
   };
 
   const metaWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-webhook`;
-  const webhookUrl = lastCreatedProviderType === 'meta_cloud' ? metaWebhookUrl : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+  const webhookUrl = lastCreatedProviderType === 'meta_cloud'
+    ? metaWebhookUrl
+    : lastCreatedProviderType === 'zapi'
+      ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zapi-webhook`
+      : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
   const copyWebhookUrl = () => { navigator.clipboard.writeText(webhookUrl); toast.success("URL copiada!"); };
 
   return (
@@ -159,6 +175,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                         <SelectItem value="self_hosted">Evolution API Self-Hosted</SelectItem>
                         <SelectItem value="cloud">Evolution API Cloud</SelectItem>
                         <SelectItem value="meta_cloud">Meta Cloud API (Oficial)</SelectItem>
+                        <SelectItem value="zapi">Z-API</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -202,7 +219,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                 )}
 
                 {/* Evolution fields (self_hosted / cloud) */}
-                {providerType !== 'meta_cloud' && (
+                {(providerType === 'self_hosted' || providerType === 'cloud') && (
                   <>
                     <FormField control={form.control} name="api_url" render={({ field }) => (
                       <FormItem>
@@ -268,14 +285,40 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                   </>
                 )}
 
+                {providerType === 'zapi' && (
+                  <>
+                    <FormField control={form.control} name="zapi_instance_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ID da Instância Z-API *</FormLabel>
+                        <FormControl><Input placeholder="ID da instância no painel Z-API" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="zapi_token" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Token Z-API *</FormLabel>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="zapi_client_token" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Client-Token Z-API (opcional)</FormLabel>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </>
+                )}
+
                 <div className="flex gap-2">
-                  {providerType !== 'meta_cloud' && (
+                  {(providerType === 'self_hosted' || providerType === 'cloud') && (
                     <Button type="button" variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
                       {isTestingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : connectionTested ? <Check className="mr-2 h-4 w-4" /> : null}
                       Testar Conexão
                     </Button>
                   )}
-                  <Button type="submit" disabled={providerType !== 'meta_cloud' ? (!connectionTested || createInstance.isPending) : createInstance.isPending} className="ml-auto">
+                  <Button type="submit" disabled={(providerType === 'self_hosted' || providerType === 'cloud') ? (!connectionTested || createInstance.isPending) : createInstance.isPending} className="ml-auto">
                     {createInstance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Salvar
                   </Button>
