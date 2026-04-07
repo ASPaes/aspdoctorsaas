@@ -293,7 +293,6 @@ export const REQUIRED_FIELDS = [
   'data_venda',
   'produto',
   'recorrencia',
-  'valor_ativacao',
   'mensalidade',
   'custo_operacao',
   'imposto_percentual',
