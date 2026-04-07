@@ -33,12 +33,17 @@ export const useWhatsAppInstances = () => {
 
   const createInstance = useMutation({
     mutationFn: async (instance: any) => {
-      const { api_url, api_key, provider_type, instance_id_external,
-              meta_phone_number_id, meta_access_token, meta_verify_token,
-              zapi_instance_id, zapi_token, zapi_client_token,
-              ...instanceData } = instance;
+      const {
+        api_url, api_key,
+        provider_type,
+        instance_id_external,
+        meta_phone_number_id, meta_access_token, meta_verify_token,
+        zapi_instance_id, zapi_token, zapi_client_token,
+        ...instanceData
+      } = instance;
 
       const isMeta = provider_type === 'meta_cloud';
+      const isZapi = provider_type === 'zapi';
 
       const { data: instanceResult, error: instanceError } = await (supabase
         .from('whatsapp_instances') as any)
@@ -58,12 +63,12 @@ export const useWhatsAppInstances = () => {
         api_url: api_url || '',
         api_key: api_key || '',
       };
+
       if (isMeta) {
         secretsPayload.meta_access_token = meta_access_token || null;
         secretsPayload.meta_verify_token = meta_verify_token || null;
       }
 
-      const isZapi = provider_type === 'zapi';
       if (isZapi) {
         secretsPayload.zapi_instance_id = zapi_instance_id || null;
         secretsPayload.zapi_token = zapi_token || null;
@@ -81,15 +86,21 @@ export const useWhatsAppInstances = () => {
 
       return instanceResult;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
+    },
   });
 
   const updateInstance = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      const { api_url, api_key, provider_type, instance_id_external,
-              meta_phone_number_id, meta_access_token, meta_verify_token,
-              zapi_instance_id, zapi_token, zapi_client_token,
-              ...instanceUpdates } = updates;
+      const {
+        api_url, api_key,
+        provider_type,
+        instance_id_external,
+        meta_phone_number_id, meta_access_token, meta_verify_token,
+        zapi_instance_id, zapi_token, zapi_client_token,
+        ...instanceUpdates
+      } = updates;
 
       const finalUpdates = {
         ...instanceUpdates,
@@ -128,7 +139,9 @@ export const useWhatsAppInstances = () => {
 
       return data;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
+    },
   });
 
   const deleteInstance = useMutation({
@@ -136,16 +149,22 @@ export const useWhatsAppInstances = () => {
       const { error } = await supabase.from('whatsapp_instances').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
+    },
   });
 
   const testConnection = useMutation({
     mutationFn: async (id: string) => {
-      const { data, error } = await supabase.functions.invoke('test-instance-connection', { body: { instanceId: id } });
+      const { data, error } = await supabase.functions.invoke('test-instance-connection', {
+        body: { instanceId: id },
+      });
       if (error) throw error;
       return data;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
+    },
   });
 
   return { instances, isLoading, error, createInstance, updateInstance, deleteInstance, testConnection };
