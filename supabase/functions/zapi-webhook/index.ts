@@ -1,33 +1,52 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 const LOG = '[zapi-webhook]';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
-  // Responde 200 imediatamente para a Z-API não fazer retry
-  const responsePromise = new Response(JSON.stringify({ received: true }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  // Responde 200 imediatamente — Z-API tem timeout curto
+  const response = new Response(JSON.stringify({ received: true }), {
+    headers: { 'Content-Type': 'application/json' },
   });
 
-  // Processa em background (fire-and-forget)
-  processWebhook(req).catch((err) =>
+  processWebhook(req.clone()).catch((err) =>
     console.error(`${LOG} Erro no processamento:`, err)
   );
 
-  return responsePromise;
+  return response;
 });
+
+// Normaliza número BR: adiciona 9 para celulares com 8 dígitos locais
+function normalizePhone(raw: string): string {
+  let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
+  // Remove @s.whatsapp.net ou @lid se vier no JID
+  digits = digits.split('@')[0];
+  // Se não tem DDI, assume Brasil
+  if (!digits.startsWith('55') && digits.length <= 11) {
+    digits = '55' + digits;
+  }
+  // BR: 55 + DDD (2) + número
+  // Celular BR sem 9: 554XNNNNNNNN (12 dígitos) → adiciona 9
+  if (digits.startsWith('55') && digits.length === 12) {
+    const ddd = digits.substring(2, 4);
+    const numero = digits.substring(4);
+    // Só adiciona 9 se começa com 6,7,8,9 (celular) e tem 8 dígitos
+    if (numero.length === 8 && /^[6-9]/.test(numero)) {
+      digits = '55' + ddd + '9' + numero;
+    }
+  }
+  return digits;
+}
 
 async function processWebhook(req: Request): Promise<void> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, serviceKey);
 
   let payload: any;
   try {
@@ -37,16 +56,15 @@ async function processWebhook(req: Request): Promise<void> {
     return;
   }
 
-  console.log(`${LOG} Payload recebido:`, JSON.stringify(payload).substring(0, 300));
+  console.log(`${LOG} Payload:`, JSON.stringify(payload).substring(0, 400));
 
-  // ── Identificar instância pelo instanceId da Z-API ──────────────
+  // ── Identificar instância pelo zapi_instance_id ──────────────
   const zapiInstanceId = payload?.instanceId || payload?.instance?.id || null;
   if (!zapiInstanceId) {
-    console.warn(`${LOG} instanceId não encontrado no payload`);
+    console.warn(`${LOG} instanceId ausente no payload`);
     return;
   }
 
-  // Buscar instância pelo zapi_instance_id nos secrets
   const { data: secretRow } = await supabase
     .from('whatsapp_instance_secrets')
     .select('instance_id, zapi_webhook_token')
@@ -54,11 +72,11 @@ async function processWebhook(req: Request): Promise<void> {
     .maybeSingle();
 
   if (!secretRow) {
-    console.warn(`${LOG} Instância não encontrada para zapiInstanceId=${zapiInstanceId}`);
+    console.warn(`${LOG} Instância não encontrada: zapiInstanceId=${zapiInstanceId}`);
     return;
   }
 
-  // ── Validar webhook token (segurança) ──────────────────────────
+  // ── Validar token de segurança ────────────────────────────────
   if (secretRow.zapi_webhook_token) {
     const receivedToken =
       req.headers.get('X-Zapitoken') ||
@@ -66,14 +84,13 @@ async function processWebhook(req: Request): Promise<void> {
       payload?.token ||
       null;
     if (receivedToken !== secretRow.zapi_webhook_token) {
-      console.warn(`${LOG} Token inválido para instanceId=${zapiInstanceId}`);
+      console.warn(`${LOG} Token inválido`);
       return;
     }
   }
 
   const instanceId = secretRow.instance_id;
 
-  // Buscar tenant_id da instância
   const { data: instance } = await supabase
     .from('whatsapp_instances')
     .select('tenant_id, instance_name')
@@ -81,193 +98,151 @@ async function processWebhook(req: Request): Promise<void> {
     .maybeSingle();
 
   if (!instance?.tenant_id) {
-    console.warn(`${LOG} tenant_id não encontrado para instanceId=${instanceId}`);
+    console.warn(`${LOG} tenant_id não encontrado`);
     return;
   }
 
-  const tenantId = instance.tenant_id;
   const type = payload?.type || payload?.event || '';
+  console.log(`${LOG} Evento: ${type} | instance: ${instance.instance_name}`);
 
-  console.log(`${LOG} Evento: ${type} | tenant: ${tenantId} | instance: ${instance.instance_name}`);
-
-  // ── Roteamento por tipo de evento ──────────────────────────────
-  if (type === 'ReceivedCallback' || type === 'message' || payload?.isMessage) {
-    await handleInboundMessage(supabase, payload, instanceId, tenantId);
-  } else if (type === 'MessageStatusCallback' || type === 'status') {
-    await handleStatusUpdate(supabase, payload, tenantId);
-  } else if (type === 'connected' || type === 'disconnected') {
-    const newStatus = type === 'connected' ? 'connected' : 'disconnected';
+  // ── Atualização de status de conexão ─────────────────────────
+  if (type === 'connected' || type === 'disconnected') {
     await supabase
       .from('whatsapp_instances')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .update({ status: type, updated_at: new Date().toISOString() })
       .eq('id', instanceId);
-    console.log(`${LOG} Status atualizado: ${newStatus}`);
-  } else {
-    console.log(`${LOG} Evento ignorado: ${type}`);
-  }
-}
-
-async function handleInboundMessage(
-  supabase: any,
-  payload: any,
-  instanceId: string,
-  tenantId: string
-): Promise<void> {
-  // Normaliza payload Z-API → formato interno
-  const phone = payload?.phone || payload?.from || '';
-  const messageId = payload?.messageId || payload?.id || `zapi_${Date.now()}`;
-  const content = payload?.text?.message || payload?.body || payload?.message || '';
-  const fromMe = payload?.fromMe === true || payload?.isFromMe === true;
-  const timestamp = payload?.momment
-    ? new Date(payload.momment).toISOString()
-    : new Date().toISOString();
-
-  let messageType: string = 'text';
-  let mediaUrl: string | null = null;
-
-  if (payload?.image) { messageType = 'image'; mediaUrl = payload.image?.imageUrl || null; }
-  else if (payload?.audio) { messageType = 'audio'; mediaUrl = payload.audio?.audioUrl || null; }
-  else if (payload?.video) { messageType = 'video'; mediaUrl = payload.video?.videoUrl || null; }
-  else if (payload?.document) { messageType = 'document'; mediaUrl = payload.document?.documentUrl || null; }
-
-  if (!phone) {
-    console.warn('[zapi-webhook] Telefone ausente no payload');
+    console.log(`${LOG} Status atualizado: ${type}`);
     return;
   }
 
-  const normalizedPhone = phone.replace(/\D/g, '').replace(/^0+/, '');
-
-  // Buscar ou criar contato
-  let contactId: string | null = null;
-  const { data: existingContact } = await supabase
-    .from('whatsapp_contacts')
-    .select('id')
-    .eq('phone_number', normalizedPhone)
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
-
-  if (existingContact) {
-    contactId = existingContact.id;
-  } else {
-    const contactName = payload?.senderName || payload?.name || normalizedPhone;
-    const { data: newContact } = await supabase
-      .from('whatsapp_contacts')
-      .insert({ phone_number: normalizedPhone, name: contactName, tenant_id: tenantId })
-      .select('id')
-      .single();
-    contactId = newContact?.id || null;
-  }
-
-  if (!contactId) {
-    console.error('[zapi-webhook] Falha ao resolver contato');
-    return;
-  }
-
-  // Buscar ou criar conversa
-  const { data: existingConv } = await supabase
-    .from('whatsapp_conversations')
-    .select('id, status')
-    .eq('contact_id', contactId)
-    .eq('instance_id', instanceId)
-    .eq('tenant_id', tenantId)
-    .maybeSingle();
-
-  let conversationId: string;
-
-  if (existingConv) {
-    conversationId = existingConv.id;
-    if (!fromMe && existingConv.status === 'closed') {
+  // ── Atualização de status de mensagem ─────────────────────────
+  if (type === 'MessageStatusCallback') {
+    const messageId = payload?.messageId || payload?.id;
+    const status = payload?.status;
+    if (messageId && status) {
+      const statusMap: Record<string, string> = {
+        SENT: 'sent', DELIVERED: 'delivered', READ: 'read', FAILED: 'failed',
+        sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed',
+      };
       await supabase
-        .from('whatsapp_conversations')
-        .update({ status: 'active', updated_at: new Date().toISOString() })
-        .eq('id', conversationId);
+        .from('whatsapp_messages')
+        .update({ status: statusMap[status] || status.toLowerCase() })
+        .eq('message_id', messageId)
+        .eq('tenant_id', instance.tenant_id);
     }
+    return;
+  }
+
+  // ── Mensagens recebidas (ReceivedCallback) ────────────────────
+  if (type !== 'ReceivedCallback' && !payload?.isMessage) {
+    console.log(`${LOG} Evento ignorado: ${type}`);
+    return;
+  }
+
+  // Ignorar mensagens enviadas pelo próprio agente
+  // (já foram salvas pelo send-whatsapp-message)
+  if (payload?.fromMe === true || payload?.isFromMe === true) {
+    console.log(`${LOG} Mensagem fromMe ignorada`);
+    return;
+  }
+
+  // ── Normalizar payload Z-API → formato Evolution MESSAGES_UPSERT ──
+  const rawPhone = payload?.phone || payload?.from || '';
+  if (!rawPhone) {
+    console.warn(`${LOG} Telefone ausente`);
+    return;
+  }
+
+  const normalizedPhone = normalizePhone(rawPhone);
+  const remoteJid = `${normalizedPhone}@s.whatsapp.net`;
+
+  const messageId = payload?.messageId || payload?.id || `zapi_${Date.now()}`;
+  const timestamp = payload?.momment
+    ? Math.floor(payload.momment / 1000)
+    : Math.floor(Date.now() / 1000);
+
+  // Monta o conteúdo da mensagem
+  let messageType = 'conversation';
+  let messageContent: any = {};
+  let bodyText = payload?.text?.message || payload?.body || payload?.message || '';
+
+  if (payload?.image) {
+    messageType = 'imageMessage';
+    messageContent = {
+      imageMessage: {
+        url: payload.image?.imageUrl || '',
+        caption: payload.image?.caption || bodyText || '',
+        mimetype: payload.image?.mimeType || 'image/jpeg',
+      }
+    };
+    bodyText = payload.image?.caption || bodyText || '';
+  } else if (payload?.audio) {
+    messageType = 'audioMessage';
+    messageContent = {
+      audioMessage: {
+        url: payload.audio?.audioUrl || '',
+        mimetype: payload.audio?.mimeType || 'audio/ogg',
+        ptt: true,
+      }
+    };
+    bodyText = '';
+  } else if (payload?.video) {
+    messageType = 'videoMessage';
+    messageContent = {
+      videoMessage: {
+        url: payload.video?.videoUrl || '',
+        caption: payload.video?.caption || bodyText || '',
+        mimetype: payload.video?.mimeType || 'video/mp4',
+      }
+    };
+    bodyText = payload.video?.caption || bodyText || '';
+  } else if (payload?.document) {
+    messageType = 'documentMessage';
+    messageContent = {
+      documentMessage: {
+        url: payload.document?.documentUrl || '',
+        fileName: payload.document?.fileName || 'document',
+        mimetype: payload.document?.mimeType || 'application/octet-stream',
+      }
+    };
+    bodyText = payload.document?.caption || bodyText || '';
   } else {
-    const { data: newConv } = await supabase
-      .from('whatsapp_conversations')
-      .insert({
-        tenant_id: tenantId,
-        contact_id: contactId,
-        instance_id: instanceId,
-        status: 'active',
-        last_message_at: timestamp,
-        last_message_preview: content.substring(0, 200),
-      })
-      .select('id')
-      .single();
-    conversationId = newConv?.id;
+    messageContent = { conversation: bodyText };
   }
 
-  if (!conversationId) {
-    console.error('[zapi-webhook] Falha ao resolver conversa');
-    return;
-  }
-
-  // Salvar mensagem (upsert para evitar duplicatas)
-  const { error: msgError } = await supabase
-    .from('whatsapp_messages')
-    .upsert({
-      tenant_id: tenantId,
-      conversation_id: conversationId,
-      message_id: messageId,
-      remote_jid: normalizedPhone,
-      content,
-      message_type: messageType,
-      media_url: mediaUrl,
-      is_from_me: fromMe,
-      status: fromMe ? 'sent' : 'received',
-      timestamp,
-      instance_id: instanceId,
-      metadata: { source: 'zapi', raw_type: payload?.type },
-    }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
-
-  if (msgError) {
-    console.error('[zapi-webhook] Erro ao salvar mensagem:', msgError);
-    return;
-  }
-
-  // Atualizar preview da conversa
-  await supabase
-    .from('whatsapp_conversations')
-    .update({
-      last_message_at: timestamp,
-      last_message_preview: content.substring(0, 200),
-      is_last_message_from_me: fromMe,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', conversationId);
-
-  console.log(`[zapi-webhook] Mensagem salva: ${messageId} | conversa: ${conversationId}`);
-}
-
-async function handleStatusUpdate(
-  supabase: any,
-  payload: any,
-  tenantId: string
-): Promise<void> {
-  const messageId = payload?.messageId || payload?.id;
-  const status = payload?.status;
-
-  if (!messageId || !status) return;
-
-  const statusMap: Record<string, string> = {
-    'sent': 'sent',
-    'delivered': 'delivered',
-    'read': 'read',
-    'failed': 'failed',
-    'SENT': 'sent',
-    'DELIVERED': 'delivered',
-    'READ': 'read',
-    'FAILED': 'failed',
+  // Monta payload no formato Evolution MESSAGES_UPSERT
+  const evolutionPayload = {
+    event: 'messages.upsert',
+    instance: instance.instance_name,
+    data: {
+      key: {
+        remoteJid,
+        fromMe: false,
+        id: messageId,
+      },
+      pushName: payload?.senderName || payload?.name || '',
+      message: messageContent,
+      messageType,
+      messageTimestamp: timestamp,
+      status: 'DELIVERY_ACK',
+    },
   };
 
-  const normalizedStatus = statusMap[status] || status.toLowerCase();
+  console.log(`${LOG} Repassando para evolution-webhook: ${remoteJid}`);
 
-  await supabase
-    .from('whatsapp_messages')
-    .update({ status: normalizedStatus, updated_at: new Date().toISOString() })
-    .eq('message_id', messageId)
-    .eq('tenant_id', tenantId);
-
-  console.log(`[zapi-webhook] Status atualizado: ${messageId} → ${normalizedStatus}`);
+  // ── Delegar para evolution-webhook (lógica central) ───────────
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/evolution-webhook`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceKey}`,
+        'x-instance-id': instanceId,
+      },
+      body: JSON.stringify(evolutionPayload),
+    });
+    console.log(`${LOG} Delegado com sucesso para evolution-webhook`);
+  } catch (err) {
+    console.error(`${LOG} Erro ao delegar:`, err);
+  }
 }
