@@ -66,6 +66,7 @@ interface FormState {
   provider_type: "self_hosted" | "zapi" | "meta_cloud";
   zapi_instance_id: string;
   zapi_token: string;
+  zapi_client_token: string;
   meta_phone_number_id: string;
   meta_access_token: string;
 }
@@ -78,6 +79,7 @@ const EMPTY_FORM: FormState = {
   provider_type: "self_hosted",
   zapi_instance_id: "",
   zapi_token: "",
+  zapi_client_token: "",
   meta_phone_number_id: "",
   meta_access_token: "",
 };
@@ -106,6 +108,7 @@ export default function WhatsAppInstancesTab() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showZapiToken, setShowZapiToken] = useState(false);
+  const [showZapiClientToken, setShowZapiClientToken] = useState(false);
   const [showMetaToken, setShowMetaToken] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Instance | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -129,6 +132,7 @@ export default function WhatsAppInstancesTab() {
     setForm(EMPTY_FORM);
     setShowApiKey(false);
     setShowZapiToken(false);
+    setShowZapiClientToken(false);
     setShowMetaToken(false);
     setDialogOpen(true);
   };
@@ -138,11 +142,12 @@ export default function WhatsAppInstancesTab() {
     setEditingId(inst.id);
     setShowApiKey(false);
     setShowZapiToken(false);
+    setShowZapiClientToken(false);
     setShowMetaToken(false);
     // Load secrets
     const { data: secret } = await (supabase
       .from("whatsapp_instance_secrets") as any)
-      .select("api_url, api_key, zapi_instance_id, zapi_token, meta_access_token")
+      .select("api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token")
       .eq("instance_id", inst.id)
       .maybeSingle();
     setForm({
@@ -152,6 +157,7 @@ export default function WhatsAppInstancesTab() {
       api_key: secret?.api_key ?? "",
       zapi_instance_id: secret?.zapi_instance_id ?? "",
       zapi_token: secret?.zapi_token ?? "",
+      zapi_client_token: secret?.zapi_client_token ?? "",
       meta_phone_number_id: (inst as any).meta_phone_number_id ?? "",
       meta_access_token: secret?.meta_access_token ?? "",
       provider_type: (inst.provider_type as FormState["provider_type"]) ?? "self_hosted",
@@ -200,6 +206,7 @@ export default function WhatsAppInstancesTab() {
         } else if (form.provider_type === "zapi") {
           secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
           secretsPayload.zapi_token = form.zapi_token.trim();
+          secretsPayload.zapi_client_token = form.zapi_client_token.trim() || null;
         } else if (form.provider_type === "meta_cloud") {
           secretsPayload.meta_access_token = form.meta_access_token.trim();
         }
@@ -256,6 +263,7 @@ export default function WhatsAppInstancesTab() {
         } else if (form.provider_type === "zapi") {
           secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
           secretsPayload.zapi_token = form.zapi_token.trim();
+          secretsPayload.zapi_client_token = form.zapi_client_token.trim() || null;
         } else if (form.provider_type === "meta_cloud") {
           secretsPayload.meta_access_token = form.meta_access_token.trim();
         }
@@ -550,6 +558,29 @@ export default function WhatsAppInstancesTab() {
                       {showZapiToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Client-Token Z-API</Label>
+                  <div className="relative">
+                    <Input
+                      type={showZapiClientToken ? "text" : "password"}
+                      placeholder="client-token da conta Z-API (opcional)"
+                      value={form.zapi_client_token}
+                      onChange={(e) => setForm((f) => ({ ...f, zapi_client_token: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10"
+                      onClick={() => setShowZapiClientToken(!showZapiClientToken)}
+                    >
+                      {showZapiClientToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Encontrado em Z-API → Conta → Security. Necessário em algumas contas.
+                  </p>
                 </div>
               </>
             )}
