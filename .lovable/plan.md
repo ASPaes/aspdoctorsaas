@@ -1,75 +1,64 @@
 
 
 ## Objetivo
-Refatorar o sistema de presenca do agente: substituir a barra horizontal (`AgentPresenceBar`) por um **botao/chip compacto** no header global (`AppLayout`), adicionar modal de pausa com selecao de motivo, manter overlay quando pausado/off, e bloquear acoes do chat.
+Corrigir o bug onde conversas ficam permanentemente marcadas como "Fora do horário" mesmo quando mensagens chegam durante o horário comercial.
 
-## Arquivos Modificados
+## Causa raiz
+No `evolution-webhook`, quando uma mensagem chega **durante** o horário comercial, o código simplesmente pula o bloco de fora-do-horário (`bhResult.inside === true`), mas **nunca limpa** o flag `opened_out_of_hours = true` que foi definido anteriormente. O `getConversationBucket` no frontend usa esse flag para classificar a conversa, mantendo-a presa no balde "Fora do horário" indefinidamente.
 
-### 1. `src/components/AppLayout.tsx`
-- Importar e renderizar o novo `AgentPresenceButton` no header, ao lado do `SidebarTrigger`
-- O botao so aparece quando a rota atual e `/whatsapp` (usar `useLocation`)
+## Mudanças no código
 
-### 2. `src/components/whatsapp/presence/AgentPresenceButton.tsx` (NOVO)
-- Chip compacto que exibe status:
-  - **active**: Badge verde "Ativo" com icone Zap
-  - **paused**: Badge amarela "Pausado mm:ss" com countdown ao vivo
-  - **off**: Badge cinza "Offline"
-- Ao clicar, abre `DropdownMenu` com acoes contextuais:
-  - Se `off`: "Iniciar expediente" -> RPC `agent_presence_set_active`
-  - Se `active`: "Pausar" (submenu com motivos) + "Encerrar expediente"
-  - Se `paused`: "Voltar ao ativo" + "Estender pausa"
-- "Encerrar expediente" verifica atendimentos ativos (mesmo fluxo do `AgentPresenceBar` atual com AlertDialog)
-- Usa `useAgentPresence` hook existente
+### 1. `supabase/functions/evolution-webhook/index.ts`
+Após o check `if (supportConfigBH.business_hours_enabled)` e `bhResult.inside === true`, adicionar lógica para limpar o flag:
 
-### 3. `src/components/whatsapp/presence/AgentPauseModal.tsx` (NOVO)
-- Dialog modal acionado ao selecionar "Pausar" no dropdown
-- Select para escolher motivo (lista de `pauseReasons`)
-- Exibe "Sugestao: X min" baseado no `average_minutes` do motivo selecionado
-- Input numerico para minutos (default = sugestao)
-- Botao "Iniciar Pausa" -> chama `setPaused(reasonId)` com minutos customizados
+```typescript
+if (bhResult.inside) {
+  // Se a conversa estava marcada como fora do horário, limpar o flag
+  const { data: convBHClear } = await supabase
+    .from('whatsapp_conversations')
+    .select('opened_out_of_hours')
+    .eq('id', conversationId)
+    .single();
 
-### 4. `src/hooks/useAgentPresence.ts`
-- Ajustar `setPaused` para aceitar minutos customizados: `setPaused(reasonId: string, minutes?: number)`
-- O parametro `minutes` sobrescreve o `average_minutes` do motivo quando fornecido
+  if (convBHClear?.opened_out_of_hours) {
+    await supabase
+      .from('whatsapp_conversations')
+      .update({
+        opened_out_of_hours: false,
+        out_of_hours_cleared_at: new Date().toISOString(),
+      })
+      .eq('id', conversationId);
+    console.log(`[business-hours] Flag fora-do-horário limpo conv=${conversationId}`);
+  }
+}
+```
 
-### 5. `src/components/whatsapp/presence/AgentPresenceOverlay.tsx`
-- Expandir para mostrar:
-  - Motivo da pausa (buscar nome do `pauseReasons` pelo `pause_reason_id`)
-  - Countdown regressivo (baseado em `pause_expected_end_at`)
-  - Botao "Voltar ao ativo"
-  - Botao "Estender pausa" -> mini-dialog inline para +X min
+Isso vai inserir entre a linha ~1024 (resultado do `checkBusinessHours`) e o bloco `if (!bhResult.inside)`, garantindo que quando uma mensagem do cliente chega dentro do horário, o flag é resetado.
 
-### 6. `src/components/whatsapp/chat/ChatInput.tsx`
-- Importar `useAgentPresence`
-- Quando `isBlocked` = true, desabilitar textarea + botao enviar
-- Tooltip: "Voce precisa estar ATIVO para atender."
+### 2. Correção de dados existentes (opcional — migration)
+Criar migration para limpar conversas que estão incorretamente marcadas como `opened_out_of_hours = true` mas têm atendimento ativo ou foram respondidas:
 
-### 7. `src/components/whatsapp/chat/ChatHeader.tsx`
-- Importar `useAgentPresence`
-- Desabilitar botoes "Assumir" e "Transferir" quando `isBlocked`
-- Tooltip nos botoes desabilitados
-
-### 8. `src/pages/WhatsApp.tsx`
-- Remover `AgentPresenceBar` (substituido pelo botao no header global)
-- Manter `AgentPresenceOverlay`
-- Ajustar alturas (remover compensacao do bar)
-
-## Nao Alterar
-- Logica de atendimentos/URA/CSAT
-- Sidebar e filtros
-- RPCs do Supabase (ja existem)
-- Hook `useAgentPresence` (ajuste minimo no `setPaused`)
+```sql
+UPDATE whatsapp_conversations
+SET opened_out_of_hours = false,
+    out_of_hours_cleared_at = now()
+WHERE opened_out_of_hours = true
+  AND out_of_hours_cleared_at IS NULL
+  AND (first_agent_message_at IS NOT NULL
+    OR EXISTS (
+      SELECT 1 FROM support_attendances sa
+      WHERE sa.conversation_id = whatsapp_conversations.id
+        AND sa.status IN ('in_progress', 'closed', 'inactive_closed')
+    ));
+```
 
 ## Impacto
-- **UI**: Barra horizontal removida, chip compacto no header global
-- **Estado**: Mesmo hook, mesmas RPCs
-- **DB**: Nenhuma alteracao
+- **UI**: Conversas voltarão para a fila normal ("Aguardando") quando mensagens chegarem durante o horário comercial
+- **Backend**: Uma query extra por mensagem recebida durante business hours (apenas para verificar se o flag está ativo)
+- **Segurança**: Sem impacto
 
-## Testes Manuais
-1. Clicar no chip "Offline" -> "Iniciar expediente" -> chip muda para verde "Ativo"
-2. Clicar "Pausar" -> modal com motivos -> selecionar -> overlay aparece com countdown
-3. No overlay, clicar "Voltar ao ativo" -> overlay some, chip verde
-4. No overlay, clicar "Estender" -> countdown aumenta
-5. Tentar enviar mensagem enquanto pausado -> input desabilitado com tooltip
-6. Encerrar expediente com atendimentos ativos -> modal de confirmacao
+## Testes manuais
+1. Configurar horário de atendimento no tenant
+2. Enviar mensagem fora do horário → deve aparecer em "Fora do horário"
+3. Enviar mensagem durante o horário → conversa deve sair de "Fora do horário" e ir para "Fila"
 
