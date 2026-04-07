@@ -4,10 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { RefreshCw, Pencil, Trash2, Copy, Link } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +23,7 @@ interface Instance {
   webhook_url: string | null;
   updated_at: string;
   ignore_group_messages?: boolean;
+  meta_phone_number_id?: string | null;
 }
 
 interface InstanceCardProps {
@@ -39,10 +37,7 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
 
   const handleToggleIgnoreGroups = async (checked: boolean) => {
     try {
-      await updateInstance.mutateAsync({
-        id: instance.id,
-        updates: { ignore_group_messages: checked },
-      });
+      await updateInstance.mutateAsync({ id: instance.id, updates: { ignore_group_messages: checked } });
       toast.success(checked ? "Mensagens de grupo serão ignoradas" : "Mensagens de grupo serão processadas");
     } catch {
       toast.error("Erro ao atualizar configuração");
@@ -96,6 +91,15 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
     }
   };
 
+  const getProviderLabel = () => {
+    switch (instance.provider_type) {
+      case 'zapi': return 'Z-API';
+      case 'meta_cloud': return 'Meta Cloud';
+      case 'cloud': return 'Evolution Cloud';
+      default: return 'Evolution';
+    }
+  };
+
   return (
     <>
       <Card>
@@ -109,9 +113,9 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               <Badge variant="outline" className="text-xs">
                 {instance.instance_name}
               </Badge>
-              {instance.provider_type === 'cloud' && (
-                <Badge variant="secondary" className="text-xs ml-1">Cloud</Badge>
-              )}
+              <Badge variant="secondary" className="text-xs ml-1">
+                {getProviderLabel()}
+              </Badge>
             </div>
           </div>
         </CardHeader>
