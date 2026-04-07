@@ -135,7 +135,12 @@ function toNullableFloat(v: string | undefined): number | null {
 
 function toNullableDate(v: string | undefined): string | null {
   if (!v || v.trim() === "") return null;
-  return v.trim();
+  const s = v.trim();
+  // Converte DD/MM/YYYY → YYYY-MM-DD
+  const ddmmyyyy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  // Já está em YYYY-MM-DD ou formato aceito
+  return s;
 }
 
 // Normaliza removendo acentos, maiúsculas e caracteres especiais
@@ -416,9 +421,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           razao_social:  ['razaosocial', 'razao', 'razaosocialempresa'],
           nome_fantasia: ['fantasia', 'nomefantasia'],
           mensalidade:   ['mrr', 'mensalidade', 'valormensal', 'recorrente'],
-          custo_operacao:['custo', 'custooperacao', 'custooperacional'],
+          custo_operacao: ['custooperacao', 'custooperacional', 'custocomfornecedor'],
           imposto_percentual: ['imposto', 'impostos', 'impostopercentual', 'aliquota'],
-          custo_fixo_percentual: ['custofixo', 'custofixopercentual', 'fixo'],
+          custo_fixo_percentual: ['custo', 'custofixo', 'custofixopercentual', 'fixo', 'custosfixos'],
           valor_ativacao: ['valorativacao', 'ativacao', 'valordeativacao'],
           telefone_whatsapp: ['whatsapp', 'whatsappfinanceiro', 'telefonewhatsapp'],
           telefone_contato: ['telefone', 'fone', 'telefonecontato'],
@@ -482,11 +487,16 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const loadFkData = useCallback(async () => {
     setFkLoading(true);
     try {
+      const tenantId = profile?.tenant_id;
       const promises = activeFkFields.map(async (fk) => {
-        const { data } = await supabase
+        let query = supabase
           .from(fk.table as any)
           .select(`id, ${fk.searchField}`)
           .limit(1000);
+        if (fk.tenantScoped && tenantId) {
+          query = query.eq('tenant_id', tenantId);
+        }
+        const { data } = await query;
         return { key: fk.csvColumn, data: (data ?? []).map((d: any) => ({ id: d.id, nome: d[fk.searchField] })) };
       });
 
