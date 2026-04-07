@@ -1022,6 +1022,26 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         const bhResult = await checkBusinessHours(
           supabase, instanceCtx, conversationId, tenantId, content, timestamp, supportConfigBH
         );
+        if (bhResult.inside) {
+          // Se a conversa estava marcada como fora do horário, limpar o flag
+          const { data: convBHClear } = await supabase
+            .from('whatsapp_conversations')
+            .select('opened_out_of_hours')
+            .eq('id', conversationId)
+            .single();
+
+          if (convBHClear?.opened_out_of_hours) {
+            await supabase
+              .from('whatsapp_conversations')
+              .update({
+                opened_out_of_hours: false,
+                out_of_hours_cleared_at: new Date().toISOString(),
+              })
+              .eq('id', conversationId);
+            console.log(`[business-hours] Flag fora-do-horário limpo conv=${conversationId}`);
+          }
+        }
+
           if (!bhResult.inside) {
           console.log(`[business-hours] Fora do horário conv=${conversationId}`);
 
