@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { processInboundMessage } from '../_shared/message-processor.ts';
+import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 
 const LOG = '[zapi-webhook]';
 
@@ -14,7 +16,7 @@ Deno.serve(async (req) => {
     headers: { 'Content-Type': 'application/json' },
   });
 
-  processWebhook(req.clone()).catch((err) =>
+  processZapiWebhook(req.clone()).catch((err) =>
     console.error(`${LOG} Erro no processamento:`, err)
   );
 
@@ -22,28 +24,19 @@ Deno.serve(async (req) => {
 });
 
 // Normaliza número BR: adiciona 9 para celulares com 8 dígitos locais
-function normalizePhone(raw: string): string {
+function normalizeZapiPhone(raw: string): string {
   let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
-  // Remove @s.whatsapp.net ou @lid se vier no JID
   digits = digits.split('@')[0];
-  // Se não tem DDI, assume Brasil
-  if (!digits.startsWith('55') && digits.length <= 11) {
-    digits = '55' + digits;
-  }
-  // BR: 55 + DDD (2) + número
-  // Celular BR sem 9: 554XNNNNNNNN (12 dígitos) → adiciona 9
+  if (!digits.startsWith('55') && digits.length <= 11) digits = '55' + digits;
   if (digits.startsWith('55') && digits.length === 12) {
     const ddd = digits.substring(2, 4);
     const numero = digits.substring(4);
-    // Só adiciona 9 se começa com 6,7,8,9 (celular) e tem 8 dígitos
-    if (numero.length === 8 && /^[6-9]/.test(numero)) {
-      digits = '55' + ddd + '9' + numero;
-    }
+    if (numero.length === 8 && /^[6-9]/.test(numero)) digits = '55' + ddd + '9' + numero;
   }
   return digits;
 }
 
-async function processWebhook(req: Request): Promise<void> {
+async function processZapiWebhook(req: Request): Promise<void> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, serviceKey);
@@ -67,7 +60,7 @@ async function processWebhook(req: Request): Promise<void> {
 
   const { data: secretRow } = await supabase
     .from('whatsapp_instance_secrets')
-    .select('instance_id, zapi_webhook_token')
+    .select('instance_id, zapi_webhook_token, zapi_instance_id, zapi_token, zapi_client_token')
     .eq('zapi_instance_id', zapiInstanceId)
     .maybeSingle();
 
@@ -93,7 +86,7 @@ async function processWebhook(req: Request): Promise<void> {
 
   const { data: instance } = await supabase
     .from('whatsapp_instances')
-    .select('tenant_id, instance_name')
+    .select('id, tenant_id, instance_name, provider_type, instance_id_external, meta_phone_number_id, skip_ura')
     .eq('id', instanceId)
     .maybeSingle();
 
@@ -105,144 +98,104 @@ async function processWebhook(req: Request): Promise<void> {
   const type = payload?.type || payload?.event || '';
   console.log(`${LOG} Evento: ${type} | instance: ${instance.instance_name}`);
 
-  // ── Atualização de status de conexão ─────────────────────────
+  // ── Status de conexão ─────────────────────────────────────────
   if (type === 'connected' || type === 'disconnected') {
-    await supabase
-      .from('whatsapp_instances')
-      .update({ status: type, updated_at: new Date().toISOString() })
-      .eq('id', instanceId);
-    console.log(`${LOG} Status atualizado: ${type}`);
+    await supabase.from('whatsapp_instances').update({ status: type, updated_at: new Date().toISOString() }).eq('id', instanceId);
     return;
   }
 
-  // ── Atualização de status de mensagem ─────────────────────────
+  // ── Status de mensagem ────────────────────────────────────────
   if (type === 'MessageStatusCallback') {
     const messageId = payload?.messageId || payload?.id;
     const status = payload?.status;
     if (messageId && status) {
-      const statusMap: Record<string, string> = {
-        SENT: 'sent', DELIVERED: 'delivered', READ: 'read', FAILED: 'failed',
-        sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed',
-      };
-      await supabase
-        .from('whatsapp_messages')
-        .update({ status: statusMap[status] || status.toLowerCase() })
-        .eq('message_id', messageId)
-        .eq('tenant_id', instance.tenant_id);
+      const statusMap: Record<string, string> = { SENT: 'sent', DELIVERED: 'delivered', READ: 'read', FAILED: 'failed', sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed' };
+      await supabase.from('whatsapp_messages').update({ status: statusMap[status] || status.toLowerCase() }).eq('message_id', messageId).eq('tenant_id', instance.tenant_id);
     }
     return;
   }
 
-  // ── Mensagens recebidas (ReceivedCallback) ────────────────────
+  // ── Mensagens recebidas ───────────────────────────────────────
   if (type !== 'ReceivedCallback' && !payload?.isMessage) {
     console.log(`${LOG} Evento ignorado: ${type}`);
     return;
   }
 
-  // Ignorar mensagens enviadas pelo próprio agente
-  // (já foram salvas pelo send-whatsapp-message)
+  // Ignorar mensagens enviadas pelo agente (já salvas pelo send-whatsapp-message)
   if (payload?.fromMe === true || payload?.isFromMe === true) {
     console.log(`${LOG} Mensagem fromMe ignorada`);
     return;
   }
 
-  // ── Normalizar payload Z-API → formato Evolution MESSAGES_UPSERT ──
+  // ── Normalizar payload Z-API → NormalizedInboundMessage ──────
   const rawPhone = payload?.phone || payload?.from || '';
-  if (!rawPhone) {
-    console.warn(`${LOG} Telefone ausente`);
-    return;
-  }
+  if (!rawPhone) { console.warn(`${LOG} Telefone ausente`); return; }
 
-  const normalizedPhone = normalizePhone(rawPhone);
-  const remoteJid = `${normalizedPhone}@s.whatsapp.net`;
-
+  const normalizedPhone = normalizeZapiPhone(rawPhone);
   const messageId = payload?.messageId || payload?.id || `zapi_${Date.now()}`;
   const timestamp = payload?.momment
-    ? Math.floor(payload.momment / 1000)
-    : Math.floor(Date.now() / 1000);
+    ? new Date(payload.momment).toISOString()
+    : new Date().toISOString();
 
-  // Monta o conteúdo da mensagem
-  let messageType = 'conversation';
-  let messageContent: any = {};
-  let bodyText = payload?.text?.message || payload?.body || payload?.message || '';
+  let messageType: NormalizedInboundMessage['messageType'] = 'text';
+  let mediaUrl: string | null = null;
+  let mediaMimetype: string | null = null;
+  let mediaFilename: string | null = null;
+  let content = payload?.text?.message || payload?.body || payload?.message || '';
 
   if (payload?.image) {
-    messageType = 'imageMessage';
-    messageContent = {
-      imageMessage: {
-        url: payload.image?.imageUrl || '',
-        caption: payload.image?.caption || bodyText || '',
-        mimetype: payload.image?.mimeType || 'image/jpeg',
-      }
-    };
-    bodyText = payload.image?.caption || bodyText || '';
+    messageType = 'image'; mediaUrl = payload.image?.imageUrl || null;
+    mediaMimetype = payload.image?.mimeType || 'image/jpeg';
+    content = payload.image?.caption || content || '';
   } else if (payload?.audio) {
-    messageType = 'audioMessage';
-    messageContent = {
-      audioMessage: {
-        url: payload.audio?.audioUrl || '',
-        mimetype: payload.audio?.mimeType || 'audio/ogg',
-        ptt: true,
-      }
-    };
-    bodyText = '';
+    messageType = 'audio'; mediaUrl = payload.audio?.audioUrl || null;
+    mediaMimetype = payload.audio?.mimeType || 'audio/ogg'; content = '';
   } else if (payload?.video) {
-    messageType = 'videoMessage';
-    messageContent = {
-      videoMessage: {
-        url: payload.video?.videoUrl || '',
-        caption: payload.video?.caption || bodyText || '',
-        mimetype: payload.video?.mimeType || 'video/mp4',
-      }
-    };
-    bodyText = payload.video?.caption || bodyText || '';
+    messageType = 'video'; mediaUrl = payload.video?.videoUrl || null;
+    mediaMimetype = payload.video?.mimeType || 'video/mp4';
+    content = payload.video?.caption || content || '';
   } else if (payload?.document) {
-    messageType = 'documentMessage';
-    messageContent = {
-      documentMessage: {
-        url: payload.document?.documentUrl || '',
-        fileName: payload.document?.fileName || 'document',
-        mimetype: payload.document?.mimeType || 'application/octet-stream',
-      }
-    };
-    bodyText = payload.document?.caption || bodyText || '';
-  } else {
-    messageContent = { conversation: bodyText };
+    messageType = 'document'; mediaUrl = payload.document?.documentUrl || null;
+    mediaMimetype = payload.document?.mimeType || 'application/octet-stream';
+    mediaFilename = payload.document?.fileName || null;
+    content = payload.document?.caption || content || '';
   }
 
-  // Monta payload no formato Evolution MESSAGES_UPSERT
-  const evolutionPayload = {
-    event: 'messages.upsert',
-    instance: instance.instance_name,
-    data: {
-      key: {
-        remoteJid,
-        fromMe: false,
-        id: messageId,
-      },
-      pushName: payload?.senderName || payload?.name || '',
-      message: messageContent,
-      messageType,
-      messageTimestamp: timestamp,
-      status: 'DELIVERY_ACK',
-    },
+  const instanceInfo: InstanceInfo = {
+    id: instance.id,
+    instance_name: instance.instance_name,
+    provider_type: instance.provider_type as any,
+    instance_id_external: instance.instance_id_external,
+    meta_phone_number_id: instance.meta_phone_number_id,
+    skip_ura: instance.skip_ura ?? false,
+    tenant_id: instance.tenant_id,
   };
 
-  console.log(`${LOG} Repassando para evolution-webhook: ${remoteJid}`);
+  const secrets: InstanceSecrets = {
+    zapi_instance_id: secretRow.zapi_instance_id,
+    zapi_token: secretRow.zapi_token,
+    zapi_client_token: secretRow.zapi_client_token,
+  };
 
-  // ── Delegar para evolution-webhook (lógica central) ───────────
-  try {
-    await fetch(`${supabaseUrl}/functions/v1/evolution-webhook`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceKey}`,
-        'x-instance-id': instanceId,
-      },
-      body: JSON.stringify(evolutionPayload),
-    });
-    console.log(`${LOG} Delegado com sucesso para evolution-webhook`);
-  } catch (err) {
-    console.error(`${LOG} Erro ao delegar:`, err);
-  }
+  const normalized: NormalizedInboundMessage = {
+    instanceId,
+    tenantId: instance.tenant_id,
+    providerType: instance.provider_type as any,
+    instanceInfo,
+    secrets,
+    messageId,
+    remoteJid: `${normalizedPhone}@s.whatsapp.net`,
+    fromMe: false,
+    pushName: payload?.senderName || payload?.name || '',
+    content,
+    messageType,
+    timestamp,
+    mediaUrl,
+    mediaMimetype,
+    mediaFilename,
+    rawPayload: payload,
+  };
+
+  console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
+  await processInboundMessage(supabase, normalized);
 }
