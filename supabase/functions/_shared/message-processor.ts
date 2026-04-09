@@ -337,3 +337,214 @@ async function countOffHoursCustomerMessages(supabase: any, conversationId: stri
   const msgs = data || [];
   return { count: msgs.length, firstAt: msgs.length > 0 ? new Date(msgs[0].timestamp) : null };
 }
+
+// ─── CSAT ─────────────────────────────────────────────────────────────────────
+
+export async function handleCsatResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string): Promise<boolean> {
+  try {
+    const { data: closedAtt } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).eq('status', 'closed').eq('closed_reason', 'manual').order('closed_at', { ascending: false }).limit(1).maybeSingle();
+    if (!closedAtt) return false;
+
+    const { data: csat } = await supabase.from('support_csat').select('id, status, asked_at, score').eq('attendance_id', closedAtt.id).in('status', ['pending', 'awaiting_reason']).limit(1).maybeSingle();
+    if (!csat) return false;
+
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    const elapsedMinutes = (Date.now() - new Date(csat.asked_at).getTime()) / (1000 * 60);
+
+    if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
+      await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
+      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
+      return true;
+    }
+
+    const trimmed = (messageContent || '').trim();
+
+    if (csat.status === 'pending') {
+      const scoreNum = parseInt(trimmed, 10);
+      if (isNaN(scoreNum) || scoreNum < supportConfig.support_csat_score_min || scoreNum > supportConfig.support_csat_score_max) {
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, `Por favor, envie apenas um número de ${supportConfig.support_csat_score_min} a ${supportConfig.support_csat_score_max}.`, { csat: true });
+        return true;
+      }
+      const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
+      await supabase.from('support_csat').update({ score: scoreNum, responded_at: new Date().toISOString(), status: needsReason ? 'awaiting_reason' : 'completed' }).eq('id', csat.id);
+      if (needsReason) {
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
+      } else {
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
+      }
+      return true;
+    }
+
+    if (csat.status === 'awaiting_reason') {
+      await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
+      return true;
+    }
+
+    return false;
+  } catch (err) { console.error('[processor] Error in handleCsatResponse:', err); return false; }
+}
+
+async function sendDeferredClosureMessage(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, attendanceId: string): Promise<void> {
+  try {
+    const { data: att } = await supabase.from('support_attendances').select('attendance_code').eq('id', attendanceId).single();
+    const code = att?.attendance_code || '';
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Atendimento *${code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`, { system: true, attendance_event: 'closed', attendance_id: attendanceId, deferred_after_csat: true });
+  } catch (err) { console.error('[processor] Error in sendDeferredClosureMessage:', err); }
+}
+
+// ─── Business Hours ───────────────────────────────────────────────────────────
+
+async function sendBusinessHoursMessage(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, supportConfig: any, dayKey: string, currentTime: string, businessHours: Record<string, any>): Promise<void> {
+  try {
+    const context = resolveOutsideHoursContext(dayKey, currentTime, businessHours);
+    const slots = context.currentSlots;
+    const firstStart = slots[0]?.start || '08:00';
+    const lastEnd = slots[slots.length - 1]?.end || '18:00';
+    const nextStart = context.nextSlotStart || firstStart;
+    const slotsDesc = slots.length > 0 ? slots.map((s: any) => `${s.start} às ${s.end}`).join(' e ') : `${firstStart} às ${lastEnd}`;
+    const hour = parseInt(currentTime.split(':')[0], 10);
+    const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    let contextHint = '';
+    if (context.period === 'before_open') contextHint = `O cliente escreveu às ${currentTime}, antes da abertura às ${nextStart}.`;
+    else if (context.period === 'lunch') contextHint = `O cliente escreveu às ${currentTime}, no intervalo. Retornamos às ${nextStart}.`;
+    else if (context.period === 'after_close') contextHint = `O cliente escreveu às ${currentTime}, após encerramento. Retornamos às ${nextStart}.`;
+    else if (context.period === 'weekend') contextHint = `O cliente escreveu num dia sem atendimento. Retornamos às ${nextStart}.`;
+
+    try {
+      const aiCfg = await getAIConfig(tenantId, supabase);
+      if (aiCfg) {
+        const basePrompt = supportConfig.business_hours_outside_prompt || 'Você é um atendente virtual. Escreva uma mensagem CURTA (máximo 3 linhas) em português, amigável e variada, informando que estamos fora do horário de atendimento.';
+        const aiMsg = await callAI(aiCfg, [
+          { role: 'system', content: 'Responda APENAS com a mensagem final para o cliente, sem explicações. Máximo 3 linhas.' },
+          { role: 'user', content: `${basePrompt}\n\nContexto: ${contextHint}\nSaudação: ${greeting}\nHorário: ${slotsDesc}\nPróximo: ${nextStart}\n\nInicie com "${greeting}!", máximo 3 linhas, máximo 1 emoji.` },
+        ]);
+        if (aiMsg && aiMsg.trim().length > 0) {
+          await sendAndPersistAutoMessage(supabase, ctx, conversationId, aiMsg.trim(), { business_hours: true, outside_hours: true, ai_generated: true });
+          return;
+        }
+      }
+    } catch { /* fallback to template */ }
+
+    const template = supportConfig.business_hours_message || 'Olá! 👋 Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
+    const message = template.replace(/\{\{start\}\}/g, firstStart).replace(/\{\{end\}\}/g, lastEnd).replace(/\{\{next_start\}\}/g, nextStart).replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart).replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '').replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '').replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, message, { business_hours: true, outside_hours: true });
+  } catch (err) { console.error('[processor] Error in sendBusinessHoursMessage:', err); }
+}
+
+export async function checkBusinessHours(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, content: string, timestamp: string, supportConfig: any): Promise<{ inside: boolean }> {
+  try {
+    const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
+    const businessHours = supportConfig.business_hours || {};
+    const msgDate = new Date(timestamp);
+    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+    const parts = formatter.formatToParts(msgDate);
+    const weekdayMap: Record<string, string> = { 'Sun': 'sun', 'Mon': 'mon', 'Tue': 'tue', 'Wed': 'wed', 'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat' };
+    const dayKey = weekdayMap[parts.find(p => p.type === 'weekday')?.value || ''] || '';
+    const currentTime = `${(parts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(parts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+    const dayConfig = businessHours[dayKey];
+    const slots: { start: string; end: string }[] = dayConfig?.slots || [];
+    if (dayConfig?.start && dayConfig?.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
+    const isInsideSlot = dayConfig?.active && slots.some((slot: any) => currentTime >= slot.start && currentTime <= slot.end);
+    if (isInsideSlot) return { inside: true };
+
+    const { data: convBH } = await supabase.from('whatsapp_conversations').select('out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
+    const { data: activeAttBH } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).eq('status', 'in_progress').limit(1).maybeSingle();
+    if (!convBH?.out_of_hours_cleared_at && !convBH?.first_agent_message_at && !activeAttBH) {
+      await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
+    }
+    return { inside: false };
+  } catch { return { inside: true }; }
+}
+
+// ─── URA ──────────────────────────────────────────────────────────────────────
+
+async function assignDefaultDepartment(supabase: any, attendanceId: string, conversationId: string, tenantId: string, supportConfig: any): Promise<void> {
+  const defaultDeptId = supportConfig.ura_default_department_id;
+  const nowIso = new Date().toISOString();
+  const attUpdate: Record<string, any> = { ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso };
+  const convUpdate: Record<string, any> = { updated_at: nowIso };
+  if (defaultDeptId) { attUpdate.department_id = defaultDeptId; convUpdate.department_id = defaultDeptId; }
+  await supabase.from('support_attendances').update(attUpdate).eq('id', attendanceId);
+  await supabase.from('whatsapp_conversations').update(convUpdate).eq('id', conversationId);
+}
+
+async function markHumanFallback(supabase: any, attendanceId: string): Promise<void> {
+  await supabase.from('support_attendances').update({ ura_human_fallback: true, updated_at: new Date().toISOString() }).eq('id', attendanceId);
+}
+
+export async function sendUraWelcome(supabase: any, ctx: SendContext, conversationId: string, contactId: string, tenantId: string, attendanceId: string, supportConfig: any, attendanceCode?: string): Promise<void> {
+  try {
+    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
+    if (!uraEnabled) return;
+    const { data: departments } = await supabase.from('support_departments').select('id, name, ura_option_number, ura_label, show_in_ura').eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true).not('ura_option_number', 'is', null).order('ura_option_number');
+    const customerName = ctx.contactName || '';
+    const template = supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '';
+    let welcomeText = template.replace(/\{\{customer_name\}\}/g, customerName).trim();
+    const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
+    let fullMessage: string;
+    if (departments && departments.length > 0 && welcomeText.includes('{options}')) {
+      const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
+      fullMessage = `${codeHeader}${welcomeText.replace('{options}', optionsList)}\n0. Encerrar atendimento`;
+    } else { fullMessage = `${codeHeader}${welcomeText}`; }
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, fullMessage, { ura: true });
+    await supabase.from('support_attendances').update({ ura_sent_at: new Date().toISOString(), ura_state: 'pending', ura_asked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', attendanceId);
+  } catch (err) { console.error('[processor] Error in sendUraWelcome:', err); }
+}
+
+export async function handleUraResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string, supportConfig: any): Promise<boolean> {
+  const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
+  if (!uraEnabled) return false;
+  const { data: att } = await supabase.from('support_attendances').select('id, attendance_code, ura_sent_at, ura_state, ura_asked_at, department_id, ura_option_selected, ura_invalid_count, ura_human_fallback, assigned_to').eq('conversation_id', conversationId).eq('status', 'waiting').limit(1).maybeSingle();
+  if (!att) return false;
+  const isUraPending = att.ura_state === 'pending' || (att.ura_sent_at && att.ura_state === 'none');
+  if (!isUraPending && att.ura_state !== 'pending') {
+    if ((att.department_id || att.ura_option_selected !== null) && !att.assigned_to) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
+    return false;
+  }
+  if (att.assigned_to) return false;
+  if (att.ura_human_fallback) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
+  if (att.department_id || att.ura_option_selected !== null) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
+  if (att.ura_asked_at) {
+    const elapsed = (Date.now() - new Date(att.ura_asked_at).getTime()) / (1000 * 60);
+    if (elapsed > (supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
+  }
+  const trimmed = (messageContent || '').trim();
+  if (detectsHumanIntent(trimmed)) { await markHumanFallback(supabase, att.id); await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(HUMAN_FALLBACK_MESSAGES)); return true; }
+  const { data: departments } = await supabase.from('support_departments').select('id, name, ura_option_number, ura_label').eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true).not('ura_option_number', 'is', null).order('ura_option_number');
+  const hasDepts = departments && departments.length > 0;
+  const optionNumber = parseInt(trimmed, 10);
+  const deptByNumber = new Map<number, any>();
+  if (hasDepts) for (const d of departments) deptByNumber.set(d.ura_option_number, d);
+  const isValidOption = !isNaN(optionNumber) && (optionNumber === 0 || deptByNumber.has(optionNumber));
+  if (!isValidOption) {
+    const currentInvalid = (att.ura_invalid_count || 0) + 1;
+    await supabase.from('support_attendances').update({ ura_invalid_count: currentInvalid, updated_at: new Date().toISOString() }).eq('id', att.id);
+    if (currentInvalid >= 4) { await markHumanFallback(supabase, att.id); await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(HUMAN_INTENT_AFTER_RETRIES_MESSAGES)); return true; }
+    let invalidMsg = supportConfig.support_ura_invalid_option_template || supportConfig.ura_invalid_option_template || pickRandom(INVALID_OPTION_MESSAGES);
+    if (hasDepts && invalidMsg.includes('{options}')) { invalidMsg = invalidMsg.replace('{options}', departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n') + '\n0. Encerrar atendimento'); }
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, invalidMsg, { ura: true, ura_invalid: true });
+    return true;
+  }
+  if (optionNumber === 0) {
+    const nowIso = new Date().toISOString();
+    await supabase.from('support_attendances').update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso }).eq('id', att.id);
+    await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId);
+    const code = att.attendance_code || '';
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Atendimento${code ? ` *${code}*` : ''} encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. 😊`, { ura: true, ura_closed: true });
+    return true;
+  }
+  const nowIso = new Date().toISOString();
+  const selectedDept = hasDepts ? deptByNumber.get(optionNumber) : null;
+  const deptName = selectedDept ? (selectedDept.ura_label || selectedDept.name) : `Opção ${optionNumber}`;
+  const updatePayload: Record<string, any> = { ura_option_selected: optionNumber, ura_selected_option: optionNumber, ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso };
+  if (selectedDept) updatePayload.department_id = selectedDept.id;
+  await supabase.from('support_attendances').update(updatePayload).eq('id', att.id);
+  if (selectedDept) await supabase.from('whatsapp_conversations').update({ department_id: selectedDept.id, updated_at: nowIso }).eq('id', conversationId);
+  await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Você escolheu *${deptName}*. Aguarde, em breve um atendente irá te ajudar!`, { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null });
+  return true;
+}
