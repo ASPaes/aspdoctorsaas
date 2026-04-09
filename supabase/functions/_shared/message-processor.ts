@@ -548,3 +548,204 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Você escolheu *${deptName}*. Aguarde, em breve um atendente irá te ajudar!`, { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null });
   return true;
 }
+
+// ─── Attendance ───────────────────────────────────────────────────────────────
+
+export async function ensureAttendanceForIncomingMessage(supabase: any, conversationId: string, contactId: string, tenantId: string, messageContent?: string, ctx?: SendContext, skipUra: boolean = false): Promise<void> {
+  try {
+    const { data: active } = await supabase.from('support_attendances').select('id, status').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+    if (active) return;
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    const reopenWindow = supportConfig.support_reopen_window_minutes;
+    const ignoreGoodbye = Math.min(Math.floor(reopenWindow / 2), 3);
+    const { data: lastClosed } = await supabase.from('support_attendances').select('id, closed_at, status, closed_reason').eq('conversation_id', conversationId).in('status', ['closed', 'inactive_closed']).order('closed_at', { ascending: false }).limit(1).maybeSingle();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
+    const diffMin = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
+    if (messageContent && closedAt && diffMin <= ignoreGoodbye && GOODBYE_PATTERNS.test(messageContent.trim())) return;
+    if (lastClosed && diffMin <= reopenWindow && lastClosed.status === 'closed') {
+      const { data: full } = await supabase.from('support_attendances').select('assigned_to, attendance_code').eq('id', lastClosed.id).single();
+      const lastOp = full?.assigned_to ?? null;
+      const attCode = full?.attendance_code ?? '';
+      const upd: Record<string, any> = { status: 'waiting', reopened_at: nowIso, reopened_from: 'customer', updated_at: nowIso };
+      if (lastOp) { upd.status = 'in_progress'; upd.assigned_to = lastOp; upd.assumed_at = nowIso; }
+      await supabase.from('support_attendances').update(upd).eq('id', lastClosed.id);
+      insertAttendanceSystemMessage(supabase, conversationId, tenantId, lastClosed.id, attCode, 'reopened').catch(() => {});
+      clearAfterHoursFlag(supabase, conversationId).catch(() => {});
+      return;
+    }
+    const newStatus = skipUra ? 'in_progress' : 'waiting';
+    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: newStatus, opened_at: nowIso, ...(skipUra ? { assumed_at: nowIso } : {}), created_from: 'customer' }).select('id, attendance_code').single();
+    if (error) { console.error('[processor] Error creating attendance:', error); return; }
+    insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
+    clearAfterHoursFlag(supabase, conversationId).catch(() => {});
+    if (!skipUra && ctx) sendUraWelcome(supabase, ctx, conversationId, contactId, tenantId, newAtt.id, supportConfig, newAtt.attendance_code).catch(() => {});
+  } catch (err) { console.error('[processor] Error in ensureAttendanceForIncomingMessage:', err); }
+}
+
+export async function ensureAttendanceForOperatorMessage(supabase: any, conversationId: string, contactId: string, tenantId: string): Promise<void> {
+  try {
+    const { data: active } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+    if (active) return;
+    const { data: pendingCsat } = await supabase.from('support_csat').select('id, attendance_id').eq('tenant_id', tenantId).is('responded_at', null).limit(1).maybeSingle();
+    if (pendingCsat) { const { data: ca } = await supabase.from('support_attendances').select('id').eq('id', pendingCsat.attendance_id).eq('conversation_id', conversationId).maybeSingle(); if (ca) return; }
+    const { data: lastAtt } = await supabase.from('support_attendances').select('id, closed_at, created_at, status').eq('conversation_id', conversationId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (lastAtt) { const ago = (Date.now() - new Date(lastAtt.closed_at || lastAtt.created_at).getTime()) / 1000; if (ago < 30) return; }
+    const nowIso = new Date().toISOString();
+    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, status: 'in_progress', opened_at: nowIso, assumed_at: nowIso, created_from: 'operator' }).select('id, attendance_code').single();
+    if (error) { console.error('[processor] Error creating operator attendance:', error); return; }
+    insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
+    clearAfterHoursFlag(supabase, conversationId).catch(() => {});
+  } catch (err) { console.error('[processor] Error in ensureAttendanceForOperatorMessage:', err); }
+}
+
+export async function checkBillingSkipUra(supabase: any, conversationId: string, tenantId: string, supportConfig: any, phone: string): Promise<{ skip: boolean; departmentId?: string; clienteId?: string | null }> {
+  try {
+    if (!(supportConfig.billing_skip_ura_enabled ?? true)) return { skip: false };
+    const cutoff = new Date(Date.now() - (supportConfig.billing_skip_ura_minutes ?? 60) * 60 * 1000).toISOString();
+    const { data: msgs } = await supabase.from('whatsapp_messages').select('id, created_at, metadata').eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', true).gte('created_at', cutoff).order('created_at', { ascending: false }).limit(10);
+    const hit = (msgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.source === 'billing_automation' && meta?.kind === 'cobranca'; });
+    if (!hit) return { skip: false };
+    const { data: dept } = await supabase.from('support_departments').select('id').eq('tenant_id', tenantId).eq('is_active', true).ilike('name', '%financ%').limit(1).maybeSingle();
+    if (!dept) return { skip: false };
+    let clienteId: string | null = null;
+    if (phone) { const sfx = phone.length >= 10 ? phone.slice(-10) : phone; const { data: cl } = await supabase.from('clientes').select('id').eq('tenant_id', tenantId).eq('cancelado', false).or(`telefone_whatsapp.ilike.%${sfx},telefone_whatsapp_contato.ilike.%${sfx},telefone_contato.ilike.%${sfx}`).limit(1).maybeSingle(); if (cl) clienteId = cl.id; }
+    return { skip: true, departmentId: dept.id, clienteId };
+  } catch { return { skip: false }; }
+}
+
+export async function ensureAttendanceForBilling(supabase: any, conversationId: string, contactId: string, tenantId: string, departmentId: string, clienteId?: string | null): Promise<void> {
+  try {
+    const { data: active } = await supabase.from('support_attendances').select('id, department_id').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+    if (active) { if (active.department_id !== departmentId) await supabase.from('support_attendances').update({ department_id: departmentId, updated_at: new Date().toISOString() }).eq('id', active.id); if (clienteId) await supabase.from('support_attendances').update({ cliente_id: clienteId }).eq('id', active.id); return; }
+    const supportConfig = await getSupportConfig(supabase, tenantId);
+    const { data: lastClosed } = await supabase.from('support_attendances').select('id, closed_at, status, attendance_code').eq('conversation_id', conversationId).in('status', ['closed', 'inactive_closed']).order('closed_at', { ascending: false }).limit(1).maybeSingle();
+    const now = new Date(); const nowIso = now.toISOString();
+    const closedAt = lastClosed?.closed_at ? new Date(lastClosed.closed_at) : null;
+    const diffMin = closedAt ? (now.getTime() - closedAt.getTime()) / (1000 * 60) : Infinity;
+    if (lastClosed && diffMin <= supportConfig.support_reopen_window_minutes && lastClosed.status === 'closed') { await supabase.from('support_attendances').update({ status: 'waiting', department_id: departmentId, cliente_id: clienteId || undefined, reopened_at: nowIso, reopened_from: 'customer', created_from: 'billing_automation', updated_at: nowIso }).eq('id', lastClosed.id); return; }
+    const { data: newAtt, error } = await supabase.from('support_attendances').insert({ tenant_id: tenantId, conversation_id: conversationId, contact_id: contactId, department_id: departmentId, cliente_id: clienteId || null, status: 'waiting', opened_at: nowIso, created_from: 'billing_automation', ura_state: 'none' }).select('id, attendance_code').single();
+    if (error) { console.error('[processor] Error creating billing attendance:', error); return; }
+    insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
+    await supabase.from('whatsapp_conversations').update({ department_id: departmentId, updated_at: nowIso }).eq('id', conversationId);
+  } catch (err) { console.error('[processor] Error in ensureAttendanceForBilling:', err); }
+}
+
+// ─── Auto triggers ────────────────────────────────────────────────────────────
+
+async function triggerAutoSentiment(supabase: any, conversationId: string, supabaseUrl: string): Promise<void> {
+  try {
+    const { data: last } = await supabase.from('whatsapp_sentiment_analysis').select('created_at').eq('conversation_id', conversationId).maybeSingle();
+    let q = supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
+    if (last?.created_at) q = q.gt('timestamp', last.created_at);
+    const { count } = await q;
+    if (count && count >= AUTO_SENTIMENT_THRESHOLD) fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` }, body: JSON.stringify({ conversationId }) }).catch(() => {});
+  } catch { }
+}
+
+async function triggerAutoCategorization(supabase: any, conversationId: string, supabaseUrl: string): Promise<void> {
+  try {
+    const { data: conv } = await supabase.from('whatsapp_conversations').select('metadata').eq('id', conversationId).maybeSingle();
+    let q = supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
+    if (conv?.metadata?.categorized_at) q = q.gt('timestamp', conv.metadata.categorized_at);
+    const { count } = await q;
+    if (count && count >= AUTO_CATEGORIZATION_THRESHOLD) fetch(`${supabaseUrl}/functions/v1/categorize-whatsapp-conversation`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` }, body: JSON.stringify({ conversationId }) }).catch(() => {});
+  } catch { }
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+export async function processInboundMessage(supabase: any, msg: NormalizedInboundMessage): Promise<void> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const { instanceId, tenantId, providerType, instanceInfo, secrets, messageId, remoteJid, fromMe, pushName, content, messageType, timestamp, mediaUrl, mediaMimetype, mediaFilename, mediaStoragePath, quotedMessageId } = msg;
+
+  const { phone, isGroup } = normalizePhoneNumber(remoteJid.includes('@') ? remoteJid : `${remoteJid}@s.whatsapp.net`);
+
+  if (isGroup) { const { data: cfg } = await supabase.from('whatsapp_instances').select('ignore_group_messages').eq('id', instanceId).single(); if (cfg?.ignore_group_messages !== false) return; }
+
+  const contactId = await findOrCreateContact(supabase, instanceId, phone, pushName || phone, isGroup, fromMe, tenantId);
+  if (!contactId) return;
+
+  const conversationId = await findOrCreateConversation(supabase, instanceId, contactId, tenantId, fromMe);
+  if (!conversationId) return;
+
+  const { data: savedMsg, error: msgError } = await supabase.from('whatsapp_messages').upsert({
+    conversation_id: conversationId, remote_jid: remoteJid, message_id: messageId, content, message_type: messageType,
+    media_url: mediaStoragePath || mediaUrl || null, media_mimetype: mediaMimetype || null, media_path: mediaStoragePath || null,
+    media_filename: mediaFilename || null, media_ext: mediaFilename?.split('.').pop()?.toLowerCase() || null,
+    media_kind: mediaKind(messageType), is_from_me: fromMe, status: fromMe ? 'sent' : 'received',
+    quoted_message_id: quotedMessageId || null, timestamp, tenant_id: tenantId, instance_id: instanceId,
+    metadata: { source: providerType },
+  }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true }).select('id').maybeSingle();
+
+  if (msgError) { console.error('[processor] Error saving message:', msgError); return; }
+  if (!savedMsg) return;
+
+  if (messageType === 'audio' && savedMsg.id) fetch(`${supabaseUrl}/functions/v1/transcribe-whatsapp-audio`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` }, body: JSON.stringify({ messageId: savedMsg.id }) }).catch(() => {});
+
+  const { data: currentConv } = await supabase.from('whatsapp_conversations').select('last_message_at, unread_count').eq('id', conversationId).single();
+  const isNewer = !currentConv?.last_message_at || timestamp >= currentConv.last_message_at;
+  const upd: Record<string, any> = {};
+  if (isNewer) { upd.last_message_at = timestamp; upd.last_message_preview = content.substring(0, 200); upd.is_last_message_from_me = fromMe; }
+  if (!fromMe) upd.unread_count = (currentConv?.unread_count || 0) + 1;
+  if (Object.keys(upd).length > 0) await supabase.from('whatsapp_conversations').update(upd).eq('id', conversationId);
+
+  const ctx: SendContext = { instanceId, tenantId, providerType, instanceInfo, secrets, remoteJid: remoteJid.includes('@') ? remoteJid : `${remoteJid}@s.whatsapp.net`, contactName: pushName || phone };
+
+  if (fromMe) {
+    const nowIso = new Date().toISOString();
+    const onlyOut = await isOutboundOnlyConversation(supabase, conversationId);
+    if (onlyOut) { await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId).neq('status', 'closed'); }
+    else { supabase.from('whatsapp_conversations').update({ first_agent_message_at: nowIso, updated_at: nowIso }).eq('id', conversationId).is('first_agent_message_at', null).then(() => {}).catch(() => {}); ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId).then(() => incrementAttendanceCounter(supabase, conversationId, 'agent')).catch(() => {}); }
+    return;
+  }
+
+  triggerAutoSentiment(supabase, conversationId, supabaseUrl);
+  triggerAutoCategorization(supabase, conversationId, supabaseUrl);
+
+  const csatHandled = await handleCsatResponse(supabase, ctx, conversationId, tenantId, content);
+  if (csatHandled) return;
+
+  const { data: convStatus } = await supabase.from('whatsapp_conversations').select('status').eq('id', conversationId).single();
+  if (convStatus?.status === 'closed') await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId);
+
+  const skipUra = instanceInfo.skip_ura === true;
+  const supportConfig = await getSupportConfig(supabase, tenantId);
+
+  if (supportConfig.business_hours_enabled) {
+    const bh = await checkBusinessHours(supabase, ctx, conversationId, tenantId, content, timestamp, supportConfig);
+    if (bh.inside) { const { data: cv } = await supabase.from('whatsapp_conversations').select('opened_out_of_hours').eq('id', conversationId).single(); if (cv?.opened_out_of_hours) await supabase.from('whatsapp_conversations').update({ opened_out_of_hours: false, out_of_hours_cleared_at: new Date().toISOString() }).eq('id', conversationId); }
+    if (!bh.inside) {
+      const nowIso = new Date().toISOString();
+      const { data: cv } = await supabase.from('whatsapp_conversations').select('status, opened_out_of_hours, opened_out_of_hours_at, out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
+      const wasClosed = cv?.status === 'closed';
+      const isNewCycle = wasClosed || !cv?.opened_out_of_hours_at;
+      if (isNewCycle) await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: nowIso, opened_out_of_hours: true, opened_out_of_hours_at: timestamp, out_of_hours_cleared_at: null, first_agent_message_at: null }).eq('id', conversationId);
+      else await supabase.from('whatsapp_conversations').update({ status: 'active', opened_out_of_hours: true, updated_at: nowIso }).eq('id', conversationId);
+      const { data: attChk } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+      const { data: cvChk } = isNewCycle ? { data: null } : await supabase.from('whatsapp_conversations').select('first_agent_message_at, out_of_hours_cleared_at').eq('id', conversationId).single();
+      if (!cvChk?.first_agent_message_at && !cvChk?.out_of_hours_cleared_at && !attChk) {
+        const cutoff10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        const { data: bhMsgs } = await supabase.from('whatsapp_messages').select('id, created_at, metadata').eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', true).gte('created_at', cutoff10).order('created_at', { ascending: false }).limit(10);
+        const lastBh = (bhMsgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.outside_hours === true; });
+        if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário 🕐 Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente 😊', 'Obrigado pela mensagem! Nossa equipe responde assim que possível ⏰']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
+      }
+      return;
+    }
+  }
+
+  const lastBilling = await getLastBillingMessageAt(supabase, conversationId, tenantId);
+  if (lastBilling) { const secs = Math.max(0, (new Date(timestamp).getTime() - lastBilling.getTime()) / 1000); if (secs <= 30 && isLikelyBusinessAutoReplyPTBR(content)) return; }
+  if (isLikelyThirdPartyURA(content)) return;
+
+  const billing = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
+  if (billing.skip) {
+    ensureAttendanceForBilling(supabase, conversationId, contactId, tenantId, billing.departmentId!, billing.clienteId).then(() => incrementAttendanceCounter(supabase, conversationId, 'customer')).catch(() => {});
+    supabase.from('whatsapp_conversations').update({ status: 'active', department_id: billing.departmentId, updated_at: new Date().toISOString() }).eq('id', conversationId).eq('status', 'closed').then(() => {}).catch(() => {});
+  } else {
+    const uraHandled = await handleUraResponse(supabase, ctx, conversationId, tenantId, content, supportConfig);
+    if (uraHandled) { incrementAttendanceCounter(supabase, conversationId, 'customer').catch(() => {}); }
+    else { ensureAttendanceForIncomingMessage(supabase, conversationId, contactId, tenantId, content, ctx, skipUra).then(() => incrementAttendanceCounter(supabase, conversationId, 'customer')).catch(() => {}); supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId).eq('status', 'closed').then(() => {}).catch(() => {}); }
+  }
+}
