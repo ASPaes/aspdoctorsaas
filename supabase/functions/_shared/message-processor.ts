@@ -145,3 +145,195 @@ function resolveOutsideHoursContext(dayKey: string, currentTime: string, busines
   }
   return { period: 'after_close', nextSlotStart: firstStart, currentSlots: slots };
 }
+
+// ─── Envio de mensagens (provider-aware) ─────────────────────────────────────
+
+export async function sendAndPersistAutoMessage(
+  supabase: any,
+  ctx: SendContext,
+  conversationId: string,
+  text: string,
+  metadata?: Record<string, any>
+): Promise<void> {
+  try {
+    const adapter = getAdapter(ctx.providerType);
+    const result = await adapter.send(ctx.secrets as any, ctx.instanceInfo as any, {
+      to: ctx.remoteJid.replace('@s.whatsapp.net', '').replace('@lid', ''),
+      messageType: 'text',
+      content: text,
+    });
+
+    if (!result.messageId) {
+      console.error('[processor] sendAndPersistAutoMessage: no messageId returned');
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    await supabase.from('whatsapp_messages').insert({
+      conversation_id: conversationId,
+      remote_jid: ctx.remoteJid,
+      message_id: result.messageId,
+      content: text,
+      message_type: 'text',
+      is_from_me: true,
+      status: 'sent',
+      timestamp: nowIso,
+      tenant_id: ctx.tenantId,
+      instance_id: ctx.instanceId,
+      metadata: metadata || { auto: true },
+    });
+
+    await supabase.from('whatsapp_conversations').update({
+      last_message_at: nowIso,
+      last_message_preview: text.substring(0, 200),
+      is_last_message_from_me: true,
+    }).eq('id', conversationId);
+  } catch (err) {
+    console.error('[processor] sendAndPersistAutoMessage error:', err);
+  }
+}
+
+// ─── Helpers de banco ─────────────────────────────────────────────────────────
+
+export async function isOutboundOnlyConversation(supabase: any, conversationId: string): Promise<boolean> {
+  const { count } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
+  return (count ?? 0) === 0;
+}
+
+export async function resolveDepartmentForInstance(supabase: any, instanceId: string, tenantId: string): Promise<string | null> {
+  try {
+    const { data } = await supabase.from('support_departments').select('id').eq('tenant_id', tenantId).eq('default_instance_id', instanceId).eq('is_active', true).maybeSingle();
+    return data?.id ?? null;
+  } catch { return null; }
+}
+
+export async function findOrCreateContact(
+  supabase: any, instanceId: string, phoneNumber: string, name: string,
+  isGroup: boolean, isFromMe: boolean, tenantId: string,
+): Promise<string | null> {
+  try {
+    const variants = [phoneNumber];
+    if (phoneNumber.startsWith('55') && phoneNumber.length === 13) variants.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
+    if (phoneNumber.startsWith('55') && phoneNumber.length === 12) variants.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
+
+    const { data: existing } = await supabase.from('whatsapp_contacts').select('id, name, phone_number').eq('tenant_id', tenantId).in('phone_number', variants).maybeSingle();
+
+    if (existing) {
+      if (existing.phone_number !== phoneNumber) await supabase.from('whatsapp_contacts').update({ phone_number: phoneNumber, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      if (!isFromMe && name !== phoneNumber && existing.name === phoneNumber) await supabase.from('whatsapp_contacts').update({ name, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      return existing.id;
+    }
+
+    const { data: newContact, error } = await supabase.from('whatsapp_contacts').insert({ instance_id: instanceId, phone_number: phoneNumber, name: isFromMe ? phoneNumber : (name || phoneNumber), is_group: isGroup, tenant_id: tenantId }).select('id').single();
+    if (error) {
+      if (error.code === '23505') {
+        const { data: retry } = await supabase.from('whatsapp_contacts').select('id').eq('tenant_id', tenantId).in('phone_number', variants).limit(1).maybeSingle();
+        return retry?.id ?? null;
+      }
+      console.error('[processor] Error creating contact:', error);
+      return null;
+    }
+    return newContact.id;
+  } catch (err) {
+    console.error('[processor] Error in findOrCreateContact:', err);
+    return null;
+  }
+}
+
+export async function findOrCreateConversation(
+  supabase: any, instanceId: string, contactId: string, tenantId: string, isFromMe: boolean = false
+): Promise<string | null> {
+  try {
+    const { data: existing } = await supabase.from('whatsapp_conversations').select('id, department_id').eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
+    if (existing) {
+      if (!existing.department_id) {
+        const deptId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
+        if (deptId) await supabase.from('whatsapp_conversations').update({ department_id: deptId }).eq('id', existing.id);
+      }
+      return existing.id;
+    }
+
+    const departmentId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
+    const { data: newConv, error } = await supabase.from('whatsapp_conversations').insert({ instance_id: instanceId, contact_id: contactId, status: isFromMe ? 'closed' : 'active', tenant_id: tenantId, ...(departmentId ? { department_id: departmentId } : {}) }).select('id').single();
+    if (error) { console.error('[processor] Error creating conversation:', error); return null; }
+
+    await applyAutoAssignment(supabase, instanceId, newConv.id, tenantId);
+    return newConv.id;
+  } catch (err) {
+    console.error('[processor] Error in findOrCreateConversation:', err);
+    return null;
+  }
+}
+
+async function applyAutoAssignment(supabase: any, instanceId: string, conversationId: string, tenantId: string): Promise<void> {
+  try {
+    const { data: rule } = await supabase.from('assignment_rules').select('*').eq('instance_id', instanceId).eq('is_active', true).maybeSingle();
+    if (!rule) return;
+    let assignedTo: string | null = null;
+    if (rule.rule_type === 'fixed') { assignedTo = rule.fixed_agent_id; }
+    else if (rule.rule_type === 'round_robin') {
+      const agents = rule.round_robin_agents || [];
+      if (agents.length === 0) return;
+      const nextIndex = (rule.round_robin_last_index + 1) % agents.length;
+      assignedTo = agents[nextIndex];
+      await supabase.from('assignment_rules').update({ round_robin_last_index: nextIndex }).eq('id', rule.id);
+    }
+    if (assignedTo) {
+      await supabase.from('whatsapp_conversations').update({ assigned_to: assignedTo }).eq('id', conversationId);
+      await supabase.from('conversation_assignments').insert({ conversation_id: conversationId, assigned_to: assignedTo, reason: `Auto-atribuição: ${rule.name}`, tenant_id: tenantId });
+    }
+  } catch (err) { console.error('[processor] Error in applyAutoAssignment:', err); }
+}
+
+export async function insertAttendanceSystemMessage(supabase: any, conversationId: string, tenantId: string, attendanceId: string, attendanceCode: string, event: 'opened' | 'closed' | 'reopened'): Promise<void> {
+  const emoji = event === 'closed' ? '🔒' : '✅';
+  const label = event === 'opened' ? 'aberto' : event === 'closed' ? 'encerrado' : 'reaberto';
+  await supabase.from('whatsapp_messages').upsert({
+    conversation_id: conversationId, remote_jid: '', message_id: `system_att_${event}_${attendanceId}`,
+    content: `${emoji} Atendimento ${attendanceCode} ${label} com sucesso.`, message_type: 'system',
+    is_from_me: false, status: 'sent', timestamp: new Date().toISOString(), tenant_id: tenantId,
+    metadata: { system: true, attendance_event: event, attendance_id: attendanceId },
+  }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+}
+
+export async function incrementAttendanceCounter(supabase: any, conversationId: string, side: 'customer' | 'agent'): Promise<void> {
+  const { data: att } = await supabase.from('support_attendances').select('id, msg_customer_count, msg_agent_count').eq('conversation_id', conversationId).neq('status', 'closed').limit(1).maybeSingle();
+  if (!att) return;
+  const now = new Date().toISOString();
+  const update: Record<string, any> = { updated_at: now };
+  if (side === 'customer') { update.msg_customer_count = (att.msg_customer_count || 0) + 1; update.last_customer_message_at = now; }
+  else { update.msg_agent_count = (att.msg_agent_count || 0) + 1; update.last_operator_message_at = now; }
+  await supabase.from('support_attendances').update(update).eq('id', att.id);
+}
+
+async function clearAfterHoursFlag(supabase: any, conversationId: string): Promise<void> {
+  try {
+    await supabase.from('whatsapp_conversations').update({ out_of_hours_cleared_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', conversationId).not('opened_out_of_hours_at', 'is', null).is('out_of_hours_cleared_at', null);
+  } catch { /* non-critical */ }
+}
+
+async function getConversationMetadata(supabase: any, conversationId: string): Promise<Record<string, any>> {
+  const { data } = await supabase.from('whatsapp_conversations').select('metadata').eq('id', conversationId).single();
+  return (data?.metadata && typeof data.metadata === 'object') ? data.metadata : {};
+}
+
+async function updateConversationMetadata(supabase: any, conversationId: string, updates: Record<string, any>): Promise<void> {
+  const current = await getConversationMetadata(supabase, conversationId);
+  await supabase.from('whatsapp_conversations').update({ metadata: { ...current, ...updates } }).eq('id', conversationId);
+}
+
+async function getLastBillingMessageAt(supabase: any, conversationId: string, tenantId: string): Promise<Date | null> {
+  try {
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('whatsapp_messages').select('created_at, metadata').eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', true).gte('created_at', cutoff).order('created_at', { ascending: false }).limit(10);
+    const hit = (data || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.source === 'billing_automation' && meta?.kind === 'cobranca'; });
+    return hit ? new Date(hit.created_at) : null;
+  } catch { return null; }
+}
+
+async function countOffHoursCustomerMessages(supabase: any, conversationId: string, tenantId: string, windowMinutes: number): Promise<{ count: number; firstAt: Date | null }> {
+  const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+  const { data } = await supabase.from('whatsapp_messages').select('timestamp').eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('timestamp', cutoff).order('timestamp', { ascending: true });
+  const msgs = data || [];
+  return { count: msgs.length, firstAt: msgs.length > 0 ? new Date(msgs[0].timestamp) : null };
+}
