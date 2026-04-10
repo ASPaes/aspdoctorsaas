@@ -76,11 +76,17 @@ interface ParsedRow {
   errors: string[];
 }
 
+interface FailedRow {
+  razao_social: string;
+  cnpj: string;
+  motivo: string;
+}
+
 interface ImportResult {
   imported: number;
   skipped: number;
   failed: number;
-  failReasons: string[];
+  failedRows: FailedRow[];
   autoCreated: Record<string, number>;
 }
 
@@ -832,7 +838,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     let imported = 0;
     let failed = 0;
-    const failReasons: string[] = [];
+    const failedRows: FailedRow[] = [];
 
     for (let b = 0; b < batches.length; b++) {
       setImportProgress({ current: b + 1, total: batches.length });
@@ -942,15 +948,35 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
       // INSERT dos registros novos
       if (payloadNovos.length > 0) {
-        const { error: insertErr, data: insertedData } = await supabase
+        const { error: batchErr, data: insertedData } = await supabase
           .from('clientes')
           .insert(payloadNovos)
           .select('id');
-        if (insertErr) {
-          failed += payloadNovos.length;
-          if (!failReasons.includes(insertErr.message)) failReasons.push(insertErr.message);
-        } else {
+        if (!batchErr) {
+          // Lote inteiro sucesso
           imported += (insertedData?.length ?? payloadNovos.length);
+        } else {
+          // Lote falhou — retry linha a linha para identificar quais registros têm problema
+          for (let ri = 0; ri < payloadNovos.length; ri++) {
+            const record = payloadNovos[ri];
+            const sourceRow = batches[b].find((_, idx) => {
+              const p = payload[idx];
+              return p === payloadNovos[ri];
+            }) ?? batches[b][ri];
+            const { error: rowErr } = await supabase
+              .from('clientes')
+              .insert(record);
+            if (rowErr) {
+              failed += 1;
+              failedRows.push({
+                razao_social: (sourceRow?.values?.razao_social || sourceRow?.values?.nome_fantasia || '—'),
+                cnpj: record.cnpj ?? '—',
+                motivo: rowErr.message,
+              });
+            } else {
+              imported += 1;
+            }
+          }
         }
       }
 
@@ -964,7 +990,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             .eq('tenant_id', tenantId);
           if (upsertErr) {
             failed += 1;
-            if (!failReasons.includes(upsertErr.message)) failReasons.push(upsertErr.message);
+            failedRows.push({
+              razao_social: record.razao_social || record.nome_fantasia || '—',
+              cnpj: record.cnpj ?? '—',
+              motivo: upsertErr.message,
+            });
           } else {
             imported += 1;
           }
@@ -976,7 +1006,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       imported,
       skipped: errorRows.length + (duplicataOpcao === 'pular' ? cnpjsDuplicadosNoBanco.size : 0),
       failed,
-      failReasons,
+      failedRows,
       autoCreated,
     });
     setImporting(false);
@@ -1686,15 +1716,42 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             )}
 
             {/* Erros de falha */}
-            {result.failReasons.length > 0 && (
-              <div className="rounded-md border border-destructive/20 p-3 space-y-1 max-h-24 overflow-y-auto">
-                <p className="text-xs font-medium text-destructive">Detalhes das falhas:</p>
-                {result.failReasons.slice(0, 5).map((r, i) => (
-                  <p key={i} className="text-xs text-muted-foreground">• {r}</p>
-                ))}
-                {result.failReasons.length > 5 && (
-                  <p className="text-xs text-muted-foreground">...e mais {result.failReasons.length - 5} erros</p>
-                )}
+            {result.failed > 0 && (
+              <div className="rounded-md border border-destructive/20 p-3 space-y-2">
+                <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                  <XCircle className="w-4 h-4 shrink-0" />
+                  {result.failed} registro{result.failed !== 1 ? 's' : ''} com falha ao salvar
+                </p>
+                {(() => {
+                  const grupos: Record<string, FailedRow[]> = {};
+                  for (const row of result.failedRows) {
+                    let tipo = row.motivo;
+                    if (tipo.includes('out of range')) tipo = 'Data inválida (valor fora do intervalo)';
+                    else if (tipo.includes('unique constraint')) tipo = 'CNPJ já cadastrado (duplicata)';
+                    else if (tipo.includes('not-null') || tipo.includes('null value')) tipo = 'Campo obrigatório vazio no banco';
+                    else if (tipo.includes('foreign key')) tipo = 'Referência inválida (FK não encontrada)';
+                    else if (tipo.length > 80) tipo = tipo.slice(0, 80) + '...';
+                    if (!grupos[tipo]) grupos[tipo] = [];
+                    grupos[tipo].push(row);
+                  }
+                  return Object.entries(grupos).map(([tipo, rows]) => (
+                    <details key={tipo} className="rounded border border-destructive/10 bg-destructive/5">
+                      <summary className="text-xs font-medium text-destructive px-3 py-2 cursor-pointer list-none flex items-center justify-between">
+                        <span>⚠ {tipo}</span>
+                        <span className="text-muted-foreground ml-2">{rows.length} registro{rows.length !== 1 ? 's' : ''} ▼</span>
+                      </summary>
+                      <div className="px-3 pb-2 space-y-1 max-h-40 overflow-y-auto">
+                        {rows.map((r, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono text-destructive/80">{r.cnpj}</span>
+                            <span>—</span>
+                            <span className="truncate">{r.razao_social}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ));
+                })()}
               </div>
             )}
 
@@ -1719,21 +1776,32 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
             {/* Botões de ação */}
             <div className="flex flex-wrap gap-2">
-              {errorRows.length > 0 && (
+              {(errorRows.length > 0 || result.failed > 0) && (
                 <Button
                   variant="outline"
                   className="gap-2"
                   onClick={() => {
+                    // Combina linhas inválidas (validação) + linhas que falharam no banco
+                    const todasComProblema = [
+                      ...errorRows,
+                      ...result.failedRows.map(fr => ({
+                        values: { razao_social: fr.razao_social, cnpj: fr.cnpj, _erro_banco: fr.motivo } as Record<string, string>,
+                        valid: false,
+                        errors: [fr.motivo],
+                      })),
+                    ];
                     const friendlyHeaders = Object.keys(FRIENDLY_TO_SYSTEM);
                     const systemFields = Object.values(FRIENDLY_TO_SYSTEM);
                     const csvLines = [
-                      friendlyHeaders.join(';'),
-                      ...errorRows.map(row =>
-                        systemFields.map(f => {
-                          const v = row.values[f] ?? '';
+                      ['Motivo do Erro', ...friendlyHeaders].join(';'),
+                      ...todasComProblema.map(row => {
+                        const motivo = row.errors?.[0] ?? '';
+                        const campos = systemFields.map(f => {
+                          const v = (row.values as any)[f] ?? '';
                           return v.includes(';') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
-                        }).join(';')
-                      ),
+                        });
+                        return [motivo, ...campos].join(';');
+                      }),
                     ];
                     const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
                     const url = URL.createObjectURL(blob);
@@ -1745,7 +1813,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                   }}
                 >
                   <Download className="w-4 h-4" />
-                  Baixar {errorRows.length} registro{errorRows.length !== 1 ? 's' : ''} com erro para corrigir
+                  Baixar relatório de erros ({errorRows.length + result.failed} registros)
                 </Button>
               )}
               <Button variant="outline" onClick={resetAll} className="gap-2">
