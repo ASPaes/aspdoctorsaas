@@ -243,17 +243,45 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
       .select('api_url, api_key').eq('instance_id', resolved.instanceId).single();
     if (!secrets) return;
 
-    // Find or create contact and conversation (outbound)
+    // ── Find or create contact — com variantes de número e vínculo ao cliente ──
+    // Montar variantes (com/sem 9 dígito)
+    const phoneVariants: string[] = [phone];
+    if (phone.startsWith('55') && phone.length === 13) {
+      phoneVariants.push(phone.slice(0, 4) + phone.slice(5)); // remove o 9
+    }
+    if (phone.startsWith('55') && phone.length === 12) {
+      phoneVariants.push(phone.slice(0, 4) + '9' + phone.slice(4)); // adiciona o 9
+    }
+
+    // Buscar cliente pelo telefone (qualquer variante)
+    const { data: clienteRow } = await supabase.from('clientes')
+      .select('id, nome_fantasia, razao_social')
+      .eq('tenant_id', resolved.tenantId)
+      .eq('cancelado', false)
+      .or(phoneVariants.map((v: string) => `telefone_whatsapp.eq.${v},telefone_whatsapp_contato.eq.${v}`).join(','))
+      .limit(1).maybeSingle();
+
+    const clienteName = clienteRow?.nome_fantasia || clienteRow?.razao_social || null;
+    const clienteId = clienteRow?.id || null;
+
+    // Buscar contato existente por qualquer variante
     const { data: contact } = await supabase.from('whatsapp_contacts')
-      .select('id').eq('tenant_id', resolved.tenantId).eq('phone_number', phone).maybeSingle();
+      .select('id, name')
+      .eq('tenant_id', resolved.tenantId)
+      .in('phone_number', phoneVariants)
+      .maybeSingle();
 
     let contactId = contact?.id;
     if (!contactId) {
       const { data: newContact } = await supabase.from('whatsapp_contacts').insert({
         instance_id: resolved.instanceId, phone_number: phone,
-        name: phone, is_group: false, tenant_id: resolved.tenantId,
+        name: clienteName || phone, is_group: false, tenant_id: resolved.tenantId,
       }).select('id').single();
       contactId = newContact?.id;
+    } else if (clienteName && contact?.name === contact?.name?.match(/^55/)?.input) {
+      // Atualizar nome se ainda está como número
+      supabase.from('whatsapp_contacts').update({ name: clienteName, updated_at: new Date().toISOString() })
+        .eq('id', contactId).then(() => {}).catch(() => {});
     }
     if (!contactId) return;
 
@@ -266,8 +294,13 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
       const { data: newConv } = await supabase.from('whatsapp_conversations').insert({
         instance_id: resolved.instanceId, contact_id: contactId,
         status: 'closed', tenant_id: resolved.tenantId,
+        ...(clienteId ? { cliente_id: clienteId } : {}),
       }).select('id').single();
       conversationId = newConv?.id;
+    } else if (clienteId) {
+      // Atualizar cliente_id na conversa existente se ainda não vinculado
+      supabase.from('whatsapp_conversations').update({ cliente_id: clienteId })
+        .eq('id', conversationId).is('cliente_id', null).then(() => {}).catch(() => {});
     }
     if (!conversationId) return;
 
@@ -288,17 +321,23 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
     }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true }).select('id').maybeSingle();
 
     if (savedMsg) {
+      // Verificar se a conversa tem mensagens do cliente (inbound)
+      const { count: inboundCount } = await supabase
+        .from('whatsapp_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId)
+        .eq('is_from_me', false);
+
+      const isOutboundOnly = (inboundCount ?? 0) === 0;
+
       await supabase.from('whatsapp_conversations').update({
         last_message_at: timestamp,
         last_message_preview: content.substring(0, 200) || '📤 Mensagem enviada',
-        is_last_message_from_me: true, updated_at: new Date().toISOString(),
+        is_last_message_from_me: true,
+        updated_at: new Date().toISOString(),
+        // Se só tem mensagens outbound, manter/forçar fechado
+        ...(isOutboundOnly ? { status: 'closed' } : {}),
       }).eq('id', conversationId);
-
-      // Limpar flag de fora do horário quando operador envia mensagem
-      supabase.from('whatsapp_conversations').update({
-        out_of_hours_cleared_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-      }).eq('id', conversationId).not('opened_out_of_hours_at', 'is', null)
-        .is('out_of_hours_cleared_at', null).then(() => {}).catch(() => {});
     }
   } catch (err) { console.error(`${LOG} Error in processSendMessageEvent:`, err); }
 }
