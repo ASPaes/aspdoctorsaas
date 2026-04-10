@@ -312,6 +312,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [fkAutoCreate, setFkAutoCreate] = useState<Record<string, boolean>>({});
   const [fkLoading, setFkLoading] = useState(false);
 
+  // Overrides manuais: { csvColumn: { csvValue: id_do_registro | '__new__' | '__skip__' } }
+  const [fkManualOverrides, setFkManualOverrides] = useState<
+    Record<string, Record<string, number | '__new__' | '__skip__'>>
+  >({});
+
   // Step 4 - import state
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
@@ -364,6 +369,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setFkData({});
     setFkAutoCreate({});
     setFkLoading(false);
+    setFkManualOverrides({});
     setImporting(false);
     setImportProgress({ current: 0, total: 0 });
     setResult(null);
@@ -667,6 +673,21 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     [fkFindMatch]
   );
 
+  const getFkOverride = useCallback(
+    (csvColumn: string, val: string) => fkManualOverrides[csvColumn]?.[val],
+    [fkManualOverrides]
+  );
+
+  const setFkOverride = useCallback(
+    (csvColumn: string, val: string, override: number | '__new__' | '__skip__') => {
+      setFkManualOverrides(prev => ({
+        ...prev,
+        [csvColumn]: { ...(prev[csvColumn] ?? {}), [val]: override },
+      }));
+    },
+    []
+  );
+
   /* ---------- Step 4: Import (core logic) ---------- */
   const handleImportWithRows = useCallback(async (rowsToImportParam: ParsedRow[]) => {
     const tenantId = effectiveTenantId;
@@ -814,13 +835,23 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       const map: Record<string, number | string> = {};
 
       for (const val of uniqueVals) {
-        // Busca fuzzy: encontra o registro mais próximo no banco
-        const found = existing.find(e => isFuzzyMatch(val, e.nome));
-        if (found) {
-          map[normalizeForCompare(val)] = found.id;
+        // 1. Verificar override manual do usuário primeiro
+        const override = fkManualOverrides[fk.csvColumn]?.[val];
+        if (override === '__skip__') continue; // usuário escolheu ignorar
+        if (override === '__new__') {
+          // usuário escolheu criar novo — cai no bloco de auto-create abaixo
+        } else if (typeof override === 'number') {
+          map[normalizeForCompare(val)] = override; // usuário escolheu um registro específico
           continue;
+        } else {
+          // Sem override — usa fuzzy match automático
+          const found = existing.find(e => isFuzzyMatch(val, e.nome));
+          if (found) {
+            map[normalizeForCompare(val)] = found.id;
+            continue;
+          }
         }
-        // Não encontrado — auto-criar se switch ligado
+        // Não encontrado / usuário pediu novo — auto-criar se switch ligado
         if (fkAutoCreate[fk.csvColumn]) {
           const insertPayload: any = { [fk.searchField]: val.trim() };
           if (fk.tenantScoped) insertPayload.tenant_id = tenantId;
@@ -1049,7 +1080,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     }
-  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataOpcao]);
+  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkManualOverrides, fkUniqueValues, queryClient, duplicataOpcao]);
 
   const handleImport = useCallback(async () => {
     await handleImportWithRows(validRows);
@@ -1448,34 +1479,116 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                             const exists = !!match;
                             const isExact = exists && normalizeForCompare(match!.nome) === normalizeForCompare(val);
                             const isFuzzy = exists && !isExact;
+                            const override = getFkOverride(fk.csvColumn, val);
+                            const needsResolution = isFuzzy || !exists;
+
+                            const badgeColor = typeof override === 'number'
+                              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                              : override === '__new__'
+                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                              : override === '__skip__'
+                              ? "bg-gray-100 dark:bg-gray-800 text-gray-500 line-through"
+                              : isExact
+                              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                              : isFuzzy
+                              ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
+                              : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300";
+
+                            const effectiveLabel = typeof override === 'number'
+                              ? (fkData[fk.csvColumn]?.find(e => e.id === override)?.nome ?? val)
+                              : override === '__new__'
+                              ? `+ Criar: "${val}"`
+                              : override === '__skip__'
+                              ? `Ignorar`
+                              : isFuzzy
+                              ? match!.nome
+                              : val;
+
                             return (
-                              <TooltipProvider key={val}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className={cn(
-                                      "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full cursor-default",
-                                      isExact ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300" :
-                                      isFuzzy ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300" :
-                                                "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
-                                    )}>
-                                      {isExact  ? <CheckCircle2 className="w-3 h-3" /> :
-                                       isFuzzy  ? <AlertTriangle className="w-3 h-3" /> :
-                                                  <XCircle className="w-3 h-3" />}
-                                      {val}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top">
-                                    <p className="text-xs">
-                                      {isExact  ? "Encontrado no cadastro" :
-                                       isFuzzy  ? `Será vinculado como: "${match!.nome}"` :
-                                                  "Não encontrado — será ignorado ou auto-cadastrado"}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              <div key={val} className="flex flex-col gap-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={cn(
+                                        "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                                        needsResolution ? "cursor-pointer hover:opacity-80" : "cursor-default",
+                                        badgeColor
+                                      )}>
+                                        {typeof override === 'number' ? <CheckCircle2 className="w-3 h-3" /> :
+                                         override === '__new__' ? <Info className="w-3 h-3" /> :
+                                         override === '__skip__' ? <XCircle className="w-3 h-3" /> :
+                                         isExact ? <CheckCircle2 className="w-3 h-3" /> :
+                                         isFuzzy ? <AlertTriangle className="w-3 h-3" /> :
+                                         <XCircle className="w-3 h-3" />}
+                                        {val}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p className="text-xs">
+                                        {typeof override === 'number' ? `Vinculado a: "${effectiveLabel}"` :
+                                         override === '__new__' ? `Será criado como novo registro` :
+                                         override === '__skip__' ? `Será ignorado` :
+                                         isExact ? "Encontrado no cadastro" :
+                                         isFuzzy ? `Sugestão automática: "${match!.nome}"` :
+                                         "Não encontrado — use o seletor para resolver"}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                {needsResolution && (
+                                  <div className="flex items-center gap-1 ml-1">
+                                    <select
+                                      className="text-xs border rounded px-1.5 py-0.5 bg-background text-foreground max-w-[180px]"
+                                      value={
+                                        typeof override === 'number' ? String(override) :
+                                        override === '__new__' ? '__new__' :
+                                        override === '__skip__' ? '__skip__' :
+                                        isFuzzy ? String(match!.id) : '__skip__'
+                                      }
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        if (v === '__new__') setFkOverride(fk.csvColumn, val, '__new__');
+                                        else if (v === '__skip__') setFkOverride(fk.csvColumn, val, '__skip__');
+                                        else setFkOverride(fk.csvColumn, val, Number(v));
+                                      }}
+                                    >
+                                      {isFuzzy && (
+                                        <option value={String(match!.id)}>
+                                          ✓ Usar sugestão: {match!.nome}
+                                        </option>
+                                      )}
+                                      <optgroup label="Vincular a registro existente">
+                                        {(fkData[fk.csvColumn] ?? []).map(e => (
+                                          <option key={e.id} value={String(e.id)}>
+                                            {e.nome}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                      <option value="__new__">+ Criar como novo registro</option>
+                                      <option value="__skip__">— Ignorar este valor</option>
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
                             );
                           })}
                         </div>
+                        {/* Resumo de itens sem resolução definida */}
+                        {(() => {
+                          const semResolucao = uniqueVals.filter(v => {
+                            const ov = getFkOverride(fk.csvColumn, v);
+                            const m = fkFindMatch(fk.csvColumn, v);
+                            const exact = !!m && normalizeForCompare(m.nome) === normalizeForCompare(v);
+                            return !exact && ov === undefined && !m;
+                          });
+                          if (semResolucao.length === 0) return null;
+                          return (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-destructive" />
+                              {semResolucao.length} valor{semResolucao.length !== 1 ? 'es' : ''} sem vínculo — use o seletor acima ou ative &quot;Auto-cadastrar&quot;
+                            </p>
+                          );
+                        })()}
                         {hasAnyMissing && fkAutoCreate[fk.csvColumn] && (
                           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                             <Info className="w-3 h-3" />
