@@ -4406,6 +4406,14 @@ export type Database = {
           tenant_id: string
         }[]
       }
+      vault_create_secret: {
+        Args: { p_name: string; p_secret: string }
+        Returns: string
+      }
+      vault_update_secret: {
+        Args: { p_id: string; p_secret: string }
+        Returns: undefined
+      }
     }
     Enums: {
       cs_avulsa_status: "previsto" | "confirmado" | "realizado" | "perdido"
