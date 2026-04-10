@@ -1457,8 +1457,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     const exactVals   = uniqueVals.filter(v => { const m = fkFindMatch(fk.csvColumn, v); return !!m && normalizeForCompare(m!.nome) === normalizeForCompare(v); });
                     const fuzzyVals   = uniqueVals.filter(v => { const m = fkFindMatch(fk.csvColumn, v); return !!m && normalizeForCompare(m!.nome) !== normalizeForCompare(v); });
                     const missingVals = uniqueVals.filter(v => !fkFindMatch(fk.csvColumn, v));
-                      + fuzzyVals.filter(v => { const ov = getFkOverride(fk.csvColumn, v); return typeof ov === 'number' || (ov === undefined); }).length
-                      + missingVals.filter(v => { const ov = getFkOverride(fk.csvColumn, v); return typeof ov === 'number' || ov === '__new__'; }).length;
                     const isFullyResolved = missingVals.every(v => { const ov = getFkOverride(fk.csvColumn, v); return typeof ov === 'number' || ov === '__new__' || ov === '__skip__'; });
 
                     return (
