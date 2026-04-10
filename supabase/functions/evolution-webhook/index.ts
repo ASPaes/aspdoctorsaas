@@ -314,15 +314,18 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
     // ── Guard: Comandos administrativos ──────────────────────────────────────
     // Verificar ANTES de qualquer processamento
+    // remote_jid pode vir sem o 9 (554991210660) ou com (5549991210660)
     {
-      const ADMIN_PHONE_GUARD = '5549991210660';
+      const ADMIN_PHONE_GUARD_SUFFIX = '49991210660'; // sufixo com 9
+      const ADMIN_PHONE_GUARD_SUFFIX2 = '4991210660'; // sufixo sem 9
       const _rawJid = data?.key?.remoteJid || '';
       const _senderNum = _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
       const _msgText = (
         data?.message?.conversation ||
         data?.message?.extendedTextMessage?.text || ''
       ).trim().toUpperCase();
-      const _isAdminCmd = _senderNum.endsWith(ADMIN_PHONE_GUARD) &&
+      const _isAdminSender = _senderNum.endsWith(ADMIN_PHONE_GUARD_SUFFIX) || _senderNum.endsWith(ADMIN_PHONE_GUARD_SUFFIX2);
+      const _isAdminCmd = _isAdminSender &&
         (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE'));
 
       if (_isAdminCmd) {
@@ -330,7 +333,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-admin-commands`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
-          body: JSON.stringify({ senderPhone: ADMIN_PHONE_GUARD, command: _msgText }),
+          body: JSON.stringify({ senderPhone: '5549991210660', command: _msgText }),
         }).catch(err => console.error(`${LOG} Admin command error:`, err));
         return;
       }
