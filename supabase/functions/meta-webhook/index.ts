@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -172,14 +173,11 @@ Deno.serve(async (req) => {
 
       if (!instance?.tenant_id) { console.warn(`${LOG} No instance for phone_number_id=${phoneNumberId}`); continue; }
 
-      // Buscar secrets
-      const { data: secretRow } = await supabase
-        .from('whatsapp_instance_secrets')
-        .select('meta_access_token, meta_app_secret')
-        .eq('instance_id', instance.id).maybeSingle();
+      // Buscar secrets via Vault RPC
+      const secrets = await getInstanceSecrets(supabase, instance.id);
 
-      const accessToken = secretRow?.meta_access_token || null;
-      const appSecret = secretRow?.meta_app_secret || null;
+      const accessToken = secrets.meta_access_token || null;
+      const appSecret = secrets.meta_app_secret || null;
 
       // ── Validar assinatura X-Hub-Signature-256 ─────────────────────────────
       if (appSecret) {
