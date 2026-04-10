@@ -318,7 +318,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [duplicatas, setDuplicatas] = useState<{ cnpj: string; razao_social: string | null }[]>([]);
   const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
-  const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'inserir'>('pular');
+  const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar'>('pular');
   const [importPhase, setImportPhase] = useState<'verificando' | 'cidades' | 'importando' | ''>('');
   // cnpjsDuplicadosNoBanco is computed locally inside handleImportWithRows (not state)
 
@@ -678,7 +678,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     let cnpjsDuplicadosNoBanco = new Set<string>();
     let duplicatasParaModal: { cnpj: string; razao_social: string | null }[] = [];
 
-    if (duplicataOpcao !== 'inserir' && cnpjsDoCSV.length > 0) {
+    if (cnpjsDoCSV.length > 0) {
       const CNPJ_BATCH = 100;
       const allExistentes: { cnpj: string; razao_social: string | null; nome_fantasia: string | null }[] = [];
       for (let ci = 0; ci < cnpjsDoCSV.length; ci += CNPJ_BATCH) {
@@ -716,7 +716,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         setImportPhase('');
         return;
       }
-      // 'inserir': ignora — não filtra, não interrompe
     }
 
     setImportPhase('cidades');
@@ -1134,12 +1133,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     label: 'Atualizar',
                     desc: 'Sobrescreve os dados do cadastro atual com os dados do arquivo.',
                   },
-                  {
-                    value: 'inserir' as const,
-                    icon: '➕',
-                    label: 'Inserir mesmo assim',
-                    desc: 'Cria um novo registro mesmo que o CNPJ já exista. Use com cautela.',
-                  },
                 ].map(opt => (
                   <label
                     key={opt.value}
@@ -1503,7 +1496,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                       {duplicatas.length} registro{duplicatas.length > 1 ? 's' : ''} já {duplicatas.length > 1 ? 'existem' : 'existe'} no sistema (CNPJ/CPF duplicado)
                     </p>
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
-                      Você escolheu <strong>&quot;{duplicataOpcao === 'pular' ? 'Pular' : duplicataOpcao === 'atualizar' ? 'Atualizar' : 'Inserir mesmo assim'}&quot;</strong> no Step 1. Confirme para continuar.
+                      Você escolheu <strong>&quot;{duplicataOpcao === 'pular' ? 'Pular' : 'Atualizar'}&quot;</strong> no Step 1. Confirme para continuar.
                     </p>
                   </div>
                 </div>
