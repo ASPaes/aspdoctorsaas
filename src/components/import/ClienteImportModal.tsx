@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { cn } from "@/lib/utils";
@@ -282,6 +283,7 @@ function StepIndicator({ current }: { current: number }) {
 
 export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
@@ -529,7 +531,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const loadFkData = useCallback(async () => {
     setFkLoading(true);
     try {
-      const tenantId = profile?.tenant_id;
+      const tenantId = effectiveTenantId;
       const promises = activeFkFields.map(async (fk) => {
         let query = supabase
           .from(fk.table as any)
@@ -584,7 +586,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
   /* ---------- Step 4: Import (core logic) ---------- */
   const handleImportWithRows = useCallback(async (rowsToImport: ParsedRow[]) => {
-    const tenantId = profile?.tenant_id;
+    const tenantId = effectiveTenantId;
     if (!tenantId) {
       toast.error("Não foi possível identificar o tenant. Faça login novamente.");
       return;
@@ -867,7 +869,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     }
-  }, [profile?.tenant_id, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataAcao]);
+  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataAcao]);
 
   const handleImport = useCallback(async () => {
     await handleImportWithRows(validRows);
@@ -1231,7 +1233,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                         {hasAnyMissing && fkAutoCreate[fk.csvColumn] && (
                           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                             <Info className="w-3 h-3" />
-                            Novos registros serão criados com o tenant_id do seu tenant.
+                            Novos registros serão criados no tenant selecionado.
                           </p>
                         )}
                       </div>
