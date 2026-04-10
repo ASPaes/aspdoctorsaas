@@ -441,21 +441,29 @@ Deno.serve(async (req) => {
     console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
 
     // ── Guard: Comandos administrativos ───────────────────────────────────────
+    // Admin envia do próprio número para o Financeiro (fromMe=true, remoteJid=número admin)
+    // OU cliente envia de fora (fromMe=false, remoteJid=número admin)
     const ADMIN_PHONE_GUARD = '5549991210660';
     const _rawJid = payload?.data?.key?.remoteJid || '';
-    const _senderNum = _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
+    const _fromMe = getPayloadIsFromMe(payload?.data);
+    const _senderNum = _fromMe
+      ? ADMIN_PHONE_GUARD // se fromMe=true na instância Financeiro, remetente é sempre o admin
+      : _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
+    const _jidNum = _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
     const _msgText = (
       payload?.data?.message?.conversation ||
       payload?.data?.message?.extendedTextMessage?.text || ''
     ).trim().toUpperCase();
-    const _isAdminCmd = _senderNum.endsWith(ADMIN_PHONE_GUARD) &&
+    const _isAdminInstance = payload?.instance === 'Financeiro' || payload?.instance?.toLowerCase().includes('financ');
+    const _isAdminSender = _jidNum.endsWith(ADMIN_PHONE_GUARD) || (_fromMe && _isAdminInstance);
+    const _isAdminCmd = _isAdminSender &&
       (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE'));
 
     if (_isAdminCmd) {
       fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-admin-commands`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
-        body: JSON.stringify({ senderPhone: _senderNum, command: (_msgText || '').trim() }),
+        body: JSON.stringify({ senderPhone: ADMIN_PHONE_GUARD, command: (_msgText || '').trim() }),
       }).catch(err => console.error(`${LOG} Admin command error:`, err));
 
       return new Response(JSON.stringify({ ok: true, handled: 'admin_command' }), {
