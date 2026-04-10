@@ -1276,6 +1276,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
         {/* ===================== STEP 4 — Preview / Import / Result ===================== */}
         {step === 4 && !importing && !result && (
+          <TooltipProvider>
           <div className="space-y-4">
             <h3 className="text-base font-semibold">Preview e Importação</h3>
 
@@ -1308,20 +1309,18 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                         {row.valid ? (
                           <CheckCircle2 className="w-4 h-4 text-green-600" />
                         ) : (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <AlertTriangle className="w-4 h-4 text-destructive cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent side="left" className="max-w-xs">
-                                <ul className="text-xs space-y-0.5">
-                                  {row.errors.map((e, i) => (
-                                    <li key={i}>• {e}</li>
-                                  ))}
-                                </ul>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="w-4 h-4 text-destructive cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-xs">
+                              <ul className="text-xs space-y-0.5">
+                                {row.errors.map((e, i) => (
+                                  <li key={i}>• {e}</li>
+                                ))}
+                              </ul>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </TableCell>
                     </TableRow>
