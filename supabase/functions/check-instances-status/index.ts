@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { getAdapter } from '../_shared/providers/index.ts';
+import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,15 +37,11 @@ Deno.serve(async (req) => {
       try {
         const providerType = (instance as any).provider_type || 'self_hosted';
 
-        // Meta Cloud: status verificado via Graph API — não precisa de secrets locais para status
-        // mas precisamos dos secrets para checkStatus
-        const { data: secrets, error: secretsError } = await supabaseAdmin
-          .from('whatsapp_instance_secrets')
-          .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token')
-          .eq('instance_id', instance.id)
-          .maybeSingle();
+        // Buscar secrets via Vault RPC
+        const secrets = await getInstanceSecrets(supabaseAdmin, instance.id);
+        const secretsError = Object.keys(secrets).length === 0;
 
-        if (secretsError || !secrets) {
+        if (secretsError) {
           console.warn(`[check-instances-status] Sem secrets para ${instance.instance_name}`);
           errorCount++;
           continue;
