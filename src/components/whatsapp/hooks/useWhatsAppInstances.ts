@@ -58,30 +58,26 @@ export const useWhatsAppInstances = () => {
 
       if (instanceError) throw instanceError;
 
-      const secretsPayload: any = {
-        instance_id: instanceResult.id,
-        api_url: api_url || '',
-        api_key: api_key || '',
-      };
-
-      if (isMeta) {
-        secretsPayload.meta_access_token = meta_access_token || null;
-        secretsPayload.meta_verify_token = meta_verify_token || null;
-        secretsPayload.meta_app_secret = meta_app_secret || null;
-      }
-
-      if (isZapi) {
-        secretsPayload.zapi_instance_id = zapi_instance_id || null;
-        secretsPayload.zapi_token = zapi_token || null;
-        secretsPayload.zapi_client_token = zapi_client_token || null;
-      }
-
-      const { error: secretsError } = await (supabase
-        .from('whatsapp_instance_secrets') as any)
-        .insert(secretsPayload);
+      const { error: secretsError } = await supabase.functions.invoke('upsert-instance-secrets', {
+        body: {
+          instance_id: instanceResult.id,
+          api_url: api_url || '',
+          api_key: api_key || '',
+          ...(isMeta && {
+            meta_access_token: meta_access_token || null,
+            meta_verify_token: meta_verify_token || null,
+            meta_app_secret: meta_app_secret || null,
+          }),
+          ...(isZapi && {
+            zapi_instance_id: zapi_instance_id || null,
+            zapi_token: zapi_token || null,
+            zapi_client_token: zapi_client_token || null,
+          }),
+        },
+      });
 
       if (secretsError) {
-        await supabase.from('whatsapp_instances').delete().eq('id', instanceResult.id);
+        console.error('Secrets error:', secretsError);
         throw secretsError;
       }
 
@@ -130,12 +126,9 @@ export const useWhatsAppInstances = () => {
       if (zapi_client_token !== undefined) secretsUpdate.zapi_client_token = zapi_client_token;
 
       if (Object.keys(secretsUpdate).length > 0) {
-        const { error: secretsError } = await (supabase
-          .from('whatsapp_instance_secrets') as any)
-          .upsert(
-            { instance_id: id, ...secretsUpdate },
-            { onConflict: 'instance_id' }
-          );
+        const { error: secretsError } = await supabase.functions.invoke('upsert-instance-secrets', {
+          body: { instance_id: id, ...secretsUpdate },
+        });
         if (secretsError) throw secretsError;
       }
 
