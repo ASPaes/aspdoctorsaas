@@ -604,14 +604,21 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     let duplicatasEncontradas: { cnpj: string; razao_social: string | null }[] = [];
 
     if (cnpjsDoCSV.length > 0 && !duplicataAcao) {
-      const { data: existentes } = await supabase
-        .from('clientes')
-        .select('cnpj, razao_social, nome_fantasia')
-        .eq('tenant_id', tenantId)
-        .in('cnpj', cnpjsDoCSV);
-
-      if (existentes && existentes.length > 0) {
-        duplicatasEncontradas = existentes.map(e => ({
+      const CNPJ_BATCH = 100;
+      const allExistentes: { cnpj: string; razao_social: string | null; nome_fantasia: string | null }[] = [];
+      for (let i = 0; i < cnpjsDoCSV.length; i += CNPJ_BATCH) {
+        const batch = cnpjsDoCSV.slice(i, i + CNPJ_BATCH);
+        const { data: batchData } = await supabase
+          .from('clientes')
+          .select('cnpj, razao_social, nome_fantasia')
+          .eq('tenant_id', tenantId)
+          .in('cnpj', batch);
+        if (batchData && batchData.length > 0) {
+          allExistentes.push(...batchData);
+        }
+      }
+      if (allExistentes.length > 0) {
+        duplicatasEncontradas = allExistentes.map(e => ({
           cnpj: e.cnpj ?? '',
           razao_social: e.razao_social || e.nome_fantasia || null,
         }));
@@ -1419,6 +1426,12 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             <p className="text-xs text-center text-muted-foreground">
               Não feche esta janela durante a importação.
             </p>
+            <button
+              className="mt-3 text-xs text-muted-foreground underline hover:text-foreground transition-colors block mx-auto"
+              onClick={() => { setImporting(false); setStep(4); setImportProgress({ current: 0, total: 0 }); }}
+            >
+              Algo deu errado? Clique aqui para cancelar e tentar novamente.
+            </button>
           </div>
         )}
 

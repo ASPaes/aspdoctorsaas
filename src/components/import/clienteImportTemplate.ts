@@ -286,7 +286,6 @@ export const REQUIRED_FIELDS = [
   'razao_social',
   'nome_fantasia',
   'cnpj',
-  'email',
   'telefone_whatsapp',
   'unidade_base',
   'data_cadastro',
@@ -294,7 +293,6 @@ export const REQUIRED_FIELDS = [
   'produto',
   'recorrencia',
   'mensalidade',
-  'custo_operacao',
   'imposto_percentual',
   'custo_fixo_percentual',
 ];
