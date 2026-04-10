@@ -37,7 +37,7 @@ export const useWhatsAppInstances = () => {
         api_url, api_key,
         provider_type,
         instance_id_external,
-        meta_phone_number_id, meta_access_token, meta_verify_token,
+        meta_phone_number_id, meta_access_token, meta_verify_token, meta_app_secret,
         zapi_instance_id, zapi_token, zapi_client_token,
         ...instanceData
       } = instance;
@@ -67,6 +67,7 @@ export const useWhatsAppInstances = () => {
       if (isMeta) {
         secretsPayload.meta_access_token = meta_access_token || null;
         secretsPayload.meta_verify_token = meta_verify_token || null;
+        secretsPayload.meta_app_secret = meta_app_secret || null;
       }
 
       if (isZapi) {
@@ -97,7 +98,7 @@ export const useWhatsAppInstances = () => {
         api_url, api_key,
         provider_type,
         instance_id_external,
-        meta_phone_number_id, meta_access_token, meta_verify_token,
+        meta_phone_number_id, meta_access_token, meta_verify_token, meta_app_secret,
         zapi_instance_id, zapi_token, zapi_client_token,
         ...instanceUpdates
       } = updates;
@@ -123,6 +124,7 @@ export const useWhatsAppInstances = () => {
       if (api_key) secretsUpdate.api_key = api_key;
       if (meta_access_token !== undefined) secretsUpdate.meta_access_token = meta_access_token;
       if (meta_verify_token !== undefined) secretsUpdate.meta_verify_token = meta_verify_token;
+      if (meta_app_secret !== undefined) secretsUpdate.meta_app_secret = meta_app_secret;
       if (zapi_instance_id !== undefined) secretsUpdate.zapi_instance_id = zapi_instance_id;
       if (zapi_token !== undefined) secretsUpdate.zapi_token = zapi_token;
       if (zapi_client_token !== undefined) secretsUpdate.zapi_client_token = zapi_client_token;

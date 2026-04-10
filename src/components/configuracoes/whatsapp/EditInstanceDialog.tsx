@@ -28,6 +28,7 @@ const formSchema = z.object({
   // Meta Cloud
   meta_phone_number_id: z.string().optional(),
   meta_access_token: z.string().optional(),
+  meta_app_secret: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -53,7 +54,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
     queryFn: async () => {
       const { data, error } = await (supabase
         .from('whatsapp_instance_secrets') as any)
-        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token')
+        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token, meta_app_secret')
         .eq('instance_id', instance.id)
         .single();
       if (error) throw error;
@@ -64,6 +65,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
         zapi_token?: string;
         zapi_client_token?: string;
         meta_access_token?: string;
+        meta_app_secret?: string;
       };
     },
     enabled: open,
@@ -84,6 +86,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       zapi_client_token: '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
       meta_access_token: '',
+      meta_app_secret: '',
     },
   });
 
@@ -102,6 +105,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       zapi_client_token: secrets?.zapi_client_token || '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
       meta_access_token: secrets?.meta_access_token || '',
+      meta_app_secret: secrets?.meta_app_secret || '',
     });
   }, [instance, secrets, form]);
 
@@ -117,7 +121,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
           instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : null,
           provider_type: values.provider_type,
           ...((!isMeta && !isZapi) && { api_url: values.api_url, api_key: values.api_key }),
-          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token }),
+          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token, meta_app_secret: values.meta_app_secret }),
           ...(isZapi && { zapi_instance_id: values.zapi_instance_id, zapi_token: values.zapi_token, zapi_client_token: values.zapi_client_token }),
         },
       });
@@ -238,6 +242,17 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                   <FormItem>
                     <FormLabel>Access Token (Permanente)</FormLabel>
                     <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="meta_app_secret" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>App Secret</FormLabel>
+                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Encontrado em: Meta for Developers → Seu App → Configurações → App Secret. Usado para validar a autenticidade dos webhooks.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )} />
