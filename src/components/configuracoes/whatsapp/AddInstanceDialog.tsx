@@ -34,6 +34,7 @@ const formSchema = z.object({
   meta_phone_number_id: z.string().optional(),
   meta_access_token: z.string().optional(),
   meta_verify_token: z.string().optional(),
+  meta_app_secret: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.provider_type === 'self_hosted' || data.provider_type === 'cloud') {
     if (!data.api_url) ctx.addIssue({ code: 'custom', path: ['api_url'], message: 'URL inválida' });
@@ -66,7 +67,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
     defaultValues: {
       display_name: "", instance_name: "", instance_id_external: "",
       api_url: "", api_key: "", provider_type: "self_hosted",
-      meta_phone_number_id: "", meta_access_token: "", meta_verify_token: "",
+      meta_phone_number_id: "", meta_access_token: "", meta_verify_token: "", meta_app_secret: "",
       zapi_instance_id: "", zapi_token: "", zapi_client_token: "",
     },
   });
@@ -120,6 +121,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
           meta_phone_number_id: values.meta_phone_number_id,
           meta_access_token: values.meta_access_token,
           meta_verify_token: values.meta_verify_token,
+          meta_app_secret: values.meta_app_secret,
         }),
         ...(isZapi && {
           zapi_instance_id: values.zapi_instance_id,
@@ -279,6 +281,19 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                           </Tooltip>
                         </div>
                         <FormControl><Input placeholder="meu-token-secreto" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="meta_app_secret" render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1.5">
+                          <FormLabel>App Secret</FormLabel>
+                          <Tooltip><TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-[250px]"><p>Encontrado em: Meta for Developers → Seu App → Configurações → App Secret. Usado para validar a autenticidade dos webhooks.</p></TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
