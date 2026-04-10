@@ -1455,145 +1455,167 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                   {activeFkFields.map((fk) => {
                     const uniqueVals = fkUniqueValues[fk.csvColumn] ?? [];
-                    const hasAnyMissing = uniqueVals.some((v) => !fkValueStatus(fk.csvColumn, v));
+
+                    const exactVals = uniqueVals.filter((v) => {
+                      const m = fkFindMatch(fk.csvColumn, v);
+                      return !!m && normalizeForCompare(m.nome) === normalizeForCompare(v);
+                    });
+                    const fuzzyVals = uniqueVals.filter((v) => {
+                      const m = fkFindMatch(fk.csvColumn, v);
+                      return !!m && normalizeForCompare(m.nome) !== normalizeForCompare(v);
+                    });
+                    const missingVals = uniqueVals.filter((v) => !fkFindMatch(fk.csvColumn, v));
+                    const isFullyResolved = missingVals.every((v) => getFkOverride(fk.csvColumn, v) !== undefined);
+
+                    const renderSelect = (val: string, defaultValue: string) => (
+                      <select
+                        className="text-xs border rounded px-1.5 py-0.5 bg-background text-foreground max-w-[220px] w-full"
+                        value={
+                          (() => {
+                            const ov = getFkOverride(fk.csvColumn, val);
+                            if (typeof ov === 'number') return String(ov);
+                            if (ov === '__new__') return '__new__';
+                            if (ov === '__skip__') return '__skip__';
+                            return defaultValue;
+                          })()
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === '__new__') setFkOverride(fk.csvColumn, val, '__new__');
+                          else if (v === '__skip__') setFkOverride(fk.csvColumn, val, '__skip__');
+                          else setFkOverride(fk.csvColumn, val, Number(v));
+                        }}
+                      >
+                        <option value="__skip__">— Ignorar este valor</option>
+                        <option value="__new__">+ Criar como novo registro</option>
+                        <optgroup label="Vincular a registro existente">
+                          {(fkData[fk.csvColumn] ?? []).map((e) => (
+                            <option key={e.id} value={String(e.id)}>
+                              {e.nome}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    );
 
                     return (
-                      <div key={fk.csvColumn} className="rounded-md border p-3 space-y-2">
+                      <div key={fk.csvColumn} className="rounded-md border p-3 space-y-3">
+                        {/* Header */}
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">{fk.label}</span>
-                          {hasAnyMissing && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Auto-cadastrar?</span>
-                              <Switch
-                                checked={fkAutoCreate[fk.csvColumn] ?? false}
-                                onCheckedChange={(v) =>
-                                  setFkAutoCreate((prev) => ({ ...prev, [fk.csvColumn]: v }))
-                                }
-                              />
+                          <span className="text-xs text-muted-foreground flex items-center gap-2">
+                            {exactVals.length > 0 && <span className="text-green-600 dark:text-green-400">✅ {exactVals.length} ok</span>}
+                            {fuzzyVals.length > 0 && <span className="text-yellow-600 dark:text-yellow-400">⚠ {fuzzyVals.length} sugestão</span>}
+                            {missingVals.length > 0 && <span className="text-red-600 dark:text-red-400">✕ {missingVals.length} não encontrado</span>}
+                          </span>
+                        </div>
+
+                        {/* 1. Exatos — colapsados */}
+                        {exactVals.length > 0 && (
+                          <details className="rounded border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10 p-2">
+                            <summary className="text-xs text-green-700 dark:text-green-400 cursor-pointer list-none hover:underline select-none">
+                              {exactVals.length} valor{exactVals.length !== 1 ? 'es' : ''} encontrado{exactVals.length !== 1 ? 's' : ''} automaticamente ▶
+                            </summary>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {exactVals.map((val) => (
+                                <span key={val} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {val}
+                                </span>
+                              ))}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {uniqueVals.map((val) => {
-                            const match = fkFindMatch(fk.csvColumn, val);
-                            const exists = !!match;
-                            const isExact = exists && normalizeForCompare(match!.nome) === normalizeForCompare(val);
-                            const isFuzzy = exists && !isExact;
-                            const override = getFkOverride(fk.csvColumn, val);
-                            const needsResolution = isFuzzy || !exists;
+                          </details>
+                        )}
 
-                            const badgeColor = typeof override === 'number'
-                              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-                              : override === '__new__'
-                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
-                              : override === '__skip__'
-                              ? "bg-gray-100 dark:bg-gray-800 text-gray-500 line-through"
-                              : isExact
-                              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-                              : isFuzzy
-                              ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300"
-                              : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300";
-
-                            const effectiveLabel = typeof override === 'number'
-                              ? (fkData[fk.csvColumn]?.find(e => e.id === override)?.nome ?? val)
-                              : override === '__new__'
-                              ? `+ Criar: "${val}"`
-                              : override === '__skip__'
-                              ? `Ignorar`
-                              : isFuzzy
-                              ? match!.nome
-                              : val;
-
-                            return (
-                              <div key={val} className="flex flex-col gap-1">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className={cn(
-                                        "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
-                                        needsResolution ? "cursor-pointer hover:opacity-80" : "cursor-default",
-                                        badgeColor
-                                      )}>
-                                        {typeof override === 'number' ? <CheckCircle2 className="w-3 h-3" /> :
-                                         override === '__new__' ? <Info className="w-3 h-3" /> :
-                                         override === '__skip__' ? <XCircle className="w-3 h-3" /> :
-                                         isExact ? <CheckCircle2 className="w-3 h-3" /> :
-                                         isFuzzy ? <AlertTriangle className="w-3 h-3" /> :
-                                         <XCircle className="w-3 h-3" />}
-                                        {val}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      <p className="text-xs">
-                                        {typeof override === 'number' ? `Vinculado a: "${effectiveLabel}"` :
-                                         override === '__new__' ? `Será criado como novo registro` :
-                                         override === '__skip__' ? `Será ignorado` :
-                                         isExact ? "Encontrado no cadastro" :
-                                         isFuzzy ? `Sugestão automática: "${match!.nome}"` :
-                                         "Não encontrado — use o seletor para resolver"}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                                {needsResolution && (
-                                  <div className="flex items-center gap-1 ml-1">
-                                    <select
-                                      className="text-xs border rounded px-1.5 py-0.5 bg-background text-foreground max-w-[180px]"
-                                      value={
-                                        typeof override === 'number' ? String(override) :
-                                        override === '__new__' ? '__new__' :
-                                        override === '__skip__' ? '__skip__' :
-                                        isFuzzy ? String(match!.id) : '__skip__'
-                                      }
-                                      onChange={(e) => {
-                                        const v = e.target.value;
-                                        if (v === '__new__') setFkOverride(fk.csvColumn, val, '__new__');
-                                        else if (v === '__skip__') setFkOverride(fk.csvColumn, val, '__skip__');
-                                        else setFkOverride(fk.csvColumn, val, Number(v));
-                                      }}
-                                    >
-                                      {isFuzzy && (
-                                        <option value={String(match!.id)}>
-                                          ✓ Usar sugestão: {match!.nome}
-                                        </option>
-                                      )}
-                                      <optgroup label="Vincular a registro existente">
-                                        {(fkData[fk.csvColumn] ?? []).map(e => (
-                                          <option key={e.id} value={String(e.id)}>
-                                            {e.nome}
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                      <option value="__new__">+ Criar como novo registro</option>
-                                      <option value="__skip__">— Ignorar este valor</option>
-                                    </select>
+                        {/* 2. Fuzzy — sugestões */}
+                        {fuzzyVals.length > 0 && (
+                          <div className="rounded border border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-900/10 p-2 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                Sugestões automáticas — confirme ou ajuste
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-xs text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/30"
+                                onClick={() => {
+                                  fuzzyVals.forEach((v) => {
+                                    const m = fkFindMatch(fk.csvColumn, v);
+                                    if (m) setFkOverride(fk.csvColumn, v, Number(m.id));
+                                  });
+                                }}
+                              >
+                                ✓ Aceitar todas
+                              </Button>
+                            </div>
+                            <div className="space-y-1.5">
+                              {fuzzyVals.map((val) => {
+                                const match = fkFindMatch(fk.csvColumn, val)!;
+                                return (
+                                  <div key={val} className="flex items-center gap-2">
+                                    <span className="text-xs font-mono text-yellow-800 dark:text-yellow-300 min-w-[100px] truncate" title={val}>{val}</span>
+                                    <span className="text-xs text-muted-foreground">→</span>
+                                    {renderSelect(val, String(match.id))}
                                   </div>
-                                )}
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3. Não encontrados */}
+                        {missingVals.length > 0 && (
+                          <div className="rounded border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 p-2 space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <p className="text-xs font-medium text-red-800 dark:text-red-300 flex items-center gap-1">
+                                <XCircle className="w-3 h-3" />
+                                Não encontrados no cadastro
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 px-2 text-xs text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                  onClick={() => {
+                                    missingVals.forEach((v) => setFkOverride(fk.csvColumn, v, '__new__'));
+                                  }}
+                                >
+                                  + Criar todos como novos
+                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[11px] text-muted-foreground">Auto-cadastrar</span>
+                                  <Switch
+                                    checked={fkAutoCreate[fk.csvColumn] ?? false}
+                                    onCheckedChange={(v) =>
+                                      setFkAutoCreate((prev) => ({ ...prev, [fk.csvColumn]: v }))
+                                    }
+                                  />
+                                </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                        {/* Resumo de itens sem resolução definida */}
-                        {(() => {
-                          const semResolucao = uniqueVals.filter(v => {
-                            const ov = getFkOverride(fk.csvColumn, v);
-                            const m = fkFindMatch(fk.csvColumn, v);
-                            const exact = !!m && normalizeForCompare(m.nome) === normalizeForCompare(v);
-                            return !exact && ov === undefined && !m;
-                          });
-                          if (semResolucao.length === 0) return null;
-                          return (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-destructive" />
-                              {semResolucao.length} valor{semResolucao.length !== 1 ? 'es' : ''} sem vínculo — use o seletor acima ou ative &quot;Auto-cadastrar&quot;
-                            </p>
-                          );
-                        })()}
-                        {hasAnyMissing && fkAutoCreate[fk.csvColumn] && (
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                            <Info className="w-3 h-3" />
-                            Novos registros serão criados no tenant selecionado.
-                          </p>
+                            </div>
+                            <div className="space-y-1.5">
+                              {missingVals.map((val) => (
+                                <div key={val} className="flex items-center gap-2">
+                                  <span className="text-xs font-mono text-red-800 dark:text-red-300 min-w-[100px] truncate" title={val}>{val}</span>
+                                  <span className="text-xs text-muted-foreground">→</span>
+                                  {renderSelect(val, '__skip__')}
+                                </div>
+                              ))}
+                            </div>
+                            {!isFullyResolved && !(fkAutoCreate[fk.csvColumn]) && (
+                              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-destructive" />
+                                {missingVals.filter((v) => getFkOverride(fk.csvColumn, v) === undefined).length} valor{missingVals.filter((v) => getFkOverride(fk.csvColumn, v) === undefined).length !== 1 ? 'es' : ''} sem vínculo — use o seletor ou ative "Auto-cadastrar"
+                              </p>
+                            )}
+                            {fkAutoCreate[fk.csvColumn] && (
+                              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <Info className="w-3 h-3" />
+                                Novos registros serão criados no tenant selecionado.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
