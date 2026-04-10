@@ -314,6 +314,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
   const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'inserir'>('pular');
   const [importPhase, setImportPhase] = useState<'verificando' | 'cidades' | 'importando' | ''>('');
+  const [cnpjsDuplicadosSet, setCnpjsDuplicadosSet] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -340,6 +341,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setDuplicataAcao(null);
     setDuplicataOpcao('pular');
     setImportPhase('');
+    setCnpjsDuplicadosSet(new Set());
   }, []);
 
   /* ---------- Build rows from raw data + mapping ---------- */
@@ -636,19 +638,20 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   );
 
   /* ---------- Step 4: Import (core logic) ---------- */
-  const handleImportWithRows = useCallback(async (rowsToImport: ParsedRow[]) => {
+  const handleImportWithRows = useCallback(async (rowsToImportParam: ParsedRow[]) => {
     const tenantId = effectiveTenantId;
     if (!tenantId) {
       toast.error("Não foi possível identificar o tenant. Faça login novamente.");
       return;
     }
-    if (rowsToImport.length === 0) return;
+    if (rowsToImportParam.length === 0) return;
 
     setImporting(true);
     setImportPhase('verificando');
     setStep(4);
 
     const autoCreated: Record<string, number> = {};
+    let rowsToImport = [...rowsToImportParam]; // cópia mutável
 
     // --- Verificação de duplicatas ---
     const cnpjsDoCSV = rowsToImport
@@ -657,19 +660,18 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     let duplicatasEncontradas: { cnpj: string; razao_social: string | null }[] = [];
 
-    if (cnpjsDoCSV.length > 0 && !duplicataAcao) {
+    // 'inserir' = bypass total da verificação
+    if (duplicataOpcao !== 'inserir' && cnpjsDoCSV.length > 0) {
       const CNPJ_BATCH = 100;
       const allExistentes: { cnpj: string; razao_social: string | null; nome_fantasia: string | null }[] = [];
-      for (let i = 0; i < cnpjsDoCSV.length; i += CNPJ_BATCH) {
-        const batch = cnpjsDoCSV.slice(i, i + CNPJ_BATCH);
+      for (let ci = 0; ci < cnpjsDoCSV.length; ci += CNPJ_BATCH) {
+        const batch = cnpjsDoCSV.slice(ci, ci + CNPJ_BATCH);
         const { data: batchData } = await supabase
           .from('clientes')
           .select('cnpj, razao_social, nome_fantasia')
           .eq('tenant_id', tenantId)
           .in('cnpj', batch);
-        if (batchData && batchData.length > 0) {
-          allExistentes.push(...batchData);
-        }
+        if (batchData && batchData.length > 0) allExistentes.push(...batchData);
       }
       if (allExistentes.length > 0) {
         duplicatasEncontradas = allExistentes.map(e => ({
@@ -679,11 +681,25 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       }
     }
 
+    // Armazenar o Set de CNPJs duplicados para uso no batch insert
+    const _cnpjsDupSet = new Set(duplicatasEncontradas.map(d => d.cnpj));
+    setCnpjsDuplicadosSet(_cnpjsDupSet);
+
     if (duplicatasEncontradas.length > 0) {
-      setDuplicatas(duplicatasEncontradas);
-      setImporting(false);
-      setImportPhase('');
-      return;
+      if (duplicataOpcao === 'pular') {
+        // Auto-pular: filtra os duplicados silenciosamente, sem mostrar modal
+        rowsToImport = rowsToImport.filter(r => {
+          const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
+          return !_cnpjsDupSet.has(cnpj);
+        });
+        // Continua com as linhas não-duplicadas (sem return)
+      } else {
+        // 'atualizar': mostrar o modal de confirmação antes de prosseguir
+        setDuplicatas(duplicatasEncontradas);
+        setImporting(false);
+        setImportPhase('');
+        return;
+      }
     }
 
     setImportPhase('cidades');
@@ -901,19 +917,53 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         };
       });
 
-      const { error } = await supabase.from("clientes").insert(payload);
+      // Separar linhas do batch em: novas vs duplicatas (para 'atualizar')
+      const payloadNovos = payload.filter((_, idx) => {
+        const row = batches[b][idx];
+        const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
+        return !cnpjsDuplicadosSet.has(cnpj);
+      });
+      const payloadDuplicados = payload.filter((_, idx) => {
+        const row = batches[b][idx];
+        const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
+        return cnpjsDuplicadosSet.has(cnpj);
+      });
 
-      if (error) {
-        failed += batches[b].length;
-        failReasons.push(`Lote ${b + 1}: ${error.message}`);
-      } else {
-        imported += batches[b].length;
+      // Insert dos registros novos
+      if (payloadNovos.length > 0) {
+        const { error: insertErr, data: insertedData } = await supabase
+          .from('clientes')
+          .insert(payloadNovos)
+          .select('id');
+        if (insertErr) {
+          failed += payloadNovos.length;
+          if (!failReasons.includes(insertErr.message)) failReasons.push(insertErr.message);
+        } else {
+          imported += (insertedData?.length ?? payloadNovos.length);
+        }
+      }
+
+      // Upsert dos registros duplicados (apenas quando duplicataOpcao === 'atualizar')
+      if (payloadDuplicados.length > 0 && duplicataOpcao === 'atualizar') {
+        for (const record of payloadDuplicados) {
+          const { error: upsertErr } = await supabase
+            .from('clientes')
+            .update(record)
+            .eq('cnpj', record.cnpj)
+            .eq('tenant_id', tenantId);
+          if (upsertErr) {
+            failed += 1;
+            if (!failReasons.includes(upsertErr.message)) failReasons.push(upsertErr.message);
+          } else {
+            imported += 1;
+          }
+        }
       }
     }
 
     setResult({
       imported,
-      skipped: errorRows.length,
+      skipped: errorRows.length + (duplicataOpcao === 'pular' ? cnpjsDuplicadosSet.size : 0),
       failed,
       failReasons,
       autoCreated,
@@ -925,28 +975,24 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     }
-  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataAcao]);
+  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataOpcao, cnpjsDuplicadosSet]);
 
   const handleImport = useCallback(async () => {
     await handleImportWithRows(validRows);
   }, [handleImportWithRows, validRows]);
 
-  const handleConfirmarDuplicatas = useCallback(async (acao: 'pular' | 'cancelar') => {
+  const handleConfirmarDuplicatas = useCallback(async (acao: 'pular' | 'atualizar' | 'cancelar') => {
     if (acao === 'cancelar') {
       setDuplicatas([]);
       setImporting(false);
-      setStep(4);
+      setImportPhase('');
       return;
     }
-    const cnpjsDuplicados = new Set(duplicatas.map(d => d.cnpj.replace(/\D/g, '')));
-    const rowsSemDuplicatas = validRows.filter(r => {
-      const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
-      return !cnpjsDuplicados.has(cnpj);
-    });
+    // 'pular' ou 'atualizar': retomar a importação
+    // O cnpjsDuplicadosSet já está definido — o batch insert vai usar duplicataOpcao para decidir
     setDuplicatas([]);
-    setDuplicataAcao('pular');
-    await handleImportWithRows(rowsSemDuplicatas);
-  }, [duplicatas, validRows, handleImportWithRows]);
+    await handleImportWithRows(validRows);
+  }, [handleImportWithRows, validRows]);
 
   /* ---------- Drag & drop ---------- */
   const handleDrop = useCallback(
@@ -1432,7 +1478,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 <div className="flex gap-2 pt-1">
                   <Button
                     size="sm"
-                    onClick={() => handleConfirmarDuplicatas(duplicataOpcao === 'pular' ? 'pular' : 'pular')}
+                    onClick={() => handleConfirmarDuplicatas(
+                      duplicataOpcao === 'atualizar' ? 'atualizar' : 'pular'
+                    )}
                     className="gap-1"
                   >
                     {duplicataOpcao === 'pular' ? '🚫 Pular duplicatas e continuar'
@@ -1442,7 +1490,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => { setDuplicatas([]); }}
+                    onClick={() => handleConfirmarDuplicatas('cancelar')}
                   >
                     Cancelar
                   </Button>
