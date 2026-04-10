@@ -314,7 +314,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
   const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'inserir'>('pular');
   const [importPhase, setImportPhase] = useState<'verificando' | 'cidades' | 'importando' | ''>('');
-  const [cnpjsDuplicadosSet, setCnpjsDuplicadosSet] = useState<Set<string>>(new Set());
+  // cnpjsDuplicadosNoBanco is computed locally inside handleImportWithRows (not state)
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -341,7 +341,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setDuplicataAcao(null);
     setDuplicataOpcao('pular');
     setImportPhase('');
-    setCnpjsDuplicadosSet(new Set());
+    // cnpjsDuplicadosNoBanco is local — no state to reset
   }, []);
 
   /* ---------- Build rows from raw data + mapping ---------- */
@@ -658,9 +658,20 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       .map(r => (r.values.cnpj ?? '').trim().replace(/\D/g, ''))
       .filter(Boolean);
 
-    let duplicatasEncontradas: { cnpj: string; razao_social: string | null }[] = [];
+    // Set para controlar CNPJs duplicados internos ao CSV (mantém primeira ocorrência)
+    const cnpjsVistos = new Set<string>();
+    rowsToImport = rowsToImport.filter(r => {
+      const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
+      if (!cnpj) return true;
+      if (cnpjsVistos.has(cnpj)) return false;
+      cnpjsVistos.add(cnpj);
+      return true;
+    });
 
-    // 'inserir' = bypass total da verificação
+    // Set local (não estado) dos CNPJs que já existem no banco
+    let cnpjsDuplicadosNoBanco = new Set<string>();
+    let duplicatasParaModal: { cnpj: string; razao_social: string | null }[] = [];
+
     if (duplicataOpcao !== 'inserir' && cnpjsDoCSV.length > 0) {
       const CNPJ_BATCH = 100;
       const allExistentes: { cnpj: string; razao_social: string | null; nome_fantasia: string | null }[] = [];
@@ -674,32 +685,32 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         if (batchData && batchData.length > 0) allExistentes.push(...batchData);
       }
       if (allExistentes.length > 0) {
-        duplicatasEncontradas = allExistentes.map(e => ({
+        duplicatasParaModal = allExistentes.map(e => ({
           cnpj: e.cnpj ?? '',
           razao_social: e.razao_social || e.nome_fantasia || null,
         }));
+        cnpjsDuplicadosNoBanco = new Set(duplicatasParaModal.map(d => d.cnpj));
       }
     }
 
-    // Armazenar o Set de CNPJs duplicados para uso no batch insert
-    const _cnpjsDupSet = new Set(duplicatasEncontradas.map(d => d.cnpj));
-    setCnpjsDuplicadosSet(_cnpjsDupSet);
-
-    if (duplicatasEncontradas.length > 0) {
+    if (duplicatasParaModal.length > 0) {
       if (duplicataOpcao === 'pular') {
-        // Auto-pular: filtra os duplicados silenciosamente, sem mostrar modal
+        // Filtra silenciosamente — não importa os duplicados
         rowsToImport = rowsToImport.filter(r => {
           const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
-          return !_cnpjsDupSet.has(cnpj);
+          return !cnpjsDuplicadosNoBanco.has(cnpj);
         });
-        // Continua com as linhas não-duplicadas (sem return)
-      } else {
-        // 'atualizar': mostrar o modal de confirmação antes de prosseguir
-        setDuplicatas(duplicatasEncontradas);
+        // Guarda lista para exibir no resultado final
+        setDuplicatas(duplicatasParaModal);
+        // Continua o import com os não-duplicados
+      } else if (duplicataOpcao === 'atualizar') {
+        // Para 'atualizar': interrompe, mostra modal de confirmação
+        setDuplicatas(duplicatasParaModal);
         setImporting(false);
         setImportPhase('');
         return;
       }
+      // 'inserir': ignora — não filtra, não interrompe
     }
 
     setImportPhase('cidades');
@@ -917,19 +928,19 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         };
       });
 
-      // Separar linhas do batch em: novas vs duplicatas (para 'atualizar')
+      // Separar novos (nunca estiveram no banco) de duplicados (existem no banco)
       const payloadNovos = payload.filter((_, idx) => {
         const row = batches[b][idx];
         const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
-        return !cnpjsDuplicadosSet.has(cnpj);
+        return !cnpjsDuplicadosNoBanco.has(cnpj);
       });
       const payloadDuplicados = payload.filter((_, idx) => {
         const row = batches[b][idx];
         const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
-        return cnpjsDuplicadosSet.has(cnpj);
+        return cnpjsDuplicadosNoBanco.has(cnpj);
       });
 
-      // Insert dos registros novos
+      // INSERT dos registros novos
       if (payloadNovos.length > 0) {
         const { error: insertErr, data: insertedData } = await supabase
           .from('clientes')
@@ -943,7 +954,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         }
       }
 
-      // Upsert dos registros duplicados (apenas quando duplicataOpcao === 'atualizar')
+      // UPDATE dos registros duplicados (apenas quando duplicataOpcao === 'atualizar')
       if (payloadDuplicados.length > 0 && duplicataOpcao === 'atualizar') {
         for (const record of payloadDuplicados) {
           const { error: upsertErr } = await supabase
@@ -963,7 +974,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     setResult({
       imported,
-      skipped: errorRows.length + (duplicataOpcao === 'pular' ? cnpjsDuplicadosSet.size : 0),
+      skipped: errorRows.length + (duplicataOpcao === 'pular' ? cnpjsDuplicadosNoBanco.size : 0),
       failed,
       failReasons,
       autoCreated,
@@ -975,21 +986,20 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
     }
-  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataOpcao, cnpjsDuplicadosSet]);
+  }, [effectiveTenantId, validRows, errorRows.length, activeFkFields, fkData, fkAutoCreate, fkUniqueValues, queryClient, duplicataOpcao]);
 
   const handleImport = useCallback(async () => {
     await handleImportWithRows(validRows);
   }, [handleImportWithRows, validRows]);
 
-  const handleConfirmarDuplicatas = useCallback(async (acao: 'pular' | 'atualizar' | 'cancelar') => {
+  const handleConfirmarDuplicatas = useCallback(async (acao: 'atualizar' | 'cancelar') => {
     if (acao === 'cancelar') {
       setDuplicatas([]);
       setImporting(false);
       setImportPhase('');
       return;
     }
-    // 'pular' ou 'atualizar': retomar a importação
-    // O cnpjsDuplicadosSet já está definido — o batch insert vai usar duplicataOpcao para decidir
+    // 'atualizar': retomar com TODAS as linhas válidas (o batch insert vai separar novos de duplicados)
     setDuplicatas([]);
     await handleImportWithRows(validRows);
   }, [handleImportWithRows, validRows]);
@@ -1478,14 +1488,10 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 <div className="flex gap-2 pt-1">
                   <Button
                     size="sm"
-                    onClick={() => handleConfirmarDuplicatas(
-                      duplicataOpcao === 'atualizar' ? 'atualizar' : 'pular'
-                    )}
+                    onClick={() => handleConfirmarDuplicatas('atualizar')}
                     className="gap-1"
                   >
-                    {duplicataOpcao === 'pular' ? '🚫 Pular duplicatas e continuar'
-                      : duplicataOpcao === 'atualizar' ? '♻️ Atualizar duplicatas e continuar'
-                      : '➕ Inserir mesmo assim e continuar'}
+                    ♻️ Atualizar duplicatas e continuar
                   </Button>
                   <Button
                     size="sm"
@@ -1689,6 +1695,23 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 {result.failReasons.length > 5 && (
                   <p className="text-xs text-muted-foreground">...e mais {result.failReasons.length - 5} erros</p>
                 )}
+              </div>
+            )}
+
+            {duplicataOpcao === 'pular' && duplicatas.length > 0 && (
+              <div className="rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 space-y-2">
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {duplicatas.length} CNPJ{duplicatas.length !== 1 ? 's' : ''} já cadastrado{duplicatas.length !== 1 ? 's' : ''} — pulado{duplicatas.length !== 1 ? 's' : ''} na importação
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {duplicatas.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
+                      <span className="font-mono">{d.cnpj}</span>
+                      {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
