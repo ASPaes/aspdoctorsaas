@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const FUNCTION_NAME = 'forward-whatsapp-message';
 const corsHeaders = {
@@ -104,9 +105,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [instanceResult, secretsResult, senderResult] = await Promise.all([
+    const [instanceResult, senderResult] = await Promise.all([
       supabase.from('whatsapp_instances').select('id, instance_name, provider_type, instance_id_external').eq('id', instanceId).single(),
-      supabase.from('whatsapp_instance_secrets').select('api_url, api_key').eq('instance_id', instanceId).single(),
       (async () => {
         const { data: profile } = await supabase.from('profiles').select('funcionario_id').eq('user_id', userId).maybeSingle();
         if (!profile?.funcionario_id) return { name: '', role: null };
@@ -116,9 +116,15 @@ Deno.serve(async (req) => {
     ]);
 
     const instance = instanceResult.data;
-    const secrets = secretsResult.data;
-    if (!instance || !secrets) {
-      return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'Instance or secrets not found', requestId }), {
+    if (!instance) {
+      return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'Instance not found', requestId }), {
+        status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
+      });
+    }
+
+    const secrets = await getInstanceSecrets(supabase, instanceId);
+    if (!secrets.api_key || !secrets.api_url) {
+      return new Response(JSON.stringify({ type: 'about:blank', title: 'Conflict', status: 409, detail: 'Instance secrets not found', requestId }), {
         status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
     }

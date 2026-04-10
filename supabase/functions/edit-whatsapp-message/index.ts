@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,13 +78,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: secrets, error: secretsError } = await supabase
-      .from('whatsapp_instance_secrets')
-      .select('api_url, api_key')
-      .eq('instance_id', (conversation as any).whatsapp_instances.id)
-      .single();
+    const secrets = await getInstanceSecrets(supabase, (conversation as any).whatsapp_instances.id);
 
-    if (secretsError || !secrets) {
+    if (!secrets.api_key || !secrets.api_url) {
       return new Response(JSON.stringify({ success: false, error: 'Instance secrets not found' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
