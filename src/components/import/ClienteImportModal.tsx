@@ -1457,7 +1457,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     const exactVals   = uniqueVals.filter(v => { const m = fkFindMatch(fk.csvColumn, v); return !!m && normalizeForCompare(m!.nome) === normalizeForCompare(v); });
                     const fuzzyVals   = uniqueVals.filter(v => { const m = fkFindMatch(fk.csvColumn, v); return !!m && normalizeForCompare(m!.nome) !== normalizeForCompare(v); });
                     const missingVals = uniqueVals.filter(v => !fkFindMatch(fk.csvColumn, v));
-                    const totalOk = exactVals.length
                       + fuzzyVals.filter(v => { const ov = getFkOverride(fk.csvColumn, v); return typeof ov === 'number' || (ov === undefined); }).length
                       + missingVals.filter(v => { const ov = getFkOverride(fk.csvColumn, v); return typeof ov === 'number' || ov === '__new__'; }).length;
                     const isFullyResolved = missingVals.every(v => { const ov = getFkOverride(fk.csvColumn, v); return typeof ov === 'number' || ov === '__new__' || ov === '__skip__'; });
@@ -1511,7 +1510,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                                   className="text-xs text-yellow-700 dark:text-yellow-400 underline hover:no-underline"
                                   onClick={() => fuzzyVals.forEach(v => {
                                     const m = fkFindMatch(fk.csvColumn, v);
-                                    if (m && getFkOverride(fk.csvColumn, v) === undefined) setFkOverride(fk.csvColumn, v, m.id as number);
+                                    if (m && getFkOverride(fk.csvColumn, v) === undefined) setFkOverride(fk.csvColumn, v, Number(m.id));
                                   })}
                                 >
                                   ✓ Aceitar todas
