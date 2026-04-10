@@ -3204,6 +3204,7 @@ export type Database = {
           id: string
           instance_id: string
           meta_access_token: string | null
+          meta_app_secret: string | null
           meta_verify_token: string | null
           tenant_id: string
           updated_at: string
@@ -3219,6 +3220,7 @@ export type Database = {
           id?: string
           instance_id: string
           meta_access_token?: string | null
+          meta_app_secret?: string | null
           meta_verify_token?: string | null
           tenant_id: string
           updated_at?: string
@@ -3234,6 +3236,7 @@ export type Database = {
           id?: string
           instance_id?: string
           meta_access_token?: string | null
+          meta_app_secret?: string | null
           meta_verify_token?: string | null
           tenant_id?: string
           updated_at?: string
