@@ -188,8 +188,11 @@ export function downloadTemplateCompletoCsv() {
   URL.revokeObjectURL(url);
 }
 
-// ── Alias para compatibilidade ───────────────────────────────────────────────
+// ── Aliases para compatibilidade ──────────────────────────────────────────────
 export const downloadTemplateCsv = downloadTemplateMinimoCsv;
+
+// Array com todos os nomes internos (snake_case) na ordem do template completo
+export const CLIENTE_IMPORT_HEADERS = Object.values(FRIENDLY_TO_SYSTEM);
 
 // ── Campos FK: coluna CSV → tabela Supabase ───────────────────────────────────
 export const FK_FIELDS: {
