@@ -88,7 +88,13 @@ type ColumnMapping = Record<string, string>; // systemCol -> fileCol
 /*  CSV Helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-function parseCsvLine(line: string): string[] {
+function detectDelimiter(line: string): ',' | ';' {
+  const semicolons = (line.match(/;/g) || []).length;
+  const commas = (line.match(/,/g) || []).length;
+  return semicolons >= commas ? ';' : ',';
+}
+
+function parseCsvLine(line: string, delimiter: ',' | ';'): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
@@ -101,7 +107,7 @@ function parseCsvLine(line: string): string[] {
       } else {
         inQuotes = !inQuotes;
       }
-    } else if ((ch === "," || ch === ";") && !inQuotes) {
+    } else if (ch === delimiter && !inQuotes) {
       result.push(current.trim());
       current = "";
     } else {
@@ -325,14 +331,14 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
   /* ---------- Build rows from raw data + mapping ---------- */
   const buildRows = useCallback(
-    (dataLines: string[][], mapping: ColumnMapping) => {
+    (dataLines: string[][], mapping: ColumnMapping, headers: string[]) => {
       const parsed: ParsedRow[] = [];
       for (const cols of dataLines) {
         const values: Record<string, string> = {};
         for (const sysCol of CLIENTE_IMPORT_HEADERS) {
           const fileCol = mapping[sysCol];
           if (fileCol && fileCol !== "__unmapped__") {
-            const fileIdx = fileHeaders.indexOf(fileCol);
+            const fileIdx = headers.indexOf(fileCol);
             values[sysCol] = fileIdx >= 0 ? (cols[fileIdx] ?? "") : "";
           } else {
             values[sysCol] = "";
@@ -343,7 +349,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       }
       setRows(parsed);
     },
-    [fileHeaders]
+    []
   );
 
   /* ---------- Parse file ---------- */
@@ -379,18 +385,29 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         return;
       }
 
-      const headerLine = parseCsvLine(lines[0]);
-      const dataLines = lines.slice(1).map(parseCsvLine);
+      // Detecta delimitador UMA VEZ a partir do cabeçalho
+      const delimiter = detectDelimiter(lines[0]);
+      const headerLine = parseCsvLine(lines[0], delimiter);
+      const dataLines = lines.slice(1).map((l) => parseCsvLine(l, delimiter));
 
       setFileHeaders(headerLine);
       setRawLines(dataLines);
 
-      // Check exact match
+      // Check exact match (alias-aware)
+      const EXACT_ALIASES: Record<string, string[]> = {
+        imposto_percentual: ['imposto', 'impostos', 'impostopercentual', 'aliquota'],
+        custo_fixo_percentual: ['custo', 'custofixo', 'custofixopercentual', 'fixo'],
+      };
+
       const exact =
         headerLine.length === CLIENTE_IMPORT_HEADERS.length &&
-        headerLine.every(
-          (h, i) => normalizeForCompare(h) === normalizeForCompare(CLIENTE_IMPORT_HEADERS[i])
-        );
+        headerLine.every((h, i) => {
+          const sysCol = CLIENTE_IMPORT_HEADERS[i];
+          const hn = normalizeForCompare(h);
+          if (hn === normalizeForCompare(sysCol)) return true;
+          const aliases = EXACT_ALIASES[sysCol] ?? [];
+          return aliases.includes(hn);
+        });
 
       if (exact) {
         setHeadersMatch(true);
@@ -462,9 +479,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const totalRequired = REQUIRED_FIELDS.length;
 
   const handleMappingContinue = useCallback(() => {
-    buildRows(rawLines, columnMapping);
+    buildRows(rawLines, columnMapping, fileHeaders);
     setStep(3);
-  }, [rawLines, columnMapping, buildRows]);
+  }, [rawLines, columnMapping, fileHeaders, buildRows]);
 
   /* ---------- Step 3: Load FK data ---------- */
   const activeFkFields = useMemo(() => {
@@ -1018,7 +1035,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               <Button variant="outline" onClick={() => { setFileHeaders([]); setRawLines([]); setHeadersMatch(false); }} className="gap-2">
                 <ArrowLeft className="w-4 h-4" /> Trocar arquivo
               </Button>
-              <Button onClick={() => { buildRows(rawLines, columnMapping); setStep(3); }} className="gap-2">
+              <Button onClick={() => { buildRows(rawLines, columnMapping, fileHeaders); setStep(3); }} className="gap-2">
                 Continuar <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
