@@ -7,168 +7,189 @@
  * Campos com * são obrigatórios.
  */
 
-// ── Ordem exata das colunas do template CSV ──────────────────────────────────
-export const CLIENTE_IMPORT_HEADERS = [
+// ── Mapeamento: nome amigável (header do CSV) → campo interno do sistema ─────
+export const FRIENDLY_TO_SYSTEM: Record<string, string> = {
+  'Razão Social': 'razao_social',
+  'Nome Fantasia': 'nome_fantasia',
+  'CNPJ': 'cnpj',
+  'Email': 'email',
+  'WhatsApp': 'telefone_whatsapp',
+  'Unidade Base': 'unidade_base',
+  'Data de Cadastro': 'data_cadastro',
+  'Tipo de Pessoa': 'tipo_pessoa',
+  'Área de Atuação': 'area_atuacao',
+  'Segmento': 'segmento',
+  'Observação do Cliente': 'observacao_cliente',
+  'Telefone Contato': 'telefone_contato',
+  'WhatsApp Contato': 'telefone_whatsapp_contato',
+  'CEP': 'cep',
+  'Estado (UF)': 'estado',
+  'Cidade': 'cidade',
+  'Endereço': 'endereco',
+  'Número': 'numero',
+  'Bairro': 'bairro',
+  'Complemento': 'complemento',
+  'Nome do Contato': 'contato_nome',
+  'CPF do Contato': 'contato_cpf',
+  'Telefone do Contato': 'contato_fone',
+  'Aniversário do Contato': 'contato_aniversario',
+  'Data da Venda': 'data_venda',
+  'Produto': 'produto',
+  'Recorrência': 'recorrencia',
+  'Valor de Ativação': 'valor_ativacao',
+  'Dia de Vencimento': 'dia_vencimento_mrr',
+  'Mensalidade': 'mensalidade',
+  'Custo Operação': 'custo_operacao',
+  'Imposto (%)': 'imposto_percentual',
+  'Custo Fixo (%)': 'custo_fixo_percentual',
+  'Fornecedor': 'fornecedor',
+  'Origem da Venda': 'origem_venda',
+  'Modelo de Contrato': 'modelo_contrato',
+  'Funcionário': 'funcionario',
+  'Forma de Pagto Ativação': 'forma_pagamento_ativacao',
+  'Forma de Pagto Mensalidade': 'forma_pagamento_mensalidade',
+  'Data de Ativação': 'data_ativacao',
+  'Código no Fornecedor': 'codigo_fornecedor',
+  'Link Portal Fornecedor': 'link_portal_fornecedor',
+  'Obs. Negociação': 'observacao_negociacao',
+  'Cancelado? (sim/nao)': 'cancelado',
+  'Data Cancelamento': 'data_cancelamento',
+  'Motivo Cancelamento': 'motivo_cancelamento',
+  'Obs. Cancelamento': 'observacao_cancelamento',
+  'Vencimento Cert. A1': 'cert_a1_vencimento',
+  'Última Venda Cert. A1': 'cert_a1_ultima_venda_em',
+  'Código da Matriz': 'matriz_codigo_sequencial',
+};
 
-  // ── SEÇÃO 1: Dados do Cliente ─────────────────────────────────────────────
-  'razao_social',               // * Razão Social da empresa
-  'nome_fantasia',              // * Nome Fantasia (apelido comercial)
-  'cnpj',                       // * CNPJ — somente números, sem . / -  (ex: 12345678000199)
-  'email',                      // * E-mail principal do cliente
-  'telefone_whatsapp',          // * WhatsApp Financeiro — formato: (DD) NNNNN-NNNN
-  'unidade_base',               // * Unidade Base — nome da unidade (FK: unidades_base)
-  'data_cadastro',              // * Data de Cadastro — formato: YYYY-MM-DD (obrigatório)
-  'tipo_pessoa',                //   Tipo de pessoa: juridica | fisica (padrão: juridica)
-  'area_atuacao',               //   Área de Atuação — nome da área (FK: areas_atuacao)
-  'segmento',                   //   Segmento de mercado (FK: segmentos)
-  'observacao_cliente',         //   Observações gerais sobre o cliente
-  'telefone_contato',           //   Telefone fixo/contato
-  'telefone_whatsapp_contato',  //   WhatsApp do contato (diferente do financeiro)
+// ── Mapeamento inverso: campo interno → nome amigável ─────────────────────────
+export const SYSTEM_TO_FRIENDLY: Record<string, string> =
+  Object.fromEntries(Object.entries(FRIENDLY_TO_SYSTEM).map(([k, v]) => [v, k]));
 
-  // ── SEÇÃO 2: Endereço ─────────────────────────────────────────────────────
-  'cep',                        //   CEP — formato: 00000-000
-  'estado',                     //   Estado — sigla (ex: SP, RJ, MG)
-  'cidade',                     //   Cidade — nome completo
-  'endereco',                   //   Logradouro (rua, av, etc.)
-  'numero',                     //   Número do endereço
-  'bairro',                     //   Bairro
-  'complemento',                //   Complemento do endereço (sala, andar, bloco...)
-
-  // ── SEÇÃO 3: Contato Principal ────────────────────────────────────────────
-  'contato_nome',               //   Nome do contato principal
-  'contato_cpf',                //   CPF do contato — formato: 000.000.000-00
-  'contato_fone',               //   Telefone do contato — formato: (DD) NNNNN-NNNN
-  'contato_aniversario',        //   Data de aniversário — formato: YYYY-MM-DD
-
-  // ── SEÇÃO 4: Produto / Contrato ───────────────────────────────────────────
-  'data_venda',                 // * Data da Venda — formato: YYYY-MM-DD
-  'produto',                    // * Produto contratado (FK: produtos)
-  'recorrencia',                // * Recorrência — valores: mensal | anual | semestral | semanal
-  'valor_ativacao',             // * Valor de Ativação — número decimal (ex: 499.90)
-  'dia_vencimento_mrr',         //   Dia do mês para vencimento da mensalidade (ex: 5, 10, 15)
-  'mensalidade',                // * Mensalidade/MRR — número decimal (ex: 299.90)
-  'custo_operacao',             // * Custo Operação (custo com fornecedor) — número decimal
-  'imposto_percentual',         // * Imposto — número de 0 a 100 (ex: 6 = 6%)
-  'custo_fixo_percentual',      // * Custo Fixo — número de 0 a 100 (ex: 5 = 5%)
-  'fornecedor',                 //   Fornecedor (FK: fornecedores)
-  'origem_venda',               //   Origem da Venda (FK: origens_venda)
-  'modelo_contrato',            //   Modelo de Contrato (FK: modelos_contrato)
-  'funcionario',                //   Funcionário/Consultor responsável (FK: funcionarios)
-  'forma_pagamento_ativacao',   //   Forma de Pagamento da Ativação (FK: formas_pagamento)
-  'forma_pagamento_mensalidade',//   Forma de Pagamento da Mensalidade (FK: formas_pagamento)
-  'data_ativacao',              //   Data de Ativação — formato: YYYY-MM-DD
-  'codigo_fornecedor',          //   Código do cliente no sistema do fornecedor
-  'link_portal_fornecedor',     //   Link de acesso ao portal do fornecedor
-  'observacao_negociacao',      //   Observações sobre a negociação/contrato
-
-  // ── SEÇÃO 5: Cancelamento (para importar histórico de churn) ─────────────
-  'cancelado',                  //   Cliente cancelado? — valores: sim | nao (padrão: nao)
-  'data_cancelamento',          //   Data do cancelamento — formato: YYYY-MM-DD
-  'motivo_cancelamento',        //   Motivo do cancelamento (FK: motivos_cancelamento)
-  'observacao_cancelamento',    //   Observações sobre o cancelamento
-
-  // ── SEÇÃO 6: Certificado Digital A1 (para calcular renovações e churn) ───
-  'cert_a1_vencimento',         //   Data de vencimento do Certificado A1 — formato: YYYY-MM-DD
-  'cert_a1_ultima_venda_em',    //   Data da última venda do Cert A1 — formato: YYYY-MM-DD
-  'matriz_codigo_sequencial',   //   Código sequencial da empresa Matriz (número inteiro, ex: 42)
+// ── Campos obrigatórios ───────────────────────────────────────────────────────
+export const REQUIRED_FIELDS = [
+  'razao_social',
+  'nome_fantasia',
+  'cnpj',
+  'email',
+  'telefone_whatsapp',
+  'unidade_base',
+  'data_cadastro',
+  'data_venda',
+  'produto',
+  'recorrencia',
+  'mensalidade',
+  'custo_operacao',
+  'imposto_percentual',
+  'custo_fixo_percentual',
 ];
 
-// ── Linha de exemplo para o template ─────────────────────────────────────────
-export const CLIENTE_IMPORT_EXAMPLE_ROW = [
-  // Dados do Cliente
-  'Empresa Exemplo Ltda',
-  'Exemplo',
-  '12345678000199',
-  'contato@empresa.com',
-  '(11) 99999-0000',
-  'Sede',
-  '2024-01-10',
-  'juridica',
-  'Tecnologia',
-  'Pequenas Empresas',
-  'Cliente indicado por parceiro',
-  '(11) 3333-0000',
-  '(11) 98888-0000',
-  // Endereço
-  '01310-100',
-  'SP',
-  'São Paulo',
-  'Av. Paulista',
-  '1000',
-  'Bela Vista',
-  'Sala 42',
-  // Contato Principal
-  'João Silva',
-  '123.456.789-00',
-  '(11) 97777-0000',
-  '1990-05-20',
-  // Produto / Contrato
-  '2024-01-15',
-  'Plano Pro',
-  'mensal',
-  '499.90',
-  '10',
-  '299.90',
-  '150.00',
-  '6',
-  '5',
-  'Fornecedor XYZ',
-  'Indicação',
-  'Padrão',
-  'Ana Souza',
-  'Cartão de Crédito',
-  'Boleto',
-  '2024-02-01',
-  'FORN-001',
-  'https://portal.fornecedor.com',
-  'Cliente com desconto especial',
-  // Cancelamento
-  'nao',
-  '',
-  '',
-  '',
-  // Certificado A1
-  '',
-  '2024-06-01',
-  '',
+// Labels amigáveis dos campos obrigatórios para exibição na UI
+export const REQUIRED_FIELD_LABELS = REQUIRED_FIELDS.map(
+  f => SYSTEM_TO_FRIENDLY[f] ?? f
+);
+
+// ── Valores válidos para recorrência ─────────────────────────────────────────
+export const RECORRENCIA_VALIDA = ['mensal', 'anual', 'semestral', 'semanal'];
+
+// ── Delimitador padrão dos templates ─────────────────────────────────────────
+const DELIMITADOR = ';';
+
+// ── Template mínimo: apenas os 14 campos obrigatórios ────────────────────────
+const TEMPLATE_MINIMO_HEADERS = REQUIRED_FIELDS.map(f => SYSTEM_TO_FRIENDLY[f] ?? f);
+const TEMPLATE_MINIMO_EXEMPLO = [
+  'Empresa Exemplo Ltda',    // Razão Social
+  'Nome Fantasia Exemplo',   // Nome Fantasia
+  '12345678000199',          // CNPJ
+  'contato@empresa.com',     // Email
+  '(11) 99999-0000',         // WhatsApp
+  'Sede',                    // Unidade Base
+  '2024-01-10',              // Data de Cadastro
+  '2024-01-15',              // Data da Venda
+  'Plano Pro',               // Produto
+  'mensal',                  // Recorrência
+  '299.90',                  // Mensalidade
+  '150.00',                  // Custo Operação
+  '6',                       // Imposto (%)
+  '5',                       // Custo Fixo (%)
 ];
 
-// ── Gera conteúdo CSV do template ─────────────────────────────────────────────
-export function gerarTemplateCsv(): string {
-  const instrucoes = [
-    '# INSTRUÇÕES DE PREENCHIMENTO:',
-    '# - Não altere os nomes das colunas da linha abaixo',
-    '# - Campos de data devem estar no formato YYYY-MM-DD (ex: 2024-01-15)',
-    '# - Campos FK devem conter o NOME exato cadastrado no sistema (ex: Boleto Bancário)',
-    '# - CNPJ: somente números sem pontos barras ou traços (ex: 12345678000199)',
-    '# - CPF do contato: somente números (ex: 12345678901)',
-    '# - Telefones: formato (DD) NNNNN-NNNN (ex: (11) 99999-0000)',
-    '# - Campos de percentual: número de 0 a 100 (ex: 6 para 6%)',
-    '# - cancelado: use "sim" ou "nao"',
-    '# - recorrencia: use mensal | anual | semestral | semanal',
-    '# - matriz_codigo_sequencial: número inteiro do Cód. Seq. da empresa matriz',
-    '# - Remova estas linhas de instrução antes de importar',
-  ].join('\n');
+// ── Template completo: todos os campos disponíveis ───────────────────────────
+const TEMPLATE_COMPLETO_HEADERS = Object.keys(FRIENDLY_TO_SYSTEM);
+const TEMPLATE_COMPLETO_EXEMPLO = TEMPLATE_COMPLETO_HEADERS.map(h => {
+  const sys = FRIENDLY_TO_SYSTEM[h];
+  const minIdx = TEMPLATE_MINIMO_HEADERS.indexOf(h);
+  if (minIdx >= 0) return TEMPLATE_MINIMO_EXEMPLO[minIdx];
+  // Exemplos para campos extras
+  const exemplos: Record<string, string> = {
+    tipo_pessoa: 'juridica',
+    area_atuacao: 'Tecnologia',
+    segmento: 'PME',
+    estado: 'SP',
+    cidade: 'São Paulo',
+    cep: '01310-100',
+    endereco: 'Av. Paulista',
+    numero: '1000',
+    bairro: 'Bela Vista',
+    complemento: 'Sala 42',
+    contato_nome: 'João Silva',
+    contato_cpf: '12345678901',
+    contato_fone: '(11) 98888-0000',
+    data_ativacao: '2024-02-01',
+    dia_vencimento_mrr: '10',
+    valor_ativacao: '499.90',
+    fornecedor: 'Fornecedor XYZ',
+    origem_venda: 'Indicação',
+    funcionario: 'Ana Souza',
+    forma_pagamento_mensalidade: 'Boleto',
+    cancelado: 'nao',
+  };
+  return exemplos[sys] ?? '';
+});
+
+// ── Gera conteúdo CSV do template mínimo ─────────────────────────────────────
+export function gerarTemplateMinimoCsv(): string {
   return [
-    instrucoes,
-    CLIENTE_IMPORT_HEADERS.join(','),
-    CLIENTE_IMPORT_EXAMPLE_ROW.join(','),
+    TEMPLATE_MINIMO_HEADERS.join(DELIMITADOR),
+    TEMPLATE_MINIMO_EXEMPLO.join(DELIMITADOR),
   ].join('\n');
 }
 
-// ── Download do template ──────────────────────────────────────────────────────
-export function downloadTemplateCsv() {
+// ── Gera conteúdo CSV do template completo ───────────────────────────────────
+export function gerarTemplateCompletoCsv(): string {
+  return [
+    TEMPLATE_COMPLETO_HEADERS.join(DELIMITADOR),
+    TEMPLATE_COMPLETO_EXEMPLO.join(DELIMITADOR),
+  ].join('\n');
+}
+
+// ── Download do template mínimo ──────────────────────────────────────────────
+export function downloadTemplateMinimoCsv() {
   const bom = '\uFEFF';
-  const conteudo = bom + gerarTemplateCsv();
-  const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob([bom + gerarTemplateMinimoCsv()], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const hoje = new Date().toISOString().slice(0, 10);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `template_importacao_clientes_${hoje}.csv`;
+  link.download = `template_minimo_clientes_${hoje}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
+
+// ── Download do template completo ────────────────────────────────────────────
+export function downloadTemplateCompletoCsv() {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + gerarTemplateCompletoCsv()], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const hoje = new Date().toISOString().slice(0, 10);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `template_completo_clientes_${hoje}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Alias para compatibilidade ───────────────────────────────────────────────
+export const downloadTemplateCsv = downloadTemplateMinimoCsv;
 
 // ── Campos FK: coluna CSV → tabela Supabase ───────────────────────────────────
 export const FK_FIELDS: {
@@ -178,7 +199,7 @@ export const FK_FIELDS: {
   searchField: string;
   dbField: string;
   tenantScoped: boolean;
-  description: string; // explicação do campo para o usuário
+  description: string;
 }[] = [
   {
     csvColumn: 'unidade_base',
@@ -280,27 +301,6 @@ export const FK_FIELDS: {
     description: 'Razão pela qual o cliente cancelou. Essencial para análise de churn e ações de retenção.',
   },
 ];
-
-// ── Campos obrigatórios ───────────────────────────────────────────────────────
-export const REQUIRED_FIELDS = [
-  'razao_social',
-  'nome_fantasia',
-  'cnpj',
-  'email',
-  'telefone_whatsapp',
-  'unidade_base',
-  'data_cadastro',
-  'data_venda',
-  'produto',
-  'recorrencia',
-  'mensalidade',
-  'custo_operacao',
-  'imposto_percentual',
-  'custo_fixo_percentual',
-];
-
-// ── Valores válidos para recorrência ─────────────────────────────────────────
-export const RECORRENCIA_VALIDA = ['mensal', 'anual', 'semestral', 'semanal'];
 
 // ── Labels amigáveis para exibição na UI ─────────────────────────────────────
 export const HEADER_LABELS: Record<string, string> = {
