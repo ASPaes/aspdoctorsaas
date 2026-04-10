@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const LOG = '[zapi-webhook]';
 
@@ -58,16 +59,18 @@ async function processZapiWebhook(req: Request): Promise<void> {
     return;
   }
 
-  const { data: secretRow } = await supabase
+  const { data: secretRow, error: secretErr } = await supabase
     .from('whatsapp_instance_secrets')
-    .select('instance_id, zapi_webhook_token, zapi_instance_id, zapi_token, zapi_client_token')
+    .select('instance_id, zapi_webhook_token')
     .eq('zapi_instance_id', zapiInstanceId)
-    .maybeSingle();
+    .single();
 
-  if (!secretRow) {
+  if (secretErr || !secretRow) {
     console.warn(`${LOG} Instância não encontrada: zapiInstanceId=${zapiInstanceId}`);
     return;
   }
+
+  const secrets = await getInstanceSecrets(supabase, secretRow.instance_id);
 
   // ── Validar token de segurança ────────────────────────────────
   if (secretRow.zapi_webhook_token) {
@@ -171,10 +174,10 @@ async function processZapiWebhook(req: Request): Promise<void> {
     tenant_id: instance.tenant_id,
   };
 
-  const secrets: InstanceSecrets = {
-    zapi_instance_id: secretRow.zapi_instance_id,
-    zapi_token: secretRow.zapi_token,
-    zapi_client_token: secretRow.zapi_client_token,
+  const vaultSecrets: InstanceSecrets = {
+    zapi_instance_id: secrets.zapi_instance_id,
+    zapi_token: secrets.zapi_token,
+    zapi_client_token: secrets.zapi_client_token,
   };
 
   const normalized: NormalizedInboundMessage = {
