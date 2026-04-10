@@ -329,6 +329,29 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const validRows = useMemo(() => rows.filter((r) => r.valid), [rows]);
   const errorRows = useMemo(() => rows.filter((r) => !r.valid), [rows]);
 
+  // Detecta CNPJs duplicados dentro do próprio arquivo (antes de importar)
+  const dupIntraCSVPreview = useMemo(() => {
+    const dups: { cnpj: string; razao_social: string; count: number }[] = [];
+    const contagem: Record<string, number> = {};
+    for (const row of rows) {
+      const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
+      if (!cnpj) continue;
+      contagem[cnpj] = (contagem[cnpj] ?? 0) + 1;
+    }
+    const jaAdicionado = new Set<string>();
+    for (const row of rows) {
+      const cnpj = (row.values.cnpj ?? '').trim().replace(/\D/g, '');
+      if (!cnpj || contagem[cnpj] <= 1 || jaAdicionado.has(cnpj)) continue;
+      jaAdicionado.add(cnpj);
+      dups.push({
+        cnpj,
+        razao_social: row.values.razao_social || row.values.nome_fantasia || '—',
+        count: contagem[cnpj],
+      });
+    }
+    return dups;
+  }, [rows]);
+
   /* ---------- Reset ---------- */
   const resetAll = useCallback(() => {
     setStep(1);
@@ -1614,6 +1637,34 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </p>
             )}
 
+            {/* Alerta de CNPJs duplicados no arquivo */}
+            {dupIntraCSVPreview.length > 0 && (
+              <div className="rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 p-3 space-y-2">
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0)} linha{dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0) !== 1 ? 's' : ''} serão ignoradas — CNPJ duplicado no arquivo
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-400">
+                  Os CNPJs abaixo aparecem mais de uma vez no arquivo. Apenas a <strong>primeira ocorrência</strong> de cada um será importada. Serão importados <strong>{validRows.length - dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0)} clientes</strong> (e não {validRows.length}).
+                </p>
+                <details>
+                  <summary className="text-xs text-orange-700 dark:text-orange-400 cursor-pointer list-none hover:underline">
+                    Ver {dupIntraCSVPreview.length} CNPJ{dupIntraCSVPreview.length !== 1 ? 's' : ''} duplicado{dupIntraCSVPreview.length !== 1 ? 's' : ''} ▼
+                  </summary>
+                  <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
+                    {dupIntraCSVPreview.map((d, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs text-orange-800 dark:text-orange-300">
+                        <span className="font-mono">{d.cnpj}</span>
+                        <span className="text-orange-500">×{d.count}</span>
+                        <span>—</span>
+                        <span className="truncate">{d.razao_social}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+
             {/* Aviso de linhas com erro */}
             {errorRows.length > 0 && (
               <div className="flex items-start gap-2 rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 text-xs text-yellow-800 dark:text-yellow-300">
@@ -1635,7 +1686,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 disabled={validRows.length === 0 || duplicatas.length > 0}
                 className="gap-2"
               >
-                Importar {validRows.length} cliente{validRows.length !== 1 ? 's' : ''}
+                {(() => {
+                  const totalDupLines = dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0);
+                  const realCount = validRows.length - totalDupLines;
+                  return `Importar ${realCount} cliente${realCount !== 1 ? 's' : ''}`;
+                })()}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
