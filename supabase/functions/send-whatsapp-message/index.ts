@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
-import { getAdapter } from '../_shared/providers/index.ts';
+import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -219,17 +219,13 @@ Deno.serve(async (req) => {
     }
 
     // Fetch instance details + secrets in parallel
-    const [instanceResult, secretsResult] = await Promise.all([
+    const [instanceResult, secrets] = await Promise.all([
       supabase
         .from('whatsapp_instances')
         .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id')
         .eq('id', sendInstanceId)
         .single(),
-      supabase
-        .from('whatsapp_instance_secrets')
-        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token')
-        .eq('instance_id', sendInstanceId)
-        .single(),
+      getInstanceSecrets(supabase, sendInstanceId),
     ]);
 
     if (instanceResult.error || !instanceResult.data) {
@@ -239,15 +235,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (secretsResult.error || !secretsResult.data) {
-      console.error('[send] Failed to fetch instance secrets:', secretsResult.error);
-      return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
-        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     const instanceData = instanceResult.data as any;
-    const secrets = secretsResult.data as any;
     const providerType = instanceData.provider_type || 'self_hosted';
 
     console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceData.instance_name, 'Provider:', providerType);
