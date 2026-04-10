@@ -313,6 +313,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
   const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'inserir'>('pular');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
   const validRows = useMemo(() => rows.filter((r) => r.valid), [rows]);
