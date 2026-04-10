@@ -344,6 +344,13 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             values[sysCol] = "";
           }
         }
+        // Normalizar CNPJ: remover caracteres não numéricos e preencher com zeros à esquerda até 14 dígitos
+        if (values.cnpj) {
+          const cnpjDigits = values.cnpj.replace(/\D/g, '');
+          if (cnpjDigits.length > 0 && cnpjDigits.length <= 14) {
+            values.cnpj = cnpjDigits.padStart(14, '0');
+          }
+        }
         const errs = validateRow(values);
         parsed.push({ values, valid: errs.length === 0, errors: errs });
       }
@@ -475,6 +482,22 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     // Also need razao_social or nome_fantasia
     return count;
   }, [columnMapping]);
+
+  const requiredFieldWarnings = useMemo(() => {
+    if (rawLines.length === 0) return [];
+    const warnings: { label: string; emptyCount: number; total: number }[] = [];
+    for (const field of REQUIRED_FIELDS) {
+      const fileCol = columnMapping[field];
+      if (!fileCol || fileCol === "__unmapped__") continue;
+      const fileIdx = fileHeaders.indexOf(fileCol);
+      if (fileIdx < 0) continue;
+      const emptyCount = rawLines.filter(cols => !(cols[fileIdx] ?? "").trim()).length;
+      if (emptyCount > 0) {
+        warnings.push({ label: HEADER_LABELS[field] ?? field, emptyCount, total: rawLines.length });
+      }
+    }
+    return warnings;
+  }, [rawLines, columnMapping, fileHeaders]);
 
   const totalRequired = REQUIRED_FIELDS.length;
 
@@ -1024,33 +1047,27 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {/* Headers match — show success */}
-        {step === 2 && headersMatch && fileHeaders.length > 0 && (
+        {/* Step 2 — Column mapping (always shown) */}
+        {step === 2 && fileHeaders.length > 0 && (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 p-3 rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
-              <CheckCircle2 className="w-5 h-5" />
-              Arquivo compatível — {rawLines.length} linhas detectadas
-            </div>
-            <div className="flex gap-2 justify-between">
-              <Button variant="outline" onClick={() => { setFileHeaders([]); setRawLines([]); setHeadersMatch(false); }} className="gap-2">
-                <ArrowLeft className="w-4 h-4" /> Trocar arquivo
-              </Button>
-              <Button onClick={() => { buildRows(rawLines, columnMapping, fileHeaders); setStep(3); }} className="gap-2">
-                Continuar <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+            {headersMatch && (
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 p-3 rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                <CheckCircle2 className="w-5 h-5" />
+                Arquivo compatível — {rawLines.length} linhas detectadas. Revise o mapeamento abaixo e clique em Continuar.
+              </div>
+            )}
 
-        {/* Headers don't match — column mapping */}
-        {step === 2 && !headersMatch && fileHeaders.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="text-base font-semibold">Mapeie as colunas do seu arquivo</h3>
-            <p className="text-sm text-muted-foreground">
-              As colunas do seu arquivo não correspondem exatamente ao template.
-              Associe cada coluna do sistema à coluna do seu arquivo.
-            </p>
+            {!headersMatch && (
+              <div>
+                <h3 className="text-base font-semibold">Mapeie as colunas do seu arquivo</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  As colunas do seu arquivo não correspondem exatamente ao template.
+                  Associe cada coluna do sistema à coluna do seu arquivo.
+                </p>
+              </div>
+            )}
 
+            {/* Tabela de mapeamento — exibida SEMPRE */}
             <div className="rounded-md border overflow-auto max-h-96">
               <Table>
                 <TableHeader>
@@ -1110,12 +1127,32 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </Table>
             </div>
 
+            {requiredFieldWarnings.length > 0 && (
+              <div className="rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 space-y-1">
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Campos obrigatórios com dados faltantes — essas linhas serão marcadas como inválidas:
+                </p>
+                <ul className="text-xs text-yellow-700 dark:text-yellow-400 space-y-0.5 ml-6">
+                  {requiredFieldWarnings.map((w) => (
+                    <li key={w.label}>
+                      • <strong>{w.label}</strong>: vazio em {w.emptyCount} de {w.total} linhas
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <p className="text-xs text-muted-foreground">
               {mappedRequiredCount} de {totalRequired} campos obrigatórios mapeados
             </p>
 
             <div className="flex gap-2 justify-between">
-              <Button variant="outline" onClick={() => { setFileHeaders([]); setRawLines([]); }} className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setFileHeaders([]); setRawLines([]); setHeadersMatch(false); }}
+                className="gap-2"
+              >
                 <ArrowLeft className="w-4 h-4" /> Trocar arquivo
               </Button>
               <Button
