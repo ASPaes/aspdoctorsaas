@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
- 
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -441,22 +441,17 @@ Deno.serve(async (req) => {
     console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
 
     // ── Guard: Comandos administrativos ───────────────────────────────────────
-    // Admin envia do próprio número para o Financeiro (fromMe=true, remoteJid=número admin)
-    // OU cliente envia de fora (fromMe=false, remoteJid=número admin)
+    // O número admin envia do próprio celular para o Financeiro.
+    // Na Evolution, remoteJid = número do remetente (admin).
     const ADMIN_PHONE_GUARD = '5549991210660';
     const _rawJid = payload?.data?.key?.remoteJid || '';
-    const _fromMe = getPayloadIsFromMe(payload?.data);
-    const _senderNum = _fromMe
-      ? ADMIN_PHONE_GUARD // se fromMe=true na instância Financeiro, remetente é sempre o admin
-      : _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
-    const _jidNum = _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
+    const _senderNum = _rawJid
+      .replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
     const _msgText = (
       payload?.data?.message?.conversation ||
       payload?.data?.message?.extendedTextMessage?.text || ''
     ).trim().toUpperCase();
-    const _isAdminInstance = payload?.instance === 'Financeiro' || payload?.instance?.toLowerCase().includes('financ');
-    const _isAdminSender = _jidNum.endsWith(ADMIN_PHONE_GUARD) || (_fromMe && _isAdminInstance);
-    const _isAdminCmd = _isAdminSender &&
+    const _isAdminCmd = _senderNum.endsWith(ADMIN_PHONE_GUARD) &&
       (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE'));
 
     if (_isAdminCmd) {
