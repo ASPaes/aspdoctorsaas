@@ -240,8 +240,8 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
       ? instanceData.instance_id_external : instanceData.instance_name;
 
     const { phone } = normalizePhoneNumber(key.remoteJid);
-    const { data: secrets } = await supabase.from('whatsapp_instance_secrets')
-      .select('api_url, api_key').eq('instance_id', resolved.instanceId).single();
+    const secrets = await getInstanceSecrets(supabase, resolved.instanceId);
+    if (!secrets) return;
     if (!secrets) return;
 
     // ── Find or create contact — com variantes de número e vínculo ao cliente ──
@@ -402,9 +402,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       await supabase.from('whatsapp_instances').update({ status: 'connected', updated_at: new Date().toISOString() }).eq('id', instanceData.id);
     }
 
-    const { data: secrets } = await supabase.from('whatsapp_instance_secrets')
-      .select('api_url, api_key').eq('instance_id', instanceData.id).single();
-    if (!secrets) { console.error(`${LOG} No secrets for instance ${instance}`); return; }
+    const secrets = await getInstanceSecrets(supabase, instanceData.id);
+    if (!secrets?.api_url) { console.error(`${LOG} No secrets for instance ${instance}`); return; }
 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     const fromMe = getPayloadIsFromMe(data);
