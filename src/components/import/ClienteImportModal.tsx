@@ -51,14 +51,20 @@ import { useQueryClient } from "@tanstack/react-query";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { cn } from "@/lib/utils";
 import {
-  CLIENTE_IMPORT_HEADERS,
-  REQUIRED_FIELDS,
-  RECORRENCIA_VALIDA,
   FK_FIELDS,
+  REQUIRED_FIELDS,
+  REQUIRED_FIELD_LABELS,
+  FRIENDLY_TO_SYSTEM,
+  SYSTEM_TO_FRIENDLY,
+  RECORRENCIA_VALIDA,
   HEADER_LABELS,
   FIELD_DESCRIPTIONS,
-  downloadTemplateCsv,
+  downloadTemplateMinimoCsv,
+  downloadTemplateCompletoCsv,
 } from "./clienteImportTemplate";
+
+// All system field names derived from FRIENDLY_TO_SYSTEM
+const ALL_SYSTEM_FIELDS = [...new Set(Object.values(FRIENDLY_TO_SYSTEM))];
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
