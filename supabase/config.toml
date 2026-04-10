@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.diagnose-contact-history]
 verify_jwt = false
+
+[functions.upsert-instance-secrets]
+verify_jwt = false
