@@ -1698,6 +1698,23 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </div>
             )}
 
+            {duplicataOpcao === 'pular' && duplicatas.length > 0 && (
+              <div className="rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 space-y-2">
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {duplicatas.length} CNPJ{duplicatas.length !== 1 ? 's' : ''} já cadastrado{duplicatas.length !== 1 ? 's' : ''} — pulado{duplicatas.length !== 1 ? 's' : ''} na importação
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {duplicatas.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
+                      <span className="font-mono">{d.cnpj}</span>
+                      {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <Separator />
 
             {/* Botões de ação */}
