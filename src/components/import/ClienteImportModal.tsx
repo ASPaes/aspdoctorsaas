@@ -312,7 +312,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [duplicatas, setDuplicatas] = useState<{ cnpj: string; razao_social: string | null }[]>([]);
   const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'inserir'>('pular');
   const [dragOver, setDragOver] = useState(false);
 
   const validRows = useMemo(() => rows.filter((r) => r.valid), [rows]);
@@ -335,6 +335,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setResult(null);
     setDuplicatas([]);
     setDuplicataAcao(null);
+    setDuplicataOpcao('pular');
   }, []);
 
   /* ---------- Build rows from raw data + mapping ---------- */
@@ -343,7 +344,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       const parsed: ParsedRow[] = [];
       for (const cols of dataLines) {
         const values: Record<string, string> = {};
-        for (const sysCol of CLIENTE_IMPORT_HEADERS) {
+        for (const sysCol of ALL_SYSTEM_FIELDS) {
           const fileCol = mapping[sysCol];
           if (fileCol && fileCol !== "__unmapped__") {
             const fileIdx = headers.indexOf(fileCol);
@@ -415,9 +416,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       };
 
       const exact =
-        headerLine.length === CLIENTE_IMPORT_HEADERS.length &&
+        headerLine.length === ALL_SYSTEM_FIELDS.length &&
         headerLine.every((h, i) => {
-          const sysCol = CLIENTE_IMPORT_HEADERS[i];
+          const sysCol = ALL_SYSTEM_FIELDS[i];
           const hn = normalizeForCompare(h);
           if (hn === normalizeForCompare(sysCol)) return true;
           const aliases = EXACT_ALIASES[sysCol] ?? [];
@@ -428,7 +429,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         setHeadersMatch(true);
         // Auto mapping
         const mapping: ColumnMapping = {};
-        CLIENTE_IMPORT_HEADERS.forEach((col, idx) => {
+        ALL_SYSTEM_FIELDS.forEach((col, idx) => {
           mapping[col] = headerLine[idx];
         });
         setColumnMapping(mapping);
@@ -437,7 +438,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         const parsed: ParsedRow[] = [];
         for (const cols of dataLines) {
           const values: Record<string, string> = {};
-          CLIENTE_IMPORT_HEADERS.forEach((h, idx) => {
+          ALL_SYSTEM_FIELDS.forEach((h, idx) => {
             values[h] = cols[idx] ?? "";
           });
           const errs = validateRow(values);
@@ -447,29 +448,69 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       } else {
         // Try auto-mapping by name similarity with aliases
         const COLUMN_ALIASES: Record<string, string[]> = {
-          estado:      ['uf', 'sigla', 'siglaestado', 'ufestado', 'estado'],
-          numero:      ['numerodoendereco', 'nro', 'num', 'numeroresidencia', 'numero'],
-          data_cadastro: ['datacadastro', 'datadecadastro', 'dtcadastro'],
-          data_venda:    ['datavenda', 'datadevendas', 'dtvenda'],
-          data_ativacao: ['dataativacao', 'datadeativacao', 'dtativacao'],
-          razao_social:  ['razaosocial', 'razao', 'razaosocialempresa'],
-          nome_fantasia: ['fantasia', 'nomefantasia'],
-          mensalidade:   ['mrr', 'mensalidade', 'valormensal', 'recorrente'],
-          custo_operacao: ['custooperacao', 'custooperacional', 'custocomfornecedor'],
-          imposto_percentual: ['imposto', 'impostos', 'impostopercentual', 'aliquota'],
-          custo_fixo_percentual: ['custo', 'custofixo', 'custofixopercentual', 'fixo', 'custosfixos'],
-          valor_ativacao: ['valorativacao', 'ativacao', 'valordeativacao'],
-          telefone_whatsapp: ['whatsapp', 'whatsappfinanceiro', 'telefonewhatsapp'],
-          telefone_contato: ['telefone', 'fone', 'telefonecontato'],
-          unidade_base: ['unidadebase', 'unidade'],
-          link_portal_fornecedor: ['linkfornecedor', 'link', 'linkportal', 'portal'],
-          codigo_fornecedor: ['idfornecedor', 'codigofornecedor', 'codigocliente'],
+          estado:                   ['uf', 'sigla', 'siglaestado', 'ufestado', 'estado', 'estado uf'],
+          numero:                   ['numerodoendereco', 'nro', 'num', 'numero', 'número'],
+          data_cadastro:            ['datacadastro', 'datadecadastro', 'dtcadastro', 'data de cadastro'],
+          data_venda:               ['datavenda', 'datadevendas', 'dtvenda', 'data da venda'],
+          data_ativacao:            ['dataativacao', 'datadeativacao', 'dtativacao', 'data de ativação', 'data de ativacao'],
+          razao_social:             ['razaosocial', 'razao', 'razaosocialempresa', 'razão social'],
+          nome_fantasia:            ['fantasia', 'nomefantasia', 'nome fantasia'],
+          mensalidade:              ['mrr', 'mensalidade', 'valormensal', 'recorrente'],
+          custo_operacao:           ['custooperacao', 'custooperacional', 'custo operação', 'custo operacao'],
+          imposto_percentual:       ['imposto', 'impostos', 'impostopercentual', 'aliquota', 'imposto (%)'],
+          custo_fixo_percentual:    ['custo', 'custofixo', 'custofixopercentual', 'custo fixo (%)', 'custo fixo'],
+          valor_ativacao:           ['valorativacao', 'ativacao', 'valordeativacao', 'valor de ativação', 'valor de ativacao'],
+          telefone_whatsapp:        ['whatsapp', 'whatsappfinanceiro', 'telefonewhatsapp'],
+          telefone_contato:         ['telefone', 'fone', 'telefonecontato', 'telefone contato'],
+          link_portal_fornecedor:   ['linkfornecedor', 'link', 'linkportal', 'portal', 'link portal fornecedor'],
+          codigo_fornecedor:        ['idfornecedor', 'codigofornecedor', 'codigocliente', 'código no fornecedor', 'codigo no fornecedor'],
+          email:                    ['email', 'e-mail', 'emailcliente'],
+          cnpj:                     ['cnpj', 'cpf', 'cnpjcpf', 'documento'],
+          unidade_base:             ['unidadebase', 'unidade', 'unidade base'],
+          area_atuacao:             ['areaatuacao', 'area', 'área de atuação', 'area de atuacao'],
+          segmento:                 ['segmento'],
+          produto:                  ['produto', 'plano', 'produto contratado'],
+          recorrencia:              ['recorrencia', 'recorrência', 'periodicidade'],
+          fornecedor:               ['fornecedor'],
+          origem_venda:             ['origemvenda', 'origem', 'canal', 'origem da venda'],
+          modelo_contrato:          ['modelocontrato', 'modelo', 'modelo de contrato'],
+          funcionario:              ['funcionario', 'funcionário', 'consultor', 'vendedor'],
+          forma_pagamento_ativacao: ['formapagamentoativacao', 'pagamentoativacao', 'forma de pagto ativação', 'forma de pagto ativacao'],
+          forma_pagamento_mensalidade: ['formapagamentomensalidade', 'pagamentomensalidade', 'forma de pagto mensalidade'],
+          dia_vencimento_mrr:       ['diavencimento', 'vencimento', 'dia de vencimento'],
+          cancelado:                ['cancelado', 'churn', 'cancelado? (sim/nao)'],
+          data_cancelamento:        ['datacancelamento', 'data cancelamento'],
+          motivo_cancelamento:      ['motivocancelamento', 'motivo', 'motivo cancelamento'],
+          observacao_cliente:       ['observacao', 'obs', 'observação do cliente', 'observacao do cliente'],
+          observacao_negociacao:    ['observacaonegociacao', 'obsnegociacao', 'obs. negociação', 'obs negociacao'],
+          observacao_cancelamento:  ['obscancelamento', 'obs. cancelamento', 'obs cancelamento'],
+          contato_nome:             ['contatonome', 'nomecontato', 'nome do contato'],
+          contato_cpf:              ['contatocpf', 'cpfcontato', 'cpf do contato'],
+          contato_fone:             ['contatofone', 'fonecontato', 'telefone do contato'],
+          contato_aniversario:      ['contatoaniversario', 'aniversario', 'aniversário do contato'],
+          cep:                      ['cep'],
+          cidade:                   ['cidade'],
+          endereco:                 ['endereco', 'endereço', 'logradouro', 'rua'],
+          bairro:                   ['bairro'],
+          complemento:              ['complemento'],
+          tipo_pessoa:              ['tipopessoa', 'tipo', 'tipo de pessoa'],
+          cert_a1_vencimento:       ['certa1vencimento', 'vencimentocert', 'vencimento cert. a1'],
+          cert_a1_ultima_venda_em:  ['certa1ultimavenda', 'ultima venda cert. a1', 'última venda cert. a1'],
+          matriz_codigo_sequencial: ['matrizcodigo', 'codigomatriz', 'código da matriz', 'codigo da matriz'],
+          telefone_whatsapp_contato: ['whatsappcontato', 'whatsapp contato'],
         };
+
         const mapping: ColumnMapping = {};
-        for (const sysCol of CLIENTE_IMPORT_HEADERS) {
+        for (const sysCol of ALL_SYSTEM_FIELDS) {
           const normalized = normalizeForCompare(sysCol);
           const aliases = COLUMN_ALIASES[sysCol] ? [...COLUMN_ALIASES[sysCol]] : [normalized];
           if (!aliases.includes(normalized)) aliases.push(normalized);
+          // Also add the friendly name as a direct alias
+          const friendlyName = SYSTEM_TO_FRIENDLY[sysCol];
+          if (friendlyName) {
+            const friendlyNorm = normalizeForCompare(friendlyName);
+            if (!aliases.includes(friendlyNorm)) aliases.push(friendlyNorm);
+          }
           const match = headerLine.find(h => aliases.includes(normalizeForCompare(h)));
           mapping[sysCol] = match ?? "__unmapped__";
         }
@@ -931,63 +972,134 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         {/* ===================== STEP 1 — Template ===================== */}
         {step === 1 && (
           <div className="space-y-4">
-            <h3 className="text-base font-semibold">Baixe o modelo de planilha</h3>
-            <p className="text-sm text-muted-foreground">
-              Use o arquivo modelo como base. Campos de tabelas relacionadas (Produto, Fornecedor, etc.)
-              devem ser preenchidos com o <strong>nome exato</strong> cadastrado no sistema — o sistema
-              fará a busca automática.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Required fields card */}
-              <div className="rounded-md border p-3 space-y-2 max-h-72 overflow-y-auto">
-                <p className="font-medium text-sm flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4 text-destructive" /> Campos Obrigatórios
-                </p>
-                <ul className="text-xs space-y-1.5 ml-1">
-                  {REQUIRED_FIELDS.map((f) => (
-                    <li key={f}>
-                      <span className="font-medium text-foreground">{HEADER_LABELS[f] ?? f}</span>
-                      {FIELD_DESCRIPTIONS[f] && (
-                        <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">
-                          {FIELD_DESCRIPTIONS[f].why}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+            {/* Card 1 — Campos Obrigatórios */}
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                Campos obrigatórios — seu arquivo precisa ter estes dados
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {REQUIRED_FIELD_LABELS.map(label => (
+                  <span key={label} className="text-xs bg-background border rounded px-2 py-0.5 font-medium">
+                    {label}
+                  </span>
+                ))}
               </div>
+              <p className="text-xs text-muted-foreground pt-1">
+                💡 Seu arquivo pode usar <strong>qualquer nome de coluna</strong> — você vai conectar cada campo no próximo passo. O que importa é ter os dados.
+              </p>
+            </div>
 
-              {/* FK fields card */}
-              <div className="rounded-md border p-3 space-y-2 max-h-72 overflow-y-auto">
-                <p className="font-medium text-sm flex items-center gap-1">
-                  <Info className="w-4 h-4 text-primary" /> Campos de Tabelas Relacionadas
-                </p>
-                <p className="text-xs text-muted-foreground">Preencha com o nome exato:</p>
-                <ul className="text-xs space-y-1.5 ml-1">
-                  {FK_FIELDS.map((fk) => (
-                    <li key={fk.csvColumn}>
-                      <span className="font-medium text-foreground">{fk.label}</span>
-                      {fk.description && (
-                        <p className="text-muted-foreground text-[11px] leading-tight mt-0.5">
-                          {fk.description}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+            {/* Card 2 — Campos extras */}
+            <div className="rounded-lg border p-4 space-y-2">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Info className="w-4 h-4 text-primary shrink-0" />
+                Quer importar mais dados? Sem problema
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Se seu arquivo vem de outro sistema e já tem mais colunas, aproveite. No Step 2 você conecta cada coluna do seu arquivo ao campo correspondente do DoctorSaaS.
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  'Endereço', 'Cidade', 'Estado', 'CEP',
+                  'Contato', 'Área de Atuação', 'Segmento',
+                  'Fornecedor', 'Origem da Venda', 'Funcionário',
+                  'Forma de Pagamento', 'Certificado A1', 'e mais...'
+                ].map(label => (
+                  <span key={label} className="text-xs bg-muted rounded px-2 py-0.5 text-muted-foreground">
+                    {label}
+                  </span>
+                ))}
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={downloadTemplateCsv} className="gap-2">
+            {/* Card 3 — Tratamento de duplicatas */}
+            <div className="rounded-lg border p-4 space-y-3">
+              <p className="text-sm font-semibold">Como tratar registros duplicados?</p>
+              <p className="text-xs text-muted-foreground">
+                O sistema identifica duplicatas pelo CNPJ / CPF. Escolha o que fazer antes de importar:
+              </p>
+              <div className="space-y-2">
+                {[
+                  {
+                    value: 'pular' as const,
+                    icon: '🚫',
+                    label: 'Pular',
+                    desc: 'Mantém o cadastro atual sem alterar. Recomendado para complementar uma base existente.',
+                  },
+                  {
+                    value: 'atualizar' as const,
+                    icon: '♻️',
+                    label: 'Atualizar',
+                    desc: 'Sobrescreve os dados do cadastro atual com os dados do arquivo.',
+                  },
+                  {
+                    value: 'inserir' as const,
+                    icon: '➕',
+                    label: 'Inserir mesmo assim',
+                    desc: 'Cria um novo registro mesmo que o CNPJ já exista. Use com cautela.',
+                  },
+                ].map(opt => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
+                      duplicataOpcao === opt.value
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-muted/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="duplicata"
+                      value={opt.value}
+                      checked={duplicataOpcao === opt.value}
+                      onChange={() => setDuplicataOpcao(opt.value)}
+                      className="mt-0.5 accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{opt.icon} {opt.label}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Card 4 — Regras de formato (collapsible) */}
+            <details className="rounded-lg border p-4 group">
+              <summary className="text-sm font-semibold cursor-pointer list-none flex items-center justify-between">
+                <span>📐 Regras de formato</span>
+                <span className="text-xs text-muted-foreground group-open:hidden">▼ expandir</span>
+                <span className="text-xs text-muted-foreground hidden group-open:inline">▲ recolher</span>
+              </summary>
+              <ul className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                <li>📅 <strong>Datas:</strong> DD/MM/AAAA ou AAAA-MM-DD (ex: 15/01/2024 ou 2024-01-15)</li>
+                <li>📱 <strong>Telefone:</strong> (DD) NNNNN-NNNN (ex: (11) 99999-0000)</li>
+                <li>🔢 <strong>CNPJ:</strong> só números, sem pontuação (ex: 12345678000199)</li>
+                <li>💰 <strong>Valores:</strong> use ponto como decimal — sem símbolo R$ (ex: 1500.00)</li>
+                <li>📊 <strong>Percentuais:</strong> número de 0 a 100 (ex: 6 para 6%)</li>
+                <li>🔁 <strong>Recorrência:</strong> mensal · anual · semestral · semanal</li>
+                <li>✅ <strong>Cancelado:</strong> sim ou nao</li>
+                <li>🏢 <strong>Tipo de pessoa:</strong> juridica ou fisica</li>
+                <li>🔗 <strong>Campos relacionados</strong> (Produto, Fornecedor, etc.): preencha com o nome exato cadastrado no sistema. No Step 3 você verá quais valores não foram encontrados e poderá auto-cadastrá-los.</li>
+              </ul>
+            </details>
+
+            {/* Botões de download */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button onClick={downloadTemplateMinimoCsv} className="gap-2">
                 <Download className="w-4 h-4" />
-                Baixar template CSV
+                Template Mínimo (14 campos obrigatórios)
               </Button>
-              <Button variant="link" onClick={() => setStep(2)} className="gap-1">
-                Já tenho o arquivo →
+              <Button variant="outline" onClick={downloadTemplateCompletoCsv} className="gap-2">
+                <Download className="w-4 h-4" />
+                Template Completo (todos os campos)
               </Button>
             </div>
+
+            <Button variant="link" onClick={() => setStep(2)} className="gap-1 px-0">
+              Já tenho meu arquivo →
+            </Button>
           </div>
         )}
 
@@ -1064,7 +1176,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {CLIENTE_IMPORT_HEADERS.map((sysCol) => {
+                  {ALL_SYSTEM_FIELDS.map((sysCol) => {
                     const isRequired =
                       REQUIRED_FIELDS.includes(sysCol) ||
                       sysCol === "razao_social" ||
