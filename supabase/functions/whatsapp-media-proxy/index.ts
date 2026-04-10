@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Auth: try header first, then query param
+    // Auth: header first, then query param
     let token = '';
     const authHeader = req.headers.get('Authorization');
     if (authHeader?.startsWith('Bearer ')) {
@@ -61,18 +61,19 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Validate JWT and get user
+    // ✅ CORRIGIDO: usar getUser() — método correto no supabase-js v2
     const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await anonClient.auth.getUser();
+
+    if (userError || !user?.id) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = (claimsData.claims as any).sub as string;
+    const userId = user.id;
 
     // Service role client for storage access
     const supabase = createClient(supabaseUrl, serviceKey);
@@ -108,7 +109,6 @@ Deno.serve(async (req) => {
     // Resolve storage path
     let storagePath = msg.media_path;
     if (!storagePath && msg.media_url) {
-      // Try to extract path from URL
       if (msg.media_url.includes('/storage/v1/object/sign/whatsapp-media/')) {
         storagePath = msg.media_url.split('/storage/v1/object/sign/whatsapp-media/')[1]?.split('?')[0];
       } else if (msg.media_url.includes('/whatsapp-media/')) {
@@ -126,14 +126,12 @@ Deno.serve(async (req) => {
 
     // If mode=meta, return metadata JSON only
     if (mode === 'meta') {
-      // Lazy backfill size if missing
       let sizeBytes = msg.media_size_bytes;
       if (!sizeBytes) {
         try {
           const { data: blob } = await supabase.storage.from('whatsapp-media').download(storagePath);
           if (blob) {
             sizeBytes = blob.size;
-            // Update DB lazily
             await supabase.from('whatsapp_messages').update({
               media_size_bytes: sizeBytes,
               media_path: storagePath,
