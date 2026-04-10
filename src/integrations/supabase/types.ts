@@ -3198,52 +3198,31 @@ export type Database = {
       }
       whatsapp_instance_secrets: {
         Row: {
-          api_key: string | null
           api_url: string | null
           created_at: string
           id: string
           instance_id: string
-          meta_access_token: string | null
-          meta_app_secret: string | null
-          meta_verify_token: string | null
           tenant_id: string
           updated_at: string
-          zapi_client_token: string | null
           zapi_instance_id: string | null
-          zapi_token: string | null
-          zapi_webhook_token: string | null
         }
         Insert: {
-          api_key?: string | null
           api_url?: string | null
           created_at?: string
           id?: string
           instance_id: string
-          meta_access_token?: string | null
-          meta_app_secret?: string | null
-          meta_verify_token?: string | null
           tenant_id: string
           updated_at?: string
-          zapi_client_token?: string | null
           zapi_instance_id?: string | null
-          zapi_token?: string | null
-          zapi_webhook_token?: string | null
         }
         Update: {
-          api_key?: string | null
           api_url?: string | null
           created_at?: string
           id?: string
           instance_id?: string
-          meta_access_token?: string | null
-          meta_app_secret?: string | null
-          meta_verify_token?: string | null
           tenant_id?: string
           updated_at?: string
-          zapi_client_token?: string | null
           zapi_instance_id?: string | null
-          zapi_token?: string | null
-          zapi_webhook_token?: string | null
         }
         Relationships: [
           {

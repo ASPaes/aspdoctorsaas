@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const ADMIN_PHONE = '5549991210660';
 
@@ -156,13 +157,9 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (instance) {
-      const { data: secrets } = await supabase
-        .from('whatsapp_instance_secrets')
-        .select('api_url, api_key')
-        .eq('instance_id', instance.id)
-        .single();
+      const secrets = await getInstanceSecrets(supabase, instance.id);
 
-      if (secrets) {
+      if (secrets.api_key && secrets.api_url) {
         const baseUrl = secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, '');
         await fetch(`${baseUrl}/message/sendText/${instanceName}`, {
           method: 'POST',

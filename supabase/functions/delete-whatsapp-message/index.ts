@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const FUNCTION_NAME = 'delete-whatsapp-message';
 const corsHeaders = {
@@ -240,16 +241,14 @@ Deno.serve(async (req) => {
     const instanceSecrets: Record<string, { api_url: string; api_key: string; instance_name: string }> = {};
 
     if (instanceIds.length > 0) {
-      const [secretsResult, instancesResult] = await Promise.all([
-        supabase.from('whatsapp_instance_secrets').select('instance_id, api_url, api_key').in('instance_id', instanceIds),
-        supabase.from('whatsapp_instances').select('id, instance_name').in('id', instanceIds),
-      ]);
+      const { data: instancesData } = await supabase.from('whatsapp_instances').select('id, instance_name').in('id', instanceIds);
+      const instanceMap = new Map((instancesData || []).map((i: any) => [i.id, i.instance_name]));
 
-      const instanceMap = new Map((instancesResult.data || []).map(i => [i.id, i.instance_name]));
-      for (const s of (secretsResult.data || [])) {
-        const name = instanceMap.get(s.instance_id);
-        if (name) {
-          instanceSecrets[s.instance_id] = { api_url: s.api_url, api_key: s.api_key, instance_name: name };
+      for (const iid of instanceIds) {
+        const vaultSecrets = await getInstanceSecrets(supabase, iid);
+        const name = instanceMap.get(iid);
+        if (name && vaultSecrets.api_url && vaultSecrets.api_key) {
+          instanceSecrets[iid] = { api_url: vaultSecrets.api_url, api_key: vaultSecrets.api_key, instance_name: name };
         }
       }
     }
