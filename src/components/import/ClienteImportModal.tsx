@@ -644,78 +644,49 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       estadosPorSigla[e.sigla.toUpperCase()] = e.id;
     }
 
-    // 2. Carregar cidades (índice duplo: com estado e sem estado)
-    const { data: cidadesData } = await supabase
-      .from('cidades')
-      .select('id, nome, estado_id')
-      .limit(10000);
-    const cidadeComEstado: Record<string, number> = {};  // "nomenorm_estadoId" → id
-    const cidadeSoNome: Record<string, number> = {};     // "nomenorm" → id (primeiro encontrado)
-    for (const c of cidadesData ?? []) {
+    // 2. Identificar apenas os estado_ids presentes no CSV
+    const uniqueUFs = new Set<string>();
+    for (const row of rowsToImport) {
+      const uf = (row.values.estado ?? '').trim().toUpperCase();
+      if (uf) uniqueUFs.add(uf);
+    }
+    const relevantEstadoIds = Array.from(uniqueUFs)
+      .map(uf => estadosPorSigla[uf])
+      .filter((id): id is number => !!id);
+
+    // Carregar apenas cidades dos estados presentes no CSV
+    let cidadesDataArr: { id: number; nome: string; estado_id: number }[] = [];
+    if (relevantEstadoIds.length > 0) {
+      const { data: cidadesRaw } = await supabase
+        .from('cidades')
+        .select('id, nome, estado_id')
+        .in('estado_id', relevantEstadoIds);
+      cidadesDataArr = (cidadesRaw ?? []) as { id: number; nome: string; estado_id: number }[];
+    }
+    const cidadeComEstado: Record<string, number> = {};
+    const cidadeSoNome: Record<string, number> = {};
+    for (const c of cidadesDataArr) {
       const n = normalizeForCompare(c.nome);
       cidadeComEstado[n + '_' + c.estado_id] = c.id;
       if (!cidadeSoNome[n]) cidadeSoNome[n] = c.id;
     }
 
-    // 3. Função que resolve estado_id + cidade_id para uma linha do CSV
-    const resolveGeo = async (row: ParsedRow): Promise<{ estadoId: number | null; cidadeId: number | null }> => {
-      const cepDigits = (row.values.cep ?? '').replace(/\D/g, '').slice(0, 8);
+    // 3. Função que resolve estado_id + cidade_id para uma linha do CSV (síncrona)
+    const resolveGeo = (row: ParsedRow): { estadoId: number | null; cidadeId: number | null } => {
       const ufCSV = (row.values.estado ?? '').trim().toUpperCase();
       const cidadeCSV = normalizeForCompare(row.values.cidade ?? '');
-
-      let estadoId: number | null = null;
+      const estadoId = ufCSV ? (estadosPorSigla[ufCSV] ?? null) : null;
       let cidadeId: number | null = null;
-
-      // Tentar ViaCEP se CEP tem exatamente 8 dígitos
-      if (cepDigits.length === 8) {
-        try {
-          const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && !data.erro) {
-              const ufAPI = (data.uf ?? '').toUpperCase();
-              const localidadeNorm = normalizeForCompare(data.localidade ?? '');
-              estadoId = estadosPorSigla[ufAPI] ?? null;
-              if (estadoId) {
-                cidadeId = cidadeComEstado[localidadeNorm + '_' + estadoId]
-                  ?? cidadeSoNome[localidadeNorm]
-                  ?? null;
-              } else {
-                cidadeId = cidadeSoNome[localidadeNorm] ?? null;
-              }
-              // Retornar imediatamente se resolveu cidade
-              if (cidadeId) return { estadoId, cidadeId };
-            }
-          }
-        } catch {
-          // ViaCEP indisponível — continuar para fallback
-        }
-      }
-
-      // Fallback: usar UF + cidade diretamente do CSV
-      if (!estadoId && ufCSV) {
-        estadoId = estadosPorSigla[ufCSV] ?? null;
-      }
-      if (!cidadeId && cidadeCSV) {
+      if (cidadeCSV) {
         cidadeId = estadoId
           ? (cidadeComEstado[cidadeCSV + '_' + estadoId] ?? cidadeSoNome[cidadeCSV] ?? null)
           : (cidadeSoNome[cidadeCSV] ?? null);
       }
-
       return { estadoId, cidadeId };
     };
 
-    // 4. Resolver geo para todas as linhas em paralelo (máx 5 simultâneos)
-    const geoResults: { estadoId: number | null; cidadeId: number | null }[] =
-      new Array(rowsToImport.length).fill({ estadoId: null, cidadeId: null });
-    const GEO_BATCH = 5;
-    for (let i = 0; i < rowsToImport.length; i += GEO_BATCH) {
-      const slice = rowsToImport.slice(i, i + GEO_BATCH);
-      const resolved = await Promise.all(slice.map(row => resolveGeo(row)));
-      for (let j = 0; j < resolved.length; j++) {
-        geoResults[i + j] = resolved[j];
-      }
-    }
+    // 4. Resolver geo para todas as linhas
+    const geoResults = rowsToImport.map(row => resolveGeo(row));
     // --- Resolve FK IDs (with auto-create) ---
     const fkResolvedMaps: Record<string, Record<string, number | string>> = {};
     for (const fk of activeFkFields) {
