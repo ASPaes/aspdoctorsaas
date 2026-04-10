@@ -3262,6 +3262,41 @@ export type Database = {
           },
         ]
       }
+      whatsapp_instance_vault_refs: {
+        Row: {
+          created_at: string | null
+          id: string
+          instance_id: string
+          secret_name: string
+          updated_at: string | null
+          vault_secret_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          instance_id: string
+          secret_name: string
+          updated_at?: string | null
+          vault_secret_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          instance_id?: string
+          secret_name?: string
+          updated_at?: string | null
+          vault_secret_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instance_vault_refs_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_instances: {
         Row: {
           created_at: string
@@ -4253,6 +4288,7 @@ export type Database = {
               tenant_id: string
             }[]
           }
+      get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
       get_my_access_context: {
         Args: never
         Returns: {

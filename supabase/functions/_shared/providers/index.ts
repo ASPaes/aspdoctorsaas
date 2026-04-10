@@ -330,3 +330,19 @@ export function getAdapter(providerType: string): ProviderAdapter {
     default:           return _evolution;
   }
 }
+
+export async function getInstanceSecrets(
+  supabase: any,
+  instanceId: string
+): Promise<InstanceSecrets> {
+  const { data, error } = await supabase.rpc('get_instance_secrets', {
+    p_instance_id: instanceId,
+  });
+
+  if (error) {
+    console.error('[getInstanceSecrets] Vault RPC error:', error.message);
+    return {};
+  }
+
+  return (data ?? {}) as InstanceSecrets;
+}
