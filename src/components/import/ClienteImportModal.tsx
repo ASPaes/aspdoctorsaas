@@ -1403,6 +1403,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </Button>
             </div>
           </div>
+          </TooltipProvider>
         )}
 
         {step === 4 && importing && (
