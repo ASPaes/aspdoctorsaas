@@ -313,6 +313,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
   const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'inserir'>('pular');
+  const [importPhase, setImportPhase] = useState<'verificando' | 'cidades' | 'importando' | ''>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -338,6 +339,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setDuplicatas([]);
     setDuplicataAcao(null);
     setDuplicataOpcao('pular');
+    setImportPhase('');
   }, []);
 
   /* ---------- Build rows from raw data + mapping ---------- */
@@ -643,6 +645,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (rowsToImport.length === 0) return;
 
     setImporting(true);
+    setImportPhase('verificando');
     setStep(4);
 
     const autoCreated: Record<string, number> = {};
@@ -679,9 +682,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     if (duplicatasEncontradas.length > 0) {
       setDuplicatas(duplicatasEncontradas);
       setImporting(false);
+      setImportPhase('');
       return;
     }
 
+    setImportPhase('cidades');
     // --- Resolve estado e cidade ---
     // Estratégia: CEP → ViaCEP → estado_id + cidade_id
     // Fallback: UF do CSV → estado_id, cidade do CSV → cidade_id
@@ -795,6 +800,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       batches.push(rowsToImport.slice(i, i + BATCH_SIZE));
     }
 
+    setImportPhase('importando');
     setImportProgress({ current: 0, total: batches.length });
 
     let imported = 0;
@@ -913,6 +919,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       autoCreated,
     });
     setImporting(false);
+    setImportPhase('');
     setDuplicataAcao(null);
 
     if (imported > 0) {
@@ -953,7 +960,13 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   );
 
   /* ---------- Render ---------- */
-  const previewRows = rows.slice(0, 5);
+  const [previewFilter, setPreviewFilter] = useState<'todos' | 'validos' | 'erros'>('todos');
+  const filteredPreviewRows = useMemo(() => {
+    if (previewFilter === 'validos') return rows.filter(r => r.valid);
+    if (previewFilter === 'erros') return rows.filter(r => !r.valid);
+    return rows;
+  }, [rows, previewFilter]);
+  const previewRows = filteredPreviewRows.slice(0, 10);
 
   return (
     <Dialog
@@ -1378,8 +1391,86 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         {step === 4 && !importing && !result && (
           <TooltipProvider>
           <div className="space-y-4">
-            <h3 className="text-base font-semibold">Preview e Importação</h3>
+            {/* Banner resumo */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-md border bg-green-500/5 border-green-200 dark:border-green-800 p-3 text-center">
+                <p className="text-xl font-bold text-green-700 dark:text-green-400">{validRows.length}</p>
+                <p className="text-xs text-muted-foreground">prontos para importar</p>
+              </div>
+              <div className="rounded-md border bg-destructive/5 border-destructive/20 p-3 text-center">
+                <p className="text-xl font-bold text-destructive">{errorRows.length}</p>
+                <p className="text-xs text-muted-foreground">com campos obrigatórios vazios</p>
+              </div>
+              <div className="rounded-md border p-3 text-center">
+                <p className="text-xl font-bold text-muted-foreground">{rows.length}</p>
+                <p className="text-xs text-muted-foreground">linhas no arquivo</p>
+              </div>
+            </div>
 
+            {/* Aviso de duplicatas encontradas */}
+            {duplicatas.length > 0 && (
+              <div className="rounded-md border border-yellow-400/50 bg-yellow-50 dark:bg-yellow-900/20 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
+                      {duplicatas.length} registro{duplicatas.length > 1 ? 's' : ''} já {duplicatas.length > 1 ? 'existem' : 'existe'} no sistema (CNPJ/CPF duplicado)
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                      Você escolheu <strong>&quot;{duplicataOpcao === 'pular' ? 'Pular' : duplicataOpcao === 'atualizar' ? 'Atualizar' : 'Inserir mesmo assim'}&quot;</strong> no Step 1. Confirme para continuar.
+                    </p>
+                  </div>
+                </div>
+                <div className="max-h-28 overflow-y-auto space-y-1">
+                  {duplicatas.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
+                      <span className="font-mono">{d.cnpj}</span>
+                      {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    onClick={() => handleConfirmarDuplicatas(duplicataOpcao === 'pular' ? 'pular' : 'pular')}
+                    className="gap-1"
+                  >
+                    {duplicataOpcao === 'pular' ? '🚫 Pular duplicatas e continuar'
+                      : duplicataOpcao === 'atualizar' ? '♻️ Atualizar duplicatas e continuar'
+                      : '➕ Inserir mesmo assim e continuar'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => { setDuplicatas([]); }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Filtros de linhas */}
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold mr-1">Preview</p>
+              {(['todos', 'validos', 'erros'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setPreviewFilter(f)}
+                  className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                    previewFilter === f
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  {f === 'todos' ? `Todos (${rows.length})`
+                    : f === 'validos' ? `✅ Válidos (${validRows.length})`
+                    : `⚠️ Com erros (${errorRows.length})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Tabela preview */}
             <div className="rounded-md border overflow-auto max-h-64">
               <Table>
                 <TableHeader>
@@ -1429,66 +1520,24 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               </Table>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="flex items-center gap-1 text-green-700 dark:text-green-400">
-                <CheckCircle2 className="w-4 h-4" />
-                {validRows.length} linhas válidas
-              </span>
-              <span className="text-muted-foreground">·</span>
-              <span className="flex items-center gap-1 text-destructive">
-                <XCircle className="w-4 h-4" />
-                {errorRows.length} linhas com erro (serão ignoradas)
-              </span>
-            </div>
-
-            {rows.length > 5 && (
+            {filteredPreviewRows.length > 10 && (
               <p className="text-xs text-muted-foreground">
-                + {rows.length - 5} linhas não exibidas no preview
+                Exibindo 10 de {filteredPreviewRows.length} linhas
               </p>
             )}
 
-            {duplicatas.length > 0 && (
-              <div className="rounded-md border border-yellow-400/50 bg-yellow-50 dark:bg-yellow-900/20 p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-300">
-                      {duplicatas.length} registro{duplicatas.length > 1 ? 's' : ''} já {duplicatas.length > 1 ? 'existem' : 'existe'} no sistema
-                    </p>
-                    <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
-                      Os seguintes CNPJs/CPFs já estão cadastrados. O que deseja fazer?
-                    </p>
-                  </div>
-                </div>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {duplicatas.map((d, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
-                      <span className="font-mono">{d.cnpj}</span>
-                      {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleConfirmarDuplicatas('pular')}
-                    className="border-yellow-400 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-100"
-                  >
-                    Pular duplicatas e importar o restante
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleConfirmarDuplicatas('cancelar')}
-                    className="text-yellow-800 dark:text-yellow-300"
-                  >
-                    Cancelar importação
-                  </Button>
-                </div>
+            {/* Aviso de linhas com erro */}
+            {errorRows.length > 0 && (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 text-xs text-yellow-800 dark:text-yellow-300">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  <strong>{errorRows.length} linha{errorRows.length > 1 ? 's' : ''}</strong> com campos obrigatórios vazios serão ignoradas.
+                  Use o filtro <strong>&quot;Com erros&quot;</strong> acima para ver quais são, corrija o arquivo e reimporte.
+                </span>
               </div>
             )}
 
+            {/* Botões */}
             <div className="flex gap-2 justify-between">
               <Button variant="outline" onClick={() => setStep(3)} className="gap-2">
                 <ArrowLeft className="w-4 h-4" /> Voltar
@@ -1498,7 +1547,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 disabled={validRows.length === 0 || duplicatas.length > 0}
                 className="gap-2"
               >
-                Importar {validRows.length} clientes
+                Importar {validRows.length} cliente{validRows.length !== 1 ? 's' : ''}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -1507,72 +1556,134 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         )}
 
         {step === 4 && importing && (
-          <div className="space-y-3 py-4">
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Importando lote {importProgress.current} de {importProgress.total}...
+          <div className="space-y-4 py-6 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+            <div>
+              <p className="text-sm font-medium">
+                {importPhase === 'verificando' && 'Verificando duplicatas...'}
+                {importPhase === 'cidades' && 'Vinculando cidades e estados...'}
+                {importPhase === 'importando' && `Importando registros — lote ${importProgress.current} de ${importProgress.total}`}
+                {importPhase === '' && 'Preparando importação...'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Não feche esta janela</p>
             </div>
             <Progress
-              value={importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}
-              className="h-2"
+              value={
+                importPhase === 'verificando' ? 10
+                : importPhase === 'cidades' ? 30
+                : importPhase === 'importando' && importProgress.total > 0
+                  ? 30 + ((importProgress.current / importProgress.total) * 70)
+                  : 5
+              }
+              className="h-2 max-w-xs mx-auto"
             />
-            <p className="text-xs text-center text-muted-foreground">
-              Não feche esta janela durante a importação.
-            </p>
             <button
-              className="mt-3 text-xs text-muted-foreground underline hover:text-foreground transition-colors block mx-auto"
-              onClick={() => { setImporting(false); setStep(4); setImportProgress({ current: 0, total: 0 }); }}
+              className="text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+              onClick={() => { setImporting(false); setImportPhase(''); setImportProgress({ current: 0, total: 0 }); }}
             >
-              Algo deu errado? Clique aqui para cancelar e tentar novamente.
+              Algo deu errado? Clique aqui para cancelar
             </button>
           </div>
         )}
 
         {step === 4 && !importing && result && (
-          <div className="space-y-3 py-2">
-            {result.imported > 0 && (
-              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
-                <CheckCircle2 className="w-5 h-5" />
-                {result.imported} clientes importados com sucesso
-              </div>
-            )}
-            {result.skipped > 0 && (
-              <div className="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
-                <AlertTriangle className="w-5 h-5" />
-                {result.skipped} linhas ignoradas por erro de validação
-              </div>
-            )}
-            {result.failed > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-destructive">
-                  <XCircle className="w-5 h-5" />
-                  {result.failed} linhas com falha ao salvar
+          <div className="space-y-4 py-2">
+            {/* Card de resumo */}
+            <div className={`rounded-lg border p-4 space-y-3 ${result.imported > 0 ? 'border-green-200 dark:border-green-800 bg-green-500/5' : 'border-destructive/20 bg-destructive/5'}`}>
+              <div className="flex items-center gap-3">
+                {result.imported > 0
+                  ? <CheckCircle2 className="w-6 h-6 text-green-600 shrink-0" />
+                  : <XCircle className="w-6 h-6 text-destructive shrink-0" />
+                }
+                <div>
+                  <p className="text-base font-semibold">
+                    {result.imported > 0 ? 'Importação concluída!' : 'Nenhum registro importado'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
-                {result.failReasons.map((r, i) => (
-                  <p key={i} className="text-xs text-muted-foreground ml-7">{r}</p>
-                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-green-700 dark:text-green-400">{result.imported}</p>
+                  <p className="text-xs text-muted-foreground">importados</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{result.skipped}</p>
+                  <p className="text-xs text-muted-foreground">ignorados</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-destructive">{result.failed}</p>
+                  <p className="text-xs text-muted-foreground">falhas</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Registros auto-criados */}
+            {Object.keys(result.autoCreated).length > 0 && (
+              <div className="flex items-start gap-2 text-sm text-blue-700 dark:text-blue-400 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-500/5 p-3">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="text-xs">
+                  Registros criados automaticamente:{' '}
+                  {Object.entries(result.autoCreated).map(([label, count]) => `${label} (${count})`).join(', ')}
+                </span>
               </div>
             )}
-            {Object.keys(result.autoCreated).length > 0 && (
-              <div className="flex items-start gap-2 text-sm text-blue-700 dark:text-blue-400">
-                <Info className="w-5 h-5 shrink-0 mt-0.5" />
-                <span>
-                  Registros criados automaticamente:{" "}
-                  {Object.entries(result.autoCreated)
-                    .map(([label, count]) => `${label} (${count})`)
-                    .join(", ")}
-                </span>
+
+            {/* Erros de falha */}
+            {result.failReasons.length > 0 && (
+              <div className="rounded-md border border-destructive/20 p-3 space-y-1 max-h-24 overflow-y-auto">
+                <p className="text-xs font-medium text-destructive">Detalhes das falhas:</p>
+                {result.failReasons.slice(0, 5).map((r, i) => (
+                  <p key={i} className="text-xs text-muted-foreground">• {r}</p>
+                ))}
+                {result.failReasons.length > 5 && (
+                  <p className="text-xs text-muted-foreground">...e mais {result.failReasons.length - 5} erros</p>
+                )}
               </div>
             )}
 
             <Separator />
 
-            <div className="flex gap-2 pt-2">
+            {/* Botões de ação */}
+            <div className="flex flex-wrap gap-2">
+              {errorRows.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    const friendlyHeaders = Object.keys(FRIENDLY_TO_SYSTEM);
+                    const systemFields = Object.values(FRIENDLY_TO_SYSTEM);
+                    const csvLines = [
+                      friendlyHeaders.join(';'),
+                      ...errorRows.map(row =>
+                        systemFields.map(f => {
+                          const v = row.values[f] ?? '';
+                          return v.includes(';') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v;
+                        }).join(';')
+                      ),
+                    ];
+                    const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `corrigir_importacao_${new Date().toISOString().slice(0,10)}.csv`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  Baixar {errorRows.length} registro{errorRows.length !== 1 ? 's' : ''} com erro para corrigir
+                </Button>
+              )}
               <Button variant="outline" onClick={resetAll} className="gap-2">
                 <FileSpreadsheet className="w-4 h-4" />
                 Importar outro arquivo
               </Button>
-              <Button onClick={() => onOpenChange(false)}>Fechar</Button>
+              <Button onClick={() => onOpenChange(false)}>
+                Fechar
+              </Button>
             </div>
           </div>
         )}
