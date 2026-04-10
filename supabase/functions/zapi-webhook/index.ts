@@ -185,7 +185,7 @@ async function processZapiWebhook(req: Request): Promise<void> {
     tenantId: instance.tenant_id,
     providerType: instance.provider_type as any,
     instanceInfo,
-    secrets,
+    secrets: vaultSecrets,
     messageId,
     remoteJid: `${normalizedPhone}@s.whatsapp.net`,
     fromMe: false,
