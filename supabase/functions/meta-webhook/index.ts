@@ -1,4 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { processInboundMessage } from '../_shared/message-processor.ts';
+import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,38 +9,42 @@ const corsHeaders = {
 
 const LOG = '[meta-webhook]';
 
-// ── Phone normalization (mirrors evolution-webhook) ──────────────────
+// ── Validação de assinatura X-Hub-Signature-256 ───────────────────────────────
+async function verifyMetaSignature(rawBody: string, signatureHeader: string | null, appSecret: string): Promise<boolean> {
+  if (!signatureHeader) return false;
+  const expected = signatureHeader.replace('sha256=', '');
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', encoder.encode(appSecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+  const computed = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return computed === expected;
+}
+
+// ── Phone normalization ───────────────────────────────────────────────────────
 function normalizePhone(raw: string): string {
-  let digits = raw.replace(/\D/g, '');
-  digits = digits.replace(/^0+/, '');
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith('55')) {
-    digits = '55' + digits;
-  }
-  // Add 9th digit for BR mobile if 12 digits (55+DDD+8)
+  let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
+  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith('55')) digits = '55' + digits;
   if (digits.startsWith('55') && digits.length === 12) {
     digits = digits.slice(0, 4) + '9' + digits.slice(4);
-    console.log(`${LOG} Brazilian phone normalized: ${digits}`);
   }
   return digits;
 }
 
-// ── Map Meta message type to our internal type ───────────────────────
-function mapMessageType(msg: any): string {
+// ── Map Meta message type ─────────────────────────────────────────────────────
+function mapMessageType(msg: any): NormalizedInboundMessage['messageType'] {
   if (!msg) return 'text';
   const t = msg.type;
-  if (t === 'text') return 'text';
   if (t === 'image') return 'image';
   if (t === 'video') return 'video';
   if (t === 'audio') return 'audio';
   if (t === 'document') return 'document';
   if (t === 'sticker') return 'sticker';
-  if (t === 'contacts') return 'contact';
-  if (t === 'location') return 'text';
+  if (t === 'contacts') return 'contacts';
   if (t === 'reaction') return 'reaction';
   return 'text';
 }
 
-// ── Extract text content from Meta message ───────────────────────────
+// ── Extract text content ──────────────────────────────────────────────────────
 function extractContent(msg: any): string {
   if (!msg) return '';
   const t = msg.type;
@@ -48,398 +54,69 @@ function extractContent(msg: any): string {
   if (t === 'audio') return '🎵 Áudio';
   if (t === 'document') return msg.document?.caption || `📄 ${msg.document?.filename || 'Documento'}`;
   if (t === 'sticker') return '🎨 Sticker';
-  if (t === 'contacts') {
-    const count = msg.contacts?.length || 0;
-    return `📇 ${count} contato${count !== 1 ? 's' : ''}`;
-  }
+  if (t === 'contacts') { const c = msg.contacts?.length || 0; return `📇 ${c} contato${c !== 1 ? 's' : ''}`; }
   if (t === 'location') return `📍 Localização: ${msg.location?.latitude},${msg.location?.longitude}`;
   if (t === 'reaction') return msg.reaction?.emoji || '';
   return '';
 }
 
-// ── Build media metadata ─────────────────────────────────────────────
-function extractMediaMeta(msg: any): Record<string, any> | null {
-  if (!msg) return null;
+// ── Extract media metadata ────────────────────────────────────────────────────
+function extractMediaMeta(msg: any): { mediaId: string | null; mimetype: string | null; filename: string | null } {
+  if (!msg) return { mediaId: null, mimetype: null, filename: null };
   const t = msg.type;
-  const mediaTypes = ['image', 'video', 'audio', 'document', 'sticker'];
-  if (!mediaTypes.includes(t)) return null;
+  if (!['image', 'video', 'audio', 'document', 'sticker'].includes(t)) return { mediaId: null, mimetype: null, filename: null };
   const media = msg[t];
-  if (!media) return null;
-  return {
-    meta_media_id: media.id || null,
-    mime_type: media.mime_type || null,
-    filename: media.filename || null,
-    sha256: media.sha256 || null,
-  };
+  if (!media) return { mediaId: null, mimetype: null, filename: null };
+  return { mediaId: media.id || null, mimetype: media.mime_type || null, filename: media.filename || null };
 }
 
-// ── Download media from Meta Graph API and upload to Supabase Storage ─
+// ── Download media from Meta Graph API → Supabase Storage ────────────────────
 async function downloadAndUploadMetaMedia(
-  supabase: any,
-  accessToken: string,
-  mediaId: string,
-  mimetype: string,
-  tenantId: string,
-  instanceId: string,
-  conversationId: string,
-  messageId: string,
-  filename: string | null,
-): Promise<{ storagePath: string | null }> {
+  supabase: any, accessToken: string, mediaId: string, mimetype: string,
+  tenantId: string, instanceId: string, conversationId: string, filename: string | null,
+): Promise<string | null> {
   try {
-    // Step 1: Get media URL from Graph API
-    console.log(`${LOG} Fetching media URL for media_id=${mediaId}`);
     const metaResp = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    if (!metaResp.ok) { console.error(`${LOG} Failed to get media URL: ${metaResp.status}`); return null; }
+    const { url: mediaUrl } = await metaResp.json();
+    if (!mediaUrl) { console.error(`${LOG} No url in media response`); return null; }
 
-    if (!metaResp.ok) {
-      console.error(`${LOG} Failed to get media URL: ${metaResp.status} ${await metaResp.text()}`);
-      return { storagePath: null };
-    }
+    const downloadResp = await fetch(mediaUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!downloadResp.ok) { console.error(`${LOG} Failed to download media: ${downloadResp.status}`); return null; }
 
-    const metaData = await metaResp.json();
-    const mediaUrl = metaData.url;
-    if (!mediaUrl) {
-      console.error(`${LOG} No url in media response`);
-      return { storagePath: null };
-    }
+    const blob = new Blob([new Uint8Array(await downloadResp.arrayBuffer())], { type: mimetype });
+    const ext = filename ? filename.split('.').pop()?.toLowerCase() || 'bin' : mimetype.split('/')[1]?.split(';')[0] || 'bin';
+    const storagePath = `${tenantId}/${instanceId}/${conversationId}/${Date.now()}-${mediaId}.${ext}`;
 
-    // Step 2: Download the binary content
-    console.log(`${LOG} Downloading media binary from Meta CDN`);
-    const downloadResp = await fetch(mediaUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!downloadResp.ok) {
-      console.error(`${LOG} Failed to download media: ${downloadResp.status}`);
-      return { storagePath: null };
-    }
-
-    const mediaBytes = new Uint8Array(await downloadResp.arrayBuffer());
-    const blob = new Blob([mediaBytes], { type: mimetype });
-
-    // Step 3: Build storage path (mirrors Evolution pattern)
-    const ext = filename
-      ? filename.split('.').pop()?.toLowerCase() || mimetype.split('/')[1]?.split(';')[0] || 'bin'
-      : mimetype.split('/')[1]?.split(';')[0] || 'bin';
-    const storageFilename = `${Date.now()}-${mediaId}.${ext}`;
-    const storagePath = `${tenantId}/${instanceId}/${conversationId}/${storageFilename}`;
-
-    // Step 4: Upload to Supabase Storage
-    console.log(`${LOG} Uploading media to storage: ${storagePath}`);
-    const { error: uploadError } = await supabase.storage
-      .from('whatsapp-media')
-      .upload(storagePath, blob, {
-        contentType: mimetype,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error(`${LOG} Storage upload error:`, uploadError);
-      return { storagePath: null };
-    }
+    const { error } = await supabase.storage.from('whatsapp-media').upload(storagePath, blob, { contentType: mimetype, upsert: false });
+    if (error) { console.error(`${LOG} Storage upload error:`, error); return null; }
 
     console.log(`${LOG} Media uploaded: ${storagePath}`);
-    return { storagePath };
-  } catch (error) {
-    console.error(`${LOG} Error in downloadAndUploadMetaMedia:`, error);
-    return { storagePath: null };
-  }
-}
-
-// ── Find or create contact ───────────────────────────────────────────
-async function findOrCreateContact(
-  supabase: any,
-  instanceId: string,
-  phoneNumber: string,
-  name: string,
-  tenantId: string,
-): Promise<string | null> {
-  // Build phone variants for BR numbers (with/without 9th digit)
-  const variants = [phoneNumber];
-  if (phoneNumber.startsWith('55') && phoneNumber.length === 13) {
-    variants.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
-  }
-  if (phoneNumber.startsWith('55') && phoneNumber.length === 12) {
-    variants.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
-  }
-
-  const { data: existing } = await supabase
-    .from('whatsapp_contacts')
-    .select('id, name, phone_number')
-    .eq('tenant_id', tenantId)
-    .in('phone_number', variants)
-    .maybeSingle();
-
-  if (existing) {
-    // Normalize phone if changed
-    if (existing.phone_number !== phoneNumber) {
-      await supabase
-        .from('whatsapp_contacts')
-        .update({ phone_number: phoneNumber, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
-    }
-    // Update name if contact had only the number as name
-    if (name && name !== phoneNumber && existing.name === existing.phone_number) {
-      await supabase
-        .from('whatsapp_contacts')
-        .update({ name, updated_at: new Date().toISOString() })
-        .eq('id', existing.id);
-    }
-    return existing.id;
-  }
-
-  const { data: created, error } = await supabase
-    .from('whatsapp_contacts')
-    .insert({
-      instance_id: instanceId,
-      phone_number: phoneNumber,
-      name: name || phoneNumber,
-      is_group: false,
-      tenant_id: tenantId,
-    })
-    .select('id')
-    .single();
-
-  if (error) {
-    console.error(`${LOG} Error creating contact:`, error);
+    return storagePath;
+  } catch (err) {
+    console.error(`${LOG} downloadAndUploadMetaMedia error:`, err);
     return null;
   }
-  console.log(`${LOG} Contact created: ${created.id}`);
-  return created.id;
 }
 
-// ── Find or create conversation (instance-scoped) ────────────────────
-async function findOrCreateConversation(
-  supabase: any,
-  instanceId: string,
-  contactId: string,
-  tenantId: string,
-): Promise<string | null> {
-  const { data: existing } = await supabase
-    .from('whatsapp_conversations')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('instance_id', instanceId)
-    .eq('contact_id', contactId)
-    .maybeSingle();
-
-  if (existing) return existing.id;
-
-  const { data: created, error } = await supabase
-    .from('whatsapp_conversations')
-    .insert({
-      instance_id: instanceId,
-      contact_id: contactId,
-      status: 'active',
-      tenant_id: tenantId,
-    })
-    .select('id')
-    .single();
-
-  if (error) {
-    console.error(`${LOG} Error creating conversation:`, error);
-    return null;
-  }
-  console.log(`${LOG} Conversation created: ${created.id}`);
-  return created.id;
+// ── Process status updates ────────────────────────────────────────────────────
+async function processStatus(supabase: any, tenantId: string, status: any): Promise<void> {
+  const { id: messageId, status: statusValue } = status;
+  if (!messageId || !statusValue) return;
+  const statusMap: Record<string, string> = { sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed' };
+  await supabase.from('whatsapp_messages')
+    .update({ status: statusMap[statusValue] || statusValue })
+    .eq('tenant_id', tenantId).eq('message_id', messageId);
+  console.log(`${LOG} Status updated: ${messageId} -> ${statusValue}`);
 }
 
-// ── Process a single inbound/outbound message ────────────────────────
-async function processMessage(
-  supabase: any,
-  instanceId: string,
-  tenantId: string,
-  phoneNumber: string,
-  contactName: string,
-  msg: any,
-  isFromMe: boolean,
-  metaTimestamp: number | null,
-  accessToken: string | null,
-) {
-  const messageId = msg.id;
-  if (!messageId) {
-    console.warn(`${LOG} Message without id, skipping`);
-    return;
-  }
-
-  const phone = normalizePhone(phoneNumber);
-  const contactId = await findOrCreateContact(supabase, instanceId, phone, contactName, tenantId);
-  if (!contactId) return;
-
-  const conversationId = await findOrCreateConversation(supabase, instanceId, contactId, tenantId);
-  if (!conversationId) return;
-
-  const messageType = mapMessageType(msg);
-
-  // Reactions are handled separately
-  if (messageType === 'reaction') {
-    console.log(`${LOG} Reaction message, skipping persistence for now`);
-    return;
-  }
-
-  const content = extractContent(msg);
-  const mediaMeta = extractMediaMeta(msg);
-  const timestamp = metaTimestamp
-    ? new Date(metaTimestamp * 1000).toISOString()
-    : new Date().toISOString();
-
-  // Build metadata
-  const metadata: Record<string, any> = {
-    source: 'meta_cloud',
-    provider: 'meta',
-  };
-  if (mediaMeta) {
-    metadata.media = mediaMeta;
-  }
-
-  // Dedupe via upsert
-  const { data: savedMsg, error: msgError } = await supabase
-    .from('whatsapp_messages')
-    .upsert(
-      {
-        conversation_id: conversationId,
-        remote_jid: `${phoneNumber}@s.whatsapp.net`,
-        message_id: messageId,
-        content,
-        message_type: messageType,
-        media_url: null,
-        media_mimetype: mediaMeta?.mime_type || null,
-        media_path: null,
-        media_filename: mediaMeta?.filename || null,
-        media_ext: mediaMeta?.filename?.split('.')?.pop()?.toLowerCase() || null,
-        media_size_bytes: null,
-        media_kind: mediaMeta
-          ? (['image', 'video', 'audio', 'document', 'sticker'].includes(msg.type) ? msg.type : 'other')
-          : null,
-        is_from_me: isFromMe,
-        status: isFromMe ? 'sent' : 'received',
-        timestamp,
-        tenant_id: tenantId,
-        instance_id: instanceId,
-        metadata,
-      },
-      { onConflict: 'tenant_id,message_id', ignoreDuplicates: true },
-    )
-    .select('id')
-    .maybeSingle();
-
-  if (msgError) {
-    console.error(`${LOG} Error saving message:`, msgError);
-    return;
-  }
-
-  if (savedMsg) {
-    console.log(`${LOG} Message saved: message_id=${messageId}, conversation_id=${conversationId}, instance_id=${instanceId}, tenant_id=${tenantId}`);
-  } else {
-    console.log(`${LOG} Duplicate ignored: message_id=${messageId}`);
-  }
-
-  // ── Download and store media if present ────────────────────────────
-  if (savedMsg && mediaMeta?.meta_media_id && accessToken) {
-    const { storagePath } = await downloadAndUploadMetaMedia(
-      supabase,
-      accessToken,
-      mediaMeta.meta_media_id,
-      mediaMeta.mime_type || 'application/octet-stream',
-      tenantId,
-      instanceId,
-      conversationId,
-      messageId,
-      mediaMeta.filename,
-    );
-
-    if (storagePath) {
-      await supabase
-        .from('whatsapp_messages')
-        .update({
-          media_path: storagePath,
-          media_url: storagePath, // UI uses media_path for signed URL generation
-        })
-        .eq('id', savedMsg.id);
-      console.log(`${LOG} Media path updated on message: ${savedMsg.id}`);
-    }
-  }
-
-  // Update conversation preview
-  const { data: currentConv } = await supabase
-    .from('whatsapp_conversations')
-    .select('last_message_at, unread_count')
-    .eq('id', conversationId)
-    .single();
-
-  const isNewerOrEqual = !currentConv?.last_message_at || timestamp >= currentConv.last_message_at;
-
-  const updateData: Record<string, any> = {};
-  if (isNewerOrEqual) {
-    updateData.last_message_at = timestamp;
-    updateData.last_message_preview = content.substring(0, 200);
-    updateData.is_last_message_from_me = isFromMe;
-  }
-  if (!isFromMe) {
-    updateData.unread_count = (currentConv?.unread_count || 0) + 1;
-  }
-
-  if (Object.keys(updateData).length > 0) {
-    await supabase
-      .from('whatsapp_conversations')
-      .update(updateData)
-      .eq('id', conversationId);
-  }
-
-  console.log(`${LOG} Conversation updated: conversation_id=${conversationId}`);
-}
-
-// ── Process status updates (sent/delivered/read) ─────────────────────
-async function processStatus(
-  supabase: any,
-  tenantId: string,
-  status: any,
-) {
-  const messageId = status.id;
-  const statusValue = status.status; // sent | delivered | read | failed
-
-  if (!messageId || !statusValue) {
-    console.warn(`${LOG} Status update missing id or status`);
-    return;
-  }
-
-  const statusMap: Record<string, string> = {
-    sent: 'sent',
-    delivered: 'delivered',
-    read: 'read',
-    failed: 'failed',
-  };
-  const mappedStatus = statusMap[statusValue] || statusValue;
-
-  const { data, error } = await supabase
-    .from('whatsapp_messages')
-    .update({ status: mappedStatus })
-    .eq('tenant_id', tenantId)
-    .eq('message_id', messageId)
-    .select('id')
-    .maybeSingle();
-
-  if (error) {
-    console.error(`${LOG} Status update error:`, error);
-    return;
-  }
-
-  if (data) {
-    console.log(`${LOG} Status updated: message_id=${messageId} -> ${mappedStatus}`);
-  } else {
-    console.warn(`${LOG} Status update matched 0 rows: message_id=${messageId}, tenant_id=${tenantId}`);
-  }
-}
-
-// ── Main handler ─────────────────────────────────────────────────────
+// ── Main handler ──────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders, status: 204 });
 
-  // ── GET: Webhook verification handshake ────────────────────────────
+  // ── GET: Webhook verification handshake ────────────────────────────────────
   if (req.method === 'GET') {
     const url = new URL(req.url);
     const mode = url.searchParams.get('hub.mode');
@@ -447,129 +124,150 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get('hub.challenge');
 
     if (mode !== 'subscribe' || !token || !challenge) {
-      console.warn(`${LOG} Webhook verification FAILED: missing params`);
+      console.warn(`${LOG} Verification FAILED: missing params`);
       return new Response('Forbidden', { status: 403 });
     }
 
-    // Buscar token de verificação nas instâncias Meta Cloud (whatsapp_instance_secrets)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseVerify = createClient(supabaseUrl, serviceRoleKey);
+    const supabaseVerify = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: match } = await supabaseVerify
+      .from('whatsapp_instance_secrets').select('instance_id')
+      .eq('meta_verify_token', token).limit(1);
 
-    const { data: matchingSecrets, error: secretsErr } = await supabaseVerify
-      .from('whatsapp_instance_secrets')
-      .select('instance_id, meta_verify_token')
-      .eq('meta_verify_token', token)
-      .limit(1);
-
-    if (secretsErr) {
-      console.error(`${LOG} Error querying verify tokens:`, secretsErr);
-      return new Response('Internal Server Error', { status: 500 });
-    }
-
-    if (matchingSecrets && matchingSecrets.length > 0) {
-      console.log(`${LOG} Webhook verification OK for instance_id=${matchingSecrets[0].instance_id}`);
+    if (match && match.length > 0) {
+      console.log(`${LOG} Verification OK instance_id=${match[0].instance_id}`);
       return new Response(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
     }
 
-    console.warn(`${LOG} Webhook verification FAILED: no matching verify_token found`);
+    console.warn(`${LOG} Verification FAILED: no matching verify_token`);
     return new Response('Forbidden', { status: 403 });
   }
 
-  // ── POST: Process webhook events ───────────────────────────────────
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
-  }
+  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
+  // Ler raw body para validação de assinatura ANTES de parsear
+  const rawBody = await req.text();
   let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    console.error(`${LOG} Invalid JSON body`);
-    return new Response('Bad Request', { status: 400 });
-  }
+  try { body = JSON.parse(rawBody); } catch { return new Response('Bad Request', { status: 400 }); }
 
-  // Meta sends { object: 'whatsapp_business_account', entry: [...] }
   if (body.object !== 'whatsapp_business_account') {
-    console.warn(`${LOG} Unknown object type: ${body.object}`);
     return new Response('OK', { status: 200, headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
   for (const entry of body.entry || []) {
     for (const change of entry.changes || []) {
       if (change.field !== 'messages') continue;
-
       const value = change.value;
       if (!value) continue;
 
       const phoneNumberId = value.metadata?.phone_number_id;
-      if (!phoneNumberId) {
-        console.warn(`${LOG} Missing phone_number_id in metadata`);
-        continue;
-      }
+      if (!phoneNumberId) { console.warn(`${LOG} Missing phone_number_id`); continue; }
 
-      // Resolve instance by meta_phone_number_id
-      const { data: instance, error: instErr } = await supabase
+      // Resolver instância
+      const { data: instance } = await supabase
         .from('whatsapp_instances')
-        .select('id, tenant_id, instance_name, provider_type')
-        .eq('meta_phone_number_id', phoneNumberId)
-        .eq('provider_type', 'meta_cloud')
-        .maybeSingle();
+        .select('id, tenant_id, instance_name, provider_type, instance_id_external, meta_phone_number_id, skip_ura')
+        .eq('meta_phone_number_id', phoneNumberId).eq('provider_type', 'meta_cloud').maybeSingle();
 
-      if (instErr) {
-        console.error(`${LOG} Error resolving instance:`, instErr);
-        continue;
-      }
+      if (!instance?.tenant_id) { console.warn(`${LOG} No instance for phone_number_id=${phoneNumberId}`); continue; }
 
-      if (!instance) {
-        console.warn(`${LOG} No instance found for phone_number_id=${phoneNumberId}`);
-        continue;
-      }
-
-      const tenantId = instance.tenant_id;
-      const instanceId = instance.id;
-
-      console.log(`${LOG} Processing event: phone_number_id=${phoneNumberId}, instance_id=${instanceId}, tenant_id=${tenantId}`);
-
-      // Fetch access token for media downloads
-      let accessToken: string | null = null;
-      const { data: secrets } = await supabase
+      // Buscar secrets
+      const { data: secretRow } = await supabase
         .from('whatsapp_instance_secrets')
-        .select('meta_access_token')
-        .eq('instance_id', instanceId)
-        .maybeSingle();
-      if (secrets?.meta_access_token) {
-        accessToken = secrets.meta_access_token;
+        .select('meta_access_token, meta_app_secret')
+        .eq('instance_id', instance.id).maybeSingle();
+
+      const accessToken = secretRow?.meta_access_token || null;
+      const appSecret = secretRow?.meta_app_secret || null;
+
+      // ── Validar assinatura X-Hub-Signature-256 ─────────────────────────────
+      if (appSecret) {
+        const signatureHeader = req.headers.get('X-Hub-Signature-256');
+        const isValid = await verifyMetaSignature(rawBody, signatureHeader, appSecret);
+        if (!isValid) {
+          console.warn(`${LOG} Invalid signature for instance_id=${instance.id}`);
+          return new Response('Unauthorized', { status: 401 });
+        }
+        console.log(`${LOG} Signature verified OK for instance_id=${instance.id}`);
       } else {
-        console.warn(`${LOG} No meta_access_token found for instance_id=${instanceId}, media will not be downloaded`);
+        console.warn(`${LOG} No app_secret configured — skipping signature validation for instance_id=${instance.id}`);
       }
 
-      // Build contact name map from contacts array
+      if (!accessToken) console.warn(`${LOG} No meta_access_token for instance_id=${instance.id}`);
+
+      // Mapa de nomes de contatos
       const contactNameMap: Record<string, string> = {};
-      for (const contact of value.contacts || []) {
-        const wa_id = contact.wa_id;
-        const name = contact.profile?.name;
-        if (wa_id && name) {
-          contactNameMap[wa_id] = name;
+      for (const c of value.contacts || []) {
+        if (c.wa_id && c.profile?.name) contactNameMap[c.wa_id] = c.profile.name;
+      }
+
+      const instanceInfo: InstanceInfo = {
+        id: instance.id,
+        instance_name: instance.instance_name,
+        provider_type: instance.provider_type as any,
+        instance_id_external: instance.instance_id_external,
+        meta_phone_number_id: instance.meta_phone_number_id,
+        skip_ura: instance.skip_ura ?? false,
+        tenant_id: instance.tenant_id,
+      };
+
+      const secrets: InstanceSecrets = { meta_access_token: accessToken };
+
+      // ── Processar mensagens ───────────────────────────────────────────────
+      for (const msg of value.messages || []) {
+        if (msg.type === 'reaction') { console.log(`${LOG} Reaction ignorada`); continue; }
+
+        const normalizedPhone = normalizePhone(msg.from);
+        const ts = msg.timestamp ? new Date(parseInt(msg.timestamp, 10) * 1000).toISOString() : new Date().toISOString();
+        const { mediaId, mimetype, filename } = extractMediaMeta(msg);
+
+        const normalized: NormalizedInboundMessage = {
+          instanceId: instance.id,
+          tenantId: instance.tenant_id,
+          providerType: 'meta_cloud',
+          instanceInfo,
+          secrets,
+          messageId: msg.id,
+          remoteJid: `${normalizedPhone}@s.whatsapp.net`,
+          fromMe: false,
+          pushName: contactNameMap[msg.from] || msg.from,
+          content: extractContent(msg),
+          messageType: mapMessageType(msg),
+          timestamp: ts,
+          mediaUrl: null,
+          mediaMimetype: mimetype,
+          mediaFilename: filename,
+          mediaStoragePath: null,
+          rawPayload: msg,
+        };
+
+        console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
+        await processInboundMessage(supabase, normalized);
+
+        // Download de mídia após salvar a mensagem
+        if (mediaId && accessToken && mimetype) {
+          const { data: savedMsg } = await supabase
+            .from('whatsapp_messages').select('id, conversation_id')
+            .eq('message_id', msg.id).eq('tenant_id', instance.tenant_id).maybeSingle();
+
+          if (savedMsg) {
+            const storagePath = await downloadAndUploadMetaMedia(
+              supabase, accessToken, mediaId, mimetype,
+              instance.tenant_id, instance.id, savedMsg.conversation_id, filename,
+            );
+            if (storagePath) {
+              await supabase.from('whatsapp_messages')
+                .update({ media_path: storagePath, media_url: storagePath })
+                .eq('id', savedMsg.id);
+            }
+          }
         }
       }
 
-      // Process inbound messages
-      for (const msg of value.messages || []) {
-        const from = msg.from; // phone number (digits)
-        const contactName = contactNameMap[from] || from;
-        const ts = msg.timestamp ? parseInt(msg.timestamp, 10) : null;
-
-        await processMessage(supabase, instanceId, tenantId, from, contactName, msg, false, ts, accessToken);
-      }
-
-      // Process status updates
+      // ── Processar status ──────────────────────────────────────────────────
       for (const status of value.statuses || []) {
-        await processStatus(supabase, tenantId, status);
+        await processStatus(supabase, instance.tenant_id, status);
       }
     }
   }
