@@ -1,4 +1,6 @@
-import { useSignedMediaUrl } from "@/hooks/useSignedMediaUrl";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { AttachmentCard } from "./AttachmentCard";
 
 interface MediaContentProps {
@@ -13,10 +15,24 @@ interface MediaContentProps {
   mediaMimetype?: string | null;
 }
 
-/**
- * Renders media (image/audio/video/document) using signed URLs
- * for private storage bucket access.
- */
+function useProxyUrl(messageId: string, mode: "inline" | "attachment" = "inline"): string | null {
+  const [proxyUrl, setProxyUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      const token = session?.access_token;
+      if (!token) return;
+      const base = import.meta.env.VITE_SUPABASE_URL;
+      setProxyUrl(`${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=${mode}&token=${token}`);
+    });
+    return () => { cancelled = true; };
+  }, [messageId, mode]);
+
+  return proxyUrl;
+}
+
 export function MediaContent({
   messageId,
   messageType,
@@ -28,10 +44,9 @@ export function MediaContent({
   mediaKind,
   mediaMimetype,
 }: MediaContentProps) {
-  const signedUrl = useSignedMediaUrl(mediaUrl);
+  const inlineUrl = useProxyUrl(messageId, "inline");
 
-  // Documents always use AttachmentCard (proxy-based, no direct link)
-  if (messageType === "document") {
+  if (messageType === "document" || (messageType !== "image" && messageType !== "audio" && messageType !== "video")) {
     return (
       <AttachmentCard
         messageId={messageId}
@@ -45,15 +60,23 @@ export function MediaContent({
     );
   }
 
-  if (!signedUrl) return null;
+  if (!inlineUrl) return null;
 
   switch (messageType) {
     case "image":
-      return <img src={signedUrl} alt="Imagem" className="rounded max-w-full mb-1 max-h-64 object-contain" loading="lazy" />;
+      return <img src={inlineUrl} alt="Imagem" className="rounded max-w-full mb-1 max-h-64 object-contain" loading="lazy" />;
     case "audio":
-      return <audio controls className="max-w-full mb-1" preload="metadata"><source src={signedUrl} /></audio>;
+      return (
+        <audio controls className="max-w-full mb-1" preload="metadata">
+          <source src={inlineUrl} />
+        </audio>
+      );
     case "video":
-      return <video controls className="rounded max-w-full mb-1 max-h-64" preload="none"><source src={signedUrl} /></video>;
+      return (
+        <video controls className="rounded max-w-full mb-1 max-h-64" preload="none">
+          <source src={inlineUrl} />
+        </video>
+      );
     default:
       return null;
   }
