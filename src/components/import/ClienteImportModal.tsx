@@ -88,6 +88,7 @@ interface ImportResult {
   failed: number;
   failedRows: FailedRow[];
   autoCreated: Record<string, number>;
+  dupIntraCSV: { cnpj: string; razao_social: string }[];
 }
 
 interface Props {
@@ -666,10 +667,17 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     // Set para controlar CNPJs duplicados internos ao CSV (mantém primeira ocorrência)
     const cnpjsVistos = new Set<string>();
+    const dupIntraCSV: { cnpj: string; razao_social: string }[] = [];
     rowsToImport = rowsToImport.filter(r => {
       const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
       if (!cnpj) return true;
-      if (cnpjsVistos.has(cnpj)) return false;
+      if (cnpjsVistos.has(cnpj)) {
+        dupIntraCSV.push({
+          cnpj,
+          razao_social: r.values.razao_social || r.values.nome_fantasia || '—',
+        });
+        return false;
+      }
       cnpjsVistos.add(cnpj);
       return true;
     });
@@ -1003,10 +1011,13 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
 
     setResult({
       imported,
-      skipped: errorRows.length + (duplicataOpcao === 'pular' ? cnpjsDuplicadosNoBanco.size : 0),
+      skipped: errorRows.length
+        + (duplicataOpcao === 'pular' ? cnpjsDuplicadosNoBanco.size : 0)
+        + dupIntraCSV.length,
       failed,
       failedRows,
       autoCreated,
+      dupIntraCSV,
     });
     setImporting(false);
     setImportPhase('');
@@ -1759,6 +1770,27 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     <div key={i} className="flex items-center gap-2 text-xs text-yellow-800 dark:text-yellow-300">
                       <span className="font-mono">{d.cnpj}</span>
                       {d.razao_social && <span className="text-yellow-600 dark:text-yellow-500">— {d.razao_social}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {result.dupIntraCSV.length > 0 && (
+              <div className="rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 p-3 space-y-2">
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {result.dupIntraCSV.length} linha{result.dupIntraCSV.length !== 1 ? 's' : ''} ignorada{result.dupIntraCSV.length !== 1 ? 's' : ''} — CNPJ duplicado dentro do próprio arquivo
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-400">
+                  O arquivo continha o mesmo CNPJ em mais de uma linha. Apenas a primeira ocorrência foi importada. Verifique e corrija o arquivo de origem.
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {result.dupIntraCSV.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-orange-800 dark:text-orange-300">
+                      <span className="font-mono">{d.cnpj}</span>
+                      <span>—</span>
+                      <span className="truncate">{d.razao_social}</span>
                     </div>
                   ))}
                 </div>
