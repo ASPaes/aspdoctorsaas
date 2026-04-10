@@ -29,8 +29,20 @@ import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
 
+const noFutureDate = (fieldName: string) =>
+  z.string().nullable().refine(
+    (v) => {
+      if (!v) return true;
+      const d = new Date(v + "T00:00:00");
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      return d <= today;
+    },
+    { message: `${fieldName} não pode ser uma data futura` }
+  );
+
 const clienteSchema = z.object({
-  data_cadastro: z.string().nullable(),
+  data_cadastro: noFutureDate("Data de Cadastro"),
   razao_social: z.string().nullable(),
   nome_fantasia: z.string().nullable(),
   cnpj: z.string().nullable().refine(v => {
@@ -59,13 +71,13 @@ const clienteSchema = z.object({
   segmento_id: z.number().nullable(),
   modelo_contrato_id: z.number().nullable().refine(v => v !== null, { message: "Modelo de Contrato obrigatório" }),
   observacao_cliente: z.string().nullable(),
-  data_venda: z.string().nullable().refine(v => !!v, { message: "Data da Venda obrigatória" }),
+  data_venda: noFutureDate("Data da Venda").refine(v => !!v, { message: "Data da Venda obrigatória" }),
   funcionario_id: z.number().nullable(),
   origem_venda_id: z.number().nullable().refine(v => v !== null, { message: "Origem da Venda obrigatória" }),
   recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
   produto_id: z.number().nullable().refine(v => v !== null, { message: "Produto obrigatório" }),
   observacao_negociacao: z.string().nullable(),
-  data_ativacao: z.string().nullable(),
+  data_ativacao: noFutureDate("Data de Ativação"),
   fornecedor_id: z.number().nullable().refine(v => v !== null, { message: "Fornecedor obrigatório" }),
   codigo_fornecedor: z.string().nullable(),
   link_portal_fornecedor: z.string().nullable(),
@@ -77,11 +89,11 @@ const clienteSchema = z.object({
   imposto_percentual: z.number({ invalid_type_error: "Imposto obrigatório" }).min(0).max(100),
   custo_fixo_percentual: z.number({ invalid_type_error: "Custo Fixo obrigatório" }).min(0).max(100),
   cancelado: z.boolean(),
-  data_cancelamento: z.string().nullable(),
+  data_cancelamento: noFutureDate("Data de Cancelamento"),
   motivo_cancelamento_id: z.number().nullable(),
   observacao_cancelamento: z.string().nullable(),
   cert_a1_vencimento: z.string().nullable(),
-  cert_a1_ultima_venda_em: z.string().nullable(),
+  cert_a1_ultima_venda_em: noFutureDate("Data Última Venda Cert. A1"),
   cert_a1_ultimo_vendedor_id: z.number().nullable(),
   contato_nome: z.string().nullable(),
   contato_cpf: z.string().nullable(),
