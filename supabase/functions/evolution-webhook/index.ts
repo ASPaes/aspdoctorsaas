@@ -312,6 +312,30 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
     console.log(`${LOG} Processing message: ${key.id}`);
 
+    // ── Guard: Comandos administrativos ──────────────────────────────────────
+    // Verificar ANTES de qualquer processamento
+    {
+      const ADMIN_PHONE_GUARD = '5549991210660';
+      const _rawJid = data?.key?.remoteJid || '';
+      const _senderNum = _rawJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
+      const _msgText = (
+        data?.message?.conversation ||
+        data?.message?.extendedTextMessage?.text || ''
+      ).trim().toUpperCase();
+      const _isAdminCmd = _senderNum.endsWith(ADMIN_PHONE_GUARD) &&
+        (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE'));
+
+      if (_isAdminCmd) {
+        console.log(`${LOG} Admin command intercepted: ${_msgText} from ${_senderNum}`);
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-admin-commands`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
+          body: JSON.stringify({ senderPhone: ADMIN_PHONE_GUARD, command: _msgText }),
+        }).catch(err => console.error(`${LOG} Admin command error:`, err));
+        return;
+      }
+    }
+
     // Resolver instância
     let { data: instanceData } = await supabase.from('whatsapp_instances')
       .select('id, instance_name, instance_id_external, provider_type, status, tenant_id, skip_ura')
@@ -439,32 +463,6 @@ Deno.serve(async (req) => {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const payload: EvolutionWebhookPayload = await req.json();
     console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
-
-    // ── Guard: Comandos administrativos ───────────────────────────────────────
-    // O número admin envia do próprio celular para o Financeiro.
-    // Na Evolution, remoteJid = número do remetente (admin).
-    const ADMIN_PHONE_GUARD = '5549991210660';
-    const _rawJid = payload?.data?.key?.remoteJid || '';
-    const _senderNum = _rawJid
-      .replace('@s.whatsapp.net', '').replace('@g.us', '').replace(/\D/g, '');
-    const _msgText = (
-      payload?.data?.message?.conversation ||
-      payload?.data?.message?.extendedTextMessage?.text || ''
-    ).trim().toUpperCase();
-    const _isAdminCmd = _senderNum.endsWith(ADMIN_PHONE_GUARD) &&
-      (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE'));
-
-    if (_isAdminCmd) {
-      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/ai-admin-commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
-        body: JSON.stringify({ senderPhone: ADMIN_PHONE_GUARD, command: (_msgText || '').trim() }),
-      }).catch(err => console.error(`${LOG} Admin command error:`, err));
-
-      return new Response(JSON.stringify({ ok: true, handled: 'admin_command' }), {
-        status: 200, headers: { 'Content-Type': 'application/json' },
-      });
-    }
 
     // ── Roteamento de eventos ─────────────────────────────────────────────────
     switch (payload.event) {
