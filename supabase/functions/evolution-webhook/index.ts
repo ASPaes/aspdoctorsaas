@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
+import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -239,8 +240,8 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
       ? instanceData.instance_id_external : instanceData.instance_name;
 
     const { phone } = normalizePhoneNumber(key.remoteJid);
-    const { data: secrets } = await supabase.from('whatsapp_instance_secrets')
-      .select('api_url, api_key').eq('instance_id', resolved.instanceId).single();
+    const secrets = await getInstanceSecrets(supabase, resolved.instanceId);
+    if (!secrets) return;
     if (!secrets) return;
 
     // ── Find or create contact — com variantes de número e vínculo ao cliente ──
@@ -401,9 +402,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       await supabase.from('whatsapp_instances').update({ status: 'connected', updated_at: new Date().toISOString() }).eq('id', instanceData.id);
     }
 
-    const { data: secrets } = await supabase.from('whatsapp_instance_secrets')
-      .select('api_url, api_key').eq('instance_id', instanceData.id).single();
-    if (!secrets) { console.error(`${LOG} No secrets for instance ${instance}`); return; }
+    const secrets = await getInstanceSecrets(supabase, instanceData.id);
+    if (!secrets?.api_url) { console.error(`${LOG} No secrets for instance ${instance}`); return; }
 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     const fromMe = getPayloadIsFromMe(data);
