@@ -12,32 +12,34 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Verificar JWT do usuário chamador
+    // Verificar JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
-    // Cliente autenticado para verificar permissões
-    const supabaseAuth = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    // Usar service_role para tudo (bypassa RLS)
+    const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Verificar se é super_admin
-    const { data: profile } = await supabaseAuth.from('profiles').select('role, tenant_id').eq('user_id', (await supabaseAuth.auth.getUser()).data.user?.id || '').single();
-    
-    const isSuperAdmin = profile?.role === 'super_admin';
+    // Extrair user_id do JWT
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
+    if (userError || !user) return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: corsHeaders });
 
+    // Buscar perfil do usuário
+    const { data: profile } = await supabase.from('profiles')
+      .select('role, tenant_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!profile) return new Response(JSON.stringify({ error: 'Perfil não encontrado' }), { status: 400, headers: corsHeaders });
+
+    const isSuperAdmin = profile.role === 'super_admin';
     const body = await req.json();
     const { target_tenant_id, ...instanceData } = body;
 
-    // Se não é super_admin, só pode criar no próprio tenant
-    const tenantId = isSuperAdmin && target_tenant_id ? target_tenant_id : profile?.tenant_id;
-
+    // Determinar tenant alvo
+    const tenantId = (isSuperAdmin && target_tenant_id) ? target_tenant_id : profile.tenant_id;
     if (!tenantId) return new Response(JSON.stringify({ error: 'tenant_id não encontrado' }), { status: 400, headers: corsHeaders });
-
-    // Usar service_role para bypasear RLS
-    const supabase = createClient(supabaseUrl, serviceKey);
 
     const {
       api_url, api_key, provider_type,
@@ -81,9 +83,12 @@ Deno.serve(async (req) => {
     const { error: secretsError } = await supabase.from('whatsapp_instance_secrets').insert(secretsPayload);
     if (secretsError) throw secretsError;
 
-    // 3. Salvar secrets sensíveis no Vault via upsert-instance-secrets
+    // 3. Salvar secrets sensíveis no Vault
     const vaultPayload: any = { instance_id: instanceResult.id };
-    if (!isMeta && !isZapi) { vaultPayload.api_url = api_url || ''; vaultPayload.api_key = api_key || ''; }
+    if (!isMeta && !isZapi) {
+      if (api_url) vaultPayload.api_url = api_url;
+      if (api_key) vaultPayload.api_key = api_key;
+    }
     if (isMeta) {
       if (meta_access_token) vaultPayload.meta_access_token = meta_access_token;
       if (meta_verify_token) vaultPayload.meta_verify_token = meta_verify_token;
