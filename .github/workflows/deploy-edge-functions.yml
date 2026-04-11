@@ -19,10 +19,142 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy all functions
-        run: |
-          for fn in ai-admin-commands analyze-whatsapp-sentiment categorize-whatsapp-conversation check-ai-usage-alert check-csat-timeout check-instances-status compose-whatsapp-message create-whatsapp-instance delete-whatsapp-message diagnose-contact-history edit-whatsapp-message evolution-webhook finalize-attendance forward-whatsapp-message generate-conversation-summary meta-webhook populate-cidades save-ai-settings send-meta-message send-whatsapp-message suggest-smart-replies test-ai-config test-evolution-connection test-instance-connection transcribe-whatsapp-audio upsert-instance-secrets whatsapp-media-proxy zapi-webhook; do
-            supabase functions deploy $fn --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-          done
+      - name: Deploy ai-admin-commands
+        run: supabase functions deploy ai-admin-commands --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy analyze-whatsapp-sentiment
+        run: supabase functions deploy analyze-whatsapp-sentiment --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy categorize-whatsapp-conversation
+        run: supabase functions deploy categorize-whatsapp-conversation --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy check-ai-usage-alert
+        run: supabase functions deploy check-ai-usage-alert --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy check-csat-timeout
+        run: supabase functions deploy check-csat-timeout --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy check-instances-status
+        run: supabase functions deploy check-instances-status --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy compose-whatsapp-message
+        run: supabase functions deploy compose-whatsapp-message --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy create-whatsapp-instance
+        run: supabase functions deploy create-whatsapp-instance --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy delete-whatsapp-message
+        run: supabase functions deploy delete-whatsapp-message --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy diagnose-contact-history
+        run: supabase functions deploy diagnose-contact-history --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy edit-whatsapp-message
+        run: supabase functions deploy edit-whatsapp-message --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy evolution-webhook
+        run: supabase functions deploy evolution-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy finalize-attendance
+        run: supabase functions deploy finalize-attendance --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy forward-whatsapp-message
+        run: supabase functions deploy forward-whatsapp-message --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy generate-conversation-summary
+        run: supabase functions deploy generate-conversation-summary --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy meta-webhook
+        run: supabase functions deploy meta-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy populate-cidades
+        run: supabase functions deploy populate-cidades --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy save-ai-settings
+        run: supabase functions deploy save-ai-settings --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-meta-message
+        run: supabase functions deploy send-meta-message --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-whatsapp-message
+        run: supabase functions deploy send-whatsapp-message --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy suggest-smart-replies
+        run: supabase functions deploy suggest-smart-replies --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy test-ai-config
+        run: supabase functions deploy test-ai-config --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy test-evolution-connection
+        run: supabase functions deploy test-evolution-connection --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy test-instance-connection
+        run: supabase functions deploy test-instance-connection --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy transcribe-whatsapp-audio
+        run: supabase functions deploy transcribe-whatsapp-audio --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy upsert-instance-secrets
+        run: supabase functions deploy upsert-instance-secrets --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy whatsapp-media-proxy
+        run: supabase functions deploy whatsapp-media-proxy --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy zapi-webhook
+        run: supabase functions deploy zapi-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
