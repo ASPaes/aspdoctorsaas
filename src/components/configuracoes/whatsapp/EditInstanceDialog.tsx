@@ -161,7 +161,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
             <FormField control={form.control} name="display_name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Nome</FormLabel>
-                <FormControl><Input placeholder="Minha Instância" {...field} /></FormControl>
+                <FormControl><Input placeholder="Minha Instância" autoComplete="off" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -169,7 +169,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
             <FormField control={form.control} name="instance_name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Nome da Instância</FormLabel>
-                <FormControl><Input placeholder="my-instance" {...field} /></FormControl>
+                <FormControl><Input placeholder="my-instance" autoComplete="off" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -178,7 +178,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
               <FormField control={form.control} name="instance_id_external" render={({ field }) => (
                 <FormItem>
                   <FormLabel>ID da Instância (UUID)</FormLabel>
-                  <FormControl><Input placeholder="ead6f2f2-7633-4e41-a08d-7272300a6ba1" {...field} /></FormControl>
+                  <FormControl><Input placeholder="ead6f2f2-7633-4e41-a08d-7272300a6ba1" autoComplete="off" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -189,14 +189,14 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                 <FormField control={form.control} name="api_url" render={({ field }) => (
                   <FormItem>
                     <FormLabel>URL da API</FormLabel>
-                    <FormControl><Input placeholder={providerType === 'cloud' ? "https://api.evoapicloud.com" : "https://api.evolution.com"} {...field} /></FormControl>
+                    <FormControl><Input placeholder={providerType === 'cloud' ? "https://api.evoapicloud.com" : "https://api.evolution.com"} autoComplete="off" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="api_key" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{providerType === 'cloud' ? 'Token da Instância' : 'API Key'}</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -208,21 +208,21 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                 <FormField control={form.control} name="zapi_instance_id" render={({ field }) => (
                   <FormItem>
                     <FormLabel>ID da Instância Z-API *</FormLabel>
-                    <FormControl><Input placeholder="ID da instância no painel Z-API" {...field} /></FormControl>
+                    <FormControl><Input placeholder="ID da instância no painel Z-API" autoComplete="off" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="zapi_token" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Token Z-API *</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="zapi_client_token" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Client-Token Z-API (opcional)</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -234,14 +234,14 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                 <FormField control={form.control} name="meta_phone_number_id" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Phone Number ID</FormLabel>
-                    <FormControl><Input placeholder="123456789012345" {...field} /></FormControl>
+                    <FormControl><Input placeholder="123456789012345" autoComplete="off" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="meta_access_token" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Access Token (Permanente)</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -249,7 +249,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                 <FormField control={form.control} name="meta_app_secret" render={({ field }) => (
                   <FormItem>
                     <FormLabel>App Secret</FormLabel>
-                    <FormControl><Input type="password" placeholder="••••••••" {...field} /></FormControl>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
                     <p className="text-xs text-muted-foreground">
                       Encontrado em: Meta for Developers → Seu App → Configurações → App Secret. Usado para validar a autenticidade dos webhooks.
                     </p>
