@@ -25,6 +25,7 @@ function patchConversation(
 export const useWhatsAppActions = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
 
   const archiveMutation = useMutation({
     mutationFn: async (conversationId: string) => {
