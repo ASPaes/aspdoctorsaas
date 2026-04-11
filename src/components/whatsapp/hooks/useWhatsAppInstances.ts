@@ -58,14 +58,16 @@ export const useWhatsAppInstances = () => {
 
       if (instanceError) throw instanceError;
 
-      // Criar linha de metadados em whatsapp_instance_secrets (campos não-sensíveis)
+      // Criar linha de metadados em whatsapp_instance_secrets (campos nÃ£o-sensÃ­veis)
       const metadataPayload: any = {
         instance_id: instanceResult.id,
         api_url: (!isMeta && !isZapi) ? (api_url || '') : '',
         api_key: '',
       };
-      if (isZapi && zapi_instance_id) {
-        metadataPayload.zapi_instance_id = zapi_instance_id;
+      if (isZapi) {
+        if (zapi_instance_id) metadataPayload.zapi_instance_id = zapi_instance_id;
+        if (zapi_token) metadataPayload.zapi_token = zapi_token;
+        if (zapi_client_token) metadataPayload.zapi_client_token = zapi_client_token;
       }
       const { error: metadataError } = await (supabase
         .from('whatsapp_instance_secrets') as any)
@@ -75,7 +77,7 @@ export const useWhatsAppInstances = () => {
         throw metadataError;
       }
 
-      // Salvar campos sensíveis no Vault
+      // Salvar campos sensÃ­veis no Vault
       const { error: secretsError } = await supabase.functions.invoke('upsert-instance-secrets', {
         body: {
           instance_id: instanceResult.id,
