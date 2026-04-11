@@ -51,12 +51,15 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    // --- Guard: block inactive users ---
+
+    // --- Guard: block inactive users (Super Admin bypasses funcionario_id check) ---
     const senderUid = authUser.id;
+    let isSuperAdmin = false;
+
     if (senderUid) {
       const { data: senderProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('access_status, funcionario_id')
+        .select('access_status, funcionario_id, is_super_admin')
         .eq('user_id', senderUid)
         .limit(1)
         .maybeSingle();
@@ -69,26 +72,33 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (senderProfile?.access_status !== 'ativo' && senderProfile?.access_status !== 'active') {
-        console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
-        return new Response(
-          JSON.stringify({ error: 'Seu usuário está inativo e não pode enviar mensagens. Fale com o administrador.' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      isSuperAdmin = senderProfile?.is_super_admin === true;
 
-      if (!senderProfile?.funcionario_id) {
-        console.warn('[send-whatsapp-message] Blocked user without funcionario:', senderUid);
-        return new Response(
-          JSON.stringify({ error: 'Usuário sem funcionário vinculado. Vincule em Acessos & Equipe.' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (!isSuperAdmin) {
+        // Only enforce these guards for non-super-admins
+        if (senderProfile?.access_status !== 'ativo' && senderProfile?.access_status !== 'active') {
+          console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
+          return new Response(
+            JSON.stringify({ error: 'Seu usuário está inativo e não pode enviar mensagens. Fale com o administrador.' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (!senderProfile?.funcionario_id) {
+          console.warn('[send-whatsapp-message] Blocked user without funcionario:', senderUid);
+          return new Response(
+            JSON.stringify({ error: 'Usuário sem funcionário vinculado. Vincule em Acessos & Equipe.' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        console.log('[send-whatsapp-message] Super Admin detected — bypassing funcionario_id guard:', senderUid);
       }
     }
 
     const body: SendMessageRequest = await req.json();
-    console.log('[send-whatsapp-message] Request received:', { 
-      conversationId: body.conversationId, 
+    console.log('[send-whatsapp-message] Request received:', {
+      conversationId: body.conversationId,
       messageType: body.messageType,
       instanceId: body.instanceId || '(auto)',
     });
@@ -127,6 +137,12 @@ Deno.serve(async (req) => {
       // 2) Resolve sender name + role
       (async (): Promise<{ label: string; name: string; role: string | null }> => {
         if (!senderUserId) return { label: '', name: '', role: null };
+
+        // Super Admin: use a display name without requiring funcionario
+        if (isSuperAdmin) {
+          return { label: '*Super Admin*', name: 'Super Admin', role: 'Administrador' };
+        }
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('funcionario_id, tenant_id')
@@ -183,7 +199,7 @@ Deno.serve(async (req) => {
     // For existing conversations, ALWAYS use instance_id (never department default).
     // explicit instanceId override only for special cases (e.g. admin change-instance).
     let sendInstanceId = body.instanceId || conversation.instance_id || null;
-    
+
     if (!sendInstanceId) {
       // Fallback: find the instance of the last received message in this conversation
       const { data: lastMsg } = await supabase
@@ -195,7 +211,7 @@ Deno.serve(async (req) => {
         .order('timestamp', { ascending: false })
         .limit(1)
         .maybeSingle();
-      
+
       sendInstanceId = lastMsg?.instance_id;
     }
 
@@ -309,7 +325,7 @@ Deno.serve(async (req) => {
       prefixedBody.content = signaturePrefix;
     }
 
-    // ── Montar SendRequest para o adapter ─────────────────────────
+    // ── Montar SendRequest para o adapter ───────────────────────────────────────
     const mediaActualUrl = storageSignedUrl || body.mediaUrl || undefined;
     const adapter = getAdapter(providerType);
 
@@ -455,8 +471,8 @@ Deno.serve(async (req) => {
       extractedMediaUrl = evolutionData.message.documentMessage.url;
     }
 
-    const messageContent = body.messageType === 'text' 
-      ? (body.content || '') 
+    const messageContent = body.messageType === 'text'
+      ? (body.content || '')
       : (body.content || `Sent ${body.messageType}`);
 
     const messageTimestamp = new Date().toISOString();
@@ -536,7 +552,6 @@ Deno.serve(async (req) => {
           is_last_message_from_me: persistedIsFromMe,
           updated_at: messageTimestamp,
         };
-
         await supabase
           .from('whatsapp_conversations')
           .update(updateData)
