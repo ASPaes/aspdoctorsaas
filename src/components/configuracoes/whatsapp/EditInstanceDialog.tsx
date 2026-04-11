@@ -52,13 +52,11 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
   const { data: secrets } = useQuery({
     queryKey: ['whatsapp', 'instance-secrets', instance.id],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('whatsapp_instance_secrets') as any)
-        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token, meta_app_secret')
-        .eq('instance_id', instance.id)
-        .single();
+      const { data, error } = await supabase.rpc('get_instance_secrets', {
+        p_instance_id: instance.id,
+      });
       if (error) throw error;
-      return data as {
+      return (data ?? {}) as {
         api_url?: string;
         api_key?: string;
         zapi_instance_id?: string;
