@@ -62,8 +62,7 @@ export const useWhatsAppInstances = () => {
       const metadataPayload: any = {
         instance_id: instanceResult.id,
         api_url: (!isMeta && !isZapi) ? (api_url || '') : '',
-        api_key: '',
-      };
+        };
       if (isZapi) {
         if (zapi_instance_id) metadataPayload.zapi_instance_id = zapi_instance_id;
         if (zapi_token) metadataPayload.zapi_token = zapi_token;
