@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 interface CreateConversationParams {
   instanceId: string;
@@ -12,19 +13,23 @@ interface CreateConversationParams {
 
 export const useCreateConversation = () => {
   const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   return useMutation({
     mutationFn: async (params: CreateConversationParams) => {
-      // Look up existing contact by tenant-scoped phone number
+      if (!tid) {
+        throw new Error('Selecione um tenant antes de criar a conversa');
+      }
+
       const { data: existingContact } = await supabase
         .from('whatsapp_contacts')
         .select('*')
+        .eq('tenant_id', tid)
         .eq('phone_number', params.phoneNumber)
         .maybeSingle();
 
       let contact: any;
       if (existingContact) {
-        // Update name/picture if provided
         const updates: any = {};
         if (params.contactName && params.contactName !== existingContact.phone_number) {
           updates.name = params.contactName;
@@ -33,13 +38,19 @@ export const useCreateConversation = () => {
           updates.profile_picture_url = params.profilePictureUrl;
         }
         if (Object.keys(updates).length > 0) {
-          await supabase.from('whatsapp_contacts').update(updates).eq('id', existingContact.id);
+          const { error: updateError } = await supabase
+            .from('whatsapp_contacts')
+            .update(updates)
+            .eq('id', existingContact.id)
+            .eq('tenant_id', tid);
+          if (updateError) throw updateError;
         }
         contact = existingContact;
       } else {
         const { data: newContact, error: contactError } = await (supabase
           .from('whatsapp_contacts') as any)
           .insert({
+            tenant_id: tid,
             phone_number: params.phoneNumber,
             name: params.contactName,
             profile_picture_url: params.profilePictureUrl,
@@ -51,21 +62,22 @@ export const useCreateConversation = () => {
         contact = newContact;
       }
 
-      // Instance-scoped: find conversation for this specific instance + contact
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('*')
+        .eq('tenant_id', tid)
         .eq('instance_id', params.instanceId)
         .eq('contact_id', contact.id)
         .maybeSingle();
 
       if (existingConv) {
-        // If clienteId provided and not yet linked, update metadata
         if (params.clienteId && !(existingConv.metadata as any)?.cliente_id) {
-          await supabase
+          const { error: updateConversationError } = await supabase
             .from('whatsapp_conversations')
-            .update({ metadata: { ...(existingConv.metadata as any || {}), cliente_id: params.clienteId } })
-            .eq('id', existingConv.id);
+            .update({ metadata: { ...((existingConv.metadata as any) || {}), cliente_id: params.clienteId } })
+            .eq('id', existingConv.id)
+            .eq('tenant_id', tid);
+          if (updateConversationError) throw updateConversationError;
         }
         return { conversation: existingConv, contact };
       }
@@ -73,7 +85,15 @@ export const useCreateConversation = () => {
       const metadata = params.clienteId ? { cliente_id: params.clienteId } : {};
       const { data: conversation, error: convError } = await (supabase
         .from('whatsapp_conversations') as any)
-        .insert({ instance_id: params.instanceId, contact_id: contact.id, status: 'active', unread_count: 0, metadata, department_id: params.departmentId || null })
+        .insert({
+          tenant_id: tid,
+          instance_id: params.instanceId,
+          contact_id: contact.id,
+          status: 'active',
+          unread_count: 0,
+          metadata,
+          department_id: params.departmentId || null,
+        })
         .select()
         .single();
 
