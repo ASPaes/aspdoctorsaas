@@ -47,8 +47,7 @@ export function useDashboardData(filters: DashboardFilters) {
       let clientesQuery = supabase
         .from('vw_clientes_financeiro')
         .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
-        .lte('data_cadastro', periodoFimStr)
-        .or(`data_cancelamento.is.null,data_cancelamento.gt.${periodoFimStr}`);
+        .lte('data_cadastro', periodoFimStr);
 
       if (tid) clientesQuery = clientesQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) clientesQuery = clientesQuery.eq('unidade_base_id', filters.unidadeBaseId);
@@ -60,11 +59,12 @@ export function useDashboardData(filters: DashboardFilters) {
       // 1. cancelado=true sem data_cancelamento → inativo (dado inconsistente)
       // 2. sem data_cancelamento → nunca cancelado, ativo
       // 3. data_cancelamento DEPOIS do fim do período → ainda ativo no período
-      // DB already filters: data_cancelamento IS NULL OR data_cancelamento > periodoFim
-      // JS filter just ensures type safety
+      // Ativo no período = sem data cancelamento OU cancelado depois do fim do período
+      // Trata null, undefined e string vazia como "sem cancelamento"
       const clientesAtivos = (clientesRaw || []).filter(c => {
-        if (!c.data_cancelamento) return true;
-        return new Date(c.data_cancelamento) > new Date(periodoFimStr);
+        const dc = c.data_cancelamento;
+        if (!dc || String(dc).trim() === '') return true;
+        return new Date(String(dc)) > new Date(periodoFimStr);
       });
       const clientesCount = clientesAtivos.length;
       const mrr = clientesAtivos.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
