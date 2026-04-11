@@ -61,8 +61,9 @@ export const useWhatsAppInstances = () => {
       // Criar linha de metadados em whatsapp_instance_secrets (campos nÃ£o-sensÃ­veis)
       const metadataPayload: any = {
         instance_id: instanceResult.id,
-        api_url: (!isMeta && !isZapi) ? (api_url || '') : '',
-        };
+        tenant_id: instanceResult.tenant_id,
+        api_url: (!isMeta && !isZapi) ? (api_url || null) : null,
+      };
       if (isZapi) {
         if (zapi_instance_id) metadataPayload.zapi_instance_id = zapi_instance_id;
         if (zapi_token) metadataPayload.zapi_token = zapi_token;
