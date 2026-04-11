@@ -58,7 +58,7 @@ export const useWhatsAppInstances = () => {
 
       if (instanceError) throw instanceError;
 
-      // Criar linha de metadados em whatsapp_instance_secrets (campos nÃ£o-sensÃ­veis)
+      // Criar linha em whatsapp_instance_secrets
       const metadataPayload: any = {
         instance_id: instanceResult.id,
         tenant_id: instanceResult.tenant_id,
