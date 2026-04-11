@@ -10,7 +10,7 @@ export interface AIConfig {
 
 export async function getAIConfig(
   tenantId: string,
-  supabase: SupabaseClient
+  supabase: any
 ): Promise<AIConfig | null> {
   try {
     const { data, error } = await supabase

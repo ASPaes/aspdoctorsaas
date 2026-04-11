@@ -174,10 +174,10 @@ Deno.serve(async (req) => {
       if (!instance?.tenant_id) { console.warn(`${LOG} No instance for phone_number_id=${phoneNumberId}`); continue; }
 
       // Buscar secrets via Vault RPC
-      const secrets = await getInstanceSecrets(supabase, instance.id);
+      const instanceSecrets = await getInstanceSecrets(supabase, instance.id);
 
-      const accessToken = secrets.meta_access_token || null;
-      const appSecret = secrets.meta_app_secret || null;
+      const accessToken = instanceSecrets.meta_access_token || null;
+      const appSecret = instanceSecrets.meta_app_secret || null;
 
       // ── Validar assinatura X-Hub-Signature-256 ─────────────────────────────
       if (appSecret) {
@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
         tenant_id: instance.tenant_id,
       };
 
-      const secrets: InstanceSecrets = { meta_access_token: accessToken };
+      const msgSecrets: InstanceSecrets = { meta_access_token: accessToken };
 
       // ── Processar mensagens ───────────────────────────────────────────────
       for (const msg of value.messages || []) {
