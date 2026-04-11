@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 /**
  * Helper: optimistically patch a conversation in all sidebar query caches.
@@ -24,6 +25,7 @@ function patchConversation(
 export const useWhatsAppActions = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
 
   const archiveMutation = useMutation({
     mutationFn: async (conversationId: string) => {
@@ -95,20 +97,16 @@ export const useWhatsAppActions = () => {
 
           // Check CSAT config and decide flow
           if (activeAtt.attendance_code) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('tenant_id')
-              .eq('user_id', user?.id)
-              .single();
+              const resolvedTenantId = effectiveTenantId;
 
-            if (profile?.tenant_id) {
+              if (resolvedTenantId) {
               // Check if CSAT is enabled
               let csatEnabled = false;
               try {
                 const { data: config } = await supabase
                   .from('configuracoes')
                   .select('support_csat_enabled, support_csat_prompt_template, support_csat_score_min, support_csat_score_max')
-                  .eq('tenant_id', profile.tenant_id)
+                  .eq('tenant_id', resolvedTenantId)
                   .maybeSingle();
 
                 if (config?.support_csat_enabled && !skipCsat) {
@@ -131,7 +129,7 @@ export const useWhatsAppActions = () => {
 
                   // Create support_csat record
                   await supabase.from('support_csat').insert({
-                    tenant_id: profile.tenant_id,
+                    tenant_id: resolvedTenantId,
                     attendance_id: activeAtt.id,
                     status: 'pending',
                     asked_at: now.toISOString(),
