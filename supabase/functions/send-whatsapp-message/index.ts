@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       if (profileError) {
         console.error('[send-whatsapp-message] Error fetching sender profile:', profileError);
         return new Response(
-          JSON.stringify({ error: 'NÃ£o foi possÃ­vel validar o usuÃ¡rio.' }),
+          JSON.stringify({ error: 'NÃÂ£o foi possÃÂ­vel validar o usuÃÂ¡rio.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
         if (senderProfile?.access_status !== 'ativo' && senderProfile?.access_status !== 'active') {
           console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
           return new Response(
-            JSON.stringify({ error: 'Seu usuÃ¡rio estÃ¡ inativo e nÃ£o pode enviar mensagens. Fale com o administrador.' }),
+            JSON.stringify({ error: 'Seu usuÃÂ¡rio estÃÂ¡ inativo e nÃÂ£o pode enviar mensagens. Fale com o administrador.' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -87,12 +87,12 @@ Deno.serve(async (req) => {
         if (!senderProfile?.funcionario_id) {
           console.warn('[send-whatsapp-message] Blocked user without funcionario:', senderUid);
           return new Response(
-            JSON.stringify({ error: 'UsuÃ¡rio sem funcionÃ¡rio vinculado. Vincule em Acessos & Equipe.' }),
+            JSON.stringify({ error: 'UsuÃÂ¡rio sem funcionÃÂ¡rio vinculado. Vincule em Acessos & Equipe.' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
       } else {
-        console.log('[send-whatsapp-message] Super Admin detected â bypassing funcionario_id guard:', senderUid);
+        console.log('[send-whatsapp-message] Super Admin detected Ã¢ÂÂ bypassing funcionario_id guard:', senderUid);
       }
     }
 
@@ -138,29 +138,9 @@ Deno.serve(async (req) => {
       (async (): Promise<{ label: string; name: string; role: string | null }> => {
         if (!senderUserId) return { label: '', name: '', role: null };
 
-        // Super Admin: use a display name without requiring funcionario
-        if (isSuperAdmin) {
-          // Se está no próprio tenant, usar assinatura normal de funcionário
-          const { data: saProfile } = await supabase
-            .from('profiles')
-            .select('funcionario_id, tenant_id')
-            .eq('user_id', senderUserId)
-            .maybeSingle();
+        // Super Admin: resolved after tenantId is known (see below)
+        if (isSuperAdmin) return { label: '', name: '', role: null };
 
-          if (saProfile?.tenant_id === tenantId && saProfile?.funcionario_id) {
-            const [funcResult, prefResult] = await Promise.all([
-              supabase.from('funcionarios').select('nome, cargo').eq('id', saProfile.funcionario_id).maybeSingle(),
-              supabase.from('user_preferences').select('signature_name').eq('tenant_id', saProfile.tenant_id).eq('user_id', senderUserId).is('department_id', null).maybeSingle(),
-            ]);
-            const func = funcResult.data;
-            if (func?.nome) {
-              const displayName = prefResult.data?.signature_name || func.nome;
-              return { label: `*${displayName}*`, name: displayName, role: func.cargo || null };
-            }
-          }
-          // Tenant diferente (simulando outro tenant) → Super Admin
-          return { label: '*Super Admin*', name: 'Super Admin', role: 'Administrador' };
-        }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -205,6 +185,36 @@ Deno.serve(async (req) => {
 
     const tenantId = conversation.tenant_id;
     const contact = (conversation as any).whatsapp_contacts;
+
+    // --- Super Admin: resolver assinatura agora que tenantId está disponível ---
+    if (isSuperAdmin) {
+      const { data: saProfile } = await supabase
+        .from('profiles')
+        .select('funcionario_id, tenant_id')
+        .eq('user_id', senderUserId)
+        .maybeSingle();
+
+      if (saProfile?.tenant_id === tenantId && saProfile?.funcionario_id) {
+        const [funcResult, prefResult] = await Promise.all([
+          supabase.from('funcionarios').select('nome, cargo').eq('id', saProfile.funcionario_id).maybeSingle(),
+          supabase.from('user_preferences').select('signature_name').eq('tenant_id', saProfile.tenant_id).eq('user_id', senderUserId).is('department_id', null).maybeSingle(),
+        ]);
+        const func = funcResult.data;
+        if (func?.nome) {
+          const displayName = prefResult.data?.signature_name || func.nome;
+          (senderInfo as any).label = `*${displayName}*`;
+          (senderInfo as any).name = displayName;
+          (senderInfo as any).role = func.cargo || null;
+        }
+      }
+      // Se tenant diferente, senderInfo já está com 'Super Admin' vindo do isSuperAdmin guard
+      // mas como retornamos { label: '', name: '', role: null }, precisamos setar aqui
+      if (!senderInfo.name) {
+        (senderInfo as any).label = '*Super Admin*';
+        (senderInfo as any).name = 'Super Admin';
+        (senderInfo as any).role = 'Administrador';
+      }
+    }
 
     if (!tenantId) {
       console.error('[send-whatsapp-message] CRITICAL: tenant_id is null/undefined');
@@ -326,7 +336,7 @@ Deno.serve(async (req) => {
     } else if (sigMode === 'ticket') {
       if (!sigTicketCode && body.messageType === 'text') {
         return new Response(
-          JSON.stringify({ success: false, error: 'CÃ³digo de atendimento nÃ£o definido. Defina o cÃ³digo antes de enviar.' }),
+          JSON.stringify({ success: false, error: 'CÃÂ³digo de atendimento nÃÂ£o definido. Defina o cÃÂ³digo antes de enviar.' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -335,7 +345,7 @@ Deno.serve(async (req) => {
         signatureValue = sigTicketCode;
       }
     }
-    // sigMode === 'none' â no prefix
+    // sigMode === 'none' Ã¢ÂÂ no prefix
 
     const prefixedBody = { ...body };
     if (signaturePrefix && prefixedBody.content) {
@@ -344,7 +354,7 @@ Deno.serve(async (req) => {
       prefixedBody.content = signaturePrefix;
     }
 
-    // ââ Montar SendRequest para o adapter âââââââââââââââââââââââââââââââââââââââ
+    // Ã¢ÂÂÃ¢ÂÂ Montar SendRequest para o adapter Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
     const mediaActualUrl = storageSignedUrl || body.mediaUrl || undefined;
     const adapter = getAdapter(providerType);
 
@@ -368,7 +378,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existingAtt) {
-        // No active attendance â create it now (before sending agent message)
+        // No active attendance Ã¢ÂÂ create it now (before sending agent message)
         const preNow = new Date();
         const preNowIso = preNow.toISOString();
         const contactIdForAtt = contact?.phone_number ? (
@@ -408,8 +418,8 @@ Deno.serve(async (req) => {
           try {
             const contactName = contact?.name || '';
             const openingText = contactName
-              ? `OlÃ¡ ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
-              : `OlÃ¡, o atendimento ${newAtt.attendance_code} foi iniciado.`;
+              ? `OlÃÂ¡ ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
+              : `OlÃÂ¡, o atendimento ${newAtt.attendance_code} foi iniciado.`;
             const destNumber = getDestinationNumber(contact.phone_number);
 
             const openResult = await adapter.send(secrets, instanceData, {
@@ -424,7 +434,7 @@ Deno.serve(async (req) => {
               conversation_id: body.conversationId,
               remote_jid: contact.phone_number,
               message_id: openMsgId,
-              content: `â Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
+              content: `Ã¢ÂÂ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
               message_type: 'system',
               is_from_me: true,
               status: 'sent',
@@ -623,7 +633,7 @@ Deno.serve(async (req) => {
           // Should not happen if pre-creation worked, but handle edge case
           console.warn('[send-whatsapp-message] No active attendance found post-send (pre-creation may have failed)');
         } else {
-          // Active attendance exists â increment and auto-assign
+          // Active attendance exists Ã¢ÂÂ increment and auto-assign
           const update: Record<string, any> = {
             msg_agent_count: (activeAtt.msg_agent_count || 0) + 1,
             last_operator_message_at: nowIso,
@@ -631,7 +641,7 @@ Deno.serve(async (req) => {
           };
 
           // If status is 'waiting', ALWAYS transition to 'in_progress' when operator sends a message
-          // The act of sending IS "assuming" â no need to click "Assumir"
+          // The act of sending IS "assuming" Ã¢ÂÂ no need to click "Assumir"
           if (activeAtt.status === 'waiting') {
             update.status = 'in_progress';
             update.assigned_to = senderUserId;
@@ -657,14 +667,14 @@ Deno.serve(async (req) => {
             console.error('[send-whatsapp-message] Error updating attendance:', updateErr);
           } else {
             if (update.assigned_to || update.status) {
-              console.log(`[send-whatsapp-message] â Attendance ${activeAtt.id} -> status=${update.status || activeAtt.status}, assigned_to=${update.assigned_to || activeAtt.assigned_to}`);
+              console.log(`[send-whatsapp-message] Ã¢ÂÂ Attendance ${activeAtt.id} -> status=${update.status || activeAtt.status}, assigned_to=${update.assigned_to || activeAtt.assigned_to}`);
               // Sync assigned_to on conversation too
               await supabase
                 .from('whatsapp_conversations')
                 .update({ assigned_to: update.assigned_to || activeAtt.assigned_to, status: 'active', updated_at: nowIso })
                 .eq('id', body.conversationId);
             }
-            console.log(`[send-whatsapp-message] â msg_agent_count incremented on ${activeAtt.id}`);
+            console.log(`[send-whatsapp-message] Ã¢ÂÂ msg_agent_count incremented on ${activeAtt.id}`);
           }
         }
       } catch (err) {
