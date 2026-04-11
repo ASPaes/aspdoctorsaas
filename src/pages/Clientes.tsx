@@ -213,7 +213,10 @@ export default function Clientes() {
         .gte("data_venda", firstDay)
         .lte("data_venda", lastDay);
     } else {
-      if (status === "ativos") q = q.eq("cancelado", false);
+      if (status === "ativos") {
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+        q = q.eq("cancelado", false).or(`data_cancelamento.is.null,data_cancelamento.gt.${todayStr}`);
+      }
       else if (status === "cancelados") q = q.eq("cancelado", true);
     }
 
@@ -345,7 +348,8 @@ export default function Clientes() {
         .from("vw_clientes_financeiro")
         .select("id", { count: "exact", head: true })) as any;
 
-      q = q.eq("cancelado", false)
+      const todayForCounter = format(new Date(), "yyyy-MM-dd");
+      q = q.eq("cancelado", false).or(`data_cancelamento.is.null,data_cancelamento.gt.${todayForCounter}`)
         .gte("data_venda", firstDay)
         .lte("data_venda", lastDay);
 
@@ -401,7 +405,10 @@ export default function Clientes() {
       const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id, telefone_whatsapp, telefone_contato";
       let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
-      if (status === "ativos") q = q.eq("cancelado", false);
+      if (status === "ativos") {
+        const todayStrList = format(new Date(), "yyyy-MM-dd");
+        q = q.eq("cancelado", false).or(`data_cancelamento.is.null,data_cancelamento.gt.${todayStrList}`);
+      }
       else if (status === "cancelados") q = q.eq("cancelado", true);
 
       if (debouncedSearch) {
