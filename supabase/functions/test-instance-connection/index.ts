@@ -50,8 +50,8 @@ Deno.serve(async (req) => {
     const { instanceId } = await req.json();
     console.log('[test-instance-connection] Testing instance:', instanceId);
 
-    // Fetch instance + secrets in parallel
-    const [instanceResult, secretsResult] = await Promise.all([
+    // Fetch instance + secrets table + vault refs in parallel
+    const [instanceResult, secretsResult, vaultRefsResult] = await Promise.all([
       supabaseAdmin
         .from('whatsapp_instances')
         .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id')
@@ -59,9 +59,13 @@ Deno.serve(async (req) => {
         .single(),
       supabaseAdmin
         .from('whatsapp_instance_secrets')
-        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token')
+        .select('api_url, zapi_instance_id, zapi_token, zapi_client_token')
         .eq('instance_id', instanceId)
-        .single(),
+        .maybeSingle(),
+      supabaseAdmin
+        .from('whatsapp_instance_vault_refs')
+        .select('secret_name, vault_secret_id')
+        .eq('instance_id', instanceId),
     ]);
 
     if (instanceResult.error || !instanceResult.data) {
@@ -69,14 +73,37 @@ Deno.serve(async (req) => {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    if (secretsResult.error || !secretsResult.data) {
+
+    // Build secrets object from table + vault
+    const tableSecrets = secretsResult.data || {};
+    const secrets: Record<string, any> = { ...tableSecrets };
+
+    // Resolve vault secrets for sensitive fields (api_key, meta_access_token, etc.)
+    if (vaultRefsResult.data && vaultRefsResult.data.length > 0) {
+      for (const ref of vaultRefsResult.data) {
+        // Only fetch from vault if not already in table secrets
+        if (!secrets[ref.secret_name]) {
+          try {
+            const { data: decrypted } = await supabaseAdmin
+              .from('vault.decrypted_secrets' as any)
+              .select('decrypted_secret')
+              .eq('id', ref.vault_secret_id)
+              .single();
+            if (decrypted?.decrypted_secret) secrets[ref.secret_name] = decrypted.decrypted_secret;
+          } catch (_e) {
+            // Vault read failed, skip
+          }
+        }
+      }
+    }
+
+    if (!secretsResult.data && (!vaultRefsResult.data || vaultRefsResult.data.length === 0)) {
       return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const instance = instanceResult.data as any;
-    const secrets = secretsResult.data as any;
     const providerType = instance.provider_type || 'self_hosted';
 
     console.log('[test-instance-connection] Provider:', providerType, 'Instance:', instance.instance_name);
