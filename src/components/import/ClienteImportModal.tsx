@@ -241,6 +241,25 @@ function validateRow(values: Record<string, string>): string[] {
     errors.push(`Recorrência inválida: "${rec}". Use: ${RECORRENCIA_VALIDA.join(", ")}`);
   }
 
+  // Validar datas: não aceitar datas futuras (maiores que hoje)
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const DATE_FIELDS: { field: string; label: string }[] = [
+    { field: 'data_cadastro', label: 'Data de Cadastro' },
+    { field: 'data_venda',    label: 'Data da Venda' },
+    { field: 'data_ativacao', label: 'Data de Ativação' },
+  ];
+  for (const { field, label } of DATE_FIELDS) {
+    const raw = (values[field] ?? "").trim();
+    if (!raw) continue;
+    const parsed = new Date(raw);
+    if (isNaN(parsed.getTime())) {
+      errors.push(`${label}: data inválida "${raw}"`);
+    } else if (parsed > today) {
+      errors.push(`${label}: data futura não permitida (${raw})`);
+    }
+  }
+
   return errors;
 }
 
