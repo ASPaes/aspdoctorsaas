@@ -43,7 +43,7 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/problem+json" } }
       );
     }
-    console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${claimsData.claims.sub}`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${user.id}`);
 
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 

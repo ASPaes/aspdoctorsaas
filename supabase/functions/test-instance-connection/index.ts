@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('is_super_admin, role')
