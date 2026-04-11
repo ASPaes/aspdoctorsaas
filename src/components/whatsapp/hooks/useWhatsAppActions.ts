@@ -97,13 +97,9 @@ export const useWhatsAppActions = () => {
 
           // Check CSAT config and decide flow
           if (activeAtt.attendance_code) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('tenant_id')
-              .eq('user_id', user?.id)
-              .single();
+              const resolvedTenantId = effectiveTenantId;
 
-            if (profile?.tenant_id) {
+              if (resolvedTenantId) {
               // Check if CSAT is enabled
               let csatEnabled = false;
               try {
