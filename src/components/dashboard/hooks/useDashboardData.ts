@@ -47,7 +47,9 @@ export function useDashboardData(filters: DashboardFilters) {
       let clientesQuery = supabase
         .from('vw_clientes_financeiro')
         .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
-        .lte('data_cadastro', periodoFimStr);
+        .lte('data_cadastro', periodoFimStr)
+        .or(`data_cancelamento.is.null,data_cancelamento.gt.${periodoFimStr}`)
+        .limit(10000);
 
       if (tid) clientesQuery = clientesQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) clientesQuery = clientesQuery.eq('unidade_base_id', filters.unidadeBaseId);
