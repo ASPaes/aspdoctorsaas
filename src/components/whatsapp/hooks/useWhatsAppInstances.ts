@@ -33,74 +33,16 @@ export const useWhatsAppInstances = () => {
 
   const createInstance = useMutation({
     mutationFn: async (instance: any) => {
-      const {
-        api_url, api_key,
-        provider_type,
-        instance_id_external,
-        meta_phone_number_id, meta_access_token, meta_verify_token, meta_app_secret,
-        zapi_instance_id, zapi_token, zapi_client_token,
-        ...instanceData
-      } = instance;
-
-      const isMeta = provider_type === 'meta_cloud';
-      const isZapi = provider_type === 'zapi';
-
-      const { data: instanceResult, error: instanceError } = await (supabase
-        .from('whatsapp_instances') as any)
-        .insert({
-          ...instanceData,
-          provider_type: provider_type || 'self_hosted',
-          instance_id_external: instance_id_external || null,
-          ...(isMeta && meta_phone_number_id ? { meta_phone_number_id } : {}),
-        })
-        .select()
-        .single();
-
-      if (instanceError) throw instanceError;
-
-      // Criar linha em whatsapp_instance_secrets
-      const metadataPayload: any = {
-        instance_id: instanceResult.id,
-        tenant_id: instanceResult.tenant_id,
-        api_url: (!isMeta && !isZapi) ? (api_url || null) : null,
-      };
-      if (isZapi) {
-        if (zapi_instance_id) metadataPayload.zapi_instance_id = zapi_instance_id;
-        if (zapi_token) metadataPayload.zapi_token = zapi_token;
-        if (zapi_client_token) metadataPayload.zapi_client_token = zapi_client_token;
-      }
-      const { error: metadataError } = await (supabase
-        .from('whatsapp_instance_secrets') as any)
-        .insert(metadataPayload);
-      if (metadataError) {
-        console.error('Metadata error:', metadataError);
-        throw metadataError;
-      }
-
-      // Salvar campos sensÃ­veis no Vault
-      const { error: secretsError } = await supabase.functions.invoke('upsert-instance-secrets', {
+      // Edge Function: suporta criação em qualquer tenant (super_admin via target_tenant_id)
+      const { data: result, error } = await supabase.functions.invoke('create-whatsapp-instance', {
         body: {
-          instance_id: instanceResult.id,
-          api_url: api_url || '',
-          api_key: api_key || '',
-          ...(isMeta && {
-            meta_access_token: meta_access_token || null,
-            meta_verify_token: meta_verify_token || null,
-            meta_app_secret: meta_app_secret || null,
-          }),
-          ...(isZapi && {
-            zapi_instance_id: zapi_instance_id || null,
-            zapi_token: zapi_token || null,
-            zapi_client_token: zapi_client_token || null,
-          }),
+          ...instance,
+          target_tenant_id: tid || undefined,
         },
       });
-      if (secretsError) {
-        console.error('Secrets error:', secretsError);
-        throw secretsError;
-      }
-
-      return instanceResult;
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
