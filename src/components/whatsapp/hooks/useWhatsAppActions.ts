@@ -106,7 +106,7 @@ export const useWhatsAppActions = () => {
                 const { data: config } = await supabase
                   .from('configuracoes')
                   .select('support_csat_enabled, support_csat_prompt_template, support_csat_score_min, support_csat_score_max')
-                  .eq('tenant_id', profile.tenant_id)
+                  .eq('tenant_id', resolvedTenantId)
                   .maybeSingle();
 
                 if (config?.support_csat_enabled && !skipCsat) {
@@ -129,7 +129,7 @@ export const useWhatsAppActions = () => {
 
                   // Create support_csat record
                   await supabase.from('support_csat').insert({
-                    tenant_id: profile.tenant_id,
+                    tenant_id: resolvedTenantId,
                     attendance_id: activeAtt.id,
                     status: 'pending',
                     asked_at: now.toISOString(),
