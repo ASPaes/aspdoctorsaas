@@ -81,13 +81,18 @@ Deno.serve(async (req) => {
     // Resolve vault secrets for sensitive fields (api_key, meta_access_token, etc.)
     if (vaultRefsResult.data && vaultRefsResult.data.length > 0) {
       for (const ref of vaultRefsResult.data) {
-        try {
-          const { data: decrypted } = await supabaseAdmin.rpc('vault_read_secret', {
-            p_id: ref.vault_secret_id,
-          });
-          if (decrypted) secrets[ref.secret_name] = decrypted;
-        } catch (_e) {
-          // Vault read failed, skip this secret
+        // Only fetch from vault if not already in table secrets
+        if (!secrets[ref.secret_name]) {
+          try {
+            const { data: decrypted } = await supabaseAdmin
+              .from('vault.decrypted_secrets' as any)
+              .select('decrypted_secret')
+              .eq('id', ref.vault_secret_id)
+              .single();
+            if (decrypted?.decrypted_secret) secrets[ref.secret_name] = decrypted.decrypted_secret;
+          } catch (_e) {
+            // Vault read failed, skip
+          }
         }
       }
     }
@@ -99,7 +104,6 @@ Deno.serve(async (req) => {
     }
 
     const instance = instanceResult.data as any;
-    const providerType = instance.provider_type || 'self_hosted';
     const providerType = instance.provider_type || 'self_hosted';
 
     console.log('[test-instance-connection] Provider:', providerType, 'Instance:', instance.instance_name);
