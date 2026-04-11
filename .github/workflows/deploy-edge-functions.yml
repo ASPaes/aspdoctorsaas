@@ -19,17 +19,10 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy evolution-webhook
-        run: supabase functions deploy evolution-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Deploy check-csat-timeout
-        run: supabase functions deploy check-csat-timeout --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Deploy check-instances-status
-        run: supabase functions deploy check-instances-status --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+      - name: Deploy all functions
+        run: |
+          for fn in ai-admin-commands analyze-whatsapp-sentiment categorize-whatsapp-conversation check-ai-usage-alert check-csat-timeout check-instances-status compose-whatsapp-message create-whatsapp-instance delete-whatsapp-message diagnose-contact-history edit-whatsapp-message evolution-webhook finalize-attendance forward-whatsapp-message generate-conversation-summary meta-webhook populate-cidades save-ai-settings send-meta-message send-whatsapp-message suggest-smart-replies test-ai-config test-evolution-connection test-instance-connection transcribe-whatsapp-audio upsert-instance-secrets whatsapp-media-proxy zapi-webhook; do
+            supabase functions deploy $fn --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          done
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
