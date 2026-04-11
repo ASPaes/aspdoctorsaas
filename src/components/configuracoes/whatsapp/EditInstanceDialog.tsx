@@ -96,16 +96,27 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       instance_name: instance.instance_name,
       instance_id_external: instance.instance_id_external || '',
       provider_type: (instance.provider_type as FormValues['provider_type']) || 'self_hosted',
-      api_url: secrets?.api_url || '',
-      api_key: secrets?.api_key || '',
-      zapi_instance_id: secrets?.zapi_instance_id || '',
-      zapi_token: secrets?.zapi_token || '',
-      zapi_client_token: secrets?.zapi_client_token || '',
+      api_url: '',
+      api_key: '',
+      zapi_instance_id: '',
+      zapi_token: '',
+      zapi_client_token: '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
-      meta_access_token: secrets?.meta_access_token || '',
-      meta_app_secret: secrets?.meta_app_secret || '',
+      meta_access_token: '',
+      meta_app_secret: '',
     });
-  }, [instance, secrets, form]);
+  }, [instance]);
+
+  useEffect(() => {
+    if (!secrets) return;
+    form.setValue('api_url', secrets.api_url || '');
+    form.setValue('api_key', secrets.api_key || '');
+    form.setValue('zapi_instance_id', secrets.zapi_instance_id || '');
+    form.setValue('zapi_token', secrets.zapi_token || '');
+    form.setValue('zapi_client_token', secrets.zapi_client_token || '');
+    form.setValue('meta_access_token', secrets.meta_access_token || '');
+    form.setValue('meta_app_secret', secrets.meta_app_secret || '');
+  }, [secrets]);
 
   const onSubmit = async (values: FormValues) => {
     try {
