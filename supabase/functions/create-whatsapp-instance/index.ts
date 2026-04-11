@@ -111,9 +111,10 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (err) {
-    console.error('[create-whatsapp-instance]', err);
-    return new Response(JSON.stringify({ error: String(err) }), {
+  } catch (err: any) {
+    const msg = err?.message || err?.details || (typeof err === 'string' ? err : JSON.stringify(err));
+    console.error('[create-whatsapp-instance]', msg, err);
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
