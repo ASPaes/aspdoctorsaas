@@ -35,15 +35,15 @@ serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims) {
-      console.error(`[${FUNCTION_NAME}][${requestId}] Auth error:`, claimsErr?.message);
+    const { data: { user }, error: userErr } = await anonClient.auth.getUser(token);
+    if (userErr || !user) {
+      console.error(`[${FUNCTION_NAME}][${requestId}] Auth error:`, userErr?.message);
       return new Response(
         JSON.stringify({ type: "about:blank", title: "Unauthorized", status: 401, detail: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/problem+json" } }
       );
     }
-    console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${claimsData.claims.sub}`);
+    console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${user.id}`);
 
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 

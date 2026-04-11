@@ -16,6 +16,7 @@ export interface InstanceSecrets {
   zapi_token?: string | null;
   zapi_client_token?: string | null;
   meta_access_token?: string | null;
+  meta_app_secret?: string | null;
 }
 
 export interface InstanceInfo {

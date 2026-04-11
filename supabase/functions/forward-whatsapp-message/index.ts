@@ -30,13 +30,13 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user: authUser }, error: claimsError } = await anonClient.auth.getUser(token);
+    if (claimsError || !authUser) {
       return new Response(JSON.stringify({ type: 'about:blank', title: 'Unauthorized', status: 401, detail: 'Invalid token' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/problem+json' },
       });
     }
-    const userId = (claimsData.claims as any).sub as string;
+    const userId = authUser.id;
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,

@@ -431,7 +431,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         mediaMimetype = mediaMessage.mimetype;
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
         mediaStoragePath = await downloadAndUploadMedia(
-          secrets.api_url, secrets.api_key, evolutionInstanceId,
+          secrets.api_url || '', secrets.api_key || '', evolutionInstanceId,
           key, supabase, mediaMimetype, instanceData.provider_type || 'self_hosted'
         );
       }
@@ -533,7 +533,7 @@ Deno.serve(async (req) => {
               media_mimetype: null, media_filename: null, media_ext: null, media_kind: null, delete_error: null,
             }).eq('tenant_id', resolved.tenantId).eq('message_id', deletedKeyId)
               .select('id, conversation_id');
-            if (delRows?.length > 0) await refreshConversationPreviewAfterRevoke(supabase, delRows[0].conversation_id);
+            if ((delRows?.length ?? 0) > 0) await refreshConversationPreviewAfterRevoke(supabase, delRows![0].conversation_id);
           }
         }
         break;

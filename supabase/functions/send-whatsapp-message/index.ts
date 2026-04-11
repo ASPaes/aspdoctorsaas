@@ -38,21 +38,21 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Verify user via getClaims
+    // Verify user via getUser
     const anonClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } }
     );
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user: authUser }, error: claimsError } = await anonClient.auth.getUser(token);
+    if (claimsError || !authUser) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
     // --- Guard: block inactive users ---
-    const senderUid = (claimsData.claims as any).sub as string | undefined;
+    const senderUid = authUser.id;
     if (senderUid) {
       const { data: senderProfile, error: profileError } = await supabase
         .from('profiles')
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     }
 
     // --- PARALLELIZED: conversation fetch + sender resolution ---
-    const senderUserId = (claimsData.claims as any).sub as string | undefined;
+    const senderUserId = authUser.id;
 
     const [convResult, senderInfo] = await Promise.all([
       // 1) Fetch conversation with contact info

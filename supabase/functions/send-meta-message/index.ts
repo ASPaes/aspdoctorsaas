@@ -69,14 +69,14 @@ Deno.serve(async (req) => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user: authUser }, error: claimsError } = await anonClient.auth.getUser(token);
+    if (claimsError || !authUser) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const senderUserId = (claimsData.claims as any).sub as string | undefined;
+    const senderUserId = authUser.id;
 
     const body: SendMetaRequest = await req.json();
     console.log(`${LOG} Request:`, { conversationId: body.conversationId, messageType: body.messageType, instanceId: body.instanceId });

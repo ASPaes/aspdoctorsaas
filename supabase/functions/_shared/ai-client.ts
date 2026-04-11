@@ -1,4 +1,4 @@
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+// AI Client shared utilities
 
 export interface AIConfig {
   apiKey: string;
@@ -10,7 +10,7 @@ export interface AIConfig {
 
 export async function getAIConfig(
   tenantId: string,
-  supabase: SupabaseClient
+  supabase: any
 ): Promise<AIConfig | null> {
   try {
     const { data, error } = await supabase
