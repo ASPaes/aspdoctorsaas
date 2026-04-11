@@ -55,9 +55,13 @@ export function useDashboardData(filters: DashboardFilters) {
 
       const { data: clientesRaw } = await clientesQuery;
       // Cliente é "ativo no fim do período" se: não cancelado, OU cancelado DEPOIS do fim do período
+      // Cliente é "ativo no fim do período" se:
+      // 1. cancelado=true sem data_cancelamento → inativo (dado inconsistente)
+      // 2. sem data_cancelamento → nunca cancelado, ativo
+      // 3. data_cancelamento DEPOIS do fim do período → ainda ativo no período
       const clientesAtivos = (clientesRaw || []).filter(c => {
-        if (!c.data_cancelamento) return true; // never cancelled
-        // Was cancelled — only count as active if cancellation is after period end
+        if (c.cancelado && !c.data_cancelamento) return false;
+        if (!c.data_cancelamento) return true;
         return new Date(c.data_cancelamento) > new Date(periodoFimStr);
       });
       const clientesCount = clientesAtivos.length;
