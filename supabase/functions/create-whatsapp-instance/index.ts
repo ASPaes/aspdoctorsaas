@@ -27,13 +27,13 @@ Deno.serve(async (req) => {
 
     // Buscar perfil do usuário
     const { data: profile } = await supabase.from('profiles')
-      .select('role, tenant_id')
+      .select('role, is_super_admin, tenant_id')
       .eq('user_id', user.id)
       .single();
 
     if (!profile) return new Response(JSON.stringify({ error: 'Perfil não encontrado' }), { status: 400, headers: corsHeaders });
 
-    const isSuperAdmin = profile.role === 'super_admin';
+    const isSuperAdmin = profile.is_super_admin === true;
     const body = await req.json();
     const { target_tenant_id, ...instanceData } = body;
 
