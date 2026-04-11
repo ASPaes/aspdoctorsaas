@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     }
 
     const instance = instanceResult.data as any;
-    const secrets = secretsResult.data as any;
+    const providerType = instance.provider_type || 'self_hosted';
     const providerType = instance.provider_type || 'self_hosted';
 
     console.log('[test-instance-connection] Provider:', providerType, 'Instance:', instance.instance_name);
