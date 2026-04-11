@@ -1,4 +1,4 @@
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+// AI Client shared utilities
 
 export interface AIConfig {
   apiKey: string;

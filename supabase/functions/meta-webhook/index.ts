@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
           tenantId: instance.tenant_id,
           providerType: 'meta_cloud',
           instanceInfo,
-          secrets,
+          secrets: msgSecrets,
           messageId: msg.id,
           remoteJid: `${normalizedPhone}@s.whatsapp.net`,
           fromMe: false,
