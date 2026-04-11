@@ -3204,7 +3204,9 @@ export type Database = {
           instance_id: string
           tenant_id: string
           updated_at: string
+          zapi_client_token: string | null
           zapi_instance_id: string | null
+          zapi_token: string | null
         }
         Insert: {
           api_url?: string | null
@@ -3213,7 +3215,9 @@ export type Database = {
           instance_id: string
           tenant_id: string
           updated_at?: string
+          zapi_client_token?: string | null
           zapi_instance_id?: string | null
+          zapi_token?: string | null
         }
         Update: {
           api_url?: string | null
@@ -3222,7 +3226,9 @@ export type Database = {
           instance_id?: string
           tenant_id?: string
           updated_at?: string
+          zapi_client_token?: string | null
           zapi_instance_id?: string | null
+          zapi_token?: string | null
         }
         Relationships: [
           {
