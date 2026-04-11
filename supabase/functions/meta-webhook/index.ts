@@ -10,7 +10,7 @@ const corsHeaders = {
 
 const LOG = '[meta-webhook]';
 
-// ââ ValidaÃ§Ã£o de assinatura X-Hub-Signature-256 âââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ ValidaÃÂ§ÃÂ£o de assinatura X-Hub-Signature-256 Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 async function verifyMetaSignature(rawBody: string, signatureHeader: string | null, appSecret: string): Promise<boolean> {
   if (!signatureHeader) return false;
   const expected = signatureHeader.replace('sha256=', '');
@@ -21,7 +21,7 @@ async function verifyMetaSignature(rawBody: string, signatureHeader: string | nu
   return computed === expected;
 }
 
-// ââ Phone normalization âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Phone normalization Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function normalizePhone(raw: string): string {
   let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
   if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith('55')) digits = '55' + digits;
@@ -31,7 +31,7 @@ function normalizePhone(raw: string): string {
   return digits;
 }
 
-// ââ Map Meta message type âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Map Meta message type Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function mapMessageType(msg: any): NormalizedInboundMessage['messageType'] {
   if (!msg) return 'text';
   const t = msg.type;
@@ -45,23 +45,23 @@ function mapMessageType(msg: any): NormalizedInboundMessage['messageType'] {
   return 'text';
 }
 
-// ââ Extract text content ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Extract text content Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function extractContent(msg: any): string {
   if (!msg) return '';
   const t = msg.type;
   if (t === 'text') return msg.text?.body || '';
-  if (t === 'image') return msg.image?.caption || 'ð· Imagem';
-  if (t === 'video') return msg.video?.caption || 'ð¥ VÃ­deo';
-  if (t === 'audio') return 'ðµ Ãudio';
-  if (t === 'document') return msg.document?.caption || `ð ${msg.document?.filename || 'Documento'}`;
-  if (t === 'sticker') return 'ð¨ Sticker';
-  if (t === 'contacts') { const c = msg.contacts?.length || 0; return `ð ${c} contato${c !== 1 ? 's' : ''}`; }
-  if (t === 'location') return `ð LocalizaÃ§Ã£o: ${msg.location?.latitude},${msg.location?.longitude}`;
+  if (t === 'image') return msg.image?.caption || 'Ã°ÂÂÂ· Imagem';
+  if (t === 'video') return msg.video?.caption || 'Ã°ÂÂÂ¥ VÃÂ­deo';
+  if (t === 'audio') return 'Ã°ÂÂÂµ ÃÂudio';
+  if (t === 'document') return msg.document?.caption || `Ã°ÂÂÂ ${msg.document?.filename || 'Documento'}`;
+  if (t === 'sticker') return 'Ã°ÂÂÂ¨ Sticker';
+  if (t === 'contacts') { const c = msg.contacts?.length || 0; return `Ã°ÂÂÂ ${c} contato${c !== 1 ? 's' : ''}`; }
+  if (t === 'location') return `Ã°ÂÂÂ LocalizaÃÂ§ÃÂ£o: ${msg.location?.latitude},${msg.location?.longitude}`;
   if (t === 'reaction') return msg.reaction?.emoji || '';
   return '';
 }
 
-// ââ Extract media metadata ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Extract media metadata Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 function extractMediaMeta(msg: any): { mediaId: string | null; mimetype: string | null; filename: string | null } {
   if (!msg) return { mediaId: null, mimetype: null, filename: null };
   const t = msg.type;
@@ -71,7 +71,7 @@ function extractMediaMeta(msg: any): { mediaId: string | null; mimetype: string 
   return { mediaId: media.id || null, mimetype: media.mime_type || null, filename: media.filename || null };
 }
 
-// ââ Download media from Meta Graph API â Supabase Storage ââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Download media from Meta Graph API Ã¢ÂÂ Supabase Storage Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 async function downloadAndUploadMetaMedia(
   supabase: any, accessToken: string, mediaId: string, mimetype: string,
   tenantId: string, instanceId: string, conversationId: string, filename: string | null,
@@ -102,7 +102,7 @@ async function downloadAndUploadMetaMedia(
   }
 }
 
-// ââ Process status updates ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Process status updates Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 async function processStatus(supabase: any, tenantId: string, status: any): Promise<void> {
   const { id: messageId, status: statusValue } = status;
   if (!messageId || !statusValue) return;
@@ -113,11 +113,11 @@ async function processStatus(supabase: any, tenantId: string, status: any): Prom
   console.log(`${LOG} Status updated: ${messageId} -> ${statusValue}`);
 }
 
-// ââ Main handler ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Main handler Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders, status: 204 });
 
-  // ââ GET: Webhook verification handshake ââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ GET: Webhook verification handshake Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   if (req.method === 'GET') {
     const url = new URL(req.url);
     const mode = url.searchParams.get('hub.mode');
@@ -130,25 +130,28 @@ Deno.serve(async (req) => {
     }
 
     const supabaseVerify = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    // Buscar instância pelo meta_verify_token no Vault
-    const { data: vaultSecrets } = await supabaseVerify
-      .schema('vault')
-      .from('decrypted_secrets')
-      .select('name, decrypted_secret')
-      .like('name', '%_meta_verify_token')
-      .eq('decrypted_secret', token);
+    // Buscar instÃ¢ncia pelo meta_verify_token no Vault
+    // Buscar instância pelo meta_verify_token — iterar instâncias meta_cloud e comparar via Vault
+    const { data: metaInstances } = await supabaseVerify
+      .from('whatsapp_instances')
+      .select('id')
+      .eq('provider_type', 'meta_cloud');
 
     let verifyInstanceId: string | null = null;
-    if (vaultSecrets && vaultSecrets.length > 0) {
-      // Extrair instance_id do nome do secret: instance_{uuid}_meta_verify_token
-      const secretName = vaultSecrets[0].name;
-      const match = secretName.match(/^instance_([a-f0-9-]+)_meta_verify_token$/);
-      if (match) verifyInstanceId = match[1];
+    for (const inst of (metaInstances || [])) {
+      const { data: secretData } = await supabaseVerify
+        .rpc('get_instance_secrets', { p_instance_id: inst.id });
+      if (secretData?.meta_verify_token === token) {
+        verifyInstanceId = inst.id;
+        break;
+      }
     }
 
     if (verifyInstanceId) {
       console.log(`${LOG} Verification OK instance_id=${verifyInstanceId}`);
       return new Response(challenge, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+    }
+
     }
 
     console.warn(`${LOG} Verification FAILED: no matching verify_token`);
@@ -157,7 +160,7 @@ Deno.serve(async (req) => {
 
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
-  // Ler raw body para validaÃ§Ã£o de assinatura ANTES de parsear
+  // Ler raw body para validaÃÂ§ÃÂ£o de assinatura ANTES de parsear
   const rawBody = await req.text();
   let body: any;
   try { body = JSON.parse(rawBody); } catch { return new Response('Bad Request', { status: 400 }); }
@@ -177,7 +180,7 @@ Deno.serve(async (req) => {
       const phoneNumberId = value.metadata?.phone_number_id;
       if (!phoneNumberId) { console.warn(`${LOG} Missing phone_number_id`); continue; }
 
-      // Resolver instÃ¢ncia
+      // Resolver instÃÂ¢ncia
       const { data: instance } = await supabase
         .from('whatsapp_instances')
         .select('id, tenant_id, instance_name, provider_type, instance_id_external, meta_phone_number_id, skip_ura')
@@ -191,7 +194,7 @@ Deno.serve(async (req) => {
       const accessToken = instanceSecrets.meta_access_token || null;
       const appSecret = instanceSecrets.meta_app_secret || null;
 
-      // ââ Validar assinatura X-Hub-Signature-256 âââââââââââââââââââââââââââââ
+      // Ã¢ÂÂÃ¢ÂÂ Validar assinatura X-Hub-Signature-256 Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
       if (appSecret) {
         const signatureHeader = req.headers.get('X-Hub-Signature-256');
         const isValid = await verifyMetaSignature(rawBody, signatureHeader, appSecret);
@@ -201,7 +204,7 @@ Deno.serve(async (req) => {
         }
         console.log(`${LOG} Signature verified OK for instance_id=${instance.id}`);
       } else {
-        console.warn(`${LOG} No app_secret configured â skipping signature validation for instance_id=${instance.id}`);
+        console.warn(`${LOG} No app_secret configured Ã¢ÂÂ skipping signature validation for instance_id=${instance.id}`);
       }
 
       if (!accessToken) console.warn(`${LOG} No meta_access_token for instance_id=${instance.id}`);
@@ -224,7 +227,7 @@ Deno.serve(async (req) => {
 
       const msgSecrets: InstanceSecrets = { meta_access_token: accessToken };
 
-      // ââ Processar mensagens âââââââââââââââââââââââââââââââââââââââââââââââ
+      // Ã¢ÂÂÃ¢ÂÂ Processar mensagens Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
       for (const msg of value.messages || []) {
         if (msg.type === 'reaction') { console.log(`${LOG} Reaction ignorada`); continue; }
 
@@ -255,7 +258,7 @@ Deno.serve(async (req) => {
         console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
         await processInboundMessage(supabase, normalized);
 
-        // Download de mÃ­dia apÃ³s salvar a mensagem
+        // Download de mÃÂ­dia apÃÂ³s salvar a mensagem
         if (mediaId && accessToken && mimetype) {
           const { data: savedMsg } = await supabase
             .from('whatsapp_messages').select('id, conversation_id')
@@ -275,7 +278,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ââ Processar status ââââââââââââââââââââââââââââââââââââââââââââââââââ
+      // Ã¢ÂÂÃ¢ÂÂ Processar status Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
       for (const status of value.statuses || []) {
         await processStatus(supabase, instance.tenant_id, status);
       }
