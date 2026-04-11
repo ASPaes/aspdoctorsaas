@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Responde 200 imediatamente — Z-API tem timeout curto
+  // Responde 200 imediatamente â Z-API tem timeout curto
   const response = new Response(JSON.stringify({ received: true }), {
     headers: { 'Content-Type': 'application/json' },
   });
@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   return response;
 });
 
-// Normaliza número BR: adiciona 9 para celulares com 8 dígitos locais
+// Normaliza nÃºmero BR: adiciona 9 para celulares com 8 dÃ­gitos locais
 function normalizeZapiPhone(raw: string): string {
   let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
   digits = digits.split('@')[0];
@@ -46,46 +46,48 @@ async function processZapiWebhook(req: Request): Promise<void> {
   try {
     payload = await req.json();
   } catch {
-    console.error(`${LOG} Payload inválido`);
+    console.error(`${LOG} Payload invÃ¡lido`);
     return;
   }
 
   console.log(`${LOG} Payload:`, JSON.stringify(payload).substring(0, 400));
 
-  // ── Identificar instância pelo zapi_instance_id ──────────────
+  // ââ Identificar instÃ¢ncia pelo zapi_instance_id ââââââââââââââ
   const zapiInstanceId = payload?.instanceId || payload?.instance?.id || null;
   if (!zapiInstanceId) {
     console.warn(`${LOG} instanceId ausente no payload`);
     return;
   }
 
-  const { data: secretRow, error: secretErr } = await supabase
-    .from('whatsapp_instance_secrets')
-    .select('instance_id, zapi_webhook_token')
-    .eq('zapi_instance_id', zapiInstanceId)
-    .single();
+  const { data: instanceRow, error: instanceErr } = await supabase
+    .from('whatsapp_instances')
+    .select('id, tenant_id')
+    .eq('instance_id_external', zapiInstanceId)
+    .eq('provider_type', 'zapi')
+    .maybeSingle();
 
-  if (secretErr || !secretRow) {
+  if (instanceErr || !instanceRow) {
     console.warn(`${LOG} Instância não encontrada: zapiInstanceId=${zapiInstanceId}`);
     return;
   }
 
-  const secrets = await getInstanceSecrets(supabase, secretRow.instance_id);
+  const secrets = await getInstanceSecrets(supabase, instanceRow.id);
 
-  // ── Validar token de segurança ────────────────────────────────
-  if (secretRow.zapi_webhook_token) {
+  // ── Validar token de segurança ───────────────────────────────────────────
+  const zapiWebhookToken = secrets?.zapi_webhook_token || null;
+  if (zapiWebhookToken) {
     const receivedToken =
       req.headers.get('X-Zapitoken') ||
       req.headers.get('x-zapitoken') ||
       payload?.token ||
       null;
-    if (receivedToken !== secretRow.zapi_webhook_token) {
+    if (receivedToken !== zapiWebhookToken) {
       console.warn(`${LOG} Token inválido`);
       return;
     }
   }
 
-  const instanceId = secretRow.instance_id;
+  const instanceId = instanceRow.id;
 
   const { data: instance } = await supabase
     .from('whatsapp_instances')
@@ -94,20 +96,20 @@ async function processZapiWebhook(req: Request): Promise<void> {
     .maybeSingle();
 
   if (!instance?.tenant_id) {
-    console.warn(`${LOG} tenant_id não encontrado`);
+    console.warn(`${LOG} tenant_id nÃ£o encontrado`);
     return;
   }
 
   const type = payload?.type || payload?.event || '';
   console.log(`${LOG} Evento: ${type} | instance: ${instance.instance_name}`);
 
-  // ── Status de conexão ─────────────────────────────────────────
+  // ââ Status de conexÃ£o âââââââââââââââââââââââââââââââââââââââââ
   if (type === 'connected' || type === 'disconnected') {
     await supabase.from('whatsapp_instances').update({ status: type, updated_at: new Date().toISOString() }).eq('id', instanceId);
     return;
   }
 
-  // ── Status de mensagem ────────────────────────────────────────
+  // ââ Status de mensagem ââââââââââââââââââââââââââââââââââââââââ
   if (type === 'MessageStatusCallback') {
     const messageId = payload?.messageId || payload?.id;
     const status = payload?.status;
@@ -118,19 +120,19 @@ async function processZapiWebhook(req: Request): Promise<void> {
     return;
   }
 
-  // ── Mensagens recebidas ───────────────────────────────────────
+  // ââ Mensagens recebidas âââââââââââââââââââââââââââââââââââââââ
   if (type !== 'ReceivedCallback' && !payload?.isMessage) {
     console.log(`${LOG} Evento ignorado: ${type}`);
     return;
   }
 
-  // Ignorar mensagens enviadas pelo agente (já salvas pelo send-whatsapp-message)
+  // Ignorar mensagens enviadas pelo agente (jÃ¡ salvas pelo send-whatsapp-message)
   if (payload?.fromMe === true || payload?.isFromMe === true) {
     console.log(`${LOG} Mensagem fromMe ignorada`);
     return;
   }
 
-  // ── Normalizar payload Z-API → NormalizedInboundMessage ──────
+  // ââ Normalizar payload Z-API â NormalizedInboundMessage ââââââ
   const rawPhone = payload?.phone || payload?.from || '';
   if (!rawPhone) { console.warn(`${LOG} Telefone ausente`); return; }
 
