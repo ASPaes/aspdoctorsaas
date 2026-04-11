@@ -1,3 +1,4 @@
+// create-whatsapp-instance v1 — suporta super_admin e multi-tenant
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 
 const corsHeaders = {
