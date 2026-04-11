@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.upsert-instance-secrets]
 verify_jwt = false
+
+[functions.create-whatsapp-instance]
+verify_jwt = false
