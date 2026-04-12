@@ -224,15 +224,26 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         table: 'whatsapp_conversations'
       }, (payload) => {
         const updated = payload.new as any;
-        // Patch the specific conversation in cache and re-sort
         queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
           if (!old?.conversations) return old;
-          const idx = old.conversations.findIndex((c: any) => c.id === updated.id);
-          if (idx === -1) {
+          const existing = old.conversations.find((c: any) => c.id === updated.id);
+          if (!existing) {
             // Conversation not in current page — schedule a soft refetch
             setTimeout(() => queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] }), 500);
             return old;
           }
+
+          // Se assigned_to ou department_id mudou, forçar refetch para recalcular filtros do servidor
+          const assignedChanged = existing.assigned_to !== updated.assigned_to;
+          const deptChanged = existing.department_id !== updated.department_id;
+          if (assignedChanged || deptChanged) {
+            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] }), 100);
+            return old;
+          }
+
+          // Patch normal
+          const idx = old.conversations.findIndex((c: any) => c.id === updated.id);
+          if (idx === -1) return old;
           const patched = [...old.conversations];
           patched[idx] = {
             ...patched[idx],
