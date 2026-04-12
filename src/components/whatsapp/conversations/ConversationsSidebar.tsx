@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useConversationSearch } from "../hooks/useConversationSearch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,6 +54,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const saved = loadSaved();
 
   const [search, setSearch] = useState(saved?.search ?? "");
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const isSearching = !!debouncedSearch && debouncedSearch.length >= 2;
+  const { data: searchResults = [], isLoading: isSearchLoading } = useConversationSearch(debouncedSearch);
   const [showNewModal, setShowNewModal] = useState(false);
   const [activePill, setActivePillRaw] = useState("waiting");
   const [pillAutoSet, setPillAutoSet] = useState(false);
@@ -118,7 +123,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const isAfterHoursPill = activePill === "after_hours";
 
   const { conversations, isLoading } = useWhatsAppConversations({
-    search: search.trim() || undefined,
     instanceId: isAfterHoursPill ? undefined : filters.instanceId,
     // When viewing "Fora do horário", ignore department/instance filters to show all tenant conversations
     departmentId: isAfterHoursPill ? undefined : (selectedDepartmentId || undefined),
@@ -131,7 +135,11 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
-  const conversationIds = useMemo(() => conversations.map(c => c.id), [conversations]);
+  const conversationIds = useMemo(() => {
+    const baseIds = conversations.map(c => c.id);
+    const searchIds = searchResults.map(c => c.id);
+    return [...new Set([...baseIds, ...searchIds])];
+  }, [conversations, searchResults]);
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
   const { stateMap } = useConversationStates(conversationIds);
 
