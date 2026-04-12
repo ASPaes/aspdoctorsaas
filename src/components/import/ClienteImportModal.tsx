@@ -728,28 +728,50 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       .map(r => (r.values.cnpj ?? '').trim().replace(/\D/g, ''))
       .filter(Boolean);
 
-    // Set para controlar CNPJs duplicados internos ao CSV (mantém primeira ocorrência)
+    // Set para controlar CNPJs duplicados internos ao CSV
     const cnpjsVistos = new Set<string>();
     const dupIntraCSV: { cnpj: string; razao_social: string }[] = [];
-    rowsToImport = rowsToImport.filter(r => {
-      const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
-      if (!cnpj) return true;
-      if (cnpjsVistos.has(cnpj)) {
-        dupIntraCSV.push({
-          cnpj,
-          razao_social: r.values.razao_social || r.values.nome_fantasia || '—',
-        });
-        return false;
-      }
-      cnpjsVistos.add(cnpj);
-      return true;
-    });
+    if (duplicataOpcao !== 'importar') {
+      // Mantém primeira ocorrência, remove duplicados
+      rowsToImport = rowsToImport.filter(r => {
+        const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
+        if (!cnpj) return true;
+        if (cnpjsVistos.has(cnpj)) {
+          dupIntraCSV.push({
+            cnpj,
+            razao_social: r.values.razao_social || r.values.nome_fantasia || '—',
+          });
+          return false;
+        }
+        cnpjsVistos.add(cnpj);
+        return true;
+      });
+    } else {
+      // Quando "importar mesmo assim", apenas registra quais são duplicados sem filtrar
+      const contagem: Record<string, number> = {};
+      rowsToImport.forEach(r => {
+        const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
+        if (cnpj) contagem[cnpj] = (contagem[cnpj] ?? 0) + 1;
+      });
+      const jaRegistrado = new Set<string>();
+      rowsToImport.forEach(r => {
+        const cnpj = (r.values.cnpj ?? '').trim().replace(/\D/g, '');
+        if (cnpj && contagem[cnpj] > 1 && !jaRegistrado.has(cnpj)) {
+          jaRegistrado.add(cnpj);
+          dupIntraCSV.push({
+            cnpj,
+            razao_social: r.values.razao_social || r.values.nome_fantasia || '—',
+          });
+        }
+      });
+      // rowsToImport NÃO é filtrado — todos os registros permanecem
+    }
 
     // Set local (não estado) dos CNPJs que já existem no banco
     let cnpjsDuplicadosNoBanco = new Set<string>();
     let duplicatasParaModal: { cnpj: string; razao_social: string | null }[] = [];
 
-    if (cnpjsDoCSV.length > 0) {
+    if (cnpjsDoCSV.length > 0 && duplicataOpcao !== 'importar') {
       const CNPJ_BATCH = 100;
       const allExistentes: { cnpj: string; razao_social: string | null; nome_fantasia: string | null }[] = [];
       for (let ci = 0; ci < cnpjsDoCSV.length; ci += CNPJ_BATCH) {
@@ -1805,7 +1827,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             )}
 
             {/* Alerta de CNPJs duplicados no arquivo */}
-            {dupIntraCSVPreview.length > 0 && (
+            {duplicataOpcao !== 'importar' && dupIntraCSVPreview.length > 0 && (
               <div className="rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 p-3 space-y-2">
                 <p className="text-sm font-medium text-orange-800 dark:text-orange-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1828,6 +1850,23 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                       </div>
                     ))}
                   </div>
+                </details>
+              </div>
+            )}
+            {duplicataOpcao === 'importar' && dupIntraCSVPreview.length > 0 && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-3">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                  ℹ️ {dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0)} linha(s) com CNPJ repetido no arquivo — todas serão importadas.
+                </p>
+                <details className="mt-1">
+                  <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer">
+                    Ver {dupIntraCSVPreview.length} CNPJ(s) duplicado(s)
+                  </summary>
+                  <ul className="text-xs text-blue-700 dark:text-blue-300 mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                    {dupIntraCSVPreview.map((d, i) => (
+                      <li key={i}>{d.cnpj} ×{d.count} — {d.razao_social}</li>
+                    ))}
+                  </ul>
                 </details>
               </div>
             )}
