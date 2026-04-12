@@ -4412,6 +4412,27 @@ export type Database = {
         | {
             Args: {
               p_days_back?: number
+              p_department_id?: string
+              p_limit?: number
+              p_search: string
+              p_tenant_id: string
+            }
+            Returns: {
+              contact_name: string
+              contact_phone: string
+              contact_profile_picture_url: string
+              content: string
+              conversation_id: string
+              instance_id: string
+              is_from_me: boolean
+              message_ext_id: string
+              message_id: string
+              message_timestamp: string
+            }[]
+          }
+        | {
+            Args: {
+              p_days_back?: number
               p_instance_ids?: string[]
               p_limit?: number
               p_search: string
