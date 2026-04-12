@@ -499,10 +499,50 @@ export default function WhatsAppRelatorio() {
             )}
           </div>
 
-          {/* Agent Performance Table */}
+          {/* Agent Performance Table (SLA-based) */}
+          {sla && sla.agentRanking.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Produtividade por Agente
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Agente</TableHead>
+                        <TableHead className="text-right">Atend.</TableHead>
+                        <TableHead className="text-right">Fechados</TableHead>
+                        <TableHead className="text-right">TMR</TableHead>
+                        <TableHead className="text-right">1ª Resp.</TableHead>
+                        <TableHead className="text-right">FCR</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sla.agentRanking.map((agent) => (
+                        <TableRow key={agent.agentId}>
+                          <TableCell className="font-medium">{agent.agentId?.slice(0, 8) ?? "—"}</TableCell>
+                          <TableCell className="text-right">{agent.totalAttendances}</TableCell>
+                          <TableCell className="text-right">{agent.closedAttendances}</TableCell>
+                          <TableCell className="text-right">{formatSecondsToDisplay(agent.avgResolutionSeconds)}</TableCell>
+                          <TableCell className="text-right">{formatSecondsToDisplay(agent.avgFirstResponseSeconds)}</TableCell>
+                          <TableCell className="text-right">{agent.fcrRate.toFixed(1)}%</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Legacy Agent Performance Table */}
           {metrics.agentPerformance.length > 0 && (
             <Card>
-              <CardHeader><CardTitle className="text-sm">Performance por Agente</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Performance por Agente (Conversas)</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
