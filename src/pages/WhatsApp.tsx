@@ -19,6 +19,7 @@ import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOv
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
@@ -174,6 +175,16 @@ function WhatsAppContent() {
     }
   }, []);
 
+  const handleSelectMessage = useCallback((conv: ConversationWithContact, messageId: string) => {
+    setSelected(conv);
+    setHighlightMessageId(messageId);
+  }, []);
+
+  const handleSelect = useCallback((conv: ConversationWithContact) => {
+    setSelected(conv);
+    setHighlightMessageId(null);
+  }, []);
+
   // Bloquear acesso se user não tem setor vinculado
   if (!departmentsLoading && !isAdmin && departments.length === 0) {
     return (
@@ -196,7 +207,7 @@ function WhatsAppContent() {
     if (selected) {
       return (
         <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
-            <ChatAreaFull conversation={selected} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
           <AgentPresenceOverlay />
         </div>
       );
@@ -204,7 +215,7 @@ function WhatsAppContent() {
     return (
       <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
           <div className="w-full h-full">
-            <ConversationsSidebar selectedId={null} onSelect={setSelected} />
+            <ConversationsSidebar selectedId={null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
           </div>
         <AgentPresenceOverlay />
       </div>
@@ -215,11 +226,11 @@ function WhatsAppContent() {
     <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background w-full max-w-full relative">
         <ResizablePanelGroup direction="horizontal" className="h-full">
           <ResizablePanel defaultSize={25} minSize={24} maxSize={40}>
-            <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={setSelected} />
+            <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
           </ResizablePanel>
           <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
           <ResizablePanel defaultSize={75} className="relative h-full">
-            <ChatAreaFull conversation={selected} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
             <AgentPresenceOverlay />
           </ResizablePanel>
         </ResizablePanelGroup>
