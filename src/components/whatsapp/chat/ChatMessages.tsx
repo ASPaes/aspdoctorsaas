@@ -61,6 +61,7 @@ export function ChatMessages({
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
   const [hasScrolledToUnread, setHasScrolledToUnread] = useState(false);
   const prevConversationId = useRef(conversationId);
   const lastRefetchedMessageAtRef = useRef<string | null>(null);
@@ -190,6 +191,42 @@ export function ChatMessages({
     pendingNewCountRef.current = 0;
   }, []);
 
+  // Scroll to highlighted message (from message search)
+  useEffect(() => {
+    if (!highlightMessageId || isLoading) return;
+    // Small delay to ensure DOM is rendered
+    const timer = setTimeout(() => {
+      if (highlightRef.current) {
+        highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        highlightRef.current.classList.add("message-highlight-flash");
+        setTimeout(() => {
+          highlightRef.current?.classList.remove("message-highlight-flash");
+          onHighlightShown?.();
+        }, 2500);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [highlightMessageId, isLoading, messages]);
+
+  // Inject highlight flash CSS
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes messageHighlightFlash {
+        0% { background-color: transparent; }
+        15% { background-color: rgba(250, 204, 21, 0.3); }
+        85% { background-color: rgba(250, 204, 21, 0.3); }
+        100% { background-color: transparent; }
+      }
+      .message-highlight-flash {
+        animation: messageHighlightFlash 2.5s ease-in-out;
+        border-radius: 0.5rem;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -237,7 +274,7 @@ export function ChatMessages({
                   }
 
                   return (
-                    <div key={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
+                    <div key={item.msg.id} ref={item.msg.id === highlightMessageId ? highlightRef : (item.msg.id === firstUnreadId ? firstUnreadRef : undefined)}>
                       {item.msg.id === firstUnreadId && (
                         <div className="flex items-center gap-2 my-2">
                           <div className="flex-1 h-px bg-primary/40" />
