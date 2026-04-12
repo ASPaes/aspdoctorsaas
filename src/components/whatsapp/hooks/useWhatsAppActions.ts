@@ -151,7 +151,7 @@ export const useWhatsAppActions = () => {
               }
 
               // Only send closure message immediately if CSAT is NOT enabled
-              if (!csatEnabled) {
+              if (!csatEnabled && !skipClosureMessage) {
                 try {
                   const closureText = `✅ Atendimento *${activeAtt.attendance_code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`;
                   await supabase.functions.invoke('send-whatsapp-message', {
