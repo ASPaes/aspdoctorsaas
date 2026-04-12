@@ -122,7 +122,7 @@ export function MessageSearchModal({ open, onOpenChange, onSelectMessage }: Prop
           )}
 
           {/* Results */}
-          <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
+          <ScrollArea className="flex-1 min-h-0 max-h-[50vh] -mx-1 px-1">
             {isLoading || isFetching ? (
               <div className="flex flex-col gap-3 p-1">
                 {Array.from({ length: 4 }).map((_, i) => (
