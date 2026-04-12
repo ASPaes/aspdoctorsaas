@@ -234,6 +234,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
         />
         <ChatMessages
           conversationId={conversation.id}
+          highlightMessageId={highlightMessageId}
+          onHighlightShown={onHighlightShown}
           unreadCount={conversation.unread_count ?? 0}
           lastMessageAt={conversation.last_message_at ?? null}
           onReply={setReplyTo}
