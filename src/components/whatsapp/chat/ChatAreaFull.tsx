@@ -34,11 +34,13 @@ interface Props {
   onClose?: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
   onDepartmentTransferred?: () => void;
+  highlightMessageId?: string | null;
+  onHighlightShown?: () => void;
 }
 
 type DeleteMode = 'panel_only' | 'everyone';
 
-export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
+export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred, highlightMessageId, onHighlightShown }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
