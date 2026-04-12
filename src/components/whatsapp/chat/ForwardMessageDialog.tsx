@@ -16,7 +16,7 @@ interface Props {
 
 export function ForwardMessageDialog({ open, onOpenChange, messageIds, onDone }: Props) {
   const [search, setSearch] = useState('');
-  const { conversations, isLoading } = useWhatsAppConversations({ search, pageSize: 50 });
+  const { conversations, isLoading } = useWhatsAppConversations({ pageSize: 50 });
   const forwardMutation = useForwardMessages();
 
   const handleSelect = async (targetConversationId: string) => {
