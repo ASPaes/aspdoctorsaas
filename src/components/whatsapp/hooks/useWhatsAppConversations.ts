@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
-import { escapeLike } from '@/lib/utils';
+
 
 export interface ConversationWithContact {
   id: string;
@@ -45,7 +45,7 @@ export interface ConversationsFilters {
   instanceId?: string;
   instanceIds?: string[];
   departmentId?: string;
-  search?: string;
+  
   status?: string;
   assignedTo?: string;
   unassigned?: boolean;
@@ -75,40 +75,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-      const searchTerm = filters?.search?.trim();
-
-      // If searching by message content (disabled — threshold set very high)
-      let messageMatchIds: string[] = [];
-      if (searchTerm && searchTerm.length >= 50) {
-        const escaped = escapeLike(searchTerm);
-        let msgQuery = supabase
-          .from('whatsapp_messages' as any)
-          .select('conversation_id')
-          .ilike('content', `%${escaped}%`)
-          .limit(100);
-
-        // Sempre filtrar por tenant_id para não escanear o banco todo
-        if (tid) msgQuery = (msgQuery as any).eq('tenant_id', tid);
-
-        // Se houver filtro de departamento, restringir às conversas daquele setor
-        if (filters?.departmentId) {
-          const { data: deptConvIds } = await supabase
-            .from('whatsapp_conversations')
-            .select('id')
-            .eq('tenant_id', tid!)
-            .eq('department_id', filters.departmentId)
-            .limit(1000);
-          if (deptConvIds && deptConvIds.length > 0) {
-            const ids = deptConvIds.map((c: any) => c.id);
-            msgQuery = (msgQuery as any).in('conversation_id', ids);
-          }
-        }
-
-        const { data: msgMatches } = await msgQuery;
-        if (msgMatches) {
-          messageMatchIds = [...new Set((msgMatches as any[]).map((m: any) => m.conversation_id))];
-        }
-      }
 
       let query = supabase
         .from('whatsapp_conversations')
@@ -149,17 +115,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
-      // Filtro client-side: nome, telefone, preview (rápido, dados já carregados)
-      if (searchTerm) {
-        const s = searchTerm.toLowerCase();
-        result = result.filter((c) => {
-          const nameMatch = (c.contact?.name ?? '').toLowerCase().includes(s);
-          const phoneMatch = (c.contact?.phone_number ?? '').includes(s);
-          const previewMatch = (c.last_message_preview ?? '').toLowerCase().includes(s);
-          const msgMatch = messageMatchIds.includes(c.id);
-          return nameMatch || phoneMatch || previewMatch || msgMatch;
-        });
-      }
 
       // --- PARALLELIZED: count + unread + waiting in a single Promise.all ---
       const buildBaseFilter = (q: any) => {
