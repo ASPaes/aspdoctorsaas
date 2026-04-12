@@ -4376,6 +4376,38 @@ export type Database = {
       }
       norm_txt: { Args: { t: string }; Returns: string }
       require_active_profile: { Args: never; Returns: boolean }
+      search_conversations_by_contact: {
+        Args: {
+          p_instance_ids?: string[]
+          p_limit?: number
+          p_search: string
+          p_tenant_id: string
+        }
+        Returns: {
+          assigned_to: string
+          category: string
+          contact_id: string
+          contact_instance_id: string
+          contact_is_group: boolean
+          contact_name: string
+          contact_phone: string
+          contact_profile_picture_url: string
+          contact_tags: string[]
+          created_at: string
+          department_id: string
+          id: string
+          instance_id: string
+          is_last_message_from_me: boolean
+          last_message_at: string
+          last_message_preview: string
+          opened_out_of_hours: boolean
+          priority: string
+          status: string
+          tenant_id: string
+          unread_count: number
+          updated_at: string
+        }[]
+      }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       validate_access_invite: {
         Args: { p_invite_id: string }
