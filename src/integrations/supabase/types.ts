@@ -4408,26 +4408,48 @@ export type Database = {
           updated_at: string
         }[]
       }
-      search_messages_by_content: {
-        Args: {
-          p_days_back?: number
-          p_limit?: number
-          p_search: string
-          p_tenant_id: string
-        }
-        Returns: {
-          contact_name: string
-          contact_phone: string
-          contact_profile_picture_url: string
-          content: string
-          conversation_id: string
-          instance_id: string
-          is_from_me: boolean
-          message_ext_id: string
-          message_id: string
-          message_timestamp: string
-        }[]
-      }
+      search_messages_by_content:
+        | {
+            Args: {
+              p_days_back?: number
+              p_instance_ids?: string[]
+              p_limit?: number
+              p_search: string
+              p_tenant_id: string
+            }
+            Returns: {
+              contact_name: string
+              contact_phone: string
+              contact_profile_picture_url: string
+              content: string
+              conversation_id: string
+              instance_id: string
+              is_from_me: boolean
+              message_ext_id: string
+              message_id: string
+              message_timestamp: string
+            }[]
+          }
+        | {
+            Args: {
+              p_days_back?: number
+              p_limit?: number
+              p_search: string
+              p_tenant_id: string
+            }
+            Returns: {
+              contact_name: string
+              contact_phone: string
+              contact_profile_picture_url: string
+              content: string
+              conversation_id: string
+              instance_id: string
+              is_from_me: boolean
+              message_ext_id: string
+              message_id: string
+              message_timestamp: string
+            }[]
+          }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       validate_access_invite: {
         Args: { p_invite_id: string }
