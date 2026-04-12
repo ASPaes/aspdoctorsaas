@@ -6,6 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, AlertTriangle, FileSearch } from "lucide-react";
 import { useMessageSearch, type MessageSearchResult } from "../hooks/useMessageSearch";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -26,7 +28,14 @@ interface Props {
 export function MessageSearchModal({ open, onOpenChange, onSelectMessage }: Props) {
   const [search, setSearch] = useState("");
   const [daysBack, setDaysBack] = useState(90);
-  const { data: results = [], isLoading, isFetching } = useMessageSearch(search, daysBack);
+  const { filteredInstanceIds } = useDepartmentFilter();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const { data: results = [], isLoading, isFetching } = useMessageSearch(
+    search,
+    daysBack,
+    isAdmin ? undefined : (filteredInstanceIds ?? undefined)
+  );
 
   const hasSearch = search.trim().length >= 3;
 

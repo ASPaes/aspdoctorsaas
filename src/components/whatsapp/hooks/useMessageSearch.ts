@@ -16,12 +16,12 @@ export interface MessageSearchResult {
   instance_id: string;
 }
 
-export function useMessageSearch(search: string, daysBack: number = 90) {
+export function useMessageSearch(search: string, daysBack: number = 90, instanceIds?: string[]) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const debouncedSearch = useDebouncedValue(search.trim(), 400);
 
   return useQuery<MessageSearchResult[]>({
-    queryKey: ["whatsapp", "message-search", debouncedSearch, daysBack, tid],
+    queryKey: ["whatsapp", "message-search", debouncedSearch, daysBack, instanceIds, tid],
     enabled: !!tid && !!debouncedSearch && debouncedSearch.length >= 3,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -32,6 +32,7 @@ export function useMessageSearch(search: string, daysBack: number = 90) {
           p_tenant_id: tid,
           p_search: debouncedSearch,
           p_days_back: daysBack,
+          p_instance_ids: instanceIds && instanceIds.length > 0 ? instanceIds : null,
           p_limit: 20,
         }
       );
