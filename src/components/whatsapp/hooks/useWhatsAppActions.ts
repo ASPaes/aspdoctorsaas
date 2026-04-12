@@ -82,6 +82,12 @@ export const useWhatsAppActions = () => {
             ? Math.round((now.getTime() - assumedAt.getTime()) / 1000)
             : 0;
 
+          const closureType = skipClosureMessage
+            ? 'silent'
+            : skipCsat
+            ? 'closure_message_only'
+            : 'csat_sent';
+
           await supabase
             .from('support_attendances')
             .update({
@@ -89,6 +95,7 @@ export const useWhatsAppActions = () => {
               closed_at: now.toISOString(),
               closed_by: user?.id ?? null,
               closed_reason: 'manual',
+              closure_type: closureType,
               wait_seconds: waitSec,
               handle_seconds: handleSec,
               updated_at: now.toISOString(),
