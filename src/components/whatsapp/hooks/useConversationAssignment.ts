@@ -222,6 +222,7 @@ export const useConversationAssignment = () => {
       );
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       toast({ title: "Conversa transferida", description: "A conversa foi transferida com sucesso." });
     },
