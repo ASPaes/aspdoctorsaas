@@ -4,7 +4,8 @@ import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus, Building2, User, Timer, Zap, Trophy } from "lucide-react";
+import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus, Building2, User, Timer, Zap, Trophy, HelpCircle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppMetrics, type WhatsAppMetricsFilters } from "@/components/whatsapp/hooks/useWhatsAppMetrics";
 import { useAttendanceMetrics, formatSecondsToDisplay } from "@/components/whatsapp/hooks/useAttendanceMetrics";
@@ -123,8 +124,12 @@ export default function WhatsAppRelatorio() {
 
   const { data: metrics, isLoading } = useWhatsAppMetrics(filters);
 
+  const slaEnabled = !!(dateRange?.from && dateRange?.to);
   const { data: sla, isLoading: slaLoading } = useAttendanceMetrics({
-    dateRange: { from: dateRange.from, to: dateRange.to },
+    dateRange: {
+      from: dateRange?.from ?? new Date(),
+      to: dateRange?.to ?? new Date(),
+    },
     departmentId: effectiveDepartmentId || undefined,
     agentId: effectiveAgentId || undefined,
   });
@@ -243,7 +248,7 @@ export default function WhatsAppRelatorio() {
             <MetricCard title="Encerradas" value={metrics.closed} icon={CheckCircle2}
               sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorClosed || undefined : undefined} />
             <MetricCard title="Taxa Resolução" value={slaLoading ? "..." : `${(sla?.resolutionRate ?? metrics.resolutionRate).toFixed(1)}%`} icon={BarChart3}
-              subtitle={`Setor: ${(sla?.sector.resolutionRate ?? 0).toFixed(1)}%`}
+              subtitle={`Setor: ${(sla?.sector?.resolutionRate ?? 0).toFixed(1)}%`}
               sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorResolutionRate || undefined : undefined} />
           </div>
 
@@ -266,6 +271,19 @@ export default function WhatsAppRelatorio() {
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <Timer className="h-3.5 w-3.5" /> TME (Fila)
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="inline-flex items-center justify-center h-4 w-4 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
+                        <HelpCircle className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-72 p-3 space-y-1.5 text-xs" onOpenAutoFocus={(e) => e.preventDefault()}>
+                      <p className="font-semibold text-foreground">Tempo Médio de Espera</p>
+                      <p className="text-muted-foreground">Quanto tempo o cliente aguardou na fila até um técnico assumir o atendimento.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Fórmula:</span> média de (assumed_at − opened_at) dos atendimentos encerrados no período.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Meta:</span> até 1 min ✅ | até 3 min ⚠️ | acima 🔴</p>
+                    </PopoverContent>
+                  </Popover>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
@@ -273,7 +291,7 @@ export default function WhatsAppRelatorio() {
                   {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgWaitSeconds ?? 0)}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Setor: {formatSecondsToDisplay(sla?.sector.avgWaitSeconds ?? 0)}
+                  Setor: {formatSecondsToDisplay(sla?.sector?.avgWaitSeconds ?? 0)}
                 </p>
                 {!slaLoading && sla && (
                   <p className={`text-[10px] mt-1 ${(sla.avgWaitSeconds ?? 0) <= 60 ? 'text-green-600' : (sla.avgWaitSeconds ?? 0) <= 180 ? 'text-amber-600' : 'text-red-600'}`}>
@@ -288,6 +306,19 @@ export default function WhatsAppRelatorio() {
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <Zap className="h-3.5 w-3.5" /> 1ª Resposta
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="inline-flex items-center justify-center h-4 w-4 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
+                        <HelpCircle className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-72 p-3 space-y-1.5 text-xs" onOpenAutoFocus={(e) => e.preventDefault()}>
+                      <p className="font-semibold text-foreground">Tempo da 1ª Resposta Humana</p>
+                      <p className="text-muted-foreground">Tempo entre a abertura do atendimento e a primeira mensagem enviada por um técnico humano (exclui respostas automáticas de bot/URA).</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Fórmula:</span> média de (first_human_response_at − opened_at) dos atendimentos no período.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Meta:</span> até 3 min ✅ | até 10 min ⚠️ | acima 🔴</p>
+                    </PopoverContent>
+                  </Popover>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
@@ -295,7 +326,7 @@ export default function WhatsAppRelatorio() {
                   {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgFirstResponseSeconds ?? 0)}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Setor: {formatSecondsToDisplay(sla?.sector.avgFirstResponseSeconds ?? 0)}
+                  Setor: {formatSecondsToDisplay(sla?.sector?.avgFirstResponseSeconds ?? 0)}
                 </p>
                 {!slaLoading && sla && (
                   <p className={`text-[10px] mt-1 ${(sla.avgFirstResponseSeconds ?? 0) <= 180 ? 'text-green-600' : (sla.avgFirstResponseSeconds ?? 0) <= 600 ? 'text-amber-600' : 'text-red-600'}`}>
@@ -310,6 +341,18 @@ export default function WhatsAppRelatorio() {
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" /> TMA (Atendimento)
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="inline-flex items-center justify-center h-4 w-4 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
+                        <HelpCircle className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-72 p-3 space-y-1.5 text-xs" onOpenAutoFocus={(e) => e.preventDefault()}>
+                      <p className="font-semibold text-foreground">Tempo Médio de Atendimento</p>
+                      <p className="text-muted-foreground">Duração efetiva do atendimento, desde que o técnico assumiu até o encerramento. Não inclui tempo de fila.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Fórmula:</span> média de (closed_at − assumed_at) dos atendimentos encerrados no período.</p>
+                    </PopoverContent>
+                  </Popover>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
@@ -317,7 +360,7 @@ export default function WhatsAppRelatorio() {
                   {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgHandleSeconds ?? 0)}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Setor: {formatSecondsToDisplay(sla?.sector.avgHandleSeconds ?? 0)}
+                  Setor: {formatSecondsToDisplay(sla?.sector?.avgHandleSeconds ?? 0)}
                 </p>
               </CardContent>
             </Card>
@@ -327,6 +370,18 @@ export default function WhatsAppRelatorio() {
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5" /> TMR (Resolução)
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="inline-flex items-center justify-center h-4 w-4 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
+                        <HelpCircle className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-72 p-3 space-y-1.5 text-xs" onOpenAutoFocus={(e) => e.preventDefault()}>
+                      <p className="font-semibold text-foreground">Tempo Médio de Resolução</p>
+                      <p className="text-muted-foreground">Tempo total do atendimento, desde a abertura até o encerramento. Inclui fila + atendimento.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Fórmula:</span> média de (closed_at − opened_at) dos atendimentos encerrados no período.</p>
+                    </PopoverContent>
+                  </Popover>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
@@ -334,7 +389,7 @@ export default function WhatsAppRelatorio() {
                   {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgResolutionSeconds ?? 0)}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Setor: {formatSecondsToDisplay(sla?.sector.avgResolutionSeconds ?? 0)}
+                  Setor: {formatSecondsToDisplay(sla?.sector?.avgResolutionSeconds ?? 0)}
                 </p>
               </CardContent>
             </Card>
@@ -344,6 +399,19 @@ export default function WhatsAppRelatorio() {
               <CardHeader className="pb-2 pt-4 px-4">
                 <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   <Trophy className="h-3.5 w-3.5" /> FCR
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="inline-flex items-center justify-center h-4 w-4 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
+                        <HelpCircle className="h-3 w-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-72 p-3 space-y-1.5 text-xs" onOpenAutoFocus={(e) => e.preventDefault()}>
+                      <p className="font-semibold text-foreground">Resolução no 1º Contato</p>
+                      <p className="text-muted-foreground">Percentual de atendimentos resolvidos sem reabertura. Quanto maior, melhor a qualidade do atendimento.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Fórmula:</span> (atendimentos sem reabertura ÷ total encerrados) × 100.</p>
+                      <p className="text-muted-foreground"><span className="font-medium">Meta:</span> acima de 70% ✅ | 50-70% ⚠️ | abaixo de 50% 🔴</p>
+                    </PopoverContent>
+                  </Popover>
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
@@ -351,7 +419,7 @@ export default function WhatsAppRelatorio() {
                   {slaLoading ? <Skeleton className="h-7 w-20" /> : `${(sla?.fcrRate ?? 0).toFixed(1)}%`}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Setor: {(sla?.sector.fcrRate ?? 0).toFixed(1)}%
+                  Setor: {(sla?.sector?.fcrRate ?? 0).toFixed(1)}%
                 </p>
                 {!slaLoading && sla && (
                   <p className={`text-[10px] mt-1 ${(sla.fcrRate ?? 0) >= 70 ? 'text-green-600' : (sla.fcrRate ?? 0) >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
@@ -500,7 +568,7 @@ export default function WhatsAppRelatorio() {
           </div>
 
           {/* Agent Performance Table (SLA-based) */}
-          {sla && sla.agentRanking.length > 0 && (
+          {sla && (sla.agentRanking ?? []).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -522,14 +590,14 @@ export default function WhatsAppRelatorio() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sla.agentRanking.map((agent) => (
+                      {(sla.agentRanking ?? []).map((agent) => (
                         <TableRow key={agent.agentId}>
                           <TableCell className="font-medium">{agent.agentId?.slice(0, 8) ?? "—"}</TableCell>
                           <TableCell className="text-right">{agent.totalAttendances}</TableCell>
                           <TableCell className="text-right">{agent.closedAttendances}</TableCell>
                           <TableCell className="text-right">{formatSecondsToDisplay(agent.avgResolutionSeconds)}</TableCell>
                           <TableCell className="text-right">{formatSecondsToDisplay(agent.avgFirstResponseSeconds)}</TableCell>
-                          <TableCell className="text-right">{agent.fcrRate.toFixed(1)}%</TableCell>
+                          <TableCell className="text-right">{(agent.fcrRate ?? 0).toFixed(1)}%</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

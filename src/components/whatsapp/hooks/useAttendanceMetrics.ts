@@ -90,7 +90,7 @@ export function useAttendanceMetrics(filters: AttendanceMetricsFilters) {
       filters.agentId,
       tid,
     ],
-    enabled: !!tid,
+    enabled: !!tid && !!filters.dateRange.from && !!filters.dateRange.to,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
