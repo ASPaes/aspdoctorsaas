@@ -123,6 +123,12 @@ export default function WhatsAppRelatorio() {
 
   const { data: metrics, isLoading } = useWhatsAppMetrics(filters);
 
+  const { data: sla, isLoading: slaLoading } = useAttendanceMetrics({
+    dateRange: { from: dateRange.from, to: dateRange.to },
+    departmentId: effectiveDepartmentId || undefined,
+    agentId: effectiveAgentId || undefined,
+  });
+
   const trendTotal = metrics?.previousPeriod?.total
     ? ((metrics.total - metrics.previousPeriod.total) / metrics.previousPeriod.total) * 100
     : 0;
