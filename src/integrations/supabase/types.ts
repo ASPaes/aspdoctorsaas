@@ -2173,7 +2173,9 @@ export type Database = {
           created_at: string
           created_from: string | null
           department_id: string | null
+          first_human_response_at: string | null
           first_response_at: string | null
+          first_response_time_seconds: number | null
           handle_seconds: number
           handoffs_count: number
           id: string
@@ -2183,6 +2185,7 @@ export type Database = {
           msg_customer_count: number
           opened_at: string
           opened_by: string | null
+          reopen_count: number | null
           reopened_at: string | null
           reopened_from: string | null
           seq_number: number
@@ -2220,7 +2223,9 @@ export type Database = {
           created_at?: string
           created_from?: string | null
           department_id?: string | null
+          first_human_response_at?: string | null
           first_response_at?: string | null
+          first_response_time_seconds?: number | null
           handle_seconds?: number
           handoffs_count?: number
           id?: string
@@ -2230,6 +2235,7 @@ export type Database = {
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
           seq_number?: number
@@ -2267,7 +2273,9 @@ export type Database = {
           created_at?: string
           created_from?: string | null
           department_id?: string | null
+          first_human_response_at?: string | null
           first_response_at?: string | null
+          first_response_time_seconds?: number | null
           handle_seconds?: number
           handoffs_count?: number
           id?: string
@@ -2277,6 +2285,7 @@ export type Database = {
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
           seq_number?: number
@@ -4276,6 +4285,16 @@ export type Database = {
               tenant_id: string
             }[]
           }
+      get_attendance_metrics: {
+        Args: {
+          p_agent_id?: string
+          p_department_id?: string
+          p_from: string
+          p_tenant_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
       get_my_access_context: {
         Args: never
