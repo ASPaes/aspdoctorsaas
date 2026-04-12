@@ -174,6 +174,36 @@ export const useWhatsAppActions = () => {
                   console.error('[closeConversation] Error sending closure message:', sendErr);
                 }
               }
+
+              // Registrar mensagem interna no chat indicando como foi encerrado
+              try {
+                const { data: attData } = await supabase
+                  .from('support_attendances')
+                  .select('tenant_id')
+                  .eq('id', activeAtt.id)
+                  .single();
+
+                const internalText = skipClosureMessage
+                  ? `🔇 Atendimento encerrado sem envio de mensagem ao cliente.`
+                  : skipCsat
+                  ? `💬 Atendimento encerrado com mensagem de encerramento (sem CSAT).`
+                  : `✅ Atendimento encerrado com pesquisa CSAT enviada ao cliente.`;
+
+                await supabase.from('whatsapp_messages').insert({
+                  conversation_id: conversationId,
+                  tenant_id: attData?.tenant_id,
+                  content: internalText,
+                  message_type: 'system',
+                  is_from_me: true,
+                  status: 'sent',
+                  timestamp: new Date().toISOString(),
+                  message_id: `internal_close_${Date.now()}`,
+                  remote_jid: 'internal',
+                  metadata: { system: true, attendance_event: 'closed_internal_note' },
+                });
+              } catch (internalErr) {
+                console.error('[closeConversation] Error inserting internal note:', internalErr);
+              }
             }
           }
 
