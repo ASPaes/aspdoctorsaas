@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, MessageSquare, BarChart3, Users, X } from "lucide-react";
+import { Search, Plus, MessageSquare, BarChart3, Users, X, FileSearch } from "lucide-react";
+import { MessageSearchModal } from "./MessageSearchModal";
 
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
@@ -26,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 interface Props {
   selectedId: string | null;
   onSelect: (conv: ConversationWithContact) => void;
+  onSelectMessage?: (conv: ConversationWithContact, messageId: string) => void;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -40,7 +42,7 @@ const SORT_LABELS: Record<string, string> = {
   oldest: "Mais Antigas",
 };
 
-export function ConversationsSidebar({ selectedId, onSelect }: Props) {
+export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: Props) {
   const STORAGE_KEY = "whatsapp-chat-filters";
 
   const loadSaved = () => {
@@ -58,6 +60,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const isSearching = !!debouncedSearch && debouncedSearch.length >= 2;
   const { data: searchResults = [], isLoading: isSearchLoading } = useConversationSearch(debouncedSearch);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
   const [activePill, setActivePillRaw] = useState("waiting");
   const [pillAutoSet, setPillAutoSet] = useState(false);
   const [forcedConvId, setForcedConvId] = useState<string | null>(null);
@@ -342,6 +345,22 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
     onSelect(conv);
   };
 
+  const handleMessageSelect = useCallback(async (conversationId: string, messageId: string) => {
+    const { data } = await supabase
+      .from("whatsapp_conversations")
+      .select("*, contact:whatsapp_contacts(*)")
+      .eq("id", conversationId)
+      .single();
+    if (data) {
+      const conv = data as unknown as ConversationWithContact;
+      if (onSelectMessage) {
+        onSelectMessage(conv, messageId);
+      } else {
+        onSelect(conv);
+      }
+    }
+  }, [onSelect, onSelectMessage]);
+
   // Active filter badges
   const activeFilterBadges: { key: string; label: string; onRemove: () => void }[] = [];
   if (filters.status) {
@@ -411,14 +430,24 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           </div>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar conversas..."
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-8 h-9"
-          />
+        <div className="flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar contato e número..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setShowMessageSearch(true)}>
+                <FileSearch className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Buscar nas mensagens</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -490,6 +519,12 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           </div>
         )}
       </ScrollArea>
+
+      <MessageSearchModal
+        open={showMessageSearch}
+        onOpenChange={setShowMessageSearch}
+        onSelectMessage={handleMessageSelect}
+      />
 
       <NewConversationModal
         open={showNewModal}
