@@ -202,10 +202,11 @@ export const useConversationAssignment = () => {
     onMutate: async (vars) => {
       queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
         if (!old?.conversations) return old;
+        // Remover a conversa da lista do usuário atual (ela foi transferida)
         return {
           ...old,
-          conversations: old.conversations.map((c: any) =>
-            c.id === vars.conversationId ? { ...c, assigned_to: vars.newAssignee } : c
+          conversations: old.conversations.filter(
+            (c: any) => c.id !== vars.conversationId
           ),
         };
       });
