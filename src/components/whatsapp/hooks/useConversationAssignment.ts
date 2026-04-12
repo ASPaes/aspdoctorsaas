@@ -118,9 +118,31 @@ export const useConversationAssignment = () => {
         .eq('id', conversationId)
         .single();
 
+      // Buscar o department_id do agente destino
+      let targetDepartmentId: string | null = null;
+      const { data: targetProfile } = await supabase
+        .from('profiles')
+        .select('funcionario_id')
+        .eq('user_id', newAssignee)
+        .maybeSingle();
+
+      if (targetProfile?.funcionario_id) {
+        const { data: targetFunc } = await supabase
+          .from('funcionarios')
+          .select('department_id')
+          .eq('id', targetProfile.funcionario_id)
+          .maybeSingle();
+        if (targetFunc?.department_id) {
+          targetDepartmentId = targetFunc.department_id;
+        }
+      }
+
+      const updatePayload: Record<string, any> = { assigned_to: newAssignee };
+      if (targetDepartmentId) updatePayload.department_id = targetDepartmentId;
+
       const { error: updateError } = await supabase
         .from('whatsapp_conversations')
-        .update({ assigned_to: newAssignee })
+        .update(updatePayload)
         .eq('id', conversationId);
       if (updateError) throw updateError;
 
@@ -130,6 +152,29 @@ export const useConversationAssignment = () => {
         assigned_by: user.id,
         reason: reason || null,
       } as any);
+
+      // Atualizar attendance ativo
+      const { data: activeAtt } = await supabase
+        .from('support_attendances')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .in('status', ['waiting', 'in_progress'])
+        .limit(1)
+        .maybeSingle();
+
+      if (activeAtt) {
+        const attUpdate: Record<string, any> = {
+          assigned_to: newAssignee,
+          status: 'in_progress',
+          assumed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (targetDepartmentId) attUpdate.department_id = targetDepartmentId;
+        await supabase
+          .from('support_attendances')
+          .update(attUpdate)
+          .eq('id', activeAtt.id);
+      }
 
       // Create notification for the new assignee
       if (convData?.tenant_id && newAssignee !== user.id) {
@@ -177,6 +222,7 @@ export const useConversationAssignment = () => {
       );
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       toast({ title: "Conversa transferida", description: "A conversa foi transferida com sucesso." });
     },
