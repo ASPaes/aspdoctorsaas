@@ -1,4 +1,4 @@
-// create-whatsapp-instance v1 — suporta super_admin e multi-tenant
+// create-whatsapp-instance v1 â suporta super_admin e multi-tenant
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 
 const corsHeaders = {
@@ -23,15 +23,15 @@ Deno.serve(async (req) => {
     // Extrair user_id do JWT
     const jwt = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-    if (userError || !user) return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: corsHeaders });
+    if (userError || !user) return new Response(JSON.stringify({ error: 'Token invÃ¡lido' }), { status: 401, headers: corsHeaders });
 
-    // Buscar perfil do usuário
+    // Buscar perfil do usuÃ¡rio
     const { data: profile } = await supabase.from('profiles')
       .select('role, is_super_admin, tenant_id')
       .eq('user_id', user.id)
       .single();
 
-    if (!profile) return new Response(JSON.stringify({ error: 'Perfil não encontrado' }), { status: 400, headers: corsHeaders });
+    if (!profile) return new Response(JSON.stringify({ error: 'Perfil nÃ£o encontrado' }), { status: 400, headers: corsHeaders });
 
     const isSuperAdmin = profile.is_super_admin === true;
     const body = await req.json();
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
     // Determinar tenant alvo
     const tenantId = (isSuperAdmin && target_tenant_id) ? target_tenant_id : profile.tenant_id;
-    if (!tenantId) return new Response(JSON.stringify({ error: 'tenant_id não encontrado' }), { status: 400, headers: corsHeaders });
+    if (!tenantId) return new Response(JSON.stringify({ error: 'tenant_id nÃ£o encontrado' }), { status: 400, headers: corsHeaders });
 
     const {
       api_url, api_key, provider_type,
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     const isMeta = provider_type === 'meta_cloud';
     const isZapi = provider_type === 'zapi';
 
-    // 1. Criar instância
+    // 1. Criar instÃ¢ncia
     const { data: instanceResult, error: instanceError } = await supabase
       .from('whatsapp_instances')
       .insert({
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         display_name,
         instance_name,
         provider_type: provider_type || 'self_hosted',
-        instance_id_external: instance_id_external || null,
+        instance_id_external: instance_id_external || (isZapi ? (zapi_instance_id || null) : null),
         ...(isMeta && meta_phone_number_id ? { meta_phone_number_id } : {}),
       })
       .select()
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     const { error: secretsError } = await supabase.from('whatsapp_instance_secrets').insert(secretsPayload);
     if (secretsError) throw secretsError;
 
-    // 3. Salvar secrets sensíveis no Vault
+    // 3. Salvar secrets sensÃ­veis no Vault
     const vaultPayload: any = { instance_id: instanceResult.id };
     if (!isMeta && !isZapi) {
       if (api_url) vaultPayload.api_url = api_url;
