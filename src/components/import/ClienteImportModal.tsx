@@ -1224,6 +1224,12 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     label: 'Atualizar',
                     desc: 'Sobrescreve os dados do cadastro atual com os dados do arquivo.',
                   },
+                  {
+                    value: 'importar' as const,
+                    icon: '📥',
+                    label: 'Importar mesmo assim',
+                    desc: 'Permite CNPJ/CPF duplicado. Cria novos registros mesmo que já existam no sistema. Os duplicados serão listados no resultado final.',
+                  },
                 ].map(opt => (
                   <label
                     key={opt.value}
