@@ -73,7 +73,7 @@ export function MessageSearchModal({ open, onOpenChange, onSelectMessage }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden">
+      <DialogContent className="max-w-lg h-[80vh] flex flex-col gap-0 p-0 overflow-hidden">
         <DialogHeader className="px-4 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FileSearch className="h-5 w-5 text-primary" />
@@ -122,7 +122,7 @@ export function MessageSearchModal({ open, onOpenChange, onSelectMessage }: Prop
           )}
 
           {/* Results */}
-          <ScrollArea className="flex-1 min-h-0 max-h-[50vh] -mx-1 px-1">
+          <ScrollArea className="flex-1 overflow-hidden -mx-1 px-1">
             {isLoading || isFetching ? (
               <div className="flex flex-col gap-3 p-1">
                 {Array.from({ length: 4 }).map((_, i) => (

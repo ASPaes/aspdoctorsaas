@@ -194,17 +194,29 @@ export function ChatMessages({
   // Scroll to highlighted message (from message search)
   useEffect(() => {
     if (!highlightMessageId || isLoading) return;
-    // Small delay to ensure DOM is rendered
-    const timer = setTimeout(() => {
-      if (highlightRef.current) {
-        highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-        highlightRef.current.classList.add("message-highlight-flash");
+
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const tryScroll = () => {
+      attempts++;
+      const el = document.querySelector(`[data-msg-id="${highlightMessageId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("message-highlight-flash");
         setTimeout(() => {
-          highlightRef.current?.classList.remove("message-highlight-flash");
+          el.classList.remove("message-highlight-flash");
           onHighlightShown?.();
         }, 2500);
+      } else if (attempts < maxAttempts) {
+        setTimeout(tryScroll, 300);
+      } else {
+        // Mensagem não encontrada nos 500 carregados — limpa highlight
+        onHighlightShown?.();
       }
-    }, 300);
+    };
+
+    const timer = setTimeout(tryScroll, 200);
     return () => clearTimeout(timer);
   }, [highlightMessageId, isLoading, messages]);
 
@@ -274,7 +286,7 @@ export function ChatMessages({
                   }
 
                   return (
-                    <div key={item.msg.id} ref={item.msg.id === highlightMessageId ? highlightRef : (item.msg.id === firstUnreadId ? firstUnreadRef : undefined)}>
+                    <div key={item.msg.id} data-msg-id={item.msg.id} ref={item.msg.id === firstUnreadId ? firstUnreadRef : undefined}>
                       {item.msg.id === firstUnreadId && (
                         <div className="flex items-center gap-2 my-2">
                           <div className="flex-1 h-px bg-primary/40" />
