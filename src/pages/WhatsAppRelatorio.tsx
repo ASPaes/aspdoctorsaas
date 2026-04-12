@@ -4,9 +4,11 @@ import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus, Building2, User } from "lucide-react";
+import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus, Building2, User, Timer, Zap, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppMetrics, type WhatsAppMetricsFilters } from "@/components/whatsapp/hooks/useWhatsAppMetrics";
+import { useAttendanceMetrics, formatSecondsToDisplay } from "@/components/whatsapp/hooks/useAttendanceMetrics";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
@@ -121,6 +123,12 @@ export default function WhatsAppRelatorio() {
 
   const { data: metrics, isLoading } = useWhatsAppMetrics(filters);
 
+  const { data: sla, isLoading: slaLoading } = useAttendanceMetrics({
+    dateRange: { from: dateRange.from, to: dateRange.to },
+    departmentId: effectiveDepartmentId || undefined,
+    agentId: effectiveAgentId || undefined,
+  });
+
   const trendTotal = metrics?.previousPeriod?.total
     ? ((metrics.total - metrics.previousPeriod.total) / metrics.previousPeriod.total) * 100
     : 0;
@@ -234,7 +242,8 @@ export default function WhatsAppRelatorio() {
               sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorActive || undefined : undefined} />
             <MetricCard title="Encerradas" value={metrics.closed} icon={CheckCircle2}
               sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorClosed || undefined : undefined} />
-            <MetricCard title="Taxa Resolução" value={`${metrics.resolutionRate.toFixed(0)}%`} icon={BarChart3}
+            <MetricCard title="Taxa Resolução" value={slaLoading ? "..." : `${(sla?.resolutionRate ?? metrics.resolutionRate).toFixed(1)}%`} icon={BarChart3}
+              subtitle={`Setor: ${(sla?.sector.resolutionRate ?? 0).toFixed(1)}%`}
               sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorResolutionRate || undefined : undefined} />
           </div>
 
@@ -250,16 +259,107 @@ export default function WhatsAppRelatorio() {
               sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorUniqueContacts || undefined : undefined} />
           </div>
 
-          {/* KPIs Row 3 */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard title="Tempo Médio Resposta" value={`${metrics.avgResponseTimeMinutes.toFixed(0)}`} unit=" min" icon={Clock}
-              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorAvgResponseTimeMinutes || undefined : undefined} />
-            <MetricCard title="1ª Resposta" value={`${metrics.avgFirstResponseTimeMinutes.toFixed(0)}`} unit=" min" icon={Clock}
-              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorAvgFirstResponseTimeMinutes || undefined : undefined} />
-            <MetricCard title="Msgs/Conversa" value={metrics.avgMessagesPerConversation.toFixed(1)} icon={BarChart3}
-              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorAvgMessagesPerConversation || undefined : undefined} />
-            <MetricCard title="Engajamento" value={`${metrics.engagementRate.toFixed(0)}%`} icon={SmilePlus} subtitle="Recebidas / Enviadas"
-              sectorValue={effectiveAgentId || !isAdmin ? metrics.sectorEngagementRate || undefined : undefined} />
+          {/* SLA Metrics Row */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* TME - Tempo Médio de Espera (fila) */}
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Timer className="h-3.5 w-3.5" /> TME (Fila)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <p className="text-2xl font-bold leading-none">
+                  {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgWaitSeconds ?? 0)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Setor: {formatSecondsToDisplay(sla?.sector.avgWaitSeconds ?? 0)}
+                </p>
+                {!slaLoading && sla && (
+                  <p className={`text-[10px] mt-1 ${(sla.avgWaitSeconds ?? 0) <= 60 ? 'text-green-600' : (sla.avgWaitSeconds ?? 0) <= 180 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {(sla.avgWaitSeconds ?? 0) <= 60 ? '✅ Dentro do SLA' : (sla.avgWaitSeconds ?? 0) <= 180 ? '⚠️ Atenção' : '🔴 Acima do SLA'}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* TPR - 1ª Resposta Humana */}
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Zap className="h-3.5 w-3.5" /> 1ª Resposta
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <p className="text-2xl font-bold leading-none">
+                  {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgFirstResponseSeconds ?? 0)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Setor: {formatSecondsToDisplay(sla?.sector.avgFirstResponseSeconds ?? 0)}
+                </p>
+                {!slaLoading && sla && (
+                  <p className={`text-[10px] mt-1 ${(sla.avgFirstResponseSeconds ?? 0) <= 180 ? 'text-green-600' : (sla.avgFirstResponseSeconds ?? 0) <= 600 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {(sla.avgFirstResponseSeconds ?? 0) <= 180 ? '✅ Dentro do SLA' : (sla.avgFirstResponseSeconds ?? 0) <= 600 ? '⚠️ Atenção' : '🔴 Acima do SLA'}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* TMA - Tempo Médio de Atendimento */}
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" /> TMA (Atendimento)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <p className="text-2xl font-bold leading-none">
+                  {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgHandleSeconds ?? 0)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Setor: {formatSecondsToDisplay(sla?.sector.avgHandleSeconds ?? 0)}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* TMR - Tempo Médio de Resolução */}
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> TMR (Resolução)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <p className="text-2xl font-bold leading-none">
+                  {slaLoading ? <Skeleton className="h-7 w-20" /> : formatSecondsToDisplay(sla?.avgResolutionSeconds ?? 0)}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Setor: {formatSecondsToDisplay(sla?.sector.avgResolutionSeconds ?? 0)}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* FCR - Resolução no 1º Contato */}
+            <Card>
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                  <Trophy className="h-3.5 w-3.5" /> FCR
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <p className="text-2xl font-bold leading-none">
+                  {slaLoading ? <Skeleton className="h-7 w-20" /> : `${(sla?.fcrRate ?? 0).toFixed(1)}%`}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Setor: {(sla?.sector.fcrRate ?? 0).toFixed(1)}%
+                </p>
+                {!slaLoading && sla && (
+                  <p className={`text-[10px] mt-1 ${(sla.fcrRate ?? 0) >= 70 ? 'text-green-600' : (sla.fcrRate ?? 0) >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {(sla.fcrRate ?? 0) >= 70 ? '✅ Ótimo' : (sla.fcrRate ?? 0) >= 50 ? '⚠️ Regular' : '🔴 Baixo'}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Charts */}
@@ -399,10 +499,50 @@ export default function WhatsAppRelatorio() {
             )}
           </div>
 
-          {/* Agent Performance Table */}
+          {/* Agent Performance Table (SLA-based) */}
+          {sla && sla.agentRanking.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Produtividade por Agente
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Agente</TableHead>
+                        <TableHead className="text-right">Atend.</TableHead>
+                        <TableHead className="text-right">Fechados</TableHead>
+                        <TableHead className="text-right">TMR</TableHead>
+                        <TableHead className="text-right">1ª Resp.</TableHead>
+                        <TableHead className="text-right">FCR</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sla.agentRanking.map((agent) => (
+                        <TableRow key={agent.agentId}>
+                          <TableCell className="font-medium">{agent.agentId?.slice(0, 8) ?? "—"}</TableCell>
+                          <TableCell className="text-right">{agent.totalAttendances}</TableCell>
+                          <TableCell className="text-right">{agent.closedAttendances}</TableCell>
+                          <TableCell className="text-right">{formatSecondsToDisplay(agent.avgResolutionSeconds)}</TableCell>
+                          <TableCell className="text-right">{formatSecondsToDisplay(agent.avgFirstResponseSeconds)}</TableCell>
+                          <TableCell className="text-right">{agent.fcrRate.toFixed(1)}%</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Legacy Agent Performance Table */}
           {metrics.agentPerformance.length > 0 && (
             <Card>
-              <CardHeader><CardTitle className="text-sm">Performance por Agente</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Performance por Agente (Conversas)</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
