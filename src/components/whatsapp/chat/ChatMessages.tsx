@@ -27,6 +27,8 @@ interface Props {
   onEnterSelectionMode?: (msgId: string) => void;
   onContactChat?: (phone: string, name: string) => void;
   onContactSave?: (phone: string, name: string) => void;
+  highlightMessageId?: string | null;
+  onHighlightShown?: () => void;
 }
 
 type TimelineItem =
@@ -50,6 +52,8 @@ export function ChatMessages({
   onEnterSelectionMode,
   onContactChat,
   onContactSave,
+  highlightMessageId,
+  onHighlightShown,
 }: Props) {
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
