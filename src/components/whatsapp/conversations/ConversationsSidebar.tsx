@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useConversationSearch } from "../hooks/useConversationSearch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,6 +54,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const saved = loadSaved();
 
   const [search, setSearch] = useState(saved?.search ?? "");
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const isSearching = !!debouncedSearch && debouncedSearch.length >= 2;
+  const { data: searchResults = [], isLoading: isSearchLoading } = useConversationSearch(debouncedSearch);
   const [showNewModal, setShowNewModal] = useState(false);
   const [activePill, setActivePillRaw] = useState("waiting");
   const [pillAutoSet, setPillAutoSet] = useState(false);
@@ -118,7 +123,6 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   const isAfterHoursPill = activePill === "after_hours";
 
   const { conversations, isLoading } = useWhatsAppConversations({
-    search: search.trim() || undefined,
     instanceId: isAfterHoursPill ? undefined : filters.instanceId,
     // When viewing "Fora do horário", ignore department/instance filters to show all tenant conversations
     departmentId: isAfterHoursPill ? undefined : (selectedDepartmentId || undefined),
@@ -131,7 +135,11 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
-  const conversationIds = useMemo(() => conversations.map(c => c.id), [conversations]);
+  const conversationIds = useMemo(() => {
+    const baseIds = conversations.map(c => c.id);
+    const searchIds = searchResults.map(c => c.id);
+    return [...new Set([...baseIds, ...searchIds])];
+  }, [conversations, searchResults]);
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
   const { stateMap } = useConversationStates(conversationIds);
 
@@ -420,6 +428,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
       </div>
 
       {/* Quick Pills */}
+      {!isSearching && (
       <div className="pt-1.5">
         <QuickPills
           active={activePill}
@@ -430,9 +439,9 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
           afterHoursCount={pillCounts.afterHours}
         />
       </div>
+      )}
 
-      {/* Active Filter Badges */}
-      {activeFilterBadges.length > 0 && (
+      {!isSearching && activeFilterBadges.length > 0 && (
         <div className="flex flex-wrap gap-1 px-3 pb-2">
           {activeFilterBadges.map((badge) => (
             <button
@@ -449,7 +458,7 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
 
       {/* List */}
       <ScrollArea className="flex-1">
-        {isLoading ? (
+        {(isSearching ? isSearchLoading : isLoading) ? (
           <div className="space-y-1 p-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 p-3">
@@ -461,14 +470,14 @@ export function ConversationsSidebar({ selectedId, onSelect }: Props) {
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : (isSearching ? searchResults : filtered).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
-            <p className="text-sm">Nenhuma conversa encontrada</p>
+            <p className="text-sm">{isSearching ? "Nenhum contato encontrado" : "Nenhuma conversa encontrada"}</p>
           </div>
         ) : (
           <div className="space-y-px p-1">
-            {filtered.map((conv) => (
+            {(isSearching ? searchResults : filtered).map((conv) => (
               <ConversationItem
                 key={conv.id}
                 conversation={conv}
