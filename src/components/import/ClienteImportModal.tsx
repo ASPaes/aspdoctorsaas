@@ -786,6 +786,13 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         setImporting(false);
         setImportPhase('');
         return;
+      } else if (duplicataOpcao === 'importar') {
+        // Não filtra nada — importa todos os registros incluindo duplicados
+        // Guarda lista para exibir no resultado final
+        setDuplicatas(duplicatasParaModal);
+        // Limpa o set para que payloadNovos inclua tudo (não separe como "duplicados")
+        cnpjsDuplicadosNoBanco = new Set<string>();
+        // Continua o import normalmente com todos os rows
       }
     }
 
@@ -1684,7 +1691,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                       {duplicatas.length} registro{duplicatas.length > 1 ? 's' : ''} já {duplicatas.length > 1 ? 'existem' : 'existe'} no sistema (CNPJ/CPF duplicado)
                     </p>
                     <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
-                      Você escolheu <strong>&quot;{duplicataOpcao === 'pular' ? 'Pular' : 'Atualizar'}&quot;</strong> no Step 1. Confirme para continuar.
+                      Você escolheu <strong>&quot;{duplicataOpcao === 'pular' ? 'Pular' : duplicataOpcao === 'atualizar' ? 'Atualizar' : 'Importar mesmo assim'}&quot;</strong> no Step 1. Confirme para continuar.
                     </p>
                   </div>
                 </div>
@@ -1982,6 +1989,20 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {duplicataOpcao === 'importar' && duplicatas.length > 0 && (
+              <div className="rounded-md border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-2">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  ⚠️ {duplicatas.length} registro{duplicatas.length !== 1 ? 's' : ''} com CNPJ/CPF já existente foram importados como novos:
+                </p>
+                <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-0.5 max-h-32 overflow-y-auto">
+                  {duplicatas.map((d, i) => (
+                    <li key={i}>{d.cnpj} — {d.razao_social || 'Sem razão social'}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
