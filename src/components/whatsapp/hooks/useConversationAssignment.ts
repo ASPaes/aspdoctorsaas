@@ -118,9 +118,31 @@ export const useConversationAssignment = () => {
         .eq('id', conversationId)
         .single();
 
+      // Buscar o department_id do agente destino
+      let targetDepartmentId: string | null = null;
+      const { data: targetProfile } = await supabase
+        .from('profiles')
+        .select('funcionario_id')
+        .eq('user_id', newAssignee)
+        .maybeSingle();
+
+      if (targetProfile?.funcionario_id) {
+        const { data: targetFunc } = await supabase
+          .from('funcionarios')
+          .select('department_id')
+          .eq('id', targetProfile.funcionario_id)
+          .maybeSingle();
+        if (targetFunc?.department_id) {
+          targetDepartmentId = targetFunc.department_id;
+        }
+      }
+
+      const updatePayload: Record<string, any> = { assigned_to: newAssignee };
+      if (targetDepartmentId) updatePayload.department_id = targetDepartmentId;
+
       const { error: updateError } = await supabase
         .from('whatsapp_conversations')
-        .update({ assigned_to: newAssignee })
+        .update(updatePayload)
         .eq('id', conversationId);
       if (updateError) throw updateError;
 
