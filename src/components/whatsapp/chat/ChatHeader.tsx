@@ -30,6 +30,7 @@ import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
+import { useSupportConfig } from '@/hooks/useSupportConfig';
 
 interface Props {
   conversation: ConversationWithContact;
@@ -50,6 +51,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const { data: supportConfig } = useSupportConfig();
+  const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
@@ -270,7 +273,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setShowCloseModal(true)}
+                    onClick={() => {
+                      if (!csatEnabled) {
+                        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+                      } else {
+                        setShowCloseModal(true);
+                      }
+                    }}
                     aria-label="Encerrar conversa"
                   >
                     <XCircle className="h-4 w-4" />
@@ -423,9 +432,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             <DialogTitle>Encerrar atendimento</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Deseja enviar a pesquisa de satisfação (CSAT) ao cliente ao encerrar?
+            Como deseja encerrar este atendimento?
           </p>
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col gap-2 mt-2">
             <Button
               variant="default"
               onClick={() => {
@@ -442,7 +451,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
               }}
             >
-              ⬜ Encerrar sem CSAT
+              💬 Encerrar com mensagem de encerramento
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCloseModal(false);
+                closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true });
+              }}
+            >
+              🔇 Encerrar sem enviar mensagem ao cliente
             </Button>
             <Button
               variant="ghost"
@@ -450,7 +468,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             >
               ❌ Cancelar
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
