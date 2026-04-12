@@ -153,6 +153,29 @@ export const useConversationAssignment = () => {
         reason: reason || null,
       } as any);
 
+      // Atualizar attendance ativo
+      const { data: activeAtt } = await supabase
+        .from('support_attendances')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .in('status', ['waiting', 'in_progress'])
+        .limit(1)
+        .maybeSingle();
+
+      if (activeAtt) {
+        const attUpdate: Record<string, any> = {
+          assigned_to: newAssignee,
+          status: 'in_progress',
+          assumed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (targetDepartmentId) attUpdate.department_id = targetDepartmentId;
+        await supabase
+          .from('support_attendances')
+          .update(attUpdate)
+          .eq('id', activeAtt.id);
+      }
+
       // Create notification for the new assignee
       if (convData?.tenant_id && newAssignee !== user.id) {
         const contactName = (convData as any).whatsapp_contacts?.name || 'Contato';
