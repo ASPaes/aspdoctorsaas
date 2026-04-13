@@ -1,4 +1,5 @@
 import { UseFormReturn } from "react-hook-form";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,9 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
   const totalCrossSell = movimentosAtivos.filter((m) => m.tipo === "cross_sell").reduce((s, m) => s + m.valor_delta, 0);
   const totalDownsell = movimentosAtivos.filter((m) => m.tipo === "downsell").reduce((s, m) => s + Math.abs(m.valor_delta), 0);
   const qtdMovimentos = (movimentos ?? []).filter((m) => m.status === "ativo").length;
+
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
   const espelho = useEspelhoFinanceiro({
     mensalidade: mensalidade ?? null,
@@ -185,18 +189,20 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
         </div>
       </div>
 
-      <EspelhoFinanceiro
-        espelho={espelho}
-        clienteId={clienteId}
-        mensalidadeBase={mensalidade ?? 0}
-        custoBase={custo_operacao ?? 0}
-        totalUpsell={totalUpsell}
-        totalCrossSell={totalCrossSell}
-        totalDownsell={totalDownsell}
-        totalVendasAvulsas={totalVendasAvulsas}
-        somaDeltaMrr={somaDeltaMrr}
-        qtdMovimentos={qtdMovimentos}
-      />
+      {isAdmin && (
+        <EspelhoFinanceiro
+          espelho={espelho}
+          clienteId={clienteId}
+          mensalidadeBase={mensalidade ?? 0}
+          custoBase={custo_operacao ?? 0}
+          totalUpsell={totalUpsell}
+          totalCrossSell={totalCrossSell}
+          totalDownsell={totalDownsell}
+          totalVendasAvulsas={totalVendasAvulsas}
+          somaDeltaMrr={somaDeltaMrr}
+          qtdMovimentos={qtdMovimentos}
+        />
+      )}
     </div>
   );
 }
