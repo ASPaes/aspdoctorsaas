@@ -91,6 +91,7 @@ function StepCard({ label, value, raw, icon: Icon, isDeduction = false, large = 
 
 interface Props {
   espelho: EspelhoResult;
+  showEspelho?: boolean;
   clienteId?: string;
   mensalidadeBase?: number;
   custoBase?: number;
@@ -104,6 +105,7 @@ interface Props {
 
 export default function EspelhoFinanceiro({
   espelho,
+  showEspelho = true,
   clienteId,
   mensalidadeBase = 0,
   custoBase = 0,
@@ -243,6 +245,8 @@ export default function EspelhoFinanceiro({
           </>
         )}
 
+        {showEspelho && (
+        <>
         {/* ═══════ B) ESPELHO FINANCEIRO — funil lógico ═══════ */}
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
@@ -298,6 +302,8 @@ export default function EspelhoFinanceiro({
             }
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
     </div>
   );
