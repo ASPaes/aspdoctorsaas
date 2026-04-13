@@ -119,6 +119,23 @@ Deno.serve(async (req) => {
     }
 
     if (!storagePath) {
+      // External URL — handle meta and redirect modes
+      if (msg.media_url?.startsWith('http')) {
+        if (mode === 'meta') {
+          const filename = msg.media_filename || msg.media_url.split('/').pop()?.split('?')[0] || 'file';
+          const ext = msg.media_ext || (filename.includes('.') ? filename.split('.').pop()?.toLowerCase() : null);
+          return new Response(JSON.stringify({
+            filename, ext, size_bytes: msg.media_size_bytes,
+            size_label: msg.media_size_bytes ? formatBytes(msg.media_size_bytes) : null,
+            mime: msg.media_mimetype, kind: msg.media_kind || 'document',
+            path: null,
+          }), {
+            status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=600' },
+          });
+        }
+        // For inline/attachment, redirect to external URL
+        return Response.redirect(msg.media_url, 302);
+      }
       return new Response(JSON.stringify({ error: 'No media path available' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
