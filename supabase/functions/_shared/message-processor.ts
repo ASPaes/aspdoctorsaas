@@ -216,7 +216,7 @@ export async function findOrCreateContact(
     if (phoneNumber.startsWith('55') && phoneNumber.length === 13) variants.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
     if (phoneNumber.startsWith('55') && phoneNumber.length === 12) variants.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
 
-    const { data: existing } = await supabase.from('whatsapp_contacts').select('id, name, phone_number').eq('tenant_id', tenantId).in('phone_number', variants).maybeSingle();
+    const { data: existing } = await supabase.from('whatsapp_contacts').select('id, name, phone_number').eq('tenant_id', tenantId).eq('instance_id', instanceId).in('phone_number', variants).maybeSingle();
 
     if (existing) {
       if (existing.phone_number !== phoneNumber) await supabase.from('whatsapp_contacts').update({ phone_number: phoneNumber, updated_at: new Date().toISOString() }).eq('id', existing.id);
