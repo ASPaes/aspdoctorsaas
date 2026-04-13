@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, DollarSign, Percent, BarChart3, Calculator, ArrowUpDown, Zap, Minus, Equal } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
@@ -92,6 +93,8 @@ function StepCard({ label, value, raw, icon: Icon, isDeduction = false, large = 
 interface Props {
   espelho: EspelhoResult;
   showEspelho?: boolean;
+  isEditing?: boolean;
+  onOpenMrrModal?: () => void;
   clienteId?: string;
   mensalidadeBase?: number;
   custoBase?: number;
@@ -106,6 +109,8 @@ interface Props {
 export default function EspelhoFinanceiro({
   espelho,
   showEspelho = true,
+  isEditing = false,
+  onOpenMrrModal,
   clienteId,
   mensalidadeBase = 0,
   custoBase = 0,
@@ -128,13 +133,21 @@ export default function EspelhoFinanceiro({
         {/* ═══════ A) COMPOSIÇÃO MRR ═══════ */}
         {clienteId && (
           <>
-            <div className="flex items-center gap-2">
-              <ArrowUpDown className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Composição MRR</h3>
-              {qtdMovimentos > 0 && (
-                <span className="ml-auto text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
-                  {qtdMovimentos} movimento{qtdMovimentos !== 1 ? "s" : ""}
-                </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Composição MRR</h3>
+                {qtdMovimentos > 0 && (
+                  <span className="ml-auto text-xs font-medium text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">
+                    {qtdMovimentos} movimento{qtdMovimentos !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              {isEditing && onOpenMrrModal && (
+                <Button type="button" variant="outline" size="sm" onClick={onOpenMrrModal}>
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Movimentos MRR
+                </Button>
               )}
             </div>
 
