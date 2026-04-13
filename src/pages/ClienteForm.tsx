@@ -498,12 +498,6 @@ export default function ClienteForm() {
                 <FileText className="h-5 w-5 text-primary" />
                 Produto / Contrato
               </CardTitle>
-              {isEditing && (
-                <Button type="button" variant="outline" size="sm" onClick={() => setMrrModalOpen(true)}>
-                  <ArrowUpDown className="h-4 w-4 mr-2" />
-                  Movimentos MRR
-                </Button>
-              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <VendaProdutoTab
@@ -518,6 +512,8 @@ export default function ClienteForm() {
                 form={form}
                 formasPagamento={lookups.formasPagamento.data ?? []}
                 clienteId={id}
+                isEditing={isEditing}
+                onOpenMrrModal={() => setMrrModalOpen(true)}
               />
             </CardContent>
           </Card>

@@ -14,6 +14,8 @@ interface Props {
   form: UseFormReturn<ClienteFormValues>;
   formasPagamento: { id: number; nome: string }[];
   clienteId?: string;
+  isEditing?: boolean;
+  onOpenMrrModal?: () => void;
 }
 
 interface MovimentoMrr {
@@ -42,7 +44,7 @@ function useMrrMovimentos(clienteId?: string) {
   });
 }
 
-export default function FinanceiroTab({ form, formasPagamento, clienteId }: Props) {
+export default function FinanceiroTab({ form, formasPagamento, clienteId, isEditing, onOpenMrrModal }: Props) {
   const mensalidade = form.watch("mensalidade");
   const custo_operacao = form.watch("custo_operacao");
   const imposto_percentual = form.watch("imposto_percentual");
@@ -192,6 +194,8 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
       <EspelhoFinanceiro
           espelho={espelho}
           showEspelho={isFinanceiroAdmin}
+          isEditing={isEditing}
+          onOpenMrrModal={onOpenMrrModal}
           clienteId={clienteId}
           mensalidadeBase={mensalidade ?? 0}
           custoBase={custo_operacao ?? 0}
