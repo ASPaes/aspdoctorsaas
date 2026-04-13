@@ -70,7 +70,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
   const qtdMovimentos = (movimentos ?? []).filter((m) => m.status === "ativo").length;
 
   const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const isFinanceiroAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const espelho = useEspelhoFinanceiro({
     mensalidade: mensalidade ?? null,
@@ -189,7 +189,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
         </div>
       </div>
 
-      {isAdmin && (
+      {isFinanceiroAdmin && (
         <EspelhoFinanceiro
           espelho={espelho}
           clienteId={clienteId}
