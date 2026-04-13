@@ -1905,7 +1905,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 className="gap-2"
               >
                 {(() => {
-                  const totalDupLines = dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0);
+                  const totalDupLines = duplicataOpcao === 'importar' ? 0 : dupIntraCSVPreview.reduce((acc, d) => acc + d.count - 1, 0);
                   const realCount = validRows.length - totalDupLines;
                   return `Importar ${realCount} cliente${realCount !== 1 ? 's' : ''}`;
                 })()}
