@@ -1115,7 +1115,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       imported,
       skipped: errorRows.length
         + (duplicataOpcao === 'pular' ? cnpjsDuplicadosNoBanco.size : 0)
-        + dupIntraCSV.length,
+        + (duplicataOpcao === 'importar' ? 0 : dupIntraCSV.length),
       failed,
       failedRows,
       autoCreated,
@@ -2052,23 +2052,22 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             )}
 
             {result.dupIntraCSV.length > 0 && (
-              <div className="rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 p-3 space-y-2">
-                <p className="text-sm font-medium text-orange-800 dark:text-orange-300 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  {result.dupIntraCSV.length} linha{result.dupIntraCSV.length !== 1 ? 's' : ''} ignorada{result.dupIntraCSV.length !== 1 ? 's' : ''} — CNPJ duplicado dentro do próprio arquivo
+              <div className={`rounded-md border p-3 ${duplicataOpcao === 'importar' ? 'border-blue-200 bg-blue-50 dark:bg-blue-950/30' : 'border-amber-200 bg-amber-50 dark:bg-amber-950/30'}`}>
+                <p className={`text-sm font-medium ${duplicataOpcao === 'importar' ? 'text-blue-800 dark:text-blue-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                  {duplicataOpcao === 'importar'
+                    ? `ℹ️ ${result.dupIntraCSV.length} registro(s) com CNPJ duplicado no arquivo foram importados normalmente:`
+                    : `⚠️ ${result.dupIntraCSV.length} linha(s) ignorada(s) — CNPJ duplicado dentro do próprio arquivo`}
                 </p>
-                <p className="text-xs text-orange-700 dark:text-orange-400">
-                  O arquivo continha o mesmo CNPJ em mais de uma linha. Apenas a primeira ocorrência foi importada. Verifique e corrija o arquivo de origem.
-                </p>
-                <div className="max-h-32 overflow-y-auto space-y-1">
+                {duplicataOpcao !== 'importar' && (
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    O arquivo continha o mesmo CNPJ em mais de uma linha. Apenas a primeira ocorrência foi importada. Verifique e corrija o arquivo de origem.
+                  </p>
+                )}
+                <ul className={`text-xs mt-2 space-y-0.5 max-h-32 overflow-y-auto ${duplicataOpcao === 'importar' ? 'text-blue-700 dark:text-blue-300' : 'text-amber-700 dark:text-amber-300'}`}>
                   {result.dupIntraCSV.map((d, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-orange-800 dark:text-orange-300">
-                      <span className="font-mono">{d.cnpj}</span>
-                      <span>—</span>
-                      <span className="truncate">{d.razao_social}</span>
-                    </div>
+                    <li key={i}>{d.cnpj} — {d.razao_social}</li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
 
