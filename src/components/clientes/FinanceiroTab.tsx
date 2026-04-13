@@ -189,9 +189,9 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
         </div>
       </div>
 
-      {isFinanceiroAdmin && (
-        <EspelhoFinanceiro
+      <EspelhoFinanceiro
           espelho={espelho}
+          showEspelho={isFinanceiroAdmin}
           clienteId={clienteId}
           mensalidadeBase={mensalidade ?? 0}
           custoBase={custo_operacao ?? 0}
@@ -202,7 +202,6 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId }: Prop
           somaDeltaMrr={somaDeltaMrr}
           qtdMovimentos={qtdMovimentos}
         />
-      )}
     </div>
   );
 }
