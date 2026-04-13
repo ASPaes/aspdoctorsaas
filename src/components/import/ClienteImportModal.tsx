@@ -887,7 +887,19 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         const override = fkManualOverrides[fk.csvColumn]?.[val];
         if (override === '__skip__') continue; // usuário escolheu ignorar
         if (override === '__new__') {
-          // usuário escolheu criar novo — cai no bloco de auto-create abaixo
+          // Usuário escolheu criar novo — cria imediatamente
+          const insertPayload: any = { [fk.searchField]: val.trim() };
+          if (fk.tenantScoped) insertPayload.tenant_id = tenantId;
+          const { data: created, error: createErr } = await supabase
+            .from(fk.table as any)
+            .insert(insertPayload)
+            .select('id')
+            .single();
+          if (created && !createErr) {
+            map[normalizeForCompare(val)] = (created as any).id;
+            autoCreated[fk.label] = (autoCreated[fk.label] ?? 0) + 1;
+          }
+          continue;
         } else if (typeof override === 'number') {
           map[normalizeForCompare(val)] = override; // usuário escolheu um registro específico
           continue;
