@@ -74,3 +74,12 @@ verify_jwt = false
 
 [functions.create-whatsapp-instance]
 verify_jwt = false
+
+[functions.zapi-webhook]
+verify_jwt = false
+
+[functions.check-ai-usage-alert]
+verify_jwt = false
+
+[functions.ai-admin-commands]
+verify_jwt = false
