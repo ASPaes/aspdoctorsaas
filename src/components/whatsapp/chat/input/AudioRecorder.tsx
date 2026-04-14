@@ -33,7 +33,11 @@ export const AudioRecorder = ({ onSend, onCancel }: AudioRecorderProps) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      // WhatsApp requires OGG/Opus format. Use it if supported, fallback to webm.
+      const preferredMime = 'audio/ogg;codecs=opus';
+      const fallbackMime = 'audio/webm;codecs=opus';
+      const mimeToUse = MediaRecorder.isTypeSupported(preferredMime) ? preferredMime : fallbackMime;
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: mimeToUse });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -54,7 +58,7 @@ export const AudioRecorder = ({ onSend, onCancel }: AudioRecorderProps) => {
   const handleStopRecording = () => {
     if (!mediaRecorderRef.current || !isRecording) return;
     mediaRecorderRef.current.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      const blob = new Blob(chunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/ogg;codecs=opus' });
       setAudioBlob(blob);
       setAudioUrl(URL.createObjectURL(blob));
       setIsPreviewing(true);
@@ -75,7 +79,8 @@ export const AudioRecorder = ({ onSend, onCancel }: AudioRecorderProps) => {
     const reader = new FileReader();
     reader.readAsDataURL(audioBlob);
     reader.onloadend = () => {
-      onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: 'audio/webm' });
+      const mime = audioBlob.type.startsWith('audio/ogg') ? 'audio/ogg; codecs=opus' : audioBlob.type;
+      onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: mime });
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   };
