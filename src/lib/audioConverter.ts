@@ -21,7 +21,7 @@ export async function convertWebmToMp3(webmBlob: Blob): Promise<Blob> {
   
   // Encode to MP3
   const mp3Encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
-  const mp3Data: Uint8Array[] = [];
+  const mp3Data: BlobPart[] = [];
   
   const blockSize = 1152;
   for (let i = 0; i < int16Samples.length; i += blockSize) {
