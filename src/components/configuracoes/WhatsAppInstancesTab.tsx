@@ -212,41 +212,51 @@ export default function WhatsAppInstancesTab() {
           .eq("id", editingId);
         if (instErr) throw instErr;
 
-        // Build secrets payload
-        const secretsPayload: any = {};
-        if (form.provider_type === "self_hosted") {
-          secretsPayload.api_url = form.api_url.trim();
-          secretsPayload.api_key = form.api_key.trim();
-        } else if (form.provider_type === "zapi") {
-          secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
-          secretsPayload.zapi_token = form.zapi_token.trim();
-          secretsPayload.zapi_client_token = form.zapi_client_token.trim() || null;
-        } else if (form.provider_type === "meta_cloud") {
-          secretsPayload.meta_access_token = form.meta_access_token.trim();
-        }
-
-        // Upsert secrets
-        const { data: existingSecret } = await supabase
-          .from("whatsapp_instance_secrets")
-          .select("id")
-          .eq("instance_id", editingId)
-          .maybeSingle();
-
-        if (existingSecret) {
-          const { error: secErr } = await (supabase
-            .from("whatsapp_instance_secrets") as any)
-            .update(secretsPayload)
-            .eq("instance_id", editingId);
-          if (secErr) throw secErr;
-        } else {
-          const { error: secErr } = await (supabase
-            .from("whatsapp_instance_secrets") as any)
-            .insert({
+        if (form.provider_type === "meta_cloud") {
+          // Meta secrets go to Vault via Edge Function
+          const { error: vaultErr } = await supabase.functions.invoke("upsert-instance-secrets", {
+            body: {
               instance_id: editingId,
-              tenant_id: tid ?? (instances.find((i) => i.id === editingId) as any)?.tenant_id,
-              ...secretsPayload,
-            });
-          if (secErr) throw secErr;
+              meta_access_token: form.meta_access_token.trim(),
+              meta_app_secret: form.meta_app_secret.trim(),
+              meta_verify_token: form.meta_verify_token.trim(),
+            },
+          });
+          if (vaultErr) throw new Error("Erro ao salvar secrets: " + vaultErr.message);
+        } else {
+          // self_hosted and zapi: keep existing logic with whatsapp_instance_secrets table
+          const secretsPayload: any = {};
+          if (form.provider_type === "self_hosted") {
+            secretsPayload.api_url = form.api_url.trim();
+            secretsPayload.api_key = form.api_key.trim();
+          } else if (form.provider_type === "zapi") {
+            secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
+            secretsPayload.zapi_token = form.zapi_token.trim();
+            secretsPayload.zapi_client_token = form.zapi_client_token.trim() || null;
+          }
+
+          const { data: existingSecret } = await supabase
+            .from("whatsapp_instance_secrets")
+            .select("id")
+            .eq("instance_id", editingId)
+            .maybeSingle();
+
+          if (existingSecret) {
+            const { error: secErr } = await (supabase
+              .from("whatsapp_instance_secrets") as any)
+              .update(secretsPayload)
+              .eq("instance_id", editingId);
+            if (secErr) throw secErr;
+          } else {
+            const { error: secErr } = await (supabase
+              .from("whatsapp_instance_secrets") as any)
+              .insert({
+                instance_id: editingId,
+                tenant_id: tid ?? (instances.find((i) => i.id === editingId) as any)?.tenant_id,
+                ...secretsPayload,
+              });
+            if (secErr) throw secErr;
+          }
         }
       } else {
         // Create instance
@@ -266,26 +276,37 @@ export default function WhatsAppInstancesTab() {
           .single();
         if (instErr) throw instErr;
 
-        // Build secrets payload
-        const secretsPayload: any = {
-          instance_id: newInst.id,
-          tenant_id: newInst.tenant_id,
-        };
-        if (form.provider_type === "self_hosted") {
-          secretsPayload.api_url = form.api_url.trim();
-          secretsPayload.api_key = form.api_key.trim();
-        } else if (form.provider_type === "zapi") {
-          secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
-          secretsPayload.zapi_token = form.zapi_token.trim();
-          secretsPayload.zapi_client_token = form.zapi_client_token.trim() || null;
-        } else if (form.provider_type === "meta_cloud") {
-          secretsPayload.meta_access_token = form.meta_access_token.trim();
-        }
+        if (form.provider_type === "meta_cloud") {
+          // Meta secrets go to Vault via Edge Function
+          const { error: vaultErr } = await supabase.functions.invoke("upsert-instance-secrets", {
+            body: {
+              instance_id: newInst.id,
+              meta_access_token: form.meta_access_token.trim(),
+              meta_app_secret: form.meta_app_secret.trim(),
+              meta_verify_token: form.meta_verify_token.trim(),
+            },
+          });
+          if (vaultErr) throw new Error("Instância criada, mas erro ao salvar secrets: " + vaultErr.message);
+        } else {
+          // self_hosted and zapi: keep existing logic with whatsapp_instance_secrets table
+          const secretsPayload: any = {
+            instance_id: newInst.id,
+            tenant_id: newInst.tenant_id,
+          };
+          if (form.provider_type === "self_hosted") {
+            secretsPayload.api_url = form.api_url.trim();
+            secretsPayload.api_key = form.api_key.trim();
+          } else if (form.provider_type === "zapi") {
+            secretsPayload.zapi_instance_id = form.zapi_instance_id.trim();
+            secretsPayload.zapi_token = form.zapi_token.trim();
+            secretsPayload.zapi_client_token = form.zapi_client_token.trim() || null;
+          }
 
-        const { error: secErr } = await (supabase
-          .from("whatsapp_instance_secrets") as any)
-          .insert(secretsPayload);
-        if (secErr) throw secErr;
+          const { error: secErr } = await (supabase
+            .from("whatsapp_instance_secrets") as any)
+            .insert(secretsPayload);
+          if (secErr) throw secErr;
+        }
       }
     },
     onSuccess: () => {
