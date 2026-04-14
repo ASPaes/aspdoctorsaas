@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent, DragEvent, ClipboardEvent } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, Paperclip } from "lucide-react";
+import { Send, Mic, Paperclip, Maximize2, Minimize2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { AIComposerButton } from "./input/AIComposerButton";
@@ -40,6 +40,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendMutation = useWhatsAppSend();
@@ -48,6 +49,16 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
 
   const { macros, incrementUsage } = useWhatsAppMacros();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || isExpanded) return;
+    textarea.style.height = 'auto';
+    const maxAutoHeight = 200;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxAutoHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxAutoHeight ? 'auto' : 'hidden';
+  }, [message, isExpanded]);
 
   useEffect(() => {
     const match = message.match(/\/macro:\s*(\S*)$/i);
@@ -295,16 +306,34 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
 
           <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
 
-          <Textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder={isBlocked ? "Você precisa estar ATIVO para atender." : "Digite uma mensagem..."}
-            className="min-h-[44px] max-h-32 resize-none"
-            disabled={sendMutation.isPending || isBlocked}
-          />
+          <div className="relative flex-1">
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              placeholder={isBlocked ? "Voc\u{00EA} precisa estar ATIVO para atender." : "Digite uma mensagem..."}
+              className="resize-none pr-8"
+              style={{
+                minHeight: '44px',
+                height: isExpanded ? '400px' : undefined,
+                maxHeight: isExpanded ? '400px' : '200px',
+                overflowY: isExpanded ? 'auto' : undefined,
+              }}
+              disabled={sendMutation.isPending || isBlocked}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="absolute top-1 right-1 h-6 w-6 opacity-60 hover:opacity-100"
+              aria-label={isExpanded ? "Recolher campo de texto" : "Expandir campo de texto"}
+            >
+              {isExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
 
           {hasContent ? (
             <Button onClick={handleSend} size="icon" disabled={sendMutation.isPending || isBlocked}>
