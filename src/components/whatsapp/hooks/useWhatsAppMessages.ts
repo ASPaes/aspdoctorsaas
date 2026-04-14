@@ -216,23 +216,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
           }
         );
       })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'whatsapp_conversations',
-        filter: `id=eq.${conversationId}`,
-      }, () => {
-        const now = Date.now();
-        if (now - lastInvalidateRef.current > 2000) {
-          lastInvalidateRef.current = now;
-          if (import.meta.env.DEV) {
-            console.log(`[realtime] fallback refetch conv=${conversationId}`);
-          }
-          queryClient.invalidateQueries({
-            queryKey: ['whatsapp', 'messages', conversationId],
-          });
-        }
-      })
       .subscribe((status) => {
         if (import.meta.env.DEV) {
           console.log(`[realtime] channel ${channelName} status: ${status}`);
