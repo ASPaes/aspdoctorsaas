@@ -148,6 +148,18 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const waitingCount = countsData?.waitingCount || 0;
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  const lastActivityRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    const markActivity = () => { lastActivityRef.current = Date.now(); };
+    window.addEventListener('keydown', markActivity, { passive: true });
+    window.addEventListener('mousedown', markActivity, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', markActivity);
+      window.removeEventListener('mousedown', markActivity);
+    };
+  }, []);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
     staleTime: 30_000,
@@ -190,18 +202,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   // Realtime: unique channel per hook instance to avoid collision
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
-
-  const lastActivityRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    const markActivity = () => { lastActivityRef.current = Date.now(); };
-    window.addEventListener('keydown', markActivity, { passive: true });
-    window.addEventListener('mousedown', markActivity, { passive: true });
-    return () => {
-      window.removeEventListener('keydown', markActivity);
-      window.removeEventListener('mousedown', markActivity);
-    };
-  }, []);
 
   useEffect(() => {
     const channelName = `conversations-rt-${channelIdRef.current}`;
@@ -251,35 +251,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
             const tB = b.last_message_at || b.created_at || '';
             return tB.localeCompare(tA);
           });
-          return { ...old, conversations: patched };
-        });
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'support_attendances',
-      }, (payload) => {
-        const updated = payload.new as any;
-        const prev = payload.old as any;
-        // Só agir quando o status realmente mudou (ex: in_progress → closed)
-        if (!updated?.conversation_id) return;
-        if (updated.status === prev?.status) return;
-
-        queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
-          if (!old?.conversations) return old;
-          const idx = old.conversations.findIndex((c: any) => c.id === updated.conversation_id);
-          if (idx === -1) {
-            // Conversa não está na página atual — invalida para buscar do servidor
-            setTimeout(() => {
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-            }, 300);
-            return old;
-          }
-          // Patch cirúrgico: atualiza o status da conversa para refletir o attendance
-          const newStatus = updated.status === 'closed' ? 'closed' : old.conversations[idx].status;
-          const patched = [...old.conversations];
-          patched[idx] = { ...patched[idx], status: newStatus };
           return { ...old, conversations: patched };
         });
       })
