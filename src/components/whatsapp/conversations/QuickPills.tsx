@@ -10,8 +10,8 @@ interface Props {
 }
 
 const pills = [
-  { key: "in_progress", label: "Atendendo" },
   { key: "waiting", label: "Fila" },
+  { key: "in_progress", label: "Atendendo" },
   { key: "after_hours", label: "Fora do horário" },
   { key: "all", label: "Todos" },
   { key: "closed", label: "Encerrados" },
