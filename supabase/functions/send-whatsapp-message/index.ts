@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       if (profileError) {
         console.error('[send-whatsapp-message] Error fetching sender profile:', profileError);
         return new Response(
-          JSON.stringify({ error: 'NÃÂ£o foi possÃÂ­vel validar o usuÃÂ¡rio.' }),
+          JSON.stringify({ error: 'NÃÂ£o foi possÃÂ­vel validar o usu\u{00E1}rio.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
         if (senderProfile?.access_status !== 'ativo' && senderProfile?.access_status !== 'active') {
           console.warn('[send-whatsapp-message] Blocked inactive user:', senderUid, 'status:', senderProfile?.access_status);
           return new Response(
-            JSON.stringify({ error: 'Seu usuÃÂ¡rio estÃÂ¡ inativo e nÃÂ£o pode enviar mensagens. Fale com o administrador.' }),
+            JSON.stringify({ error: 'Seu usu\u{00E1}rio est\u{00E1} inativo e nÃÂ£o pode enviar mensagens. Fale com o administrador.' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         if (!senderProfile?.funcionario_id) {
           console.warn('[send-whatsapp-message] Blocked user without funcionario:', senderUid);
           return new Response(
-            JSON.stringify({ error: 'UsuÃÂ¡rio sem funcionÃÂ¡rio vinculado. Vincule em Acessos & Equipe.' }),
+            JSON.stringify({ error: 'Usu\u{00E1}rio sem funcion\u{00E1}rio vinculado. Vincule em Acessos & Equipe.' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -418,8 +418,8 @@ Deno.serve(async (req) => {
           try {
             const contactName = contact?.name || '';
             const openingText = contactName
-              ? `OlÃÂ¡ ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
-              : `OlÃÂ¡, o atendimento ${newAtt.attendance_code} foi iniciado.`;
+              ? `Ol\u{00E1} ${contactName}, o atendimento ${newAtt.attendance_code} foi iniciado.`
+              : `Ol\u{00E1}, o atendimento ${newAtt.attendance_code} foi iniciado.`;
             const destNumber = getDestinationNumber(contact.phone_number);
 
             const openResult = await adapter.send(secrets, instanceData, {
