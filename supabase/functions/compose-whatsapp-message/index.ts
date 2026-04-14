@@ -148,6 +148,9 @@ serve(async (req) => {
       case "fix_grammar":
         prompt = `Corrija gramática, ortografia e pontuação:\n\n"${message}"\n\nResponda apenas com o texto corrigido.`;
         break;
+      case "simplify":
+        prompt = `Reescreva esta mensagem t\u{00E9}cnica de forma simples e clara, como se estivesse explicando para uma pessoa leiga que n\u{00E3}o entende termos t\u{00E9}cnicos. Use linguagem do dia a dia, exemplos pr\u{00E1}ticos se necess\u{00E1}rio, e mantenha um tom amig\u{00E1}vel:\n\n"${message}"\n\nResponda apenas com a vers\u{00E3}o simplificada.`;
+        break;
       case "translate":
         prompt = `Traduza para ${languageNames[targetLanguage || "en"] || targetLanguage}:\n\n"${message}"\n\nResponda apenas com a tradução.`;
         break;
