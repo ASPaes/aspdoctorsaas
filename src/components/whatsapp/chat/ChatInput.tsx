@@ -115,12 +115,15 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       return;
     }
     const content = message.trim();
-    if (!content || sendMutation.isPending) return;
+    if (!content) return;
+
+    setMessage("");
+    onCancelReply?.();
+    setTimeout(() => textareaRef.current?.focus(), 50);
 
     sendMutation.mutate(
       { conversationId, content, messageType: "text", quotedMessageId: replyTo?.message_id || undefined },
       {
-        onSuccess: () => { setMessage(""); onCancelReply?.(); setTimeout(() => textareaRef.current?.focus(), 50); },
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
     );
