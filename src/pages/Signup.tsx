@@ -83,6 +83,18 @@ export default function Signup() {
           toast.error("Este email já possui conta. Verifique sua senha.");
           return;
         }
+        if (inviteId) {
+          const { error: acceptError } = await (supabase.rpc as any)(
+            "accept_access_invite",
+            { p_invite_id: inviteId }
+          );
+          if (acceptError) {
+            console.error("Error accepting invite (existing user):", acceptError);
+            toast.error("Login OK, mas erro ao vincular convite. Contate o administrador.");
+            setLoading(false);
+            return;
+          }
+        }
         await refreshProfile();
         toast.success("Bem-vindo!");
         navigate("/dashboard");
