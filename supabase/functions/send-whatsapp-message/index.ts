@@ -473,9 +473,19 @@ Deno.serve(async (req) => {
       sendResult = await adapter.send(secrets, instanceData, sendRequest);
     } catch (sendErr: any) {
       console.error('[send-whatsapp-message] Erro no envio:', sendErr);
+      const errMsg = sendErr.message || 'Failed to send message';
+      // Meta-specific: credential/account errors should return 422 not 500
+      const isMetaAccountError = errMsg.includes('133010') || errMsg.includes('Account not registered');
+      const isMetaAuthError = errMsg.includes('190') || errMsg.includes('OAuthException');
+      const statusCode = (isMetaAccountError || isMetaAuthError) ? 422 : 500;
+      const userMessage = isMetaAccountError
+        ? 'Conta Meta não registrada. Verifique o Access Token e o Phone Number ID nas configurações da instância.'
+        : isMetaAuthError
+        ? 'Token Meta inválido ou expirado. Atualize o Access Token nas configurações.'
+        : errMsg;
       return new Response(
-        JSON.stringify({ success: false, error: sendErr.message || 'Failed to send message' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        JSON.stringify({ success: false, error: userMessage }),
+        { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
