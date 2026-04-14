@@ -12,27 +12,56 @@ import { Loader2 } from "lucide-react";
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const search = window.location.search;
-    const fullUrl = hash + search;
-    
-    // Supabase may use hash (#) or query string (?) depending on flow
-    const hasRecoveryToken = fullUrl.includes("type=recovery");
-    
-    if (!hasRecoveryToken) {
-      // Give Supabase client a moment to process the token exchange
-      const timer = setTimeout(() => {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const hashParams = new URLSearchParams(window.location.hash.replace("#", ""));
+    const hashType = hashParams.get("type");
+    const hashAccessToken = hashParams.get("access_token");
+
+    if (code) {
+      // PKCE flow: exchange code for session
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        if (error) {
+          console.error("Code exchange failed:", error);
+          toast.error("Link de redefinição inválido ou expirado.");
+          navigate("/login", { replace: true });
+        } else {
+          setSessionReady(true);
+          setChecking(false);
+          window.history.replaceState({}, "", "/reset-password");
+        }
+      });
+    } else if (hashType === "recovery" && hashAccessToken) {
+      // Implicit flow: token is in the hash, supabase-js handles it automatically
+      const checkSession = () => {
         supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session) {
-            toast.error("Link de redefinição inválido ou expirado.");
-            navigate("/login", { replace: true });
+          if (session) {
+            setSessionReady(true);
+            setChecking(false);
+          } else {
+            setTimeout(() => {
+              supabase.auth.getSession().then(({ data: { session: s2 } }) => {
+                if (s2) {
+                  setSessionReady(true);
+                } else {
+                  toast.error("Link de redefinição inválido ou expirado.");
+                  navigate("/login", { replace: true });
+                }
+                setChecking(false);
+              });
+            }, 2000);
           }
         });
-      }, 1500);
-      return () => clearTimeout(timer);
+      };
+      checkSession();
+    } else {
+      toast.error("Link de redefinição inválido.");
+      navigate("/login", { replace: true });
     }
   }, [navigate]);
 
@@ -49,6 +78,16 @@ export default function ResetPassword() {
     }
   };
 
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!sessionReady) return null;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
@@ -61,7 +100,7 @@ export default function ResetPassword() {
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Nova senha</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" required minLength={6} />
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required minLength={8} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
