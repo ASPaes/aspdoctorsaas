@@ -50,55 +50,15 @@ Deno.serve(async (req) => {
     const { instanceId } = await req.json();
     console.log('[test-instance-connection] Testing instance:', instanceId);
 
-    // Fetch instance + secrets table + vault refs in parallel
-    const [instanceResult, secretsResult, vaultRefsResult] = await Promise.all([
-      supabaseAdmin
-        .from('whatsapp_instances')
-        .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id')
-        .eq('id', instanceId)
-        .single(),
-      supabaseAdmin
-        .from('whatsapp_instance_secrets')
-        .select('api_url, zapi_instance_id, zapi_token, zapi_client_token')
-        .eq('instance_id', instanceId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from('whatsapp_instance_vault_refs')
-        .select('secret_name, vault_secret_id')
-        .eq('instance_id', instanceId),
-    ]);
+    // Fetch instance
+    const instanceResult = await supabaseAdmin
+      .from('whatsapp_instances')
+      .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id')
+      .eq('id', instanceId)
+      .single();
 
     if (instanceResult.error || !instanceResult.data) {
       return new Response(JSON.stringify({ error: 'Instance not found' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Build secrets object from table + vault
-    const tableSecrets = secretsResult.data || {};
-    const secrets: Record<string, any> = { ...tableSecrets };
-
-    // Resolve vault secrets for sensitive fields (api_key, meta_access_token, etc.)
-    if (vaultRefsResult.data && vaultRefsResult.data.length > 0) {
-      for (const ref of vaultRefsResult.data) {
-        // Only fetch from vault if not already in table secrets
-        if (!secrets[ref.secret_name]) {
-          try {
-            const { data: decrypted } = await supabaseAdmin
-              .from('vault.decrypted_secrets' as any)
-              .select('decrypted_secret')
-              .eq('id', ref.vault_secret_id)
-              .single();
-            if (decrypted?.decrypted_secret) secrets[ref.secret_name] = decrypted.decrypted_secret;
-          } catch (_e) {
-            // Vault read failed, skip
-          }
-        }
-      }
-    }
-
-    if (!secretsResult.data && (!vaultRefsResult.data || vaultRefsResult.data.length === 0)) {
-      return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -107,6 +67,30 @@ Deno.serve(async (req) => {
     const providerType = instance.provider_type || 'self_hosted';
 
     console.log('[test-instance-connection] Provider:', providerType, 'Instance:', instance.instance_name);
+
+    // Use the same RPC-based secret resolution as send-whatsapp-message
+    const secrets = await getInstanceSecrets(supabaseAdmin, instanceId);
+
+    // For non-vault providers, also check the table
+    if (!secrets.api_key && !secrets.meta_access_token) {
+      const { data: tableSecrets } = await supabaseAdmin
+        .from('whatsapp_instance_secrets')
+        .select('api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token')
+        .eq('instance_id', instanceId)
+        .maybeSingle();
+
+      if (tableSecrets) {
+        Object.assign(secrets, tableSecrets);
+      }
+    }
+
+    if (Object.keys(secrets).length === 0) {
+      return new Response(JSON.stringify({ error: 'Instance secrets not found' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[test-instance-connection] Secrets keys found:', Object.keys(secrets).join(', '));
 
     const adapter = getAdapter(providerType);
     const status = await adapter.checkStatus(secrets, instance);
