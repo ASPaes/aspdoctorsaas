@@ -25,7 +25,8 @@ export const useWhatsAppSend = () => {
       const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
         body: params,
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'Erro ao enviar mensagem');
+      if (data?.success === false) throw new Error(data.error || 'Erro ao enviar mensagem');
       return data;
     },
     onMutate: async (newMessage) => {

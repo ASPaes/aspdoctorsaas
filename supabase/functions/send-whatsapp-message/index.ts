@@ -284,7 +284,6 @@ Deno.serve(async (req) => {
     const providerType = instanceData.provider_type || 'self_hosted';
 
     console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceData.instance_name, 'Provider:', providerType);
-    console.log('[send-whatsapp-message] Secrets keys:', Object.keys(secrets).join(', '), 'meta_access_token length:', (secrets.meta_access_token || '').length, 'phone_number_id:', instanceData.meta_phone_number_id);
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
@@ -474,19 +473,21 @@ Deno.serve(async (req) => {
       sendResult = await adapter.send(secrets, instanceData, sendRequest);
     } catch (sendErr: any) {
       console.error('[send-whatsapp-message] Erro no envio:', sendErr);
-      const errMsg = sendErr.message || 'Failed to send message';
-      // Meta-specific: credential/account errors should return 422 not 500
+      const errMsg = sendErr?.message || sendErr?.details || 'Failed to send message';
       const isMetaAccountError = errMsg.includes('133010') || errMsg.includes('Account not registered');
       const isMetaAuthError = errMsg.includes('190') || errMsg.includes('OAuthException');
-      const statusCode = (isMetaAccountError || isMetaAuthError) ? 422 : 500;
       const userMessage = isMetaAccountError
         ? 'Conta Meta não registrada. Verifique o Access Token e o Phone Number ID nas configurações da instância.'
         : isMetaAuthError
         ? 'Token Meta inválido ou expirado. Atualize o Access Token nas configurações.'
         : errMsg;
+
       return new Response(
         JSON.stringify({ success: false, error: userMessage }),
-        { status: statusCode, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        {
+          status: (isMetaAccountError || isMetaAuthError) ? 200 : 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       );
     }
 
