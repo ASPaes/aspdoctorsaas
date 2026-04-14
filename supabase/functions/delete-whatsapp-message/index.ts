@@ -277,9 +277,9 @@ Deno.serve(async (req) => {
         let jidToUse = msg.remote_jid;
         console.log(`[${FUNCTION_NAME}][${requestId}] Message details: message_id=${msg.message_id}, original_remote_jid=${msg.remote_jid}, fromMe=${msg.is_from_me}`);
 
-        // If original JID is missing, try to resolve from conversation contact
-        if (!jidToUse) {
-          jidToUse = await resolveRemoteJid(supabase, null, conversationId, requestId);
+        // If original JID is missing or doesn't have @ suffix, resolve from conversation contact
+        if (!jidToUse || (!jidToUse.includes('@s.whatsapp.net') && !jidToUse.includes('@g.us') && !jidToUse.includes('@lid'))) {
+          jidToUse = await resolveRemoteJid(supabase, jidToUse, conversationId, requestId);
         }
 
         if (!jidToUse) {
