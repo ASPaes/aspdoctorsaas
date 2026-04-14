@@ -67,6 +67,7 @@ export function useConversationStates(conversationIds: string[]) {
         table: "support_attendances",
       }, () => {
         queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+        queryClient.refetchQueries({ queryKey: ["conversation-states"] });
       })
       .subscribe();
 
