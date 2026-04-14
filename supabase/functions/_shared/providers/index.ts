@@ -217,14 +217,15 @@ class ZApiAdapter implements ProviderAdapter {
         break;
       }
       case 'audio': {
+        // Z-API send-audio: use base64 if available, force OGG mimetype for WhatsApp compatibility
         if (msg.mediaBase64) {
-          // Use base64 endpoint - Z-API handles format conversion
-          const raw = msg.mediaBase64.startsWith('data:')
-            ? msg.mediaBase64
-            : `data:${msg.mediaMimetype || 'audio/ogg'};base64,${msg.mediaBase64}`;
+          const rawBase64 = msg.mediaBase64.startsWith('data:')
+            ? msg.mediaBase64.split(',')[1] || ''
+            : msg.mediaBase64;
+          // Send raw base64 without data URI prefix - Z-API handles conversion
           endpoint = `${base}/send-audio`;
-          body = { phone, audio: raw };
-        } else {
+          body = { phone, audio: rawBase64, encoding: true };
+        } else if (msg.mediaUrl) {
           endpoint = `${base}/send-audio`;
           body = { phone, audio: msg.mediaUrl };
         }
