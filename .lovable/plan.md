@@ -1,64 +1,57 @@
 
 
-## Objetivo
-Corrigir o bug onde conversas ficam permanentemente marcadas como "Fora do horário" mesmo quando mensagens chegam durante o horário comercial.
+## Diagnosis
 
-## Causa raiz
-No `evolution-webhook`, quando uma mensagem chega **durante** o horário comercial, o código simplesmente pula o bloco de fora-do-horário (`bhResult.inside === true`), mas **nunca limpa** o flag `opened_out_of_hours = true` que foi definido anteriormente. O `getConversationBucket` no frontend usa esse flag para classificar a conversa, mantendo-a presa no balde "Fora do horário" indefinidamente.
+Camila Marques (role: `user`, department: `Financeiro`) cannot transfer conversations to other departments because of an RLS policy conflict on the `support_attendances` table.
 
-## Mudanças no código
+The UPDATE policy `support_attendances_update_by_department` has a `WITH CHECK` clause that requires the **new** `department_id` to match the user's own department. When Camila transfers to "Implantação", the update sets `department_id = 'implantacao_id'` which doesn't match her `current_user_department_id()` (Financeiro), so PostgreSQL rejects the write.
 
-### 1. `supabase/functions/evolution-webhook/index.ts`
-Após o check `if (supportConfigBH.business_hours_enabled)` e `bhResult.inside === true`, adicionar lógica para limpar o flag:
+The same issue may also affect the `whatsapp_conversations` SELECT policy — after updating the conversation's `department_id` to a different department, Camila can no longer read that conversation (which is expected), but the subsequent queries in the mutation chain may also fail.
 
-```typescript
-if (bhResult.inside) {
-  // Se a conversa estava marcada como fora do horário, limpar o flag
-  const { data: convBHClear } = await supabase
-    .from('whatsapp_conversations')
-    .select('opened_out_of_hours')
-    .eq('id', conversationId)
-    .single();
+## Root Cause
 
-  if (convBHClear?.opened_out_of_hours) {
-    await supabase
-      .from('whatsapp_conversations')
-      .update({
-        opened_out_of_hours: false,
-        out_of_hours_cleared_at: new Date().toISOString(),
-      })
-      .eq('id', conversationId);
-    console.log(`[business-hours] Flag fora-do-horário limpo conv=${conversationId}`);
-  }
-}
+The `support_attendances_update_by_department` policy's `WITH CHECK` is too restrictive:
+```sql
+WITH CHECK (
+  is_admin_or_head() OR 
+  (department_id = current_user_department_id() AND tenant_id = current_tenant_id())
+)
 ```
 
-Isso vai inserir entre a linha ~1024 (resultado do `checkBusinessHours`) e o bloco `if (!bhResult.inside)`, garantindo que quando uma mensagem do cliente chega dentro do horário, o flag é resetado.
+This blocks any non-admin from updating an attendance to a different department — which is exactly what a department transfer does.
 
-### 2. Correção de dados existentes (opcional — migration)
-Criar migration para limpar conversas que estão incorretamente marcadas como `opened_out_of_hours = true` mas têm atendimento ativo ou foram respondidas:
+## Fix
+
+Create a migration that relaxes the `WITH CHECK` on the `support_attendances` UPDATE policy to allow users to transfer attendances **from** their own department **to** any department within their tenant:
 
 ```sql
-UPDATE whatsapp_conversations
-SET opened_out_of_hours = false,
-    out_of_hours_cleared_at = now()
-WHERE opened_out_of_hours = true
-  AND out_of_hours_cleared_at IS NULL
-  AND (first_agent_message_at IS NOT NULL
-    OR EXISTS (
-      SELECT 1 FROM support_attendances sa
-      WHERE sa.conversation_id = whatsapp_conversations.id
-        AND sa.status IN ('in_progress', 'closed', 'inactive_closed')
-    ));
+-- Drop and recreate the update policy
+DROP POLICY IF EXISTS "support_attendances_update_by_department" ON support_attendances;
+
+CREATE POLICY "support_attendances_update_by_department"
+  ON support_attendances
+  FOR UPDATE
+  USING (
+    is_admin_or_head() 
+    OR (department_id = current_user_department_id() AND tenant_id = current_tenant_id())
+  )
+  WITH CHECK (
+    is_admin_or_head() 
+    OR (tenant_id = current_tenant_id() AND current_user_department_id() IS NOT NULL)
+  );
 ```
 
-## Impacto
-- **UI**: Conversas voltarão para a fila normal ("Aguardando") quando mensagens chegarem durante o horário comercial
-- **Backend**: Uma query extra por mensagem recebida durante business hours (apenas para verificar se o flag está ativo)
-- **Segurança**: Sem impacto
+The `USING` clause still ensures users can only update attendances from their own department. The `WITH CHECK` clause is relaxed to allow the new row to have any `department_id` within the tenant — the key security constraint remains that the user must belong to the original department (enforced by `USING`).
 
-## Testes manuais
-1. Configurar horário de atendimento no tenant
-2. Enviar mensagem fora do horário → deve aparecer em "Fora do horário"
-3. Enviar mensagem durante o horário → conversa deve sair de "Fora do horário" e ir para "Fila"
+## Impact
+- **Security**: Users can only transfer attendances that belong to their own department (USING unchanged). They cannot arbitrarily modify attendances from other departments.
+- **No code changes**: Only a database migration is needed.
+- **Files**: One new migration file.
+
+## Manual Test
+1. Log in as Camila Marques (Financeiro, role: user)
+2. Open a conversation assigned to her
+3. Click "Transferir Conversa" > Setor > select "Implantação"
+4. Click "Transferir Setor"
+5. Expected: Success toast, conversation moves to Implantação queue
 
