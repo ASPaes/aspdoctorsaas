@@ -217,8 +217,17 @@ class ZApiAdapter implements ProviderAdapter {
         break;
       }
       case 'audio': {
-        endpoint = `${base}/send-audio`;
-        body = { phone, audio: msg.mediaUrl };
+        if (msg.mediaBase64) {
+          // Use base64 endpoint - Z-API handles format conversion
+          const raw = msg.mediaBase64.startsWith('data:')
+            ? msg.mediaBase64
+            : `data:${msg.mediaMimetype || 'audio/ogg'};base64,${msg.mediaBase64}`;
+          endpoint = `${base}/send-audio`;
+          body = { phone, audio: raw };
+        } else {
+          endpoint = `${base}/send-audio`;
+          body = { phone, audio: msg.mediaUrl };
+        }
         break;
       }
       case 'video': {
