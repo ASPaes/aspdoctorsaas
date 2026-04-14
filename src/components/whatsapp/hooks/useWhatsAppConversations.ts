@@ -148,6 +148,18 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const waitingCount = countsData?.waitingCount || 0;
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  const lastActivityRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    const markActivity = () => { lastActivityRef.current = Date.now(); };
+    window.addEventListener('keydown', markActivity, { passive: true });
+    window.addEventListener('mousedown', markActivity, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', markActivity);
+      window.removeEventListener('mousedown', markActivity);
+    };
+  }, []);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
     staleTime: 30_000,
@@ -190,18 +202,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   // Realtime: unique channel per hook instance to avoid collision
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
-
-  const lastActivityRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    const markActivity = () => { lastActivityRef.current = Date.now(); };
-    window.addEventListener('keydown', markActivity, { passive: true });
-    window.addEventListener('mousedown', markActivity, { passive: true });
-    return () => {
-      window.removeEventListener('keydown', markActivity);
-      window.removeEventListener('mousedown', markActivity);
-    };
-  }, []);
 
   useEffect(() => {
     const channelName = `conversations-rt-${channelIdRef.current}`;
