@@ -155,6 +155,8 @@ export function useAttendanceStatus(
       queryClient.invalidateQueries({
         queryKey: ["whatsapp", "conversations"],
       });
+      queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+      queryClient.refetchQueries({ queryKey: ["conversation-states"] });
     },
     [queryClient, tenantId]
   );
