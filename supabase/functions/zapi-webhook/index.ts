@@ -12,16 +12,15 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Responde 200 imediatamente â Z-API tem timeout curto
-  const response = new Response(JSON.stringify({ received: true }), {
+  try {
+    await processZapiWebhook(req);
+  } catch (err) {
+    console.error(`${LOG} Erro no processamento:`, err);
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
     headers: { 'Content-Type': 'application/json' },
   });
-
-  processZapiWebhook(req.clone()).catch((err) =>
-    console.error(`${LOG} Erro no processamento:`, err)
-  );
-
-  return response;
 });
 
 // Normaliza nÃºmero BR: adiciona 9 para celulares com 8 dÃ­gitos locais
