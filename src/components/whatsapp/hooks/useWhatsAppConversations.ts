@@ -62,6 +62,77 @@ export interface ConversationsResult {
   waitingCount: number;
 }
 
+// ---------------------------------------------------------------------------
+// Helper: build Supabase filter chains reused by both hooks
+// ---------------------------------------------------------------------------
+
+function applyBaseFilter(q: any, tid: string | null, filters?: ConversationsFilters) {
+  if (tid) q = q.eq('tenant_id', tid);
+  if (filters?.departmentId) {
+    q = q.eq('department_id', filters.departmentId);
+  } else if (filters?.instanceIds && filters.instanceIds.length > 0) {
+    q = q.in('instance_id', filters.instanceIds);
+  } else if (filters?.instanceId) {
+    q = q.eq('instance_id', filters.instanceId);
+  }
+  return q;
+}
+
+function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilters) {
+  q = applyBaseFilter(q, tid, filters);
+  if (filters?.status) q = q.eq('status', filters.status);
+  if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+  if (filters?.unassigned) q = q.is('assigned_to', null);
+  return q;
+}
+
+// ---------------------------------------------------------------------------
+// useConversationCounts — separate hook with its own cache key & staleTime
+// ---------------------------------------------------------------------------
+
+export function useConversationCounts(filters?: ConversationsFilters) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  return useQuery({
+    queryKey: ['whatsapp', 'conversation-counts', filters, tid],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const [countResult, unreadResult, waitingResult] = await Promise.all([
+        applyFullFilter(
+          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true }),
+          tid,
+          filters,
+        ),
+        applyBaseFilter(
+          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
+            .gt('unread_count', 0),
+          tid,
+          filters,
+        ),
+        applyBaseFilter(
+          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
+            .eq('status', 'active')
+            .eq('is_last_message_from_me', false)
+            .not('last_message_at', 'is', null),
+          tid,
+          filters,
+        ),
+      ]);
+
+      return {
+        totalCount: countResult.count || 0,
+        unreadCount: unreadResult.count || 0,
+        waitingCount: waitingResult.count || 0,
+      };
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// useWhatsAppConversations — main hook (conversations list only)
+// ---------------------------------------------------------------------------
+
 export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -70,32 +141,25 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
+  // Counts from the dedicated hook
+  const { data: countsData } = useConversationCounts(filters);
+  const totalCount = countsData?.totalCount || 0;
+  const unreadCount = countsData?.unreadCount || 0;
+  const waitingCount = countsData?.waitingCount || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
-
       let query = supabase
         .from('whatsapp_conversations')
         .select(`*, contact:whatsapp_contacts(*)`)
         .order('last_message_at', { ascending: false, nullsFirst: false })
         .range(from, to);
 
-
-
-
-      if (tid) query = query.eq('tenant_id', tid);
-      if (filters?.departmentId) {
-        query = query.eq('department_id', filters.departmentId);
-      } else if (filters?.instanceIds && filters.instanceIds.length > 0) {
-        query = query.in('instance_id', filters.instanceIds);
-      } else if (filters?.instanceId) {
-        query = query.eq('instance_id', filters.instanceId);
-      }
-      if (filters?.status) query = query.eq('status', filters.status);
-      if (filters?.assignedTo) query = query.eq('assigned_to', filters.assignedTo);
-      if (filters?.unassigned) query = query.is('assigned_to', null);
+      query = applyFullFilter(query, tid, filters);
 
       // Hide conversations without messages, unless they are in includeIds
       const includeIds = filters?.includeIds;
@@ -108,61 +172,14 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       const { data: conversationsData, error } = await query;
       if (error) throw error;
 
-      let result = ((conversationsData ?? []) as unknown as ConversationWithContact[]).map(conv => ({
+      const result = ((conversationsData ?? []) as unknown as ConversationWithContact[]).map(conv => ({
         ...conv,
         unread_count: parseInt(String((conv as any).unread_count ?? 0), 10) || 0,
         last_message_at: conv.last_message_at || null,
         isLastMessageFromMe: (conv as any).is_last_message_from_me ?? false,
       }));
 
-
-      // --- PARALLELIZED: count + unread + waiting in a single Promise.all ---
-      const buildBaseFilter = (q: any) => {
-        if (tid) q = q.eq('tenant_id', tid);
-        if (filters?.departmentId) {
-          q = q.eq('department_id', filters.departmentId);
-        } else if (filters?.instanceIds && filters.instanceIds.length > 0) {
-          q = q.in('instance_id', filters.instanceIds);
-        } else if (filters?.instanceId) {
-          q = q.eq('instance_id', filters.instanceId);
-        }
-        return q;
-      };
-
-      const buildFullFilter = (q: any) => {
-        q = buildBaseFilter(q);
-        if (filters?.status) q = q.eq('status', filters.status);
-        if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
-        if (filters?.unassigned) q = q.is('assigned_to', null);
-        return q;
-      };
-
-      const [countResult, unreadResult, waitingResult] = await Promise.all([
-        buildFullFilter(
-          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
-        ),
-        buildBaseFilter(
-          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
-            .gt('unread_count', 0)
-        ),
-        buildBaseFilter(
-          supabase.from('whatsapp_conversations').select('*', { count: 'exact', head: true })
-            .eq('status', 'active')
-            .eq('is_last_message_from_me', false)
-            .not('last_message_at', 'is', null)
-        ),
-      ]);
-
-      const totalCount = countResult.count || 0;
-      const totalPages = Math.ceil(totalCount / pageSize);
-
-      return {
-        conversations: result,
-        totalCount,
-        totalPages,
-        unreadCount: unreadResult.count || 0,
-        waitingCount: waitingResult.count || 0,
-      } as ConversationsResult;
+      return { conversations: result };
     },
   });
 
@@ -184,7 +201,10 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           const existing = old.conversations.find((c: any) => c.id === updated.id);
           if (!existing) {
             // Conversation not in current page — schedule a soft refetch
-            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] }), 500);
+            setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
+            }, 500);
             return old;
           }
 
@@ -192,7 +212,10 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           const assignedChanged = existing.assigned_to !== updated.assigned_to;
           const deptChanged = existing.department_id !== updated.department_id;
           if (assignedChanged || deptChanged) {
-            setTimeout(() => queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] }), 100);
+            setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
+            }, 100);
             return old;
           }
 
@@ -220,6 +243,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         table: 'whatsapp_conversations'
       }, () => {
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
       })
       .subscribe();
 
@@ -228,10 +252,10 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   return {
     conversations: data?.conversations || [],
-    totalCount: data?.totalCount || 0,
-    totalPages: data?.totalPages || 0,
-    unreadCount: data?.unreadCount || 0,
-    waitingCount: data?.waitingCount || 0,
+    totalCount,
+    totalPages,
+    unreadCount,
+    waitingCount,
     isLoading,
     error,
   };
