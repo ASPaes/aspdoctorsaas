@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Sparkles, Maximize2, RefreshCw, User, Smile, Briefcase, CheckCircle2, Languages, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Sparkles, Maximize2, RefreshCw, User, Smile, Briefcase, CheckCircle2, BookOpen, Languages, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useWhatsAppComposer, type ComposerAction } from '../../hooks/useWhatsAppComposer';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,7 @@ const menuOptions: MenuItem[] = [
   { id: 'friendly', label: 'Mais amigável', icon: Smile },
   { id: 'formal', label: 'Mais formal', icon: Briefcase },
   { id: 'fix_grammar', label: 'Corrigir gramática', icon: CheckCircle2 },
+  { id: 'simplify', label: 'Simplificar para leigos', icon: BookOpen },
   {
     id: 'translate', label: 'Traduzir para...', icon: Languages,
     submenu: [

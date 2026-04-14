@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type ComposerAction = 'expand' | 'rephrase' | 'my_tone' | 'friendly' | 'formal' | 'fix_grammar' | 'translate';
+export type ComposerAction = 'expand' | 'rephrase' | 'my_tone' | 'friendly' | 'formal' | 'fix_grammar' | 'simplify' | 'translate';
 
 interface ComposeParams {
   message: string;
