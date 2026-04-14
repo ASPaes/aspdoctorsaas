@@ -69,6 +69,8 @@ interface FormState {
   zapi_client_token: string;
   meta_phone_number_id: string;
   meta_access_token: string;
+  meta_app_secret: string;
+  meta_verify_token: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -82,6 +84,8 @@ const EMPTY_FORM: FormState = {
   zapi_client_token: "",
   meta_phone_number_id: "",
   meta_access_token: "",
+  meta_app_secret: "",
+  meta_verify_token: "",
 };
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -110,6 +114,8 @@ export default function WhatsAppInstancesTab() {
   const [showZapiToken, setShowZapiToken] = useState(false);
   const [showZapiClientToken, setShowZapiClientToken] = useState(false);
   const [showMetaToken, setShowMetaToken] = useState(false);
+  const [showMetaAppSecret, setShowMetaAppSecret] = useState(false);
+  const [showMetaVerifyToken, setShowMetaVerifyToken] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Instance | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
@@ -134,6 +140,8 @@ export default function WhatsAppInstancesTab() {
     setShowZapiToken(false);
     setShowZapiClientToken(false);
     setShowMetaToken(false);
+    setShowMetaAppSecret(false);
+    setShowMetaVerifyToken(false);
     setDialogOpen(true);
   };
 
@@ -144,10 +152,12 @@ export default function WhatsAppInstancesTab() {
     setShowZapiToken(false);
     setShowZapiClientToken(false);
     setShowMetaToken(false);
+    setShowMetaAppSecret(false);
+    setShowMetaVerifyToken(false);
     // Load secrets
     const { data: secret } = await (supabase
       .from("whatsapp_instance_secrets") as any)
-      .select("api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token")
+      .select("api_url, api_key, zapi_instance_id, zapi_token, zapi_client_token, meta_access_token, meta_app_secret, meta_verify_token")
       .eq("instance_id", inst.id)
       .maybeSingle();
     setForm({
@@ -160,6 +170,8 @@ export default function WhatsAppInstancesTab() {
       zapi_client_token: secret?.zapi_client_token ?? "",
       meta_phone_number_id: (inst as any).meta_phone_number_id ?? "",
       meta_access_token: secret?.meta_access_token ?? "",
+      meta_app_secret: secret?.meta_app_secret ?? "",
+      meta_verify_token: secret?.meta_verify_token ?? "",
       provider_type: (inst.provider_type as FormState["provider_type"]) ?? "self_hosted",
     });
     setDialogOpen(true);
@@ -180,6 +192,8 @@ export default function WhatsAppInstancesTab() {
       } else if (form.provider_type === "meta_cloud") {
         if (!form.meta_phone_number_id.trim()) throw new Error("Phone Number ID é obrigatório");
         if (!form.meta_access_token.trim()) throw new Error("Access Token é obrigatório");
+        if (!form.meta_app_secret.trim()) throw new Error("App Secret é obrigatório");
+        if (!form.meta_verify_token.trim()) throw new Error("Verify Token é obrigatório");
       }
 
       if (editingId) {
@@ -514,6 +528,7 @@ export default function WhatsAppInstancesTab() {
                       placeholder="sua-api-key"
                       value={form.api_key}
                       onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -537,6 +552,7 @@ export default function WhatsAppInstancesTab() {
                     placeholder="ID da instância no Z-API"
                     value={form.zapi_instance_id}
                     onChange={(e) => setForm((f) => ({ ...f, zapi_instance_id: e.target.value }))}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -547,6 +563,7 @@ export default function WhatsAppInstancesTab() {
                       placeholder="seu-token-zapi"
                       value={form.zapi_token}
                       onChange={(e) => setForm((f) => ({ ...f, zapi_token: e.target.value }))}
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -567,6 +584,7 @@ export default function WhatsAppInstancesTab() {
                       placeholder="client-token da conta Z-API (opcional)"
                       value={form.zapi_client_token}
                       onChange={(e) => setForm((f) => ({ ...f, zapi_client_token: e.target.value }))}
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -593,6 +611,7 @@ export default function WhatsAppInstancesTab() {
                     placeholder="ID do número no Meta Business"
                     value={form.meta_phone_number_id}
                     onChange={(e) => setForm((f) => ({ ...f, meta_phone_number_id: e.target.value }))}
+                    autoComplete="off"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -603,6 +622,7 @@ export default function WhatsAppInstancesTab() {
                       placeholder="token de acesso Meta"
                       value={form.meta_access_token}
                       onChange={(e) => setForm((f) => ({ ...f, meta_access_token: e.target.value }))}
+                      autoComplete="off"
                     />
                     <Button
                       type="button"
@@ -614,6 +634,54 @@ export default function WhatsAppInstancesTab() {
                       {showMetaToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Verify Token *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showMetaVerifyToken ? "text" : "password"}
+                      value={form.meta_verify_token}
+                      onChange={(e) => setForm((f) => ({ ...f, meta_verify_token: e.target.value }))}
+                      placeholder="meu-token-verificacao"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10"
+                      onClick={() => setShowMetaVerifyToken(!showMetaVerifyToken)}
+                    >
+                      {showMetaVerifyToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Token de verificação usado na configuração do webhook da Meta.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>App Secret *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showMetaAppSecret ? "text" : "password"}
+                      value={form.meta_app_secret}
+                      onChange={(e) => setForm((f) => ({ ...f, meta_app_secret: e.target.value }))}
+                      placeholder="app-secret-da-meta"
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-10 w-10"
+                      onClick={() => setShowMetaAppSecret(!showMetaAppSecret)}
+                    >
+                      {showMetaAppSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Chave secreta do App na Meta. Usado para verificar assinaturas de webhooks (X-Hub-Signature-256).
+                  </p>
                 </div>
               </>
             )}
