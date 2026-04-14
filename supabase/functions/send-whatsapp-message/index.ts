@@ -284,6 +284,7 @@ Deno.serve(async (req) => {
     const providerType = instanceData.provider_type || 'self_hosted';
 
     console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceData.instance_name, 'Provider:', providerType);
+    console.log('[send-whatsapp-message] Secrets keys:', Object.keys(secrets).join(', '), 'meta_access_token length:', (secrets.meta_access_token || '').length, 'phone_number_id:', instanceData.meta_phone_number_id);
 
     const destinationNumber = getDestinationNumber(contact.phone_number);
 
