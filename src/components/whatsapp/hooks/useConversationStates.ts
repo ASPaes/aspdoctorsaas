@@ -45,6 +45,7 @@ export function useConversationStates(conversationIds: string[]) {
     enabled: conversationIds.length > 0,
     staleTime: 2000,
     refetchInterval: 10000,
+    refetchIntervalInBackground: true,
   });
 
   // Realtime: invalidate on changes to conversations or attendances
@@ -66,6 +67,7 @@ export function useConversationStates(conversationIds: string[]) {
         table: "support_attendances",
       }, () => {
         queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+        queryClient.refetchQueries({ queryKey: ["conversation-states"] });
       })
       .subscribe();
 
