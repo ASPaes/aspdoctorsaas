@@ -10,27 +10,27 @@ const AUTO_CATEGORIZATION_THRESHOLD = 5;
 const GOODBYE_PATTERNS = /^(tchau|obrigad[oa]|valeu|vlw|flw|falou|até\s*(mais|logo|breve)?|brigad[oa]|grat[oa]|obg|tmj|ok\s*obrigad[oa]?)[\s!.?]*$/i;
 
 const INVALID_OPTION_MESSAGES = [
-  'Hmm, não consegui entender sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
-  'Opa, não identifiquei a opção escolhida. Poderia enviar só o número correspondente? 🙏',
+  'Hmm, não consegui entender sua resposta \u{1F605}. Por favor, envie apenas o número de uma das opções acima.',
+  'Opa, não identifiquei a opção escolhida. Poderia enviar só o número correspondente? \u{1F64F}',
   'Desculpe, não entendi! Envie apenas o número da opção desejada para eu te direcionar.',
-  'Não reconheci a opção. Tente enviar só o número, por favor! 😊',
+  'Não reconheci a opção. Tente enviar só o número, por favor! \u{1F60A}',
 ];
 
 const WAITING_AGENT_MESSAGES = [
-  'Pode ficar tranquilo! Você já está na fila e será atendido em breve 😊',
-  'Recebemos sua mensagem! Um atendente já vai te chamar, aguarde só mais um pouquinho 🙏',
+  'Pode ficar tranquilo! Você já está na fila e será atendido em breve \u{1F60A}',
+  'Recebemos sua mensagem! Um atendente já vai te chamar, aguarde só mais um pouquinho \u{1F64F}',
   'Fique tranquilo, já estamos direcionando seu atendimento. Em breve alguém vai te ajudar!',
-  'Sua mensagem foi recebida! Estamos encaminhando, aguarde um momento ⏳',
+  'Sua mensagem foi recebida! Estamos encaminhando, aguarde um momento \u{23F3}',
 ];
 
 const HUMAN_FALLBACK_MESSAGES = [
-  'Entendido! Vou te direcionar para um atendente agora mesmo. Aguarde um momento 😊',
-  'Sem problemas! Já estou encaminhando você para um atendente humano. Aguarde! 🙏',
+  'Entendido! Vou te direcionar para um atendente agora mesmo. Aguarde um momento \u{1F60A}',
+  'Sem problemas! Já estou encaminhando você para um atendente humano. Aguarde! \u{1F64F}',
   'Certo! Vamos te conectar com um atendente. Só um instante!',
 ];
 
 const HUMAN_INTENT_AFTER_RETRIES_MESSAGES = [
-  'Percebi que está com dificuldade. Vou te encaminhar direto para um atendente 😊',
+  'Percebi que está com dificuldade. Vou te encaminhar direto para um atendente \u{1F60A}',
   'Tudo bem! Vou direcionar você para um atendente que pode te ajudar melhor. Aguarde!',
 ];
 
@@ -286,7 +286,7 @@ async function applyAutoAssignment(supabase: any, instanceId: string, conversati
 }
 
 export async function insertAttendanceSystemMessage(supabase: any, conversationId: string, tenantId: string, attendanceId: string, attendanceCode: string, event: 'opened' | 'closed' | 'reopened'): Promise<void> {
-  const emoji = event === 'closed' ? '🔒' : '✅';
+  const emoji = event === 'closed' ? '\u{1F512}' : '\u{2705}';
   const label = event === 'opened' ? 'aberto' : event === 'closed' ? 'encerrado' : 'reaberto';
   await supabase.from('whatsapp_messages').upsert({
     conversation_id: conversationId, remote_jid: '', message_id: `system_att_${event}_${attendanceId}`,
@@ -353,7 +353,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
       await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊', { csat: true, csat_timeout: true });
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! \u{1F60A}', { csat: true, csat_timeout: true });
       await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       return true;
     }
@@ -371,7 +371,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
       if (needsReason) {
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
       } else {
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
         await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       }
       return true;
@@ -379,7 +379,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! ✅ Sua avaliação foi registrada.', { csat: true });
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
       await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       return true;
     }
@@ -392,7 +392,7 @@ async function sendDeferredClosureMessage(supabase: any, ctx: SendContext, conve
   try {
     const { data: att } = await supabase.from('support_attendances').select('attendance_code').eq('id', attendanceId).single();
     const code = att?.attendance_code || '';
-    await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Atendimento *${code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. 😊`, { system: true, attendance_event: 'closed', attendance_id: attendanceId, deferred_after_csat: true });
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, `\u{2705} Atendimento *${code}* encerrado com sucesso.\n\nObrigado pelo contato! Caso precise de algo mais, é só nos enviar uma nova mensagem. \u{1F60A}`, { system: true, attendance_event: 'closed', attendance_id: attendanceId, deferred_after_csat: true });
   } catch (err) { console.error('[processor] Error in sendDeferredClosureMessage:', err); }
 }
 
@@ -429,7 +429,7 @@ async function sendBusinessHoursMessage(supabase: any, ctx: SendContext, convers
       }
     } catch { /* fallback to template */ }
 
-    const template = supportConfig.business_hours_message || 'Olá! 👋 Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
+    const template = supportConfig.business_hours_message || 'Olá! \u{1F44B} Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
     const message = template.replace(/\{\{start\}\}/g, firstStart).replace(/\{\{end\}\}/g, lastEnd).replace(/\{\{next_start\}\}/g, nextStart).replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart).replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '').replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '').replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
     await sendAndPersistAutoMessage(supabase, ctx, conversationId, message, { business_hours: true, outside_hours: true });
   } catch (err) { console.error('[processor] Error in sendBusinessHoursMessage:', err); }
@@ -493,7 +493,7 @@ export async function sendUraWelcome(supabase: any, ctx: SendContext, conversati
     const customerName = ctx.contactName || '';
     const template = supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '';
     let welcomeText = template.replace(/\{\{customer_name\}\}/g, customerName).trim();
-    const codeHeader = attendanceCode ? `📋 *Atendimento ${attendanceCode}*\n\n` : '';
+    const codeHeader = attendanceCode ? `\u{1F4CB} *Atendimento ${attendanceCode}*\n\n` : '';
     let fullMessage: string;
     if (departments && departments.length > 0 && welcomeText.includes('{options}')) {
       const optionsList = departments.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
@@ -543,7 +543,7 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
     await supabase.from('support_attendances').update({ status: 'closed', closed_at: nowIso, closed_reason: 'ura_encerrado', ura_option_selected: 0, ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso }).eq('id', att.id);
     await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId);
     const code = att.attendance_code || '';
-    await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Atendimento${code ? ` *${code}*` : ''} encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. 😊`, { ura: true, ura_closed: true });
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, `\u{2705} Atendimento${code ? ` *${code}*` : ''} encerrado com sucesso.\n\nSe precisar de algo, é só enviar uma nova mensagem. \u{1F60A}`, { ura: true, ura_closed: true });
     return true;
   }
   const nowIso = new Date().toISOString();
@@ -553,7 +553,7 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   if (selectedDept) updatePayload.department_id = selectedDept.id;
   await supabase.from('support_attendances').update(updatePayload).eq('id', att.id);
   if (selectedDept) await supabase.from('whatsapp_conversations').update({ department_id: selectedDept.id, updated_at: nowIso }).eq('id', conversationId);
-  await sendAndPersistAutoMessage(supabase, ctx, conversationId, `✅ Você escolheu *${deptName}*. Aguarde, em breve um atendente irá te ajudar!`, { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null });
+  await sendAndPersistAutoMessage(supabase, ctx, conversationId, `\u{2705} Você escolheu *${deptName}*. Aguarde, em breve um atendente irá te ajudar!`, { ura: true, ura_confirmed: true, department_id: selectedDept?.id || null });
   return true;
 }
 
@@ -737,7 +737,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         const cutoff10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
         const { data: bhMsgs } = await supabase.from('whatsapp_messages').select('id, created_at, metadata').eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', true).gte('created_at', cutoff10).order('created_at', { ascending: false }).limit(10);
         const lastBh = (bhMsgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.outside_hours === true; });
-        if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário 🕐 Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente 😊', 'Obrigado pela mensagem! Nossa equipe responde assim que possível ⏰']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
+        if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário \u{1F550} Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente \u{1F60A}', 'Obrigado pela mensagem! Nossa equipe responde assim que possível \u{23F0}']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
       }
       return;
     }
