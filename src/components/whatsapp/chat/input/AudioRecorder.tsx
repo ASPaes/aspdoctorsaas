@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { X, Send, StopCircle, Headphones, Trash2, RotateCcw } from "lucide-react";
 import type { MediaSendParams } from "./types";
 import { useToast } from "@/hooks/use-toast";
-import { convertWebmToMp3 } from "@/lib/audioConverter";
 
 interface AudioRecorderProps {
   onSend: (params: MediaSendParams) => void;
@@ -75,29 +74,15 @@ export const AudioRecorder = ({ onSend, onCancel }: AudioRecorderProps) => {
     startRecording();
   };
 
-  const handleConfirmSend = async () => {
+  const handleConfirmSend = () => {
     if (!audioBlob) return;
-    
-    try {
-      // Convert WebM to MP3 for WhatsApp compatibility
-      const mp3Blob = await convertWebmToMp3(audioBlob);
-      
-      const reader = new FileReader();
-      reader.readAsDataURL(mp3Blob);
-      reader.onloadend = () => {
-        onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: 'audio/mpeg' });
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-      };
-    } catch (err) {
-      console.error('Audio conversion failed, sending original:', err);
-      // Fallback: send original WebM
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = () => {
-        onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: audioBlob.type });
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-      };
-    }
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+    reader.onloadend = () => {
+      const mime = audioBlob.type.startsWith('audio/ogg') ? 'audio/ogg; codecs=opus' : audioBlob.type;
+      onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: mime });
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
   };
 
   const handleCancel = () => {
