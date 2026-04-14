@@ -118,22 +118,13 @@ export const useConversationAssignment = () => {
         .eq('id', conversationId)
         .single();
 
-      // Buscar o department_id do agente destino
+      // Buscar o department_id do agente destino via RPC (bypassa RLS issues)
       let targetDepartmentId: string | null = null;
-      const { data: targetProfile } = await supabase
-        .from('profiles')
-        .select('funcionario_id')
-        .eq('user_id', newAssignee)
-        .maybeSingle();
-
-      if (targetProfile?.funcionario_id) {
-        const { data: targetFunc } = await supabase
-          .from('funcionarios')
-          .select('department_id')
-          .eq('id', targetProfile.funcionario_id)
-          .maybeSingle();
-        if (targetFunc?.department_id) {
-          targetDepartmentId = targetFunc.department_id;
+      const { data: agentsList } = await supabase.rpc("get_transfer_agents");
+      if (agentsList) {
+        const targetAgent = (agentsList as any[]).find((a: any) => a.user_id === newAssignee);
+        if (targetAgent?.department_id) {
+          targetDepartmentId = targetAgent.department_id;
         }
       }
 
