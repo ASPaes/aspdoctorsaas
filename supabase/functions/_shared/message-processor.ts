@@ -455,7 +455,15 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
     const { data: convBH } = await supabase.from('whatsapp_conversations').select('out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
     const { data: activeAttBH } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).eq('status', 'in_progress').limit(1).maybeSingle();
     if (!convBH?.out_of_hours_cleared_at && !convBH?.first_agent_message_at && !activeAttBH) {
-      await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
+      // Cooldown: só envia se passaram 5+ minutos desde o último aviso
+      const { data: convMeta } = await supabase.from('whatsapp_conversations').select('metadata').eq('id', conversationId).single();
+      const lastNotice = convMeta?.metadata?.off_hours_last_notice_at;
+      const cooldownMs = 5 * 60 * 1000;
+      if (!lastNotice || (Date.now() - new Date(lastNotice).getTime()) > cooldownMs) {
+        await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
+        const updatedMeta = { ...(convMeta?.metadata || {}), off_hours_last_notice_at: new Date().toISOString() };
+        await supabase.from('whatsapp_conversations').update({ metadata: updatedMeta }).eq('id', conversationId);
+      }
     }
     return { inside: false };
   } catch { return { inside: true }; }
