@@ -112,60 +112,20 @@ export const useConversationAssignment = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Get conversation data for notification before transfer
       const { data: convData } = await supabase
         .from('whatsapp_conversations')
         .select('tenant_id, department_id, whatsapp_contacts(name)')
         .eq('id', conversationId)
         .single();
 
-      // Buscar o department_id do agente destino via RPC (bypassa RLS issues)
-      let targetDepartmentId: string | null = null;
-      const { data: agentsList } = await supabase.rpc("get_transfer_agents");
-      if (agentsList) {
-        const targetAgent = (agentsList as any[]).find((a: any) => a.user_id === newAssignee);
-        if (targetAgent?.department_id) {
-          targetDepartmentId = targetAgent.department_id;
-        }
-      }
-
-      const updatePayload: Record<string, any> = { assigned_to: newAssignee };
-      if (targetDepartmentId) updatePayload.department_id = targetDepartmentId;
-
-      const { error: updateError } = await supabase
-        .from('whatsapp_conversations')
-        .update(updatePayload)
-        .eq('id', conversationId);
-      if (updateError) throw updateError;
-
-      await supabase.from('conversation_assignments').insert({
-        conversation_id: conversationId,
-        assigned_to: newAssignee,
-        assigned_by: user.id,
-        reason: reason || null,
-      } as any);
-
-      // Atualizar attendance ativo
-      const { data: activeAtt } = await supabase
-        .from('support_attendances')
-        .select('id')
-        .eq('conversation_id', conversationId)
-        .in('status', ['waiting', 'in_progress'])
-        .limit(1)
-        .maybeSingle();
-
-      if (activeAtt) {
-        const attUpdate: Record<string, any> = {
-          assigned_to: newAssignee,
-          status: 'in_progress',
-          assumed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        if (targetDepartmentId) attUpdate.department_id = targetDepartmentId;
-        await supabase
-          .from('support_attendances')
-          .update(attUpdate)
-          .eq('id', activeAtt.id);
-      }
+      // Execute transfer via server-side RPC (handles RLS, department change, attendance update)
+      const { error: rpcError } = await (supabase.rpc as any)('transfer_conversation_to_agent', {
+        p_conversation_id: conversationId,
+        p_new_assignee: newAssignee,
+        p_reason: reason || null,
+      });
+      if (rpcError) throw rpcError;
 
       // Create notification for the new assignee
       if (convData?.tenant_id && newAssignee !== user.id) {
