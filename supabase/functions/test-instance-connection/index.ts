@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { getAdapter } from '../_shared/providers/index.ts';
+import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
