@@ -15,11 +15,24 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have a recovery token in the URL
     const hash = window.location.hash;
-    if (!hash.includes("type=recovery")) {
-      toast.error("Link de redefinição inválido.");
-      navigate("/login", { replace: true });
+    const search = window.location.search;
+    const fullUrl = hash + search;
+    
+    // Supabase may use hash (#) or query string (?) depending on flow
+    const hasRecoveryToken = fullUrl.includes("type=recovery");
+    
+    if (!hasRecoveryToken) {
+      // Give Supabase client a moment to process the token exchange
+      const timer = setTimeout(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) {
+            toast.error("Link de redefinição inválido ou expirado.");
+            navigate("/login", { replace: true });
+          }
+        });
+      }, 1500);
+      return () => clearTimeout(timer);
     }
   }, [navigate]);
 
