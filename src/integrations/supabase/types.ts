@@ -4491,6 +4491,14 @@ export type Database = {
             }[]
           }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
+      transfer_conversation_to_agent: {
+        Args: {
+          p_conversation_id: string
+          p_new_assignee: string
+          p_reason?: string
+        }
+        Returns: undefined
+      }
       validate_access_invite: {
         Args: { p_invite_id: string }
         Returns: {
