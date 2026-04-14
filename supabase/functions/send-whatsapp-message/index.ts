@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     const tenantId = conversation.tenant_id;
     const contact = (conversation as any).whatsapp_contacts;
 
-    // --- Super Admin: resolver assinatura agora que tenantId está disponível ---
+    // --- Super Admin: resolver assinatura agora que tenantId est\u{00E1} dispon\u{00ED}vel ---
     if (isSuperAdmin) {
       const { data: saProfile } = await supabase
         .from('profiles')
@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
           (senderInfo as any).role = func.cargo || null;
         }
       }
-      // Se tenant diferente, senderInfo já está com 'Super Admin' vindo do isSuperAdmin guard
+      // Se tenant diferente, senderInfo j\u{00E1} est\u{00E1} com 'Super Admin' vindo do isSuperAdmin guard
       // mas como retornamos { label: '', name: '', role: null }, precisamos setar aqui
       if (!senderInfo.name) {
         (senderInfo as any).label = '*Super Admin*';
@@ -434,7 +434,7 @@ Deno.serve(async (req) => {
               conversation_id: body.conversationId,
               remote_jid: contact.phone_number,
               message_id: openMsgId,
-              content: `Ã¢ÂÂ Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
+              content: `\u{2705} Atendimento ${newAtt.attendance_code} aberto com sucesso.`,
               message_type: 'system',
               is_from_me: true,
               status: 'sent',
@@ -477,9 +477,9 @@ Deno.serve(async (req) => {
       const isMetaAccountError = errMsg.includes('133010') || errMsg.includes('Account not registered');
       const isMetaAuthError = errMsg.includes('190') || errMsg.includes('OAuthException');
       const userMessage = isMetaAccountError
-        ? 'Conta Meta não registrada. Verifique o Access Token e o Phone Number ID nas configurações da instância.'
+        ? 'Conta Meta n\u{00E3}o registrada. Verifique o Access Token e o Phone Number ID nas configura\u{00E7}\u{00F5}es da inst\u{00E2}ncia.'
         : isMetaAuthError
-        ? 'Token Meta inválido ou expirado. Atualize o Access Token nas configurações.'
+        ? 'Token Meta inv\u{00E1}lido ou expirado. Atualize o Access Token nas configura\u{00E7}\u{00F5}es.'
         : errMsg;
 
       return new Response(
@@ -679,14 +679,14 @@ Deno.serve(async (req) => {
             console.error('[send-whatsapp-message] Error updating attendance:', updateErr);
           } else {
             if (update.assigned_to || update.status) {
-              console.log(`[send-whatsapp-message] Ã¢ÂÂ Attendance ${activeAtt.id} -> status=${update.status || activeAtt.status}, assigned_to=${update.assigned_to || activeAtt.assigned_to}`);
+              console.log(`[send-whatsapp-message] \u{2705} Attendance ${activeAtt.id} -> status=${update.status || activeAtt.status}, assigned_to=${update.assigned_to || activeAtt.assigned_to}`);
               // Sync assigned_to on conversation too
               await supabase
                 .from('whatsapp_conversations')
                 .update({ assigned_to: update.assigned_to || activeAtt.assigned_to, status: 'active', updated_at: nowIso })
                 .eq('id', body.conversationId);
             }
-            console.log(`[send-whatsapp-message] Ã¢ÂÂ msg_agent_count incremented on ${activeAtt.id}`);
+            console.log(`[send-whatsapp-message] \u{2705} msg_agent_count incremented on ${activeAtt.id}`);
           }
         }
       } catch (err) {
