@@ -131,6 +131,26 @@ async function processZapiWebhook(req: Request): Promise<void> {
     return;
   }
 
+  // Filtro de grupos — ignorar se instância configurada para não receber grupos
+  const rawJid = payload?.phone || payload?.from || '';
+  const isGroup =
+    rawJid.includes('@g.us') ||
+    payload?.isGroup === true ||
+    payload?.chatId?.includes('@g.us') ||
+    (rawJid.replace(/\D/g, '').length > 15);
+
+  if (isGroup) {
+    const { data: instCfg } = await supabase
+      .from('whatsapp_instances')
+      .select('ignore_group_messages')
+      .eq('id', instanceId)
+      .single();
+    if (instCfg?.ignore_group_messages !== false) {
+      console.log(`${LOG} Mensagem de grupo ignorada: ${rawJid}`);
+      return;
+    }
+  }
+
   // ââ Normalizar payload Z-API â NormalizedInboundMessage ââââââ
   const rawPhone = payload?.phone || payload?.from || '';
   if (!rawPhone) { console.warn(`${LOG} Telefone ausente`); return; }
