@@ -702,6 +702,24 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const ctx: SendContext = { instanceId, tenantId, providerType, instanceInfo, secrets, remoteJid: remoteJid.includes('@') ? remoteJid : `${remoteJid}@s.whatsapp.net`, contactName: pushName || phone };
 
   if (fromMe) {
+    // Guard: ignorar echo de mensagens de sistema enviadas pelo próprio platform
+    // (ex: mensagem de inatividade, CSAT, encerramento) para evitar reabrir atendimento
+    const { data: existingMsg } = await supabase
+      .from('whatsapp_messages')
+      .select('metadata')
+      .eq('message_id', messageId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const meta = typeof existingMsg?.metadata === 'string'
+      ? JSON.parse(existingMsg.metadata)
+      : existingMsg?.metadata;
+
+    if (meta?.system_message === true) {
+      console.log(`[message-processor] System message echo ignored: ${messageId}`);
+      return;
+    }
+
     const nowIso = new Date().toISOString();
     const onlyOut = await isOutboundOnlyConversation(supabase, conversationId);
     if (onlyOut) { await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId).neq('status', 'closed'); }
