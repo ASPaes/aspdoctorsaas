@@ -323,7 +323,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={sendMutation.isPending || isBlocked}
+              disabled={isBlocked}
             />
             <Button
               type="button"
@@ -338,7 +338,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           </div>
 
           {hasContent ? (
-            <Button onClick={handleSend} size="icon" disabled={sendMutation.isPending || isBlocked}>
+            <Button onClick={handleSend} size="icon" disabled={isBlocked}>
               <Send className="w-4 h-4" />
             </Button>
           ) : (
