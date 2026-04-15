@@ -578,6 +578,7 @@ Deno.serve(async (req) => {
             ...(body.fileName ? { fileName: body.fileName } : {}),
             sender_signature_mode: sigMode,
             sender_signature_value: signatureValue || null,
+            ...(body.systemMessage ? { system_message: true } : {}),
           },
           sent_by_user_id: senderUserId || null,
           instance_id: sendInstanceId,
