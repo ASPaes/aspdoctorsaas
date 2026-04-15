@@ -693,19 +693,27 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         const zapiSingle = raw?.contact;
         const zapiMulti = raw?.contacts;
 
-        const parseVcard = (vcard: string) => {
-          const name = vcard.match(/FN[^:]*:(.*)/i)?.[1]?.trim() || '';
+        const parseVcard = (vcard: string, displayNameOverride?: string) => {
+          const name = displayNameOverride || vcard.match(/FN[^:]*:(.*)/i)?.[1]?.trim() || '';
           const phone = vcard.match(/TEL[^:]*:(.*)/i)?.[1]?.trim().replace(/\D/g, '') || '';
-          return { name, phone, vcard };
+          return { displayName: name, vcard };
         };
 
         let contacts: any[] = [];
-        if (evoSingle?.vcard) contacts = [parseVcard(evoSingle.vcard)];
-        else if (evoMulti?.length) contacts = evoMulti.map((c: any) => parseVcard(c.vcard || ''));
-        else if (zapiSingle?.vcard) contacts = [parseVcard(zapiSingle.vcard)];
-        else if (zapiMulti?.length) contacts = zapiMulti.map((c: any) => parseVcard(c.vcard || ''));
+        if (evoSingle?.vcard) contacts = [parseVcard(evoSingle.vcard, evoSingle.displayName)];
+        else if (evoMulti?.length) contacts = evoMulti.map((c: any) => parseVcard(c.vcard || '', c.displayName));
+        else if (zapiSingle?.vcard) contacts = [parseVcard(zapiSingle.vcard, zapiSingle.name)];
+        else if (zapiMulti?.length) contacts = zapiMulti.map((c: any) => parseVcard(c.vcard || '', c.name));
 
-        if (contacts.length) base.contacts = contacts;
+        if (contacts.length) {
+          // ContactCard espera 'contact' (singular) para messageType='contact'
+          // e 'contacts' (array) para messageType='contacts'
+          if (messageType === 'contact') {
+            base.contact = contacts[0];
+          } else {
+            base.contacts = contacts;
+          }
+        }
       }
       return base;
     })(),
