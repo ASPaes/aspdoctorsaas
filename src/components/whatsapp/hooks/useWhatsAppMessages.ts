@@ -116,8 +116,6 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
-  const realtimeConnectedRef = useRef(true);
-  const realtimeWasDisconnectedRef = useRef(false);
 
   const { data: messages = [] as Message[], isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'messages', conversationId],
@@ -135,7 +133,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    refetchInterval: () => realtimeConnectedRef.current ? 60_000 : 10_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   });
 
@@ -221,18 +219,8 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         }
         if (status === 'SUBSCRIBED') {
           retryCountRef.current = 0;
-          realtimeConnectedRef.current = true;
-          if (realtimeWasDisconnectedRef.current) {
-            realtimeWasDisconnectedRef.current = false;
-            // Refetch imediato para buscar mensagens perdidas durante desconexão
-            queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
-          }
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          realtimeConnectedRef.current = false;
-          realtimeWasDisconnectedRef.current = true;
-          // Refetch imediato como fallback ao perder conexão
-          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
           console.warn(`[realtime] channel ${channelName} failed (${status}). Retry ${retryCountRef.current + 1}/3`);
           retryCountRef.current += 1;
           if (retryCountRef.current <= 3) {
