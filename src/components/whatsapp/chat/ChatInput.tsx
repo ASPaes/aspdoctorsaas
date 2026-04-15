@@ -130,7 +130,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
 
     setMessage("");
     onCancelReply?.();
-    setTimeout(() => textareaRef.current?.focus(), 50);
+    // Refocus imediato + fallback para garantir foco após re-render
+    requestAnimationFrame(() => textareaRef.current?.focus());
+    setTimeout(() => textareaRef.current?.focus(), 100);
 
     sendMutation.mutate(
       { conversationId, content, messageType: "text", quotedMessageId: replyTo?.message_id || undefined },
