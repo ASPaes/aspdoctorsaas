@@ -91,6 +91,8 @@ export function MessageBubble({
       <CheckCheck className={cn("h-3 w-3", msg.status === "read" ? "text-blue-400" : "text-muted-foreground/60")} />
     ) : msg.status === "sending" ? (
       <Clock className="h-3 w-3 text-muted-foreground/40" />
+    ) : msg.status === "failed" ? (
+      <svg className="h-3 w-3 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     ) : (
       <Check className="h-3 w-3 text-muted-foreground/60" />
     )
