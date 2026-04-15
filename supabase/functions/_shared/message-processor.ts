@@ -684,7 +684,31 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     media_filename: mediaFilename || null, media_ext: mediaFilename?.split('.').pop()?.toLowerCase() || null,
     media_kind: mediaKind(messageType), is_from_me: fromMe, status: fromMe ? 'sent' : 'received',
     quoted_message_id: quotedMessageId || null, timestamp, tenant_id: tenantId, instance_id: instanceId,
-    metadata: { source: providerType },
+    metadata: (() => {
+      const base: Record<string, any> = { source: providerType };
+      if ((messageType === 'contact' || messageType === 'contacts') && msg.rawPayload) {
+        const raw = msg.rawPayload as any;
+        const evoSingle = raw?.message?.contactMessage;
+        const evoMulti = raw?.message?.contactsArrayMessage?.contacts;
+        const zapiSingle = raw?.contact;
+        const zapiMulti = raw?.contacts;
+
+        const parseVcard = (vcard: string) => {
+          const name = vcard.match(/FN[^:]*:(.*)/i)?.[1]?.trim() || '';
+          const phone = vcard.match(/TEL[^:]*:(.*)/i)?.[1]?.trim().replace(/\D/g, '') || '';
+          return { name, phone, vcard };
+        };
+
+        let contacts: any[] = [];
+        if (evoSingle?.vcard) contacts = [parseVcard(evoSingle.vcard)];
+        else if (evoMulti?.length) contacts = evoMulti.map((c: any) => parseVcard(c.vcard || ''));
+        else if (zapiSingle?.vcard) contacts = [parseVcard(zapiSingle.vcard)];
+        else if (zapiMulti?.length) contacts = zapiMulti.map((c: any) => parseVcard(c.vcard || ''));
+
+        if (contacts.length) base.contacts = contacts;
+      }
+      return base;
+    })(),
   }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true }).select('id').maybeSingle();
 
   if (msgError) { console.error('[processor] Error saving message:', msgError); return; }
