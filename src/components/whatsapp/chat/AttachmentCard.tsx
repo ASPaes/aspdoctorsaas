@@ -46,7 +46,8 @@ export function AttachmentCard({
   mediaUrl,
 }: AttachmentCardProps) {
   // Lazy fetch metadata if missing
-  const needsMeta = !!mediaUrl && (!mediaFilename || mediaSizeBytes == null);
+  const isTemp = messageId?.startsWith('temp-');
+  const needsMeta = !isTemp && !!mediaUrl && (!mediaFilename || mediaSizeBytes == null);
   const { data: meta } = useMediaMeta(needsMeta ? messageId : null);
 
   const filename = mediaFilename || meta?.filename || 'Arquivo';
@@ -58,6 +59,7 @@ export function AttachmentCard({
   const kindLabel = KIND_LABELS[kind] || 'Arquivo';
 
   const handleOpen = async () => {
+    if (messageId?.startsWith('temp-')) return;
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data: { session } } = await supabase.auth.getSession();
@@ -73,6 +75,7 @@ export function AttachmentCard({
   const [downloading, setDownloading] = useState(false);
 
   const handleDownload = async () => {
+    if (messageId?.startsWith('temp-')) return;
     if (downloading) return;
     setDownloading(true);
     try {

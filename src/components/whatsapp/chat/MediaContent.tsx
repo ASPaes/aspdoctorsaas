@@ -15,12 +15,12 @@ interface MediaContentProps {
   mediaMimetype?: string | null;
 }
 
-function useProxyUrl(messageId: string, mode: "inline" | "attachment" = "inline"): string | null {
+function useProxyUrl(messageId: string, mediaUrl: string | null | undefined, mode: "inline" | "attachment" = "inline"): string | null {
   const [proxyUrl, setProxyUrl] = useState<string | null>(null);
   const isTemp = messageId?.startsWith('temp-');
 
   useEffect(() => {
-    if (isTemp) return; // Mensagem otimista — não tem row no banco ainda
+    if (isTemp) return;
     let cancelled = false;
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return;
@@ -32,7 +32,7 @@ function useProxyUrl(messageId: string, mode: "inline" | "attachment" = "inline"
     return () => { cancelled = true; };
   }, [messageId, mode, isTemp]);
 
-  return proxyUrl;
+  return isTemp ? (mediaUrl || null) : proxyUrl;
 }
 
 export function MediaContent({
@@ -46,9 +46,7 @@ export function MediaContent({
   mediaKind,
   mediaMimetype,
 }: MediaContentProps) {
-  const inlineUrl = useProxyUrl(messageId, "inline");
-  const isTemp = messageId?.startsWith('temp-');
-  const resolvedInlineUrl = isTemp ? mediaUrl : inlineUrl;
+  const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline");
 
   if (messageType === "document" || (messageType !== "image" && messageType !== "audio" && messageType !== "video")) {
     return (
