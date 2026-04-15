@@ -144,23 +144,24 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     return [...new Set([...baseIds, ...searchIds])];
   }, [conversations, searchResults]);
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
-  const { stateMap } = useConversationStates(conversationIds);
+  const { stateMap, isLoading: isStatesLoading } = useConversationStates(conversationIds);
 
   // Helper: build a ConversationStateRow from stateMap or fallback to conversation fields
   const getStateForConv = useCallback((conv: any): ConversationStateRow => {
     const fromView = stateMap.get(conv.id);
     if (fromView) return fromView;
-    // Fallback when the view hasn't loaded yet or has no row
+    // Enquanto stateMap ainda está carregando, usar attendance_status='loading'
+    // para evitar flash de classificação incorreta (todas caindo em "Fila")
     return {
       conversation_id: conv.id,
-      conversation_status: conv.status ?? "active",
-      attendance_status: null,
+      conversation_status: isStatesLoading ? "loading" : (conv.status ?? "active"),
+      attendance_status: isStatesLoading ? "loading" : null,
       opened_out_of_hours: conv.opened_out_of_hours ?? false,
       attendance_assigned_to: null,
       department_id: conv.department_id ?? null,
       tenant_id: conv.tenant_id ?? "",
     };
-  }, [stateMap]);
+  }, [stateMap, isStatesLoading]);
 
   // Compute pill counts using centralized bucket logic
   const pillCounts = useMemo(() => {
