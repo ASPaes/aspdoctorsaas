@@ -438,6 +438,20 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     }
 
     const content = getMessageContent(message, messageType as string);
+
+    // Override para mensagens de contato (contactMessage / contactsArrayMessage)
+    let resolvedMessageType: NormalizedInboundMessage['messageType'] = messageType as any;
+    let resolvedContent = content;
+    if (message?.contactMessage?.vcard) {
+      resolvedMessageType = 'contact';
+      resolvedContent = message.contactMessage.displayName || message.contactMessage.vcard.match(/FN[^:]*:(.*)/i)?.[1]?.trim() || '';
+    } else if (message?.contactsArrayMessage?.contacts?.length) {
+      resolvedMessageType = 'contacts';
+      resolvedContent = message.contactsArrayMessage.contacts
+        .map((c: any) => c.displayName || '')
+        .filter(Boolean)
+        .join(', ');
+    }
     const quotedMessageId = message.extendedTextMessage?.contextInfo?.stanzaId || null;
 
     const instanceInfo: InstanceInfo = {
@@ -465,8 +479,8 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       remoteJid: key.remoteJid,
       fromMe,
       pushName: pushName || phone,
-      content,
-      messageType,
+      content: resolvedContent,
+      messageType: resolvedMessageType,
       timestamp,
       mediaUrl: null,
       mediaMimetype,
