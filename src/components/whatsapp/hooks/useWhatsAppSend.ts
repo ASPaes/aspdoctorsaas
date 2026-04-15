@@ -105,9 +105,11 @@ export const useWhatsAppSend = () => {
         );
         return;
       }
+      // Aguarda 15s para o Realtime entregar o INSERT antes de invalidar
+      // Evita apagar a mensagem otimista prematuramente
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
-      }, 3000);
+      }, 15_000);
     },
   });
 
