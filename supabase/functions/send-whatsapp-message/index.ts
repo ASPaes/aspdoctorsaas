@@ -24,6 +24,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Warmup ping — mantém função aquecida sem autenticação
+  if (req.headers.get('x-warmup') === 'true') {
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     // Validate JWT
     const authHeader = req.headers.get('Authorization');
