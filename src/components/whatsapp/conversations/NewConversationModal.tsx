@@ -17,6 +17,8 @@ import { normalizeBRPhone, formatBRPhone, coreDigits } from "@/lib/phoneBR";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { AlertTriangle, Info } from "lucide-react";
 
 interface ContactOption {
   label: string;
@@ -34,10 +36,88 @@ interface Props {
   initialInstanceId?: string;
 }
 
+function useCheckOpenConversation(phone: string, instanceId: string) {
+  const { user } = useAuth();
+  const cleanPhone = phone.replace(/\D/g, '');
+
+  return useQuery({
+    queryKey: ['check-open-conversation', cleanPhone, instanceId],
+    queryFn: async () => {
+      if (!cleanPhone || cleanPhone.length < 10 || !instanceId) return null;
+
+      // Buscar contato pelo número
+      const { data: contact } = await supabase
+        .from('whatsapp_contacts')
+        .select('id')
+        .ilike('phone_number', `%${cleanPhone.slice(-10)}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!contact) return null;
+
+      // Buscar conversa ativa com attendance aberto
+      const { data: conv } = await supabase
+        .from('whatsapp_conversations')
+        .select('id, assigned_to')
+        .eq('contact_id', contact.id)
+        .eq('instance_id', instanceId)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      if (!conv) return null;
+
+      const { data: att } = await supabase
+        .from('support_attendances')
+        .select('id, assigned_to')
+        .eq('conversation_id', conv.id)
+        .in('status', ['waiting', 'in_progress'])
+        .limit(1)
+        .maybeSingle();
+
+      if (!att) return null;
+
+      const assignedTo = att.assigned_to || conv.assigned_to;
+      const isOwnUser = assignedTo === user?.id;
+
+      // Buscar nome do técnico
+      let techName = 'outro técnico';
+      if (assignedTo) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('funcionario_id')
+          .eq('user_id', assignedTo)
+          .maybeSingle();
+
+        if (profile?.funcionario_id) {
+          const { data: func } = await supabase
+            .from('funcionarios')
+            .select('nome')
+            .eq('id', profile.funcionario_id)
+            .maybeSingle();
+          if (func?.nome) techName = func.nome;
+        }
+      }
+
+      return {
+        exists: true,
+        conversationId: conv.id,
+        assignedTo,
+        isOwnUser,
+        techName,
+      };
+    },
+    enabled: cleanPhone.length >= 10 && !!instanceId,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName, initialInstanceId }: Props) {
   const { instances } = useWhatsAppInstances();
   const createConversation = useCreateConversation();
   const { selectedDepartmentId } = useDepartmentFilter();
+  const { user } = useAuth();
   const [instanceId, setInstanceId] = useState("");
   const [phone, setPhone] = useState(initialPhone || "");
   const [name, setName] = useState(initialName || "");
@@ -45,6 +125,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
+
+  const { data: openConv, isLoading: isCheckingOpen } = useCheckOpenConversation(phone, instanceId);
 
   useEffect(() => {
     if (open && initialPhone) {
@@ -343,7 +425,45 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             </TabsContent>
           </Tabs>
 
-          <Button onClick={handleCreate} disabled={createConversation.isPending || (tab === "cliente" && selectedCliente && !phone)} className="w-full">
+          {isCheckingOpen && phone.replace(/\D/g,'').length >= 10 && instanceId && (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Verificando atendimentos abertos...</span>
+            </div>
+          )}
+
+          {openConv?.exists && !isCheckingOpen && (
+            openConv.isOwnUser ? (
+              <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 p-3">
+                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="space-y-1.5 flex-1">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Você já tem um atendimento aberto com este contato.</p>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-blue-700 dark:text-blue-400"
+                    onClick={() => {
+                      onOpenChange(false);
+                      resetForm();
+                      onCreated?.(openConv.conversationId);
+                    }}
+                  >
+                    Ir para a conversa →
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/40 p-3">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">Contato em atendimento</p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400">Este contato já está sendo atendido por {openConv.techName}. Não é possível abrir nova conversa.</p>
+                </div>
+              </div>
+            )
+          )}
+
+          <Button onClick={handleCreate} disabled={createConversation.isPending || (tab === "cliente" && selectedCliente && !phone) || (openConv?.exists && !openConv?.isOwnUser)} className="w-full">
             {createConversation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Iniciar Conversa
           </Button>
