@@ -26,6 +26,9 @@ export interface ConversationStateRow {
 }
 
 export function getConversationBucket(row: ConversationStateRow): ConversationBucket {
+  // Aguardando carregamento — não classificar ainda
+  if (row.attendance_status === "loading") return "in_progress";
+
   // 1. Closed conversation or closed/inactive attendance
   if (
     row.conversation_status === "closed" ||
