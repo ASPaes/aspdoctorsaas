@@ -229,6 +229,20 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       return;
     }
 
+    // Bloquear se há atendimento aberto com outro técnico
+    if (openConv?.exists && !openConv?.isOwnUser) {
+      toast.error(`Este contato já está em atendimento com ${openConv.techName}`);
+      return;
+    }
+
+    // Redirecionar se é o próprio usuário
+    if (openConv?.exists && openConv?.isOwnUser) {
+      onOpenChange(false);
+      resetForm();
+      onCreated?.(openConv.conversationId);
+      return;
+    }
+
     const cleanPhone = normalizePhoneBR(phone);
     createConversation.mutate(
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
@@ -463,7 +477,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             )
           )}
 
-          <Button onClick={handleCreate} disabled={createConversation.isPending || (tab === "cliente" && selectedCliente && !phone) || (openConv?.exists && !openConv?.isOwnUser)} className="w-full">
+          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
             {createConversation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Iniciar Conversa
           </Button>
