@@ -116,6 +116,8 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
+  const realtimeConnectedRef = useRef(true);
+  const realtimeWasDisconnectedRef = useRef(false);
 
   const { data: messages = [] as Message[], isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'messages', conversationId],
@@ -147,8 +149,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     }
   }, [conversationId]);
 
-  const realtimeConnectedRef = useRef(true);
-  const realtimeWasDisconnectedRef = useRef(false);
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
   const retryCountRef = useRef(0);
