@@ -130,6 +130,17 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
 
   const { data: openConv, isLoading: isCheckingOpen } = useCheckOpenConversation(phone, instanceId);
+  const queryClient = useQueryClient();
+
+  // Invalidar cache quando phone ou instanceId mudar
+  useEffect(() => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length >= 10 && instanceId) {
+      queryClient.invalidateQueries({ 
+        queryKey: ['check-open-conversation', cleanPhone, instanceId] 
+      });
+    }
+  }, [phone, instanceId, queryClient]);
 
   useEffect(() => {
     if (open && initialPhone) {
