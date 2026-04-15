@@ -203,7 +203,11 @@ async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: 
     for (const update of updates) {
       const messageId = update?.key?.id;
       const statusRaw = update?.update?.status;
-      if (!messageId || !statusRaw) continue;
+      console.log(`[processMessageUpdate] raw update: ${JSON.stringify(update).substring(0, 300)}`);
+      if (!messageId || !statusRaw) {
+        console.log(`[processMessageUpdate] SKIP — messageId=${messageId} statusRaw=${statusRaw}`);
+        continue;
+      }
       const mappedStatus = statusMap[statusRaw] || statusRaw.toLowerCase();
       await supabase.from('whatsapp_messages').update({ status: mappedStatus })
         .eq('tenant_id', resolved.tenantId).eq('message_id', messageId);
