@@ -116,8 +116,6 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
 
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
-  const realtimeConnectedRef = useRef(true);
-  const realtimeWasDisconnectedRef = useRef(false);
 
   const { data: messages = [] as Message[], isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'messages', conversationId],
@@ -135,7 +133,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    refetchInterval: () => realtimeConnectedRef.current ? 60_000 : 10_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   });
 
