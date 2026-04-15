@@ -68,6 +68,21 @@ export const useWhatsAppSend = () => {
         (old: Message[] = []) => [...old, optimisticMessage]
       );
 
+      // Timeout: se ainda 'sending' após 30s, marcar como falhou automaticamente
+      setTimeout(() => {
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', newMessage.conversationId],
+          (old: Message[] | undefined) => {
+            if (!old) return old;
+            return old.map(m =>
+              m.id === tempId && m.status === 'sending'
+                ? { ...m, status: 'failed' }
+                : m
+            );
+          }
+        );
+      }, 30_000);
+
       queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
         if (!old?.conversations) return old;
         const patched = old.conversations.map((c: any) =>
@@ -92,8 +107,17 @@ export const useWhatsAppSend = () => {
       return { previousMessages, tempId };
     },
     onError: (_err, newMessage, context) => {
-      if (context?.previousMessages) {
-        queryClient.setQueryData(['whatsapp', 'messages', newMessage.conversationId], context.previousMessages);
+      // Não apaga a mensagem — marca como falhou para o técnico ver
+      if (context?.tempId) {
+        queryClient.setQueryData(
+          ['whatsapp', 'messages', newMessage.conversationId],
+          (old: Message[] | undefined) => {
+            if (!old) return old;
+            return old.map(m =>
+              m.id === context.tempId ? { ...m, status: 'failed' } : m
+            );
+          }
+        );
       }
     },
     onSettled: (data, _error, variables) => {
