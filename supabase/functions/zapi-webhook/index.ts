@@ -163,6 +163,12 @@ async function processZapiWebhook(req: Request): Promise<void> {
     mediaMimetype = payload.document?.mimeType || 'application/octet-stream';
     mediaFilename = payload.document?.fileName || null;
     content = payload.document?.caption || content || '';
+  } else if (payload?.contact) {
+    messageType = 'contact';
+    content = payload.contact?.name || '';
+  } else if (payload?.contacts && Array.isArray(payload.contacts)) {
+    messageType = 'contacts';
+    content = payload.contacts.map((c: any) => c.name || '').filter(Boolean).join(', ');
   }
 
   const instanceInfo: InstanceInfo = {
