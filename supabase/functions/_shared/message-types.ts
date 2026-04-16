@@ -63,6 +63,11 @@ export interface NormalizedInboundMessage {
 
   // Raw para fallback/debug
   rawPayload?: unknown;
+
+  contactData?: {
+    contact?: { displayName: string | null; vcard: string | null };
+    contacts?: Array<{ displayName: string | null; vcard: string | null }>;
+  };
 }
 
 /**
