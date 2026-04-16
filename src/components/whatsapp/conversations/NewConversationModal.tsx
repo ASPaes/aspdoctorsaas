@@ -165,6 +165,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   // Reset waCheck quando phone ou instância mudar
   useEffect(() => {
     setWaCheck('idle');
+    setConfirmNotFound(false);
   }, [phone, instanceId]);
 
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
@@ -244,19 +245,17 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     setName(opt.name || selectedCliente?.nome_fantasia || selectedCliente?.razao_social || "");
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!instanceId || !phone.trim()) {
       toast.error("Preencha instância e telefone");
       return;
     }
 
-    // Bloquear se há atendimento aberto com outro técnico
     if (openConv?.exists && !openConv?.isOwnUser) {
       toast.error(`Este contato já está em atendimento com ${openConv.techName}`);
       return;
     }
 
-    // Redirecionar se é o próprio usuário
     if (openConv?.exists && openConv?.isOwnUser) {
       onOpenChange(false);
       resetForm();
@@ -264,22 +263,73 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       return;
     }
 
+    // Verificação automática para Z-API e Evolution (exceto Meta)
+    const selectedInstance = instances.find(i => i.id === instanceId);
+    const providerType = (selectedInstance as any)?.provider_type || 'self_hosted';
+
+    if (providerType !== 'meta_cloud' && waCheck === 'idle') {
+      setWaCheck('checking');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-whatsapp-number`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ instanceId, phone: phone.replace(/\D/g, '') }),
+          }
+        );
+        const data = await res.json();
+        if (data.exists === true) {
+          if (data.corrected && data.phone) {
+            setPhone(data.phone);
+            setWaCheck('exists_corrected');
+            toast.success("Adicionamos o 9 automaticamente ao número 😉");
+            // Pequeno delay para o estado atualizar antes de criar
+            await new Promise(r => setTimeout(r, 100));
+            const cleanPhone = data.phone;
+            createConversation.mutate(
+              { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
+              {
+                onSuccess: (d) => {
+                  if (selectedCliente) {
+                    supabase.from("whatsapp_conversations").update({ metadata: { cliente_id: selectedCliente.id } as any }).eq("id", d.conversation.id).then();
+                  }
+                  toast.success("Conversa criada com sucesso");
+                  onOpenChange(false);
+                  resetForm();
+                  onCreated?.(d.conversation.id);
+                },
+                onError: () => toast.error("Erro ao criar conversa"),
+              }
+            );
+            return;
+          } else {
+            setWaCheck('exists');
+          }
+        } else {
+          setWaCheck('not_exists');
+          return; // Para aqui — mostra aviso com opção de confirmar
+        }
+      } catch {
+        setWaCheck('idle');
+        // Se verificação falhou, continua e cria mesmo assim
+      }
+    }
+
+    // Criação normal (verificado, confirmado pelo usuário, ou Meta)
     const cleanPhone = normalizePhoneBR(phone);
     createConversation.mutate(
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
       {
-        onSuccess: (data) => {
+        onSuccess: (d) => {
           if (selectedCliente) {
-            supabase
-              .from("whatsapp_conversations")
-              .update({ metadata: { cliente_id: selectedCliente.id } as any })
-              .eq("id", data.conversation.id)
-              .then();
+            supabase.from("whatsapp_conversations").update({ metadata: { cliente_id: selectedCliente.id } as any }).eq("id", d.conversation.id).then();
           }
           toast.success("Conversa criada com sucesso");
           onOpenChange(false);
           resetForm();
-          onCreated?.(data.conversation.id);
+          onCreated?.(d.conversation.id);
         },
         onError: () => toast.error("Erro ao criar conversa"),
       }
@@ -289,6 +339,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const resetForm = () => {
     setPhone("55");
     setWaCheck('idle');
+    setConfirmNotFound(false);
     setName("");
     setSearchTerm("");
     setSelectedCliente(null);
