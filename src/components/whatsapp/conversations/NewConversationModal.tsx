@@ -498,6 +498,9 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
                     ⚠️ Meta não suporta verificação prévia de número
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  💡 Celular brasileiro? Não esqueça do 9 após o DDD — ex: (49) <strong>9</strong>9999-9999
+                </p>
               </div>
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Nome (opcional)</Label>
