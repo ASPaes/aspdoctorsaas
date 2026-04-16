@@ -137,15 +137,68 @@ Deno.serve(async (req) => {
       replyMessage = statusMsg;
 
     // --- Comando não reconhecido ---
+    } else if (cmd === 'SIM DB' || cmd === 'NAO DB' || cmd === 'NÃO DB' || cmd === 'DEPOIS DB') {
+
+      // Find the most recent pending/sent DB health alert
+      const { data: pendingAlert } = await supabase
+        .from('db_health_action_log')
+        .select('id, check_name, diagnosis, recommended_action, level')
+        .in('status', ['sent', 'snoozed'])
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!pendingAlert) {
+        replyMessage = `\u2139\uFE0F Nenhum alerta DB pendente encontrado.`;
+      } else if (cmd === 'SIM DB') {
+        // Execute the recommended action
+        try {
+          await supabase.rpc('exec_db_health_query', {
+            query_text: pendingAlert.recommended_action
+          });
+          await supabase
+            .from('db_health_action_log')
+            .update({ status: 'resolved', resolved_at: new Date().toISOString(), response: 'SIM DB', responded_at: new Date().toISOString() })
+            .eq('id', pendingAlert.id);
+          replyMessage = `\u2705 *A\u00E7\u00E3o executada com sucesso!*\n\n\uD83D\uDCCB *Alerta:* ${pendingAlert.diagnosis}\n\uD83D\uDCA1 *Executado:* ${pendingAlert.recommended_action}\n\nBanco atualizado.`;
+        } catch (execErr) {
+          replyMessage = `\u274C *Erro ao executar a\u00E7\u00E3o:*\n${String(execErr)}\n\nVerifique manualmente no Supabase SQL Editor.`;
+        }
+      } else if (cmd === 'NAO DB' || cmd === 'NÃO DB') {
+        await supabase
+          .from('db_health_action_log')
+          .update({ status: 'dismissed', response: 'NÃO DB', responded_at: new Date().toISOString() })
+          .eq('id', pendingAlert.id);
+        replyMessage = `\u274C *Alerta ignorado.*\n\n\uD83D\uDCCB ${pendingAlert.diagnosis}\n\nO pr\u00F3ximo check ocorre no hor\u00E1rio programado.`;
+      } else if (cmd === 'DEPOIS DB') {
+        await supabase
+          .from('db_health_action_log')
+          .update({ status: 'snoozed', response: 'DEPOIS DB', responded_at: new Date().toISOString() })
+          .eq('id', pendingAlert.id);
+        // Schedule a reminder in 2 hours via pg_cron (one-time)
+        const runAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+        const cronMin = runAt.getUTCMinutes();
+        const cronHour = runAt.getUTCHours();
+        const cronDay = runAt.getUTCDate();
+        const cronMonth = runAt.getUTCMonth() + 1;
+        await supabase.rpc('exec_db_health_query', {
+          query_text: `SELECT cron.schedule('db-health-snooze-${pendingAlert.id.slice(0,8)}', '${cronMin} ${cronHour} ${cronDay} ${cronMonth} *', $$SELECT net.http_post(url := 'https://vbngjzovjhkmietztffo.supabase.co/functions/v1/check-db-health', headers := '{"Content-Type":"application/json","Authorization":"Bearer ' || current_setting('app.service_role_key', true) || '"}'::jsonb, body := '{}'::jsonb)$$)`
+        });
+        replyMessage = `\u23F0 *Lembrete agendado para 2h.*\n\n\uD83D\uDCCB ${pendingAlert.diagnosis}\n\nVoc\u00EA ser\u00E1 avisado novamente \u00E0s ${runAt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}h.`;
+      }
+
     } else {
-      replyMessage = `❓ Comando não reconhecido: *${command}*\n\nComandos disponíveis:\n\n` +
-        `▪ *LIMIT UP suggest* — dobra limite de Sugestão de Respostas\n` +
-        `▪ *LIMIT UP compose* — dobra limite de Composição\n` +
-        `▪ *LIMIT UP sentiment* — dobra limite de Sentimento\n` +
-        `▪ *LIMIT UP summary* — dobra limite de Resumo\n` +
-        `▪ *LIMIT UP audio* — dobra limite de Transcrição\n` +
-        `▪ *LIMIT UP ALL* — dobra todos os limites\n` +
-        `▪ *STATUS IA* — ver uso atual de todas as funções`;
+      replyMessage = `\u2753 Comando n\u00E3o reconhecido: *${command}*\n\nComandos dispon\u00EDveis:\n\n` +
+        `\u25AA *LIMIT UP suggest* \u2014 dobra limite de Sugest\u00E3o de Respostas\n` +
+        `\u25AA *LIMIT UP compose* \u2014 dobra limite de Composi\u00E7\u00E3o\n` +
+        `\u25AA *LIMIT UP sentiment* \u2014 dobra limite de Sentimento\n` +
+        `\u25AA *LIMIT UP summary* \u2014 dobra limite de Resumo\n` +
+        `\u25AA *LIMIT UP audio* \u2014 dobra limite de Transcri\u00E7\u00E3o\n` +
+        `\u25AA *LIMIT UP ALL* \u2014 dobra todos os limites\n` +
+        `\u25AA *STATUS IA* \u2014 ver uso atual de todas as fun\u00E7\u00F5es\n` +
+        `\u25AA *SIM DB* \u2014 confirmar a\u00E7\u00E3o de alerta DB\n` +
+        `\u25AA *N\u00C3O DB* \u2014 ignorar alerta DB\n` +
+        `\u25AA *DEPOIS DB* \u2014 lembrar em 2h`;
     }
 
     // Enviar resposta via Evolution API
