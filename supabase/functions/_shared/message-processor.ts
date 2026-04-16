@@ -702,8 +702,22 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         let contacts: any[] = [];
         if (evoSingle?.vcard) contacts = [parseVcard(evoSingle.vcard, evoSingle.displayName)];
         else if (evoMulti?.length) contacts = evoMulti.map((c: any) => parseVcard(c.vcard || '', c.displayName));
-        else if (zapiSingle?.vcard) contacts = [parseVcard(zapiSingle.vcard, zapiSingle.name)];
-        else if (zapiMulti?.length) contacts = zapiMulti.map((c: any) => parseVcard(c.vcard || '', c.name));
+        else if (zapiSingle?.vcard) {
+          contacts = [parseVcard(zapiSingle.vcard, zapiSingle.displayName || zapiSingle.name)];
+        } else if (zapiSingle && (zapiSingle.displayName || zapiSingle.name)) {
+          const dn = zapiSingle.displayName || zapiSingle.name || '';
+          const ph = (zapiSingle.phone || zapiSingle.phoneNumber || '').replace(/\D/g, '');
+          const sv = ph ? `BEGIN:VCARD\nVERSION:3.0\nFN:${dn}\nTEL:${ph}\nEND:VCARD` : null;
+          contacts = [{ displayName: dn, vcard: sv }];
+        } else if (zapiMulti?.length) {
+          contacts = zapiMulti.map((c: any) => {
+            const dn = c.displayName || c.name || '';
+            if (c.vcard) return parseVcard(c.vcard, dn);
+            const ph = (c.phone || c.phoneNumber || '').replace(/\D/g, '');
+            const sv = ph ? `BEGIN:VCARD\nVERSION:3.0\nFN:${dn}\nTEL:${ph}\nEND:VCARD` : null;
+            return { displayName: dn, vcard: sv };
+          });
+        }
 
         if (contacts.length) {
           // ContactCard espera 'contact' (singular) para messageType='contact'
