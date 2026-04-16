@@ -1,7 +1,49 @@
 
 import { useEffect, useState } from "react";
+import { X, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AttachmentCard } from "./AttachmentCard";
+
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <img
+          src={src}
+          alt="Visualização"
+          className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+        />
+        <div className="absolute top-2 right-2 flex gap-2">
+          <a
+            href={src}
+            download
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+            title="Baixar"
+          >
+            <Download className="h-4 w-4" />
+          </a>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+            title="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface MediaContentProps {
   messageId: string;
@@ -47,6 +89,7 @@ export function MediaContent({
   mediaMimetype,
 }: MediaContentProps) {
   const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (messageType === "document" || (messageType !== "image" && messageType !== "audio" && messageType !== "video")) {
     return (
@@ -66,7 +109,20 @@ export function MediaContent({
 
   switch (messageType) {
     case "image":
-      return <img src={resolvedInlineUrl} alt="Imagem" className="rounded max-w-full mb-1 max-h-64 object-contain" loading="lazy" />;
+      return (
+        <>
+          {lightboxOpen && resolvedInlineUrl && (
+            <ImageLightbox src={resolvedInlineUrl} onClose={() => setLightboxOpen(false)} />
+          )}
+          <img
+            src={resolvedInlineUrl}
+            alt="Imagem"
+            className="rounded max-w-full mb-1 max-h-64 object-contain cursor-zoom-in"
+            loading="lazy"
+            onClick={() => setLightboxOpen(true)}
+          />
+        </>
+      );
     case "audio":
       return (
         <audio controls className="max-w-full mb-1" preload="metadata">
