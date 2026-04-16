@@ -202,6 +202,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   // Realtime: unique channel per hook instance to avoid collision
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+  const invalidateThrottleRef = useRef<number>(0);
+  const insertDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const channelName = `conversations-rt-${channelIdRef.current}`;
@@ -229,10 +231,14 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           const assignedChanged = existing.assigned_to !== updated.assigned_to;
           const deptChanged = existing.department_id !== updated.department_id;
           if (assignedChanged || deptChanged) {
-            setTimeout(() => {
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-            }, 100);
+            const now = Date.now();
+            if (now - invalidateThrottleRef.current > 1000) {
+              invalidateThrottleRef.current = now;
+              setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
+              }, 100);
+            }
             return old;
           }
 
@@ -259,8 +265,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         schema: 'public',
         table: 'whatsapp_conversations'
       }, () => {
-        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-        queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
+        if (insertDebounceRef.current) clearTimeout(insertDebounceRef.current);
+        insertDebounceRef.current = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
+        }, 800);
       })
       .subscribe();
 
