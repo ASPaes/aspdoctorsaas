@@ -104,11 +104,26 @@ export function MediaContent({
     );
   }
 
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   if (!resolvedInlineUrl) return null;
 
   switch (messageType) {
     case "image":
-      return <img src={resolvedInlineUrl} alt="Imagem" className="rounded max-w-full mb-1 max-h-64 object-contain" loading="lazy" />;
+      return (
+        <>
+          {lightboxOpen && resolvedInlineUrl && (
+            <ImageLightbox src={resolvedInlineUrl} onClose={() => setLightboxOpen(false)} />
+          )}
+          <img
+            src={resolvedInlineUrl}
+            alt="Imagem"
+            className="rounded max-w-full mb-1 max-h-64 object-contain cursor-zoom-in"
+            loading="lazy"
+            onClick={() => setLightboxOpen(true)}
+          />
+        </>
+      );
     case "audio":
       return (
         <audio controls className="max-w-full mb-1" preload="metadata">
