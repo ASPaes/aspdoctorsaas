@@ -121,7 +121,7 @@ async function runChecks(): Promise<HealthCheck[]> {
       query_text: `SELECT count(*)::int as value FROM cron.job_run_details`
     });
     const value = data?.[0]?.value ?? 0;
-    if (value >= 3000) {
+    if (value >= 15000) {
       checks.push({
         name: 'cron_bloat',
         level: value >= 8000 ? 'critical' : 'warn',
