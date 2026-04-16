@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, GitMerge, EyeOff, Phone, MessageSquare, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Loader2, GitMerge, EyeOff, Phone, MessageSquare, CheckCircle2, AlertTriangle, Search } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -187,7 +187,19 @@ export function DuplicateContactsTab() {
 
   const pairKey = (pair: DuplicatePair) => `${pair.id_a}:${pair.id_b}`;
 
-  const visiblePairs = (pairs || []).filter(p => !ignored.has(pairKey(p)));
+  const [search, setSearch] = useState('');
+
+  const visiblePairs = (pairs || []).filter(p => {
+    if (ignored.has(pairKey(p))) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      p.name_a?.toLowerCase().includes(q) ||
+      p.name_b?.toLowerCase().includes(q) ||
+      p.phone_a?.includes(q) ||
+      p.phone_b?.includes(q)
+    );
+  });
 
   if (isLoading) {
     return (
@@ -209,14 +221,24 @@ export function DuplicateContactsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="shrink-0">
           <h3 className="text-sm font-medium">
             {visiblePairs.length} par{visiblePairs.length !== 1 ? 'es' : ''} encontrado{visiblePairs.length !== 1 ? 's' : ''}
           </h3>
           <p className="text-xs text-muted-foreground">
             Clique no contato que deseja manter, depois em Unificar.
           </p>
+        </div>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar por nome ou telefone..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
         </div>
       </div>
 
