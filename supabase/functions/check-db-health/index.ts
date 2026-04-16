@@ -249,10 +249,11 @@ Deno.serve(async () => {
 
     console.log(`[check-db-health][${requestId}] ${checks.length} checks, ${issues.length} issues`);
 
-    // Check if it's the 19h report time (18:55 - 19:10 window in São Paulo)
-    const nowSP = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
-    const hourSP = new Date(nowSP).getHours();
-    const isReportTime = hourSP === 19;
+    // Check if it's the 19h report time in São Paulo (UTC-3)
+    const nowUTC = new Date();
+    const hourSP = (nowUTC.getUTCHours() - 3 + 24) % 24;
+    const minuteSP = nowUTC.getUTCMinutes();
+    const isReportTime = hourSP === 19 && minuteSP < 15;
 
     const creds = await getWhatsAppCredentials();
 
@@ -291,20 +292,52 @@ Deno.serve(async () => {
 
       const shortId = log?.id?.slice(0, 8) ?? 'N/A';
 
+      // Human-friendly descriptions per check type
+      const checkDescriptions: Record<string, { title: string; impact: string; action: string }> = {
+        dead_tuples: {
+          title: '🧹 Limpeza do banco necessária',
+          impact: 'Registros obsoletos estão acumulando e deixando o chat mais lento com o tempo.',
+          action: 'Executar limpeza automática (VACUUM) — rápido e sem impacto nos usuários.',
+        },
+        cron_bloat: {
+          title: '📦 Log de tarefas acumulado',
+          impact: 'Histórico de tarefas agendadas ocupando espaço desnecessário no banco.',
+          action: 'Remover registros antigos — sem impacto nenhum na operação.',
+        },
+        query_lenta: {
+          title: '🐢 Sistema com lentidão detectada',
+          impact: 'Algumas buscas estão demorando mais que o normal — usuários podem sentir lentidão ao abrir conversas.',
+          action: 'Analisar e otimizar. Responda SIM DB para registrar e monitorar.',
+        },
+        conexoes_ativas: {
+          title: '🔌 Muitas conexões simultâneas',
+          impact: 'Pico de acessos pode deixar o sistema mais lento ou recusar novos acessos.',
+          action: 'Monitorar se o sistema está respondendo normalmente agora.',
+        },
+      };
+
+      const desc = checkDescriptions[issue.name] || {
+        title: '⚠️ Alerta do banco de dados',
+        impact: issue.diagnosis,
+        action: issue.action,
+      };
+
+      const levelLabel = issue.level === 'critical' ? '🔴 CRÍTICO' : '🟡 ATENÇÃO';
+
       const msg = [
-        `${emoji(issue.level)} *Alerta DB — DoctorSaaS*`,
-        `🕐 Check das ${hora} (${periodo})`,
+        `${emoji(issue.level)} *${desc.title}*`,
+        `${levelLabel} · Check das ${hora}`,
         ``,
-        `📋 *Diagnóstico:*`,
-        issue.diagnosis,
+        `📋 *O que está acontecendo:*`,
+        desc.impact,
         ``,
-        `💡 *Ação recomendada:*`,
-        issue.action,
+        `💡 *O que fazer:*`,
+        desc.action,
         ``,
         `Deseja executar agora?`,
-        `✅ *SIM DB* — executar ação`,
+        `✅ *SIM DB* — executar`,
         `❌ *NÃO DB* — ignorar`,
-        `⏰ *DEPOIS DB* — avisar em 2h`,
+        `⏰ *DEPOIS DB* — lembrar em 2h`,
         ``,
         `🆔 ${shortId}`,
       ].join('\n');
