@@ -124,6 +124,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [instanceId, setInstanceId] = useState("");
   const [phone, setPhone] = useState(initialPhone || "55");
   const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'exists_corrected' | 'not_exists' | 'unsupported'>('idle');
+  const [confirmNotFound, setConfirmNotFound] = useState(false);
   const [name, setName] = useState(initialName || "");
   const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
@@ -164,6 +165,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   // Reset waCheck quando phone ou instância mudar
   useEffect(() => {
     setWaCheck('idle');
+    setConfirmNotFound(false);
   }, [phone, instanceId]);
 
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
@@ -243,19 +245,17 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
     setName(opt.name || selectedCliente?.nome_fantasia || selectedCliente?.razao_social || "");
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!instanceId || !phone.trim()) {
       toast.error("Preencha instância e telefone");
       return;
     }
 
-    // Bloquear se há atendimento aberto com outro técnico
     if (openConv?.exists && !openConv?.isOwnUser) {
       toast.error(`Este contato já está em atendimento com ${openConv.techName}`);
       return;
     }
 
-    // Redirecionar se é o próprio usuário
     if (openConv?.exists && openConv?.isOwnUser) {
       onOpenChange(false);
       resetForm();
@@ -263,22 +263,73 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       return;
     }
 
+    // Verificação automática para Z-API e Evolution (exceto Meta)
+    const selectedInstance = instances.find(i => i.id === instanceId);
+    const providerType = (selectedInstance as any)?.provider_type || 'self_hosted';
+
+    if (providerType !== 'meta_cloud' && waCheck === 'idle') {
+      setWaCheck('checking');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-whatsapp-number`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+            body: JSON.stringify({ instanceId, phone: phone.replace(/\D/g, '') }),
+          }
+        );
+        const data = await res.json();
+        if (data.exists === true) {
+          if (data.corrected && data.phone) {
+            setPhone(data.phone);
+            setWaCheck('exists_corrected');
+            toast.success("Adicionamos o 9 automaticamente ao número 😉");
+            // Pequeno delay para o estado atualizar antes de criar
+            await new Promise(r => setTimeout(r, 100));
+            const cleanPhone = data.phone;
+            createConversation.mutate(
+              { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
+              {
+                onSuccess: (d) => {
+                  if (selectedCliente) {
+                    supabase.from("whatsapp_conversations").update({ metadata: { cliente_id: selectedCliente.id } as any }).eq("id", d.conversation.id).then();
+                  }
+                  toast.success("Conversa criada com sucesso");
+                  onOpenChange(false);
+                  resetForm();
+                  onCreated?.(d.conversation.id);
+                },
+                onError: () => toast.error("Erro ao criar conversa"),
+              }
+            );
+            return;
+          } else {
+            setWaCheck('exists');
+          }
+        } else {
+          setWaCheck('not_exists');
+          return; // Para aqui — mostra aviso com opção de confirmar
+        }
+      } catch {
+        setWaCheck('idle');
+        // Se verificação falhou, continua e cria mesmo assim
+      }
+    }
+
+    // Criação normal (verificado, confirmado pelo usuário, ou Meta)
     const cleanPhone = normalizePhoneBR(phone);
     createConversation.mutate(
       { instanceId, phoneNumber: cleanPhone, contactName: name.trim() || cleanPhone, departmentId: selectedDepartmentId || undefined },
       {
-        onSuccess: (data) => {
+        onSuccess: (d) => {
           if (selectedCliente) {
-            supabase
-              .from("whatsapp_conversations")
-              .update({ metadata: { cliente_id: selectedCliente.id } as any })
-              .eq("id", data.conversation.id)
-              .then();
+            supabase.from("whatsapp_conversations").update({ metadata: { cliente_id: selectedCliente.id } as any }).eq("id", d.conversation.id).then();
           }
           toast.success("Conversa criada com sucesso");
           onOpenChange(false);
           resetForm();
-          onCreated?.(data.conversation.id);
+          onCreated?.(d.conversation.id);
         },
         onError: () => toast.error("Erro ao criar conversa"),
       }
@@ -288,6 +339,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const resetForm = () => {
     setPhone("55");
     setWaCheck('idle');
+    setConfirmNotFound(false);
     setName("");
     setSearchTerm("");
     setSelectedCliente(null);
@@ -474,47 +526,32 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             <TabsContent value="avulso" className="space-y-3 mt-3">
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Telefone</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="+55 (11) 99999-9999"
-                    value={maskPhoneBR(phone)}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={!instanceId || phone.replace(/\D/g,'').length < 10 || waCheck === 'checking'}
-                    onClick={handleCheckWhatsApp}
-                  >
-                    {waCheck === 'checking' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verificar'}
-                  </Button>
-                </div>
-                {waCheck === 'exists' && (
-                  <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
-                    <CheckCircle className="h-3.5 w-3.5" /> Número ativo no WhatsApp
-                  </p>
-                )}
+                <Input
+                  placeholder="+55 (11) 99999-9999"
+                  value={maskPhoneBR(phone)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                />
                 {waCheck === 'exists_corrected' && (
                   <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
-                    <CheckCircle className="h-3.5 w-3.5" /> Número encontrado! Adicionamos o 9 automaticamente — não esqueça na próxima 😉
+                    <CheckCircle className="h-3.5 w-3.5" /> 9 adicionado automaticamente 😉
                   </p>
                 )}
                 {waCheck === 'not_exists' && (
-                  <p className="flex items-center gap-1 text-xs text-destructive mt-1">
-                    <XCircle className="h-3.5 w-3.5" /> Número não encontrado no WhatsApp
-                  </p>
+                  <div className="mt-2 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/40 p-3 space-y-2">
+                    <p className="flex items-center gap-1 text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Número não encontrado no WhatsApp
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400">Pode ser um erro na verificação. Deseja criar a conversa mesmo assim?</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => setWaCheck('idle')}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleCreate}>
+                        Criar mesmo assim
+                      </Button>
+                    </div>
+                  </div>
                 )}
-                {waCheck === 'unsupported' && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ⚠️ Meta não suporta verificação prévia de número
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  💡 Celular brasileiro? Não esqueça do 9 após o DDD — ex: (49) <strong>9</strong>9999-9999
-                </p>
               </div>
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Nome (opcional)</Label>
@@ -565,9 +602,10 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             )
           )}
 
-          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
-            {createConversation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Iniciar Conversa
+          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || waCheck === 'checking' || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
+            {(createConversation.isPending || waCheck === 'checking') ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Verificando...</>
+            ) : 'Iniciar Conversa'}
           </Button>
         </div>
       </DialogContent>
