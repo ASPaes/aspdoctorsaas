@@ -526,47 +526,32 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             <TabsContent value="avulso" className="space-y-3 mt-3">
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Telefone</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="+55 (11) 99999-9999"
-                    value={maskPhoneBR(phone)}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={!instanceId || phone.replace(/\D/g,'').length < 10 || waCheck === 'checking'}
-                    onClick={handleCheckWhatsApp}
-                  >
-                    {waCheck === 'checking' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verificar'}
-                  </Button>
-                </div>
-                {waCheck === 'exists' && (
-                  <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
-                    <CheckCircle className="h-3.5 w-3.5" /> Número ativo no WhatsApp
-                  </p>
-                )}
+                <Input
+                  placeholder="+55 (11) 99999-9999"
+                  value={maskPhoneBR(phone)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                />
                 {waCheck === 'exists_corrected' && (
                   <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
-                    <CheckCircle className="h-3.5 w-3.5" /> Número encontrado! Adicionamos o 9 automaticamente — não esqueça na próxima 😉
+                    <CheckCircle className="h-3.5 w-3.5" /> 9 adicionado automaticamente 😉
                   </p>
                 )}
                 {waCheck === 'not_exists' && (
-                  <p className="flex items-center gap-1 text-xs text-destructive mt-1">
-                    <XCircle className="h-3.5 w-3.5" /> Número não encontrado no WhatsApp
-                  </p>
+                  <div className="mt-2 rounded-md border border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/40 p-3 space-y-2">
+                    <p className="flex items-center gap-1 text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> Número não encontrado no WhatsApp
+                    </p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400">Pode ser um erro na verificação. Deseja criar a conversa mesmo assim?</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => setWaCheck('idle')}>
+                        Cancelar
+                      </Button>
+                      <Button size="sm" className="flex-1 h-7 text-xs" onClick={handleCreate}>
+                        Criar mesmo assim
+                      </Button>
+                    </div>
+                  </div>
                 )}
-                {waCheck === 'unsupported' && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ⚠️ Meta não suporta verificação prévia de número
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  💡 Celular brasileiro? Não esqueça do 9 após o DDD — ex: (49) <strong>9</strong>9999-9999
-                </p>
               </div>
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Nome (opcional)</Label>
@@ -617,9 +602,10 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             )
           )}
 
-          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
-            {createConversation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Iniciar Conversa
+          <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || waCheck === 'checking' || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
+            {(createConversation.isPending || waCheck === 'checking') ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Verificando...</>
+            ) : 'Iniciar Conversa'}
           </Button>
         </div>
       </DialogContent>
