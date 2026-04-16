@@ -1501,6 +1501,45 @@ export type Database = {
         }
         Relationships: []
       }
+      db_metrics_snapshots: {
+        Row: {
+          active_connections: number | null
+          captured_at: string
+          cron_job_details_count: number | null
+          dead_tuples_support_attendances: number | null
+          dead_tuples_whatsapp_conversations: number | null
+          dead_tuples_whatsapp_messages: number | null
+          id: string
+          idle_connections: number | null
+          top_slow_query_ms: number | null
+          total_connections: number | null
+        }
+        Insert: {
+          active_connections?: number | null
+          captured_at?: string
+          cron_job_details_count?: number | null
+          dead_tuples_support_attendances?: number | null
+          dead_tuples_whatsapp_conversations?: number | null
+          dead_tuples_whatsapp_messages?: number | null
+          id?: string
+          idle_connections?: number | null
+          top_slow_query_ms?: number | null
+          total_connections?: number | null
+        }
+        Update: {
+          active_connections?: number | null
+          captured_at?: string
+          cron_job_details_count?: number | null
+          dead_tuples_support_attendances?: number | null
+          dead_tuples_whatsapp_conversations?: number | null
+          dead_tuples_whatsapp_messages?: number | null
+          id?: string
+          idle_connections?: number | null
+          top_slow_query_ms?: number | null
+          total_connections?: number | null
+        }
+        Relationships: []
+      }
       estados: {
         Row: {
           codigo_ibge: string | null
@@ -1655,6 +1694,36 @@ export type Database = {
           id?: number
           nome?: string
           tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      monitor_authorized_users: {
+        Row: {
+          active: boolean
+          email: string
+          granted_at: string
+          granted_by: string | null
+          id: string
+          name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          email: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          email?: string
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          name?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -2848,6 +2917,114 @@ export type Database = {
           },
         ]
       }
+      system_error_log: {
+        Row: {
+          context: Json | null
+          error_message: string
+          error_message_pt: string | null
+          error_type: string
+          function_name: string
+          id: string
+          notified_at: string | null
+          occurred_at: string
+          resolved_at: string | null
+          severity: string
+          tenant_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          error_message: string
+          error_message_pt?: string | null
+          error_type: string
+          function_name: string
+          id?: string
+          notified_at?: string | null
+          occurred_at?: string
+          resolved_at?: string | null
+          severity?: string
+          tenant_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          error_message?: string
+          error_message_pt?: string | null
+          error_type?: string
+          function_name?: string
+          id?: string
+          notified_at?: string | null
+          occurred_at?: string
+          resolved_at?: string | null
+          severity?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
+      tenant_daily_metrics: {
+        Row: {
+          active_operators: number
+          ai_calls_audio: number
+          ai_calls_compose: number
+          ai_calls_sentiment: number
+          ai_calls_suggest: number
+          ai_calls_summary: number
+          avg_first_response_seconds: number | null
+          conversations_closed: number
+          conversations_opened: number
+          created_at: string
+          errors_count: number
+          id: string
+          messages_received: number
+          messages_sent: number
+          metric_date: string
+          tenant_id: string
+          updated_at: string
+          whatsapp_instances_connected: number
+          whatsapp_instances_total: number
+        }
+        Insert: {
+          active_operators?: number
+          ai_calls_audio?: number
+          ai_calls_compose?: number
+          ai_calls_sentiment?: number
+          ai_calls_suggest?: number
+          ai_calls_summary?: number
+          avg_first_response_seconds?: number | null
+          conversations_closed?: number
+          conversations_opened?: number
+          created_at?: string
+          errors_count?: number
+          id?: string
+          messages_received?: number
+          messages_sent?: number
+          metric_date?: string
+          tenant_id: string
+          updated_at?: string
+          whatsapp_instances_connected?: number
+          whatsapp_instances_total?: number
+        }
+        Update: {
+          active_operators?: number
+          ai_calls_audio?: number
+          ai_calls_compose?: number
+          ai_calls_sentiment?: number
+          ai_calls_suggest?: number
+          ai_calls_summary?: number
+          avg_first_response_seconds?: number | null
+          conversations_closed?: number
+          conversations_opened?: number
+          created_at?: string
+          errors_count?: number
+          id?: string
+          messages_received?: number
+          messages_sent?: number
+          metric_date?: string
+          tenant_id?: string
+          updated_at?: string
+          whatsapp_instances_connected?: number
+          whatsapp_instances_total?: number
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           cnpj: string | null
@@ -3300,6 +3477,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_instance_status_log: {
+        Row: {
+          alert_sent: boolean
+          captured_at: string
+          id: string
+          instance_id: string
+          instance_name: string
+          status: string
+          tenant_id: string
+          was_connected: boolean
+        }
+        Insert: {
+          alert_sent?: boolean
+          captured_at?: string
+          id?: string
+          instance_id: string
+          instance_name: string
+          status: string
+          tenant_id: string
+          was_connected?: boolean
+        }
+        Update: {
+          alert_sent?: boolean
+          captured_at?: string
+          id?: string
+          instance_id?: string
+          instance_name?: string
+          status?: string
+          tenant_id?: string
+          was_connected?: boolean
+        }
+        Relationships: []
       }
       whatsapp_instance_vault_refs: {
         Row: {
@@ -4252,9 +4462,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      can_access_monitor: { Args: never; Returns: boolean }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
+      collect_db_metrics_snapshot: { Args: never; Returns: undefined }
+      collect_tenant_daily_metrics: { Args: never; Returns: undefined }
       create_access_invite: {
         Args: {
           p_access_status?: string

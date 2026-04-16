@@ -58,6 +58,15 @@ Deno.serve(async (req) => {
             ? null  // Meta configura webhook via painel
             : evolutionWebhookUrl;
 
+        // Get previous status before updating
+        const { data: prevInstance } = await supabaseAdmin
+          .from('whatsapp_instances')
+          .select('status, tenant_id')
+          .eq('id', instance.id)
+          .single();
+        const prevStatus = prevInstance?.status || 'unknown';
+        const tenantId = prevInstance?.tenant_id;
+
         await supabaseAdmin
           .from('whatsapp_instances')
           .update({
@@ -66,6 +75,77 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', instance.id);
+
+        // Log status snapshot for monitoring
+        await supabaseAdmin
+          .from('whatsapp_instance_status_log')
+          .insert({
+            instance_id: instance.id,
+            instance_name: instance.instance_name,
+            tenant_id: tenantId,
+            status: newStatus,
+            was_connected: status.connected,
+            alert_sent: false,
+          });
+
+        // Alert if instance just disconnected
+        if (newStatus === 'disconnected' && prevStatus === 'connected' && tenantId) {
+          try {
+            const { data: alertConfig } = await supabaseAdmin
+              .from('ai_alert_config')
+              .select('admin_phone, admin_instance_name')
+              .single();
+
+            if (alertConfig) {
+              const { data: alertInstance } = await supabaseAdmin
+                .from('whatsapp_instances')
+                .select('id, instance_name')
+                .eq('instance_name', alertConfig.admin_instance_name)
+                .single();
+
+              if (alertInstance) {
+                const alertSecrets = await getInstanceSecrets(supabaseAdmin, alertInstance.id);
+                if (alertSecrets.api_url && alertSecrets.api_key) {
+                  const baseUrl = (alertSecrets.api_url as string).replace(/\/$/, '').replace(/\/manager$/, '');
+
+                  const { data: tenantData } = await supabaseAdmin
+                    .from('tenants')
+                    .select('nome')
+                    .eq('id', tenantId)
+                    .single();
+
+                  const msg = [
+                    `🔴 *Instância Desconectada — DoctorSaaS*`,
+                    ``,
+                    `📱 *Instância:* ${instance.instance_name}`,
+                    `🏢 *Tenant:* ${tenantData?.nome || tenantId}`,
+                    `🕐 *Horário:* ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}`,
+                    ``,
+                    `⚠️ *Impacto:* Mensagens deste número não estão sendo recebidas nem enviadas.`,
+                    ``,
+                    `💡 *Ação:* Verifique o WhatsApp do número vinculado e reconecte a instância no painel.`,
+                  ].join('\n');
+
+                  await fetch(`${baseUrl}/message/sendText/${alertConfig.admin_instance_name}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', apikey: alertSecrets.api_key as string },
+                    body: JSON.stringify({ number: alertConfig.admin_phone, text: msg }),
+                  });
+
+                  await supabaseAdmin
+                    .from('whatsapp_instance_status_log')
+                    .update({ alert_sent: true })
+                    .eq('instance_id', instance.id)
+                    .eq('status', 'disconnected')
+                    .order('captured_at', { ascending: false })
+                    .limit(1);
+                }
+              }
+            }
+          } catch (alertErr) {
+            console.error(`[check-instances-status] Erro ao enviar alerta para ${instance.instance_name}:`, alertErr);
+          }
+        }
 
         console.log(`[check-instances-status] ${instance.instance_name} (${providerType}): ${newStatus}`);
         checked++;
