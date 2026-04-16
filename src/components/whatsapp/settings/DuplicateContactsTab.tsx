@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, GitMerge, EyeOff, Phone, MessageSquare, CheckCircle2, AlertTriangle, Search } from "lucide-react";
@@ -153,7 +154,8 @@ function DuplicatePairCard({
 
 export function DuplicateContactsTab() {
   const { profile } = useAuth();
-  const tenantId = profile?.tenant_id;
+  const { effectiveTenantId } = useTenantFilter();
+  const tenantId = effectiveTenantId || profile?.tenant_id;
   const queryClient = useQueryClient();
   const [ignored, setIgnored] = useState<Set<string>>(new Set());
 
