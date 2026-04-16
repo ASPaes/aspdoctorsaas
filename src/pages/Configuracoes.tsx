@@ -74,7 +74,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
-          {isAdmin && <TabsTrigger value="ferramentas">Ferramentas</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="ferramentas">Duplicidades</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="setup" className="mt-4">
