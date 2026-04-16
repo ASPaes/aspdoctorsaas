@@ -10,6 +10,7 @@ import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
+import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function WhatsAppSettings() {
