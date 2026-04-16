@@ -4338,6 +4338,21 @@ export type Database = {
         }
         Returns: Json
       }
+      get_duplicate_contacts: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          conversations_a: number
+          conversations_b: number
+          id_a: string
+          id_b: string
+          last_message_a: string
+          last_message_b: string
+          name_a: string
+          name_b: string
+          phone_a: string
+          phone_b: string
+        }[]
+      }
       get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
       get_my_access_context: {
         Args: never
@@ -4430,6 +4445,10 @@ export type Database = {
       is_tenant_admin: { Args: never; Returns: boolean }
       mark_notification_read: {
         Args: { p_recipient_id: string }
+        Returns: undefined
+      }
+      merge_whatsapp_contacts: {
+        Args: { p_keep_id: string; p_merge_id: string; p_tenant_id: string }
         Returns: undefined
       }
       next_support_attendance_seq: {
