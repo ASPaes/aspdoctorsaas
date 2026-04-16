@@ -27,16 +27,14 @@ async function getWhatsAppCredentials() {
     .single();
   if (!instance) throw new Error('WhatsApp instance not found');
 
-  const { data: secrets } = await supabase
-    .from('whatsapp_instance_secrets')
-    .select('api_url, api_key')
-    .eq('instance_id', instance.id)
-    .single();
-  if (!secrets?.api_key || !secrets?.api_url) throw new Error('Secrets not found');
+  const { data: secrets, error: secretsError } = await supabase.rpc('get_instance_secrets', {
+    p_instance_id: instance.id,
+  });
+  if (secretsError || !secrets?.api_url) throw new Error('Secrets not found');
 
   return {
-    api_url: secrets.api_url.replace(/\/$/, '').replace(/\/manager$/, ''),
-    api_key: secrets.api_key,
+    api_url: (secrets.api_url as string).replace(/\/$/, '').replace(/\/manager$/, ''),
+    api_key: (secrets.api_key as string) || '',
     instance_name: instance.instance_name,
     admin_phone: alertConfig.admin_phone,
   };
