@@ -185,10 +185,10 @@ async function processZapiWebhook(req: Request): Promise<void> {
     content = payload.document?.caption || content || '';
   } else if (payload?.contact) {
     messageType = 'contact';
-    content = payload.contact?.name || '';
+    content = payload.contact?.displayName || payload.contact?.name || '';
   } else if (payload?.contacts && Array.isArray(payload.contacts)) {
     messageType = 'contacts';
-    content = payload.contacts.map((c: any) => c.name || '').filter(Boolean).join(', ');
+    content = payload.contacts.map((c: any) => c.displayName || c.name || '').filter(Boolean).join(', ');
   }
 
   const instanceInfo: InstanceInfo = {
@@ -225,6 +225,22 @@ async function processZapiWebhook(req: Request): Promise<void> {
     mediaFilename,
     rawPayload: payload,
   };
+
+  if (payload?.contact) {
+    normalized.contactData = {
+      contact: {
+        displayName: payload.contact?.displayName || payload.contact?.name || null,
+        vcard: payload.contact?.vcard || null,
+      },
+    };
+  } else if (payload?.contacts && Array.isArray(payload.contacts)) {
+    normalized.contactData = {
+      contacts: payload.contacts.map((c: any) => ({
+        displayName: c.displayName || c.name || null,
+        vcard: c.vcard || null,
+      })),
+    };
+  }
 
   console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
   await processInboundMessage(supabase, normalized);
