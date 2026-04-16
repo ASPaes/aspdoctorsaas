@@ -370,7 +370,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       ).trim().toUpperCase();
       const _isAdminSender = _senderNum.endsWith(ADMIN_PHONE_GUARD_SUFFIX) || _senderNum.endsWith(ADMIN_PHONE_GUARD_SUFFIX2);
       const _isAdminCmd = _isAdminSender &&
-        (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE'));
+        (_msgText.startsWith('LIMIT UP') || _msgText === 'STATUS IA' || _msgText.startsWith('SNOOZE') || _msgText === 'SIM DB' || _msgText === 'NÃO DB' || _msgText === 'NAO DB' || _msgText === 'DEPOIS DB');
 
       if (_isAdminCmd) {
         console.log(`${LOG} Admin command intercepted: ${_msgText} from ${_senderNum}`);
