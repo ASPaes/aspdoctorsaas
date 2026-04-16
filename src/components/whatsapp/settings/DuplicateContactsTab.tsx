@@ -90,12 +90,12 @@ function DuplicatePairCard({
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
           Possível duplicata
         </div>
-        <Button variant="ghost" size="sm" onClick={onIgnore} className="h-7 text-xs">
+        <Button variant="ghost" size="sm" onClick={onIgnore} className="h-7 text-xs shrink-0">
           <EyeOff className="h-3.5 w-3.5 mr-1" /> Ignorar
         </Button>
       </div>
