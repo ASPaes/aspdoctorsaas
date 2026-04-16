@@ -124,6 +124,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [instanceId, setInstanceId] = useState("");
   const [phone, setPhone] = useState(initialPhone || "55");
   const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'exists_corrected' | 'not_exists' | 'unsupported'>('idle');
+  const [confirmNotFound, setConfirmNotFound] = useState(false);
   const [name, setName] = useState(initialName || "");
   const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
