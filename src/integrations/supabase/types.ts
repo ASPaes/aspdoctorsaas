@@ -1459,6 +1459,48 @@ export type Database = {
           },
         ]
       }
+      db_health_action_log: {
+        Row: {
+          check_name: string
+          diagnosis: string
+          id: string
+          level: string
+          recommended_action: string
+          resolved_at: string | null
+          responded_at: string | null
+          response: string | null
+          sent_at: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          check_name: string
+          diagnosis: string
+          id?: string
+          level: string
+          recommended_action: string
+          resolved_at?: string | null
+          responded_at?: string | null
+          response?: string | null
+          sent_at?: string
+          status?: string
+          tenant_id?: string
+        }
+        Update: {
+          check_name?: string
+          diagnosis?: string
+          id?: string
+          level?: string
+          recommended_action?: string
+          resolved_at?: string | null
+          responded_at?: string | null
+          response?: string | null
+          sent_at?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       estados: {
         Row: {
           codigo_ibge: string | null
@@ -4249,6 +4291,7 @@ export type Database = {
         Args: { p_encryption_key: string; p_key: string }
         Returns: string
       }
+      exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       fn_cohort_logos:
         | {
             Args: {
