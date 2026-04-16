@@ -89,6 +89,7 @@ export function MediaContent({
   mediaMimetype,
 }: MediaContentProps) {
   const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (messageType === "document" || (messageType !== "image" && messageType !== "audio" && messageType !== "video")) {
     return (
@@ -103,8 +104,6 @@ export function MediaContent({
       />
     );
   }
-
-  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (!resolvedInlineUrl) return null;
 
