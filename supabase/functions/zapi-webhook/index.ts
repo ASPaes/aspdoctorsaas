@@ -226,6 +226,22 @@ async function processZapiWebhook(req: Request): Promise<void> {
     rawPayload: payload,
   };
 
+  if (payload?.contact) {
+    normalized.contactData = {
+      contact: {
+        displayName: payload.contact?.displayName || payload.contact?.name || null,
+        vcard: payload.contact?.vcard || null,
+      },
+    };
+  } else if (payload?.contacts && Array.isArray(payload.contacts)) {
+    normalized.contactData = {
+      contacts: payload.contacts.map((c: any) => ({
+        displayName: c.displayName || c.name || null,
+        vcard: c.vcard || null,
+      })),
+    };
+  }
+
   console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
   await processInboundMessage(supabase, normalized);
 }
