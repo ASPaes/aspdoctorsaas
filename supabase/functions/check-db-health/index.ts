@@ -17,7 +17,6 @@ async function getWhatsAppCredentials() {
   const { data: alertConfig } = await supabase
     .from('ai_alert_config')
     .select('admin_phone, admin_instance_name')
-    .eq('tenant_id', 'a0000000-0000-0000-0000-000000000001')
     .single();
   if (!alertConfig) throw new Error('Alert config not found');
 
