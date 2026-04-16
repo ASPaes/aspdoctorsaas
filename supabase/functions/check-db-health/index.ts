@@ -249,6 +249,21 @@ Deno.serve(async () => {
 
     console.log(`[check-db-health][${requestId}] ${checks.length} checks, ${issues.length} issues`);
 
+    // Check if it's the 19h report time (18:55 - 19:10 window in São Paulo)
+    const nowSP = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
+    const hourSP = new Date(nowSP).getHours();
+    const isReportTime = hourSP === 19;
+
+    const creds = await getWhatsAppCredentials();
+
+    if (isReportTime) {
+      console.log(`[check-db-health][${requestId}] Building daily report`);
+      await buildDailyReport(creds);
+      return new Response(JSON.stringify({ ok: true, message: 'Daily report sent' }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (issues.length === 0) {
       console.log(`[check-db-health][${requestId}] All checks passed — no alert sent`);
       return new Response(JSON.stringify({ ok: true, message: 'All checks passed' }), {
@@ -256,7 +271,6 @@ Deno.serve(async () => {
       });
     }
 
-    const creds = await getWhatsAppCredentials();
     const hora = formatTime();
     const periodo = new Date().getHours() < 12 ? 'manhã' : 'noite';
 
