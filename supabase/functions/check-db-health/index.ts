@@ -135,6 +135,96 @@ async function runChecks(): Promise<HealthCheck[]> {
   return checks;
 }
 
+async function buildDailyReport(creds: any): Promise<void> {
+  const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' });
+
+  // Métricas do banco — snapshot mais recente do dia
+  const { data: snapshots } = await supabase
+    .from('db_metrics_snapshots')
+    .select('active_connections, top_slow_query_ms, dead_tuples_whatsapp_messages, cron_job_details_count, captured_at')
+    .gte('captured_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .order('active_connections', { ascending: false })
+    .limit(100);
+
+  const maxConn = snapshots?.length ? Math.max(...snapshots.map((s: any) => s.active_connections || 0)) : 0;
+  const peakSnap = snapshots?.find((s: any) => s.active_connections === maxConn);
+  const peakTime = peakSnap ? new Date(peakSnap.captured_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--';
+  const latestSnap = snapshots?.[snapshots.length - 1] as any;
+  const slowMs = latestSnap?.top_slow_query_ms || 0;
+  const deadTuples = latestSnap?.dead_tuples_whatsapp_messages || 0;
+
+  // Métricas por tenant
+  const { data: tenants } = await supabase
+    .from('tenant_daily_metrics')
+    .select('tenant_id, messages_sent, messages_received, conversations_opened, conversations_closed, active_operators, ai_calls_suggest, ai_calls_compose, ai_calls_sentiment, ai_calls_summary, ai_calls_audio, whatsapp_instances_connected, whatsapp_instances_total')
+    .eq('metric_date', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
+  const { data: tenantNames } = await supabase
+    .from('tenants')
+    .select('id, nome');
+
+  const nameMap: Record<string, string> = {};
+  (tenantNames || []).forEach((t: any) => { nameMap[t.id] = t.nome; });
+
+  const activeTenantsData = (tenants || []).filter((t: any) => t.messages_sent > 0 || t.messages_received > 0);
+  const totalMsgSent = activeTenantsData.reduce((s: number, t: any) => s + (t.messages_sent || 0), 0);
+  const totalMsgRecv = activeTenantsData.reduce((s: number, t: any) => s + (t.messages_received || 0), 0);
+  const totalAI = activeTenantsData.reduce((s: number, t: any) => s + (t.ai_calls_suggest || 0) + (t.ai_calls_compose || 0) + (t.ai_calls_sentiment || 0) + (t.ai_calls_summary || 0) + (t.ai_calls_audio || 0), 0);
+
+  // Status instâncias
+  const { data: instances } = await supabase
+    .from('whatsapp_instances')
+    .select('instance_name, status, tenant_id');
+
+  const disconnected = (instances || []).filter((i: any) => i.status !== 'connected');
+
+  // Alertas do dia
+  const { data: alerts } = await supabase
+    .from('db_health_action_log')
+    .select('level, status')
+    .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+  const alertsCount = alerts?.length || 0;
+  const resolvedCount = alerts?.filter((a: any) => a.status === 'resolved').length || 0;
+
+  // Montar mensagem
+  const lines = [
+    `📊 *Relatório Diário — DoctorSaaS*`,
+    `📅 ${hoje.charAt(0).toUpperCase() + hoje.slice(1)}`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `🗄️ *Banco de Dados*`,
+    ``,
+    `🔌 Conexões: pico de *${maxConn}* às ${peakTime}h`,
+    slowMs > 2000 ? `⚠️ Query lenta: *${slowMs}ms* média` : `⚡ Performance: *normal*`,
+    deadTuples > 1000 ? `⚠️ Dead tuples: *${deadTuples}* em mensagens` : `🧹 Limpeza: *ok*`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `💬 *Operação Geral*`,
+    ``,
+    `📨 Mensagens: *${totalMsgSent}* enviadas · *${totalMsgRecv}* recebidas`,
+    `🤖 IA utilizada: *${totalAI}* chamadas`,
+    `📱 Instâncias: *${(instances || []).length - disconnected.length}/${(instances || []).length}* conectadas`,
+    disconnected.length > 0 ? `⚠️ Desconectadas: ${disconnected.map((i: any) => i.instance_name).join(', ')}` : ``,
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `🏢 *Por Tenant*`,
+    ``,
+    ...activeTenantsData.sort((a: any, b: any) => b.messages_sent - a.messages_sent).map((t: any) => {
+      const aiTotal = (t.ai_calls_suggest || 0) + (t.ai_calls_compose || 0) + (t.ai_calls_sentiment || 0) + (t.ai_calls_summary || 0) + (t.ai_calls_audio || 0);
+      const instStatus = t.whatsapp_instances_connected === t.whatsapp_instances_total ? '✅' : '⚠️';
+      return `${instStatus} *${nameMap[t.tenant_id] || t.tenant_id}*\n   💬 ${t.messages_sent}↑ ${t.messages_received}↓ · 🤖 ${aiTotal} IA · 👥 ${t.active_operators} ops`;
+    }),
+    ``,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    alertsCount > 0 ? `🔔 *Alertas hoje:* ${alertsCount} enviados · ${resolvedCount} resolvidos` : `✅ *Sem alertas hoje*`,
+    ``,
+    `_Próximo check: amanhã às 08:15h_`,
+  ].filter(l => l !== undefined).join('\n');
+
+  await sendWhatsApp(creds, lines);
+}
+
 function emoji(level: string) {
   if (level === 'critical') return '🔴';
   if (level === 'warn') return '🟡';
@@ -159,6 +249,21 @@ Deno.serve(async () => {
 
     console.log(`[check-db-health][${requestId}] ${checks.length} checks, ${issues.length} issues`);
 
+    // Check if it's the 19h report time (18:55 - 19:10 window in São Paulo)
+    const nowSP = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
+    const hourSP = new Date(nowSP).getHours();
+    const isReportTime = hourSP === 19;
+
+    const creds = await getWhatsAppCredentials();
+
+    if (isReportTime) {
+      console.log(`[check-db-health][${requestId}] Building daily report`);
+      await buildDailyReport(creds);
+      return new Response(JSON.stringify({ ok: true, message: 'Daily report sent' }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (issues.length === 0) {
       console.log(`[check-db-health][${requestId}] All checks passed — no alert sent`);
       return new Response(JSON.stringify({ ok: true, message: 'All checks passed' }), {
@@ -166,7 +271,6 @@ Deno.serve(async () => {
       });
     }
 
-    const creds = await getWhatsAppCredentials();
     const hora = formatTime();
     const periodo = new Date().getHours() < 12 ? 'manhã' : 'noite';
 
