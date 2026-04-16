@@ -231,14 +231,14 @@ async function processZapiWebhook(req: Request): Promise<void> {
     normalized.contactData = {
       contact: {
         displayName: payload.contact?.displayName || payload.contact?.name || null,
-        vcard: payload.contact?.vcard || null,
+        vcard: payload.contact?.vCard || payload.contact?.vcard || null,
       },
     };
   } else if (payload?.contacts && Array.isArray(payload.contacts)) {
     normalized.contactData = {
       contacts: payload.contacts.map((c: any) => ({
         displayName: c.displayName || c.name || null,
-        vcard: c.vcard || null,
+        vcard: c.vCard || c.vcard || null,
       })),
     };
   }
