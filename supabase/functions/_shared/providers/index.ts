@@ -237,7 +237,15 @@ class ZApiAdapter implements ProviderAdapter {
         break;
       }
       case 'document': {
-        endpoint = `${base}/send-document/${msg.mediaMimetype || 'application/pdf'}`;
+        // Z-API expects file extension in path, not full MIME type
+        let docExt = 'pdf';
+        if (msg.fileName && msg.fileName.includes('.')) {
+          docExt = msg.fileName.split('.').pop()?.toLowerCase() || 'pdf';
+        } else if (msg.mediaMimetype) {
+          const sub = msg.mediaMimetype.split('/')[1]?.split(';')[0]?.trim();
+          if (sub && !sub.includes('/')) docExt = sub;
+        }
+        endpoint = `${base}/send-document/${docExt}`;
         body = { phone, document: msg.mediaUrl, fileName: msg.fileName };
         break;
       }
