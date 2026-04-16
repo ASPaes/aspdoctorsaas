@@ -42,7 +42,7 @@ export default function AppLayout() {
                     Duplicidades
                   </Button>
                   <Dialog open={dupOpen} onOpenChange={setDupOpen}>
-                    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+                    <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Contatos Duplicados</DialogTitle>
                       </DialogHeader>
