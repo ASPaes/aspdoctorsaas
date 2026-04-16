@@ -211,33 +211,12 @@ export function DuplicateContactsTab() {
     );
   }
 
-  if (visiblePairs.length === 0) {
+  if (visiblePairs.length === 0 && !search.trim() && (pairs || []).filter(p => !ignored.has(pairKey(p))).length === 0) {
     return (
-      <div className="space-y-4">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por nome ou telefone..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
-        <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-          {search.trim() ? (
-            <>
-              <p className="text-sm font-medium">Nenhum resultado para "{search}"</p>
-              <p className="text-xs text-muted-foreground">Tente outro nome ou telefone.</p>
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
-              <p className="text-sm font-medium">Nenhum contato duplicado encontrado</p>
-              <p className="text-xs text-muted-foreground">Sua base de contatos está organizada.</p>
-            </>
-          )}
-        </div>
+      <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+        <CheckCircle2 className="h-8 w-8 text-green-500" />
+        <p className="text-sm font-medium">Nenhum contato duplicado encontrado</p>
+        <p className="text-xs text-muted-foreground">Sua base de contatos está organizada.</p>
       </div>
     );
   }
@@ -264,6 +243,13 @@ export function DuplicateContactsTab() {
           />
         </div>
       </div>
+
+      {visiblePairs.length === 0 && search.trim() && (
+        <div className="flex flex-col items-center justify-center py-8 text-center space-y-1">
+          <p className="text-sm font-medium">Nenhum resultado para "{search}"</p>
+          <p className="text-xs text-muted-foreground">Tente outro nome ou telefone.</p>
+        </div>
+      )}
 
       <div className="space-y-3">
         {visiblePairs.map(pair => (
