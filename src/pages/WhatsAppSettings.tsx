@@ -36,6 +36,7 @@ export default function WhatsAppSettings() {
           <TabsTrigger value="assignment">Atribuição</TabsTrigger>
           <TabsTrigger value="team">Equipe</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
+          {isAdmin && <TabsTrigger value="ferramentas">Ferramentas</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="instances" className="mt-4">
@@ -67,6 +68,12 @@ export default function WhatsAppSettings() {
         <TabsContent value="security" className="mt-4">
           <SecuritySettingsTab />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="ferramentas" className="mt-4">
+            <DuplicateContactsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
