@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, User, Building2, Phone, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, User, Building2, Phone, CheckCircle2, CheckCircle, XCircle } from "lucide-react";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useCreateConversation } from "../hooks/useCreateConversation";
 import { useClienteSearch, type ClienteSearchResult } from "../hooks/useClienteSearch";
@@ -122,7 +122,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const { selectedDepartmentId } = useDepartmentFilter();
   const { user } = useAuth();
   const [instanceId, setInstanceId] = useState("");
-  const [phone, setPhone] = useState(initialPhone || "");
+  const [phone, setPhone] = useState(initialPhone || "55");
+  const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'not_exists' | 'unsupported'>('idle');
   const [name, setName] = useState(initialName || "");
   const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
@@ -159,6 +160,11 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       }
     }
   }, [open, initialInstanceId, instances, instanceId]);
+
+  // Reset waCheck quando phone ou instância mudar
+  useEffect(() => {
+    setWaCheck('idle');
+  }, [phone, instanceId]);
 
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
 
@@ -280,11 +286,34 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   };
 
   const resetForm = () => {
-    setPhone("");
+    setPhone("55");
+    setWaCheck('idle');
     setName("");
     setSearchTerm("");
     setSelectedCliente(null);
     setSelectedContactPhone(null);
+  };
+
+  const handleCheckWhatsApp = async () => {
+    if (!instanceId || phone.replace(/\D/g,'').length < 10) return;
+    setWaCheck('checking');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-whatsapp-number`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ instanceId, phone: phone.replace(/\D/g,'') }),
+        }
+      );
+      const data = await res.json();
+      if (data.unsupported) setWaCheck('unsupported');
+      else if (data.exists === true) setWaCheck('exists');
+      else setWaCheck('not_exists');
+    } catch {
+      setWaCheck('idle');
+    }
   };
 
   return (
@@ -436,11 +465,39 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             <TabsContent value="avulso" className="space-y-3 mt-3">
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Telefone</Label>
-                <Input
-                  placeholder="+55 (11) 99999-9999"
-                  value={maskPhoneBR(phone)}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="+55 (11) 99999-9999"
+                    value={maskPhoneBR(phone)}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={!instanceId || phone.replace(/\D/g,'').length < 10 || waCheck === 'checking'}
+                    onClick={handleCheckWhatsApp}
+                  >
+                    {waCheck === 'checking' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verificar'}
+                  </Button>
+                </div>
+                {waCheck === 'exists' && (
+                  <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                    <CheckCircle className="h-3.5 w-3.5" /> Número ativo no WhatsApp
+                  </p>
+                )}
+                {waCheck === 'not_exists' && (
+                  <p className="flex items-center gap-1 text-xs text-destructive mt-1">
+                    <XCircle className="h-3.5 w-3.5" /> Número não encontrado no WhatsApp
+                  </p>
+                )}
+                {waCheck === 'unsupported' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ⚠️ Meta não suporta verificação prévia de número
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Nome (opcional)</Label>
