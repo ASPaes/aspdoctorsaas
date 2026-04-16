@@ -48,6 +48,7 @@ import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 import ClienteImportModal from "@/components/import/ClienteImportModal";
+import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -56,7 +57,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-function WhatsAppSettingsContent() {
+function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [whatsappSubTab, setWhatsappSubTab] = useState("setup");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for future use
@@ -73,6 +74,7 @@ function WhatsAppSettingsContent() {
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
+          {isAdmin && <TabsTrigger value="ferramentas">Ferramentas</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="setup" className="mt-4">
@@ -109,6 +111,12 @@ function WhatsAppSettingsContent() {
         <TabsContent value="seguranca" className="mt-4">
           <SecuritySettingsTab />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="ferramentas" className="mt-4">
+            <DuplicateContactsTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
@@ -318,7 +326,7 @@ export default function Configuracoes() {
         )}
 
         <TabsContent value="whatsapp">
-          <WhatsAppSettingsContent />
+          <WhatsAppSettingsContent isAdmin={isAdmin} />
         </TabsContent>
 
         {isAdmin && (
