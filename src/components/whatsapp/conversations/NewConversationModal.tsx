@@ -123,7 +123,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const { user } = useAuth();
   const [instanceId, setInstanceId] = useState("");
   const [phone, setPhone] = useState(initialPhone || "55");
-  const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'not_exists' | 'unsupported'>('idle');
+  const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'exists_corrected' | 'not_exists' | 'unsupported'>('idle');
   const [name, setName] = useState(initialName || "");
   const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
@@ -308,9 +308,18 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
         }
       );
       const data = await res.json();
-      if (data.unsupported) setWaCheck('unsupported');
-      else if (data.exists === true) setWaCheck('exists');
-      else setWaCheck('not_exists');
+      if (data.unsupported) {
+        setWaCheck('unsupported');
+      } else if (data.exists === true) {
+        if (data.corrected && data.phone) {
+          setPhone(data.phone);
+          setWaCheck('exists_corrected');
+        } else {
+          setWaCheck('exists');
+        }
+      } else {
+        setWaCheck('not_exists');
+      }
     } catch {
       setWaCheck('idle');
     }
@@ -486,6 +495,11 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
                 {waCheck === 'exists' && (
                   <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
                     <CheckCircle className="h-3.5 w-3.5" /> Número ativo no WhatsApp
+                  </p>
+                )}
+                {waCheck === 'exists_corrected' && (
+                  <p className="flex items-center gap-1 text-xs text-green-600 mt-1">
+                    <CheckCircle className="h-3.5 w-3.5" /> Número encontrado! Adicionamos o 9 automaticamente — não esqueça na próxima 😉
                   </p>
                 )}
                 {waCheck === 'not_exists' && (
