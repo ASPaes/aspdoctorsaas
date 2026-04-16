@@ -184,6 +184,7 @@ async function processZapiWebhook(req: Request): Promise<void> {
     mediaFilename = payload.document?.fileName || null;
     content = payload.document?.caption || content || '';
   } else if (payload?.contact) {
+    console.log('[zapi-webhook] contact payload:', JSON.stringify(payload.contact));
     messageType = 'contact';
     content = payload.contact?.displayName || payload.contact?.name || '';
   } else if (payload?.contacts && Array.isArray(payload.contacts)) {
