@@ -657,7 +657,7 @@ export default function SuperMonitor() {
 
         {/* Tenants + Instâncias */}
         <div style={panelStyle}>
-          <div style={labelStyle}>tenants · ontem</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>tenants <HelpTooltip text="Cada tenant é uma empresa usando a plataforma. Mostra o volume de mensagens e uso de IA por empresa. 'Sem atividade' significa que a empresa não teve movimentação no período." /></div>
           {filteredTenants.map((t: any, i: number) => {
             const active = (t.messages_sent || 0) + (t.messages_received || 0) > 0;
             return (
