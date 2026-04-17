@@ -898,9 +898,11 @@ export default function SuperMonitor() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               opacity: actionLoading !== null ? 0.6 : 1,
             });
-            const MainCard = ({ action, label, desc, icon, value, max, lastRun, alwaysEnabled, tooltip }: any) => {
+            const MainCard = ({ action, label, desc, icon, value, max, lastRun, alwaysEnabled, tooltip, inverted }: any) => {
               const p = pct(value, max);
-              const b = badge(p);
+              const b = inverted
+                ? (p >= 80 ? { label: 'ótimo', bg: '#dcfce7', color: '#166534' } : p >= 40 ? { label: 'ok', bg: '#dcfce7', color: '#166534' } : { label: 'incompleto', bg: '#fef9c3', color: '#854d0e' })
+                : badge(p);
               const enabled = alwaysEnabled || p >= 30;
               return (
                 <div style={cardStyle}>
@@ -916,14 +918,18 @@ export default function SuperMonitor() {
                   </div>
                   <div style={{ textAlign: 'center', fontSize: 24, margin: '6px 0', opacity: typeof value === 'number' ? trashOpacity(p) : 1 }}>{icon}</div>
                   <div style={{ height: 7, background: 'var(--color-border-tertiary)', borderRadius: 4, overflow: 'hidden', margin: '8px 0 4px' }}>
-                    <div style={{ height: '100%', width: `${typeof value === 'number' ? p : 100}%`, background: barColor(typeof value === 'number' ? p : 0), borderRadius: 4, transition: 'width 0.5s' }} />
+                    <div style={{ height: '100%', width: `${typeof value === 'number' ? p : 100}%`, background: inverted ? '#22c55e' : barColor(typeof value === 'number' ? p : 0), borderRadius: 4, transition: 'width 0.5s' }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                     <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{typeof value === 'number' ? value.toLocaleString('pt-BR') + ' registros' : value}</span>
                     <span style={{ color: 'var(--color-text-secondary)' }}>limite {max.toLocaleString('pt-BR')}</span>
                   </div>
-                  <div style={{ fontSize: 10, textAlign: 'center', margin: '3px 0 6px', color: barColor(typeof value === 'number' ? p : 0), fontWeight: 500 }}>
-                    {typeof value === 'number' ? `${p}% · ${p >= 70 ? 'limpar agora!' : p >= 30 ? 'recomendado limpar' : 'saudável'}` : lastRun}
+                  <div style={{ fontSize: 10, textAlign: 'center', margin: '3px 0 6px', color: inverted ? '#16a34a' : barColor(typeof value === 'number' ? p : 0), fontWeight: 500 }}>
+                    {typeof value === 'number'
+                      ? inverted
+                        ? `${p}% coletado · ${p >= 80 ? 'tudo em dia' : p >= 40 ? 'coletando normalmente' : 'poucos dados ainda'}`
+                        : `${p}% · ${p >= 70 ? 'limpar agora!' : p >= 30 ? 'recomendado limpar' : 'saudável'}`
+                      : lastRun}
                   </div>
                   <button
                     style={btnStyle(enabled)}
@@ -942,8 +948,8 @@ export default function SuperMonitor() {
                 <MainCard action="vacuum_conversations" label="Otimizar conversas" desc="Registros obsoletos · whatsapp_conversations" icon="🗑️" value={deadConv} max={2000} lastRun="automático via autovacuum" tooltip="Mesmo processo da limpeza do chat, mas para a tabela de conversas. Saudável quando abaixo de 30%." />
                 <MainCard action="vacuum_attendances" label="Otimizar atendimentos" desc="Registros obsoletos · support_attendances" icon="🗑️" value={deadAtt} max={2000} lastRun="automático via autovacuum" tooltip="Limpeza da tabela de atendimentos. Normalmente fica baixo pois há menos movimentação." />
                 <MainCard action="clean_cron" label="Limpar histórico" desc="Log de tarefas · cron.job_run_details" icon="🗑️" value={cronCount} max={15000} lastRun="limpeza automática: diária às 03h" tooltip="O sistema registra cada tarefa automática executada. Com o tempo esse log cresce. A limpeza é automática toda madrugada, mas você pode forçar agora se necessário." />
-                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={snapshotsToday} max={288} lastRun={`automático · último: ${lastSnapshot}h`} alwaysEnabled tooltip="Coleta dados do banco a cada 5 minutos para alimentar os gráficos do dashboard. Clique para forçar uma coleta agora e ver os dados mais recentes." />
-                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={4} max={4} lastRun={`automático · última: ${lastMetrics}h`} alwaysEnabled tooltip="Consolida os dados de uso de cada empresa (mensagens, IA, conversas) para o relatório diário. Roda automaticamente às 01h, mas você pode forçar agora." />
+                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={snapshotsToday} max={288} lastRun={`automático · último: ${lastSnapshot}h`} alwaysEnabled inverted tooltip="Coleta dados do banco a cada 5 minutos para alimentar os gráficos do dashboard. Clique para forçar uma coleta agora e ver os dados mais recentes." />
+                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={4} max={4} lastRun={`automático · última: ${lastMetrics}h`} alwaysEnabled inverted tooltip="Consolida os dados de uso de cada empresa (mensagens, IA, conversas) para o relatório diário. Roda automaticamente às 01h, mas você pode forçar agora." />
               </>
             );
           })()}
