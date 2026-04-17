@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshCw, Wifi, WifiOff, AlertTriangle, CheckCircle, Activity, MessageSquare, Bot, Database } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DayPicker } from 'react-day-picker';
+import type { DateRange } from 'react-day-picker';
+import { format, subDays, startOfMonth, endOfMonth, startOfQuarter, startOfYear, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import 'react-day-picker/dist/style.css';
 
 function ScoreRing({ score }: { score: number }) {
   const r = 30;
