@@ -82,9 +82,24 @@ export const SmartReplySuggestions = ({
     );
   }
 
-  // Nothing to show
-  if (!isLoading && suggestions.length === 0) {
-    return null;
+  // Empty state — show button to request suggestions manually
+  if (!isLoading && !error && suggestions.length === 0) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 border-t border-border bg-card/50">
+        <Sparkles className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="text-[11px] text-muted-foreground">Sugestões IA</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="h-6 px-2 text-xs gap-1 ml-auto"
+        >
+          <Sparkles className="h-3 w-3" />
+          Gerar sugestões
+        </Button>
+      </div>
+    );
   }
 
   const visibleChips = suggestions.slice(0, MAX_VISIBLE_CHIPS);
