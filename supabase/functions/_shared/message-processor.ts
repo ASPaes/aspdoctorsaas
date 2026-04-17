@@ -516,7 +516,7 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   }
   if (att.assigned_to) return false;
   if (att.ura_human_fallback) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
-  if (att.department_id || att.ura_option_selected !== null) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
+  if (att.ura_option_selected !== null) { await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(WAITING_AGENT_MESSAGES)); return true; }
   if (att.ura_asked_at) {
     const elapsed = (Date.now() - new Date(att.ura_asked_at).getTime()) / (1000 * 60);
     if (elapsed > (supportConfig.ura_timeout_minutes ?? 2)) { await assignDefaultDepartment(supabase, att.id, conversationId, tenantId, supportConfig); return false; }
