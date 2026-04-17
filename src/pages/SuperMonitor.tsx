@@ -245,7 +245,7 @@ export default function SuperMonitor() {
           <Activity size={20} style={{ color: 'hsl(var(--primary))' }} />
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Monitor — DoctorSaaS</h1>
-            <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', margin: 0, textTransform: 'capitalize' }}>{now}</p>
+            <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', margin: 0, textTransform: 'capitalize' }}>{nowLabel}</p>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
