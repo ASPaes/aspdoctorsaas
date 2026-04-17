@@ -736,9 +736,7 @@ export default function SuperMonitor() {
       {/* Linha 3: Falhas + Alertas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10 }}>
         <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AlertTriangle size={11} /> falhas e ocorrências · últimas 24h
-          </div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>falhas e ocorrências <HelpTooltip text="Problemas que aconteceram nas últimas 24 horas — instâncias que ficaram offline, erros de conexão ou falhas no sistema. Itens em andamento ainda não foram resolvidos." /></div>
           {instanceLog.length === 0 && alerts.filter((a: any) => a.level === 'critical').length === 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#16a34a', padding: '6px 0' }}>
               <CheckCircle size={12} /> Nenhuma falha registrada nas últimas 24h
@@ -790,7 +788,7 @@ export default function SuperMonitor() {
         </div>
 
         <div style={panelStyle}>
-          <div style={labelStyle}>histórico de alertas · últimas 24h</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>histórico de alertas <HelpTooltip text="Alertas enviados via WhatsApp sobre a saúde do banco de dados. Mostra se cada alerta foi resolvido, ignorado ou está pendente." /></div>
           {alerts.length === 0 && <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', margin: 0 }}>Nenhum alerta nas últimas 24h</p>}
           {alerts.map((alert: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
@@ -827,7 +825,7 @@ export default function SuperMonitor() {
       </div>
 
       <div style={{ ...panelStyle, marginTop: 10 }}>
-        <div style={{ ...labelStyle, marginBottom: 12 }}>manutenção · estado atual do banco</div>
+        <div style={{ ...labelStyle, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>manutenção <HelpTooltip text="Tarefas de limpeza e otimização do banco. A barra mostra o nível de acúmulo — verde é saudável, amarelo recomenda atenção, vermelho precisa limpar. Clique em 'Executar agora' quando necessário." /></div>
         {actionResult && (
           <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>{actionResult.ok ? '✅' : '❌'}</span>
