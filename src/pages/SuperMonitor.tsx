@@ -699,18 +699,20 @@ export default function SuperMonitor() {
           )}
           {instanceLog.map((log: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, padding: '7px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 4 }} />
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 4, animation: 'pulse 2s infinite' }} />
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>Instância offline — {log.instance_name}</span>
-                  <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fee2e2', color: '#991b1b', fontWeight: 500 }}>{log.occurrences}x detectada</span>
+                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: '#fee2e2', color: '#991b1b', fontWeight: 500 }}>em andamento</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>Mensagens não entregues durante o período. Reconectar no painel do WhatsApp.</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                  Mensagens não entregues. Reconectar o WhatsApp vinculado a esta instância.
+                </div>
                 <div style={{ display: 'flex', gap: 5, marginTop: 4, alignItems: 'center' }}>
                   <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: '#fee2e2', color: '#991b1b' }}>WhatsApp</span>
                   <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)' }}>{log.tenant_nome}</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginLeft: 'auto' }}>
-                    desde {log.first_seen ? new Date(log.first_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h · último {log.last_seen ? new Date(log.last_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
+                    offline desde {log.first_seen ? new Date(log.first_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
                   </span>
                 </div>
               </div>
