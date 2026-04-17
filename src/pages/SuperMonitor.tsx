@@ -414,64 +414,61 @@ export default function SuperMonitor() {
           >
             Score {score}/100
           </span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[
-                  { label: 'Hoje', days: 0 },
-                  { label: '7d', days: 7 },
-                  { label: '30d', days: 30 },
-                  { label: '3m', days: 90 },
-                  { label: '6m', days: 180 },
-                  { label: '12m', days: 365 },
-                  { label: 'Tudo', days: -1 },
-                ].map(({ label, days }) => {
-                  const isActive = (() => {
-                    const to = new Date(); to.setDate(to.getDate() - 1);
-                    const toStr = to.toISOString().split('T')[0];
-                    if (days === 0) return dateFrom === toStr && dateTo === toStr;
-                    if (days === -1) return dateFrom === '2020-01-01';
-                    const from = new Date(); from.setDate(from.getDate() - days);
-                    return dateFrom === from.toISOString().split('T')[0] && dateTo === toStr;
-                  })();
-                  return (
-                    <button
-                      key={label}
-                      onClick={() => {
-                        const to = new Date(); to.setDate(to.getDate() - 1);
-                        const toStr = to.toISOString().split('T')[0];
-                        if (days === -1) { setDateRange({ from: new Date('2020-01-01'), to: new Date() }); }
-                        else if (days === 0) { setDateRange({ from: new Date(), to: new Date() }); }
-                        else {
-                          const f = new Date(); f.setDate(f.getDate() - days);
-                          setDateRange({ from: f, to: new Date(toStr) });
-                        }
-                        setRefreshKey(k => k + 1);
-                      }}
-                      style={{
-                        fontSize: 11, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
-                        border: isActive ? '1.5px solid #3b82f6' : '0.5px solid var(--color-border-secondary)',
-                        background: isActive ? '#dbeafe' : 'var(--color-background-secondary)',
-                        color: isActive ? '#1e40af' : 'var(--color-text-secondary)',
-                        fontWeight: isActive ? 500 : 400,
-                      }}
-                    >{label}</button>
-                  );
-                })}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => { setDateRange(r => ({ ...r, from: e.target.value ? new Date(e.target.value) : undefined })); setRefreshKey(k => k + 1); }}
-                  style={{ fontSize: 11, padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>–</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => { setDateRange(r => ({ ...r, to: e.target.value ? new Date(e.target.value) : undefined })); setRefreshKey(k => k + 1); }}
-                  style={{ fontSize: 11, padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
-                />
-              </div>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <button style={{
+                    fontSize: 12, padding: '4px 12px', borderRadius: 8, cursor: 'pointer',
+                    border: '0.5px solid var(--color-border-secondary)',
+                    background: 'var(--color-background-secondary)',
+                    color: 'var(--color-text-primary)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    {dateRange.from
+                      ? dateRange.to
+                        ? `${format(dateRange.from, 'dd/MM/yy')} – ${format(dateRange.to, 'dd/MM/yy')}`
+                        : format(dateRange.from, 'dd/MM/yy')
+                      : 'Período'}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent style={{ width: 'auto', padding: 0 }} align="start">
+                  <div style={{ display: 'flex' }}>
+                    <div style={{ width: 152, borderRight: '1px solid var(--color-border-tertiary)', padding: '8px 0', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-text-secondary)', padding: '2px 12px 6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Atalhos</div>
+                      {([
+                        { label: 'Hoje', fn: () => ({ from: new Date(), to: new Date() }) },
+                        { label: 'Últimos 7 dias', fn: () => ({ from: subDays(new Date(), 7), to: subDays(new Date(), 1) }) },
+                        { label: 'Últimos 30 dias', fn: () => ({ from: subDays(new Date(), 30), to: subDays(new Date(), 1) }) },
+                        { label: 'Este mês', fn: () => ({ from: startOfMonth(new Date()), to: new Date() }) },
+                        { label: 'Mês passado', fn: () => ({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }) },
+                        { label: 'Este trimestre', fn: () => ({ from: startOfQuarter(new Date()), to: new Date() }) },
+                        { label: 'Este ano', fn: () => ({ from: startOfYear(new Date()), to: new Date() }) },
+                        { label: 'Tudo', fn: () => ({ from: new Date('2020-01-01'), to: new Date() }) },
+                      ] as const).map(({ label, fn }) => (
+                        <button key={label} onClick={() => { setDateRange(fn()); setRefreshKey(k => k + 1); setCalendarOpen(false); }} style={{ textAlign: 'left', padding: '6px 12px', fontSize: 13, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-text-primary)' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >{label}</button>
+                      ))}
+                    </div>
+                    <div>
+                      <DayPicker
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={(range) => {
+                          if (range) {
+                            setDateRange(range);
+                            if (range.from && range.to) { setRefreshKey(k => k + 1); setCalendarOpen(false); }
+                          }
+                        }}
+                        numberOfMonths={2}
+                        locale={ptBR}
+                        showOutsideDays
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
           <select
             value={selectedTenant}
             onChange={e => setSelectedTenant(e.target.value)}
