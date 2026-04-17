@@ -263,13 +263,14 @@ export default function SuperMonitor() {
     (t.ai_calls_summary || 0) +
     (t.ai_calls_audio || 0);
   const filteredTenants = selectedTenant === 'all' ? tenantMetrics : tenantMetrics.filter((t: any) => t.tenant_id === selectedTenant);
-  const totalMsgs = tenantMetrics.reduce(
+  const totalMsgs = filteredTenants.reduce(
     (s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0),
     0,
   );
-  const totalAI = tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0);
-  const connectedInstances = instances.filter((i: any) => i.status === 'connected').length;
-  const disconnectedInstances = instances.filter((i: any) => i.status !== 'connected');
+  const totalAI = filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0);
+  const filteredInstances = selectedTenant === 'all' ? instances : instances.filter((i: any) => i.tenant_id === selectedTenant);
+  const connectedInstances = filteredInstances.filter((i: any) => i.status === 'connected').length;
+  const disconnectedInstances = filteredInstances.filter((i: any) => i.status !== 'connected');
   const pendingAlerts = alerts.filter((a: any) => a.status === 'sent' || a.status === 'snoozed').length;
 
   const latestSnap: any = snapshots[snapshots.length - 1];
