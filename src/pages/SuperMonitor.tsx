@@ -66,6 +66,26 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
   );
 }
 
+function parseBRDate(value: string): Date | null {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const day = parseInt(digits.slice(0, 2));
+  const month = parseInt(digits.slice(2, 4)) - 1;
+  const year = parseInt(digits.slice(4, 8));
+  const date = new Date(year, month, day);
+  if (isNaN(date.getTime())) return null;
+  if (date > new Date()) return null;
+  return date;
+}
+
+function formatBRDate(date: Date | undefined): string {
+  if (!date) return '';
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
 function HelpTooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -465,46 +485,33 @@ export default function SuperMonitor() {
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 8px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>De</span>
-                          <input
-                            type="text"
-                            placeholder="DD/MM/AAAA"
-                            maxLength={10}
-                            value={dateRange.from ? format(dateRange.from, 'dd/MM/yyyy') : ''}
-                            onChange={e => {
-                              const v = e.target.value.replace(/\D/g, '').slice(0, 8);
-                              const masked = v.replace(/^(\d{2})(\d{0,2})(\d{0,4})$/, (_,d,m,y) => [d,m,y].filter(Boolean).join('/'));
-                              if (v.length === 8) {
-                                const parsed = new Date(`${v.slice(4)}-${v.slice(2,4)}-${v.slice(0,2)}`);
-                                if (!isNaN(parsed.getTime()) && parsed <= new Date()) {
-                                  setDateRange(r => ({ ...r, from: parsed }));
-                                }
-                              }
-                            }}
-                            style={{ width: 100, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)' }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>até</span>
-                          <input
-                            type="text"
-                            placeholder="DD/MM/AAAA"
-                            maxLength={10}
-                            value={dateRange.to ? format(dateRange.to, 'dd/MM/yyyy') : ''}
-                            onChange={e => {
-                              const v = e.target.value.replace(/\D/g, '').slice(0, 8);
-                              if (v.length === 8) {
-                                const parsed = new Date(`${v.slice(4)}-${v.slice(2,4)}-${v.slice(0,2)}`);
-                                if (!isNaN(parsed.getTime()) && parsed <= new Date()) {
-                                  setDateRange(r => ({ ...r, to: parsed }));
-                                }
-                              }
-                            }}
-                            style={{ width: 100, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)' }}
-                          />
-                        </div>
-                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>ou selecione no calendário</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>De</span>
+                        <input
+                          type="text"
+                          placeholder="DD/MM/AAAA"
+                          maxLength={10}
+                          defaultValue={formatBRDate(dateRange.from)}
+                          key={formatBRDate(dateRange.from)}
+                          onBlur={e => {
+                            const parsed = parseBRDate(e.target.value);
+                            if (parsed) setDateRange(r => ({ ...r, from: parsed }));
+                          }}
+                          style={{ width: 100, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)' }}
+                        />
+                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>até</span>
+                        <input
+                          type="text"
+                          placeholder="DD/MM/AAAA"
+                          maxLength={10}
+                          defaultValue={formatBRDate(dateRange.to)}
+                          key={formatBRDate(dateRange.to)}
+                          onBlur={e => {
+                            const parsed = parseBRDate(e.target.value);
+                            if (parsed) setDateRange(r => ({ ...r, to: parsed }));
+                          }}
+                          style={{ width: 100, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)' }}
+                        />
+                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>ou selecione abaixo</span>
                       </div>
                       <DayPicker
                         mode="range"
