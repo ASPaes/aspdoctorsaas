@@ -76,17 +76,19 @@ Deno.serve(async (req) => {
           })
           .eq('id', instance.id);
 
-        // Log status snapshot for monitoring
-        await supabaseAdmin
-          .from('whatsapp_instance_status_log')
-          .insert({
-            instance_id: instance.id,
-            instance_name: instance.instance_name,
-            tenant_id: tenantId,
-            status: newStatus,
-            was_connected: status.connected,
-            alert_sent: false,
-          });
+        // Log status snapshot only when status changes
+        if (newStatus !== prevStatus) {
+          await supabaseAdmin
+            .from('whatsapp_instance_status_log')
+            .insert({
+              instance_id: instance.id,
+              instance_name: instance.instance_name,
+              tenant_id: tenantId,
+              status: newStatus,
+              was_connected: status.connected,
+              alert_sent: false,
+            });
+        }
 
         // Alert if instance just disconnected
         if (newStatus === 'disconnected' && prevStatus === 'connected' && tenantId) {
