@@ -810,7 +810,14 @@ export default function SuperMonitor() {
         <div style={{ ...panelStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ ...labelStyle, marginBottom: 0 }}>uso de IA por função</div>
-            <HelpTooltip text="Distribuição de como a IA foi usada: sugestões ajudam o atendente a responder, composição cria mensagens automáticas, sentimento analisa o humor do cliente, resumo condensa a conversa e transcrição converte áudios em texto." />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {aiCostMetrics?.total_cost_usd > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 500, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 10 }}>
+                  ${Number(aiCostMetrics.total_cost_usd).toFixed(2)}
+                </span>
+              )}
+              <HelpTooltip text="Distribuição de como a IA foi usada: sugestões ajudam o atendente a responder, composição cria mensagens automáticas, sentimento analisa o humor do cliente, resumo condensa a conversa e transcrição converte áudios em texto." />
+            </div>
           </div>
           {[
             { label: 'Sugestões', key: 'ai_calls_suggest', color: '#3b82f6' },
@@ -820,35 +827,53 @@ export default function SuperMonitor() {
             { label: 'Transcrição', key: 'ai_calls_audio', color: '#f59e0b' },
           ].map((fn) => {
             const total = filteredTenants.reduce((s: number, t: any) => s + ((t as any)[fn.key] || 0), 0);
+            const pct = totalAI > 0 ? Math.round((total / totalAI) * 100) : 0;
             return (
-              <div key={fn.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', width: 70 }}>{fn.label}</span>
+              <div key={fn.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 68, flexShrink: 0 }}>{fn.label}</span>
                 <MiniBar value={total} max={Math.max(totalAI, 1)} color={fn.color} />
-                <span style={{ fontSize: 10, fontWeight: 600, width: 36, textAlign: 'right' }}>{total}</span>
+                <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 28, textAlign: 'right', flexShrink: 0 }}>{pct}%</span>
+                <span style={{ fontSize: 10, fontWeight: 500, width: 34, textAlign: 'right', flexShrink: 0 }}>{total}</span>
               </div>
             );
           })}
-          <div style={{ ...labelStyle, marginTop: 12 }}>por tenant</div>
-          {groupedTenants
-            .filter((t: any) => aiCalls(t) > 0)
-            .map((t: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: 'hsl(var(--muted-foreground))',
-                    width: 90,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {(t as any).tenants?.nome || t.tenant_id}
-                </span>
-                <MiniBar value={aiCalls(t)} max={maxAIGrouped} color="#8b5cf6" />
-                <span style={{ fontSize: 10, fontWeight: 600, width: 36, textAlign: 'right' }}>{aiCalls(t)}</span>
-              </div>
-            ))}
+          <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
+          <div style={{ ...labelStyle, marginBottom: 6 }}>por tenant</div>
+          {(() => {
+            const byTenant = aiCostMetrics?.by_tenant as any[] | null;
+            const totalCost = Number(aiCostMetrics?.total_cost_usd ?? 0);
+            return groupedTenants
+              .filter((t: any) => aiCalls(t) > 0)
+              .map((t: any, i: number) => {
+                const calls = aiCalls(t);
+                const pct = totalAI > 0 ? Math.round((calls / totalAI) * 100) : 0;
+                const costEntry = byTenant?.find((b: any) => b.tenant_id === t.tenant_id);
+                const cost = costEntry ? Number(costEntry.cost_usd) : 0;
+                const costPct = totalCost > 0 ? Math.round((cost / totalCost) * 100) : 0;
+                return (
+                  <div key={i} style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 68, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {(t as any).tenants?.nome || t.tenant_id}
+                      </span>
+                      <MiniBar value={calls} max={maxAIGrouped} color="#8b5cf6" />
+                      <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 28, textAlign: 'right', flexShrink: 0 }}>{pct}%</span>
+                      <span style={{ fontSize: 10, fontWeight: 500, width: 34, textAlign: 'right', flexShrink: 0 }}>{calls}</span>
+                    </div>
+                    {cost > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 68, flexShrink: 0 }} />
+                        <div style={{ flex: 1, height: 3, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${costPct}%`, height: '100%', background: '#16a34a', borderRadius: 2 }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 28, textAlign: 'right', flexShrink: 0 }}>{costPct}%</span>
+                        <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 500, width: 34, textAlign: 'right', flexShrink: 0 }}>${cost.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+          })()}
         </div>
 
         {/* Tenants + Instâncias */}
