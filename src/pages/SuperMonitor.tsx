@@ -411,21 +411,49 @@ export default function SuperMonitor() {
           >
             Score {score}/100
           </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>De</span>
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={e => { setDateFrom(e.target.value); setRefreshKey(k => k + 1); }}
-                  style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>até</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={e => { setDateTo(e.target.value); setRefreshKey(k => k + 1); }}
-                  style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
-                />
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[
+                  { label: 'Hoje', days: 0 },
+                  { label: '7d', days: 7 },
+                  { label: '30d', days: 30 },
+                  { label: '3m', days: 90 },
+                  { label: '6m', days: 180 },
+                  { label: '12m', days: 365 },
+                  { label: 'Tudo', days: -1 },
+                ].map(({ label, days }) => {
+                  const isActive = (() => {
+                    const to = new Date(); to.setDate(to.getDate() - 1);
+                    const toStr = to.toISOString().split('T')[0];
+                    if (days === 0) return dateFrom === toStr && dateTo === toStr;
+                    if (days === -1) return dateFrom === '2020-01-01';
+                    const from = new Date(); from.setDate(from.getDate() - days);
+                    return dateFrom === from.toISOString().split('T')[0] && dateTo === toStr;
+                  })();
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        const to = new Date(); to.setDate(to.getDate() - 1);
+                        const toStr = to.toISOString().split('T')[0];
+                        if (days === -1) { setDateFrom('2020-01-01'); setDateTo(toStr); }
+                        else if (days === 0) { setDateFrom(toStr); setDateTo(toStr); }
+                        else {
+                          const from = new Date(); from.setDate(from.getDate() - days);
+                          setDateFrom(from.toISOString().split('T')[0]);
+                          setDateTo(toStr);
+                        }
+                        setRefreshKey(k => k + 1);
+                      }}
+                      style={{
+                        fontSize: 11, padding: '3px 8px', borderRadius: 6, cursor: 'pointer',
+                        border: isActive ? '1.5px solid #3b82f6' : '0.5px solid var(--color-border-secondary)',
+                        background: isActive ? '#dbeafe' : 'var(--color-background-secondary)',
+                        color: isActive ? '#1e40af' : 'var(--color-text-secondary)',
+                        fontWeight: isActive ? 500 : 400,
+                      }}
+                    >{label}</button>
+                  );
+                })}
               </div>
           <select
             value={selectedTenant}
@@ -433,7 +461,7 @@ export default function SuperMonitor() {
             style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
           >
             <option value="all">Todos os tenants</option>
-            {tenantMetrics.map((t: any) => (
+            {Array.from(new Map(tenantMetrics.map((t: any) => [t.tenant_id, t])).values()).map((t: any) => (
               <option key={t.tenant_id} value={t.tenant_id}>{t.tenants?.nome || t.tenant_id}</option>
             ))}
           </select>
