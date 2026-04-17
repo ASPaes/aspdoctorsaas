@@ -8,15 +8,6 @@ const supabase = createClient(
 const ALLOWED_ACTIONS = ['vacuum_messages', 'vacuum_conversations', 'vacuum_attendances', 'clean_cron', 'collect_snapshot', 'collect_metrics'] as const;
 type Action = typeof ALLOWED_ACTIONS[number];
 
-const ACTION_SQL: Record<Action, string> = {
-  vacuum_messages: 'VACUUM ANALYZE public.whatsapp_messages',
-  vacuum_conversations: 'VACUUM ANALYZE public.whatsapp_conversations',
-  vacuum_attendances: 'VACUUM ANALYZE public.support_attendances',
-  clean_cron: "DELETE FROM cron.job_run_details WHERE end_time < now() - interval '2 days'",
-  collect_snapshot: 'SELECT public.collect_db_metrics_snapshot()',
-  collect_metrics: 'SELECT public.collect_tenant_daily_metrics()',
-};
-
 const ACTION_LABEL: Record<Action, string> = {
   vacuum_messages: 'VACUUM em whatsapp_messages',
   vacuum_conversations: 'VACUUM em whatsapp_conversations',
