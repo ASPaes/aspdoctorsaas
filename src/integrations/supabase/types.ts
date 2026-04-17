@@ -4597,6 +4597,10 @@ export type Database = {
               tenant_id: string
             }[]
           }
+      get_ai_cost_metrics: {
+        Args: { p_date_from?: string; p_date_to?: string; p_tenant_id?: string }
+        Returns: Json
+      }
       get_attendance_metrics: {
         Args: {
           p_agent_id?: string
