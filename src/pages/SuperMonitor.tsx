@@ -296,6 +296,20 @@ export default function SuperMonitor() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: aiCostMetrics } = useQuery({
+    queryKey: ['monitor-ai-cost', queryDateFrom, queryDateTo, selectedTenant, refreshKey],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_ai_cost_metrics' as any, {
+        p_tenant_id: selectedTenant !== 'all' ? selectedTenant : null,
+        p_date_from: queryDateFrom,
+        p_date_to: queryDateTo,
+      });
+      return data as any;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
   const aiCalls = (t: any) =>
     (t.ai_calls_suggest || 0) +
     (t.ai_calls_compose || 0) +
