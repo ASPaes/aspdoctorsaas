@@ -555,9 +555,7 @@ export default function SuperMonitor() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
         {/* Banco */}
         <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Database size={11} /> banco de dados · snapshots do dia
-          </div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>banco de dados <HelpTooltip text="Saúde técnica do banco. 'Conexões' mostram quantos acessos simultâneos estão acontecendo. 'Query lenta' indica buscas que estão demorando mais que o normal." /></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
             {[
               { label: 'Pico conexões', value: maxConn ? `${maxConn} · ${peakTime}h` : '—', warn: maxConn >= 30 },
