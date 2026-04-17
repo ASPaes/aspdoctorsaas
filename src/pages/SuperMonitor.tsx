@@ -827,8 +827,11 @@ export default function SuperMonitor() {
             ))}
         </div>
 
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>histórico de alertas <HelpTooltip text="Alertas enviados via WhatsApp sobre a saúde do banco de dados. Mostra se cada alerta foi resolvido, ignorado ou está pendente." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Alertas enviados via WhatsApp sobre a saúde do banco de dados. Mostra se cada alerta foi resolvido, ignorado ou está pendente." />
+          </span>
+          <div style={labelStyle}>histórico de alertas</div>
           {alerts.length === 0 && <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', margin: 0 }}>Nenhum alerta nas últimas 24h</p>}
           {alerts.map((alert: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
@@ -864,8 +867,11 @@ export default function SuperMonitor() {
         </div>
       </div>
 
-      <div style={{ ...panelStyle, marginTop: 10 }}>
-        <div style={{ ...labelStyle, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>manutenção <HelpTooltip text="Tarefas de limpeza e otimização do banco. A barra mostra o nível de acúmulo — verde é saudável, amarelo recomenda atenção, vermelho precisa limpar. Clique em 'Executar agora' quando necessário." /></div>
+      <div style={{ ...panelStyle, marginTop: 10, position: 'relative' }}>
+        <span style={{ position: 'absolute', top: 12, right: 12 }}>
+          <HelpTooltip text="Tarefas de limpeza e otimização do banco. A barra mostra o nível de acúmulo — verde é saudável, amarelo recomenda atenção, vermelho precisa limpar. Clique em 'Executar agora' quando necessário." />
+        </span>
+        <div style={{ ...labelStyle, marginBottom: 12 }}>manutenção</div>
         {actionResult && (
           <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>{actionResult.ok ? '✅' : '❌'}</span>
