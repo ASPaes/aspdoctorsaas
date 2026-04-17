@@ -484,7 +484,7 @@ export default function SuperMonitor() {
         </div>
 
         <div style={{ ...panelStyle, borderTop: '2px solid #8b5cf6' }}>
-          <div style={labelStyle}>chamadas IA</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>chamadas IA <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." /></div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
             {(tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
           </div>
