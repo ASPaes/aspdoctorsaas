@@ -874,6 +874,62 @@ export default function SuperMonitor() {
                 );
               });
           })()}
+          <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
+          <div style={{ ...labelStyle, marginBottom: 6 }}>top tenants · detalhamento por função</div>
+          {(() => {
+            const fns = [
+              { label: 'Sugestões', key: 'ai_calls_suggest', color: '#3b82f6' },
+              { label: 'Composição', key: 'ai_calls_compose', color: '#8b5cf6' },
+              { label: 'Sentimento', key: 'ai_calls_sentiment', color: '#06b6d4' },
+              { label: 'Resumo', key: 'ai_calls_summary', color: '#10b981' },
+              { label: 'Transcrição', key: 'ai_calls_audio', color: '#f59e0b' },
+            ];
+            const topTenants = [...groupedTenants]
+              .filter((t: any) => aiCalls(t) > 0)
+              .sort((a: any, b: any) => aiCalls(b) - aiCalls(a))
+              .slice(0, 3);
+            const grandTotal = Math.max(totalAI, 1);
+            return topTenants.map((t: any, ti: number) => {
+              const tenantTotal = aiCalls(t);
+              const tenantPct = Math.round((tenantTotal / grandTotal) * 100);
+              const costEntry = (aiCostMetrics?.by_tenant as any[])?.find((b: any) => b.tenant_id === t.tenant_id);
+              const cost = costEntry ? Number(costEntry.cost_usd) : 0;
+              return (
+                <div key={ti} style={{ marginBottom: 10, padding: '8px', background: 'var(--color-background-secondary)', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: 4, background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 600, color: '#1d4ed8' }}>
+                        {ti + 1}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                        {(t as any).tenants?.nome || t.tenant_id}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>{tenantPct}% do total</span>
+                      <span style={{ fontSize: 10, fontWeight: 500 }}>{tenantTotal} chamadas</span>
+                      {cost > 0 && <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 500 }}>${cost.toFixed(2)}</span>}
+                    </div>
+                  </div>
+                  {fns.map(fn => {
+                    const val = (t as any)[fn.key] || 0;
+                    if (val === 0) return null;
+                    const pct = Math.round((val / tenantTotal) * 100);
+                    return (
+                      <div key={fn.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', width: 60, flexShrink: 0 }}>{fn.label}</span>
+                        <div style={{ flex: 1, height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: fn.color, borderRadius: 2 }} />
+                        </div>
+                        <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', width: 24, textAlign: 'right', flexShrink: 0 }}>{pct}%</span>
+                        <span style={{ fontSize: 9, fontWeight: 500, width: 30, textAlign: 'right', flexShrink: 0 }}>{val}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Tenants + Instâncias */}
