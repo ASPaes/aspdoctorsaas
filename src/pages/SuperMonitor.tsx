@@ -301,6 +301,16 @@ export default function SuperMonitor() {
           >
             Score {score}/100
           </span>
+          <select
+            value={selectedTenant}
+            onChange={e => setSelectedTenant(e.target.value)}
+            style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+          >
+            <option value="all">Todos os tenants</option>
+            {tenantMetrics.map((t: any) => (
+              <option key={t.tenant_id} value={t.tenant_id}>{t.tenants?.nome || t.tenant_id}</option>
+            ))}
+          </select>
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
             style={{
@@ -550,7 +560,7 @@ export default function SuperMonitor() {
             );
           })}
           <div style={{ ...labelStyle, marginTop: 12 }}>por tenant</div>
-          {tenantMetrics
+          {filteredTenants
             .filter((t: any) => aiCalls(t) > 0)
             .map((t: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -575,7 +585,7 @@ export default function SuperMonitor() {
         {/* Tenants + Instâncias */}
         <div style={panelStyle}>
           <div style={labelStyle}>tenants · ontem</div>
-          {tenantMetrics.map((t: any, i: number) => {
+          {filteredTenants.map((t: any, i: number) => {
             const active = (t.messages_sent || 0) + (t.messages_received || 0) > 0;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
