@@ -4672,6 +4672,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_today_metrics: { Args: never; Returns: Json }
       get_transfer_agents: {
         Args: never
         Returns: {

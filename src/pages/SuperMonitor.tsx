@@ -213,6 +213,16 @@ export default function SuperMonitor() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: todayMetrics } = useQuery({
+    queryKey: ['monitor-today', refreshKey],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_today_metrics' as any);
+      return data as any;
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
   const aiCalls = (t: any) =>
     (t.ai_calls_suggest || 0) +
     (t.ai_calls_compose || 0) +
@@ -406,25 +416,22 @@ export default function SuperMonitor() {
           </div>
         </div>
 
-        {/* Mensagens */}
-        <div style={panelStyle}>
-          <div style={labelStyle}>mensagens ontem</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <MessageSquare size={14} style={{ color: '#3b82f6' }} />
-            <span style={{ fontSize: 22, fontWeight: 600 }}>{totalMsgs.toLocaleString('pt-BR')}</span>
+        <div style={{ ...panelStyle, borderTop: '2px solid #3b82f6' }}>
+          <div style={labelStyle}>mensagens hoje</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
+            {((todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
           </div>
-          <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', margin: '2px 0 8px' }}>todas as instâncias</p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>
-            <span>Enviadas</span>
-            <span style={{ fontWeight: 600, color: 'hsl(var(--foreground))' }}>
-              {tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0), 0).toLocaleString('pt-BR')}
-            </span>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h · atualiza ao clicar
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
-            <span>Recebidas</span>
-            <span style={{ fontWeight: 600, color: 'hsl(var(--foreground))' }}>
-              {tenantMetrics.reduce((s: number, t: any) => s + (t.messages_received || 0), 0).toLocaleString('pt-BR')}
-            </span>
+          <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Enviadas</span>
+            <span style={{ fontWeight: 500 }}>{(todayMetrics?.messages_sent ?? 0).toLocaleString('pt-BR')}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 3 }}>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Recebidas</span>
+            <span style={{ fontWeight: 500 }}>{(todayMetrics?.messages_received ?? 0).toLocaleString('pt-BR')}</span>
           </div>
         </div>
 
@@ -449,29 +456,19 @@ export default function SuperMonitor() {
           </div>
         </div>
 
-        {/* IA */}
-        <div style={panelStyle}>
-          <div style={labelStyle}>chamadas IA ontem</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Bot size={14} style={{ color: '#8b5cf6' }} />
-            <span style={{ fontSize: 22, fontWeight: 600 }}>{totalAI.toLocaleString('pt-BR')}</span>
+        <div style={{ ...panelStyle, borderTop: '2px solid #8b5cf6' }}>
+          <div style={labelStyle}>chamadas IA hoje</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
+            {(todayMetrics?.ai_calls ?? 0).toLocaleString('pt-BR')}
           </div>
-          <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', margin: '2px 0 8px' }}>todas as funções</p>
-          {tenantMetrics.slice(0, 2).map((t: any, i: number) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 10,
-                color: 'hsl(var(--muted-foreground))',
-                marginTop: i > 0 ? 3 : 0,
-              }}
-            >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                {(t as any).tenants?.nome || t.tenant_id}
-              </span>
-              <span style={{ fontWeight: 600, color: 'hsl(var(--foreground))' }}>{aiCalls(t)}</span>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
+          </div>
+          <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
+          {filteredTenants.filter((t: any) => (t.ai_calls_suggest || 0) + (t.ai_calls_compose || 0) + (t.ai_calls_sentiment || 0) + (t.ai_calls_summary || 0) + (t.ai_calls_audio || 0) > 0).slice(0, 2).map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: i > 0 ? 3 : 0 }}>
+              <span style={{ color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{(t as any).tenants?.nome || t.tenant_id}</span>
+              <span style={{ fontWeight: 500 }}>{aiCalls(t)}</span>
             </div>
           ))}
         </div>
@@ -880,8 +877,8 @@ export default function SuperMonitor() {
                 <MainCard action="vacuum_conversations" label="Otimizar conversas" desc={`Registros obsoletos · whatsapp_conversations`} icon="🗑️" value={deadConv} max={2000} lastRun="automático via autovacuum" />
                 <MainCard action="vacuum_attendances" label="Otimizar atendimentos" desc={`Registros obsoletos · support_attendances`} icon="🗑️" value={deadAtt} max={2000} lastRun="automático via autovacuum" />
                 <MainCard action="clean_cron" label="Limpar histórico" desc="Log de tarefas · cron.job_run_details" icon="🗑️" value={cronCount} max={15000} lastRun="limpeza automática: diária às 03h" />
-                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={`último: ${lastSnapshot}h`} max={1} lastRun="automático · 07h-20h seg-sex" alwaysEnabled />
-                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={`última: ${lastMetrics}h`} max={1} lastRun="automático · diário às 01h" alwaysEnabled />
+                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={snapshotsToday} max={288} lastRun={`automático · último: ${lastSnapshot}h`} alwaysEnabled />
+                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={4} max={4} lastRun={`automático · última: ${lastMetrics}h`} alwaysEnabled />
               </>
             );
           })()}
