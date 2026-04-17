@@ -454,18 +454,29 @@ export default function SuperMonitor() {
                       ))}
                     </div>
                     <div>
+                      <div style={{ padding: '8px 16px 0', fontSize: 11, color: 'var(--color-text-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', paddingBottom: 8, marginBottom: 4 }}>
+                        Clique no dia inicial e depois no dia final para definir o período
+                      </div>
                       <DayPicker
                         mode="range"
                         selected={dateRange}
-                        onSelect={(range) => {
-                          if (range) {
-                            setDateRange(range);
-                            if (range.from && range.to) { setRefreshKey(k => k + 1); setCalendarOpen(false); }
-                          }
-                        }}
+                        onSelect={(range) => { if (range) setDateRange(range); }}
                         numberOfMonths={2}
                         locale={ptBR}
                         showOutsideDays
+                        footer={
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '8px 16px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
+                            <button
+                              onClick={() => setCalendarOpen(false)}
+                              style={{ fontSize: 12, padding: '5px 14px', borderRadius: 7, border: '0.5px solid var(--color-border-secondary)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+                            >Cancelar</button>
+                            <button
+                              onClick={() => { setRefreshKey(k => k + 1); setCalendarOpen(false); }}
+                              disabled={!dateRange.from || !dateRange.to}
+                              style={{ fontSize: 12, padding: '5px 14px', borderRadius: 7, border: 'none', background: dateRange.from && dateRange.to ? '#2563eb' : '#93c5fd', color: '#fff', cursor: dateRange.from && dateRange.to ? 'pointer' : 'default', fontWeight: 500 }}
+                            >Aplicar período</button>
+                          </div>
+                        }
                       />
                     </div>
                   </div>
