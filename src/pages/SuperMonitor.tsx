@@ -80,7 +80,7 @@ export default function SuperMonitor() {
         body: JSON.stringify({ action }),
       });
       const json = await res.json();
-      setActionResult({ ok: json.ok, label });
+      setActionResult({ ok: json.ok, label: json.message || label });
       if (json.ok) setRefreshKey(k => k + 1);
     } catch (e) {
       setActionResult({ ok: false, label });
