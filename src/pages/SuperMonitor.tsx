@@ -413,19 +413,21 @@ export default function SuperMonitor() {
         </div>
 
         <div style={{ ...panelStyle, borderTop: '2px solid #3b82f6' }}>
-          <div style={labelStyle}>mensagens totais</div>
+          <div style={labelStyle}>mensagens</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0)).toLocaleString('pt-BR')}
+            {(tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>acumulado histórico</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            total até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
+          </div>
           <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Hoje até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Hoje</span>
             <span style={{ fontWeight: 500, color: '#3b82f6' }}>{((todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 3 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>↑ enviadas / ↓ recebidas</span>
-            <span style={{ color: 'var(--color-text-secondary)' }}>{(todayMetrics?.messages_sent ?? 0)} / {(todayMetrics?.messages_received ?? 0)}</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>↑ {(todayMetrics?.messages_sent ?? 0)} enviadas</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>↓ {(todayMetrics?.messages_received ?? 0)} recebidas</span>
           </div>
         </div>
 
@@ -451,18 +453,20 @@ export default function SuperMonitor() {
         </div>
 
         <div style={{ ...panelStyle, borderTop: '2px solid #8b5cf6' }}>
-          <div style={labelStyle}>chamadas IA totais</div>
+          <div style={labelStyle}>chamadas IA</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0).toLocaleString('pt-BR')}
+            {(tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>acumulado histórico</div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            total até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
+          </div>
           <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Hoje até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Hoje</span>
             <span style={{ fontWeight: 500, color: '#8b5cf6' }}>{(todayMetrics?.ai_calls ?? 0).toLocaleString('pt-BR')}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 3 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>tenants ativos</span>
+            <span style={{ color: 'var(--color-text-secondary)' }}>tenants ativos hoje</span>
             <span style={{ color: 'var(--color-text-secondary)' }}>{tenantMetrics.filter((t: any) => aiCalls(t) > 0).length}</span>
           </div>
         </div>
