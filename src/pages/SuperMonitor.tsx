@@ -150,6 +150,8 @@ export default function SuperMonitor() {
   const yesterday = sp.toISOString().split('T')[0];
   const queryDateFrom = dateFrom || yesterday;
   const queryDateTo = dateTo || yesterday;
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayIncluded = queryDateTo >= todayStr;
   const since24h = new Date(Date.now() - 86400000).toISOString();
 
   const { data: tenantMetrics = [] } = useQuery({
@@ -532,20 +534,26 @@ export default function SuperMonitor() {
             <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(filteredTenants.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
+            {(filteredTenants.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayIncluded ? (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0) : 0)).toLocaleString('pt-BR')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-            total até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
+            {todayIncluded
+              ? `total até ${todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h`
+              : `${queryDateFrom} – ${queryDateTo}`}
           </div>
           <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Hoje</span>
-            <span style={{ fontWeight: 500, color: '#3b82f6' }}>{((todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 3 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>↑ {(todayMetrics?.messages_sent ?? 0)} enviadas</span>
-            <span style={{ color: 'var(--color-text-secondary)' }}>↓ {(todayMetrics?.messages_received ?? 0)} recebidas</span>
-          </div>
+          {todayIncluded && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>Hoje</span>
+                <span style={{ fontWeight: 500, color: '#3b82f6' }}>{((todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 3 }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>↑ {(todayMetrics?.messages_sent ?? 0)} enviadas</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>↓ {(todayMetrics?.messages_received ?? 0)} recebidas</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Conversas */}
@@ -578,16 +586,20 @@ export default function SuperMonitor() {
             <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
+            {(filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayIncluded ? (todayMetrics?.ai_calls ?? 0) : 0)).toLocaleString('pt-BR')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-            total até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
+            {todayIncluded
+              ? `total até ${todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h`
+              : `${queryDateFrom} – ${queryDateTo}`}
           </div>
           <div style={{ height: '0.5px', background: 'var(--color-border-tertiary)', margin: '8px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Hoje</span>
-            <span style={{ fontWeight: 500, color: '#8b5cf6' }}>{(todayMetrics?.ai_calls ?? 0).toLocaleString('pt-BR')}</span>
-          </div>
+          {todayIncluded && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: 'var(--color-text-secondary)' }}>Hoje</span>
+              <span style={{ fontWeight: 500, color: '#8b5cf6' }}>{(todayMetrics?.ai_calls ?? 0).toLocaleString('pt-BR')}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 3 }}>
             <span style={{ color: 'var(--color-text-secondary)' }}>tenants ativos hoje</span>
             <span style={{ color: 'var(--color-text-secondary)' }}>{tenantMetrics.filter((t: any) => aiCalls(t) > 0).length}</span>
