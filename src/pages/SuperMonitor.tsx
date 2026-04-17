@@ -423,7 +423,7 @@ export default function SuperMonitor() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         {/* Score */}
         <div style={panelStyle}>
-          <div style={labelStyle}>saúde do sistema</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>saúde do sistema <HelpTooltip text="Nota de 0 a 100 que resume o estado geral da plataforma. Considera instâncias offline, lentidão, alertas pendentes e uso do banco de dados." /></div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <ScoreRing score={score} />
           </div>
