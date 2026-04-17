@@ -124,14 +124,31 @@ export default function SuperMonitor() {
   const { data: instanceLog = [] } = useQuery({
     queryKey: ['monitor-instance-log', refreshKey],
     queryFn: async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('whatsapp_instance_status_log')
-        .select('*, tenants(nome)')
+        .select('instance_name, tenant_id, captured_at, tenants(nome)')
         .gte('captured_at', since24h)
         .eq('status', 'disconnected')
-        .order('captured_at', { ascending: false })
-        .limit(10);
-      return data ?? [];
+        .order('captured_at', { ascending: true });
+      if (!data) return [];
+      // Group by instance_name
+      const grouped: Record<string, any> = {};
+      for (const row of data) {
+        const key = row.instance_name;
+        if (!grouped[key]) {
+          grouped[key] = {
+            instance_name: row.instance_name,
+            tenant_id: row.tenant_id,
+            tenant_nome: (row as any).tenants?.nome || row.tenant_id,
+            occurrences: 0,
+            first_seen: row.captured_at,
+            last_seen: row.captured_at,
+          };
+        }
+        grouped[key].occurrences++;
+        grouped[key].last_seen = row.captured_at;
+      }
+      return Object.values(grouped).sort((a: any, b: any) => b.occurrences - a.occurrences);
     },
     ...opts,
   });
@@ -635,22 +652,19 @@ export default function SuperMonitor() {
             </div>
           )}
           {instanceLog.map((log: any, i: number) => (
-            <div key={`il-${i}`} style={{ display: 'flex', gap: 8, padding: '8px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
-              <WifiOff size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, margin: 0 }}>Instância desconectada — {log.instance_name}</p>
-                <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', margin: '2px 0' }}>
-                  Mensagens não entregues durante o período. Reconectar no painel.
-                </p>
-                <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'hsl(var(--muted-foreground))' }}>
-                  <span style={{ padding: '1px 5px', borderRadius: 3, background: 'hsl(var(--muted))' }}>WhatsApp</span>
-                  <span>{log.tenants?.nome || log.tenant_id}</span>
-                  <span>
-                    {new Date(log.captured_at).toLocaleTimeString('pt-BR', {
-                      timeZone: 'America/Sao_Paulo',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}h
+            <div key={i} style={{ display: 'flex', gap: 8, padding: '7px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0, marginTop: 4 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>Instância offline — {log.instance_name}</span>
+                  <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fee2e2', color: '#991b1b', fontWeight: 500 }}>{log.occurrences}x detectada</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>Mensagens não entregues durante o período. Reconectar no painel do WhatsApp.</div>
+                <div style={{ display: 'flex', gap: 5, marginTop: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: '#fee2e2', color: '#991b1b' }}>WhatsApp</span>
+                  <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)' }}>{log.tenant_nome}</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginLeft: 'auto' }}>
+                    desde {new Date(log.first_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}h · último {new Date(log.last_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}h
                   </span>
                 </div>
               </div>
