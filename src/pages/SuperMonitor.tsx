@@ -464,7 +464,7 @@ export default function SuperMonitor() {
 
         {/* Conversas */}
         <div style={panelStyle}>
-          <div style={labelStyle}>conversas encerradas</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>conversas encerradas <HelpTooltip text="Quantidade de atendimentos finalizados. 'Abertas' são as que ainda estão em andamento agora." /></div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>
             {tenantMetrics.reduce((s: number, t: any) => s + (t.conversations_closed || 0), 0)}
           </div>
