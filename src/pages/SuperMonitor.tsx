@@ -228,7 +228,7 @@ export default function SuperMonitor() {
     marginBottom: 8,
   };
 
-  const now = new Date().toLocaleString('pt-BR', {
+  const nowLabel = new Date().toLocaleString('pt-BR', {
     timeZone: 'America/Sao_Paulo',
     weekday: 'long',
     day: '2-digit',
