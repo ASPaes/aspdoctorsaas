@@ -106,16 +106,13 @@ function HelpTooltip({ text }: { text: string }) {
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
-  const [dateFrom, setDateFrom] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 7),
+    to: subDays(new Date(), 1),
   });
-  const [dateTo, setDateTo] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  });
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const dateFrom = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const dateTo = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<{ ok: boolean; label: string } | null>(null);
 
@@ -441,12 +438,11 @@ export default function SuperMonitor() {
                       onClick={() => {
                         const to = new Date(); to.setDate(to.getDate() - 1);
                         const toStr = to.toISOString().split('T')[0];
-                        if (days === -1) { setDateFrom('2020-01-01'); setDateTo(toStr); }
-                        else if (days === 0) { setDateFrom(toStr); setDateTo(toStr); }
+                        if (days === -1) { setDateRange({ from: new Date('2020-01-01'), to: new Date() }); }
+                        else if (days === 0) { setDateRange({ from: new Date(), to: new Date() }); }
                         else {
-                          const from = new Date(); from.setDate(from.getDate() - days);
-                          setDateFrom(from.toISOString().split('T')[0]);
-                          setDateTo(toStr);
+                          const f = new Date(); f.setDate(f.getDate() - days);
+                          setDateRange({ from: f, to: new Date(toStr) });
                         }
                         setRefreshKey(k => k + 1);
                       }}
@@ -465,14 +461,14 @@ export default function SuperMonitor() {
                 <input
                   type="date"
                   value={dateFrom}
-                  onChange={e => { setDateFrom(e.target.value); setRefreshKey(k => k + 1); }}
+                  onChange={e => { setDateRange(r => ({ ...r, from: e.target.value ? new Date(e.target.value) : undefined })); setRefreshKey(k => k + 1); }}
                   style={{ fontSize: 11, padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
                 />
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>–</span>
                 <input
                   type="date"
                   value={dateTo}
-                  onChange={e => { setDateTo(e.target.value); setRefreshKey(k => k + 1); }}
+                  onChange={e => { setDateRange(r => ({ ...r, to: e.target.value ? new Date(e.target.value) : undefined })); setRefreshKey(k => k + 1); }}
                   style={{ fontSize: 11, padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
                 />
               </div>
