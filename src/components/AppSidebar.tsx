@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
@@ -197,6 +197,16 @@ export function AppSidebar() {
                 <NavLink to="/super/tenants" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                   <Crown className="h-4 w-4" />
                   <span>Super Admin</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {isSuperAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Monitor">
+                <NavLink to="/super/monitor" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                  <Activity className="h-4 w-4" />
+                  <span>Monitor</span>
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
