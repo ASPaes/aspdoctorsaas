@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -85,13 +84,8 @@ async function fetchSmartReplies(conversationId: string): Promise<SmartReplyResp
   }
 }
 
-const MIN_INTERVAL_MS = 30_000;
-const DEBOUNCE_MS = 600;
-
 export const useSmartReply = (conversationId: string | null) => {
   const queryClient = useQueryClient();
-  const lastInvalidatedRef = useRef<number>(0);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canRun = !!conversationId;
 
@@ -101,42 +95,11 @@ export const useSmartReply = (conversationId: string | null) => {
       if (!conversationId) return Promise.resolve({ suggestions: [], rateLimited: false } as SmartReplyResponse);
       return fetchSmartReplies(conversationId);
     },
-    enabled: canRun,
-    staleTime: 2 * 60 * 1000,
+    enabled: false,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     retry: false,
   });
-
-  // Listen for new client messages to debounced-invalidate
-  useEffect(() => {
-    if (!conversationId) return;
-    const channel = supabase
-      .channel(`smart-reply-trigger-${conversationId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'whatsapp_messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      }, (payload) => {
-        const msg = payload.new as any;
-        if (msg.is_from_me) return;
-
-        const now = Date.now();
-        if (now - lastInvalidatedRef.current < MIN_INTERVAL_MS) return;
-
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-          lastInvalidatedRef.current = Date.now();
-          queryClient.invalidateQueries({ queryKey: ['smart-replies', conversationId] });
-        }, DEBOUNCE_MS);
-      })
-      .subscribe();
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      supabase.removeChannel(channel);
-    };
-  }, [conversationId, queryClient]);
 
   const refreshMutation = useMutation({
     mutationFn: () => {
