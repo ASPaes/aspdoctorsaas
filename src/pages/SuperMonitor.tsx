@@ -80,7 +80,11 @@ export default function SuperMonitor() {
         body: JSON.stringify({ action }),
       });
       const json = await res.json();
-      setActionResult({ ok: json.ok, label: json.message || label });
+      const isQueued = json.scheduled || json.message?.includes('minuto') || json.message?.includes('queued');
+      const displayLabel = isQueued
+        ? `${label} — será executado em até 2 minutos automaticamente`
+        : json.message || label;
+      setActionResult({ ok: json.ok, label: displayLabel });
       if (json.ok) setRefreshKey(k => k + 1);
     } catch (e) {
       setActionResult({ ok: false, label });
