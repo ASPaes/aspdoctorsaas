@@ -509,7 +509,7 @@ export default function SuperMonitor() {
             borderColor: disconnectedInstances.length > 0 ? '#eab308' : '#22c55e',
           }}
         >
-          <div style={labelStyle}>instâncias whatsapp</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>instâncias whatsapp <HelpTooltip text="Cada instância é um número de WhatsApp conectado à plataforma. Se uma aparece como OFFLINE, mensagens daquele número não estão sendo entregues." /></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {disconnectedInstances.length > 0 ? (
               <WifiOff size={14} style={{ color: '#eab308' }} />
