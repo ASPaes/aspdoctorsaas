@@ -45,11 +45,48 @@ export async function getAIConfig(
   }
 }
 
+export interface AIUsage {
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+}
+
+export interface AIResult {
+  content: string;
+  usage: AIUsage;
+}
+
+const MODEL_PRICES: Record<string, { input: number; output: number }> = {
+  'gpt-4o': { input: 2.50, output: 10.00 },
+  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'gpt-4': { input: 30.00, output: 60.00 },
+  'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
+  'o1': { input: 15.00, output: 60.00 },
+  'o1-mini': { input: 3.00, output: 12.00 },
+  'claude-opus-4': { input: 15.00, output: 75.00 },
+  'claude-sonnet-4': { input: 3.00, output: 15.00 },
+  'claude-haiku': { input: 0.80, output: 4.00 },
+  'claude-3-5-sonnet': { input: 3.00, output: 15.00 },
+  'claude-3-5-haiku': { input: 0.80, output: 4.00 },
+  'claude-3-opus': { input: 15.00, output: 75.00 },
+  'gemini-1.5-pro': { input: 3.50, output: 10.50 },
+  'gemini-1.5-flash': { input: 0.075, output: 0.30 },
+  'gemini-2.0-flash': { input: 0.10, output: 0.40 },
+};
+
+function calcCost(model: string, inputTokens: number, outputTokens: number): number {
+  const key = Object.keys(MODEL_PRICES).find(k => model.toLowerCase().includes(k));
+  if (!key) return 0;
+  const price = MODEL_PRICES[key];
+  return (inputTokens / 1_000_000) * price.input + (outputTokens / 1_000_000) * price.output;
+}
+
 export async function callAI(
   config: AIConfig,
   messages: { role: string; content: string }[],
   tools?: any[]
-): Promise<string> {
+): Promise<AIResult> {
   const { provider, apiKey, model, baseUrl, systemPrompt } = config;
 
   // Injeta o systemPrompt do tenant como primeiro system message
@@ -82,9 +119,14 @@ export async function callAI(
     if (!res.ok) throw new Error(`OpenAI error ${res.status}: ${await res.text()}`);
     const data = await res.json();
 
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.arguments) return toolCall.function.arguments;
-    return data.choices?.[0]?.message?.content ?? "";
+    const inputTokens = data.usage?.prompt_tokens ?? 0;
+    const outputTokens = data.usage?.completion_tokens ?? 0;
+    const content = (() => {
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall?.function?.arguments) return toolCall.function.arguments;
+      return data.choices?.[0]?.message?.content ?? "";
+    })();
+    return { content, usage: { inputTokens, outputTokens, estimatedCostUsd: calcCost(config.model, inputTokens, outputTokens) } };
   }
 
   if (provider === "anthropic") {
@@ -118,7 +160,9 @@ export async function callAI(
 
     if (!res.ok) throw new Error(`Anthropic error ${res.status}: ${await res.text()}`);
     const data = await res.json();
-    return data.content?.[0]?.text ?? "";
+    const inputTokens = data.usage?.input_tokens ?? 0;
+    const outputTokens = data.usage?.output_tokens ?? 0;
+    return { content: data.content?.[0]?.text ?? "", usage: { inputTokens, outputTokens, estimatedCostUsd: calcCost(config.model, inputTokens, outputTokens) } };
   }
 
   if (provider === "gemini") {
@@ -152,7 +196,9 @@ export async function callAI(
 
     if (!res.ok) throw new Error(`Gemini error ${res.status}: ${await res.text()}`);
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const inputTokens = data.usageMetadata?.promptTokenCount ?? 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
+    return { content: data.candidates?.[0]?.content?.parts?.[0]?.text ?? "", usage: { inputTokens, outputTokens, estimatedCostUsd: calcCost(config.model, inputTokens, outputTokens) } };
   }
 
   throw new Error(`Provider desconhecido: ${provider}`);
