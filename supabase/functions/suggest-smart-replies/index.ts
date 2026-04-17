@@ -11,7 +11,7 @@ async function checkRateLimit(
   supabase: any,
   tenantId: string,
   functionName: string
-): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+): Promise<{ allowed: boolean; retryAfterSeconds?: number; logId?: string }> {
   try {
     const { data: configs } = await supabase
       .from('ai_rate_limit_config')
@@ -37,12 +37,13 @@ async function checkRateLimit(
       return { allowed: false, retryAfterSeconds: windowSeconds };
     }
 
+    const logId = crypto.randomUUID();
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
+      .insert({ id: logId, tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
-    return { allowed: true };
+    return { allowed: true, logId };
   } catch {
     return { allowed: true };
   }
@@ -193,13 +194,15 @@ CONTEXTO: Cliente: ${contactName}. Última mensagem: "${lastClientMessage.conten
         ],
         tools
       );
-      await supabase.from('ai_usage_log').update({
-        input_tokens: aiResult.usage.inputTokens,
-        output_tokens: aiResult.usage.outputTokens,
-        estimated_cost_usd: aiResult.usage.estimatedCostUsd,
-        model: aiConfig.model,
-        provider: aiConfig.provider,
-      }).eq('tenant_id', convData.tenant_id).eq('function_name', 'suggest-smart-replies').order('called_at', { ascending: false }).limit(1);
+      if (rateLimit.logId) {
+        await supabase.from('ai_usage_log').update({
+          input_tokens: aiResult.usage.inputTokens,
+          output_tokens: aiResult.usage.outputTokens,
+          estimated_cost_usd: aiResult.usage.estimatedCostUsd,
+          model: aiConfig.model,
+          provider: aiConfig.provider,
+        }).eq('id', rateLimit.logId);
+      }
       const parsed = JSON.parse(aiResult.content);
       suggestions = parsed.suggestions || defaultSuggestions;
     } catch (aiError: any) {
