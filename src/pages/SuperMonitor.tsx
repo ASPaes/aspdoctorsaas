@@ -288,6 +288,36 @@ export default function SuperMonitor() {
     0,
   );
   const totalAI = filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0);
+  const groupedTenants = Object.values(
+    filteredTenants.reduce((acc: any, t: any) => {
+      const id = t.tenant_id;
+      if (!acc[id]) {
+        acc[id] = {
+          tenant_id: id,
+          tenants: t.tenants,
+          messages_sent: 0, messages_received: 0,
+          conversations_opened: 0, conversations_closed: 0,
+          active_operators: 0,
+          ai_calls_suggest: 0, ai_calls_compose: 0, ai_calls_sentiment: 0,
+          ai_calls_summary: 0, ai_calls_audio: 0,
+          whatsapp_instances_connected: t.whatsapp_instances_connected,
+          whatsapp_instances_total: t.whatsapp_instances_total,
+        };
+      }
+      acc[id].messages_sent += t.messages_sent || 0;
+      acc[id].messages_received += t.messages_received || 0;
+      acc[id].conversations_opened += t.conversations_opened || 0;
+      acc[id].conversations_closed += t.conversations_closed || 0;
+      acc[id].active_operators = Math.max(acc[id].active_operators, t.active_operators || 0);
+      acc[id].ai_calls_suggest += t.ai_calls_suggest || 0;
+      acc[id].ai_calls_compose += t.ai_calls_compose || 0;
+      acc[id].ai_calls_sentiment += t.ai_calls_sentiment || 0;
+      acc[id].ai_calls_summary += t.ai_calls_summary || 0;
+      acc[id].ai_calls_audio += t.ai_calls_audio || 0;
+      return acc;
+    }, {} as any)
+  );
+  const maxAIGrouped = Math.max(...groupedTenants.map((t: any) => aiCalls(t)), 1);
   const filteredInstances = selectedTenant === 'all' ? instances : instances.filter((i: any) => i.tenant_id === selectedTenant);
   const connectedInstances = filteredInstances.filter((i: any) => i.status === 'connected').length;
   const disconnectedInstances = filteredInstances.filter((i: any) => i.status !== 'connected');
@@ -305,7 +335,7 @@ export default function SuperMonitor() {
     : '--';
   const connValues = snapshots.map((s: any) => s.active_connections || 0);
 
-  const maxAI = Math.max(...tenantMetrics.map((t: any) => aiCalls(t)), 1);
+  
 
   const score = Math.max(
     0,
@@ -737,7 +767,7 @@ export default function SuperMonitor() {
             );
           })}
           <div style={{ ...labelStyle, marginTop: 12 }}>por tenant</div>
-          {filteredTenants
+          {groupedTenants
             .filter((t: any) => aiCalls(t) > 0)
             .map((t: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -753,7 +783,7 @@ export default function SuperMonitor() {
                 >
                   {(t as any).tenants?.nome || t.tenant_id}
                 </span>
-                <MiniBar value={aiCalls(t)} max={maxAI} color="#8b5cf6" />
+                <MiniBar value={aiCalls(t)} max={maxAIGrouped} color="#8b5cf6" />
                 <span style={{ fontSize: 10, fontWeight: 600, width: 36, textAlign: 'right' }}>{aiCalls(t)}</span>
               </div>
             ))}
@@ -765,7 +795,7 @@ export default function SuperMonitor() {
             <div style={{ ...labelStyle, marginBottom: 0 }}>tenants</div>
             <HelpTooltip text="Cada tenant é uma empresa usando a plataforma. Mostra o volume de mensagens e uso de IA por empresa. 'Sem atividade' significa que a empresa não teve movimentação no período." />
           </div>
-          {filteredTenants.map((t: any, i: number) => {
+          {groupedTenants.map((t: any, i: number) => {
             const active = (t.messages_sent || 0) + (t.messages_received || 0) > 0;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
