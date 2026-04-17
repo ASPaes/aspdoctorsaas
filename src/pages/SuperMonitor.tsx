@@ -438,12 +438,11 @@ export default function SuperMonitor() {
                       onClick={() => {
                         const to = new Date(); to.setDate(to.getDate() - 1);
                         const toStr = to.toISOString().split('T')[0];
-                        if (days === -1) { setDateFrom('2020-01-01'); setDateTo(toStr); }
-                        else if (days === 0) { setDateFrom(toStr); setDateTo(toStr); }
+                        if (days === -1) { setDateRange({ from: new Date('2020-01-01'), to: new Date() }); }
+                        else if (days === 0) { setDateRange({ from: new Date(), to: new Date() }); }
                         else {
-                          const from = new Date(); from.setDate(from.getDate() - days);
-                          setDateFrom(from.toISOString().split('T')[0]);
-                          setDateTo(toStr);
+                          const f = new Date(); f.setDate(f.getDate() - days);
+                          setDateRange({ from: f, to: new Date(toStr) });
                         }
                         setRefreshKey(k => k + 1);
                       }}
