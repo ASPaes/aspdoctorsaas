@@ -32,6 +32,7 @@ const AccessBlocked = lazy(() => import("@/pages/AccessBlocked"));
 const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
+const SuperMonitor = lazy(() => import("@/pages/SuperMonitor"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 
 const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
@@ -95,6 +96,7 @@ const App = () => (
               <Route element={<SuperAdminGuard />}>
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
+                <Route path="/super/monitor" element={<SuperMonitor />} />
               </Route>
             </Route>
 
