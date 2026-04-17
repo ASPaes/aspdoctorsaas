@@ -60,6 +60,37 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
   );
 }
 
+function HelpTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: 16, height: 16, borderRadius: '50%',
+          border: '1px solid var(--color-border-secondary)',
+          background: open ? 'var(--color-background-info)' : 'var(--color-background-secondary)',
+          color: open ? 'var(--color-text-info)' : 'var(--color-text-secondary)',
+          fontSize: 10, fontWeight: 500, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, lineHeight: 1,
+        }}
+        title="Saiba mais"
+      >?</button>
+      {open && (
+        <span style={{
+          position: 'absolute', top: 22, left: 0, zIndex: 50,
+          background: 'var(--color-background-primary)',
+          border: '0.5px solid var(--color-border-secondary)',
+          borderRadius: 8, padding: '8px 10px',
+          fontSize: 11, color: 'var(--color-text-secondary)',
+          lineHeight: 1.5, width: 220, boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
@@ -392,7 +423,7 @@ export default function SuperMonitor() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         {/* Score */}
         <div style={panelStyle}>
-          <div style={labelStyle}>saúde do sistema</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>saúde do sistema <HelpTooltip text="Nota de 0 a 100 que resume o estado geral da plataforma. Considera instâncias offline, lentidão, alertas pendentes e uso do banco de dados." /></div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <ScoreRing score={score} />
           </div>
@@ -413,7 +444,7 @@ export default function SuperMonitor() {
         </div>
 
         <div style={{ ...panelStyle, borderTop: '2px solid #3b82f6' }}>
-          <div style={labelStyle}>mensagens</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>mensagens <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." /></div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
             {(tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
           </div>
@@ -433,7 +464,7 @@ export default function SuperMonitor() {
 
         {/* Conversas */}
         <div style={panelStyle}>
-          <div style={labelStyle}>conversas encerradas</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>conversas encerradas <HelpTooltip text="Quantidade de atendimentos finalizados. 'Abertas' são as que ainda estão em andamento agora." /></div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>
             {tenantMetrics.reduce((s: number, t: any) => s + (t.conversations_closed || 0), 0)}
           </div>
@@ -453,7 +484,7 @@ export default function SuperMonitor() {
         </div>
 
         <div style={{ ...panelStyle, borderTop: '2px solid #8b5cf6' }}>
-          <div style={labelStyle}>chamadas IA</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>chamadas IA <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." /></div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
             {(tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
           </div>
@@ -478,7 +509,7 @@ export default function SuperMonitor() {
             borderColor: disconnectedInstances.length > 0 ? '#eab308' : '#22c55e',
           }}
         >
-          <div style={labelStyle}>instâncias whatsapp</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>instâncias whatsapp <HelpTooltip text="Cada instância é um número de WhatsApp conectado à plataforma. Se uma aparece como OFFLINE, mensagens daquele número não estão sendo entregues." /></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {disconnectedInstances.length > 0 ? (
               <WifiOff size={14} style={{ color: '#eab308' }} />
@@ -524,9 +555,7 @@ export default function SuperMonitor() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
         {/* Banco */}
         <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Database size={11} /> banco de dados · snapshots do dia
-          </div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>banco de dados <HelpTooltip text="Saúde técnica do banco. 'Conexões' mostram quantos acessos simultâneos estão acontecendo. 'Query lenta' indica buscas que estão demorando mais que o normal." /></div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
             {[
               { label: 'Pico conexões', value: maxConn ? `${maxConn} · ${peakTime}h` : '—', warn: maxConn >= 30 },
@@ -586,9 +615,7 @@ export default function SuperMonitor() {
 
         {/* IA por função */}
         <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Bot size={11} /> uso de IA por função · ontem
-          </div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>uso de IA por função <HelpTooltip text="Distribuição de como a IA foi usada: sugestões ajudam o atendente a responder, composição cria mensagens automáticas, sentimento analisa o humor do cliente, resumo condensa a conversa e transcrição converte áudios em texto." /></div>
           {[
             { label: 'Sugestões', key: 'ai_calls_suggest', color: '#3b82f6' },
             { label: 'Composição', key: 'ai_calls_compose', color: '#8b5cf6' },
@@ -630,7 +657,7 @@ export default function SuperMonitor() {
 
         {/* Tenants + Instâncias */}
         <div style={panelStyle}>
-          <div style={labelStyle}>tenants · ontem</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>tenants <HelpTooltip text="Cada tenant é uma empresa usando a plataforma. Mostra o volume de mensagens e uso de IA por empresa. 'Sem atividade' significa que a empresa não teve movimentação no período." /></div>
           {filteredTenants.map((t: any, i: number) => {
             const active = (t.messages_sent || 0) + (t.messages_received || 0) > 0;
             return (
@@ -709,9 +736,7 @@ export default function SuperMonitor() {
       {/* Linha 3: Falhas + Alertas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10 }}>
         <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AlertTriangle size={11} /> falhas e ocorrências · últimas 24h
-          </div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>falhas e ocorrências <HelpTooltip text="Problemas que aconteceram nas últimas 24 horas — instâncias que ficaram offline, erros de conexão ou falhas no sistema. Itens em andamento ainda não foram resolvidos." /></div>
           {instanceLog.length === 0 && alerts.filter((a: any) => a.level === 'critical').length === 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#16a34a', padding: '6px 0' }}>
               <CheckCircle size={12} /> Nenhuma falha registrada nas últimas 24h
@@ -763,7 +788,7 @@ export default function SuperMonitor() {
         </div>
 
         <div style={panelStyle}>
-          <div style={labelStyle}>histórico de alertas · últimas 24h</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>histórico de alertas <HelpTooltip text="Alertas enviados via WhatsApp sobre a saúde do banco de dados. Mostra se cada alerta foi resolvido, ignorado ou está pendente." /></div>
           {alerts.length === 0 && <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', margin: 0 }}>Nenhum alerta nas últimas 24h</p>}
           {alerts.map((alert: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
@@ -800,7 +825,7 @@ export default function SuperMonitor() {
       </div>
 
       <div style={{ ...panelStyle, marginTop: 10 }}>
-        <div style={{ ...labelStyle, marginBottom: 12 }}>manutenção · estado atual do banco</div>
+        <div style={{ ...labelStyle, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>manutenção <HelpTooltip text="Tarefas de limpeza e otimização do banco. A barra mostra o nível de acúmulo — verde é saudável, amarelo recomenda atenção, vermelho precisa limpar. Clique em 'Executar agora' quando necessário." /></div>
         {actionResult && (
           <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>{actionResult.ok ? '✅' : '❌'}</span>
