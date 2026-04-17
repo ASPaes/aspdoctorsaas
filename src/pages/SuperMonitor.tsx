@@ -63,6 +63,32 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<{ ok: boolean; label: string } | null>(null);
+
+  const runDbAction = async (action: string, label: string) => {
+    setActionLoading(action);
+    setActionResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-db-actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action }),
+      });
+      const json = await res.json();
+      setActionResult({ ok: json.ok, label });
+      if (json.ok) setRefreshKey(k => k + 1);
+    } catch (e) {
+      setActionResult({ ok: false, label });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     const interval = setInterval(() => setRefreshKey(k => k + 1), 5 * 60 * 1000);
     return () => clearInterval(interval);
@@ -747,6 +773,43 @@ export default function SuperMonitor() {
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ ...panelStyle, marginTop: 16 }}>
+        <div style={labelStyle}>ações do banco · executar manualmente</div>
+        {actionResult && (
+          <div style={{ fontSize: 11, padding: '6px 10px', borderRadius: 6, marginBottom: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b' }}>
+            {actionResult.ok ? '✅' : '❌'} {actionResult.ok ? `${actionResult.label} executado com sucesso` : `Erro ao executar ${actionResult.label}`}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {[
+            { action: 'vacuum_messages', label: 'VACUUM mensagens', desc: 'Limpa dead tuples em whatsapp_messages' },
+            { action: 'vacuum_conversations', label: 'VACUUM conversas', desc: 'Limpa dead tuples em whatsapp_conversations' },
+            { action: 'vacuum_attendances', label: 'VACUUM atendimentos', desc: 'Limpa dead tuples em support_attendances' },
+            { action: 'clean_cron', label: 'Limpar log cron', desc: 'Remove registros antigos de cron.job_run_details' },
+            { action: 'collect_snapshot', label: 'Coletar snapshot', desc: 'Força coleta imediata de métricas do banco' },
+            { action: 'collect_metrics', label: 'Consolidar métricas', desc: 'Força consolidação diária dos tenants' },
+          ].map(item => (
+            <button
+              key={item.action}
+              onClick={() => runDbAction(item.action, item.label)}
+              disabled={actionLoading !== null}
+              title={item.desc}
+              style={{
+                fontSize: 12, padding: '6px 12px', borderRadius: 8,
+                border: '0.5px solid var(--color-border-secondary)',
+                background: actionLoading === item.action ? 'var(--color-background-info)' : 'var(--color-background-secondary)',
+                color: actionLoading === item.action ? 'var(--color-text-info)' : 'var(--color-text-primary)',
+                cursor: actionLoading !== null ? 'not-allowed' : 'pointer',
+                opacity: actionLoading !== null && actionLoading !== item.action ? 0.5 : 1,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              {actionLoading === item.action ? '⏳' : '▶'} {item.label}
+            </button>
           ))}
         </div>
       </div>

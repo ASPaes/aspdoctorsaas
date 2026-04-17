@@ -83,3 +83,6 @@ verify_jwt = false
 
 [functions.ai-admin-commands]
 verify_jwt = false
+
+[functions.admin-db-actions]
+verify_jwt = false
