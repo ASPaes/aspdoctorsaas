@@ -391,31 +391,11 @@ export default function SuperMonitor() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          {disconnectedInstances.length > 0 && (
-            <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#fee2e2', color: '#991b1b', fontWeight: 500 }}>
-              {disconnectedInstances.length} instância offline
-            </span>
-          )}
           {pendingAlerts > 0 && (
             <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#fef9c3', color: '#854d0e', fontWeight: 500 }}>
               {pendingAlerts} alerta pendente
             </span>
           )}
-          <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>
-            {tenantMetrics.filter((t: any) => (t.messages_sent || 0) > 0).length} tenants ativos
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              padding: '3px 8px',
-              borderRadius: 6,
-              background: `${scoreColor}20`,
-              color: scoreColor,
-              fontWeight: 600,
-            }}
-          >
-            Score {score}/100
-          </span>
               <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger asChild>
                   <button style={{
