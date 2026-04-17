@@ -124,14 +124,31 @@ export default function SuperMonitor() {
   const { data: instanceLog = [] } = useQuery({
     queryKey: ['monitor-instance-log', refreshKey],
     queryFn: async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('whatsapp_instance_status_log')
-        .select('*, tenants(nome)')
+        .select('instance_name, tenant_id, captured_at, tenants(nome)')
         .gte('captured_at', since24h)
         .eq('status', 'disconnected')
-        .order('captured_at', { ascending: false })
-        .limit(10);
-      return data ?? [];
+        .order('captured_at', { ascending: true });
+      if (!data) return [];
+      // Group by instance_name
+      const grouped: Record<string, any> = {};
+      for (const row of data) {
+        const key = row.instance_name;
+        if (!grouped[key]) {
+          grouped[key] = {
+            instance_name: row.instance_name,
+            tenant_id: row.tenant_id,
+            tenant_nome: (row as any).tenants?.nome || row.tenant_id,
+            occurrences: 0,
+            first_seen: row.captured_at,
+            last_seen: row.captured_at,
+          };
+        }
+        grouped[key].occurrences++;
+        grouped[key].last_seen = row.captured_at;
+      }
+      return Object.values(grouped).sort((a: any, b: any) => b.occurrences - a.occurrences);
     },
     ...opts,
   });
