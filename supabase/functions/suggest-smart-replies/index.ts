@@ -39,7 +39,7 @@ async function checkRateLimit(
 
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName })
+      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
     return { allowed: true };
@@ -185,7 +185,7 @@ CONTEXTO: Cliente: ${contactName}. Última mensagem: "${lastClientMessage.conten
 
     let suggestions = defaultSuggestions;
     try {
-      const rawResult = await callAI(
+      const aiResult = await callAI(
         aiConfig,
         [
           { role: "system", content: systemPrompt },
@@ -193,7 +193,14 @@ CONTEXTO: Cliente: ${contactName}. Última mensagem: "${lastClientMessage.conten
         ],
         tools
       );
-      const parsed = JSON.parse(rawResult);
+      await supabase.from('ai_usage_log').update({
+        input_tokens: aiResult.usage.inputTokens,
+        output_tokens: aiResult.usage.outputTokens,
+        estimated_cost_usd: aiResult.usage.estimatedCostUsd,
+        model: aiConfig.model,
+        provider: aiConfig.provider,
+      }).eq('tenant_id', convData.tenant_id).eq('function_name', 'suggest-smart-replies').order('called_at', { ascending: false }).limit(1);
+      const parsed = JSON.parse(aiResult.content);
       suggestions = parsed.suggestions || defaultSuggestions;
     } catch (aiError: any) {
       const msg = aiError.message || "";

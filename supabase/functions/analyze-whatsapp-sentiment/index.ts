@@ -39,7 +39,7 @@ async function checkRateLimit(
 
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName })
+      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
     return { allowed: true };
@@ -183,8 +183,15 @@ Critérios para abertura de Ticket CS (needs_cs_ticket = true):
 
     let result: any;
     try {
-      const rawResult = await callAI(aiConfig, [{ role: "user", content: prompt }], tools);
-      result = JSON.parse(rawResult);
+      const aiResult = await callAI(aiConfig, [{ role: "user", content: prompt }], tools);
+      await supabase.from('ai_usage_log').update({
+        input_tokens: aiResult.usage.inputTokens,
+        output_tokens: aiResult.usage.outputTokens,
+        estimated_cost_usd: aiResult.usage.estimatedCostUsd,
+        model: aiConfig.model,
+        provider: aiConfig.provider,
+      }).eq('tenant_id', convData.tenant_id).eq('function_name', 'analyze-whatsapp-sentiment').order('called_at', { ascending: false }).limit(1);
+      result = JSON.parse(aiResult.content);
     } catch (aiError: any) {
       const msg = aiError.message || "";
       console.error("[analyze-sentiment] AI error:", msg);
