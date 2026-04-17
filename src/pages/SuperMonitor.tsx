@@ -778,20 +778,24 @@ export default function SuperMonitor() {
       </div>
 
       <div style={{ ...panelStyle, marginTop: 16 }}>
-        <div style={labelStyle}>ações do banco · executar manualmente</div>
+        <div style={labelStyle}>manutenção · ações rápidas</div>
         {actionResult && (
-          <div style={{ fontSize: 11, padding: '6px 10px', borderRadius: 6, marginBottom: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b' }}>
-            {actionResult.ok ? '✅' : '❌'} {actionResult.ok ? `${actionResult.label} executado com sucesso` : `Erro ao executar ${actionResult.label}`}
+          <div style={{ marginBottom: 10, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>{actionResult.ok ? '✅' : '❌'}</span>
+            <div>
+              <div style={{ fontWeight: 500 }}>{actionResult.ok ? 'Concluído!' : 'Não foi possível executar'}</div>
+              <div style={{ opacity: 0.8, marginTop: 1 }}>{actionResult.label}</div>
+            </div>
           </div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {[
-            { action: 'vacuum_messages', label: 'VACUUM mensagens', desc: 'Limpa dead tuples em whatsapp_messages' },
-            { action: 'vacuum_conversations', label: 'VACUUM conversas', desc: 'Limpa dead tuples em whatsapp_conversations' },
-            { action: 'vacuum_attendances', label: 'VACUUM atendimentos', desc: 'Limpa dead tuples em support_attendances' },
-            { action: 'clean_cron', label: 'Limpar log cron', desc: 'Remove registros antigos de cron.job_run_details' },
-            { action: 'collect_snapshot', label: 'Coletar snapshot', desc: 'Força coleta imediata de métricas do banco' },
-            { action: 'collect_metrics', label: 'Consolidar métricas', desc: 'Força consolidação diária dos tenants' },
+            { action: 'vacuum_messages', label: 'Otimizar chat', desc: 'Limpa registros obsoletos do chat — melhora velocidade das conversas', icon: '⚡' },
+            { action: 'vacuum_conversations', label: 'Otimizar conversas', desc: 'Limpa registros obsoletos de conversas', icon: '💬' },
+            { action: 'vacuum_attendances', label: 'Otimizar atendimentos', desc: 'Limpa registros obsoletos de atendimentos', icon: '🎯' },
+            { action: 'clean_cron', label: 'Limpar histórico', desc: 'Remove logs antigos de tarefas automáticas — libera espaço', icon: '🗑️' },
+            { action: 'collect_snapshot', label: 'Atualizar métricas banco', desc: 'Força coleta imediata dos dados do banco para o dashboard', icon: '📊' },
+            { action: 'collect_metrics', label: 'Atualizar métricas tenants', desc: 'Força consolidação dos dados de uso por tenant', icon: '🔄' },
           ].map(item => (
             <button
               key={item.action}
@@ -799,16 +803,21 @@ export default function SuperMonitor() {
               disabled={actionLoading !== null}
               title={item.desc}
               style={{
-                fontSize: 12, padding: '6px 12px', borderRadius: 8,
+                fontSize: 12, padding: '8px 14px', borderRadius: 8,
                 border: '0.5px solid var(--color-border-secondary)',
                 background: actionLoading === item.action ? 'var(--color-background-info)' : 'var(--color-background-secondary)',
                 color: actionLoading === item.action ? 'var(--color-text-info)' : 'var(--color-text-primary)',
                 cursor: actionLoading !== null ? 'not-allowed' : 'pointer',
                 opacity: actionLoading !== null && actionLoading !== item.action ? 0.5 : 1,
                 display: 'flex', alignItems: 'center', gap: 6,
+                transition: 'opacity 0.2s',
               }}
             >
-              {actionLoading === item.action ? '⏳' : '▶'} {item.label}
+              <span style={{ fontSize: 14 }}>{actionLoading === item.action ? '⏳' : item.icon}</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 500 }}>{item.label}</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>{item.desc}</div>
+              </div>
             </button>
           ))}
         </div>
