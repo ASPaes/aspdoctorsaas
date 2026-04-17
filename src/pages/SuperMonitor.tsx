@@ -100,6 +100,16 @@ function HelpTooltip({ text }: { text: string }) {
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [dateTo, setDateTo] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<{ ok: boolean; label: string } | null>(null);
 
@@ -135,15 +145,18 @@ export default function SuperMonitor() {
   const sp = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   sp.setDate(sp.getDate() - 1);
   const yesterday = sp.toISOString().split('T')[0];
+  const queryDateFrom = dateFrom || yesterday;
+  const queryDateTo = dateTo || yesterday;
   const since24h = new Date(Date.now() - 86400000).toISOString();
 
   const { data: tenantMetrics = [] } = useQuery({
-    queryKey: ['monitor-tenant-metrics', yesterday, refreshKey],
+    queryKey: ['monitor-tenant-metrics', queryDateFrom, queryDateTo, refreshKey],
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from('tenant_daily_metrics')
         .select('*, tenants(nome)')
-        .gte('metric_date', yesterday)
+        .gte('metric_date', queryDateFrom)
+        .lte('metric_date', queryDateTo)
         .order('metric_date', { ascending: false })
         .order('messages_sent', { ascending: false });
       return data ?? [];
@@ -247,9 +260,11 @@ export default function SuperMonitor() {
   });
 
   const { data: todayMetrics } = useQuery({
-    queryKey: ['monitor-today', refreshKey],
+    queryKey: ['monitor-today', refreshKey, selectedTenant],
     queryFn: async () => {
-      const { data } = await supabase.rpc('get_today_metrics' as any);
+      const { data } = await supabase.rpc('get_today_metrics' as any, {
+        p_tenant_id: selectedTenant !== 'all' ? selectedTenant : null,
+      });
       return data as any;
     },
     staleTime: Infinity,
@@ -396,6 +411,22 @@ export default function SuperMonitor() {
           >
             Score {score}/100
           </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>De</span>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => { setDateFrom(e.target.value); setRefreshKey(k => k + 1); }}
+                  style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>até</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => { setDateTo(e.target.value); setRefreshKey(k => k + 1); }}
+                  style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+                />
+              </div>
           <select
             value={selectedTenant}
             onChange={e => setSelectedTenant(e.target.value)}
