@@ -444,7 +444,7 @@ export default function SuperMonitor() {
         </div>
 
         <div style={{ ...panelStyle, borderTop: '2px solid #3b82f6' }}>
-          <div style={labelStyle}>mensagens</div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>mensagens <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." /></div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
             {(tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
           </div>
