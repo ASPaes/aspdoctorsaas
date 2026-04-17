@@ -39,7 +39,7 @@ async function checkRateLimit(
 
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName })
+      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
     return { allowed: true };
@@ -157,7 +157,7 @@ async function handleAttendanceSummary(
   const messagesText = formatMessages(messages);
 
   const prompt = buildSingleAttendancePrompt(contactName, messagesText);
-  const result = await callAndParseAI(aiConfig, prompt);
+  const result = await callAndParseAI(aiConfig, prompt, supabase, conversation.tenant_id);
   if (result instanceof Response) return result;
 
   // Update attendance AI fields
@@ -269,7 +269,7 @@ Retorne APENAS um JSON válido sem markdown:
 }`;
   }
 
-  const result = await callAndParseAI(aiConfig, promptContent);
+  const result = await callAndParseAI(aiConfig, promptContent, supabase, conversation.tenant_id);
   if (result instanceof Response) return result;
 
   const totalMessages = attendances?.reduce((sum: number, a: any) => sum + 1, 0) || 0;
@@ -343,12 +343,22 @@ REGRAS:
 - "tags": palavras-chave únicas e curtas (1-2 palavras).`;
 }
 
-async function callAndParseAI(aiConfig: any, prompt: string): Promise<any> {
+async function callAndParseAI(aiConfig: any, prompt: string, supabase?: any, tenantId?: string): Promise<any> {
   try {
-    const rawResult = await callAI(aiConfig, [
+    const aiResult = await callAI(aiConfig, [
       { role: "system", content: "Você é um assistente de atendimento ao cliente. Gere resumos objetivos e úteis. Sempre responda com JSON válido sem formatação markdown." },
       { role: "user", content: prompt },
     ]);
+    if (supabase && tenantId) {
+      await supabase.from('ai_usage_log').update({
+        input_tokens: aiResult.usage.inputTokens,
+        output_tokens: aiResult.usage.outputTokens,
+        estimated_cost_usd: aiResult.usage.estimatedCostUsd,
+        model: aiConfig.model,
+        provider: aiConfig.provider,
+      }).eq('tenant_id', tenantId).eq('function_name', 'generate-conversation-summary').order('called_at', { ascending: false }).limit(1);
+    }
+    const rawResult = aiResult.content;
     try {
       return JSON.parse(rawResult);
     } catch {

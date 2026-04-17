@@ -39,7 +39,7 @@ async function checkRateLimit(
 
     supabase
       .from('ai_usage_log')
-      .insert({ tenant_id: tenantId, function_name: functionName })
+      .insert({ tenant_id: tenantId, function_name: functionName, model: null, provider: null, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 })
       .then(() => {});
 
     return { allowed: true };
