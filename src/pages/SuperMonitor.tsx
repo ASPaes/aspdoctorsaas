@@ -62,29 +62,42 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
 
 function HelpTooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [open]);
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+    <span style={{ position: 'relative', display: 'inline-flex' }} onClick={e => e.stopPropagation()}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          width: 16, height: 16, borderRadius: '50%',
+          width: 18, height: 18, borderRadius: '50%',
           border: '1px solid var(--color-border-secondary)',
-          background: open ? 'var(--color-background-info)' : 'var(--color-background-secondary)',
-          color: open ? 'var(--color-text-info)' : 'var(--color-text-secondary)',
-          fontSize: 10, fontWeight: 500, cursor: 'pointer',
+          background: open ? '#dbeafe' : 'var(--color-background-secondary)',
+          color: open ? '#1e40af' : 'var(--color-text-secondary)',
+          fontSize: 11, fontWeight: 500, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, lineHeight: 1,
+          flexShrink: 0, lineHeight: 1, padding: 0,
         }}
-        title="Saiba mais"
       >?</button>
       {open && (
         <span style={{
-          position: 'absolute', top: 22, left: 0, zIndex: 50,
-          background: 'var(--color-background-primary)',
-          border: '0.5px solid var(--color-border-secondary)',
-          borderRadius: 8, padding: '8px 10px',
-          fontSize: 11, color: 'var(--color-text-secondary)',
-          lineHeight: 1.5, width: 220, boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          position: 'absolute',
+          top: 24,
+          right: 0,
+          zIndex: 100,
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: 10,
+          padding: '10px 12px',
+          fontSize: 12,
+          color: '#e2e8f0',
+          lineHeight: 1.6,
+          width: 240,
+          display: 'block',
+          whiteSpace: 'normal',
         }}>{text}</span>
       )}
     </span>
@@ -422,8 +435,11 @@ export default function SuperMonitor() {
       {/* Linha 1: Score + KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         {/* Score */}
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>saúde do sistema <HelpTooltip text="Nota de 0 a 100 que resume o estado geral da plataforma. Considera instâncias offline, lentidão, alertas pendentes e uso do banco de dados." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Nota de 0 a 100 que resume o estado geral da plataforma. Considera instâncias offline, lentidão, alertas pendentes e uso do banco de dados." />
+          </span>
+          <div style={labelStyle}>saúde do sistema</div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <ScoreRing score={score} />
           </div>
@@ -443,8 +459,11 @@ export default function SuperMonitor() {
           </div>
         </div>
 
-        <div style={{ ...panelStyle, borderTop: '2px solid #3b82f6' }}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>mensagens <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." /></div>
+        <div style={{ ...panelStyle, borderTop: '2px solid #3b82f6', position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." />
+          </span>
+          <div style={labelStyle}>mensagens</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
             {(tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
           </div>
@@ -463,8 +482,11 @@ export default function SuperMonitor() {
         </div>
 
         {/* Conversas */}
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>conversas encerradas <HelpTooltip text="Quantidade de atendimentos finalizados. 'Abertas' são as que ainda estão em andamento agora." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Quantidade de atendimentos finalizados. 'Abertas' são as que ainda estão em andamento agora." />
+          </span>
+          <div style={labelStyle}>conversas encerradas</div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>
             {tenantMetrics.reduce((s: number, t: any) => s + (t.conversations_closed || 0), 0)}
           </div>
@@ -483,8 +505,11 @@ export default function SuperMonitor() {
           </div>
         </div>
 
-        <div style={{ ...panelStyle, borderTop: '2px solid #8b5cf6' }}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>chamadas IA <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." /></div>
+        <div style={{ ...panelStyle, borderTop: '2px solid #8b5cf6', position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." />
+          </span>
+          <div style={labelStyle}>chamadas IA</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
             {(tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
           </div>
@@ -509,7 +534,10 @@ export default function SuperMonitor() {
             borderColor: disconnectedInstances.length > 0 ? '#eab308' : '#22c55e',
           }}
         >
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>instâncias whatsapp <HelpTooltip text="Cada instância é um número de WhatsApp conectado à plataforma. Se uma aparece como OFFLINE, mensagens daquele número não estão sendo entregues." /></div>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Cada instância é um número de WhatsApp conectado à plataforma. Se uma aparece como OFFLINE, mensagens daquele número não estão sendo entregues." />
+          </span>
+          <div style={labelStyle}>instâncias whatsapp</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {disconnectedInstances.length > 0 ? (
               <WifiOff size={14} style={{ color: '#eab308' }} />
@@ -554,8 +582,11 @@ export default function SuperMonitor() {
       {/* Linha 2: Banco + IA + Tenants */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
         {/* Banco */}
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>banco de dados <HelpTooltip text="Saúde técnica do banco. 'Conexões' mostram quantos acessos simultâneos estão acontecendo. 'Query lenta' indica buscas que estão demorando mais que o normal." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Saúde técnica do banco. 'Conexões' mostram quantos acessos simultâneos estão acontecendo. 'Query lenta' indica buscas que estão demorando mais que o normal." />
+          </span>
+          <div style={labelStyle}>banco de dados</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
             {[
               { label: 'Pico conexões', value: maxConn ? `${maxConn} · ${peakTime}h` : '—', warn: maxConn >= 30 },
@@ -614,8 +645,11 @@ export default function SuperMonitor() {
         </div>
 
         {/* IA por função */}
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>uso de IA por função <HelpTooltip text="Distribuição de como a IA foi usada: sugestões ajudam o atendente a responder, composição cria mensagens automáticas, sentimento analisa o humor do cliente, resumo condensa a conversa e transcrição converte áudios em texto." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Distribuição de como a IA foi usada: sugestões ajudam o atendente a responder, composição cria mensagens automáticas, sentimento analisa o humor do cliente, resumo condensa a conversa e transcrição converte áudios em texto." />
+          </span>
+          <div style={labelStyle}>uso de IA por função</div>
           {[
             { label: 'Sugestões', key: 'ai_calls_suggest', color: '#3b82f6' },
             { label: 'Composição', key: 'ai_calls_compose', color: '#8b5cf6' },
@@ -656,8 +690,11 @@ export default function SuperMonitor() {
         </div>
 
         {/* Tenants + Instâncias */}
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>tenants <HelpTooltip text="Cada tenant é uma empresa usando a plataforma. Mostra o volume de mensagens e uso de IA por empresa. 'Sem atividade' significa que a empresa não teve movimentação no período." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Cada tenant é uma empresa usando a plataforma. Mostra o volume de mensagens e uso de IA por empresa. 'Sem atividade' significa que a empresa não teve movimentação no período." />
+          </span>
+          <div style={labelStyle}>tenants</div>
           {filteredTenants.map((t: any, i: number) => {
             const active = (t.messages_sent || 0) + (t.messages_received || 0) > 0;
             return (
@@ -735,8 +772,11 @@ export default function SuperMonitor() {
 
       {/* Linha 3: Falhas + Alertas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10 }}>
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>falhas e ocorrências <HelpTooltip text="Problemas que aconteceram nas últimas 24 horas — instâncias que ficaram offline, erros de conexão ou falhas no sistema. Itens em andamento ainda não foram resolvidos." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Problemas que aconteceram nas últimas 24 horas — instâncias que ficaram offline, erros de conexão ou falhas no sistema. Itens em andamento ainda não foram resolvidos." />
+          </span>
+          <div style={labelStyle}>falhas e ocorrências</div>
           {instanceLog.length === 0 && alerts.filter((a: any) => a.level === 'critical').length === 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#16a34a', padding: '6px 0' }}>
               <CheckCircle size={12} /> Nenhuma falha registrada nas últimas 24h
@@ -787,8 +827,11 @@ export default function SuperMonitor() {
             ))}
         </div>
 
-        <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>histórico de alertas <HelpTooltip text="Alertas enviados via WhatsApp sobre a saúde do banco de dados. Mostra se cada alerta foi resolvido, ignorado ou está pendente." /></div>
+        <div style={{ ...panelStyle, position: 'relative' }}>
+          <span style={{ position: 'absolute', top: 12, right: 12 }}>
+            <HelpTooltip text="Alertas enviados via WhatsApp sobre a saúde do banco de dados. Mostra se cada alerta foi resolvido, ignorado ou está pendente." />
+          </span>
+          <div style={labelStyle}>histórico de alertas</div>
           {alerts.length === 0 && <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', margin: 0 }}>Nenhum alerta nas últimas 24h</p>}
           {alerts.map((alert: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
@@ -824,8 +867,11 @@ export default function SuperMonitor() {
         </div>
       </div>
 
-      <div style={{ ...panelStyle, marginTop: 10 }}>
-        <div style={{ ...labelStyle, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 5 }}>manutenção <HelpTooltip text="Tarefas de limpeza e otimização do banco. A barra mostra o nível de acúmulo — verde é saudável, amarelo recomenda atenção, vermelho precisa limpar. Clique em 'Executar agora' quando necessário." /></div>
+      <div style={{ ...panelStyle, marginTop: 10, position: 'relative' }}>
+        <span style={{ position: 'absolute', top: 12, right: 12 }}>
+          <HelpTooltip text="Tarefas de limpeza e otimização do banco. A barra mostra o nível de acúmulo — verde é saudável, amarelo recomenda atenção, vermelho precisa limpar. Clique em 'Executar agora' quando necessário." />
+        </span>
+        <div style={{ ...labelStyle, marginBottom: 12 }}>manutenção</div>
         {actionResult && (
           <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>{actionResult.ok ? '✅' : '❌'}</span>
