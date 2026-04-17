@@ -4521,6 +4521,7 @@ export type Database = {
         Returns: string
       }
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
+      exec_db_maintenance: { Args: { action: string }; Returns: string }
       fn_cohort_logos:
         | {
             Args: {

@@ -8,15 +8,6 @@ const supabase = createClient(
 const ALLOWED_ACTIONS = ['vacuum_messages', 'vacuum_conversations', 'vacuum_attendances', 'clean_cron', 'collect_snapshot', 'collect_metrics'] as const;
 type Action = typeof ALLOWED_ACTIONS[number];
 
-const ACTION_SQL: Record<Action, string> = {
-  vacuum_messages: 'VACUUM ANALYZE public.whatsapp_messages',
-  vacuum_conversations: 'VACUUM ANALYZE public.whatsapp_conversations',
-  vacuum_attendances: 'VACUUM ANALYZE public.support_attendances',
-  clean_cron: "DELETE FROM cron.job_run_details WHERE end_time < now() - interval '2 days'",
-  collect_snapshot: 'SELECT public.collect_db_metrics_snapshot()',
-  collect_metrics: 'SELECT public.collect_tenant_daily_metrics()',
-};
-
 const ACTION_LABEL: Record<Action, string> = {
   vacuum_messages: 'VACUUM em whatsapp_messages',
   vacuum_conversations: 'VACUUM em whatsapp_conversations',
@@ -45,12 +36,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const sql = ACTION_SQL[action as Action];
     const label = ACTION_LABEL[action as Action];
 
     console.log(`[admin-db-actions][${requestId}] Executando: ${label}`);
 
-    const { error } = await supabase.rpc('exec_db_health_query', { query_text: sql });
+    const { error } = await supabase.rpc('exec_db_maintenance', { action });
 
     if (error) {
       console.error(`[admin-db-actions][${requestId}] Erro:`, error);
@@ -63,7 +53,7 @@ Deno.serve(async (req) => {
       check_name: action,
       level: 'ok',
       diagnosis: `Ação manual executada: ${label}`,
-      recommended_action: sql,
+      recommended_action: action,
       status: 'resolved',
       response: 'DASHBOARD',
       responded_at: new Date().toISOString(),
