@@ -64,43 +64,36 @@ function HelpTooltip({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
+    const handler = (e: MouseEvent) => { setOpen(false); };
+    setTimeout(() => document.addEventListener('click', handler), 0);
+    return () => document.removeEventListener('click', handler);
   }, [open]);
   return (
-    <span style={{ position: 'relative', display: 'inline-flex' }} onClick={e => e.stopPropagation()}>
+    <div style={{ position: 'relative', display: 'inline-block' }} onClick={e => e.stopPropagation()}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen(v => !v)}
         style={{
           width: 18, height: 18, borderRadius: '50%',
-          border: '1px solid var(--color-border-secondary)',
-          background: open ? '#dbeafe' : 'var(--color-background-secondary)',
-          color: open ? '#1e40af' : 'var(--color-text-secondary)',
-          fontSize: 11, fontWeight: 500, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, lineHeight: 1, padding: 0,
+          border: '1.5px solid #94a3b8',
+          background: open ? '#334155' : '#e2e8f0',
+          color: open ? '#f1f5f9' : '#475569',
+          fontSize: 10, fontWeight: 700, lineHeight: 1,
+          cursor: 'pointer', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          padding: 0, flexShrink: 0,
         }}
       >?</button>
       {open && (
-        <span style={{
-          position: 'absolute',
-          top: 24,
-          right: 0,
-          zIndex: 100,
-          background: '#1e293b',
-          border: '1px solid #334155',
-          borderRadius: 10,
-          padding: '10px 12px',
-          fontSize: 12,
-          color: '#e2e8f0',
-          lineHeight: 1.6,
-          width: 240,
-          display: 'block',
-          whiteSpace: 'normal',
-        }}>{text}</span>
+        <div style={{
+          position: 'absolute', top: 22, right: 0, zIndex: 999,
+          background: '#1e293b', color: '#e2e8f0',
+          border: '1px solid #334155', borderRadius: 10,
+          padding: '10px 12px', fontSize: 12, lineHeight: 1.6,
+          width: 240, whiteSpace: 'normal',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+        }}>{text}</div>
       )}
-    </span>
+    </div>
   );
 }
 
@@ -905,7 +898,7 @@ export default function SuperMonitor() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               opacity: actionLoading !== null ? 0.6 : 1,
             });
-            const MainCard = ({ action, label, desc, icon, value, max, lastRun, alwaysEnabled }: any) => {
+            const MainCard = ({ action, label, desc, icon, value, max, lastRun, alwaysEnabled, tooltip }: any) => {
               const p = pct(value, max);
               const b = badge(p);
               const enabled = alwaysEnabled || p >= 30;
@@ -916,7 +909,10 @@ export default function SuperMonitor() {
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{label}</div>
                       <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>{desc}</div>
                     </div>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 500, background: b.bg, color: b.color, flexShrink: 0, marginLeft: 8 }}>{b.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 500, background: b.bg, color: b.color }}>{b.label}</span>
+                      {tooltip && <HelpTooltip text={tooltip} />}
+                    </div>
                   </div>
                   <div style={{ textAlign: 'center', fontSize: 24, margin: '6px 0', opacity: typeof value === 'number' ? trashOpacity(p) : 1 }}>{icon}</div>
                   <div style={{ height: 7, background: 'var(--color-border-tertiary)', borderRadius: 4, overflow: 'hidden', margin: '8px 0 4px' }}>
@@ -942,12 +938,12 @@ export default function SuperMonitor() {
             };
             return (
               <>
-                <MainCard action="vacuum_messages" label="Otimizar chat" desc={`Registros obsoletos · whatsapp_messages`} icon="🗑️" value={deadMsg} max={2000} lastRun="automático via autovacuum" />
-                <MainCard action="vacuum_conversations" label="Otimizar conversas" desc={`Registros obsoletos · whatsapp_conversations`} icon="🗑️" value={deadConv} max={2000} lastRun="automático via autovacuum" />
-                <MainCard action="vacuum_attendances" label="Otimizar atendimentos" desc={`Registros obsoletos · support_attendances`} icon="🗑️" value={deadAtt} max={2000} lastRun="automático via autovacuum" />
-                <MainCard action="clean_cron" label="Limpar histórico" desc="Log de tarefas · cron.job_run_details" icon="🗑️" value={cronCount} max={15000} lastRun="limpeza automática: diária às 03h" />
-                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={snapshotsToday} max={288} lastRun={`automático · último: ${lastSnapshot}h`} alwaysEnabled />
-                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={4} max={4} lastRun={`automático · última: ${lastMetrics}h`} alwaysEnabled />
+                <MainCard action="vacuum_messages" label="Otimizar chat" desc="Registros obsoletos · whatsapp_messages" icon="🗑️" value={deadMsg} max={2000} lastRun="automático via autovacuum" tooltip="Registros 'fantasma' acumulam no banco quando mensagens são atualizadas ou deletadas. Quando a barra fica vermelha, o sistema começa a ficar mais lento. Clique em Executar para limpar." />
+                <MainCard action="vacuum_conversations" label="Otimizar conversas" desc="Registros obsoletos · whatsapp_conversations" icon="🗑️" value={deadConv} max={2000} lastRun="automático via autovacuum" tooltip="Mesmo processo da limpeza do chat, mas para a tabela de conversas. Saudável quando abaixo de 30%." />
+                <MainCard action="vacuum_attendances" label="Otimizar atendimentos" desc="Registros obsoletos · support_attendances" icon="🗑️" value={deadAtt} max={2000} lastRun="automático via autovacuum" tooltip="Limpeza da tabela de atendimentos. Normalmente fica baixo pois há menos movimentação." />
+                <MainCard action="clean_cron" label="Limpar histórico" desc="Log de tarefas · cron.job_run_details" icon="🗑️" value={cronCount} max={15000} lastRun="limpeza automática: diária às 03h" tooltip="O sistema registra cada tarefa automática executada. Com o tempo esse log cresce. A limpeza é automática toda madrugada, mas você pode forçar agora se necessário." />
+                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={snapshotsToday} max={288} lastRun={`automático · último: ${lastSnapshot}h`} alwaysEnabled tooltip="Coleta dados do banco a cada 5 minutos para alimentar os gráficos do dashboard. Clique para forçar uma coleta agora e ver os dados mais recentes." />
+                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={4} max={4} lastRun={`automático · última: ${lastMetrics}h`} alwaysEnabled tooltip="Consolida os dados de uso de cada empresa (mensagens, IA, conversas) para o relatório diário. Roda automaticamente às 01h, mas você pode forçar agora." />
               </>
             );
           })()}
