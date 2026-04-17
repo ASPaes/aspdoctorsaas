@@ -36,12 +36,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const sql = ACTION_SQL[action as Action];
     const label = ACTION_LABEL[action as Action];
 
     console.log(`[admin-db-actions][${requestId}] Executando: ${label}`);
 
-    const { error } = await supabase.rpc('exec_db_health_query', { query_text: sql });
+    const { error } = await supabase.rpc('exec_db_maintenance', { action });
 
     if (error) {
       console.error(`[admin-db-actions][${requestId}] Erro:`, error);
@@ -54,7 +53,7 @@ Deno.serve(async (req) => {
       check_name: action,
       level: 'ok',
       diagnosis: `Ação manual executada: ${label}`,
-      recommended_action: sql,
+      recommended_action: action,
       status: 'resolved',
       response: 'DASHBOARD',
       responded_at: new Date().toISOString(),
