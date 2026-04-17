@@ -37,10 +37,24 @@ Deno.serve(async (req) => {
     }
 
     const label = ACTION_LABEL[action as Action];
+    const isVacuum = ['vacuum_messages', 'vacuum_conversations', 'vacuum_attendances'].includes(action);
 
     console.log(`[admin-db-actions][${requestId}] Executando: ${label}`);
 
-    const { error } = await supabase.rpc('exec_db_maintenance', { action });
+    const VACUUM_SQL: Record<string, string> = {
+      vacuum_messages: 'VACUUM ANALYZE public.whatsapp_messages',
+      vacuum_conversations: 'VACUUM ANALYZE public.whatsapp_conversations',
+      vacuum_attendances: 'VACUUM ANALYZE public.support_attendances',
+    };
+
+    let error: any = null;
+    if (isVacuum) {
+      const result = await supabase.rpc('exec_db_health_query', { query_text: VACUUM_SQL[action] });
+      error = result.error;
+    } else {
+      const result = await supabase.rpc('exec_db_maintenance', { action });
+      error = result.error;
+    }
 
     if (error) {
       console.error(`[admin-db-actions][${requestId}] Erro:`, error);
