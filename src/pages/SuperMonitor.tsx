@@ -169,6 +169,7 @@ export default function SuperMonitor() {
     (t.ai_calls_summary || 0) +
     (t.ai_calls_audio || 0);
   const filteredTenants = selectedTenant === 'all' ? tenantMetrics : tenantMetrics.filter((t: any) => t.tenant_id === selectedTenant);
+  const totalMsgs = tenantMetrics.reduce(
     (s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0),
     0,
   );
