@@ -108,7 +108,6 @@ export const useSmartReply = (conversationId: string | null) => {
     },
     onSuccess: (result) => {
       queryClient.setQueryData(['smart-replies', conversationId], result);
-      lastInvalidatedRef.current = Date.now();
       if (result.suggestions.length > 0 && !result.rateLimited) {
         toast.success('Novas sugestões geradas!');
       }
