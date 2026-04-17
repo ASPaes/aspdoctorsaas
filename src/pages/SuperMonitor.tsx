@@ -188,6 +188,27 @@ export default function SuperMonitor() {
     ...opts,
   });
 
+  const { data: maintenanceData, refetch: refetchMaintenance } = useQuery({
+    queryKey: ['monitor-maintenance', refreshKey],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('exec_db_health_query', {
+        query_text: `
+          SELECT
+            (SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname = 'whatsapp_messages') as dead_messages,
+            (SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname = 'whatsapp_conversations') as dead_conversations,
+            (SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname = 'support_attendances') as dead_attendances,
+            (SELECT count(*) FROM cron.job_run_details) as cron_count,
+            (SELECT count(*) FROM public.db_metrics_snapshots WHERE captured_at > now() - interval '24h') as snapshots_today,
+            (SELECT max(captured_at) FROM public.db_metrics_snapshots) as last_snapshot,
+            (SELECT max(updated_at) FROM public.tenant_daily_metrics) as last_metrics
+        `
+      });
+      return (data as any)?.[0] ?? null;
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
   const aiCalls = (t: any) =>
     (t.ai_calls_suggest || 0) +
     (t.ai_calls_compose || 0) +
@@ -779,10 +800,10 @@ export default function SuperMonitor() {
         </div>
       </div>
 
-      <div style={{ ...panelStyle, marginTop: 16 }}>
-        <div style={labelStyle}>manutenção · ações rápidas</div>
+      <div style={{ ...panelStyle, marginTop: 10 }}>
+        <div style={{ ...labelStyle, marginBottom: 12 }}>manutenção · estado atual do banco</div>
         {actionResult && (
-          <div style={{ marginBottom: 10, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: actionResult.ok ? '#dcfce7' : '#fee2e2', color: actionResult.ok ? '#166534' : '#991b1b', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>{actionResult.ok ? '✅' : '❌'}</span>
             <div>
               <div style={{ fontWeight: 500 }}>{actionResult.ok ? 'Concluído!' : 'Não foi possível executar'}</div>
@@ -790,38 +811,76 @@ export default function SuperMonitor() {
             </div>
           </div>
         )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {[
-            { action: 'vacuum_messages', label: 'Otimizar chat', desc: 'Limpa registros obsoletos do chat — melhora velocidade das conversas', icon: '⚡' },
-            { action: 'vacuum_conversations', label: 'Otimizar conversas', desc: 'Limpa registros obsoletos de conversas', icon: '💬' },
-            { action: 'vacuum_attendances', label: 'Otimizar atendimentos', desc: 'Limpa registros obsoletos de atendimentos', icon: '🎯' },
-            { action: 'clean_cron', label: 'Limpar histórico', desc: 'Remove logs antigos de tarefas automáticas — libera espaço', icon: '🗑️' },
-            { action: 'collect_snapshot', label: 'Atualizar métricas banco', desc: 'Força coleta imediata dos dados do banco para o dashboard', icon: '📊' },
-            { action: 'collect_metrics', label: 'Atualizar métricas tenants', desc: 'Força consolidação dos dados de uso por tenant', icon: '🔄' },
-          ].map(item => (
-            <button
-              key={item.action}
-              onClick={() => runDbAction(item.action, item.label)}
-              disabled={actionLoading !== null}
-              title={item.desc}
-              style={{
-                fontSize: 12, padding: '8px 14px', borderRadius: 8,
-                border: '0.5px solid var(--color-border-secondary)',
-                background: actionLoading === item.action ? 'var(--color-background-info)' : 'var(--color-background-secondary)',
-                color: actionLoading === item.action ? 'var(--color-text-info)' : 'var(--color-text-primary)',
-                cursor: actionLoading !== null ? 'not-allowed' : 'pointer',
-                opacity: actionLoading !== null && actionLoading !== item.action ? 0.5 : 1,
-                display: 'flex', alignItems: 'center', gap: 6,
-                transition: 'opacity 0.2s',
-              }}
-            >
-              <span style={{ fontSize: 14 }}>{actionLoading === item.action ? '⏳' : item.icon}</span>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontWeight: 500 }}>{item.label}</div>
-                <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>{item.desc}</div>
-              </div>
-            </button>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+          {(() => {
+            const md = maintenanceData as any;
+            const deadMsg = md?.dead_messages ?? 0;
+            const deadConv = md?.dead_conversations ?? 0;
+            const deadAtt = md?.dead_attendances ?? 0;
+            const cronCount = parseInt(md?.cron_count ?? '0');
+            const snapshotsToday = parseInt(md?.snapshots_today ?? '0');
+            const lastSnapshot = md?.last_snapshot ? new Date(md.last_snapshot).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--';
+            const lastMetrics = md?.last_metrics ? new Date(md.last_metrics).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--';
+            const pct = (val: number, max: number) => Math.min(100, Math.round((val / max) * 100));
+            const barColor = (p: number) => p >= 70 ? '#ef4444' : p >= 30 ? '#eab308' : '#22c55e';
+            const badge = (p: number) => p >= 70 ? { label: 'crítico', bg: '#fee2e2', color: '#991b1b' } : p >= 30 ? { label: 'atenção', bg: '#fef9c3', color: '#854d0e' } : { label: 'ok', bg: '#dcfce7', color: '#166534' };
+            const trashOpacity = (p: number) => 0.2 + (p / 100) * 0.8;
+            const cardStyle: React.CSSProperties = { background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 12, padding: '14px' };
+            const btnStyle = (enabled: boolean): React.CSSProperties => ({
+              width: '100%', marginTop: 10, padding: '8px 10px', borderRadius: 8,
+              border: '0.5px solid var(--color-border-secondary)',
+              background: enabled ? 'var(--color-background-primary)' : 'var(--color-background-secondary)',
+              color: enabled ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              fontSize: 12, cursor: enabled ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              opacity: actionLoading !== null ? 0.6 : 1,
+            });
+            const MainCard = ({ action, label, desc, icon, value, max, lastRun, alwaysEnabled }: any) => {
+              const p = pct(value, max);
+              const b = badge(p);
+              const enabled = alwaysEnabled || p >= 30;
+              return (
+                <div style={cardStyle}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{label}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>{desc}</div>
+                    </div>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 500, background: b.bg, color: b.color, flexShrink: 0, marginLeft: 8 }}>{b.label}</span>
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: 24, margin: '6px 0', opacity: typeof value === 'number' ? trashOpacity(p) : 1 }}>{icon}</div>
+                  <div style={{ height: 7, background: 'var(--color-border-tertiary)', borderRadius: 4, overflow: 'hidden', margin: '8px 0 4px' }}>
+                    <div style={{ height: '100%', width: `${typeof value === 'number' ? p : 100}%`, background: barColor(typeof value === 'number' ? p : 0), borderRadius: 4, transition: 'width 0.5s' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                    <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{typeof value === 'number' ? value.toLocaleString('pt-BR') + ' registros' : value}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>limite {max.toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div style={{ fontSize: 10, textAlign: 'center', margin: '3px 0 6px', color: barColor(typeof value === 'number' ? p : 0), fontWeight: 500 }}>
+                    {typeof value === 'number' ? `${p}% · ${p >= 70 ? 'limpar agora!' : p >= 30 ? 'recomendado limpar' : 'saudável'}` : lastRun}
+                  </div>
+                  <button
+                    style={btnStyle(enabled)}
+                    disabled={!enabled || actionLoading !== null}
+                    onClick={() => enabled && runDbAction(action, label).then(() => refetchMaintenance())}
+                  >
+                    {actionLoading === action ? '⏳' : enabled ? `${icon} Executar agora` : '✅ Sem necessidade agora'}
+                  </button>
+                  <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', textAlign: 'center', marginTop: 5 }}>{lastRun}</div>
+                </div>
+              );
+            };
+            return (
+              <>
+                <MainCard action="vacuum_messages" label="Otimizar chat" desc={`Registros obsoletos · whatsapp_messages`} icon="🗑️" value={deadMsg} max={2000} lastRun="automático via autovacuum" />
+                <MainCard action="vacuum_conversations" label="Otimizar conversas" desc={`Registros obsoletos · whatsapp_conversations`} icon="🗑️" value={deadConv} max={2000} lastRun="automático via autovacuum" />
+                <MainCard action="vacuum_attendances" label="Otimizar atendimentos" desc={`Registros obsoletos · support_attendances`} icon="🗑️" value={deadAtt} max={2000} lastRun="automático via autovacuum" />
+                <MainCard action="clean_cron" label="Limpar histórico" desc="Log de tarefas · cron.job_run_details" icon="🗑️" value={cronCount} max={15000} lastRun="limpeza automática: diária às 03h" />
+                <MainCard action="collect_snapshot" label="Métricas do banco" desc={`${snapshotsToday} snapshots coletados hoje`} icon="📊" value={`último: ${lastSnapshot}h`} max={1} lastRun="automático · 07h-20h seg-sex" alwaysEnabled />
+                <MainCard action="collect_metrics" label="Métricas por tenant" desc="Consolidado diário de uso" icon="🔄" value={`última: ${lastMetrics}h`} max={1} lastRun="automático · diário às 01h" alwaysEnabled />
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
