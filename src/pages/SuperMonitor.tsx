@@ -615,9 +615,7 @@ export default function SuperMonitor() {
 
         {/* IA por função */}
         <div style={panelStyle}>
-          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Bot size={11} /> uso de IA por função · ontem
-          </div>
+          <div style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>uso de IA por função <HelpTooltip text="Distribuição de como a IA foi usada: sugestões ajudam o atendente a responder, composição cria mensagens automáticas, sentimento analisa o humor do cliente, resumo condensa a conversa e transcrição converte áudios em texto." /></div>
           {[
             { label: 'Sugestões', key: 'ai_calls_suggest', color: '#3b82f6' },
             { label: 'Composição', key: 'ai_calls_compose', color: '#8b5cf6' },
