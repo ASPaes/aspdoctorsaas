@@ -440,7 +440,7 @@ export default function SuperMonitor() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {[
               { ok: !latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000, label: 'Performance ok' },
-              { ok: connectedInstances === instances.length, label: `${connectedInstances}/${instances.length} instâncias` },
+              { ok: connectedInstances === filteredInstances.length, label: `${connectedInstances}/${filteredInstances.length} instâncias` },
               { ok: pendingAlerts === 0, label: pendingAlerts === 0 ? 'Sem alertas' : `${pendingAlerts} alertas` },
               { ok: !latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500, label: 'Banco limpo' },
               { ok: (latestSnap?.active_connections || 0) < 25, label: 'Conexões ok' },
@@ -459,7 +459,7 @@ export default function SuperMonitor() {
             <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(tenantMetrics.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
+            {(filteredTenants.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0)).toLocaleString('pt-BR')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
             total até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
@@ -482,19 +482,19 @@ export default function SuperMonitor() {
             <HelpTooltip text="Quantidade de atendimentos finalizados. 'Abertas' são as que ainda estão em andamento agora." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 600 }}>
-            {tenantMetrics.reduce((s: number, t: any) => s + (t.conversations_closed || 0), 0)}
+            {filteredTenants.reduce((s: number, t: any) => s + (t.conversations_closed || 0), 0)}
           </div>
           <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', margin: '2px 0 8px' }}>acumulado histórico</p>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>
             <span>Abertas</span>
             <span style={{ fontWeight: 600, color: 'hsl(var(--foreground))' }}>
-              {tenantMetrics.reduce((s: number, t: any) => s + (t.conversations_opened || 0), 0)}
+              {filteredTenants.reduce((s: number, t: any) => s + (t.conversations_opened || 0), 0)}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
             <span>Operadores</span>
             <span style={{ fontWeight: 600, color: 'hsl(var(--foreground))' }}>
-              {tenantMetrics.reduce((s: number, t: any) => s + (t.active_operators || 0), 0)}
+              {filteredTenants.reduce((s: number, t: any) => s + (t.active_operators || 0), 0)}
             </span>
           </div>
         </div>
@@ -505,7 +505,7 @@ export default function SuperMonitor() {
             <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(tenantMetrics.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
+            {(filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayMetrics?.ai_calls ?? 0)).toLocaleString('pt-BR')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
             total até {todayMetrics?.checked_at ? new Date(todayMetrics.checked_at).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
@@ -539,7 +539,7 @@ export default function SuperMonitor() {
               <Wifi size={14} style={{ color: '#22c55e' }} />
             )}
             <span style={{ fontSize: 22, fontWeight: 600 }}>
-              {connectedInstances} / {instances.length}
+              {connectedInstances} / {filteredInstances.length}
             </span>
           </div>
           <p
@@ -651,7 +651,7 @@ export default function SuperMonitor() {
             { label: 'Resumo', key: 'ai_calls_summary', color: '#10b981' },
             { label: 'Transcrição', key: 'ai_calls_audio', color: '#f59e0b' },
           ].map((fn) => {
-            const total = tenantMetrics.reduce((s: number, t: any) => s + ((t as any)[fn.key] || 0), 0);
+            const total = filteredTenants.reduce((s: number, t: any) => s + ((t as any)[fn.key] || 0), 0);
             return (
               <div key={fn.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', width: 70 }}>{fn.label}</span>
