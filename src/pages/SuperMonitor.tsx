@@ -106,16 +106,13 @@ function HelpTooltip({ text }: { text: string }) {
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
-  const [dateFrom, setDateFrom] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 7),
+    to: subDays(new Date(), 1),
   });
-  const [dateTo, setDateTo] = useState<string>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  });
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const dateFrom = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const dateTo = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<{ ok: boolean; label: string } | null>(null);
 
