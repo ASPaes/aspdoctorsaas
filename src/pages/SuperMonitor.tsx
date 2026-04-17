@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshCw, Wifi, WifiOff, AlertTriangle, CheckCircle, Activity, MessageSquare, Bot, Database } from 'lucide-react';
@@ -62,6 +62,11 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
 
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedTenant, setSelectedTenant] = useState<string>('all');
+  useEffect(() => {
+    const interval = setInterval(() => setRefreshKey(k => k + 1), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
   const opts = { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false };
   const now = new Date();
   const sp = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -126,12 +131,16 @@ export default function SuperMonitor() {
     queryFn: async () => {
       const { data } = await supabase
         .from('whatsapp_instance_status_log')
-        .select('instance_name, tenant_id, captured_at, tenants(nome)')
+        .select('instance_name, tenant_id, captured_at')
         .gte('captured_at', since24h)
         .eq('status', 'disconnected')
         .order('captured_at', { ascending: true });
-      if (!data) return [];
-      // Group by instance_name
+      if (!data || data.length === 0) return [];
+      const { data: tenantsData } = await supabase
+        .from('tenants')
+        .select('id, nome');
+      const tenantMap: Record<string, string> = {};
+      (tenantsData || []).forEach((t: any) => { tenantMap[t.id] = t.nome; });
       const grouped: Record<string, any> = {};
       for (const row of data) {
         const key = row.instance_name;
@@ -139,7 +148,7 @@ export default function SuperMonitor() {
           grouped[key] = {
             instance_name: row.instance_name,
             tenant_id: row.tenant_id,
-            tenant_nome: (row as any).tenants?.nome || row.tenant_id,
+            tenant_nome: tenantMap[row.tenant_id] || row.tenant_id,
             occurrences: 0,
             first_seen: row.captured_at,
             last_seen: row.captured_at,
@@ -159,6 +168,7 @@ export default function SuperMonitor() {
     (t.ai_calls_sentiment || 0) +
     (t.ai_calls_summary || 0) +
     (t.ai_calls_audio || 0);
+  const filteredTenants = selectedTenant === 'all' ? tenantMetrics : tenantMetrics.filter((t: any) => t.tenant_id === selectedTenant);
   const totalMsgs = tenantMetrics.reduce(
     (s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0),
     0,
@@ -291,6 +301,16 @@ export default function SuperMonitor() {
           >
             Score {score}/100
           </span>
+          <select
+            value={selectedTenant}
+            onChange={e => setSelectedTenant(e.target.value)}
+            style={{ fontSize: 12, padding: '3px 8px', borderRadius: 8, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
+          >
+            <option value="all">Todos os tenants</option>
+            {tenantMetrics.map((t: any) => (
+              <option key={t.tenant_id} value={t.tenant_id}>{t.tenants?.nome || t.tenant_id}</option>
+            ))}
+          </select>
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
             style={{
@@ -540,7 +560,7 @@ export default function SuperMonitor() {
             );
           })}
           <div style={{ ...labelStyle, marginTop: 12 }}>por tenant</div>
-          {tenantMetrics
+          {filteredTenants
             .filter((t: any) => aiCalls(t) > 0)
             .map((t: any, i: number) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -565,7 +585,7 @@ export default function SuperMonitor() {
         {/* Tenants + Instâncias */}
         <div style={panelStyle}>
           <div style={labelStyle}>tenants · ontem</div>
-          {tenantMetrics.map((t: any, i: number) => {
+          {filteredTenants.map((t: any, i: number) => {
             const active = (t.messages_sent || 0) + (t.messages_received || 0) > 0;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '0.5px solid hsl(var(--border))' }}>
@@ -664,7 +684,7 @@ export default function SuperMonitor() {
                   <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: '#fee2e2', color: '#991b1b' }}>WhatsApp</span>
                   <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)' }}>{log.tenant_nome}</span>
                   <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginLeft: 'auto' }}>
-                    desde {new Date(log.first_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}h · último {new Date(log.last_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}h
+                    desde {log.first_seen ? new Date(log.first_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h · último {log.last_seen ? new Date(log.last_seen).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) : '--'}h
                   </span>
                 </div>
               </div>
