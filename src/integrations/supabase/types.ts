@@ -1501,6 +1501,30 @@ export type Database = {
         }
         Relationships: []
       }
+      db_maintenance_queue: {
+        Row: {
+          action: string
+          executed_at: string | null
+          id: string
+          requested_at: string
+          status: string
+        }
+        Insert: {
+          action: string
+          executed_at?: string | null
+          id?: string
+          requested_at?: string
+          status?: string
+        }
+        Update: {
+          action?: string
+          executed_at?: string | null
+          id?: string
+          requested_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       db_metrics_snapshots: {
         Row: {
           active_connections: number | null
@@ -4686,6 +4710,7 @@ export type Database = {
         Returns: number
       }
       norm_txt: { Args: { t: string }; Returns: string }
+      process_maintenance_queue: { Args: never; Returns: undefined }
       require_active_profile: { Args: never; Returns: boolean }
       search_conversations_by_contact: {
         Args: {
