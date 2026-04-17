@@ -464,8 +464,47 @@ export default function SuperMonitor() {
                       ))}
                     </div>
                     <div>
-                      <div style={{ padding: '8px 16px 0', fontSize: 11, color: 'var(--color-text-secondary)', borderBottom: '0.5px solid var(--color-border-tertiary)', paddingBottom: 8, marginBottom: 4 }}>
-                        Clique no dia inicial e depois no dia final para definir o período
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 8px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>De</span>
+                          <input
+                            type="text"
+                            placeholder="DD/MM/AAAA"
+                            maxLength={10}
+                            value={dateRange.from ? format(dateRange.from, 'dd/MM/yyyy') : ''}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                              const masked = v.replace(/^(\d{2})(\d{0,2})(\d{0,4})$/, (_,d,m,y) => [d,m,y].filter(Boolean).join('/'));
+                              if (v.length === 8) {
+                                const parsed = new Date(`${v.slice(4)}-${v.slice(2,4)}-${v.slice(0,2)}`);
+                                if (!isNaN(parsed.getTime()) && parsed <= new Date()) {
+                                  setDateRange(r => ({ ...r, from: parsed }));
+                                }
+                              }
+                            }}
+                            style={{ width: 100, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>até</span>
+                          <input
+                            type="text"
+                            placeholder="DD/MM/AAAA"
+                            maxLength={10}
+                            value={dateRange.to ? format(dateRange.to, 'dd/MM/yyyy') : ''}
+                            onChange={e => {
+                              const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                              if (v.length === 8) {
+                                const parsed = new Date(`${v.slice(4)}-${v.slice(2,4)}-${v.slice(0,2)}`);
+                                if (!isNaN(parsed.getTime()) && parsed <= new Date()) {
+                                  setDateRange(r => ({ ...r, to: parsed }));
+                                }
+                              }
+                            }}
+                            style={{ width: 100, fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)' }}
+                          />
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>ou selecione no calendário</span>
                       </div>
                       <DayPicker
                         mode="range"
@@ -474,6 +513,8 @@ export default function SuperMonitor() {
                         numberOfMonths={2}
                         locale={ptBR}
                         showOutsideDays
+                        defaultMonth={new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)}
+                        disabled={{ after: new Date() }}
                         footer={
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '8px 16px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
                             <button
