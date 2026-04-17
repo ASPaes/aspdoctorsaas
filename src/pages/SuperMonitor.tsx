@@ -461,14 +461,14 @@ export default function SuperMonitor() {
                 <input
                   type="date"
                   value={dateFrom}
-                  onChange={e => { setDateFrom(e.target.value); setRefreshKey(k => k + 1); }}
+                  onChange={e => { setDateRange(r => ({ ...r, from: e.target.value ? new Date(e.target.value) : undefined })); setRefreshKey(k => k + 1); }}
                   style={{ fontSize: 11, padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
                 />
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>–</span>
                 <input
                   type="date"
                   value={dateTo}
-                  onChange={e => { setDateTo(e.target.value); setRefreshKey(k => k + 1); }}
+                  onChange={e => { setDateRange(r => ({ ...r, to: e.target.value ? new Date(e.target.value) : undefined })); setRefreshKey(k => k + 1); }}
                   style={{ fontSize: 11, padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--color-border-secondary)', background: 'var(--color-background-secondary)', color: 'var(--color-text-primary)', cursor: 'pointer' }}
                 />
               </div>
