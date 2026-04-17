@@ -3023,7 +3023,15 @@ export type Database = {
           whatsapp_instances_connected?: number
           whatsapp_instances_total?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tenant_daily_metrics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tenants: {
         Row: {
@@ -3509,7 +3517,15 @@ export type Database = {
           tenant_id?: string
           was_connected?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instance_status_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_instance_vault_refs: {
         Row: {
