@@ -63,6 +63,32 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<{ ok: boolean; label: string } | null>(null);
+
+  const runDbAction = async (action: string, label: string) => {
+    setActionLoading(action);
+    setActionResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-db-actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ action }),
+      });
+      const json = await res.json();
+      setActionResult({ ok: json.ok, label });
+      if (json.ok) setRefreshKey(k => k + 1);
+    } catch (e) {
+      setActionResult({ ok: false, label });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     const interval = setInterval(() => setRefreshKey(k => k + 1), 5 * 60 * 1000);
     return () => clearInterval(interval);
