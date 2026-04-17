@@ -93,11 +93,7 @@ export default function SuperMonitor() {
     }
   };
 
-  useEffect(() => {
-    const interval = setInterval(() => setRefreshKey(k => k + 1), 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-  const opts = { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false };
+  const opts = { staleTime: Infinity, refetchOnWindowFocus: false };
   const now = new Date();
   const sp = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
   sp.setDate(sp.getDate() - 1);
@@ -209,7 +205,7 @@ export default function SuperMonitor() {
       });
       return (data as any)?.[0] ?? null;
     },
-    staleTime: 60_000,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 
@@ -219,7 +215,7 @@ export default function SuperMonitor() {
       const { data } = await supabase.rpc('get_today_metrics' as any);
       return data as any;
     },
-    staleTime: 60_000,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
 
