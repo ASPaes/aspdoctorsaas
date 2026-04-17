@@ -63,7 +63,10 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const opts = { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false };
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const now = new Date();
+  const sp = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  sp.setDate(sp.getDate() - 1);
+  const yesterday = sp.toISOString().split('T')[0];
   const since24h = new Date(Date.now() - 86400000).toISOString();
 
   const { data: tenantMetrics = [] } = useQuery({
@@ -72,7 +75,8 @@ export default function SuperMonitor() {
       const { data } = await (supabase as any)
         .from('tenant_daily_metrics')
         .select('*, tenants(nome)')
-        .eq('metric_date', yesterday)
+        .gte('metric_date', yesterday)
+        .order('metric_date', { ascending: false })
         .order('messages_sent', { ascending: false });
       return data ?? [];
     },
