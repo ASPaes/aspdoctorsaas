@@ -60,6 +60,37 @@ function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: st
   );
 }
 
+function HelpTooltip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: 16, height: 16, borderRadius: '50%',
+          border: '1px solid var(--color-border-secondary)',
+          background: open ? 'var(--color-background-info)' : 'var(--color-background-secondary)',
+          color: open ? 'var(--color-text-info)' : 'var(--color-text-secondary)',
+          fontSize: 10, fontWeight: 500, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, lineHeight: 1,
+        }}
+        title="Saiba mais"
+      >?</button>
+      {open && (
+        <span style={{
+          position: 'absolute', top: 22, left: 0, zIndex: 50,
+          background: 'var(--color-background-primary)',
+          border: '0.5px solid var(--color-border-secondary)',
+          borderRadius: 8, padding: '8px 10px',
+          fontSize: 11, color: 'var(--color-text-secondary)',
+          lineHeight: 1.5, width: 220, boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
