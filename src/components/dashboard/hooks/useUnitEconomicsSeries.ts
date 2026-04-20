@@ -120,16 +120,21 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
         const endDate = m.endDate;
         const endStr = m.end;
 
-        // base_inicio: active on 1st day
+        // base_inicio: ativo no 1º dia do mês.
+        // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > startDate).
         const baseInicio = clients.filter(c => {
           if (!c.data_venda) return false;
           if (new Date(c.data_venda) > startDate) return false;
-          if (c.data_cancelamento && new Date(c.data_cancelamento) <= startDate) return false;
+          if (c.cancelado === true) {
+            if (!c.data_cancelamento) return false;
+            if (new Date(c.data_cancelamento) <= startDate) return false;
+          }
           return true;
         });
 
-        // cancelados within month
+        // cancelados no mês — flag cancelado=true E data_cancelamento dentro da janela.
         const cancelados = clients.filter(c => {
+          if (c.cancelado !== true) return false;
           if (!c.data_cancelamento) return false;
           const dc = new Date(c.data_cancelamento);
           return dc >= startDate && dc <= endDate;
@@ -142,11 +147,15 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
           return dv >= startDate && dv <= endDate;
         });
 
-        // ativos_fim: active at end of month
+        // ativos_fim: ativo no último dia do mês.
+        // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > endDate).
         const ativosFim = clients.filter(c => {
           if (!c.data_venda) return false;
           if (new Date(c.data_venda) > endDate) return false;
-          if (c.data_cancelamento && new Date(c.data_cancelamento) <= endDate) return false;
+          if (c.cancelado === true) {
+            if (!c.data_cancelamento) return false;
+            if (new Date(c.data_cancelamento) <= endDate) return false;
+          }
           return true;
         });
 
