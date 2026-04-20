@@ -226,6 +226,7 @@ export default function ClienteForm() {
 
   const estadoId = form.watch("estado_id");
   const cancelado = form.watch("cancelado");
+  const [confirmReactivateOpen, setConfirmReactivateOpen] = useState(false);
   const lookups = useLookups(estadoId);
 
   // Draft persistence
@@ -570,7 +571,23 @@ export default function ClienteForm() {
               </div>
               <FormField control={form.control} name="cancelado" render={({ field }) => (
                 <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={(next) => {
+                      if (field.value && !next) {
+                        const hasData =
+                          !!form.getValues("data_cancelamento") ||
+                          form.getValues("motivo_cancelamento_id") != null ||
+                          !!form.getValues("observacao_cancelamento");
+                        if (hasData) {
+                          setConfirmReactivateOpen(true);
+                          return;
+                        }
+                      }
+                      field.onChange(next);
+                    }}
+                    aria-label="Ativar ou desativar cancelamento do cliente"
+                  />
                 </FormControl>
               )} />
             </CardHeader>
@@ -583,6 +600,33 @@ export default function ClienteForm() {
               </CardContent>
             )}
           </Card>
+
+          <AlertDialog open={confirmReactivateOpen} onOpenChange={setConfirmReactivateOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reativar cliente?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Os dados de cancelamento (data, motivo e observação) serão removidos e o cliente voltará ao status Ativo. Esta ação só é persistida ao clicar em Salvar Cliente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    form.setValue("cancelado", false, { shouldDirty: true });
+                    form.setValue("data_cancelamento", null, { shouldDirty: true });
+                    form.setValue("motivo_cancelamento_id", null, { shouldDirty: true });
+                    form.setValue("observacao_cancelamento", null, { shouldDirty: true });
+                    setConfirmReactivateOpen(false);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Reativar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
 
           {/* Botões de ação */}
           <div className="flex justify-end gap-3">
