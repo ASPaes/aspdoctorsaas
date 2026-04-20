@@ -107,15 +107,17 @@ export function useDashboardData(filters: DashboardFilters) {
       // 4. Clientes início do período (snapshot temporal)
       let clientesInicioQuery = supabase
         .from('clientes')
-        .select('id, mensalidade, data_cancelamento')
+        .select('id, mensalidade, data_cancelamento, cancelado')
         .lt('data_cadastro', periodoInicioStr);
       if (tid) clientesInicioQuery = clientesInicioQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) clientesInicioQuery = clientesInicioQuery.eq('unidade_base_id', filters.unidadeBaseId);
       if (filters.fornecedorId) clientesInicioQuery = clientesInicioQuery.eq('fornecedor_id', filters.fornecedorId);
       const { data: clientesInicioFull } = await clientesInicioQuery;
+      // Ativo no início: não-cancelado, OU cancelado com data >= início (saiu no próprio período ou depois).
       const clientesInicioAtivos = (clientesInicioFull || []).filter(c => {
-        if (!c.data_cancelamento) return true;
-        return new Date(c.data_cancelamento) >= new Date(periodoInicioStr);
+        if (c.cancelado !== true) return true;
+        if (!c.data_cancelamento) return false;
+        return new Date(String(c.data_cancelamento)) >= new Date(periodoInicioStr);
       });
       const clientesInicioCount = clientesInicioAtivos.length;
 
