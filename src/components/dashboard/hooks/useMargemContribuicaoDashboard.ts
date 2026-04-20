@@ -46,9 +46,11 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
       if (error) throw error;
       if (!raw || raw.length === 0) return defaultData;
 
-      // Filter to clients active at end of period
+      // Filtra clientes ativos no fim do período.
+      // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       const data = raw.filter(c => {
-        if (!c.data_cancelamento) return true;
+        if (c.cancelado !== true) return true;
+        if (!c.data_cancelamento) return false;
         return new Date(c.data_cancelamento) > new Date(periodoFimStr);
       });
 
