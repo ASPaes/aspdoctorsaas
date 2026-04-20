@@ -992,12 +992,14 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         const impostoRaw = toNullableFloat(v.imposto_percentual);
         const custoFixoRaw = toNullableFloat(v.custo_fixo_percentual);
 
+        const isCancelado = (v.cancelado ?? "").trim().toLowerCase() === "sim";
         return {
           tenant_id: tenantId,
-          cancelado: (v.cancelado ?? "").trim().toLowerCase() === "sim",
-          data_cancelamento: toNullableDate(v.data_cancelamento),
-          motivo_cancelamento_id: resolveFk("motivo_cancelamento"),
-          observacao_cancelamento: toNullableString(v.observacao_cancelamento),
+          cancelado: isCancelado,
+          // Sanitização de integridade: cliente não-cancelado nunca persiste dados de cancelamento.
+          data_cancelamento: isCancelado ? toNullableDate(v.data_cancelamento) : null,
+          motivo_cancelamento_id: isCancelado ? resolveFk("motivo_cancelamento") : null,
+          observacao_cancelamento: isCancelado ? toNullableString(v.observacao_cancelamento) : null,
           cert_a1_vencimento: toNullableDate(v.cert_a1_vencimento),
           cert_a1_ultima_venda_em: toNullableDate(v.cert_a1_ultima_venda_em),
           matriz_id: (() => {
