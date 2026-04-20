@@ -63,13 +63,12 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesCount = clientesAtivos.length;
       const mrr = clientesAtivos.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
-      // 2. Novos clientes no período
+      // 2. Novos clientes no período (inclui os que cancelaram dentro do mesmo período — early churn)
       let novosQuery = supabase
         .from('clientes')
         .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
         .gte('data_cadastro', periodoInicioStr)
-        .lte('data_cadastro', periodoFimStr)
-        .eq('cancelado', false);
+        .lte('data_cadastro', periodoFimStr);
 
       if (tid) novosQuery = novosQuery.eq('tenant_id', tid);
       if (filters.unidadeBaseId) novosQuery = novosQuery.eq('unidade_base_id', filters.unidadeBaseId);
