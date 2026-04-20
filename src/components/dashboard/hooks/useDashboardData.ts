@@ -42,13 +42,11 @@ export function useDashboardData(filters: DashboardFilters) {
       const periodoFimStr = format(periodoFim, 'yyyy-MM-dd');
 
       // 1. Clientes ativos no fim do período — snapshot temporal
-      // Busca todos os clientes cadastrados até o fim do período, depois filtra em JS
-      // para considerar apenas aqueles que NÃO estavam cancelados na data final.
+      // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       let clientesQuery = supabase
         .from('vw_clientes_financeiro')
         .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
         .lte('data_cadastro', periodoFimStr)
-        .or(`data_cancelamento.is.null,data_cancelamento.gt.${periodoFimStr}`)
         .limit(10000);
 
       if (tid) clientesQuery = clientesQuery.eq('tenant_id', tid);
@@ -56,17 +54,11 @@ export function useDashboardData(filters: DashboardFilters) {
       if (filters.fornecedorId) clientesQuery = clientesQuery.eq('fornecedor_id', filters.fornecedorId);
 
       const { data: clientesRaw } = await clientesQuery;
-      // Cliente é "ativo no fim do período" se: não cancelado, OU cancelado DEPOIS do fim do período
-      // Cliente é "ativo no fim do período" se:
-      // 1. cancelado=true sem data_cancelamento → inativo (dado inconsistente)
-      // 2. sem data_cancelamento → nunca cancelado, ativo
-      // 3. data_cancelamento DEPOIS do fim do período → ainda ativo no período
-      // Ativo no período = sem data cancelamento OU cancelado depois do fim do período
-      // Trata null, undefined e string vazia como "sem cancelamento"
+      // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
-        const dc = c.data_cancelamento;
-        if (!dc || String(dc).trim() === '') return true;
-        return new Date(String(dc)) > new Date(periodoFimStr);
+        if (c.cancelado !== true) return true;
+        if (!c.data_cancelamento) return false; // cancelado sem data: defensivo, considera inativo
+        return new Date(String(c.data_cancelamento)) > new Date(periodoFimStr);
       });
       const clientesCount = clientesAtivos.length;
       const mrr = clientesAtivos.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
