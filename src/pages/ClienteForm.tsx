@@ -369,6 +369,12 @@ export default function ClienteForm() {
         contato_fone: values.contato_fone ? normalizeBRPhone(values.contato_fone) : null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
         custo_fixo_percentual: values.custo_fixo_percentual != null ? values.custo_fixo_percentual / 100 : null,
+        // Sanitização de integridade: cliente não-cancelado nunca persiste dados de cancelamento.
+        ...(values.cancelado !== true ? {
+          data_cancelamento: null,
+          motivo_cancelamento_id: null,
+          observacao_cancelamento: null,
+        } : {}),
       };
 
       if (isEditing) {
