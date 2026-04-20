@@ -79,10 +79,11 @@ export function useDashboardData(filters: DashboardFilters) {
       const newMrr = novosClientes?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
       const totalImplantacao = novosClientes?.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0) || 0;
 
-      // 3. Cancelamentos no período
+      // 3. Cancelamentos no período — requer flag cancelado=true E data_cancelamento na janela
       let cancelamentosQuery = supabase
         .from('clientes')
         .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, data_venda, motivo_cancelamento_id, unidade_base_id, fornecedor_id, razao_social, nome_fantasia')
+        .eq('cancelado', true)
         .not('data_cancelamento', 'is', null)
         .gte('data_cancelamento', periodoInicioStr)
         .lte('data_cancelamento', periodoFimStr);
