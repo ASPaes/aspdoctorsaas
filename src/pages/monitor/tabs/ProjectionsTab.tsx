@@ -576,6 +576,129 @@ function MessagesProjectionPanel() {
   );
 }
 
+function TenantsProjectionPanel() {
+  const { data } = useQuery({
+    queryKey: ['monitor-tenants-projection'],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_tenants_projection' as any);
+      return data as any;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  if (!data) return <div style={panelStyle}>Carregando projeção de tenants...</div>;
+
+  const tenantList = (data.by_tenant_status as any[]) || [];
+
+  const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
+    active_today: { color: '#166534', bg: '#dcfce7', label: 'ATIVO HOJE' },
+    active: { color: '#1e40af', bg: '#dbeafe', label: 'ATIVO' },
+    inactive_7d: { color: '#92400e', bg: '#fef3c7', label: '7+ DIAS SEM USO' },
+    inactive_30d: { color: '#991b1b', bg: '#fee2e2', label: '30+ DIAS SEM USO' },
+    never_active: { color: '#3730a3', bg: '#e0e7ff', label: 'NUNCA ATIVO' },
+  };
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Projeção · Tenants (Engajamento)</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SeverityBadge severity={data.severity} />
+          <HelpTooltip text="DAU (ativos hoje), WAU (7 dias), MAU (30 dias). Stickiness = DAU/MAU — ratio alto (>50%) indica produto usado diariamente. Inativos 30+ dias são churn silencioso." />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Total</div>
+          <div style={{ fontSize: 18, fontWeight: 500 }}>{data.total_tenants}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>tenants</div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>DAU · hoje</div>
+          <div style={{ fontSize: 18, fontWeight: 500, color: '#16a34a' }}>{data.active_dau}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>ativos hoje</div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>WAU · 7d</div>
+          <div style={{ fontSize: 18, fontWeight: 500, color: '#2563eb' }}>{data.active_wau}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>ativos semana</div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>MAU · 30d</div>
+          <div style={{ fontSize: 18, fontWeight: 500, color: '#8b5cf6' }}>{data.active_mau}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>ativos mês</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Stickiness</div>
+          <div style={{ fontSize: 16, fontWeight: 500 }}>{Number(data.stickiness_pct).toFixed(1)}%</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>DAU / MAU</div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Em 6 meses</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#f59e0b' }}>{data.projected_6m}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>tenants projetados</div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Em 12 meses</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#f59e0b' }}>{data.projected_12m}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>{Number(data.avg_new_per_month).toFixed(1)}/mês média</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {data.inactive_7d > 0 && (
+          <div style={{ flex: 1, padding: 8, background: '#fef3c7', borderRadius: 6, fontSize: 11, color: '#92400e' }}>
+            <span style={{ fontWeight: 600 }}>{data.inactive_7d}</span> sem uso há 7+ dias
+          </div>
+        )}
+        {data.inactive_30d > 0 && (
+          <div style={{ flex: 1, padding: 8, background: '#fee2e2', borderRadius: 6, fontSize: 11, color: '#991b1b' }}>
+            <span style={{ fontWeight: 600 }}>{data.inactive_30d}</span> sem uso há 30+ dias
+          </div>
+        )}
+        {data.new_last_30d > 0 && (
+          <div style={{ flex: 1, padding: 8, background: '#dcfce7', borderRadius: 6, fontSize: 11, color: '#166534' }}>
+            <span style={{ fontWeight: 600 }}>{data.new_last_30d}</span> novos no mês
+          </div>
+        )}
+      </div>
+
+      {tenantList.length > 0 && (
+        <>
+          <div style={labelStyle}>Status dos tenants</div>
+          {tenantList.map((t: any, i: number) => {
+            const config = statusConfig[t.status] || statusConfig.active;
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, padding: '4px 0' }}>
+                <span style={{ fontSize: 10, width: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {t.nome}
+                </span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: config.bg, color: config.color, flexShrink: 0 }}>
+                  {config.label}
+                </span>
+                <span style={{ flex: 1 }} />
+                <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+                  {Number(t.total_messages_30d || 0).toLocaleString('pt-BR')} msgs/30d
+                </span>
+                {t.days_since_activity !== null && t.days_since_activity !== undefined && (
+                  <span style={{ fontSize: 9, color: 'var(--color-text-secondary)', width: 90, textAlign: 'right', flexShrink: 0 }}>
+                    ativ. há {t.days_since_activity}d
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ProjectionsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -583,9 +706,7 @@ export function ProjectionsTab() {
       <DatabaseProjectionPanel />
       <AIProjectionPanel />
       <MessagesProjectionPanel />
-      <div style={{ ...panelStyle, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 12, padding: 24 }}>
-        Em breve: projeção de crescimento de tenants
-      </div>
+      <TenantsProjectionPanel />
     </div>
   );
 }
