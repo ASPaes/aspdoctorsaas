@@ -4,6 +4,7 @@ import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { fetchAllRows } from '@/lib/supabasePaginate';
 
 const LTV_CAP = 120;
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -77,9 +78,13 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       });
 
       // === QUERY A: All clients ===
-      const { data: allClientes } = await tf(supabase
-        .from('clientes')
-        .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao'));
+      const allClientes = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('clientes')
+          .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
 
       // === QUERY B: CAC despesas ===
       const { data: cacDespesas } = await tf(supabase
