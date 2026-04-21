@@ -22,12 +22,43 @@ function SeverityBadge({ severity }: { severity: string }) {
     warning: { bg: '#fef3c7', color: '#92400e', label: 'ATENÇÃO' },
     attention: { bg: '#fef9c3', color: '#854d0e', label: 'OBSERVAR' },
     ok: { bg: '#dcfce7', color: '#166534', label: 'OK' },
+    no_data: { bg: '#e0e7ff', color: '#3730a3', label: 'SEM HISTÓRICO' },
   };
   const c = config[severity] || config.ok;
   return (
     <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: c.bg, color: c.color }}>
       {c.label}
     </span>
+  );
+}
+
+function ProjectionChart({ history, proj30, proj90 }: { history: any[]; proj30: number; proj90: number }) {
+  if (history.length === 0) return null;
+  const allValues = [...history.map((h: any) => Number(h.mb)), proj30, proj90];
+  const maxVal = Math.max(...allValues, 1);
+  const width = 560;
+  const height = 80;
+  const histX = (i: number) => (i / (history.length + 9)) * width;
+  const projX = (d: number) => ((history.length - 1 + d) / (history.length + 9)) * width;
+  const yFn = (v: number) => height - (v / maxVal) * (height - 8) - 4;
+  const histPath = history.map((h: any, i: number) => `${i === 0 ? 'M' : 'L'} ${histX(i)} ${yFn(Number(h.mb))}`).join(' ');
+  const lastMb = Number(history[history.length - 1].mb);
+  const projPath = `M ${histX(history.length - 1)} ${yFn(lastMb)} L ${projX(3)} ${yFn(proj30)} L ${projX(9)} ${yFn(proj90)}`;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+        <path d={histPath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
+        <path d={projPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4,3" />
+        <circle cx={histX(history.length - 1)} cy={yFn(lastMb)} r="3" fill="#3b82f6" />
+        <circle cx={projX(9)} cy={yFn(proj90)} r="3" fill="#f59e0b" />
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+        <span>30 dias atrás</span>
+        <span style={{ color: '#3b82f6' }}>● hoje</span>
+        <span style={{ color: '#f59e0b' }}>◌ +90 dias</span>
+      </div>
+    </div>
   );
 }
 
@@ -44,22 +75,6 @@ function StorageProjectionPanel() {
 
   if (!data) return <div style={panelStyle}>Carregando projeção de storage...</div>;
 
-  const history = (data.history as any[]) || [];
-  const proj30 = Number(data.projection_30d_gb) * 1024;
-  const proj90 = Number(data.projection_90d_gb) * 1024;
-  const allValues = [...history.map((h: any) => Number(h.mb)), proj30, proj90];
-  const maxVal = Math.max(...allValues, 1);
-  const width = 560;
-  const height = 80;
-  const histX = (i: number) => (i / (history.length + 9)) * width;
-  const projX = (d: number) => ((history.length - 1 + d) / (history.length + 9)) * width;
-  const yFn = (v: number) => height - (v / maxVal) * (height - 8) - 4;
-  const histPath = history.map((h: any, i: number) => `${i === 0 ? 'M' : 'L'} ${histX(i)} ${yFn(Number(h.mb))}`).join(' ');
-  const lastMb = history.length > 0 ? Number(history[history.length - 1].mb) : 0;
-  const projPath = history.length > 0
-    ? `M ${histX(history.length - 1)} ${yFn(lastMb)} L ${projX(3)} ${yFn(proj30)} L ${projX(9)} ${yFn(proj90)}`
-    : '';
-
   return (
     <div style={panelStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -70,21 +85,11 @@ function StorageProjectionPanel() {
         </div>
       </div>
 
-      {history.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
-            <path d={histPath} fill="none" stroke="#3b82f6" strokeWidth="1.5" />
-            {projPath && <path d={projPath} fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4,3" />}
-            {history.length > 0 && <circle cx={histX(history.length - 1)} cy={yFn(lastMb)} r="3" fill="#3b82f6" />}
-            <circle cx={projX(9)} cy={yFn(proj90)} r="3" fill="#f59e0b" />
-          </svg>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-            <span>30 dias atrás</span>
-            <span style={{ color: '#3b82f6' }}>● hoje</span>
-            <span style={{ color: '#f59e0b' }}>◌ +90 dias</span>
-          </div>
-        </div>
-      )}
+      <ProjectionChart
+        history={(data.history as any[]) || []}
+        proj30={Number(data.projection_30d_gb) * 1024}
+        proj90={Number(data.projection_90d_gb) * 1024}
+      />
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
         <span style={{ fontSize: 18, fontWeight: 500 }}>+{Number(data.slope_mb_per_day ?? 0).toFixed(1)} MB</span>
@@ -141,12 +146,131 @@ function StorageProjectionPanel() {
   );
 }
 
+function DatabaseProjectionPanel() {
+  const { data } = useQuery({
+    queryKey: ['monitor-database-projection'],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_database_projection' as any);
+      return data as any;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  if (!data) return <div style={panelStyle}>Carregando projeção de banco...</div>;
+
+  const hasHistory = data.has_history === true;
+  const topTables = (data.top_tables as any[]) || [];
+  const maxTableSize = topTables.length > 0 ? Math.max(...topTables.map((t: any) => Number(t.size_mb))) : 1;
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Projeção · Banco de Dados</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SeverityBadge severity={data.severity} />
+          <HelpTooltip text="Tamanho total do banco PostgreSQL e sua projeção de crescimento. O limite do plano Pro é 8 GB. A coleta é feita a cada 5 minutos via pg_cron — a projeção precisa de alguns dias de histórico para ser confiável." />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+        <span style={{ fontSize: 22, fontWeight: 500 }}>
+          {Number(data.current_gb) >= 1 ? `${Number(data.current_gb).toFixed(2)} GB` : `${Number(data.current_mb).toFixed(0)} MB`}
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+          / {data.limit_gb} GB ({Number(data.usage_pct).toFixed(2)}%)
+        </span>
+      </div>
+
+      <div style={{ height: 6, background: 'var(--color-border-tertiary)', borderRadius: 3, overflow: 'hidden', marginBottom: 12 }}>
+        <div style={{
+          width: `${Math.min(Number(data.usage_pct), 100)}%`,
+          height: '100%',
+          background: Number(data.usage_pct) > 80 ? '#dc2626' : Number(data.usage_pct) > 60 ? '#f59e0b' : '#16a34a',
+          borderRadius: 3,
+        }} />
+      </div>
+
+      {hasHistory ? (
+        <>
+          <ProjectionChart
+            history={(data.history as any[]) || []}
+            proj30={Number(data.projection_30d_gb) * 1024}
+            proj90={Number(data.projection_90d_gb) * 1024}
+          />
+
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
+            <span style={{ fontSize: 18, fontWeight: 500 }}>+{Number(data.slope_mb_per_day ?? 0).toFixed(2)} MB</span>
+            <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>por dia · média últimos {data.history_days} dias</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
+            <div style={{ padding: 8, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>em 30 dias</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{Number(data.projection_30d_gb).toFixed(2)} GB</div>
+            </div>
+            <div style={{ padding: 8, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>em 90 dias</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{Number(data.projection_90d_gb).toFixed(2)} GB</div>
+            </div>
+            <div style={{ padding: 8, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>em 1 ano</div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{Number(data.projection_365d_gb).toFixed(2)} GB</div>
+            </div>
+          </div>
+
+          {data.days_until_limit && (
+            <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>ETA até o limite de 8 GB</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>{Number(data.days_until_limit).toLocaleString('pt-BR')} dias</span>
+                {data.eta_date && (
+                  <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
+                    ({new Date(data.eta_date).toLocaleDateString('pt-BR')})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 10, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+          Coletando histórico. A projeção ficará disponível após alguns dias de coletas automáticas.
+        </div>
+      )}
+
+      {topTables.length > 0 && (
+        <>
+          <div style={labelStyle}>Top 10 tabelas por tamanho</div>
+          {topTables.map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {t.name}
+              </span>
+              <div style={{ flex: 1, height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${(Number(t.size_mb) / maxTableSize) * 100}%`, height: '100%', background: '#8b5cf6', borderRadius: 2 }} />
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 70, textAlign: 'right', flexShrink: 0 }}>
+                {Number(t.rows).toLocaleString('pt-BR')} rows
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 500, width: 56, textAlign: 'right', flexShrink: 0 }}>
+                {Number(t.size_mb) >= 1024 ? `${(Number(t.size_mb)/1024).toFixed(1)}GB` : `${Number(t.size_mb).toFixed(1)}MB`}
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ProjectionsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <StorageProjectionPanel />
+      <DatabaseProjectionPanel />
       <div style={{ ...panelStyle, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 12, padding: 24 }}>
-        Em breve: projeções de Banco de Dados, IA, Mensagens e Crescimento de Tenants
+        Em breve: projeções de IA, Mensagens e Crescimento de Tenants
       </div>
     </div>
   );
