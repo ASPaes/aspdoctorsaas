@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import type { DashboardFilters } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { fetchAllRows } from '@/lib/supabasePaginate';
 
 export interface MargemContribuicaoData {
   receita_mrr: number;
@@ -33,17 +34,16 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
   return useQuery({
     queryKey: ['margem-contribuicao-dashboard', filters.unidadeBaseId, filters.fornecedorId, periodoFimStr, tid],
     queryFn: async (): Promise<MargemContribuicaoData> => {
-      let query = supabase
-        .from('vw_clientes_financeiro')
-        .select('mensalidade, custo_operacao, data_cadastro, data_cancelamento, cancelado')
-        .lte('data_cadastro', periodoFimStr);
-
-      if (tid) query = query.eq('tenant_id', tid);
-      if (filters.unidadeBaseId) query = query.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) query = query.eq('fornecedor_id', filters.fornecedorId);
-
-      const { data: raw, error } = await query;
-      if (error) throw error;
+      const raw = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('vw_clientes_financeiro')
+          .select('mensalidade, custo_operacao, data_cadastro, data_cancelamento, cancelado')
+          .lte('data_cadastro', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
+        return q;
+      });
       if (!raw || raw.length === 0) return defaultData;
 
       // Filtra clientes ativos no fim do período.
