@@ -4652,6 +4652,7 @@ export type Database = {
         }[]
       }
       get_storage_metrics: { Args: never; Returns: Json }
+      get_storage_projection: { Args: never; Returns: Json }
       get_tenant_access_users: {
         Args: never
         Returns: {
