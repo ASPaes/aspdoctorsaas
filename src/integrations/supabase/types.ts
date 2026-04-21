@@ -4632,6 +4632,7 @@ export type Database = {
         }[]
       }
       get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
+      get_messages_projection: { Args: never; Returns: Json }
       get_my_access_context: {
         Args: never
         Returns: {
