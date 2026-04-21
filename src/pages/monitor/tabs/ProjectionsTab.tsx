@@ -62,6 +62,32 @@ function ProjectionChart({ history, proj30, proj90 }: { history: any[]; proj30: 
   );
 }
 
+function AIChart({ history }: { history: any[] }) {
+  if (history.length === 0) return null;
+  const values = history.map((h: any) => Number(h.cost_usd));
+  const maxVal = Math.max(...values, 0.01);
+  const width = 560;
+  const height = 80;
+  const xFn = (i: number) => (i / Math.max(history.length - 1, 1)) * width;
+  const yFn = (v: number) => height - (v / maxVal) * (height - 8) - 4;
+  const path = history.map((h: any, i: number) => `${i === 0 ? 'M' : 'L'} ${xFn(i)} ${yFn(Number(h.cost_usd))}`).join(' ');
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+        <path d={path} fill="none" stroke="#8b5cf6" strokeWidth="1.5" />
+        {history.map((h: any, i: number) => (
+          <circle key={i} cx={xFn(i)} cy={yFn(Number(h.cost_usd))} r="2" fill="#8b5cf6" />
+        ))}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+        <span>{history[0]?.date ? new Date(history[0].date).toLocaleDateString('pt-BR') : ''}</span>
+        <span>{history[history.length - 1]?.date ? new Date(history[history.length - 1].date).toLocaleDateString('pt-BR') : ''}</span>
+      </div>
+    </div>
+  );
+}
+
 function StorageProjectionPanel() {
   const { data } = useQuery({
     queryKey: ['monitor-storage-projection'],
@@ -264,13 +290,147 @@ function DatabaseProjectionPanel() {
   );
 }
 
+function AIProjectionPanel() {
+  const { data } = useQuery({
+    queryKey: ['monitor-ai-projection'],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_ai_projection' as any);
+      return data as any;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  if (!data) return <div style={panelStyle}>Carregando projeção de IA...</div>;
+
+  const hasHistory = data.has_history === true;
+  const byFunction = (data.by_function as any[]) || [];
+  const byTenant = (data.by_tenant as any[]) || [];
+  const mtdPct = Number(data.days_in_month) > 0 ? (Number(data.days_elapsed_mtd) / Number(data.days_in_month)) * 100 : 0;
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Projeção · Custo de IA</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SeverityBadge severity={data.severity} />
+          <HelpTooltip text="Projeção de custo mensal de IA baseada na média diária dos últimos 7 dias. Severidade: OBSERVAR acima de $100/mês, ATENÇÃO acima de $200, CRÍTICO acima de $500." />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Mês até hoje</div>
+          <div style={{ fontSize: 16, fontWeight: 500 }}>${Number(data.current_mtd_cost_usd).toFixed(2)}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            dia {data.days_elapsed_mtd} de {data.days_in_month}
+          </div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Projeção fim do mês</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#f59e0b' }}>${Number(data.projected_monthly_usd).toFixed(2)}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            +${(Number(data.projected_monthly_usd) - Number(data.current_mtd_cost_usd)).toFixed(2)} restante
+          </div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Projeção mês seguinte</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#f59e0b' }}>${Number(data.next_month_projection_usd).toFixed(2)}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            ${Number(data.avg_daily_usd).toFixed(2)}/dia × 30
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden', marginBottom: 12 }}>
+        <div style={{
+          width: `${Math.min(mtdPct, 100)}%`,
+          height: '100%',
+          background: '#8b5cf6',
+          borderRadius: 2,
+        }} />
+      </div>
+
+      {hasHistory && <AIChart history={(data.history as any[]) || []} />}
+
+      {!hasHistory && (
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 10, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+          Coletando histórico. São necessários pelo menos 3 dias de dados.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>${Number(data.last_30d_total_usd).toFixed(2)}</span>
+        <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>
+          nos últimos 30 dias · {Number(data.last_30d_calls).toLocaleString('pt-BR')} chamadas
+        </span>
+      </div>
+
+      {byFunction.length > 0 && (
+        <>
+          <div style={labelStyle}>Por função (30 dias)</div>
+          {byFunction.map((f: any, i: number) => {
+            const maxCost = Math.max(...byFunction.map((x: any) => Number(x.cost_usd_30d)), 0.01);
+            const functionLabels: Record<string, string> = {
+              'suggest-smart-replies': 'Sugestões',
+              'compose-whatsapp-message': 'Composição',
+              'analyze-whatsapp-sentiment': 'Sentimento',
+              'generate-conversation-summary': 'Resumo',
+              'transcribe-whatsapp-audio': 'Transcrição',
+            };
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {functionLabels[f.function_name] || f.function_name}
+                </span>
+                <div style={{ flex: 1, height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${(Number(f.cost_usd_30d) / maxCost) * 100}%`, height: '100%', background: '#8b5cf6', borderRadius: 2 }} />
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 70, textAlign: 'right', flexShrink: 0 }}>
+                  {Number(f.calls_30d).toLocaleString('pt-BR')}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 500, width: 56, textAlign: 'right', flexShrink: 0, color: '#16a34a' }}>
+                  ${Number(f.cost_usd_30d).toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {byTenant.length > 0 && (
+        <>
+          <div style={{ ...labelStyle, marginTop: 10 }}>Por tenant (30 dias)</div>
+          {byTenant.map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {t.tenant_nome || t.tenant_id}
+              </span>
+              <div style={{ flex: 1, height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${Number(t.pct)}%`, height: '100%', background: '#8b5cf6', borderRadius: 2 }} />
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 36, textAlign: 'right', flexShrink: 0 }}>
+                {Number(t.pct).toFixed(0)}%
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 500, width: 56, textAlign: 'right', flexShrink: 0, color: '#16a34a' }}>
+                ${Number(t.cost_usd_30d).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ProjectionsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <StorageProjectionPanel />
       <DatabaseProjectionPanel />
+      <AIProjectionPanel />
       <div style={{ ...panelStyle, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 12, padding: 24 }}>
-        Em breve: projeções de IA, Mensagens e Crescimento de Tenants
+        Em breve: projeções de Mensagens e Crescimento de Tenants
       </div>
     </div>
   );
