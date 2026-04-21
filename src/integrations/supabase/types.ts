@@ -4651,6 +4651,7 @@ export type Database = {
           visual_notifications_enabled: boolean
         }[]
       }
+      get_storage_metrics: { Args: never; Returns: Json }
       get_tenant_access_users: {
         Args: never
         Returns: {
