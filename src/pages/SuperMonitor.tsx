@@ -9,119 +9,12 @@ import { format, subDays, startOfMonth, endOfMonth, startOfQuarter, startOfYear,
 import { ptBR } from 'date-fns/locale';
 import 'react-day-picker/dist/style.css';
 
-function ScoreRing({ score }: { score: number }) {
-  const r = 30;
-  const circ = 2 * Math.PI * r;
-  const fill = (score / 100) * circ;
-  const color = score >= 80 ? '#22c55e' : score >= 60 ? '#eab308' : '#ef4444';
-  return (
-    <svg width={80} height={80} viewBox="0 0 80 80">
-      <circle cx={40} cy={40} r={r} fill="none" stroke="hsl(var(--border))" strokeWidth={6} />
-      <circle
-        cx={40}
-        cy={40}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={6}
-        strokeDasharray={`${fill} ${circ}`}
-        strokeLinecap="round"
-        transform="rotate(-90 40 40)"
-      />
-      <text x={40} y={40} textAnchor="middle" dominantBaseline="central" fontSize={18} fontWeight={600} fill="hsl(var(--foreground))">
-        {score}
-      </text>
-      <text x={40} y={56} textAnchor="middle" fontSize={9} fill="hsl(var(--muted-foreground))">/100</text>
-    </svg>
-  );
-}
+import { ScoreRing } from './monitor/shared/ScoreRing';
+import { MiniBar } from './monitor/shared/MiniBar';
+import { Sparkline } from './monitor/shared/Sparkline';
+import { HelpTooltip } from './monitor/shared/HelpTooltip';
+import { parseBRDate, formatBRDate } from './monitor/shared/dateUtils';
 
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div style={{ flex: 1, height: 4, background: 'hsl(var(--muted))', borderRadius: 2, overflow: 'hidden' }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 300ms ease' }} />
-    </div>
-  );
-}
-
-function Sparkline({ values, color = '#3b82f6' }: { values: number[]; color?: string }) {
-  if (!values.length) return null;
-  const max = Math.max(...values, 1);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 40 }}>
-      {values.map((v, i) => (
-        <div
-          key={i}
-          style={{
-            flex: 1,
-            height: `${Math.max(2, (v / max) * 100)}%`,
-            background: color,
-            opacity: 0.6,
-            borderRadius: 1,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function parseBRDate(value: string): Date | null {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length !== 8) return null;
-  const day = parseInt(digits.slice(0, 2));
-  const month = parseInt(digits.slice(2, 4)) - 1;
-  const year = parseInt(digits.slice(4, 8));
-  const date = new Date(year, month, day);
-  if (isNaN(date.getTime())) return null;
-  if (date > new Date()) return null;
-  return date;
-}
-
-function formatBRDate(date: Date | undefined): string {
-  if (!date) return '';
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const y = date.getFullYear();
-  return `${d}/${m}/${y}`;
-}
-
-function HelpTooltip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => { setOpen(false); };
-    setTimeout(() => document.addEventListener('click', handler), 0);
-    return () => document.removeEventListener('click', handler);
-  }, [open]);
-  return (
-    <div style={{ position: 'relative', display: 'inline-block' }} onClick={e => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{
-          width: 18, height: 18, borderRadius: '50%',
-          border: '1.5px solid #94a3b8',
-          background: open ? '#334155' : '#e2e8f0',
-          color: open ? '#f1f5f9' : '#475569',
-          fontSize: 10, fontWeight: 700, lineHeight: 1,
-          cursor: 'pointer', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          padding: 0, flexShrink: 0,
-        }}
-      >?</button>
-      {open && (
-        <div style={{
-          position: 'absolute', top: 22, right: 0, zIndex: 999,
-          background: '#1e293b', color: '#e2e8f0',
-          border: '1px solid #334155', borderRadius: 10,
-          padding: '10px 12px', fontSize: 12, lineHeight: 1.6,
-          width: 240, whiteSpace: 'normal',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-        }}>{text}</div>
-      )}
-    </div>
-  );
-}
 
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
