@@ -4699,6 +4699,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_tenants_projection: { Args: never; Returns: Json }
       get_today_metrics:
         | { Args: never; Returns: Json }
         | { Args: { p_tenant_id?: string }; Returns: Json }
