@@ -88,6 +88,46 @@ function AIChart({ history }: { history: any[] }) {
   );
 }
 
+function MessagesChart({ history }: { history: any[] }) {
+  if (history.length === 0) return null;
+  const maxVal = Math.max(...history.map((h: any) => Number(h.total)), 1);
+  const width = 560;
+  const height = 90;
+  const barWidth = width / history.length;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+        {history.map((h: any, i: number) => {
+          const sent = Number(h.sent || 0);
+          const received = Number(h.received || 0);
+          const sentH = (sent / maxVal) * (height - 8);
+          const receivedH = (received / maxVal) * (height - 8);
+          const x = i * barWidth + 1;
+          const w = Math.max(barWidth - 2, 1);
+          return (
+            <g key={i}>
+              <rect x={x} y={height - sentH - receivedH - 2} width={w} height={sentH} fill="#10b981" opacity="0.85" />
+              <rect x={x} y={height - receivedH - 2} width={w} height={receivedH} fill="#3b82f6" opacity="0.85" />
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+        <span>{history[0]?.date ? new Date(history[0].date).toLocaleDateString('pt-BR') : ''}</span>
+        <span style={{ display: 'flex', gap: 10 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ width: 8, height: 8, background: '#10b981', borderRadius: 2 }}></span>enviadas
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ width: 8, height: 8, background: '#3b82f6', borderRadius: 2 }}></span>recebidas
+          </span>
+        </span>
+        <span>{history[history.length - 1]?.date ? new Date(history[history.length - 1].date).toLocaleDateString('pt-BR') : ''}</span>
+      </div>
+    </div>
+  );
+}
+
 function StorageProjectionPanel() {
   const { data } = useQuery({
     queryKey: ['monitor-storage-projection'],
@@ -423,14 +463,128 @@ function AIProjectionPanel() {
   );
 }
 
+function MessagesProjectionPanel() {
+  const { data } = useQuery({
+    queryKey: ['monitor-messages-projection'],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_messages_projection' as any);
+      return data as any;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  if (!data) return <div style={panelStyle}>Carregando projeção de mensagens...</div>;
+
+  const hasHistory = data.has_history === true;
+  const byTenant = (data.by_tenant as any[]) || [];
+  const mtdPct = Number(data.days_in_month) > 0 ? (Number(data.days_elapsed_mtd) / Number(data.days_in_month)) * 100 : 0;
+
+  return (
+    <div style={panelStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>Projeção · Volume de Mensagens</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SeverityBadge severity={data.severity} />
+          <HelpTooltip text="Volume de mensagens (enviadas + recebidas) e tendência de crescimento. Mensagens são um indicador-líder: se crescem, pressionam banco, storage (mídias), IA e webhooks. Severidade baseada na taxa de crescimento vs média diária." />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Mês até hoje</div>
+          <div style={{ fontSize: 16, fontWeight: 500 }}>{Number(data.current_mtd_total).toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            dia {data.days_elapsed_mtd} de {data.days_in_month}
+          </div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Projeção fim do mês</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#f59e0b' }}>{Number(data.projected_monthly).toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            +{(Number(data.projected_monthly) - Number(data.current_mtd_total)).toLocaleString('pt-BR')} restante
+          </div>
+        </div>
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 2 }}>Projeção mês seguinte</div>
+          <div style={{ fontSize: 16, fontWeight: 500, color: '#f59e0b' }}>{Number(data.next_month_projection).toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            {Number(data.avg_daily).toLocaleString('pt-BR')}/dia × 30
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden', marginBottom: 12 }}>
+        <div style={{
+          width: `${Math.min(mtdPct, 100)}%`,
+          height: '100%',
+          background: '#10b981',
+          borderRadius: 2,
+        }} />
+      </div>
+
+      {hasHistory && <MessagesChart history={(data.history as any[]) || []} />}
+
+      {!hasHistory && (
+        <div style={{ padding: 10, background: 'var(--color-background-primary)', borderRadius: 6, marginBottom: 10, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+          Coletando histórico. São necessários pelo menos 3 dias de dados.
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
+        <div style={{ padding: 8, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>Total 30 dias</div>
+          <div style={{ fontSize: 13, fontWeight: 500 }}>{Number(data.last_30d_total).toLocaleString('pt-BR')}</div>
+        </div>
+        <div style={{ padding: 8, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>Crescimento</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: Number(data.slope_per_day) > 0 ? '#f59e0b' : '#16a34a' }}>
+            {Number(data.slope_per_day) > 0 ? '+' : ''}{Number(data.slope_per_day).toFixed(0)}/dia
+          </div>
+        </div>
+        <div style={{ padding: 8, background: 'var(--color-background-primary)', borderRadius: 6 }}>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>Dia de pico</div>
+          <div style={{ fontSize: 13, fontWeight: 500 }}>{Number(data.peak_day_total ?? 0).toLocaleString('pt-BR')}</div>
+          <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginTop: 1 }}>
+            {data.peak_day_date ? new Date(data.peak_day_date).toLocaleDateString('pt-BR') : '—'}
+          </div>
+        </div>
+      </div>
+
+      {byTenant.length > 0 && (
+        <>
+          <div style={labelStyle}>Por tenant (30 dias)</div>
+          {byTenant.map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {t.tenant_nome || t.tenant_id}
+              </span>
+              <div style={{ flex: 1, height: 4, background: 'var(--color-border-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${Number(t.pct)}%`, height: '100%', background: '#10b981', borderRadius: 2 }} />
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 36, textAlign: 'right', flexShrink: 0 }}>
+                {Number(t.pct).toFixed(0)}%
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 500, width: 70, textAlign: 'right', flexShrink: 0 }}>
+                {Number(t.total_30d).toLocaleString('pt-BR')}
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ProjectionsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <StorageProjectionPanel />
       <DatabaseProjectionPanel />
       <AIProjectionPanel />
+      <MessagesProjectionPanel />
       <div style={{ ...panelStyle, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 12, padding: 24 }}>
-        Em breve: projeções de Mensagens e Crescimento de Tenants
+        Em breve: projeção de crescimento de tenants
       </div>
     </div>
   );
