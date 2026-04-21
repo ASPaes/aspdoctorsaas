@@ -816,6 +816,128 @@ export default function SuperMonitor() {
           )}
         </div>
 
+        {/* Storage */}
+        <div style={{ ...panelStyle }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ ...labelStyle, marginBottom: 0 }}>storage</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {storageMetrics?.estimated_cost_usd > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 500, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: 10 }}>
+                  ${Number(storageMetrics.estimated_cost_usd).toFixed(2)}/mês
+                </span>
+              )}
+              <HelpTooltip text="Uso do armazenamento do Supabase (bucket whatsapp-media). Mostra total, distribuição por tenant, tipos de arquivo e crescimento. Limite do plano Pro: 100 GB. Custo estimado: $0.021/GB/mês." />
+            </div>
+          </div>
+          {/* Uso total */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              {storageMetrics?.total_gb >= 1 ? `${Number(storageMetrics.total_gb).toFixed(2)} GB` : `${Number(storageMetrics?.total_mb ?? 0).toFixed(0)} MB`}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
+              / {storageMetrics?.limit_gb ?? 100} GB ({Number(storageMetrics?.usage_pct ?? 0).toFixed(2)}%)
+            </span>
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+            {Number(storageMetrics?.total_objects ?? 0).toLocaleString('pt-BR')} arquivos
+          </div>
+          {/* Barra de uso */}
+          <div style={{ height: 6, background: 'var(--color-border-tertiary)', borderRadius: 3, overflow: 'hidden', marginBottom: 10 }}>
+            <div style={{
+              width: `${Math.min(Number(storageMetrics?.usage_pct ?? 0), 100)}%`,
+              height: '100%',
+              background: Number(storageMetrics?.usage_pct ?? 0) > 80 ? '#dc2626' : Number(storageMetrics?.usage_pct ?? 0) > 60 ? '#f59e0b' : '#16a34a',
+              borderRadius: 3,
+            }} />
+          </div>
+          {/* Crescimento */}
+          <div style={{ ...labelStyle, marginBottom: 6 }}>crescimento</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+            <div style={{ padding: 6, background: 'var(--color-background-secondary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>hoje</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>{Number(storageMetrics?.growth?.today_mb ?? 0).toFixed(1)} MB</div>
+            </div>
+            <div style={{ padding: 6, background: 'var(--color-background-secondary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>7 dias</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>{Number(storageMetrics?.growth?.last_7d_mb ?? 0).toFixed(0)} MB</div>
+            </div>
+            <div style={{ padding: 6, background: 'var(--color-background-secondary)', borderRadius: 6 }}>
+              <div style={{ fontSize: 9, color: 'var(--color-text-secondary)' }}>média/dia</div>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>{Number(storageMetrics?.growth?.avg_daily_mb_7d ?? 0).toFixed(0)} MB</div>
+            </div>
+          </div>
+          {/* Por tipo */}
+          <div style={{ ...labelStyle, marginBottom: 6 }}>por tipo</div>
+          {(() => {
+            const byType = storageMetrics?.by_type;
+            if (!byType) return null;
+            const types = [
+              { key: 'audios',    label: 'Áudios',    color: '#f59e0b' },
+              { key: 'images',    label: 'Imagens',   color: '#3b82f6' },
+              { key: 'videos',    label: 'Vídeos',    color: '#8b5cf6' },
+              { key: 'documents', label: 'Documentos', color: '#10b981' },
+              { key: 'other',     label: 'Outros',    color: '#6b7280' },
+            ];
+            const totalMb = Number(storageMetrics?.total_mb ?? 1);
+            return types.map((t) => {
+              const data = byType[t.key];
+              if (!data || data.count === 0) return null;
+              const pct = Math.round((Number(data.mb) / totalMb) * 100);
+              return (
+                <div key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 68, flexShrink: 0 }}>{t.label}</span>
+                  <MiniBar value={Number(data.mb)} max={totalMb} color={t.color} />
+                  <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 28, textAlign: 'right', flexShrink: 0 }}>{pct}%</span>
+                  <span style={{ fontSize: 10, fontWeight: 500, width: 58, textAlign: 'right', flexShrink: 0 }}>
+                    {Number(data.mb) >= 1024 ? `${(Number(data.mb)/1024).toFixed(1)}GB` : `${Number(data.mb).toFixed(0)}MB`}
+                  </span>
+                </div>
+              );
+            });
+          })()}
+          {/* Por tenant */}
+          <div style={{ ...labelStyle, marginTop: 10, marginBottom: 6 }}>por tenant</div>
+          {(storageMetrics?.by_tenant as any[] | null)?.slice(0, 5).map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 68, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                {t.tenant_nome}
+              </span>
+              <MiniBar value={Number(t.mb)} max={Number(storageMetrics?.total_mb ?? 1)} color={t.tenant_id ? '#8b5cf6' : '#dc2626'} />
+              <span style={{ fontSize: 10, color: 'var(--color-text-secondary)', width: 28, textAlign: 'right', flexShrink: 0 }}>{Number(t.pct).toFixed(0)}%</span>
+              <span style={{ fontSize: 10, fontWeight: 500, width: 58, textAlign: 'right', flexShrink: 0 }}>
+                {Number(t.mb) >= 1024 ? `${(Number(t.mb)/1024).toFixed(1)}GB` : `${Number(t.mb).toFixed(0)}MB`}
+              </span>
+            </div>
+          ))}
+          {/* Alertas */}
+          {storageMetrics?.warnings && (storageMetrics.warnings.orphans_count > 0 || storageMetrics.warnings.large_files_count > 0 || storageMetrics.warnings.old_files_count > 0) && (
+            <>
+              <div style={{ ...labelStyle, marginTop: 10, marginBottom: 6 }}>alertas</div>
+              {storageMetrics.warnings.orphans_count > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginBottom: 4, padding: '4px 6px', background: '#fef3c7', borderRadius: 6 }}>
+                  <span style={{ color: '#92400e' }}>⚠</span>
+                  <span style={{ color: '#92400e', flex: 1 }}>{storageMetrics.warnings.orphans_count} arquivos órfãos</span>
+                  <span style={{ color: '#92400e', fontWeight: 500 }}>{Number(storageMetrics.warnings.orphans_mb).toFixed(1)} MB</span>
+                </div>
+              )}
+              {storageMetrics.warnings.large_files_count > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginBottom: 4, padding: '4px 6px', background: '#fef3c7', borderRadius: 6 }}>
+                  <span style={{ color: '#92400e' }}>⚠</span>
+                  <span style={{ color: '#92400e', flex: 1 }}>{storageMetrics.warnings.large_files_count} arquivos &gt; 10MB</span>
+                  <span style={{ color: '#92400e', fontWeight: 500 }}>{Number(storageMetrics.warnings.large_files_mb).toFixed(0)} MB</span>
+                </div>
+              )}
+              {storageMetrics.warnings.old_files_count > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginBottom: 4, padding: '4px 6px', background: '#fef3c7', borderRadius: 6 }}>
+                  <span style={{ color: '#92400e' }}>⚠</span>
+                  <span style={{ color: '#92400e', flex: 1 }}>{storageMetrics.warnings.old_files_count} arquivos &gt; 90 dias</span>
+                  <span style={{ color: '#92400e', fontWeight: 500 }}>{Number(storageMetrics.warnings.old_files_mb).toFixed(0)} MB</span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         {/* IA por função */}
         <div style={{ ...panelStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
