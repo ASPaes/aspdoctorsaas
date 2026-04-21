@@ -44,56 +44,57 @@ export function useDashboardData(filters: DashboardFilters) {
 
       // 1. Clientes ativos no fim do período — snapshot temporal
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
-      let clientesQuery = supabase
-        .from('vw_clientes_financeiro')
-        .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
-        .lte('data_cadastro', periodoFimStr)
-        .limit(10000);
+      // Usa paginação para superar o limite de 1000 linhas do PostgREST (db-max-rows).
+      const clientesRaw = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
+          .lte('data_cadastro', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
+        return q;
+      });
 
-      if (tid) clientesQuery = clientesQuery.eq('tenant_id', tid);
-      if (filters.unidadeBaseId) clientesQuery = clientesQuery.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) clientesQuery = clientesQuery.eq('fornecedor_id', filters.fornecedorId);
-
-      const { data: clientesRaw } = await clientesQuery;
       // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
         if (c.cancelado !== true) return true;
-        if (!c.data_cancelamento) return false; // cancelado sem data: defensivo, considera inativo
+        if (!c.data_cancelamento) return false;
         return new Date(String(c.data_cancelamento)) > new Date(periodoFimStr);
       });
       const clientesCount = clientesAtivos.length;
       const mrr = clientesAtivos.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
       // 2. Novos clientes no período (inclui os que cancelaram dentro do mesmo período — early churn)
-      let novosQuery = supabase
-        .from('clientes')
-        .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
-        .gte('data_cadastro', periodoInicioStr)
-        .lte('data_cadastro', periodoFimStr);
-
-      if (tid) novosQuery = novosQuery.eq('tenant_id', tid);
-      if (filters.unidadeBaseId) novosQuery = novosQuery.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) novosQuery = novosQuery.eq('fornecedor_id', filters.fornecedorId);
-
-      const { data: novosClientes } = await novosQuery;
+      const novosClientes = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('clientes')
+          .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
+          .gte('data_cadastro', periodoInicioStr)
+          .lte('data_cadastro', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
+        return q;
+      });
       const novosCount = novosClientes?.length || 0;
       const newMrr = novosClientes?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
       const totalImplantacao = novosClientes?.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0) || 0;
 
       // 3. Cancelamentos no período — requer flag cancelado=true E data_cancelamento na janela
-      let cancelamentosQuery = supabase
-        .from('clientes')
-        .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, data_venda, motivo_cancelamento_id, unidade_base_id, fornecedor_id, razao_social, nome_fantasia')
-        .eq('cancelado', true)
-        .not('data_cancelamento', 'is', null)
-        .gte('data_cancelamento', periodoInicioStr)
-        .lte('data_cancelamento', periodoFimStr);
-
-      if (tid) cancelamentosQuery = cancelamentosQuery.eq('tenant_id', tid);
-      if (filters.unidadeBaseId) cancelamentosQuery = cancelamentosQuery.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) cancelamentosQuery = cancelamentosQuery.eq('fornecedor_id', filters.fornecedorId);
-
-      const { data: cancelamentos } = await cancelamentosQuery;
+      const cancelamentos = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('clientes')
+          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, data_venda, motivo_cancelamento_id, unidade_base_id, fornecedor_id, razao_social, nome_fantasia')
+          .eq('cancelado', true)
+          .not('data_cancelamento', 'is', null)
+          .gte('data_cancelamento', periodoInicioStr)
+          .lte('data_cancelamento', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
+        return q;
+      });
       const cancelamentosQtd = cancelamentos?.length || 0;
       const mrrCancelado = cancelamentos?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
 
@@ -106,14 +107,16 @@ export function useDashboardData(filters: DashboardFilters) {
       const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
       // 4. Clientes início do período (snapshot temporal)
-      let clientesInicioQuery = supabase
-        .from('clientes')
-        .select('id, mensalidade, data_cancelamento, cancelado')
-        .lt('data_cadastro', periodoInicioStr);
-      if (tid) clientesInicioQuery = clientesInicioQuery.eq('tenant_id', tid);
-      if (filters.unidadeBaseId) clientesInicioQuery = clientesInicioQuery.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) clientesInicioQuery = clientesInicioQuery.eq('fornecedor_id', filters.fornecedorId);
-      const { data: clientesInicioFull } = await clientesInicioQuery;
+      const clientesInicioFull = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('clientes')
+          .select('id, mensalidade, data_cancelamento, cancelado')
+          .lt('data_cadastro', periodoInicioStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
+        return q;
+      });
       // Ativo no início: não-cancelado, OU cancelado com data >= início (saiu no próprio período ou depois).
       const clientesInicioAtivos = (clientesInicioFull || []).filter(c => {
         if (c.cancelado !== true) return true;
