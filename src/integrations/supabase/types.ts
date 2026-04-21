@@ -1545,6 +1545,7 @@ export type Database = {
           active_connections: number | null
           captured_at: string
           cron_job_details_count: number | null
+          database_size_bytes: number | null
           dead_tuples_support_attendances: number | null
           dead_tuples_whatsapp_conversations: number | null
           dead_tuples_whatsapp_messages: number | null
@@ -1557,6 +1558,7 @@ export type Database = {
           active_connections?: number | null
           captured_at?: string
           cron_job_details_count?: number | null
+          database_size_bytes?: number | null
           dead_tuples_support_attendances?: number | null
           dead_tuples_whatsapp_conversations?: number | null
           dead_tuples_whatsapp_messages?: number | null
@@ -1569,6 +1571,7 @@ export type Database = {
           active_connections?: number | null
           captured_at?: string
           cron_job_details_count?: number | null
+          database_size_bytes?: number | null
           dead_tuples_support_attendances?: number | null
           dead_tuples_whatsapp_conversations?: number | null
           dead_tuples_whatsapp_messages?: number | null
@@ -4611,6 +4614,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_database_projection: { Args: never; Returns: Json }
       get_duplicate_contacts: {
         Args: { p_tenant_id: string }
         Returns: {
