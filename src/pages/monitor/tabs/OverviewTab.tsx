@@ -31,6 +31,26 @@ export function OverviewTab({ queryDateFrom, queryDateTo, selectedTenant, refres
   const activeQueries = latestSnapshot?.active_connections ?? 0;
   const slowQueryMs = latestSnapshot?.longest_query_duration_ms ?? 0;
   const score = Math.max(0, Math.min(100, 100 - (totalInst - connectedInst) * 10 - Math.max(0, storagePct - 50)));
+  interface Alert {
+    severity: 'critical' | 'warning' | 'info';
+    icon: string;
+    message: string;
+  }
+  const alerts: Alert[] = [];
+  const offlineInst = totalInst - connectedInst;
+  if (offlineInst > 0) alerts.push({ severity: 'critical', icon: '●', message: `${offlineInst} ${offlineInst === 1 ? 'instância' : 'instâncias'} WhatsApp offline` });
+  if (storagePct > 80) alerts.push({ severity: 'critical', icon: '⚠', message: `Storage em ${storagePct.toFixed(1)}% — próximo do limite` });
+  else if (storagePct > 60) alerts.push({ severity: 'warning', icon: '⚠', message: `Storage em ${storagePct.toFixed(1)}% — monitorar` });
+  const orphans = Number((storageMetrics as any)?.warnings?.orphans_count ?? 0);
+  if (orphans > 0) alerts.push({ severity: 'info', icon: 'ⓘ', message: `${orphans} ${orphans === 1 ? 'arquivo órfão' : 'arquivos órfãos'} no storage` });
+  const largeFiles = Number((storageMetrics as any)?.warnings?.large_files_count ?? 0);
+  if (largeFiles > 0) alerts.push({ severity: 'info', icon: 'ⓘ', message: `${largeFiles} arquivos grandes (>10MB)` });
+  if (slowQueryMs > 5000) alerts.push({ severity: 'warning', icon: '⚠', message: `Query mais lenta em ${(slowQueryMs/1000).toFixed(1)}s` });
+  const alertColors = {
+    critical: { bg: '#fee2e2', text: '#991b1b' },
+    warning: { bg: '#fef3c7', text: '#92400e' },
+    info: { bg: '#dbeafe', text: '#1e40af' },
+  };
   const sparkValues = snapshots.slice(-20).map((s: any) => s.active_connections || 0);
 
   const labelStyle: React.CSSProperties = { fontSize: 10, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 };
@@ -42,6 +62,25 @@ export function OverviewTab({ queryDateFrom, queryDateTo, selectedTenant, refres
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {alerts.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 10, background: 'var(--color-background-secondary)', borderRadius: 8 }}>
+          <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>
+            Alertas ativos ({alerts.length})
+          </div>
+          {alerts.map((a, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', background: alertColors[a.severity].bg, color: alertColors[a.severity].text, borderRadius: 6, fontSize: 11 }}>
+              <span style={{ fontWeight: 600 }}>{a.icon}</span>
+              <span>{a.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {alerts.length === 0 && (
+        <div style={{ padding: 10, background: '#dcfce7', color: '#166534', borderRadius: 8, fontSize: 11, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 600 }}>✓</span>
+          <span>Tudo funcionando normalmente — nenhum alerta ativo</span>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 12 }}>
         <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div style={labelStyle}>Saúde da Plataforma</div>
