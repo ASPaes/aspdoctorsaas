@@ -310,6 +310,16 @@ export default function SuperMonitor() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: storageMetrics } = useQuery({
+    queryKey: ['monitor-storage', refreshKey],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_storage_metrics' as any);
+      return data as any;
+    },
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
   const aiCalls = (t: any) =>
     (t.ai_calls_suggest || 0) +
     (t.ai_calls_compose || 0) +
