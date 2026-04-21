@@ -15,10 +15,14 @@ import { Sparkline } from './monitor/shared/Sparkline';
 import { HelpTooltip } from './monitor/shared/HelpTooltip';
 import { parseBRDate, formatBRDate } from './monitor/shared/dateUtils';
 import { useMonitorData } from './monitor/hooks/useMonitorData';
+import { OverviewTab } from './monitor/tabs/OverviewTab';
+import { DetailsTab } from './monitor/tabs/DetailsTab';
+import { ProjectionsTab } from './monitor/tabs/ProjectionsTab';
 
 
 export default function SuperMonitor() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'projections'>('overview');
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 7),
@@ -342,6 +346,34 @@ export default function SuperMonitor() {
         </div>
       </div>
 
+      <div style={{ display: 'flex', gap: 4, borderBottom: '0.5px solid var(--color-border-tertiary)', marginBottom: 4 }}>
+        {[
+          { key: 'overview' as const, label: 'Visão Geral' },
+          { key: 'details' as const, label: 'Detalhes' },
+          { key: 'projections' as const, label: 'Projeções' },
+        ].map(t => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setActiveTab(t.key)}
+            style={{
+              padding: '8px 14px',
+              fontSize: 13,
+              fontWeight: activeTab === t.key ? 500 : 400,
+              color: activeTab === t.key ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === t.key ? '2px solid var(--color-text-primary)' : '2px solid transparent',
+              background: 'transparent',
+              cursor: 'pointer',
+              marginBottom: -1,
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'projections' && <ProjectionsTab />}
+      {activeTab === 'details' && (<>
       {/* Linha 1: Score + KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         {/* Score */}
@@ -1085,6 +1117,7 @@ export default function SuperMonitor() {
           })()}
         </div>
       </div>
+      </>)}
     </div>
   );
 }
