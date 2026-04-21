@@ -371,7 +371,7 @@ export default function SuperMonitor() {
           </button>
         ))}
       </div>
-      {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'overview' && <OverviewTab queryDateFrom={queryDateFrom} queryDateTo={queryDateTo} selectedTenant={selectedTenant} refreshKey={refreshKey} onDrillDown={() => setActiveTab('details')} />}
       {activeTab === 'projections' && <ProjectionsTab />}
       {activeTab === 'details' && (<>
       {/* Linha 1: Score + KPIs */}
