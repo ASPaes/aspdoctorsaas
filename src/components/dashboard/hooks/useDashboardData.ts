@@ -4,6 +4,7 @@ import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'd
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { fetchAllRows } from '@/lib/supabasePaginate';
 
 const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
