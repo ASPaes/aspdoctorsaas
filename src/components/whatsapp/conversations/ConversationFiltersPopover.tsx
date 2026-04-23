@@ -44,7 +44,7 @@ const STATUS_OPTIONS = [
 export function ConversationFiltersPopover({ filters, onChange }: Props) {
   const { instances } = useWhatsAppInstances();
   const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
   const [open, setOpen] = useState(false);
 
   // For admin: load agents (users with funcionario linked)
