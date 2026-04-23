@@ -2043,7 +2043,9 @@ export type Database = {
           invited_at: string | null
           invited_by: string | null
           is_super_admin: boolean
+          max_concurrent_chats: number | null
           role: string
+          skills: string[]
           status: string
           tenant_id: string
           user_id: string
@@ -2058,7 +2060,9 @@ export type Database = {
           invited_at?: string | null
           invited_by?: string | null
           is_super_admin?: boolean
+          max_concurrent_chats?: number | null
           role?: string
+          skills?: string[]
           status?: string
           tenant_id: string
           user_id: string
@@ -2073,7 +2077,9 @@ export type Database = {
           invited_at?: string | null
           invited_by?: string | null
           is_super_admin?: boolean
+          max_concurrent_chats?: number | null
           role?: string
+          skills?: string[]
           status?: string
           tenant_id?: string
           user_id?: string
