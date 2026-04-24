@@ -237,7 +237,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const [profilesRes, emailsRes, funcionariosRes, departmentsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id, role, is_super_admin, status, access_status, funcionario_id")
+          .select("user_id, role, is_super_admin, status, access_status, funcionario_id, max_concurrent_chats, skills")
           .eq("tenant_id", tenantId!)
           .order("created_at"),
         (supabase.rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! }),
@@ -278,6 +278,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         status: string;
         access_status: string | null;
         funcionario_id: number | null;
+        max_concurrent_chats: number | null;
+        skills: string[] | null;
       }>).map((profileRow) => {
         const funcionario = profileRow.funcionario_id
           ? funcionarioById.get(profileRow.funcionario_id) ?? null
@@ -300,6 +302,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           department_name: department?.name ?? null,
           department_is_active: department?.is_active ?? null,
           access_status: profileRow.access_status,
+          max_concurrent_chats: profileRow.max_concurrent_chats,
+          skills: profileRow.skills ?? [],
         };
       });
     },
