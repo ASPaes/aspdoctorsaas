@@ -1,7 +1,7 @@
 import { useState, useEffect, KeyboardEvent } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, X, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -18,8 +18,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { AgentMultiSelect } from "./AgentMultiSelect";
 import type {
   AssignmentRule,
@@ -46,26 +49,35 @@ const STRATEGY_OPTIONS: Array<{
   value: AssignmentStrategy;
   title: string;
   description: string;
+  tooltip: string;
 }> = [
   {
     value: "least_loaded",
     title: "Menor carga (recomendada)",
     description: "Distribui para o agente com menos chats ativos no momento.",
+    tooltip:
+      "A cada nova conversa do setor, o sistema calcula quantos atendimentos ativos cada agente tem no momento e atribui para o que tem menos carga. Se dois agentes empatam, escolhe pela ordem. É a estratégia padrão recomendada para a maioria das operações por equilibrar a carga automaticamente.",
   },
   {
     value: "round_robin",
     title: "Rodízio",
     description: "Alternância cíclica entre os agentes do setor.",
+    tooltip:
+      "Distribui as conversas em ordem circular entre os agentes do setor (1º agente → 2º → 3º → volta ao 1º). Ignora quantos chats cada agente já tem. Útil quando a ordem de chegada é mais importante que a carga individual.",
   },
   {
     value: "fixed",
     title: "Fixa",
     description: "Todas as conversas para 1 agente específico.",
+    tooltip:
+      "Todas as conversas deste setor vão para 1 agente específico escolhido na regra. Se o agente estiver offline ou no limite, a política de overflow (fila ou backup) é aplicada. Útil para setores com um único responsável fixo.",
   },
   {
     value: "skill_based",
     title: "Por competência",
     description: "Agentes com as skills exigidas recebem os chats.",
+    tooltip:
+      "Como a Menor Carga, mas aplica um filtro: apenas agentes que tenham TODAS as competências (tags) exigidas na regra são elegíveis. Se nenhum agente tiver as skills, a política de overflow é acionada. Útil para demandas especializadas dentro de um setor.",
   },
 ];
 
@@ -79,20 +91,68 @@ const OVERFLOW_OPTIONS: Array<{
 ];
 
 export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: AssignmentRuleDialogProps) {
-  const { data: users = [] } = useTenantUsers();
-  const activeUsers = users.filter((u) => u.status === "ativo");
+  const { effectiveTenantId: tid } = useTenantFilter();
 
-  // Setores ativos do tenant
+  // Setores ativos do tenant (filtrado explicitamente para evitar vazamento cross-tenant em super_admin)
   const { data: departments = [] } = useQuery({
-    queryKey: ["support-departments-active"],
+    queryKey: ["support-departments-active-dialog", tid],
+    enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
         .select("id, name")
+        .eq("tenant_id", tid as string)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Usuários do tenant enriquecidos com nome do funcionário e setor
+  const { data: enrichedUsers = [] } = useQuery({
+    queryKey: ["rule-dialog-users", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("user_id, role, status, access_status, funcionario_id")
+        .eq("tenant_id", tid as string)
+        .eq("status", "ativo")
+        .eq("access_status", "active");
+      if (pErr) throw pErr;
+
+      const funcIds = (profiles ?? [])
+        .map((p) => p.funcionario_id)
+        .filter((v): v is number => Boolean(v));
+      const { data: funcionarios = [] } = await supabase
+        .from("funcionarios")
+        .select("id, nome, department_id")
+        .in("id", funcIds.length ? funcIds : [0]);
+
+      const deptIds = Array.from(
+        new Set((funcionarios ?? []).map((f) => f.department_id).filter((v): v is string => Boolean(v))),
+      );
+      const { data: depts = [] } = await supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("tenant_id", tid as string)
+        .in("id", deptIds.length ? deptIds : ["00000000-0000-0000-0000-000000000000"]);
+
+      const funcMap = new Map((funcionarios ?? []).map((f) => [f.id, f]));
+      const deptMap = new Map((depts ?? []).map((d) => [d.id, d.name]));
+
+      return (profiles ?? [])
+        .map((p) => {
+          const func = p.funcionario_id ? funcMap.get(p.funcionario_id) : null;
+          return {
+            user_id: p.user_id,
+            role: p.role,
+            funcionario_nome: func?.nome ?? "Sem vínculo",
+            department_name: func?.department_id ? deptMap.get(func.department_id) ?? "—" : "—",
+          };
+        })
+        .sort((a, b) => (a.funcionario_nome || "").localeCompare(b.funcionario_nome || ""));
     },
   });
 
@@ -247,28 +307,44 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
           <div className="space-y-3">
             <Label>Estratégia de Distribuição</Label>
             <RadioGroup value={strategy} onValueChange={(v) => setStrategy(v as AssignmentStrategy)}>
-              {STRATEGY_OPTIONS.map((opt) => (
-                <div
-                  key={opt.value}
-                  className={cn(
-                    "flex items-start space-x-2 rounded-lg border p-3 transition-colors",
-                    strategy === opt.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border",
-                  )}
-                >
-                  <RadioGroupItem value={opt.value} id={`strategy-${opt.value}`} className="mt-1" />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor={`strategy-${opt.value}`}
-                      className="font-medium cursor-pointer"
-                    >
-                      {opt.title}
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
+              <TooltipProvider delayDuration={200}>
+                {STRATEGY_OPTIONS.map((opt) => (
+                  <div
+                    key={opt.value}
+                    className={cn(
+                      "flex items-start space-x-2 rounded-lg border p-3 transition-colors",
+                      strategy === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-border",
+                    )}
+                  >
+                    <RadioGroupItem value={opt.value} id={`strategy-${opt.value}`} className="mt-1" />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor={`strategy-${opt.value}`}
+                        className="font-medium cursor-pointer"
+                      >
+                        {opt.title}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+                          aria-label={`Ajuda sobre ${opt.title}`}
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        <p className="text-xs leading-relaxed">{opt.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                </div>
-              ))}
+                ))}
+              </TooltipProvider>
             </RadioGroup>
           </div>
 
@@ -287,9 +363,14 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
                     <SelectValue placeholder="Selecionar agente..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {activeUsers.map((user) => (
+                    {enrichedUsers.map((user) => (
                       <SelectItem key={user.user_id} value={user.user_id}>
-                        {user.email} ({user.role})
+                        <div className="flex flex-col">
+                          <span className="font-medium">{user.funcionario_nome}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {user.department_name} · {user.role}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -398,9 +479,14 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
                       <SelectValue placeholder="Selecionar agente..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeUsers.map((user) => (
+                      {enrichedUsers.map((user) => (
                         <SelectItem key={user.user_id} value={user.user_id}>
-                          {user.email} ({user.role})
+                          <div className="flex flex-col">
+                            <span className="font-medium">{user.funcionario_nome}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {user.department_name} · {user.role}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
