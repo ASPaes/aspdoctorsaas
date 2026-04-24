@@ -1,7 +1,7 @@
 import { useState, useEffect, KeyboardEvent } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, X, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -18,8 +18,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { AgentMultiSelect } from "./AgentMultiSelect";
 import type {
   AssignmentRule,
