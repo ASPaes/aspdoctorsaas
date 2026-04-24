@@ -12,6 +12,8 @@ export interface TenantProfile {
   is_super_admin: boolean;
   created_at: string;
   funcionario_id: number | null;
+  max_concurrent_chats: number | null;
+  skills: string[];
 }
 
 export interface TenantInvite {
