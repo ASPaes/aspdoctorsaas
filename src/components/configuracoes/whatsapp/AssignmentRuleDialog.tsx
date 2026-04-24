@@ -35,7 +35,7 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
   const { data: users = [] } = useTenantUsers();
   const activeUsers = users.filter(u => u.status === 'ativo');
 
-  const [ruleType, setRuleType] = useState<'fixed' | 'round_robin'>(rule?.rule_type || 'fixed');
+  const [ruleType, setRuleType] = useState<'fixed' | 'round_robin'>((rule?.rule_type as 'fixed' | 'round_robin') || 'fixed');
   const [roundRobinAgents, setRoundRobinAgents] = useState<string[]>(rule?.round_robin_agents || []);
 
   const { register, handleSubmit, watch, setValue, reset } = useForm<FormData>({
