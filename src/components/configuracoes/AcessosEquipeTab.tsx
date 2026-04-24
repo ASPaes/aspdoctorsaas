@@ -165,6 +165,101 @@ function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: str
   queryClient.setQueryData(accessEquipeQueryKeys.departments(tenantId), []);
 }
 
+// ========== Admin-only cells (Limite & Competências) ==========
+
+function MaxChatsCell({
+  user,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  onSave: (value: number | null) => void;
+  isPending: boolean;
+}) {
+  const initial = user.max_concurrent_chats;
+  return (
+    <Input
+      key={`max-${user.user_id}-${initial ?? "null"}`}
+      type="number"
+      min={0}
+      max={100}
+      defaultValue={initial ?? ""}
+      placeholder="Padrão"
+      disabled={isPending}
+      className="w-20 h-8 text-sm"
+      onBlur={(e) => {
+        const raw = e.target.value.trim();
+        if (raw === "") {
+          if (initial === null || initial === undefined) return;
+          onSave(null);
+          return;
+        }
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < 0 || n > 100) return;
+        if (n === initial) return;
+        onSave(n);
+      }}
+    />
+  );
+}
+
+function SkillsCell({
+  user,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  onSave: (next: string[]) => void;
+  isPending: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+  const skills = user.skills ?? [];
+
+  const handleAdd = () => {
+    const tag = draft.trim().toLowerCase().slice(0, 20);
+    if (!tag) return;
+    if (skills.includes(tag)) {
+      setDraft("");
+      return;
+    }
+    onSave([...skills, tag]);
+    setDraft("");
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 max-w-xs">
+      {skills.map((tag) => (
+        <Badge key={tag} variant="secondary" className="gap-1 pr-1 text-xs">
+          <span>{tag}</span>
+          <button
+            type="button"
+            onClick={() => onSave(skills.filter((t) => t !== tag))}
+            disabled={isPending}
+            className="hover:bg-muted-foreground/20 rounded-sm p-0.5 disabled:opacity-50"
+            aria-label={`Remover ${tag}`}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleAdd();
+          }
+        }}
+        disabled={isPending}
+        placeholder="+ tag"
+        maxLength={20}
+        className="h-7 w-24 text-xs"
+      />
+    </div>
+  );
+}
+
 // ========== Main Component ==========
 
 export default function AcessosEquipeTab() {
@@ -582,6 +677,10 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
     onError: (err: any) => sonnerToast.error(err.message),
   });
+
+  const updateMaxChatsMutation = useUpdateUserMaxConcurrentChats();
+  const updateSkillsMutation = useUpdateUserSkills();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const handleSendInvite = () => {
     if (!selectedFunc || !selectedFunc.email) return;
