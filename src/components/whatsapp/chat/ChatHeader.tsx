@@ -60,6 +60,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const availability = useAgentAvailability();
 
   // Client link status
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
