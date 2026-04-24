@@ -48,6 +48,8 @@ export function AssignmentRulesManager() {
         <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />Nova Regra</Button>
       </div>
 
+      <DistributionEngineToggle />
+
       {rules.length === 0 ? (
         <div className="text-center py-12 border border-dashed border-border rounded-lg">
           <p className="text-muted-foreground mb-4">Nenhuma regra de atribuição configurada</p>
