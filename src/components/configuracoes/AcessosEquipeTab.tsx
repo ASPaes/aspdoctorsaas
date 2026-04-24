@@ -1012,6 +1012,30 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                   <TableHead>Papel</TableHead>
                   <TableHead>Acesso</TableHead>
                   <TableHead>Status</TableHead>
+                  {isAdmin && (
+                    <>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">Limite</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Quantos atendimentos simultâneos o agente pode receber. Em branco = usa o padrão do tenant (5).
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">Competências</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Tags de especialidade usadas na distribuição por competência.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1148,6 +1172,46 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      {isAdmin && (
+                        <>
+                          <TableCell>
+                            <MaxChatsCell
+                              user={u}
+                              isPending={updateMaxChatsMutation.isPending}
+                              onSave={(value) =>
+                                updateMaxChatsMutation.mutate(
+                                  { userId: u.user_id, maxConcurrentChats: value },
+                                  {
+                                    onSuccess: () => {
+                                      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+                                      sonnerToast.success("Limite atualizado.");
+                                    },
+                                    onError: (err: any) => sonnerToast.error(err.message),
+                                  }
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <SkillsCell
+                              user={u}
+                              isPending={updateSkillsMutation.isPending}
+                              onSave={(next) =>
+                                updateSkillsMutation.mutate(
+                                  { userId: u.user_id, skills: next },
+                                  {
+                                    onSuccess: () => {
+                                      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+                                      sonnerToast.success("Competências atualizadas.");
+                                    },
+                                    onError: (err: any) => sonnerToast.error(err.message),
+                                  }
+                                )
+                              }
+                            />
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   );
                 })}
