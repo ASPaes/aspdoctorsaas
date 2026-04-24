@@ -6,7 +6,15 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import {
   useTenantInfo,
   useCancelInvite,
+  useUpdateUserMaxConcurrentChats,
+  useUpdateUserSkills,
 } from "@/hooks/useTenantUsers";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -89,6 +97,8 @@ interface AccessUser {
   department_name: string | null;
   department_is_active: boolean | null;
   access_status: string | null;
+  max_concurrent_chats: number | null;
+  skills: string[] | null;
 }
 
 interface Department {
