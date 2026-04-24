@@ -9,6 +9,8 @@ import {
   useCreateInvite,
   useCancelInvite,
   useUpdateUserFuncionario,
+  useUpdateUserMaxConcurrentChats,
+  useUpdateUserSkills,
 } from "@/hooks/useTenantUsers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +22,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SkillsTagInput } from "./SkillsTagInput";
 import { toast } from "sonner";
-import { Users, UserPlus, Trash2, Loader2, Copy } from "lucide-react";
+import { Users, UserPlus, Trash2, Loader2, Copy, HelpCircle } from "lucide-react";
 
 export default function UsuariosTab() {
   const { profile } = useAuth();
@@ -33,7 +37,11 @@ export default function UsuariosTab() {
   const createInvite = useCreateInvite();
   const cancelInvite = useCancelInvite();
   const updateFuncionario = useUpdateUserFuncionario();
+  const updateMaxChats = useUpdateUserMaxConcurrentChats();
+  const updateSkills = useUpdateUserSkills();
   const { effectiveTenantId: tid } = useTenantFilter();
+
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const { data: funcionarios = [] } = useQuery({
     queryKey: ["funcionarios-for-users", tid],
@@ -123,6 +131,7 @@ export default function UsuariosTab() {
           <CardTitle>Usuários</CardTitle>
         </CardHeader>
         <CardContent>
+          <TooltipProvider delayDuration={200}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -130,6 +139,36 @@ export default function UsuariosTab() {
                 <TableHead>Funcionário</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
+                {isAdmin && (
+                  <>
+                    <TableHead>
+                      <span className="inline-flex items-center gap-1">
+                        Limite
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            Quantos atendimentos simultâneos este agente pode receber. Deixe em branco para usar o padrão do tenant (5).
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
+                    </TableHead>
+                    <TableHead>
+                      <span className="inline-flex items-center gap-1">
+                        Competências
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            Tags de especialidade do agente. Usadas na distribuição por competência.
+                          </TooltipContent>
+                        </Tooltip>
+                      </span>
+                    </TableHead>
+                  </>
+                )}
                 <TableHead>Criado em</TableHead>
               </TableRow>
             </TableHeader>
@@ -193,6 +232,61 @@ export default function UsuariosTab() {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  {isAdmin && (
+                    <>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          defaultValue={u.max_concurrent_chats ?? ""}
+                          placeholder="Padrão"
+                          disabled={updateMaxChats.isPending}
+                          className="w-20 text-sm"
+                          onBlur={(e) => {
+                            const raw = e.target.value.trim();
+                            const initial = u.max_concurrent_chats;
+                            if (raw === "") {
+                              if (initial === null || initial === undefined) return;
+                              updateMaxChats.mutate(
+                                { userId: u.user_id, maxConcurrentChats: null },
+                                {
+                                  onSuccess: () => toast.success("Limite atualizado."),
+                                  onError: (err: any) => toast.error(err.message),
+                                }
+                              );
+                              return;
+                            }
+                            const n = Number(raw);
+                            if (!Number.isFinite(n) || n < 0 || n > 100) return;
+                            if (n === initial) return;
+                            updateMaxChats.mutate(
+                              { userId: u.user_id, maxConcurrentChats: n },
+                              {
+                                onSuccess: () => toast.success("Limite atualizado."),
+                                onError: (err: any) => toast.error(err.message),
+                              }
+                            );
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <SkillsTagInput
+                          value={u.skills ?? []}
+                          disabled={updateSkills.isPending}
+                          onChange={(next) => {
+                            updateSkills.mutate(
+                              { userId: u.user_id, skills: next },
+                              {
+                                onSuccess: () => toast.success("Competências atualizadas."),
+                                onError: (err: any) => toast.error(err.message),
+                              }
+                            );
+                          }}
+                        />
+                      </TableCell>
+                    </>
+                  )}
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(u.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
@@ -200,6 +294,7 @@ export default function UsuariosTab() {
               ))}
             </TableBody>
           </Table>
+          </TooltipProvider>
         </CardContent>
       </Card>
 

@@ -12,6 +12,8 @@ export interface TenantProfile {
   is_super_admin: boolean;
   created_at: string;
   funcionario_id: number | null;
+  max_concurrent_chats: number | null;
+  skills: string[];
 }
 
 export interface TenantInvite {
@@ -133,6 +135,34 @@ export function useUpdateUserFuncionario() {
       const { error } = await supabase
         .from("profiles")
         .update({ funcionario_id: funcionarioId } as any)
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
+export function useUpdateUserMaxConcurrentChats() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, maxConcurrentChats }: { userId: string; maxConcurrentChats: number | null }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ max_concurrent_chats: maxConcurrentChats } as any)
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
+export function useUpdateUserSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, skills }: { userId: string; skills: string[] }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ skills } as any)
         .eq("user_id", userId);
       if (error) throw error;
     },

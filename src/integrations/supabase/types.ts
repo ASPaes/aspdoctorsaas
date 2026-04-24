@@ -275,41 +275,65 @@ export type Database = {
       }
       assignment_rules: {
         Row: {
+          acceptance_timeout_seconds: number | null
           created_at: string
+          department_id: string | null
+          excluded_agents: string[]
+          fallback_agent_id: string | null
           fixed_agent_id: string | null
           id: string
           instance_id: string
           is_active: boolean
           name: string
+          overflow_policy: string
+          required_skills: string[]
+          respect_business_hours: boolean
           round_robin_agents: string[] | null
           round_robin_last_index: number
           rule_type: string
+          strategy: string | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          acceptance_timeout_seconds?: number | null
           created_at?: string
+          department_id?: string | null
+          excluded_agents?: string[]
+          fallback_agent_id?: string | null
           fixed_agent_id?: string | null
           id?: string
           instance_id: string
           is_active?: boolean
           name: string
+          overflow_policy?: string
+          required_skills?: string[]
+          respect_business_hours?: boolean
           round_robin_agents?: string[] | null
           round_robin_last_index?: number
           rule_type?: string
+          strategy?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          acceptance_timeout_seconds?: number | null
           created_at?: string
+          department_id?: string | null
+          excluded_agents?: string[]
+          fallback_agent_id?: string | null
           fixed_agent_id?: string | null
           id?: string
           instance_id?: string
           is_active?: boolean
           name?: string
+          overflow_policy?: string
+          required_skills?: string[]
+          respect_business_hours?: boolean
           round_robin_agents?: string[] | null
           round_robin_last_index?: number
           rule_type?: string
+          strategy?: string | null
           tenant_id?: string
           updated_at?: string
         }
@@ -326,6 +350,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_assignment_rules_department"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
             referencedColumns: ["id"]
           },
         ]
@@ -2312,6 +2343,7 @@ export type Database = {
       }
       support_attendances: {
         Row: {
+          acceptance_deadline_at: string | null
           ai_category: string | null
           ai_problem: string | null
           ai_solution: string | null
@@ -2340,10 +2372,14 @@ export type Database = {
           id: string
           last_customer_message_at: string | null
           last_operator_message_at: string | null
+          last_queue_reason: string | null
           msg_agent_count: number
           msg_customer_count: number
           opened_at: string
           opened_by: string | null
+          queue_priority: number
+          queue_retries: number
+          queued_at: string | null
           reopen_count: number | null
           reopened_at: string | null
           reopened_from: string | null
@@ -2362,6 +2398,7 @@ export type Database = {
           wait_seconds: number
         }
         Insert: {
+          acceptance_deadline_at?: string | null
           ai_category?: string | null
           ai_problem?: string | null
           ai_solution?: string | null
@@ -2390,10 +2427,14 @@ export type Database = {
           id?: string
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
+          last_queue_reason?: string | null
           msg_agent_count?: number
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          queue_priority?: number
+          queue_retries?: number
+          queued_at?: string | null
           reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
@@ -2412,6 +2453,7 @@ export type Database = {
           wait_seconds?: number
         }
         Update: {
+          acceptance_deadline_at?: string | null
           ai_category?: string | null
           ai_problem?: string | null
           ai_solution?: string | null
@@ -2440,10 +2482,14 @@ export type Database = {
           id?: string
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
+          last_queue_reason?: string | null
           msg_agent_count?: number
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          queue_priority?: number
+          queue_retries?: number
+          queued_at?: string | null
           reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
@@ -4570,6 +4616,11 @@ export type Database = {
       }
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       exec_db_maintenance: { Args: { action: string }; Returns: string }
+      fn_assign_conversation_if_ready: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      fn_check_acceptance_timeouts: { Args: never; Returns: Json }
       fn_cohort_logos:
         | {
             Args: {
@@ -4606,6 +4657,20 @@ export type Database = {
               tenant_id: string
             }[]
           }
+      fn_current_chat_count: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: number
+      }
+      fn_dispatch_next_in_queue: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: Json
+      }
+      fn_effective_chat_limit: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: number
+      }
+      fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
+      fn_process_ura_timeouts: { Args: never; Returns: Json }
       get_ai_cost_metrics: {
         Args: { p_date_from?: string; p_date_to?: string; p_tenant_id?: string }
         Returns: Json
@@ -4700,7 +4765,9 @@ export type Database = {
           email: string
           funcionario_id: number
           is_super_admin: boolean
+          max_concurrent_chats: number
           role: string
+          skills: string[]
           status: string
           user_id: string
         }[]
