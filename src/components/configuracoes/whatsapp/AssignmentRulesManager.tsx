@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AssignmentRuleCard } from "./AssignmentRuleCard";
 import { AssignmentRuleDialog } from "./AssignmentRuleDialog";
+import { DistributionEngineToggle } from "./DistributionEngineToggle";
 import { useAssignmentRules, type AssignmentRule } from "@/components/whatsapp/hooks/useAssignmentRules";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -46,6 +47,8 @@ export function AssignmentRulesManager() {
         </div>
         <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />Nova Regra</Button>
       </div>
+
+      <DistributionEngineToggle />
 
       {rules.length === 0 ? (
         <div className="text-center py-12 border border-dashed border-border rounded-lg">

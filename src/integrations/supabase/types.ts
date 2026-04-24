@@ -282,7 +282,7 @@ export type Database = {
           fallback_agent_id: string | null
           fixed_agent_id: string | null
           id: string
-          instance_id: string
+          instance_id: string | null
           is_active: boolean
           name: string
           overflow_policy: string
@@ -303,7 +303,7 @@ export type Database = {
           fallback_agent_id?: string | null
           fixed_agent_id?: string | null
           id?: string
-          instance_id: string
+          instance_id?: string | null
           is_active?: boolean
           name: string
           overflow_policy?: string
@@ -324,7 +324,7 @@ export type Database = {
           fallback_agent_id?: string | null
           fixed_agent_id?: string | null
           id?: string
-          instance_id?: string
+          instance_id?: string | null
           is_active?: boolean
           name?: string
           overflow_policy?: string
