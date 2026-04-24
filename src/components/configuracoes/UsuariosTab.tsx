@@ -37,7 +37,11 @@ export default function UsuariosTab() {
   const createInvite = useCreateInvite();
   const cancelInvite = useCancelInvite();
   const updateFuncionario = useUpdateUserFuncionario();
+  const updateMaxChats = useUpdateUserMaxConcurrentChats();
+  const updateSkills = useUpdateUserSkills();
   const { effectiveTenantId: tid } = useTenantFilter();
+
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const { data: funcionarios = [] } = useQuery({
     queryKey: ["funcionarios-for-users", tid],
