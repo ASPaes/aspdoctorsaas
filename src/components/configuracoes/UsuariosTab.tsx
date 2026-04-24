@@ -9,6 +9,8 @@ import {
   useCreateInvite,
   useCancelInvite,
   useUpdateUserFuncionario,
+  useUpdateUserMaxConcurrentChats,
+  useUpdateUserSkills,
 } from "@/hooks/useTenantUsers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +22,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SkillsTagInput } from "./SkillsTagInput";
 import { toast } from "sonner";
-import { Users, UserPlus, Trash2, Loader2, Copy } from "lucide-react";
+import { Users, UserPlus, Trash2, Loader2, Copy, HelpCircle } from "lucide-react";
 
 export default function UsuariosTab() {
   const { profile } = useAuth();
