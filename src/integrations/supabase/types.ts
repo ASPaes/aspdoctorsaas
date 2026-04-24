@@ -4765,7 +4765,9 @@ export type Database = {
           email: string
           funcionario_id: number
           is_super_admin: boolean
+          max_concurrent_chats: number
           role: string
+          skills: string[]
           status: string
           user_id: string
         }[]
