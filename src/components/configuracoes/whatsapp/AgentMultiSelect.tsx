@@ -110,37 +110,44 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] p-1 max-h-[300px] overflow-y-auto"
+          className="w-[var(--radix-popover-trigger-width)] p-0"
           align="start"
           sideOffset={4}
+          onWheel={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
         >
-          {enrichedUsers.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum agente encontrado.
-            </div>
-          ) : (
-            enrichedUsers.map((user) => {
-              const isSelected = value.includes(user.user_id);
-              return (
-                <button
-                  key={user.user_id}
-                  type="button"
-                  onClick={() => toggleAgent(user.user_id)}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                >
-                  <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                    <Check className={cn("h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
-                  </span>
-                  <div className="flex flex-col min-w-0 text-left">
-                    <span className="font-medium truncate">{user.funcionario_nome}</span>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {user.department_name} · {user.role}
+          <div
+            className="max-h-[300px] overflow-y-auto overscroll-contain p-1"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {enrichedUsers.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Nenhum agente encontrado.
+              </div>
+            ) : (
+              enrichedUsers.map((user) => {
+                const isSelected = value.includes(user.user_id);
+                return (
+                  <button
+                    key={user.user_id}
+                    type="button"
+                    onClick={() => toggleAgent(user.user_id)}
+                    className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                  >
+                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                      <Check className={cn("h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
                     </span>
-                  </div>
-                </button>
-              );
-            })
-          )}
+                    <div className="flex flex-col min-w-0 text-left">
+                      <span className="font-medium truncate">{user.funcionario_nome}</span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {user.department_name} · {user.role}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </PopoverContent>
       </Popover>
       {selectedUsers.length > 0 && (
