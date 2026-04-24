@@ -31,6 +31,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { useSupportConfig } from '@/hooks/useSupportConfig';
+import { useAuth } from "@/contexts/AuthContext";
+import { useAgentAvailability } from "@/hooks/useAgentAvailability";
+import { SectorQueueBadge } from "./SectorQueueBadge";
 
 interface Props {
   conversation: ConversationWithContact;
