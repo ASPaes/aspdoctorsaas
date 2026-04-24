@@ -47,7 +47,7 @@ export default function AssignmentTab() {
     setForm({
       name: rule.name,
       instance_id: rule.instance_id,
-      rule_type: rule.rule_type,
+      rule_type: rule.rule_type as "fixed" | "round_robin",
     });
     setDialogOpen(true);
   };

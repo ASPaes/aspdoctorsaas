@@ -35,14 +35,14 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
   const { data: users = [] } = useTenantUsers();
   const activeUsers = users.filter(u => u.status === 'ativo');
 
-  const [ruleType, setRuleType] = useState<'fixed' | 'round_robin'>(rule?.rule_type || 'fixed');
+  const [ruleType, setRuleType] = useState<'fixed' | 'round_robin'>((rule?.rule_type as 'fixed' | 'round_robin') || 'fixed');
   const [roundRobinAgents, setRoundRobinAgents] = useState<string[]>(rule?.round_robin_agents || []);
 
   const { register, handleSubmit, watch, setValue, reset } = useForm<FormData>({
     defaultValues: {
       name: rule?.name || "",
       instance_id: rule?.instance_id || "",
-      rule_type: rule?.rule_type || 'fixed',
+      rule_type: (rule?.rule_type as 'fixed' | 'round_robin') || 'fixed',
       fixed_agent_id: rule?.fixed_agent_id || "",
       round_robin_agents: rule?.round_robin_agents || [],
     },
@@ -50,12 +50,12 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
 
   useEffect(() => {
     if (open) {
-      setRuleType(rule?.rule_type || 'fixed');
+      setRuleType((rule?.rule_type as 'fixed' | 'round_robin') || 'fixed');
       setRoundRobinAgents(rule?.round_robin_agents || []);
       reset({
         name: rule?.name || "",
         instance_id: rule?.instance_id || "",
-        rule_type: rule?.rule_type || 'fixed',
+        rule_type: (rule?.rule_type as 'fixed' | 'round_robin') || 'fixed',
         fixed_agent_id: rule?.fixed_agent_id || "",
         round_robin_agents: rule?.round_robin_agents || [],
       });
