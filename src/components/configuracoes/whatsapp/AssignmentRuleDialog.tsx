@@ -307,28 +307,44 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
           <div className="space-y-3">
             <Label>Estratégia de Distribuição</Label>
             <RadioGroup value={strategy} onValueChange={(v) => setStrategy(v as AssignmentStrategy)}>
-              {STRATEGY_OPTIONS.map((opt) => (
-                <div
-                  key={opt.value}
-                  className={cn(
-                    "flex items-start space-x-2 rounded-lg border p-3 transition-colors",
-                    strategy === opt.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border",
-                  )}
-                >
-                  <RadioGroupItem value={opt.value} id={`strategy-${opt.value}`} className="mt-1" />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor={`strategy-${opt.value}`}
-                      className="font-medium cursor-pointer"
-                    >
-                      {opt.title}
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
+              <TooltipProvider delayDuration={200}>
+                {STRATEGY_OPTIONS.map((opt) => (
+                  <div
+                    key={opt.value}
+                    className={cn(
+                      "flex items-start space-x-2 rounded-lg border p-3 transition-colors",
+                      strategy === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-border",
+                    )}
+                  >
+                    <RadioGroupItem value={opt.value} id={`strategy-${opt.value}`} className="mt-1" />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor={`strategy-${opt.value}`}
+                        className="font-medium cursor-pointer"
+                      >
+                        {opt.title}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+                          aria-label={`Ajuda sobre ${opt.title}`}
+                        >
+                          <HelpCircle className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="max-w-xs">
+                        <p className="text-xs leading-relaxed">{opt.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                </div>
-              ))}
+                ))}
+              </TooltipProvider>
             </RadioGroup>
           </div>
 
