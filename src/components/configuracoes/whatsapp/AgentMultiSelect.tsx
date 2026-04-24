@@ -8,7 +8,9 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 interface AgentMultiSelectProps {
   value: string[];
@@ -16,10 +18,70 @@ interface AgentMultiSelectProps {
 }
 
 export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
-  const { data: users = [] } = useTenantUsers();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
-  const activeUsers = users.filter(u => u.status === 'ativo');
-  const selectedUsers = activeUsers.filter(u => value.includes(u.user_id));
+  const { data: enrichedUsers = [] } = useQuery({
+    queryKey: ["agent-multiselect-users", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("user_id, role, status, access_status, funcionario_id")
+        .eq("tenant_id", tid as string)
+        .eq("status", "ativo")
+        .eq("access_status", "active");
+      if (pErr) throw pErr;
+
+      const funcIds = (profiles ?? [])
+        .map(p => p.funcionario_id)
+        .filter(Boolean) as number[];
+
+      const { data: funcionarios = [] } = await supabase
+        .from("funcionarios")
+        .select("id, nome, department_id")
+        .in("id", funcIds.length ? funcIds : [0]);
+
+      const deptIds = Array.from(
+        new Set(
+          (funcionarios ?? [])
+            .map(f => f.department_id)
+            .filter(Boolean) as string[]
+        )
+      );
+
+      const { data: depts = [] } = await supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("tenant_id", tid as string)
+        .in(
+          "id",
+          deptIds.length
+            ? deptIds
+            : ["00000000-0000-0000-0000-000000000000"]
+        );
+
+      const funcMap = new Map((funcionarios ?? []).map(f => [f.id, f]));
+      const deptMap = new Map((depts ?? []).map(d => [d.id, d.name]));
+
+      return (profiles ?? [])
+        .map(p => {
+          const func = p.funcionario_id ? funcMap.get(p.funcionario_id) : null;
+          return {
+            user_id: p.user_id,
+            role: p.role,
+            funcionario_nome: func?.nome ?? "Sem vínculo",
+            department_name: func?.department_id
+              ? (deptMap.get(func.department_id) ?? "—")
+              : "—",
+          };
+        })
+        .sort((a, b) =>
+          (a.funcionario_nome || "").localeCompare(b.funcionario_nome || "")
+        );
+    },
+  });
+
+  const selectedUsers = enrichedUsers.filter(u => value.includes(u.user_id));
 
   const toggleAgent = (userId: string) => {
     if (value.includes(userId)) {
@@ -38,7 +100,7 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
               <div className="flex gap-1 flex-wrap">
                 {selectedUsers.map((user) => (
                   <Badge key={user.user_id} variant="secondary" className="text-xs">
-                    {user.email}
+                    {user.funcionario_nome}
                   </Badge>
                 ))}
               </div>
@@ -52,15 +114,19 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
             <CommandInput placeholder="Buscar agente..." />
             <CommandEmpty>Nenhum agente encontrado.</CommandEmpty>
             <CommandGroup>
-              {activeUsers.map((user) => (
+              {enrichedUsers.map((user) => (
                 <CommandItem
                   key={user.user_id}
-                  value={user.email}
+                  value={user.funcionario_nome}
                   onSelect={() => toggleAgent(user.user_id)}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value.includes(user.user_id) ? "opacity-100" : "opacity-0")} />
-                  {user.email}
-                  <Badge variant="outline" className="ml-auto text-xs">{user.role}</Badge>
+                  <Check className={cn("mr-2 h-4 w-4 shrink-0", value.includes(user.user_id) ? "opacity-100" : "opacity-0")} />
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-medium truncate">{user.funcionario_nome}</span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {user.department_name} · {user.role}
+                    </span>
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
