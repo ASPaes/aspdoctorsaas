@@ -91,20 +91,68 @@ const OVERFLOW_OPTIONS: Array<{
 ];
 
 export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: AssignmentRuleDialogProps) {
-  const { data: users = [] } = useTenantUsers();
-  const activeUsers = users.filter((u) => u.status === "ativo");
+  const { effectiveTenantId: tid } = useTenantFilter();
 
-  // Setores ativos do tenant
+  // Setores ativos do tenant (filtrado explicitamente para evitar vazamento cross-tenant em super_admin)
   const { data: departments = [] } = useQuery({
-    queryKey: ["support-departments-active"],
+    queryKey: ["support-departments-active-dialog", tid],
+    enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
         .select("id, name")
+        .eq("tenant_id", tid as string)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  // Usuários do tenant enriquecidos com nome do funcionário e setor
+  const { data: enrichedUsers = [] } = useQuery({
+    queryKey: ["rule-dialog-users", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data: profiles, error: pErr } = await supabase
+        .from("profiles")
+        .select("user_id, role, status, access_status, funcionario_id")
+        .eq("tenant_id", tid as string)
+        .eq("status", "ativo")
+        .eq("access_status", "active");
+      if (pErr) throw pErr;
+
+      const funcIds = (profiles ?? [])
+        .map((p) => p.funcionario_id)
+        .filter((v): v is number => Boolean(v));
+      const { data: funcionarios = [] } = await supabase
+        .from("funcionarios")
+        .select("id, nome, department_id")
+        .in("id", funcIds.length ? funcIds : [0]);
+
+      const deptIds = Array.from(
+        new Set((funcionarios ?? []).map((f) => f.department_id).filter((v): v is string => Boolean(v))),
+      );
+      const { data: depts = [] } = await supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("tenant_id", tid as string)
+        .in("id", deptIds.length ? deptIds : ["00000000-0000-0000-0000-000000000000"]);
+
+      const funcMap = new Map((funcionarios ?? []).map((f) => [f.id, f]));
+      const deptMap = new Map((depts ?? []).map((d) => [d.id, d.name]));
+
+      return (profiles ?? [])
+        .map((p) => {
+          const func = p.funcionario_id ? funcMap.get(p.funcionario_id) : null;
+          return {
+            user_id: p.user_id,
+            role: p.role,
+            funcionario_nome: func?.nome ?? "Sem vínculo",
+            department_name: func?.department_id ? deptMap.get(func.department_id) ?? "—" : "—",
+          };
+        })
+        .sort((a, b) => (a.funcionario_nome || "").localeCompare(b.funcionario_nome || ""));
     },
   });
 
