@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem,
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
 import {
   Popover, PopoverContent, PopoverTrigger,
@@ -109,27 +109,33 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
+        <PopoverContent
+          className="w-[320px] p-0"
+          align="start"
+          sideOffset={4}
+        >
           <Command>
             <CommandInput placeholder="Buscar agente..." />
-            <CommandEmpty>Nenhum agente encontrado.</CommandEmpty>
-            <CommandGroup>
-              {enrichedUsers.map((user) => (
-                <CommandItem
-                  key={user.user_id}
-                  value={user.funcionario_nome}
-                  onSelect={() => toggleAgent(user.user_id)}
-                >
-                  <Check className={cn("mr-2 h-4 w-4 shrink-0", value.includes(user.user_id) ? "opacity-100" : "opacity-0")} />
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-medium truncate">{user.funcionario_nome}</span>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {user.department_name} · {user.role}
-                    </span>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            <CommandList className="max-h-[280px] overflow-y-auto">
+              <CommandEmpty>Nenhum agente encontrado.</CommandEmpty>
+              <CommandGroup>
+                {enrichedUsers.map((user) => (
+                  <CommandItem
+                    key={user.user_id}
+                    value={user.funcionario_nome}
+                    onSelect={() => toggleAgent(user.user_id)}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4 shrink-0", value.includes(user.user_id) ? "opacity-100" : "opacity-0")} />
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-medium truncate">{user.funcionario_nome}</span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {user.department_name} · {user.role}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
