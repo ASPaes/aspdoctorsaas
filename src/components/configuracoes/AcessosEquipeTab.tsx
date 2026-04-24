@@ -6,7 +6,15 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import {
   useTenantInfo,
   useCancelInvite,
+  useUpdateUserMaxConcurrentChats,
+  useUpdateUserSkills,
 } from "@/hooks/useTenantUsers";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -89,6 +97,8 @@ interface AccessUser {
   department_name: string | null;
   department_is_active: boolean | null;
   access_status: string | null;
+  max_concurrent_chats: number | null;
+  skills: string[] | null;
 }
 
 interface Department {
@@ -153,6 +163,101 @@ function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: str
   queryClient.setQueryData(accessEquipeQueryKeys.pendingInvites(tenantId), []);
   queryClient.setQueryData(accessEquipeQueryKeys.pendingApprovals(tenantId), []);
   queryClient.setQueryData(accessEquipeQueryKeys.departments(tenantId), []);
+}
+
+// ========== Admin-only cells (Limite & Competências) ==========
+
+function MaxChatsCell({
+  user,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  onSave: (value: number | null) => void;
+  isPending: boolean;
+}) {
+  const initial = user.max_concurrent_chats;
+  return (
+    <Input
+      key={`max-${user.user_id}-${initial ?? "null"}`}
+      type="number"
+      min={0}
+      max={100}
+      defaultValue={initial ?? ""}
+      placeholder="Padrão"
+      disabled={isPending}
+      className="w-20 h-8 text-sm"
+      onBlur={(e) => {
+        const raw = e.target.value.trim();
+        if (raw === "") {
+          if (initial === null || initial === undefined) return;
+          onSave(null);
+          return;
+        }
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < 0 || n > 100) return;
+        if (n === initial) return;
+        onSave(n);
+      }}
+    />
+  );
+}
+
+function SkillsCell({
+  user,
+  onSave,
+  isPending,
+}: {
+  user: AccessUser;
+  onSave: (next: string[]) => void;
+  isPending: boolean;
+}) {
+  const [draft, setDraft] = useState("");
+  const skills = user.skills ?? [];
+
+  const handleAdd = () => {
+    const tag = draft.trim().toLowerCase().slice(0, 20);
+    if (!tag) return;
+    if (skills.includes(tag)) {
+      setDraft("");
+      return;
+    }
+    onSave([...skills, tag]);
+    setDraft("");
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1 max-w-xs">
+      {skills.map((tag) => (
+        <Badge key={tag} variant="secondary" className="gap-1 pr-1 text-xs">
+          <span>{tag}</span>
+          <button
+            type="button"
+            onClick={() => onSave(skills.filter((t) => t !== tag))}
+            disabled={isPending}
+            className="hover:bg-muted-foreground/20 rounded-sm p-0.5 disabled:opacity-50"
+            aria-label={`Remover ${tag}`}
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </Badge>
+      ))}
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleAdd();
+          }
+        }}
+        disabled={isPending}
+        placeholder="+ tag"
+        maxLength={20}
+        className="h-7 w-24 text-xs"
+      />
+    </div>
+  );
 }
 
 // ========== Main Component ==========
@@ -227,7 +332,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       const [profilesRes, emailsRes, funcionariosRes, departmentsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id, role, is_super_admin, status, access_status, funcionario_id")
+          .select("user_id, role, is_super_admin, status, access_status, funcionario_id, max_concurrent_chats, skills")
           .eq("tenant_id", tenantId!)
           .order("created_at"),
         (supabase.rpc as any)("get_tenant_users_with_email", { p_tenant_id: tenantId! }),
@@ -268,6 +373,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         status: string;
         access_status: string | null;
         funcionario_id: number | null;
+        max_concurrent_chats: number | null;
+        skills: string[] | null;
       }>).map((profileRow) => {
         const funcionario = profileRow.funcionario_id
           ? funcionarioById.get(profileRow.funcionario_id) ?? null
@@ -290,6 +397,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           department_name: department?.name ?? null,
           department_is_active: department?.is_active ?? null,
           access_status: profileRow.access_status,
+          max_concurrent_chats: profileRow.max_concurrent_chats,
+          skills: profileRow.skills ?? [],
         };
       });
     },
@@ -568,6 +677,10 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     },
     onError: (err: any) => sonnerToast.error(err.message),
   });
+
+  const updateMaxChatsMutation = useUpdateUserMaxConcurrentChats();
+  const updateSkillsMutation = useUpdateUserSkills();
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
 
   const handleSendInvite = () => {
     if (!selectedFunc || !selectedFunc.email) return;
@@ -899,6 +1012,30 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                   <TableHead>Papel</TableHead>
                   <TableHead>Acesso</TableHead>
                   <TableHead>Status</TableHead>
+                  {isAdmin && (
+                    <>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">Limite</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Quantos atendimentos simultâneos o agente pode receber. Em branco = usa o padrão do tenant (5).
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">Competências</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Tags de especialidade usadas na distribuição por competência.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1035,6 +1172,46 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      {isAdmin && (
+                        <>
+                          <TableCell>
+                            <MaxChatsCell
+                              user={u}
+                              isPending={updateMaxChatsMutation.isPending}
+                              onSave={(value) =>
+                                updateMaxChatsMutation.mutate(
+                                  { userId: u.user_id, maxConcurrentChats: value },
+                                  {
+                                    onSuccess: () => {
+                                      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+                                      sonnerToast.success("Limite atualizado.");
+                                    },
+                                    onError: (err: any) => sonnerToast.error(err.message),
+                                  }
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <SkillsCell
+                              user={u}
+                              isPending={updateSkillsMutation.isPending}
+                              onSave={(next) =>
+                                updateSkillsMutation.mutate(
+                                  { userId: u.user_id, skills: next },
+                                  {
+                                    onSuccess: () => {
+                                      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
+                                      sonnerToast.success("Competências atualizadas.");
+                                    },
+                                    onError: (err: any) => sonnerToast.error(err.message),
+                                  }
+                                )
+                              }
+                            />
+                          </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   );
                 })}
