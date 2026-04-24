@@ -116,7 +116,7 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
         >
           <Command>
             <CommandInput placeholder="Buscar agente..." />
-            <CommandList className="max-h-[280px] overflow-y-auto">
+            <CommandList className="max-h-[280px] overflow-y-auto overscroll-contain">
               <CommandEmpty>Nenhum agente encontrado.</CommandEmpty>
               <CommandGroup>
                 {enrichedUsers.map((user) => (
