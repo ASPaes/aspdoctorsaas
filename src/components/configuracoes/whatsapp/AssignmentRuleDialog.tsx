@@ -49,26 +49,35 @@ const STRATEGY_OPTIONS: Array<{
   value: AssignmentStrategy;
   title: string;
   description: string;
+  tooltip: string;
 }> = [
   {
     value: "least_loaded",
     title: "Menor carga (recomendada)",
     description: "Distribui para o agente com menos chats ativos no momento.",
+    tooltip:
+      "A cada nova conversa do setor, o sistema calcula quantos atendimentos ativos cada agente tem no momento e atribui para o que tem menos carga. Se dois agentes empatam, escolhe pela ordem. É a estratégia padrão recomendada para a maioria das operações por equilibrar a carga automaticamente.",
   },
   {
     value: "round_robin",
     title: "Rodízio",
     description: "Alternância cíclica entre os agentes do setor.",
+    tooltip:
+      "Distribui as conversas em ordem circular entre os agentes do setor (1º agente → 2º → 3º → volta ao 1º). Ignora quantos chats cada agente já tem. Útil quando a ordem de chegada é mais importante que a carga individual.",
   },
   {
     value: "fixed",
     title: "Fixa",
     description: "Todas as conversas para 1 agente específico.",
+    tooltip:
+      "Todas as conversas deste setor vão para 1 agente específico escolhido na regra. Se o agente estiver offline ou no limite, a política de overflow (fila ou backup) é aplicada. Útil para setores com um único responsável fixo.",
   },
   {
     value: "skill_based",
     title: "Por competência",
     description: "Agentes com as skills exigidas recebem os chats.",
+    tooltip:
+      "Como a Menor Carga, mas aplica um filtro: apenas agentes que tenham TODAS as competências (tags) exigidas na regra são elegíveis. Se nenhum agente tiver as skills, a política de overflow é acionada. Útil para demandas especializadas dentro de um setor.",
   },
 ];
 
