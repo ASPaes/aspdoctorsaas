@@ -142,6 +142,34 @@ export function useUpdateUserFuncionario() {
   });
 }
 
+export function useUpdateUserMaxConcurrentChats() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, maxConcurrentChats }: { userId: string; maxConcurrentChats: number | null }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ max_concurrent_chats: maxConcurrentChats } as any)
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
+export function useUpdateUserSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, skills }: { userId: string; skills: string[] }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ skills } as any)
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant-users"] }),
+  });
+}
+
 export function useCreateInvite() {
   const qc = useQueryClient();
   const { profile } = useAuth();
