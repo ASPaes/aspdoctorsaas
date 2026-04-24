@@ -3,18 +3,38 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
+export type AssignmentStrategy = 'fixed' | 'round_robin' | 'least_loaded' | 'skill_based';
+export type OverflowPolicy = 'queue' | 'fallback_agent' | 'manual';
+
 export interface AssignmentRule {
   id: string;
   name: string;
-  instance_id: string;
-  rule_type: 'fixed' | 'round_robin';
-  fixed_agent_id: string | null;
-  round_robin_agents: string[];
-  round_robin_last_index: number;
-  is_active: boolean;
   tenant_id: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
+
+  // Novo modelo (usar estes daqui para frente)
+  department_id: string | null;
+  strategy: AssignmentStrategy | null;
+  excluded_agents: string[];
+  required_skills: string[];
+  overflow_policy: OverflowPolicy;
+  fallback_agent_id: string | null;
+  acceptance_timeout_seconds: number | null;
+  respect_business_hours: boolean;
+
+  // Estratégia 'fixed' usa este campo (mantido)
+  fixed_agent_id: string | null;
+
+  // Deprecated — mantidos para compatibilidade com código antigo e rollback
+  /** @deprecated use department_id */
+  instance_id: string | null;
+  /** @deprecated use strategy */
+  rule_type: string | null;
+  /** @deprecated use excluded_agents + membros do setor */
+  round_robin_agents: string[];
+  round_robin_last_index: number;
 }
 
 export const useAssignmentRules = () => {
