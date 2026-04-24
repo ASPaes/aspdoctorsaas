@@ -463,9 +463,14 @@ export function AssignmentRuleDialog({ open, onOpenChange, rule, onSave }: Assig
                       <SelectValue placeholder="Selecionar agente..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {activeUsers.map((user) => (
+                      {enrichedUsers.map((user) => (
                         <SelectItem key={user.user_id} value={user.user_id}>
-                          {user.email} ({user.role})
+                          <div className="flex flex-col">
+                            <span className="font-medium">{user.funcionario_nome}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {user.department_name} · {user.role}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
