@@ -1,9 +1,5 @@
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
@@ -95,7 +91,10 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
     <div className="space-y-2">
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" className="w-full justify-start min-h-[40px] h-auto">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[40px]"
+          >
             {selectedUsers.length > 0 ? (
               <div className="flex gap-1 flex-wrap">
                 {selectedUsers.map((user) => (
@@ -107,36 +106,41 @@ export function AgentMultiSelect({ value, onChange }: AgentMultiSelectProps) {
             ) : (
               <span className="text-muted-foreground">Selecionar agentes...</span>
             )}
-          </Button>
+            <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+          </button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[320px] p-0"
+          className="w-[var(--radix-popover-trigger-width)] p-1 max-h-[300px] overflow-y-auto"
           align="start"
           sideOffset={4}
         >
-          <Command>
-            <CommandInput placeholder="Buscar agente..." />
-            <CommandList className="max-h-[280px] overflow-y-auto overscroll-contain">
-              <CommandEmpty>Nenhum agente encontrado.</CommandEmpty>
-              <CommandGroup>
-                {enrichedUsers.map((user) => (
-                  <CommandItem
-                    key={user.user_id}
-                    value={user.funcionario_nome}
-                    onSelect={() => toggleAgent(user.user_id)}
-                  >
-                    <Check className={cn("mr-2 h-4 w-4 shrink-0", value.includes(user.user_id) ? "opacity-100" : "opacity-0")} />
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-medium truncate">{user.funcionario_nome}</span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {user.department_name} · {user.role}
-                      </span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
+          {enrichedUsers.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum agente encontrado.
+            </div>
+          ) : (
+            enrichedUsers.map((user) => {
+              const isSelected = value.includes(user.user_id);
+              return (
+                <button
+                  key={user.user_id}
+                  type="button"
+                  onClick={() => toggleAgent(user.user_id)}
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                >
+                  <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                    <Check className={cn("h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                  </span>
+                  <div className="flex flex-col min-w-0 text-left">
+                    <span className="font-medium truncate">{user.funcionario_nome}</span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {user.department_name} · {user.role}
+                    </span>
+                  </div>
+                </button>
+              );
+            })
+          )}
         </PopoverContent>
       </Popover>
       {selectedUsers.length > 0 && (
