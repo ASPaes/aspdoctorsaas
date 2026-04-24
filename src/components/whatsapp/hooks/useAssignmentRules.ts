@@ -53,7 +53,7 @@ export const useAssignmentRules = () => {
   });
 
   const createRule = useMutation({
-    mutationFn: async (rule: Omit<AssignmentRule, 'id' | 'created_at' | 'updated_at' | 'round_robin_last_index'>) => {
+    mutationFn: async (rule: Partial<AssignmentRule> & { name: string; tenant_id: string }) => {
       const { data, error } = await supabase.from('assignment_rules').insert(rule as any).select().single();
       if (error) throw error;
       return data;
