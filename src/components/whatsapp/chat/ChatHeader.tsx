@@ -365,6 +365,37 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Badge>
           )}
 
+          {/* Sector queue badge: fila do setor (somente quando > 0) */}
+          <SectorQueueBadge
+            departmentId={convDeptId ?? (selectedDepartment?.id ?? null)}
+            departmentName={convDepartment?.name ?? selectedDepartment?.name ?? null}
+          />
+
+          {/* Agent availability badge: capacidade do agente logado */}
+          {availability.isEnabled && availability.status !== 'unlimited' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap ${
+                    availability.status === 'full'
+                      ? 'border-red-500/50 text-red-600 dark:text-red-400'
+                      : availability.status === 'warn'
+                        ? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+                        : 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+                  }`}
+                >
+                  {availability.current}/{availability.limit}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {availability.status === 'full'
+                  ? `Você atingiu o limite de ${availability.limit} atendimentos simultâneos`
+                  : `Você tem ${availability.current} de ${availability.limit} atendimentos simultâneos`}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {conversationInstance && hasMultipleInstances && (
             <Badge variant="secondary" className="text-[10px] h-4 shrink-0 whitespace-nowrap">
               {conversationInstance.display_name || conversationInstance.instance_name}
