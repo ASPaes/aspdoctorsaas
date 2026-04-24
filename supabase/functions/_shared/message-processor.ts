@@ -244,11 +244,16 @@ export async function findOrCreateConversation(
   supabase: any, instanceId: string, contactId: string, tenantId: string, isFromMe: boolean = false
 ): Promise<string | null> {
   try {
-    const { data: existing } = await supabase.from('whatsapp_conversations').select('id, department_id').eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
+    const { data: existing } = await supabase.from('whatsapp_conversations').select('id, department_id, status').eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
     if (existing) {
       if (!existing.department_id) {
         const deptId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
         if (deptId) await supabase.from('whatsapp_conversations').update({ department_id: deptId }).eq('id', existing.id);
+      }
+      // Fix: inbound message on previously-closed outbound-only conversation (e.g., N8N billing followed by customer reply).
+      // Reopen to 'active'; attendance creation + routing is handled downstream by triggers on support_attendances.
+      if (!isFromMe && (existing.status === 'closed' || existing.status === 'archived')) {
+        await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', existing.id);
       }
       return existing.id;
     }
@@ -257,32 +262,14 @@ export async function findOrCreateConversation(
     const { data: newConv, error } = await supabase.from('whatsapp_conversations').insert({ instance_id: instanceId, contact_id: contactId, status: isFromMe ? 'closed' : 'active', tenant_id: tenantId, ...(departmentId ? { department_id: departmentId } : {}) }).select('id').single();
     if (error) { console.error('[processor] Error creating conversation:', error); return null; }
 
-    await applyAutoAssignment(supabase, instanceId, newConv.id, tenantId);
+    // Auto-assignment is now handled by database triggers on support_attendances (Phase 1 distribution engine).
+    // When an attendance is created by ensureAttendanceForIncomingMessage / ensureAttendanceForBilling,
+    // the trigger fires fn_assign_conversation_if_ready, which respects the kill-switch and new rule schema.
     return newConv.id;
   } catch (err) {
     console.error('[processor] Error in findOrCreateConversation:', err);
     return null;
   }
-}
-
-async function applyAutoAssignment(supabase: any, instanceId: string, conversationId: string, tenantId: string): Promise<void> {
-  try {
-    const { data: rule } = await supabase.from('assignment_rules').select('*').eq('instance_id', instanceId).eq('is_active', true).maybeSingle();
-    if (!rule) return;
-    let assignedTo: string | null = null;
-    if (rule.rule_type === 'fixed') { assignedTo = rule.fixed_agent_id; }
-    else if (rule.rule_type === 'round_robin') {
-      const agents = rule.round_robin_agents || [];
-      if (agents.length === 0) return;
-      const nextIndex = (rule.round_robin_last_index + 1) % agents.length;
-      assignedTo = agents[nextIndex];
-      await supabase.from('assignment_rules').update({ round_robin_last_index: nextIndex }).eq('id', rule.id);
-    }
-    if (assignedTo) {
-      await supabase.from('whatsapp_conversations').update({ assigned_to: assignedTo }).eq('id', conversationId);
-      await supabase.from('conversation_assignments').insert({ conversation_id: conversationId, assigned_to: assignedTo, reason: `Auto-atribuição: ${rule.name}`, tenant_id: tenantId });
-    }
-  } catch (err) { console.error('[processor] Error in applyAutoAssignment:', err); }
 }
 
 export async function insertAttendanceSystemMessage(supabase: any, conversationId: string, tenantId: string, attendanceId: string, attendanceCode: string, event: 'opened' | 'closed' | 'reopened'): Promise<void> {
