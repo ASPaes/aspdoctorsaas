@@ -231,6 +231,12 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Sistema de Demandas" onClick={handleOpenDemandas}>
+              <Ticket className="h-4 w-4" />
+              <span>Sistema de Demandas</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sair">
               <button onClick={handleLogout} className="flex w-full items-center gap-2">
                 <LogOut className="h-4 w-4" />
