@@ -4801,6 +4801,7 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
+      is_tenant_admin_or_head: { Args: never; Returns: boolean }
       mark_notification_read: {
         Args: { p_recipient_id: string }
         Returns: undefined
