@@ -113,6 +113,19 @@ export function AppSidebar() {
     navigate("/login", { replace: true });
   };
 
+  const handleOpenDemandas = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-sso-token');
+      if (error) throw error;
+      const token = (data as { token?: string })?.token;
+      if (!token) throw new Error('Token não recebido');
+      window.open(`https://doctordev.lovable.app/sso?token=${encodeURIComponent(token)}`, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('[Sistema de Demandas]', err);
+      toast.error('Não foi possível abrir o Sistema de Demandas.');
+    }
+  };
+
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
