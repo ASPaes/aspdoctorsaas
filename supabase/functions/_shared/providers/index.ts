@@ -129,7 +129,7 @@ class EvolutionAdapter implements ProviderAdapter {
       }
     }
 
-    const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
+    const res = await fetch(endpoint!, { method: 'POST', headers, body: JSON.stringify(body!) });
     if (!res.ok) throw new Error(`Evolution send error: ${await res.text()}`);
     const data = await res.json();
     return { messageId: data?.key?.id || `evo_${Date.now()}`, raw: data };
