@@ -409,8 +409,9 @@ async function sendBusinessHoursMessage(supabase: any, ctx: SendContext, convers
           { role: 'system', content: 'Responda APENAS com a mensagem final para o cliente, sem explicações. Máximo 3 linhas.' },
           { role: 'user', content: `${basePrompt}\n\nContexto: ${contextHint}\nSaudação: ${greeting}\nHorário: ${slotsDesc}\nPróximo: ${nextStart}\n\nInicie com "${greeting}!", máximo 3 linhas, máximo 1 emoji.` },
         ]);
-        if (aiMsg && aiMsg.trim().length > 0) {
-          await sendAndPersistAutoMessage(supabase, ctx, conversationId, aiMsg.trim(), { business_hours: true, outside_hours: true, ai_generated: true });
+        const aiText = aiMsg?.content?.trim();
+        if (aiText && aiText.length > 0) {
+          await sendAndPersistAutoMessage(supabase, ctx, conversationId, aiText, { business_hours: true, outside_hours: true, ai_generated: true });
           return;
         }
       }

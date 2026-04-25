@@ -99,7 +99,7 @@ serve(async (req) => {
         { role: "system", content: systemPrompt },
         { role: "user", content: `CONVERSA:\n\n${recentMessages.join("\n")}` },
       ]);
-      const clean = rawResult.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const clean = (rawResult.content ?? "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       result = JSON.parse(clean);
     } catch (aiError: any) {
       const msg = aiError.message || "";
