@@ -128,7 +128,7 @@ Considere: tempo de resposta, resolução de problemas, tom de comunicação, sa
 
     console.log(`[${FUNCTION_NAME}][${requestId}] Calling AI provider=${aiConfig.provider} model=${aiConfig.model}`);
 
-    let result: string;
+    let result: import("../_shared/ai-client.ts").AIResult;
     try {
       // Try with tools first (OpenAI/custom)
       if (aiConfig.provider === "openai" || aiConfig.provider === "custom") {
@@ -150,18 +150,19 @@ Considere: tempo de resposta, resolução de problemas, tom de comunicação, sa
     }
 
     // Parse result
+    const resultText = result.content ?? "";
     let diagnosis;
     try {
       // Try parsing directly
-      diagnosis = JSON.parse(result);
+      diagnosis = JSON.parse(resultText);
     } catch {
       // Try extracting JSON from markdown code block
-      const jsonMatch = result.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonMatch = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (jsonMatch) {
         diagnosis = JSON.parse(jsonMatch[1].trim());
       } else {
         // Try finding JSON object in text
-        const braceMatch = result.match(/\{[\s\S]*\}/);
+        const braceMatch = resultText.match(/\{[\s\S]*\}/);
         if (braceMatch) {
           diagnosis = JSON.parse(braceMatch[0]);
         } else {

@@ -196,7 +196,7 @@ REGRAS:
 - "topics": máximo 5
 - "suggested_area": escolha entre as áreas disponíveis ou null`;
 
-    let rawResult: string;
+    let rawResult: import("../_shared/ai-client.ts").AIResult;
     try {
       rawResult = await callAI(
         { ...aiConfig, ...(aiConfig.provider === "openai" || aiConfig.provider === "custom" ? {} : {}) },
@@ -228,10 +228,11 @@ REGRAS:
     }
 
     let result: any;
+    const rawText = rawResult.content ?? "";
     try {
-      result = JSON.parse(rawResult);
+      result = JSON.parse(rawText);
     } catch {
-      const jsonMatch = rawResult.match(/\{[\s\S]*\}/);
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
