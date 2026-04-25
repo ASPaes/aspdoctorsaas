@@ -121,8 +121,8 @@ export function AppSidebar() {
       if (!token) throw new Error('Token não recebido');
       window.open(`https://doctordev.lovable.app/sso?token=${encodeURIComponent(token)}`, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      console.error('[Sistema de Demandas]', err);
-      toast.error('Não foi possível abrir o Sistema de Demandas.');
+      console.error('[Suporte DoctorSaaS]', err);
+      toast.error('Não foi possível abrir o Suporte DoctorSaaS.');
     }
   };
 
@@ -231,9 +231,9 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Sistema de Demandas" onClick={handleOpenDemandas}>
+            <SidebarMenuButton tooltip="Suporte DoctorSaaS" onClick={handleOpenDemandas}>
               <Ticket className="h-4 w-4" />
-              <span>Sistema de Demandas</span>
+              <span>Suporte DoctorSaaS</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
