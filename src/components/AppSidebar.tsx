@@ -231,9 +231,9 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Sistema de Demandas" onClick={handleOpenDemandas}>
+            <SidebarMenuButton tooltip="Suporte DoctorSaaS" onClick={handleOpenDemandas}>
               <Ticket className="h-4 w-4" />
-              <span>Sistema de Demandas</span>
+              <span>Suporte DoctorSaaS</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
