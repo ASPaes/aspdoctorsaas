@@ -201,8 +201,8 @@ class ZApiAdapter implements ProviderAdapter {
     const headers = this.getHeaders(secrets);
     const phone = msg.to.replace(/\D/g, '');
 
-    let endpoint: string;
-    let body: Record<string, unknown>;
+    let endpoint = '';
+    let body: Record<string, unknown> = {};
 
     switch (msg.messageType) {
       case 'text': {

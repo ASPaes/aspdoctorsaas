@@ -436,7 +436,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
         mediaStoragePath = await downloadAndUploadMedia(
           secrets.api_url || '', secrets.api_key || '', evolutionInstanceId,
-          key, supabase, mediaMimetype, instanceData.provider_type || 'self_hosted'
+          key, supabase, mediaMimetype as string, instanceData.provider_type || 'self_hosted'
         );
       }
     }
