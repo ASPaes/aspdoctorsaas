@@ -26,7 +26,7 @@ export default function SuperMonitor() {
   const [selectedTenant, setSelectedTenant] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 7),
-    to: subDays(new Date(), 1),
+    to: new Date(),
   });
   const [calendarOpen, setCalendarOpen] = useState(false);
   const dateFrom = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
