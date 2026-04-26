@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
       tenant_id: profile.tenant_id,
       tenant_nome: tenant?.nome || '',
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 60, // 60 segundos
+      exp: Math.floor(Date.now() / 1000) + 300, // 5 minutos
     };
 
     const payloadB64 = btoa(JSON.stringify(payload));
