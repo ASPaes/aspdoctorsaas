@@ -61,10 +61,14 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [message, isExpanded]);
 
   useEffect(() => {
-    const match = message.match(/\/macro:\s*(\S*)$/i);
+    // Aceita "/macro: termo" (legado) OU "/" no início/após espaço seguido de termo
+    const matchLegacy = message.match(/\/macro:\s*(\S*)$/i);
+    const matchSlash = message.match(/(?:^|\s)\/([^\s/]*)$/);
+    const match = matchLegacy || matchSlash;
     if (match) {
-      const searchTerm = match[1].toLowerCase();
+      const searchTerm = (match[1] || "").toLowerCase();
       const filtered = macros.filter(m =>
+        searchTerm === "" ||
         (m.shortcut?.toLowerCase().includes(searchTerm)) ||
         m.title.toLowerCase().includes(searchTerm)
       );
