@@ -189,6 +189,13 @@ export default function MacrosTab() {
                 <Input placeholder="Geral" value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} />
               </div>
             </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="space-y-0.5">
+                <Label>Macro ativa</Label>
+                <p className="text-xs text-muted-foreground">Quando desativada, não aparece no chat ao digitar "/".</p>
+              </div>
+              <Switch checked={form.is_active} onCheckedChange={(v) => setForm(f => ({ ...f, is_active: v }))} />
+            </div>
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
