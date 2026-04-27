@@ -983,6 +983,30 @@ export type Database = {
           },
         ]
       }
+      cnpj_cache: {
+        Row: {
+          cnpj: string
+          expires_at: string
+          fetched_at: string
+          payload: Json
+          source: string
+        }
+        Insert: {
+          cnpj: string
+          expires_at?: string
+          fetched_at?: string
+          payload: Json
+          source: string
+        }
+        Update: {
+          cnpj?: string
+          expires_at?: string
+          fetched_at?: string
+          payload?: Json
+          source?: string
+        }
+        Relationships: []
+      }
       configuracoes: {
         Row: {
           billing_skip_ura_enabled: boolean
