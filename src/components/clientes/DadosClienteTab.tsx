@@ -185,7 +185,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       form.setValue("cnpj", masked);
       return;
     }
-    // Jurídica — CNPJ com auto-fill
+    // Jurídica — CNPJ com auto-fill via Edge Function lookup-cnpj
     const masked = maskCNPJ(maskedValue);
     form.setValue("cnpj", masked);
     const digits = masked.replace(/\D/g, "");
@@ -193,19 +193,38 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
 
     setCnpjLoading(true);
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
-      if (!res.ok) {
-        toast({ title: "CNPJ não encontrado", variant: "destructive" });
+      const { data: response, error } = await supabase.functions.invoke("lookup-cnpj", {
+        body: { cnpj: digits },
+      });
+
+      if (error) {
+        console.error("[CNPJ lookup] invoke error:", error);
+        toast({
+          title: "Erro ao consultar CNPJ",
+          description: error.message ?? "Falha de comunicação com o servidor",
+          variant: "destructive",
+        });
         return;
       }
-      const data = await res.json();
+
+      if (!response?.success) {
+        const isNotFound = response?.error === "cnpj_not_found";
+        toast({
+          title: isNotFound ? "CNPJ não encontrado" : "Erro ao consultar CNPJ",
+          description: response?.message ?? "Tente novamente em instantes",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const data = response.data;
 
       if (data.razao_social) form.setValue("razao_social", data.razao_social);
       if (data.nome_fantasia) form.setValue("nome_fantasia", data.nome_fantasia);
       if (data.email) form.setValue("email", data.email);
 
       if (data.ddd_telefone_1) {
-        const phoneDig = data.ddd_telefone_1.replace(/\D/g, "");
+        const phoneDig = String(data.ddd_telefone_1).replace(/\D/g, "");
         if (phoneDig.length >= 10) {
           const { formatBRPhone } = await import("@/lib/phoneBR");
           form.setValue("telefone_contato", formatBRPhone(normalizeBRPhone(phoneDig)));
@@ -235,13 +254,18 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       }
 
       if (data.cep) {
-        const cepFormatted = maskCEP(data.cep.toString().replace(/\D/g, ""));
+        const cepFormatted = maskCEP(String(data.cep));
         form.setValue("cep", cepFormatted);
       }
 
       toast({ title: "Dados do CNPJ preenchidos com sucesso" });
-    } catch {
-      toast({ title: "Erro ao consultar CNPJ", variant: "destructive" });
+    } catch (err) {
+      console.error("[CNPJ lookup] unexpected error:", err);
+      toast({
+        title: "Erro ao consultar CNPJ",
+        description: err instanceof Error ? err.message : "Erro desconhecido",
+        variant: "destructive",
+      });
     } finally {
       setCnpjLoading(false);
     }
