@@ -68,9 +68,11 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     if (match) {
       const searchTerm = (match[1] || "").toLowerCase();
       const filtered = macros.filter(m =>
-        searchTerm === "" ||
-        (m.shortcut?.toLowerCase().includes(searchTerm)) ||
-        m.title.toLowerCase().includes(searchTerm)
+        m.is_active !== false && (
+          searchTerm === "" ||
+          (m.shortcut?.toLowerCase().includes(searchTerm)) ||
+          m.title.toLowerCase().includes(searchTerm)
+        )
       );
       setFilteredMacros(filtered);
       setShowMacroSuggestions(filtered.length > 0);
