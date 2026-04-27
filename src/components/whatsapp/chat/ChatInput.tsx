@@ -61,12 +61,18 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [message, isExpanded]);
 
   useEffect(() => {
-    const match = message.match(/\/macro:\s*(\S*)$/i);
+    // Aceita "/macro: termo" (legado) OU "/" no início/após espaço seguido de termo
+    const matchLegacy = message.match(/\/macro:\s*(\S*)$/i);
+    const matchSlash = message.match(/(?:^|\s)\/([^\s/]*)$/);
+    const match = matchLegacy || matchSlash;
     if (match) {
-      const searchTerm = match[1].toLowerCase();
+      const searchTerm = (match[1] || "").toLowerCase();
       const filtered = macros.filter(m =>
-        (m.shortcut?.toLowerCase().includes(searchTerm)) ||
-        m.title.toLowerCase().includes(searchTerm)
+        m.is_active !== false && (
+          searchTerm === "" ||
+          (m.shortcut?.toLowerCase().includes(searchTerm)) ||
+          m.title.toLowerCase().includes(searchTerm)
+        )
       );
       setFilteredMacros(filtered);
       setShowMacroSuggestions(filtered.length > 0);
@@ -220,7 +226,12 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const handleMacroSelect = (macro: any) => {
-    setMessage(macro.content);
+    // Remove o trigger ("/macro: ..." ou "/...") do final e insere o conteúdo da macro
+    const newMessage = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, (m) => {
+      const leadingSpace = m.startsWith(" ") ? " " : "";
+      return leadingSpace + macro.content;
+    });
+    setMessage(newMessage || macro.content);
     incrementUsage(macro.id);
     setShowMacroSuggestions(false);
     setTimeout(() => textareaRef.current?.focus(), 0);

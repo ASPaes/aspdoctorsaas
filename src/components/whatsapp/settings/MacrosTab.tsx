@@ -23,9 +23,10 @@ interface MacroForm {
   content: string;
   shortcut: string;
   category: string;
+  is_active: boolean;
 }
 
-const EMPTY_FORM: MacroForm = { title: "", content: "", shortcut: "", category: "" };
+const EMPTY_FORM: MacroForm = { title: "", content: "", shortcut: "", category: "", is_active: true };
 
 export default function MacrosTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -48,8 +49,13 @@ export default function MacrosTab() {
       content: macro.content,
       shortcut: macro.shortcut || "",
       category: macro.category || "",
+      is_active: macro.is_active !== false,
     });
     setDialogOpen(true);
+  };
+
+  const toggleActive = (macro: WhatsAppMacro) => {
+    updateMacro({ id: macro.id, updates: { is_active: !macro.is_active } });
   };
 
   const handleSave = () => {
@@ -63,6 +69,7 @@ export default function MacrosTab() {
           content: form.content.trim(),
           shortcut: form.shortcut.trim() || null,
           category: form.category.trim() || null,
+          is_active: form.is_active,
         },
       });
     } else {
@@ -73,7 +80,7 @@ export default function MacrosTab() {
         category: form.category.trim() || null,
         tenant_id: tid,
         is_global: true,
-        is_active: true,
+        is_active: form.is_active,
       });
     }
     setDialogOpen(false);
@@ -117,18 +124,28 @@ export default function MacrosTab() {
             <h3 className="text-sm font-medium text-muted-foreground">{category}</h3>
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {items.map((macro) => (
-                <Card key={macro.id}>
+                <Card key={macro.id} className={macro.is_active === false ? "opacity-60" : ""}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{macro.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{macro.title}</p>
+                          {macro.is_active === false && (
+                            <Badge variant="secondary" className="text-[10px]">Inativa</Badge>
+                          )}
+                        </div>
                         {macro.shortcut && (
                           <Badge variant="outline" className="text-[10px] mt-1">
                             <Hash className="h-2.5 w-2.5 mr-0.5" />{macro.shortcut}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Switch
+                          checked={macro.is_active !== false}
+                          onCheckedChange={() => toggleActive(macro)}
+                          aria-label="Ativar/Desativar macro"
+                        />
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(macro)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -171,6 +188,13 @@ export default function MacrosTab() {
                 <Label>Categoria</Label>
                 <Input placeholder="Geral" value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} />
               </div>
+            </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="space-y-0.5">
+                <Label>Macro ativa</Label>
+                <p className="text-xs text-muted-foreground">Quando desativada, não aparece no chat ao digitar "/".</p>
+              </div>
+              <Switch checked={form.is_active} onCheckedChange={(v) => setForm(f => ({ ...f, is_active: v }))} />
             </div>
           </div>
           <DialogFooter>
