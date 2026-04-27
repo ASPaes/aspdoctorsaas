@@ -23,9 +23,10 @@ interface MacroForm {
   content: string;
   shortcut: string;
   category: string;
+  is_active: boolean;
 }
 
-const EMPTY_FORM: MacroForm = { title: "", content: "", shortcut: "", category: "" };
+const EMPTY_FORM: MacroForm = { title: "", content: "", shortcut: "", category: "", is_active: true };
 
 export default function MacrosTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
