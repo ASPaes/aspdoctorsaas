@@ -224,7 +224,12 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const handleMacroSelect = (macro: any) => {
-    setMessage(macro.content);
+    // Remove o trigger ("/macro: ..." ou "/...") do final e insere o conteúdo da macro
+    const newMessage = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, (m) => {
+      const leadingSpace = m.startsWith(" ") ? " " : "";
+      return leadingSpace + macro.content;
+    });
+    setMessage(newMessage || macro.content);
     incrementUsage(macro.id);
     setShowMacroSuggestions(false);
     setTimeout(() => textareaRef.current?.focus(), 0);
