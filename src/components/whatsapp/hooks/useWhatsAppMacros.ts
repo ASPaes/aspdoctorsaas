@@ -26,7 +26,6 @@ export const useWhatsAppMacros = (instanceId?: string) => {
     queryFn: async () => {
       let query = (supabase.from('whatsapp_macros') as any)
         .select('*')
-        .eq('is_active', true)
         .order('title', { ascending: true });
 
       if (instanceId) {
