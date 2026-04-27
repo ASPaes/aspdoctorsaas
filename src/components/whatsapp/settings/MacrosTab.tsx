@@ -49,8 +49,13 @@ export default function MacrosTab() {
       content: macro.content,
       shortcut: macro.shortcut || "",
       category: macro.category || "",
+      is_active: macro.is_active !== false,
     });
     setDialogOpen(true);
+  };
+
+  const toggleActive = (macro: WhatsAppMacro) => {
+    updateMacro({ id: macro.id, updates: { is_active: !macro.is_active } });
   };
 
   const handleSave = () => {
@@ -64,6 +69,7 @@ export default function MacrosTab() {
           content: form.content.trim(),
           shortcut: form.shortcut.trim() || null,
           category: form.category.trim() || null,
+          is_active: form.is_active,
         },
       });
     } else {
@@ -74,7 +80,7 @@ export default function MacrosTab() {
         category: form.category.trim() || null,
         tenant_id: tid,
         is_global: true,
-        is_active: true,
+        is_active: form.is_active,
       });
     }
     setDialogOpen(false);
