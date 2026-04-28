@@ -212,7 +212,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
-        table: 'whatsapp_conversations'
+        table: 'whatsapp_conversations',
+        filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const updated = payload.new as any;
         queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
@@ -263,7 +264,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'whatsapp_conversations'
+        table: 'whatsapp_conversations',
+        filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, () => {
         if (insertDebounceRef.current) clearTimeout(insertDebounceRef.current);
         insertDebounceRef.current = setTimeout(() => {
@@ -274,7 +276,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  }, [queryClient, tid]);
 
   return {
     conversations: data?.conversations || [],
