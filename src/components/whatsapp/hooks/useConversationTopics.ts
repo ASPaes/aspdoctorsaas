@@ -1,5 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ConversationMetadata {
@@ -13,8 +12,6 @@ interface ConversationMetadata {
 }
 
 export const useConversationTopics = (conversationId: string | null) => {
-  const queryClient = useQueryClient();
-
   const queryResult = useQuery({
     queryKey: ['conversation-topics', conversationId],
     queryFn: async (): Promise<ConversationMetadata | null> => {
@@ -30,19 +27,6 @@ export const useConversationTopics = (conversationId: string | null) => {
     enabled: !!conversationId,
     staleTime: 30000,
   });
-
-  useEffect(() => {
-    if (!conversationId) return;
-    const channel = supabase
-      .channel(`topics-${conversationId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'whatsapp_conversations' }, (payload) => {
-        if ((payload.new as any)?.id === conversationId) {
-          queryClient.invalidateQueries({ queryKey: ['conversation-topics', conversationId] });
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [conversationId, queryClient]);
 
   return queryResult;
 };
