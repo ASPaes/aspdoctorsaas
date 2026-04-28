@@ -2394,6 +2394,7 @@ export type Database = {
           handle_seconds: number
           handoffs_count: number
           id: string
+          inactivity_warning_sent_at: string | null
           last_customer_message_at: string | null
           last_operator_message_at: string | null
           last_queue_reason: string | null
@@ -2449,6 +2450,7 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          inactivity_warning_sent_at?: string | null
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
@@ -2504,6 +2506,7 @@ export type Database = {
           handle_seconds?: number
           handoffs_count?: number
           id?: string
+          inactivity_warning_sent_at?: string | null
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
