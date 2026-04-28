@@ -199,10 +199,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           )}
 
           {/* Avatar */}
-          <Avatar className="h-8 w-8 shrink-0">
-            {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
-            <AvatarFallback className="text-[10px] font-medium">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <ContactAvatar
+            name={name || ""}
+            profilePictureUrl={contact?.profile_picture_url}
+            size="sm"
+          />
 
           {/* Name + phone */}
           <div className="min-w-0 flex-1">
