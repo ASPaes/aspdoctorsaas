@@ -13,6 +13,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { signInWithPassword } = useAuth();
