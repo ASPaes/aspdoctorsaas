@@ -147,19 +147,22 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const { stateMap, isLoading: isStatesLoading } = useConversationStates(conversationIds);
 
   // Helper: build a ConversationStateRow from stateMap or fallback to conversation fields
-  // Fallback usa attendanceMap como segunda fonte para garantir classificação correta
-  // mesmo quando stateMap está vazio (loading, error ou cache stale).
+  // Fallback usa attendanceMap como segunda fonte, mas APENAS quando o attendance está ativo
+  // (waiting/in_progress). Attendance closed no map indica histórico, não estado atual —
+  // se cliente mandar nova msg, vai criar/reabrir attendance ativo. Tratar attendance closed
+  // como estado atual quebraria conversas em "Fora do horário" recém-reabertas.
   const getStateForConv = useCallback((conv: any): ConversationStateRow => {
     const fromView = stateMap.get(conv.id);
     if (fromView) return fromView;
-    // Fallback: usa attendanceMap (mais confiável) para attendance_status
+    // Fallback: usa attendance APENAS se ativo (waiting/in_progress)
     const att = attendanceMap.get(conv.id);
+    const attActive = att && (att.status === "waiting" || att.status === "in_progress");
     return {
       conversation_id: conv.id,
       conversation_status: isStatesLoading ? "loading" : (conv.status ?? "active"),
-      attendance_status: isStatesLoading ? "loading" : (att?.status ?? null),
+      attendance_status: isStatesLoading ? "loading" : (attActive ? att!.status : null),
       opened_out_of_hours: conv.opened_out_of_hours ?? false,
-      attendance_assigned_to: att?.assigned_to ?? null,
+      attendance_assigned_to: attActive ? att!.assigned_to : null,
       department_id: conv.department_id ?? null,
       tenant_id: conv.tenant_id ?? "",
     };
