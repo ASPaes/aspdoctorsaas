@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, MessageSquare } from "lucide-react";
 import { useConversations, type Conversation } from "./hooks/useConversations";
@@ -19,10 +19,6 @@ export function ConversationList({ selectedId, onSelect }: Props) {
   const [search, setSearch] = useState("");
   const { data: conversations = [], isLoading } = useConversations(search);
 
-  const getInitials = (name: string | null, phone: string) => {
-    if (name) return name.substring(0, 2).toUpperCase();
-    return phone.substring(phone.length - 2);
-  };
 
   const formatTime = (ts: string | null) => {
     if (!ts) return "";
@@ -79,14 +75,12 @@ export function ConversationList({ selectedId, onSelect }: Props) {
                 )}
                 style={{ gridTemplateColumns: "40px minmax(0, 1fr) max-content" }}
               >
-                <Avatar className="h-10 w-10 shrink-0 self-center">
-                  {conv.contact_profile_picture && (
-                    <AvatarImage src={conv.contact_profile_picture} />
-                  )}
-                  <AvatarFallback className="text-xs">
-                    {getInitials(conv.contact_name, conv.contact_phone)}
-                  </AvatarFallback>
-                </Avatar>
+                <ContactAvatar
+                  name={conv.contact_name || conv.contact_phone}
+                  profilePictureUrl={conv.contact_profile_picture}
+                  size="md"
+                  className="self-center"
+                />
 
                 <div className="min-w-0 overflow-hidden self-center">
                   <p className="text-sm font-medium truncate">
