@@ -70,7 +70,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.upsert-instance-secrets]
-verify_jwt = false
+verify_jwt = true
 
 [functions.create-whatsapp-instance]
 verify_jwt = false
@@ -85,4 +85,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.admin-db-actions]
+verify_jwt = true
+
+[functions.generate-sso-token]
+verify_jwt = false
+
+[functions.lookup-cnpj]
+verify_jwt = false
+
+[functions.check-inactivity-timeout]
 verify_jwt = false
