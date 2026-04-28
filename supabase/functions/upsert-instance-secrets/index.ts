@@ -6,24 +6,94 @@ const SENSITIVE_FIELDS = [
   'meta_access_token', 'meta_app_secret', 'meta_verify_token',
 ];
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info, apikey',
+};
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info, apikey' } });
+    return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  // ── Defense in depth: validate JWT manually even if verify_jwt is on ──
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return json(401, { error: 'Unauthorized: missing bearer token' });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+  // Service-role client for trusted DB ops
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  // Anon client just to verify the token belongs to a real user
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user }, error: userError } = await userClient.auth.getUser(token);
+  if (userError || !user) {
+    return json(401, { error: 'Unauthorized: invalid token' });
+  }
 
   try {
     const body = await req.json();
     const { instance_id, ...fields } = body;
-
     if (!instance_id) {
-      return new Response(JSON.stringify({ error: 'instance_id obrigatório' }), { status: 400 });
+      return json(400, { error: 'instance_id obrigatório' });
     }
 
+    // ── Authorization: caller must be admin/head of the instance's tenant ──
+    // (super_admins also pass)
+    const { data: instance, error: instErr } = await supabase
+      .from('whatsapp_instances')
+      .select('id, tenant_id')
+      .eq('id', instance_id)
+      .maybeSingle();
+
+    if (instErr || !instance) {
+      return json(404, { error: 'instance not found' });
+    }
+
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('tenant_id, role, is_super_admin, access_status, status')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (profErr || !profile) {
+      return json(403, { error: 'profile not found' });
+    }
+
+    const isSuperAdmin = profile.is_super_admin === true;
+    const sameTenant = profile.tenant_id === instance.tenant_id;
+    const isAdminOrHead =
+      sameTenant && ['admin', 'head'].includes(profile.role || '');
+    const isActive =
+      ['active', 'ativo'].includes(profile.access_status || '') &&
+      ['ativo', 'active'].includes(profile.status || 'ativo');
+
+    if (!isSuperAdmin && (!isAdminOrHead || !isActive)) {
+      console.warn(
+        `[upsert-instance-secrets] Forbidden: user=${user.id} role=${profile.role} ` +
+          `caller_tenant=${profile.tenant_id} instance_tenant=${instance.tenant_id}`,
+      );
+      return json(403, {
+        error:
+          'Apenas administradores do tenant podem alterar credenciais da instância.',
+      });
+    }
+
+    // ── Original upsert logic ──
     for (const field of SENSITIVE_FIELDS) {
       const val = fields[field];
       if (val === undefined || val === null || val === '') continue;
@@ -59,15 +129,13 @@ Deno.serve(async (req) => {
         .from('whatsapp_instance_vault_refs')
         .upsert(
           { instance_id, secret_name: field, vault_secret_id: vaultId },
-          { onConflict: 'instance_id,secret_name' }
+          { onConflict: 'instance_id,secret_name' },
         );
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return json(200, { ok: true });
   } catch (err) {
     console.error('[upsert-instance-secrets]', err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+    return json(500, { error: String(err) });
   }
 });
