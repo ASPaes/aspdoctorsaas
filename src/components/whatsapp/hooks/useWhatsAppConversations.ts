@@ -164,11 +164,6 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     queryKey: ['whatsapp', 'conversations', filters, tid],
     staleTime: 30_000,
     refetchOnWindowFocus: false,
-    refetchInterval: () => {
-      if (document.visibilityState !== 'visible') return false;
-      if (Date.now() - lastActivityRef.current < 15_000) return false;
-      return 30_000;
-    },
     queryFn: async () => {
       let query = supabase
         .from('whatsapp_conversations')
