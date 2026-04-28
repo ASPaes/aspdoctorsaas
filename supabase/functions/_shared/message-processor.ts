@@ -250,11 +250,6 @@ export async function findOrCreateConversation(
         const deptId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
         if (deptId) await supabase.from('whatsapp_conversations').update({ department_id: deptId }).eq('id', existing.id);
       }
-      // Fix: inbound message on previously-closed outbound-only conversation (e.g., N8N billing followed by customer reply).
-      // Reopen to 'active'; attendance creation + routing is handled downstream by triggers on support_attendances.
-      if (!isFromMe && (existing.status === 'closed' || existing.status === 'archived')) {
-        await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', existing.id);
-      }
       return existing.id;
     }
 
