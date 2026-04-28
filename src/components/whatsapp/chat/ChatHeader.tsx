@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -199,10 +200,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           )}
 
           {/* Avatar */}
-          <Avatar className="h-8 w-8 shrink-0">
-            {contact?.profile_picture_url && <AvatarImage src={contact.profile_picture_url} />}
-            <AvatarFallback className="text-[10px] font-medium">{name.substring(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <ContactAvatar
+            name={name || ""}
+            profilePictureUrl={contact?.profile_picture_url}
+            size="sm"
+          />
 
           {/* Name + phone */}
           <div className="min-w-0 flex-1">
