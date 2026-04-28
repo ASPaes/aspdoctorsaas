@@ -3275,6 +3275,7 @@ export type Database = {
           name: string | null
           notes: string | null
           phone_number: string
+          picture_synced_at: string | null
           profile_picture_url: string | null
           tags: string[] | null
           tenant_id: string
@@ -3288,6 +3289,7 @@ export type Database = {
           name?: string | null
           notes?: string | null
           phone_number: string
+          picture_synced_at?: string | null
           profile_picture_url?: string | null
           tags?: string[] | null
           tenant_id: string
@@ -3301,6 +3303,7 @@ export type Database = {
           name?: string | null
           notes?: string | null
           phone_number?: string
+          picture_synced_at?: string | null
           profile_picture_url?: string | null
           tags?: string[] | null
           tenant_id?: string
