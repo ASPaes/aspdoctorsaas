@@ -504,77 +504,88 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<void> {
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
+
+  switch (payload.event) {
+    case 'messages.upsert':
+      if (isRevokeMessage(payload.data?.message)) {
+        await processMessageRevoke(payload, supabase);
+      } else if (isEditedMessage(payload.data?.message)) {
+        await processMessageEdit(payload, supabase);
+      } else {
+        await processMessageUpsert(payload, supabase);
+      }
+      break;
+    case 'messages.update':
+      await processMessageUpdate(payload, supabase);
+      break;
+    case 'messages.delete': {
+      const deleteData = payload.data;
+      const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
+      if (deletedKeyId) {
+        const resolved = await resolveInstanceTenant(supabase, payload.instance);
+        if (resolved) {
+          const { data: delRows } = await supabase.from('whatsapp_messages').update({
+            delete_status: 'revoked', delete_scope: 'everyone',
+            deleted_at: new Date().toISOString(), message_type: 'revoked',
+            content: '', media_url: null, media_path: null,
+            media_mimetype: null, media_filename: null, media_ext: null, media_kind: null, delete_error: null,
+          }).eq('tenant_id', resolved.tenantId).eq('message_id', deletedKeyId)
+            .select('id, conversation_id');
+          if ((delRows?.length ?? 0) > 0) await refreshConversationPreviewAfterRevoke(supabase, delRows![0].conversation_id);
+        }
+      }
+      break;
+    }
+    case 'connection.update':
+      await processConnectionUpdate(payload, supabase);
+      break;
+    case 'send.message':
+      await processSendMessageEvent(payload, supabase);
+      break;
+    default:
+      console.log(`${LOG} Unhandled event: ${payload.event}`);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
-  try {
-    // Validação de webhook secret
-    const webhookSecret = Deno.env.get('EVOLUTION_WEBHOOK_SECRET');
-    if (webhookSecret) {
-      const incomingSecret = req.headers.get('x-webhook-secret') || req.headers.get('apikey');
-      if (incomingSecret !== webhookSecret) {
-        console.warn(`${LOG} Unauthorized request`);
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+  // Validação síncrona de secret (rápida) — antes de retornar 200
+  const webhookSecret = Deno.env.get('EVOLUTION_WEBHOOK_SECRET');
+  if (webhookSecret) {
+    const incomingSecret = req.headers.get('x-webhook-secret') || req.headers.get('apikey');
+    if (incomingSecret !== webhookSecret) {
+      console.warn(`${LOG} Unauthorized request`);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
-
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-    const payload: EvolutionWebhookPayload = await req.json();
-    console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
-
-    // ── Roteamento de eventos ─────────────────────────────────────────────────
-    switch (payload.event) {
-      case 'messages.upsert':
-        if (isRevokeMessage(payload.data?.message)) {
-          await processMessageRevoke(payload, supabase);
-        } else if (isEditedMessage(payload.data?.message)) {
-          await processMessageEdit(payload, supabase);
-        } else {
-          await processMessageUpsert(payload, supabase);
-        }
-        break;
-      case 'messages.update':
-        await processMessageUpdate(payload, supabase);
-        break;
-      case 'messages.delete': {
-        const deleteData = payload.data;
-        const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
-        if (deletedKeyId) {
-          const resolved = await resolveInstanceTenant(supabase, payload.instance);
-          if (resolved) {
-            const { data: delRows } = await supabase.from('whatsapp_messages').update({
-              delete_status: 'revoked', delete_scope: 'everyone',
-              deleted_at: new Date().toISOString(), message_type: 'revoked',
-              content: '', media_url: null, media_path: null,
-              media_mimetype: null, media_filename: null, media_ext: null, media_kind: null, delete_error: null,
-            }).eq('tenant_id', resolved.tenantId).eq('message_id', deletedKeyId)
-              .select('id, conversation_id');
-            if ((delRows?.length ?? 0) > 0) await refreshConversationPreviewAfterRevoke(supabase, delRows![0].conversation_id);
-          }
-        }
-        break;
-      }
-      case 'connection.update':
-        await processConnectionUpdate(payload, supabase);
-        break;
-      case 'send.message':
-        await processSendMessageEvent(payload, supabase);
-        break;
-      default:
-        console.log(`${LOG} Unhandled event: ${payload.event}`);
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, event: payload.event }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-  } catch (err) {
-    console.error(`${LOG} Fatal error:`, err);
-    return new Response(
-      JSON.stringify({ success: false, error: String(err) }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
   }
+
+  // Parse rápido do body
+  let payload: EvolutionWebhookPayload;
+  try {
+    payload = await req.json();
+  } catch (err) {
+    console.error(`${LOG} Invalid JSON:`, err);
+    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Processamento real em background (resposta imediata <50ms)
+  // @ts-ignore - EdgeRuntime é fornecido pelo Supabase Edge runtime
+  EdgeRuntime.waitUntil(
+    handleEvolutionEvent(payload).catch((err) => {
+      console.error(`${LOG} Background processing error:`, err);
+    })
+  );
+
+  return new Response(
+    JSON.stringify({ received: true, event: payload.event }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+  );
 });
