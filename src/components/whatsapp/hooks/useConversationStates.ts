@@ -41,9 +41,7 @@ export function useConversationStates(conversationIds: string[]) {
       return map;
     },
     enabled: conversationIds.length > 0,
-    staleTime: 2000,
-    refetchInterval: 10000,
-    refetchIntervalInBackground: true,
+    staleTime: 30000,
   });
 
   return {
