@@ -1,5 +1,4 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
@@ -77,22 +76,6 @@ export function useConversations(search?: string) {
     },
     staleTime: 30_000,
   });
-
-  // Realtime subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel("conversations-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "whatsapp_conversations" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["whatsapp-conversations"] });
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
 
   return query;
 }
