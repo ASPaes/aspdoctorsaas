@@ -12,6 +12,12 @@ const corsHeaders = {
 
 const LOG = "[check-inactivity-timeout]";
 
+// Limite de atendimentos processados por execução. Protege contra avalanches
+// (ex: backlog de zumbis ou mudança de threshold para valor baixo) e respeita
+// rate limits dos providers WhatsApp. Os atendimentos não processados serão
+// pegos na próxima execução do cron (1 min depois).
+const MAX_BATCH_SIZE = 50;
+
 interface AttendanceRow {
   id: string;
   attendance_code: string;
@@ -25,24 +31,10 @@ interface AttendanceRow {
   inactivity_warning_sent_at: string | null;
 }
 
-interface ConversationRow {
-  id: string;
-  instance_id: string;
-}
-
 interface ContactRow {
   id: string;
   phone_number: string;
   name: string | null;
-}
-
-interface InstanceRow {
-  id: string;
-  instance_name: string;
-  instance_id_external: string | null;
-  provider_type: string;
-  meta_phone_number_id: string | null;
-  skip_ura: boolean | null;
 }
 
 function getLastActivityIso(att: AttendanceRow): string {
@@ -112,7 +104,7 @@ async function processAttendance(
   supabase: any,
   att: AttendanceRow,
   correlationId: string
-): Promise<void> {
+): Promise<"closed" | "warned" | "skipped" | "error"> {
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
@@ -127,97 +119,154 @@ async function processAttendance(
 
     if (!closeThresholdMin || closeThresholdMin <= 0) {
       log("close threshold inválido — skip", { closeThresholdMin });
-      return;
+      return "skipped";
     }
 
     const lastActivityIso = getLastActivityIso(att);
     const elapsedMin = (Date.now() - new Date(lastActivityIso).getTime()) / 60000;
 
-    // ── 1. CHECK CLOSE ────────────────────────────────────────────────────────
-    if (elapsedMin >= closeThresholdMin) {
-      log("threshold de fechamento atingido — encerrando", { elapsedMin, closeThresholdMin });
-
-      const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
-      const nowIso = new Date().toISOString();
-
-      const { error: attErr } = await supabase
-        .from("support_attendances")
-        .update({
-          status: "closed",
-          closed_at: nowIso,
-          closed_reason: "inactivity",
-          closure_type: "inactivity_auto",
-          updated_at: nowIso,
-        })
-        .eq("id", att.id)
-        .eq("status", "in_progress");
-
-      if (attErr) {
-        log("erro ao fechar attendance", attErr);
-        return;
+    // ─────────────────────────────────────────────────────────────────────────
+    // FLUXO COM AVISO ATIVADO
+    // Sempre: AVISO → ESPERA warnBeforeMin → FECHAMENTO
+    // Cliente nunca é fechado sem ter sido avisado primeiro.
+    // ─────────────────────────────────────────────────────────────────────────
+    if (warnEnabled) {
+      if (warnBeforeMin <= 0) {
+        log("warnBefore inválido com aviso ativado — skip", { warnBeforeMin });
+        return "skipped";
       }
 
-      await supabase
-        .from("whatsapp_conversations")
-        .update({ status: "closed", updated_at: nowIso })
-        .eq("id", att.conversation_id);
+      // Caso A: aviso ainda não foi enviado
+      if (!att.inactivity_warning_sent_at) {
+        const warnAtMin = Math.max(0, closeThresholdMin - warnBeforeMin);
 
-      if (built) {
-        await sendAndPersistAutoMessage(
-          supabase,
-          built.ctx,
-          att.conversation_id,
-          `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, é só nos enviar uma nova mensagem. \u{1F60A}`,
-          {
-            system: true,
-            attendance_event: "closed",
-            attendance_id: att.id,
-            inactivity_close: true,
+        if (elapsedMin >= warnAtMin) {
+          log("enviando aviso de inatividade", { elapsedMin, warnAtMin });
+
+          const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
+          if (!built) {
+            log("não foi possível construir SendContext — skip");
+            return "skipped";
           }
-        );
-      }
-      return;
-    }
 
-    // ── 2. CHECK WARNING ──────────────────────────────────────────────────────
-    if (!warnEnabled) return;
-    if (att.inactivity_warning_sent_at) return;
+          const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
 
-    const warnAtMin = closeThresholdMin - warnBeforeMin;
-    if (warnAtMin <= 0) return;
+          await sendAndPersistAutoMessage(
+            supabase,
+            built.ctx,
+            att.conversation_id,
+            message,
+            {
+              system: true,
+              inactivity_warning: true,
+              attendance_id: att.id,
+            }
+          );
 
-    if (elapsedMin >= warnAtMin) {
-      log("threshold de aviso atingido — enviando aviso", { elapsedMin, warnAtMin });
+          // Marca timestamp do aviso (idempotência: só atualiza se ainda for null)
+          await supabase
+            .from("support_attendances")
+            .update({ inactivity_warning_sent_at: new Date().toISOString() })
+            .eq("id", att.id)
+            .is("inactivity_warning_sent_at", null);
 
-      const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
-      if (!built) {
-        log("não foi possível construir SendContext — skip");
-        return;
-      }
-
-      const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
-
-      await sendAndPersistAutoMessage(
-        supabase,
-        built.ctx,
-        att.conversation_id,
-        message,
-        {
-          system: true,
-          inactivity_warning: true,
-          attendance_id: att.id,
+          return "warned";
         }
-      );
+        return "skipped"; // ainda não chegou na janela de aviso
+      }
 
-      await supabase
-        .from("support_attendances")
-        .update({ inactivity_warning_sent_at: new Date().toISOString() })
-        .eq("id", att.id)
-        .is("inactivity_warning_sent_at", null);
+      // Caso B: aviso já foi enviado — verifica se passou warnBeforeMin desde então
+      const warningSentAt = new Date(att.inactivity_warning_sent_at).getTime();
+      const minSinceWarning = (Date.now() - warningSentAt) / 60000;
+
+      if (minSinceWarning < warnBeforeMin) {
+        return "skipped"; // ainda na janela de espera pós-aviso
+      }
+
+      log("janela pós-aviso expirada — encerrando", {
+        minSinceWarning,
+        warnBeforeMin,
+      });
+
+      return await closeAttendance(supabase, att, correlationId);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // FLUXO COM AVISO DESATIVADO
+    // Comportamento simples: passou do threshold → fecha.
+    // ─────────────────────────────────────────────────────────────────────────
+    if (elapsedMin >= closeThresholdMin) {
+      log("aviso desativado, threshold atingido — encerrando", {
+        elapsedMin,
+        closeThresholdMin,
+      });
+      return await closeAttendance(supabase, att, correlationId);
+    }
+
+    return "skipped";
   } catch (err) {
     console.error(`${LOG}[${correlationId}][${att.attendance_code}] erro:`, err);
+    return "error";
   }
+}
+
+async function closeAttendance(
+  supabase: any,
+  att: AttendanceRow,
+  correlationId: string
+): Promise<"closed" | "skipped"> {
+  const log = (msg: string, extra?: any) =>
+    console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
+
+  const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
+  const nowIso = new Date().toISOString();
+
+  // Atualiza attendance: status closed (guard idempotência via .eq status)
+  const { error: attErr, data: updRows } = await supabase
+    .from("support_attendances")
+    .update({
+      status: "closed",
+      closed_at: nowIso,
+      closed_reason: "inactivity",
+      closure_type: "inactivity_auto",
+      updated_at: nowIso,
+    })
+    .eq("id", att.id)
+    .eq("status", "in_progress")
+    .select("id");
+
+  if (attErr) {
+    log("erro ao fechar attendance", attErr);
+    return "skipped";
+  }
+
+  // Se update não afetou nenhuma linha (status já mudou em paralelo), não envia
+  if (!updRows || updRows.length === 0) {
+    log("attendance não estava mais in_progress — skip mensagem");
+    return "skipped";
+  }
+
+  await supabase
+    .from("whatsapp_conversations")
+    .update({ status: "closed", updated_at: nowIso })
+    .eq("id", att.conversation_id);
+
+  if (built) {
+    await sendAndPersistAutoMessage(
+      supabase,
+      built.ctx,
+      att.conversation_id,
+      `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, é só nos enviar uma nova mensagem. \u{1F60A}`,
+      {
+        system: true,
+        attendance_event: "closed",
+        attendance_id: att.id,
+        inactivity_close: true,
+      }
+    );
+  }
+
+  return "closed";
 }
 
 serve(async (req) => {
@@ -232,25 +281,44 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Busca limitada — prioriza atendimentos com aviso já enviado (próximos de fechar)
+    // e depois os mais antigos sem aviso (próximos de receber aviso)
     const { data: rows, error } = await supabase
       .from("support_attendances")
       .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at")
-      .eq("status", "in_progress");
+      .eq("status", "in_progress")
+      .order("inactivity_warning_sent_at", { ascending: true, nullsFirst: false })
+      .order("last_operator_message_at", { ascending: true, nullsFirst: true })
+      .limit(MAX_BATCH_SIZE);
 
     if (error) throw error;
 
     const attendances = (rows ?? []) as AttendanceRow[];
-    console.log(`${LOG}[${correlationId}] scanning ${attendances.length} attendances`);
+    console.log(`${LOG}[${correlationId}] processing ${attendances.length} attendances (max ${MAX_BATCH_SIZE})`);
 
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       attendances.map((att) => processAttendance(supabase, att, correlationId))
     );
 
+    const summary = { closed: 0, warned: 0, skipped: 0, error: 0 };
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        summary[r.value] = (summary[r.value] || 0) + 1;
+      } else {
+        summary.error++;
+      }
+    }
+
     const elapsed = Date.now() - startedAt;
-    console.log(`${LOG}[${correlationId}] done in ${elapsed}ms`);
+    console.log(`${LOG}[${correlationId}] done in ${elapsed}ms`, summary);
 
     return new Response(
-      JSON.stringify({ success: true, processed: attendances.length, elapsed_ms: elapsed }),
+      JSON.stringify({
+        success: true,
+        scanned: attendances.length,
+        ...summary,
+        elapsed_ms: elapsed,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
