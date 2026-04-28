@@ -1,6 +1,4 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import type { ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 
@@ -47,32 +45,6 @@ export function useConversationStates(conversationIds: string[]) {
     refetchInterval: 10000,
     refetchIntervalInBackground: true,
   });
-
-  // Realtime: invalidate on changes to conversations or attendances
-  const channelRef = useRef(`conv-states-${crypto.randomUUID().slice(0, 8)}`);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel(channelRef.current)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "whatsapp_conversations",
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
-      })
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "support_attendances",
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
-        queryClient.refetchQueries({ queryKey: ["conversation-states"] });
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
 
   return {
     stateMap: data ?? new Map<string, ConversationStateRow>(),
