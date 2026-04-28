@@ -5,18 +5,21 @@ import { getInstanceSecrets } from '../_shared/providers/index.ts';
 
 const LOG = '[zapi-webhook]';
 
-Deno.serve(async (req) => {
+Deno.serve((req) => {
   if (req.method === 'OPTIONS') {
     return new Response(JSON.stringify({ received: true }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  try {
-    await processZapiWebhook(req);
-  } catch (err) {
-    console.error(`${LOG} Erro no processamento:`, err);
-  }
+  // Resposta imediata (<50ms) para evitar timeout/retry da Z-API.
+  // Processamento real continua em background até o limite do worker.
+  // @ts-ignore - EdgeRuntime é fornecido pelo Supabase Edge runtime
+  EdgeRuntime.waitUntil(
+    processZapiWebhook(req).catch((err) => {
+      console.error(`${LOG} Erro no processamento (background):`, err);
+    })
+  );
 
   return new Response(JSON.stringify({ received: true }), {
     headers: { 'Content-Type': 'application/json' },
