@@ -19,10 +19,6 @@ export function ConversationList({ selectedId, onSelect }: Props) {
   const [search, setSearch] = useState("");
   const { data: conversations = [], isLoading } = useConversations(search);
 
-  const getInitials = (name: string | null, phone: string) => {
-    if (name) return name.substring(0, 2).toUpperCase();
-    return phone.substring(phone.length - 2);
-  };
 
   const formatTime = (ts: string | null) => {
     if (!ts) return "";
