@@ -1,4 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import type { ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 
@@ -41,8 +43,36 @@ export function useConversationStates(conversationIds: string[]) {
       return map;
     },
     enabled: conversationIds.length > 0,
-    staleTime: 30000,
+    staleTime: 2000,
   });
+
+  // Realtime: invalida quando estado muda. Filter por tenant_id reduz volume processado.
+  const channelRef = useRef(`conv-states-${crypto.randomUUID().slice(0, 8)}`);
+
+  useEffect(() => {
+    if (!tid) return;
+    const channel = supabase
+      .channel(channelRef.current)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "whatsapp_conversations",
+        filter: `tenant_id=eq.${tid}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+      })
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "support_attendances",
+        filter: `tenant_id=eq.${tid}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient, tid]);
 
   return {
     stateMap: data ?? new Map<string, ConversationStateRow>(),
