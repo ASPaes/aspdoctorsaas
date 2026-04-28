@@ -658,6 +658,18 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const contactId = await findOrCreateContact(supabase, instanceId, phone, pushName || phone, isGroup, fromMe, tenantId);
   if (!contactId) return;
 
+  // Fire-and-forget: sincroniza foto de perfil do contato (idempotente; sync interno valida frescor)
+  if (!fromMe) {
+    fetch(`${supabaseUrl}/functions/v1/sync-contact-picture`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+      },
+      body: JSON.stringify({ contact_id: contactId }),
+    }).catch(() => {});
+  }
+
   const conversationId = await findOrCreateConversation(supabase, instanceId, contactId, tenantId, fromMe);
   if (!conversationId) return;
 
