@@ -61,7 +61,6 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // ✅ CORRIGIDO: usar getUser() — método correto no supabase-js v2
     const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
@@ -78,10 +77,10 @@ Deno.serve(async (req) => {
     // Service role client for storage access
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Get user's tenant
+    // Get user's tenant + super_admin flag
     const { data: profile } = await supabase
       .from('profiles')
-      .select('tenant_id')
+      .select('tenant_id, is_super_admin')
       .eq('user_id', userId)
       .eq('status', 'ativo')
       .maybeSingle();
@@ -92,13 +91,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch message ensuring tenant match
-    const { data: msg, error: msgError } = await supabase
+    // Fetch message — super admin can access any tenant; others restricted to their own
+    let query = supabase
       .from('whatsapp_messages')
       .select('id, media_url, media_path, media_filename, media_ext, media_mimetype, media_size_bytes, media_kind, tenant_id')
-      .eq('id', messageRowId)
-      .eq('tenant_id', profile.tenant_id)
-      .maybeSingle();
+      .eq('id', messageRowId);
+
+    if (!profile.is_super_admin) {
+      query = query.eq('tenant_id', profile.tenant_id);
+    }
+
+    const { data: msg, error: msgError } = await query.maybeSingle();
 
     if (msgError || !msg) {
       return new Response(JSON.stringify({ error: 'Not found' }), {
