@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, Bell } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
@@ -228,6 +228,14 @@ export function AppSidebar() {
             <SidebarMenuButton tooltip="Preferências" onClick={() => setPrefsOpen(true)}>
               <SlidersHorizontal className="h-4 w-4" />
               <span>Preferências</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Notificações">
+              <NavLink to="/configuracoes/notificacoes" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                <Bell className="h-4 w-4" />
+                <span>Notificações</span>
+              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
