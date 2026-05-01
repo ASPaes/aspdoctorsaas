@@ -23,11 +23,13 @@ export function useCertA1Data(periodoInicio: Date | null, periodoFim: Date | nul
     queryKey: ['cert-a1-metrics', periodoInicioStr, periodoFimStr, tid],
     queryFn: async (): Promise<CertA1Metrics> => {
       // 1. Vendas no período — buscar registros com data_venda preenchida
-      let vendasQuery = tf(supabase.from('certificado_a1_vendas').select('valor_venda, data_venda, status')).not('data_venda', 'is', null);
-      if (periodoInicioStr && periodoFimStr) {
-        vendasQuery = vendasQuery.gte('data_venda', periodoInicioStr).lte('data_venda', periodoFimStr);
-      }
-      const { data: vendas } = await vendasQuery;
+      const vendas = await fetchAllRows<any>(() => {
+        let q = tf(supabase.from('certificado_a1_vendas').select('valor_venda, data_venda, status')).not('data_venda', 'is', null);
+        if (periodoInicioStr && periodoFimStr) {
+          q = q.gte('data_venda', periodoInicioStr).lte('data_venda', periodoFimStr);
+        }
+        return q;
+      });
       // Somente "ganho" para vendas e faturamento
       const ganhos = vendas?.filter(v => v.status === 'ganho') || [];
       const vendasQtd = ganhos.length;
