@@ -289,7 +289,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             sonnerToast(notif.title, {
               description: notif.body || undefined,
               duration: 5000,
-              position: "top-right",
+              
               action: notif.action_url
                 ? {
                     label: "Abrir",
