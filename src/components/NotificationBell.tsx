@@ -1,32 +1,20 @@
 import { Bell, Check, CheckCheck, ExternalLink } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/hooks/useNotifications";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { playNotificationSound } from "@/utils/whatsapp/notificationSound";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function NotificationBell() {
   const { unreadCount, notifications, markRead, dismiss, markAllRead } = useNotifications();
-  const { preferences } = useUserPreferences();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const prevCount = useRef(unreadCount);
-
-  // Play sound on new notification
-  useEffect(() => {
-    if (unreadCount > prevCount.current && preferences?.sound_enabled !== false) {
-      playNotificationSound();
-    }
-    prevCount.current = unreadCount;
-  }, [unreadCount, preferences?.sound_enabled]);
 
   const handleItemClick = (item: NotificationItem) => {
     if (!item.read_at) {
