@@ -286,29 +286,32 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           }
 
           if (wantsToast) {
-            toast({
-              title: notif.title,
+            sonnerToast(notif.title, {
               description: notif.body || undefined,
               duration: 5000,
-              onClick: () => {
-                if (notif.action_url) {
-                  navigate(notif.action_url);
-                }
-                supabase
-                  .rpc("mark_notification_read" as any, {
-                    p_recipient_id: recipient.id,
-                  })
-                  .then(() => {
-                    setUnreadCount((c) => Math.max(0, c - 1));
-                    queryClient.invalidateQueries({
-                      queryKey: ["notifications-list"],
-                    });
-                    queryClient.invalidateQueries({
-                      queryKey: ["notifications-unread-count"],
-                    });
-                  });
-              },
-            } as any);
+              position: "top-right",
+              action: notif.action_url
+                ? {
+                    label: "Abrir",
+                    onClick: () => {
+                      if (notif.action_url) navigate(notif.action_url);
+                      supabase
+                        .rpc("mark_notification_read" as any, {
+                          p_recipient_id: recipient.id,
+                        })
+                        .then(() => {
+                          setUnreadCount((c) => Math.max(0, c - 1));
+                          queryClient.invalidateQueries({
+                            queryKey: ["notifications-list"],
+                          });
+                          queryClient.invalidateQueries({
+                            queryKey: ["notifications-unread-count"],
+                          });
+                        });
+                    },
+                  }
+                : undefined,
+            });
           }
 
           if (
