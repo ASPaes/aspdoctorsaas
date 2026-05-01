@@ -310,14 +310,14 @@ export function useDashboardData(filters: DashboardFilters) {
       const prevTotalImplantacao = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0) : null;
 
       // Previous month movimentos for upsell/cross-sell delta
-      const { data: prevMovimentos } = await tf(supabase
+      const prevMovimentos = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', prevMonthStart)
         .lte('data_movimento', prevMonthEnd)
         .eq('status', 'ativo')
         .is('estornado_por', null)
-        .is('estorno_de', null));
+        .is('estorno_de', null)));
 
       // Build prev month client set for filtering
       const prevClientesFiltered = new Set((prevNovos || []).map(c => c.id));
