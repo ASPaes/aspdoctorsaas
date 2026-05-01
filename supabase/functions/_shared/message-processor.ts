@@ -111,39 +111,146 @@ function mediaKind(messageType: string): string | null {
   return ['image', 'audio', 'video', 'document'].includes(messageType) ? messageType : null;
 }
 
-function resolveOutsideHoursContext(dayKey: string, currentTime: string, businessHours: Record<string, any>) {
-  const dayOrder = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+// ─── TZ + Holiday helpers ─────────────────────────────────────────────────────
+
+const WEEKDAY_KEYS: Record<string, string> = { Sun: 'sun', Mon: 'mon', Tue: 'tue', Wed: 'wed', Thu: 'thu', Fri: 'fri', Sat: 'sat' };
+
+function tzDateStr(date: Date, tz: string): string {
+  // en-CA produz YYYY-MM-DD respeitando o timezone
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+function tzDayKey(date: Date, tz: string): string {
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(date);
+  return WEEKDAY_KEYS[wd] || '';
+}
+
+export interface BusinessHoursExceptionsLookup {
+  today: { name: string | null; is_closed: boolean } | null;
+  closedDates: Set<string>;
+}
+
+export async function getBusinessHoursExceptions(
+  supabase: any,
+  tenantId: string,
+  msgDate: Date,
+  tz: string,
+  daysAhead: number = 14,
+): Promise<BusinessHoursExceptionsLookup> {
+  try {
+    const startStr = tzDateStr(msgDate, tz);
+    const endStr = tzDateStr(new Date(msgDate.getTime() + daysAhead * 86400000), tz);
+    const { data, error } = await supabase
+      .from('business_hours_exceptions')
+      .select('date, name, is_closed')
+      .eq('tenant_id', tenantId)
+      .gte('date', startStr)
+      .lte('date', endStr);
+    if (error) {
+      console.error('[processor] getBusinessHoursExceptions error:', error.message);
+      return { today: null, closedDates: new Set() };
+    }
+    const closedDates = new Set<string>();
+    let today: { name: string | null; is_closed: boolean } | null = null;
+    for (const row of (data || [])) {
+      if (row.is_closed) closedDates.add(row.date);
+      if (row.date === startStr) today = { name: row.name ?? null, is_closed: !!row.is_closed };
+    }
+    return { today, closedDates };
+  } catch (err) {
+    console.error('[processor] getBusinessHoursExceptions unexpected:', err);
+    return { today: null, closedDates: new Set() };
+  }
+}
+
+function resolveOutsideHoursContext(
+  msgDate: Date,
+  tz: string,
+  businessHours: Record<string, any>,
+  closedDates: Set<string>,
+  isHolidayToday: boolean,
+) {
+  const todayDateStr = tzDateStr(msgDate, tz);
+  const dayKey = tzDayKey(msgDate, tz);
+  const tParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(msgDate);
+  const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
   const dayConfig = businessHours[dayKey];
-  if (!dayConfig || !dayConfig.active) {
-    const idx = dayOrder.indexOf(dayKey);
-    let nextStart: string | null = null;
-    for (let i = 1; i <= 7; i++) {
-      const nd = dayOrder[(idx + i) % 7];
-      if (businessHours[nd]?.active && businessHours[nd]?.slots?.length > 0) { nextStart = businessHours[nd].slots[0].start; break; }
+  const slots: { start: string; end: string }[] = (dayConfig?.slots || []).slice();
+  if (dayConfig?.start && dayConfig?.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
+
+  // Encontra próximo datetime ativo iterando por DATA real (pula feriados fechados e dias inativos)
+  const findNext = (): { dateStr: string; time: string; dayKey: string } | null => {
+    // Hoje: só considera se NÃO é feriado fechado e ainda há slot futuro hoje
+    if (!isHolidayToday && dayConfig?.active && slots.length > 0) {
+      for (const slot of slots) {
+        if (currentTime < slot.start) return { dateStr: todayDateStr, time: slot.start, dayKey };
+      }
     }
-    return { period: 'weekend', nextSlotStart: nextStart, currentSlots: [] as any[] };
-  }
-  const slots: { start: string; end: string }[] = dayConfig.slots || [];
-  if (dayConfig.start && dayConfig.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
-  if (slots.length === 0) return { period: 'inactive_day', nextSlotStart: null, currentSlots: [] };
-  const firstStart = slots[0].start;
-  const lastEnd = slots[slots.length - 1].end;
-  if (currentTime < firstStart) return { period: 'before_open', nextSlotStart: firstStart, currentSlots: slots };
-  if (currentTime > lastEnd) {
-    const idx = dayOrder.indexOf(dayKey);
-    let nextStart: string | null = null;
-    for (let i = 1; i <= 7; i++) {
-      const nd = dayOrder[(idx + i) % 7];
-      if (businessHours[nd]?.active && businessHours[nd]?.slots?.length > 0) { nextStart = businessHours[nd].slots[0].start; break; }
+    // Próximos 14 dias
+    for (let i = 1; i <= 14; i++) {
+      const d = new Date(msgDate.getTime() + i * 86400000);
+      const dStr = tzDateStr(d, tz);
+      if (closedDates.has(dStr)) continue;
+      const dKey = tzDayKey(d, tz);
+      const cfg = businessHours[dKey];
+      if (!cfg?.active) continue;
+      const dSlots: { start: string; end: string }[] = (cfg.slots || []).slice();
+      if (cfg.start && cfg.end && dSlots.length === 0) dSlots.push({ start: cfg.start, end: cfg.end });
+      if (dSlots.length === 0) continue;
+      return { dateStr: dStr, time: dSlots[0].start, dayKey: dKey };
     }
-    return { period: 'after_close', nextSlotStart: nextStart, currentSlots: slots };
-  }
-  for (let i = 0; i < slots.length - 1; i++) {
-    if (currentTime > slots[i].end && currentTime < slots[i + 1].start) {
-      return { period: 'lunch', nextSlotStart: slots[i + 1].start, currentSlots: slots };
+    return null;
+  };
+
+  const next = findNext();
+
+  let period: 'holiday' | 'weekend' | 'inactive_day' | 'before_open' | 'lunch' | 'after_close';
+  if (isHolidayToday) period = 'holiday';
+  else if (!dayConfig?.active) period = 'weekend';
+  else if (slots.length === 0) period = 'inactive_day';
+  else {
+    const firstStart = slots[0].start;
+    const lastEnd = slots[slots.length - 1].end;
+    if (currentTime < firstStart) period = 'before_open';
+    else if (currentTime > lastEnd) period = 'after_close';
+    else {
+      let inLunch = false;
+      for (let i = 0; i < slots.length - 1; i++) {
+        if (currentTime > slots[i].end && currentTime < slots[i + 1].start) { inLunch = true; break; }
+      }
+      period = inLunch ? 'lunch' : 'after_close';
     }
   }
-  return { period: 'after_close', nextSlotStart: firstStart, currentSlots: slots };
+
+  return {
+    period,
+    nextSlotStart: next?.time ?? null,
+    nextSlotDateStr: next?.dateStr ?? null,
+    nextSlotDayKey: next?.dayKey ?? null,
+    currentSlots: slots,
+    todayDateStr,
+    currentTime,
+    dayKey,
+  };
+}
+
+const DAYKEY_LABEL_PTBR: Record<string, string> = {
+  sun: 'domingo', mon: 'segunda-feira', tue: 'terça-feira', wed: 'quarta-feira',
+  thu: 'quinta-feira', fri: 'sexta-feira', sat: 'sábado',
+};
+
+function formatNextDateLabelPTBR(todayStr: string, nextDateStr: string | null, nextDayKey: string | null): string {
+  if (!nextDateStr) return '';
+  const today = new Date(`${todayStr}T00:00:00Z`);
+  const next = new Date(`${nextDateStr}T00:00:00Z`);
+  const diffDays = Math.round((next.getTime() - today.getTime()) / 86400000);
+  if (diffDays <= 0) return 'hoje';
+  if (diffDays === 1) return 'amanhã';
+  if (diffDays < 7 && nextDayKey) return DAYKEY_LABEL_PTBR[nextDayKey] || '';
+  // Mais de uma semana — formata DD/MM
+  const [y, m, d] = nextDateStr.split('-');
+  return `${d}/${m}`;
 }
 
 // ─── Envio de mensagens (provider-aware) ─────────────────────────────────────
@@ -380,41 +487,84 @@ async function sendDeferredClosureMessage(supabase: any, ctx: SendContext, conve
 
 // ─── Business Hours ───────────────────────────────────────────────────────────
 
-async function sendBusinessHoursMessage(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, supportConfig: any, dayKey: string, currentTime: string, businessHours: Record<string, any>): Promise<void> {
+async function sendBusinessHoursMessage(
+  supabase: any,
+  ctx: SendContext,
+  conversationId: string,
+  tenantId: string,
+  supportConfig: any,
+  msgDate: Date,
+  tz: string,
+  businessHours: Record<string, any>,
+  closedDates: Set<string>,
+  holidayException: { name: string | null; is_closed: boolean } | null,
+): Promise<void> {
   try {
-    const context = resolveOutsideHoursContext(dayKey, currentTime, businessHours);
+    const isHolidayToday = !!(holidayException && holidayException.is_closed);
+    const context = resolveOutsideHoursContext(msgDate, tz, businessHours, closedDates, isHolidayToday);
     const slots = context.currentSlots;
     const firstStart = slots[0]?.start || '08:00';
     const lastEnd = slots[slots.length - 1]?.end || '18:00';
     const nextStart = context.nextSlotStart || firstStart;
     const slotsDesc = slots.length > 0 ? slots.map((s: any) => `${s.start} às ${s.end}`).join(' e ') : `${firstStart} às ${lastEnd}`;
-    const hour = parseInt(currentTime.split(':')[0], 10);
+    const hour = parseInt(context.currentTime.split(':')[0], 10);
     const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    const nextDateLabel = formatNextDateLabelPTBR(context.todayDateStr, context.nextSlotDateStr, context.nextSlotDayKey);
+    const nextWhen = nextDateLabel ? `${nextDateLabel} a partir das ${nextStart}` : `às ${nextStart}`;
+    const holidayName = holidayException?.name || 'feriado';
+
     let contextHint = '';
-    if (context.period === 'before_open') contextHint = `O cliente escreveu às ${currentTime}, antes da abertura às ${nextStart}.`;
-    else if (context.period === 'lunch') contextHint = `O cliente escreveu às ${currentTime}, no intervalo. Retornamos às ${nextStart}.`;
-    else if (context.period === 'after_close') contextHint = `O cliente escreveu às ${currentTime}, após encerramento. Retornamos às ${nextStart}.`;
-    else if (context.period === 'weekend') contextHint = `O cliente escreveu num dia sem atendimento. Retornamos às ${nextStart}.`;
+    if (context.period === 'holiday') contextHint = `Hoje é feriado (${holidayName}). O cliente escreveu às ${context.currentTime}. Retornamos ${nextWhen}.`;
+    else if (context.period === 'before_open') contextHint = `O cliente escreveu às ${context.currentTime}, antes da abertura ${nextWhen}.`;
+    else if (context.period === 'lunch') contextHint = `O cliente escreveu às ${context.currentTime}, no intervalo. Retornamos às ${nextStart}.`;
+    else if (context.period === 'after_close') contextHint = `O cliente escreveu às ${context.currentTime}, após encerramento. Retornamos ${nextWhen}.`;
+    else if (context.period === 'weekend') contextHint = `O cliente escreveu num dia sem atendimento. Retornamos ${nextWhen}.`;
 
     try {
       const aiCfg = await getAIConfig(tenantId, supabase);
       if (aiCfg) {
-        const basePrompt = supportConfig.business_hours_outside_prompt || 'Você é um atendente virtual. Escreva uma mensagem CURTA (máximo 3 linhas) em português, amigável e variada, informando que estamos fora do horário de atendimento.';
+        const basePromptDefault = context.period === 'holiday'
+          ? `Você é um atendente virtual. Escreva uma mensagem CURTA (máximo 3 linhas) em português, amigável e variada, informando que hoje é feriado (${holidayName}) e que retornamos ${nextWhen}. Não dê detalhes sobre o feriado.`
+          : 'Você é um atendente virtual. Escreva uma mensagem CURTA (máximo 3 linhas) em português, amigável e variada, informando que estamos fora do horário de atendimento.';
+        const basePrompt = (context.period === 'holiday')
+          ? basePromptDefault
+          : (supportConfig.business_hours_outside_prompt || basePromptDefault);
         const aiMsg = await callAI(aiCfg, [
           { role: 'system', content: 'Responda APENAS com a mensagem final para o cliente, sem explicações. Máximo 3 linhas.' },
-          { role: 'user', content: `${basePrompt}\n\nContexto: ${contextHint}\nSaudação: ${greeting}\nHorário: ${slotsDesc}\nPróximo: ${nextStart}\n\nInicie com "${greeting}!", máximo 3 linhas, máximo 1 emoji.` },
+          { role: 'user', content: `${basePrompt}\n\nContexto: ${contextHint}\nSaudação: ${greeting}\nHorário regular: ${slotsDesc}\nPróximo retorno: ${nextWhen}\n\nInicie com "${greeting}!", máximo 3 linhas, máximo 1 emoji.` },
         ]);
         const aiText = aiMsg?.content?.trim();
         if (aiText && aiText.length > 0) {
-          await sendAndPersistAutoMessage(supabase, ctx, conversationId, aiText, { business_hours: true, outside_hours: true, ai_generated: true });
+          await sendAndPersistAutoMessage(supabase, ctx, conversationId, aiText, {
+            business_hours: true,
+            outside_hours: true,
+            ai_generated: true,
+            ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
+          });
           return;
         }
       }
     } catch { /* fallback to template */ }
 
-    const template = supportConfig.business_hours_message || 'Olá! \u{1F44B} Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
-    const message = template.replace(/\{\{start\}\}/g, firstStart).replace(/\{\{end\}\}/g, lastEnd).replace(/\{\{next_start\}\}/g, nextStart).replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart).replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '').replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '').replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
-    await sendAndPersistAutoMessage(supabase, ctx, conversationId, message, { business_hours: true, outside_hours: true });
+    const message = isHolidayToday
+      ? `${greeting}! \u{1F4C5} Hoje é feriado (${holidayName}) e nosso atendimento está pausado.\nRetornamos ${nextWhen}. Sua mensagem foi registrada e responderemos assim que voltarmos. \u{1F64F}`
+      : (() => {
+          const template = supportConfig.business_hours_message || 'Olá! \u{1F44B} Nosso horário é das {{start}} às {{end}}. Retornamos às {{next_start}}!';
+          return template
+            .replace(/\{\{start\}\}/g, firstStart)
+            .replace(/\{\{end\}\}/g, lastEnd)
+            .replace(/\{\{next_start\}\}/g, nextStart)
+            .replace(/\{\{slot1_start\}\}/g, slots[0]?.start || firstStart)
+            .replace(/\{\{slot1_end\}\}/g, slots[0]?.end || '')
+            .replace(/\{\{slot2_start\}\}/g, slots[1]?.start || '')
+            .replace(/\{\{slot2_end\}\}/g, slots[1]?.end || lastEnd);
+        })();
+
+    await sendAndPersistAutoMessage(supabase, ctx, conversationId, message, {
+      business_hours: true,
+      outside_hours: true,
+      ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
+    });
   } catch (err) { console.error('[processor] Error in sendBusinessHoursMessage:', err); }
 }
 
@@ -423,16 +573,19 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
     const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
     const businessHours = supportConfig.business_hours || {};
     const msgDate = new Date(timestamp);
-    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-    const parts = formatter.formatToParts(msgDate);
-    const weekdayMap: Record<string, string> = { 'Sun': 'sun', 'Mon': 'mon', 'Tue': 'tue', 'Wed': 'wed', 'Thu': 'thu', 'Fri': 'fri', 'Sat': 'sat' };
-    const dayKey = weekdayMap[parts.find(p => p.type === 'weekday')?.value || ''] || '';
-    const currentTime = `${(parts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(parts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+    // Holiday/exception lookup (mesmo dia + próximos 14 dias)
+    const exceptions = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 14);
+    const isHolidayToday = !!(exceptions.today && exceptions.today.is_closed);
+
+    const dayKey = tzDayKey(msgDate, tz);
+    const tParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(msgDate);
+    const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
 
     const dayConfig = businessHours[dayKey];
-    const slots: { start: string; end: string }[] = dayConfig?.slots || [];
+    const slots: { start: string; end: string }[] = (dayConfig?.slots || []).slice();
     if (dayConfig?.start && dayConfig?.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
-    const isInsideSlot = dayConfig?.active && slots.some((slot: any) => currentTime >= slot.start && currentTime <= slot.end);
+    const isInsideSlot = !isHolidayToday && dayConfig?.active && slots.some((slot: any) => currentTime >= slot.start && currentTime <= slot.end);
     if (isInsideSlot) return { inside: true };
 
     const { data: convBH } = await supabase.from('whatsapp_conversations').select('out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
@@ -443,7 +596,7 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
       const lastNotice = convMeta?.metadata?.off_hours_last_notice_at;
       const cooldownMs = 5 * 60 * 1000;
       if (!lastNotice || (Date.now() - new Date(lastNotice).getTime()) > cooldownMs) {
-        await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, dayKey, currentTime, businessHours);
+        await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, msgDate, tz, businessHours, exceptions.closedDates, exceptions.today);
         const updatedMeta = { ...(convMeta?.metadata || {}), off_hours_last_notice_at: new Date().toISOString() };
         await supabase.from('whatsapp_conversations').update({ metadata: updatedMeta }).eq('id', conversationId);
       }
