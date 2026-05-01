@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TenantSelector } from "@/components/TenantSelector";
 import { NotificationBell } from "@/components/NotificationBell";
+import { NotificationPermissionBanner } from "@/components/notifications/NotificationPermissionBanner";
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";
 import TeamPresencePopover from "@/components/whatsapp/presence/TeamPresencePopover";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +54,7 @@ export default function AppLayout() {
               )}
             </div>
             <div className="flex items-center gap-3">
+              <NotificationPermissionBanner />
               <NotificationBell />
               <TenantSelector />
               <ThemeToggle />
