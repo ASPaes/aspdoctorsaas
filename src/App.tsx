@@ -62,7 +62,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
     <TooltipProvider>
       <Toaster />
-      <Sonner position="top-right" />
+      <Sonner position="bottom-right" />
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
