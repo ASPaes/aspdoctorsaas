@@ -29,7 +29,7 @@ export function useConversationMute(conversationId: string | null | undefined) {
         .eq("user_id", uid!)
         .eq("conversation_id", conversationId!)
         .maybeSingle();
-      return (data as MuteRow | null) ?? null;
+      return ((data as unknown) as MuteRow | null) ?? null;
     },
   });
 
