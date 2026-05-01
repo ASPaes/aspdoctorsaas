@@ -151,11 +151,11 @@ export function useDashboardData(filters: DashboardFilters) {
       const earlyChurnRate = novosCount > 0 ? cancelamentosEarly / novosCount : 0;
 
       // 6. CAC
-      const { data: cacData } = await tf(supabase
+      const cacData = await fetchAllRows<any>(() => tf(supabase
         .from('cac_despesas')
         .select('valor_alocado, unidade_base_id')
         .lte('mes_inicial', periodoFimStr)
-        .eq('ativo', true));
+        .eq('ativo', true)));
 
       const cacTotal = cacData
         ?.filter(d => !filters.unidadeBaseId || !d.unidade_base_id || d.unidade_base_id === filters.unidadeBaseId)
