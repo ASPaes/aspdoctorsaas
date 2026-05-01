@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInDays, parseISO, isWithinInterval, endOfDay, subDays } from 'date-fns';
 import type { CSTicket, CSTicketStatus, CSTicketPrioridade, CSIndicacaoStatus } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { fetchAllRows } from '@/lib/supabasePaginate';
 
 export interface CSDashboardFilters {
   periodoInicio: Date;
