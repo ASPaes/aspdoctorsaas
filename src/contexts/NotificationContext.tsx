@@ -364,7 +364,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             queryKey: ["notifications-unread-count"],
           });
         }
-        }
       )
       .on(
         "postgres_changes",
