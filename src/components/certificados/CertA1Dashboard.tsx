@@ -77,22 +77,25 @@ export function CertA1Dashboard() {
   const { data: metrics, isLoading } = useQuery({
     queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr, tid],
     queryFn: async () => {
-      let vendasQuery = tf(supabase
-        .from("certificado_a1_vendas")
-        .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
-        .not("data_venda", "is", null));
-      if (periodoInicioStr && periodoFimStr) {
-        vendasQuery = vendasQuery.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
-      }
-      const { data: vendas } = await vendasQuery;
+      const vendas = await fetchAllRows<any>(() => {
+        let q = tf(supabase
+          .from("certificado_a1_vendas")
+          .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
+          .not("data_venda", "is", null));
+        if (periodoInicioStr && periodoFimStr) {
+          q = q.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
+        }
+        return q;
+      });
 
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
       let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null; telefone_whatsapp: string | null }> = {};
       if (clienteIds.length > 0) {
-        const { data: clientes } = await tf(supabase
+        // Paginar pra suportar listas grandes; .in() respeita o filtro mas o resultado ainda trunca em 1000
+        const clientes = await fetchAllRows<any>(() => tf(supabase
           .from("clientes")
           .select("id, razao_social, nome_fantasia, telefone_whatsapp")
-          .in("id", clienteIds as string[]));
+          .in("id", clienteIds as string[])));
         (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
