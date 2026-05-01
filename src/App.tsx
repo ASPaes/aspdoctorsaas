@@ -37,6 +37,7 @@ const SuperMonitor = lazy(() => import("@/pages/SuperMonitor"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 
 const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
+const ConfiguracoesNotificacoes = lazy(() => import("@/pages/ConfiguracoesNotificacoes"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 
@@ -86,6 +87,7 @@ const App = () => (
               <Route path="/cadastros" element={<Navigate to="/configuracoes?tab=cadastros" replace />} />
               <Route path="/certificados-a1" element={<CertificadosA1 />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/configuracoes/notificacoes" element={<ConfiguracoesNotificacoes />} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<CustomerSuccess />} />
               <Route path="/whatsapp" element={<WhatsApp />} />
