@@ -107,6 +107,21 @@ function WhatsAppContent() {
     })();
   }, [searchParams, selected?.id, setSearchParams]);
 
+  // Quando seleciona uma conversa, marcar suas notifications como lidas
+  useEffect(() => {
+    if (!selected?.id) return;
+    (async () => {
+      const { error } = await supabase.rpc(
+        "mark_conversation_notifications_read" as any,
+        { p_conversation_id: selected.id }
+      );
+      if (!error) {
+        queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+      }
+    })();
+  }, [selected?.id, queryClient]);
+
   // Capture URL params once on mount and clear them immediately
   const pendingParamsRef = useRef<{ phone: string; clienteId: string | null; clienteName: string | null } | null>(null);
   const didCaptureRef = useRef(false);
