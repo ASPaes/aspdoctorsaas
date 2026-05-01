@@ -456,12 +456,13 @@ export function useDashboardData(filters: DashboardFilters) {
       // === DISTRIBUTIONS ===
       // Need lookup names
       const [
-        { data: estados }, { data: cidades }, { data: segmentos },
+        { data: estados }, cidades, { data: segmentos },
         { data: areasAtuacao }, { data: fornecedores }, { data: motivosCancelamento },
         { data: origensVenda },
       ] = await Promise.all([
         supabase.from('estados').select('id, sigla, nome'),
-        supabase.from('cidades').select('id, nome, estado_id'),
+        // cidades: tabela global ~5.5k linhas — paginar pra não truncar em 1000
+        fetchAllRows<any>(() => supabase.from('cidades').select('id, nome, estado_id')),
         tf(supabase.from('segmentos').select('id, nome')),
         tf(supabase.from('areas_atuacao').select('id, nome')),
         tf(supabase.from('fornecedores').select('id, nome')),
