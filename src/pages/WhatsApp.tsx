@@ -80,6 +80,33 @@ function WhatsAppContent() {
     return () => { supabase.removeChannel(channel); };
   }, [selected?.id]);
 
+  // Auto-select conversation from URL param ?conversation=<id>
+  useEffect(() => {
+    const convId = searchParams.get("conversation");
+    if (!convId) return;
+    if (selected?.id === convId) {
+      searchParams.delete("conversation");
+      setSearchParams(searchParams, { replace: true });
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("whatsapp_conversations")
+        .select("*, contact:whatsapp_contacts(*)")
+        .eq("id", convId)
+        .maybeSingle();
+      if (data) {
+        setSelected(data as unknown as ConversationWithContact);
+        searchParams.delete("conversation");
+        setSearchParams(searchParams, { replace: true });
+      } else {
+        toast.error("Conversa não encontrada ou sem permissão de acesso.");
+        searchParams.delete("conversation");
+        setSearchParams(searchParams, { replace: true });
+      }
+    })();
+  }, [searchParams, selected?.id, setSearchParams]);
+
   // Capture URL params once on mount and clear them immediately
   const pendingParamsRef = useRef<{ phone: string; clienteId: string | null; clienteName: string | null } | null>(null);
   const didCaptureRef = useRef(false);
