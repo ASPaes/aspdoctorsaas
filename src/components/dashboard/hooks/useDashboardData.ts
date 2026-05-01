@@ -209,13 +209,13 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // Todos movimentos ativos até fim do período
-      const { data: todosMovimentosAtivos } = await tf(supabase
+      const todosMovimentosAtivos = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
-        .lte('data_movimento', periodoFimStr));
+        .lte('data_movimento', periodoFimStr)));
 
       const movimentosPorCliente: Record<string, number> = {};
       todosMovimentosAtivos?.forEach(m => {
