@@ -10,6 +10,7 @@ export interface NotificationItem {
   delivered_at: string;
   read_at: string | null;
   dismissed_at: string | null;
+  silent_mode: boolean;
   notification: {
     id: string;
     type: string;
