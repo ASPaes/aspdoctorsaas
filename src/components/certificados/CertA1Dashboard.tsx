@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLookups } from "@/hooks/useLookups";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { format, addDays, subDays, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
 import { DateRangePicker, DateRange } from "@/components/ui/date-range-picker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
