@@ -2093,6 +2093,7 @@ export type Database = {
         Row: {
           action_url: string | null
           body: string
+          conversation_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -2105,6 +2106,7 @@ export type Database = {
         Insert: {
           action_url?: string | null
           body?: string
+          conversation_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2117,6 +2119,7 @@ export type Database = {
         Update: {
           action_url?: string | null
           body?: string
+          conversation_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -5030,6 +5033,10 @@ export type Database = {
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_admin_or_head: { Args: never; Returns: boolean }
       mark_all_notifications_read: { Args: never; Returns: undefined }
+      mark_conversation_notifications_read: {
+        Args: { p_conversation_id: string }
+        Returns: number
+      }
       mark_notification_read: {
         Args: { p_recipient_id: string }
         Returns: undefined

@@ -86,11 +86,24 @@ export function NotificationBell() {
                     <p className={cn("text-sm leading-tight truncate", !item.read_at && "font-medium")}>
                       {item.notification.title}
                     </p>
-                    {item.notification.body && (
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {item.notification.body}
-                      </p>
-                    )}
+                    {(() => {
+                      const unreadCount = item.notification.metadata?.unread_count ?? 1;
+                      const hasMultiple = unreadCount > 1;
+                      return (
+                        <>
+                          {hasMultiple && (
+                            <p className="text-[10px] text-primary font-medium mt-0.5">
+                              {unreadCount} mensagens novas
+                            </p>
+                          )}
+                          {item.notification.body && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {item.notification.body}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {formatDistanceToNow(new Date(item.delivered_at), { addSuffix: true, locale: ptBR })}
                     </p>
