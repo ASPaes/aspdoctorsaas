@@ -2044,6 +2044,7 @@ export type Database = {
           id: string
           notification_id: string
           read_at: string | null
+          silent_mode: boolean
           tenant_id: string
           user_id: string
         }
@@ -2053,6 +2054,7 @@ export type Database = {
           id?: string
           notification_id: string
           read_at?: string | null
+          silent_mode?: boolean
           tenant_id: string
           user_id: string
         }
@@ -2062,6 +2064,7 @@ export type Database = {
           id?: string
           notification_id?: string
           read_at?: string | null
+          silent_mode?: boolean
           tenant_id?: string
           user_id?: string
         }
@@ -4929,6 +4932,13 @@ export type Database = {
       get_message_notification_recipients: {
         Args: { p_conversation_id: string }
         Returns: {
+          user_id: string
+        }[]
+      }
+      get_message_notification_recipients_v2: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          silent_mode: boolean
           user_id: string
         }[]
       }
