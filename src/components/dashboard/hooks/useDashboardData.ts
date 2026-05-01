@@ -165,14 +165,14 @@ export function useDashboardData(filters: DashboardFilters) {
       // 7. Movimentos MRR
       let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0;
 
-      const { data: movimentosPeriodo } = await tf(supabase
+      const movimentosPeriodo = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', periodoInicioStr)
         .lte('data_movimento', periodoFimStr)
         .eq('status', 'ativo')
         .is('estornado_por', null)
-        .is('estorno_de', null));
+        .is('estorno_de', null)));
 
       // Build set of ALL clients matching current filters (ativos + cancelados no período)
       // to correctly filter movimentos by fornecedor/unidade
