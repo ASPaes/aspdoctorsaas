@@ -24,6 +24,7 @@ import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
+import { ConversationMuteButton } from "./ConversationMuteButton";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -218,6 +219,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">Editar contato</TooltipContent>
               </Tooltip>
+              <ConversationMuteButton conversationId={conversation.id} />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
