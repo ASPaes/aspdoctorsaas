@@ -11,7 +11,7 @@ import { useLocation, useNavigate, matchPath } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
 
 const SOUND_URL =
