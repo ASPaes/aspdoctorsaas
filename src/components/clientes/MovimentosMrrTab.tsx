@@ -52,23 +52,24 @@ export default function MovimentosMrrTab() {
   const { data: movimentos, isLoading } = useQuery({
     queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, tid],
     queryFn: async () => {
-      let q = supabase
-        .from("movimentos_mrr")
-        .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, origem_venda, criado_em")
-        .eq("status", "ativo")
-        .is("estornado_por", null)
-        .is("estorno_de", null)
-        .order("data_movimento", { ascending: false });
+      const data = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from("movimentos_mrr")
+          .select("id, tipo, valor_delta, custo_delta, valor_venda_avulsa, data_movimento, descricao, status, estornado_por, estorno_de, cliente_id, funcionario_id, origem_venda, criado_em")
+          .eq("status", "ativo")
+          .is("estornado_por", null)
+          .is("estorno_de", null)
+          .order("data_movimento", { ascending: false });
 
-      q = tf(q);
+        q = tf(q);
 
-      if (periodo.from) q = q.gte("data_movimento", format(periodo.from, "yyyy-MM-dd"));
-      if (periodo.to) q = q.lte("data_movimento", format(periodo.to, "yyyy-MM-dd"));
-      if (tipoFilter) q = q.eq("tipo", tipoFilter as any);
-      if (funcionarioFilter) q = q.eq("funcionario_id", Number(funcionarioFilter));
+        if (periodo.from) q = q.gte("data_movimento", format(periodo.from, "yyyy-MM-dd"));
+        if (periodo.to) q = q.lte("data_movimento", format(periodo.to, "yyyy-MM-dd"));
+        if (tipoFilter) q = q.eq("tipo", tipoFilter as any);
+        if (funcionarioFilter) q = q.eq("funcionario_id", Number(funcionarioFilter));
 
-      const { data, error } = await q;
-      if (error) throw error;
+        return q;
+      });
       return data || [];
     },
   });
