@@ -226,6 +226,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             notification_id: string;
             tenant_id: string;
             delivered_at: string;
+            silent_mode: boolean;
           };
 
           // Update badge optimistically
