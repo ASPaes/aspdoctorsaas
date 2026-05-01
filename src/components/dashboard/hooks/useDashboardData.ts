@@ -356,10 +356,12 @@ export function useDashboardData(filters: DashboardFilters) {
         };
       });
 
-      // All clients for time series (no period filter)
-      const { data: allClientes } = await tf(supabase
-        .from('clientes')
-        .select('id, mensalidade, valor_ativacao, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
+      // All clients for time series (no period filter) — usa fetchAllRows para evitar limite de 1000 do PostgREST
+      const allClientes = await fetchAllRows<any>(() => {
+        return tf(supabase
+          .from('clientes')
+          .select('id, mensalidade, valor_ativacao, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
+      });
 
       const mrrEvolution: typeof timeSeries.mrrEvolution = [];
       const faturamentoEvolution: typeof timeSeries.faturamentoEvolution = [];
