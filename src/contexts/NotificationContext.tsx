@@ -269,6 +269,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             return;
           }
 
+          // CASO MONITOR: admin/head que está vendo notification de outro setor
+          // (silent_mode=true) - aparece no sino mas sem som/toast/native
+          if (recipient.silent_mode) {
+            return; // já incrementou unreadCount lá em cima e invalidou queries
+          }
+
           let mode: AlertMode;
           if (!isVisible) {
             mode = s.alert_background;
