@@ -6,6 +6,7 @@ import { escapeLike } from "@/lib/utils";
 import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { ptBR } from "date-fns/locale";
