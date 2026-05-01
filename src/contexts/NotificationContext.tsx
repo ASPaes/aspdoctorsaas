@@ -359,7 +359,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [uid, navigate, queryClient, toast, playSound, refreshUnreadCount]);
+  }, [uid, navigate, queryClient, playSound, refreshUnreadCount]);
 
   // Favicon badge
   useEffect(() => {
