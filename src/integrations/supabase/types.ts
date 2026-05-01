@@ -4701,6 +4701,10 @@ export type Database = {
       }
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
+      fn_user_owns_whatsapp_media_path: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
       get_ai_cost_metrics: {
         Args: { p_date_from?: string; p_date_to?: string; p_tenant_id?: string }
         Returns: Json
