@@ -126,13 +126,13 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesInicioCount = clientesInicioAtivos.length;
 
       // Movimentos antes do período
-      const { data: movimentosInicioRaw } = await tf(supabase
+      const movimentosInicioRaw = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
-        .lt('data_movimento', periodoInicioStr));
+        .lt('data_movimento', periodoInicioStr)));
 
       const movimentosInicioMap: Record<string, number> = {};
       movimentosInicioRaw?.forEach(m => {
