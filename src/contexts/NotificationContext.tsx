@@ -364,6 +364,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             queryKey: ["notifications-unread-count"],
           });
         }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          const updated = payload.new as { id: string; type: string };
+          if (updated?.type !== "whatsapp_new_message") return;
+          // Refresca lista do sino — counter "X mensagens novas" deve atualizar
+          queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+        }
       )
       .subscribe();
 
