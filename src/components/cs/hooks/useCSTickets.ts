@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { escapeLike } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { fetchAllRows } from '@/lib/supabasePaginate';
 import type {
   CSTicket,
   CSTicketTipo,
