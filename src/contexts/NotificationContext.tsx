@@ -256,6 +256,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           const notifConvId =
             (notif.metadata as any)?.conversation_id ?? null;
 
+          // CASO ESPECIAL: se a conversa já está aberta, marca como lido imediatamente
+          // e não dispara som/toast (o user já está vendo)
+          if (notifConvId && notifConvId === currentConvId) {
+            await supabase.rpc("mark_notification_read" as any, {
+              p_recipient_id: recipient.id,
+            });
+            setUnreadCount((c) => Math.max(0, c - 1));
+            queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+            queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+            return;
+          }
+
           let mode: AlertMode;
           if (!isVisible) {
             mode = s.alert_background;
