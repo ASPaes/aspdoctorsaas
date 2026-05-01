@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
 import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Loader2 } from "lucide-react";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
@@ -61,7 +62,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-right" />
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -77,7 +78,7 @@ const App = () => (
             <Route path="/access-blocked" element={<AuthGuard><AccessBlocked /></AuthGuard>} />
 
             {/* Protected routes */}
-            <Route element={<AuthGuard><TenantFilterProvider><AppLayout /></TenantFilterProvider></AuthGuard>}>
+            <Route element={<AuthGuard><TenantFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></TenantFilterProvider></AuthGuard>}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/clientes/novo" element={<ClienteForm />} />
