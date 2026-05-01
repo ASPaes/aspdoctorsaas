@@ -10,6 +10,7 @@ const defaultMetrics: KPIMetrics = {
   faturamentoTotal: 0, faturamentoPorUnidade: [], clientesAtivos: 0, mrr: 0, ticketMedio: 0, arr: 0,
   crescimentoReais: 0, crescimentoPercent: 0, ltvMeses: 0, ltvReais: 0, cac: 0, ltvCac: 0,
   cancelamentosQtd: 0, mrrCancelado: 0, cancelamentosEarly: 0, mrrCanceladoEarly: 0, earlyChurnRate: 0, churnCarteiraPercent: 0,
+  clientesInicioCount: 0, mrrInicio: 0,
   novosClientes: 0, newMrr: 0, totalImplantacao: 0,
   prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
   netNewMrr: 0, nrr: 0, grr: 0, cacPayback: 0, margemContribuicao: 0, concentracaoTop10: 0, receitaAtivacao: 0,
