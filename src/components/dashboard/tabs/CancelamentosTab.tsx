@@ -82,8 +82,13 @@ export function CancelamentosTab({ metrics, timeSeries, distributions, tvMode, c
   // We approximate using the evolution data
   const currChurnQtd = metrics.cancelamentosQtd;
   const currMrrCancelado = metrics.mrrCancelado;
-  const currChurnCarteira = metrics.cancelamentosQtd / Math.max(metrics.clientesAtivos + metrics.cancelamentosQtd, 1);
-  const currChurnReceita = metrics.mrrCancelado / Math.max(metrics.mrr + metrics.mrrCancelado, 1);
+  // Fórmula SaaS padrão: cancelados ÷ ativos no INÍCIO do período
+  const currChurnCarteira = metrics.clientesInicioCount > 0
+    ? metrics.cancelamentosQtd / metrics.clientesInicioCount
+    : 0;
+  const currChurnReceita = metrics.mrrInicio > 0
+    ? metrics.mrrCancelado / metrics.mrrInicio
+    : 0;
 
   // For churn rates prev month, we need active counts from prev month - approximate from mrrEvolution
   const mrrEvo = timeSeries.mrrEvolution;
