@@ -292,16 +292,18 @@ export function useDashboardData(filters: DashboardFilters) {
       const prevMonthStart = format(startOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
       const prevMonthEnd = format(endOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
 
-      let prevNovosQuery = supabase
-        .from('clientes')
-        .select('id, mensalidade, valor_ativacao')
-        .gte('data_cadastro', prevMonthStart)
-        .lte('data_cadastro', prevMonthEnd)
-        .eq('cancelado', false);
-      if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
-      if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
-      const { data: prevNovos } = await prevNovosQuery;
+      const prevNovos = await fetchAllRows<any>(() => {
+        let prevNovosQuery = supabase
+          .from('clientes')
+          .select('id, mensalidade, valor_ativacao')
+          .gte('data_cadastro', prevMonthStart)
+          .lte('data_cadastro', prevMonthEnd)
+          .eq('cancelado', false);
+        if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
+        if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
+        return prevNovosQuery;
+      });
 
       const prevNovosClientes = prevNovos?.length ?? null;
       const prevNewMrr = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) : null;
