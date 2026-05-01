@@ -477,15 +477,83 @@ export default function Clientes() {
     return m;
   }, [lookups.unidadesBase.data]);
 
+  // Ticket Médio — calculado sobre TODA a base filtrada (não só a página atual),
+  // dividido por todos os clientes (incluindo MRR=0), mesma fórmula do Dashboard:
+  //   ticket_medio = SUM(mensalidade + deltas_ativos) / COUNT(clientes)
+  const { data: ticketMedioFull } = useQuery({
+    queryKey: ["clientes_ticket_medio", filterKey, somenteMatrizes ? matrizIdsSet?.size ?? "loading" : null],
+    queryFn: async () => {
+      let allRows: Array<{ id: string; mensalidade: number | null }>;
+      if (hasDateOrValueFilters) {
+        const rows = await fetchClientesFilteredRows();
+        allRows = rows.map((r: any) => ({ id: r.id, mensalidade: r.mensalidade }));
+      } else {
+        // Buscar toda a base filtrada (apenas id + mensalidade) paginando
+        const pageSize = 1000;
+        const acc: Array<{ id: string; mensalidade: number | null }> = [];
+        for (let offset = 0; ; offset += pageSize) {
+          let q = tf(supabase.from("vw_clientes_financeiro").select("id, mensalidade")) as any;
+          if (status === "ativos") q = q.eq("cancelado", false);
+          else if (status === "cancelados") q = q.eq("cancelado", true);
+
+          if (debouncedSearch) {
+            const s = `%${escapeLike(debouncedSearch)}%`;
+            const isNumeric = /^\d+$/.test(debouncedSearch.trim());
+            if (isNumeric) {
+              q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
+            } else {
+              q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+            }
+          }
+          if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
+          else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
+          if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
+          else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
+          const applyLk = (field: string, val: string) => {
+            if (val === "__null__") q = q.is(field, null);
+            else if (val) q = q.eq(field, Number(val));
+          };
+          applyLk("modelo_contrato_id", modeloContratoId);
+          applyLk("produto_id", produtoId);
+          applyLk("origem_venda_id", origemVendaId);
+          applyLk("estado_id", estadoId);
+          applyLk("cidade_id", cidadeId);
+          applyLk("motivo_cancelamento_id", motivoCancelamentoId);
+          applyLk("area_atuacao_id", areaAtuacaoId);
+          applyLk("segmento_id", segmentoId);
+          applyLk("funcionario_id", funcionarioId);
+          applyLk("fornecedor_id", fornecedorId);
+          q = q.range(offset, offset + pageSize - 1);
+          const { data, error } = await q;
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          acc.push(...(data as any));
+          if (data.length < pageSize) break;
+        }
+        // Aplica filtro "Somente Matrizes" client-side, idem à listagem
+        allRows = somenteMatrizes && matrizIdsSet
+          ? acc.filter((r) => matrizIdsSet.has(r.id))
+          : acc;
+      }
+
+      const count = allRows.length;
+      if (count === 0) return { ticketMedio: null as number | null };
+      let mrrTotal = 0;
+      for (const r of allRows) {
+        mrrTotal += (Number(r.mensalidade ?? 0)) + (mrrDeltaMap.get(r.id) ?? 0);
+      }
+      return { ticketMedio: mrrTotal / count };
+    },
+    enabled: mrrDeltasRaw !== undefined,
+  });
+
   const kpis = useMemo(() => {
-    const list = clientes;
-    const qtdClientes = totalCount;
-    const comMrr = list.filter((c) => getMrrAtual(c) > 0);
-    const ticketMedio = comMrr.length > 0
-      ? comMrr.reduce((acc, c) => acc + getMrrAtual(c), 0) / comMrr.length
-      : null;
-    return { qtdClientes, ticketMedio, clientesNovosMes: novosNoMes ?? 0 };
-  }, [clientes, totalCount, novosNoMes, getMrrAtual]);
+    return {
+      qtdClientes: totalCount,
+      ticketMedio: ticketMedioFull?.ticketMedio ?? null,
+      clientesNovosMes: novosNoMes ?? 0,
+    };
+  }, [totalCount, novosNoMes, ticketMedioFull]);
 
   const formatCurrency = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
 
