@@ -1428,11 +1428,13 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__unmapped__">— não mapear —</SelectItem>
-                              {fileHeaders.map((h) => (
-                                <SelectItem key={h} value={h}>
-                                  {h}
-                                </SelectItem>
-                              ))}
+                              {fileHeaders
+                                .filter((h) => h && h.trim() !== "")
+                                .map((h) => (
+                                  <SelectItem key={h} value={h}>
+                                    {h}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                         </TableCell>
