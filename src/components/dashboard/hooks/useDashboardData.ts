@@ -193,12 +193,12 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // Movimentos inativados no período (churn por reversão)
-      const { data: movimentosInativados } = await tf(supabase
+      const movimentosInativados = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .eq('status', 'inativo')
         .gte('inativado_em', periodoInicioStr)
-        .lte('inativado_em', periodoFimStr + 'T23:59:59'));
+        .lte('inativado_em', periodoFimStr + 'T23:59:59')));
 
       let churnReversao = 0;
       movimentosInativados?.forEach(m => {
