@@ -338,6 +338,7 @@ export function useDashboardData(filters: DashboardFilters) {
         crescimentoReais, crescimentoPercent, ltvMeses, ltvReais, cac, ltvCac,
         cancelamentosQtd, mrrCancelado: churnMrrTotal, cancelamentosEarly, mrrCanceladoEarly, earlyChurnRate,
         churnCarteiraPercent: (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0,
+        clientesInicioCount, mrrInicio,
         novosClientes: novosCount, newMrr, totalImplantacao,
         prevNovosClientes, prevNewMrr, prevTotalImplantacao,
         prevUpsellMrr: prevUpsellMrr || null, prevCrossSellMrr: prevCrossSellMrr || null,
