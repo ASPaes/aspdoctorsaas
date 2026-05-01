@@ -591,14 +591,16 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
     const { data: convBH } = await supabase.from('whatsapp_conversations').select('out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
     const { data: activeAttBH } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).eq('status', 'in_progress').limit(1).maybeSingle();
     if (!convBH?.out_of_hours_cleared_at && !convBH?.first_agent_message_at && !activeAttBH) {
-      // Cooldown: só envia se passaram 5+ minutos desde o último aviso
-      const { data: convMeta } = await supabase.from('whatsapp_conversations').select('metadata').eq('id', conversationId).single();
-      const lastNotice = convMeta?.metadata?.off_hours_last_notice_at;
-      const cooldownMs = 5 * 60 * 1000;
-      if (!lastNotice || (Date.now() - new Date(lastNotice).getTime()) > cooldownMs) {
+      // Cooldown atômico: try_claim_off_hours_notice retorna true só para UMA execução
+      // dentro da janela de 5min, evitando race condition em rajada de mensagens.
+      const { data: claimed, error: claimErr } = await supabase.rpc('try_claim_off_hours_notice', {
+        p_conversation_id: conversationId,
+        p_cooldown_minutes: 5,
+      });
+      if (claimErr) {
+        console.error('[checkBusinessHours] try_claim_off_hours_notice error:', claimErr.message);
+      } else if (claimed === true) {
         await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, msgDate, tz, businessHours, exceptions.closedDates, exceptions.today);
-        const updatedMeta = { ...(convMeta?.metadata || {}), off_hours_last_notice_at: new Date().toISOString() };
-        await supabase.from('whatsapp_conversations').update({ metadata: updatedMeta }).eq('id', conversationId);
       }
     }
     return { inside: false };
