@@ -1023,6 +1023,7 @@ export type Database = {
           custo_fixo_percentual: number
           id: number
           imposto_percentual: number
+          notification_defaults: Json
           oncall_escalation_window_minutes: number
           oncall_message_template: string | null
           oncall_min_customer_messages: number
@@ -1073,6 +1074,7 @@ export type Database = {
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          notification_defaults?: Json
           oncall_escalation_window_minutes?: number
           oncall_message_template?: string | null
           oncall_min_customer_messages?: number
@@ -1123,6 +1125,7 @@ export type Database = {
           custo_fixo_percentual?: number
           id?: number
           imposto_percentual?: number
+          notification_defaults?: Json
           oncall_escalation_window_minutes?: number
           oncall_message_template?: string | null
           oncall_min_customer_messages?: number
@@ -1945,6 +1948,95 @@ export type Database = {
           },
         ]
       }
+      notification_conversation_mute: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          muted_until: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          muted_until?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          muted_until?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_conversation_mute_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "notification_conversation_mute_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_conversation_mute_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_conversation_mute_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      notification_dispatch_queue: {
+        Row: {
+          attempts: number
+          conversation_id: string
+          created_at: string
+          error: string | null
+          id: string
+          message_id: string
+          processed_at: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attempts?: number
+          conversation_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          message_id: string
+          processed_at?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          attempts?: number
+          conversation_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          message_id?: string
+          processed_at?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       notification_recipients: {
         Row: {
           delivered_at: string
@@ -2153,6 +2245,60 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          device_label: string | null
+          endpoint: string
+          id: string
+          last_used_at: string
+          p256dh: string
+          tenant_id: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          device_label?: string | null
+          endpoint: string
+          id?: string
+          last_used_at?: string
+          p256dh: string
+          tenant_id: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          device_label?: string | null
+          endpoint?: string
+          id?: string
+          last_used_at?: string
+          p256dh?: string
+          tenant_id?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -3207,40 +3353,79 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          alert_background: string
+          alert_closed: string
+          alert_in_conversation: string
+          alert_other_conversation: string
+          alert_other_module: string
           created_at: string
           department_id: string | null
+          dnd_days: number[]
+          dnd_enabled: boolean
+          dnd_end: string | null
+          dnd_start: string | null
           id: string
+          master_enabled: boolean
           prefer_department_overrides: boolean
+          push_enabled: boolean | null
           signature_name: string | null
           sound_enabled: boolean
+          sound_id: string | null
           tenant_id: string
           updated_at: string
           user_id: string
           visual_notifications_enabled: boolean
+          volume: number | null
         }
         Insert: {
+          alert_background?: string
+          alert_closed?: string
+          alert_in_conversation?: string
+          alert_other_conversation?: string
+          alert_other_module?: string
           created_at?: string
           department_id?: string | null
+          dnd_days?: number[]
+          dnd_enabled?: boolean
+          dnd_end?: string | null
+          dnd_start?: string | null
           id?: string
+          master_enabled?: boolean
           prefer_department_overrides?: boolean
+          push_enabled?: boolean | null
           signature_name?: string | null
           sound_enabled?: boolean
+          sound_id?: string | null
           tenant_id: string
           updated_at?: string
           user_id: string
           visual_notifications_enabled?: boolean
+          volume?: number | null
         }
         Update: {
+          alert_background?: string
+          alert_closed?: string
+          alert_in_conversation?: string
+          alert_other_conversation?: string
+          alert_other_module?: string
           created_at?: string
           department_id?: string | null
+          dnd_days?: number[]
+          dnd_enabled?: boolean
+          dnd_end?: string | null
+          dnd_start?: string | null
           id?: string
+          master_enabled?: boolean
           prefer_department_overrides?: boolean
+          push_enabled?: boolean | null
           signature_name?: string | null
           sound_enabled?: boolean
+          sound_id?: string | null
           tenant_id?: string
           updated_at?: string
           user_id?: string
           visual_notifications_enabled?: boolean
+          volume?: number | null
         }
         Relationships: [
           {
@@ -4606,6 +4791,7 @@ export type Database = {
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
+      cleanup_notification_dispatch_queue: { Args: never; Returns: number }
       collect_db_metrics_snapshot: { Args: never; Returns: undefined }
       collect_tenant_daily_metrics: { Args: never; Returns: undefined }
       create_access_invite: {
@@ -4737,6 +4923,12 @@ export type Database = {
         }[]
       }
       get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
+      get_message_notification_recipients: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          user_id: string
+        }[]
+      }
       get_messages_projection: { Args: never; Returns: Json }
       get_my_access_context: {
         Args: never
@@ -4822,6 +5014,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_unread_notification_count: { Args: never; Returns: number }
       get_ura_departments: {
         Args: never
         Returns: {
@@ -4836,6 +5029,7 @@ export type Database = {
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_admin_or_head: { Args: never; Returns: boolean }
+      mark_all_notifications_read: { Args: never; Returns: undefined }
       mark_notification_read: {
         Args: { p_recipient_id: string }
         Returns: undefined
@@ -4844,13 +5038,25 @@ export type Database = {
         Args: { p_keep_id: string; p_merge_id: string; p_tenant_id: string }
         Returns: undefined
       }
+      mute_conversation: {
+        Args: { p_conversation_id: string; p_duration: string }
+        Returns: undefined
+      }
       next_support_attendance_seq: {
         Args: { p_tenant: string }
         Returns: number
       }
       norm_txt: { Args: { t: string }; Returns: string }
       process_maintenance_queue: { Args: never; Returns: undefined }
+      process_notification_dispatch_queue: {
+        Args: { p_batch_size?: number }
+        Returns: Json
+      }
       require_active_profile: { Args: never; Returns: boolean }
+      resolve_user_notification_settings: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       search_conversations_by_contact: {
         Args: {
           p_instance_ids?: string[]
@@ -4946,6 +5152,10 @@ export type Database = {
               message_timestamp: string
             }[]
           }
+      should_create_recipient: {
+        Args: { p_conversation_id: string; p_user_id: string }
+        Returns: boolean
+      }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       transfer_conversation_to_agent: {
         Args: {
@@ -4953,6 +5163,10 @@ export type Database = {
           p_new_assignee: string
           p_reason?: string
         }
+        Returns: undefined
+      }
+      unmute_conversation: {
+        Args: { p_conversation_id: string }
         Returns: undefined
       }
       validate_access_invite: {
