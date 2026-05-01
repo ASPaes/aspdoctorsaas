@@ -82,20 +82,27 @@ export function CancelamentosTab({ metrics, timeSeries, distributions, tvMode, c
   // We approximate using the evolution data
   const currChurnQtd = metrics.cancelamentosQtd;
   const currMrrCancelado = metrics.mrrCancelado;
-  const currChurnCarteira = metrics.cancelamentosQtd / Math.max(metrics.clientesAtivos + metrics.cancelamentosQtd, 1);
-  const currChurnReceita = metrics.mrrCancelado / Math.max(metrics.mrr + metrics.mrrCancelado, 1);
+  // Fórmula SaaS padrão: cancelados ÷ ativos no INÍCIO do período
+  const currChurnCarteira = metrics.clientesInicioCount > 0
+    ? metrics.cancelamentosQtd / metrics.clientesInicioCount
+    : 0;
+  const currChurnReceita = metrics.mrrInicio > 0
+    ? metrics.mrrCancelado / metrics.mrrInicio
+    : 0;
 
-  // For churn rates prev month, we need active counts from prev month - approximate from mrrEvolution
+  // For churn rates prev month, aproximamos a base de início do mês anterior
+  // usando o ativo no fim de 2 meses atrás (= início do mês anterior).
   const mrrEvo = timeSeries.mrrEvolution;
-  const prevMrrPoint = prevIdx !== null && mrrEvo.length >= churnQtdArr.length ? mrrEvo[prevIdx] : null;
-  const prevActiveCount = prevMrrPoint ? (Number((prevMrrPoint as any).clientesAtivos) || 0) : null;
-  const prevMrr = prevMrrPoint ? prevMrrPoint.value : null;
+  const prevPrevIdx = churnQtdArr.length >= 3 ? churnQtdArr.length - 3 : null;
+  const prevBasePoint = prevPrevIdx !== null && mrrEvo.length >= churnQtdArr.length ? mrrEvo[prevPrevIdx] : null;
+  const prevBaseActive = prevBasePoint ? (Number((prevBasePoint as any).clientesAtivos) || 0) : null;
+  const prevBaseMrr = prevBasePoint ? prevBasePoint.value : null;
 
-  const prevChurnCarteiraRate = prevActiveCount !== null && prevChurnQtd !== null
-    ? prevChurnQtd / Math.max(prevActiveCount + prevChurnQtd, 1)
+  const prevChurnCarteiraRate = prevBaseActive !== null && prevBaseActive > 0 && prevChurnQtd !== null
+    ? prevChurnQtd / prevBaseActive
     : null;
-  const prevChurnReceitaRate = prevMrr !== null && prevChurnMrr !== null
-    ? prevChurnMrr / Math.max(prevMrr + prevChurnMrr, 1)
+  const prevChurnReceitaRate = prevBaseMrr !== null && prevBaseMrr > 0 && prevChurnMrr !== null
+    ? prevChurnMrr / prevBaseMrr
     : null;
 
   const deltaQtd = getChurnDeltaInverted(currChurnQtd, prevChurnQtd, 'pct');

@@ -32,6 +32,9 @@ export interface KPIMetrics {
   mrrCanceladoEarly: number;
   earlyChurnRate: number;
   churnCarteiraPercent: number;
+  // Snapshot início do período (para fórmulas SaaS padrão de churn)
+  clientesInicioCount: number;
+  mrrInicio: number;
 
   // Vendas
   novosClientes: number;
