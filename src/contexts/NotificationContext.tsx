@@ -103,10 +103,10 @@ function isInDoNotDisturbWindow(settings: NotificationSettings): boolean {
   return cur >= startMin || cur < endMin;
 }
 
-function extractConversationId(pathname: string): string | null {
-  const m = matchPath("/chat/:id", pathname) || matchPath("/whatsapp/:id", pathname);
-  if (m?.params?.id) return m.params.id as string;
-  return null;
+function extractConversationId(pathname: string, search: string): string | null {
+  if (!pathname.startsWith("/whatsapp")) return null;
+  const params = new URLSearchParams(search);
+  return params.get("conversation");
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -250,9 +250,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
           // Determine state
           const loc = locationRef.current;
-          const currentConvId = extractConversationId(loc.pathname);
-          const isOnChatModule =
-            loc.pathname.startsWith("/chat") || loc.pathname.startsWith("/whatsapp");
+          const currentConvId = extractConversationId(loc.pathname, loc.search);
+          const isOnChatModule = loc.pathname.startsWith("/whatsapp");
           const isVisible = document.visibilityState === "visible";
           const notifConvId =
             (notif.metadata as any)?.conversation_id ?? null;
