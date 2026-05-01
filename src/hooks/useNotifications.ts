@@ -55,7 +55,7 @@ export function useNotifications() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notification_recipients")
-        .select("id, notification_id, delivered_at, read_at, dismissed_at, notifications:notification_id(id, type, severity, title, body, action_url, metadata, created_at)")
+        .select("id, notification_id, delivered_at, read_at, dismissed_at, silent_mode, notifications:notification_id(id, type, severity, title, body, action_url, metadata, created_at)")
         .eq("tenant_id", tid!)
         .eq("user_id", uid!)
         .is("dismissed_at", null)
@@ -68,6 +68,7 @@ export function useNotifications() {
         delivered_at: r.delivered_at,
         read_at: r.read_at,
         dismissed_at: r.dismissed_at,
+        silent_mode: r.silent_mode ?? false,
         notification: r.notifications,
       }));
     },
