@@ -66,10 +66,12 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const timeStr = formatTime(conv.last_message_at);
 
   const isOutOfHours = conv.opened_out_of_hours === true;
-  const isWaitingWithoutAgent = !attendance || (attendance.status === 'waiting' && !attendance.assigned_to);
+  const hasActiveAttendance = !!attendance && (attendance.status === "waiting" || attendance.status === "in_progress");
 
   const attendanceBadge = (() => {
-    if (isOutOfHours && isWaitingWithoutAgent) {
+    // Prioridade: "Fora do horário" sempre que não houver atendimento ATIVO
+    // (atendimento closed no histórico não invalida estado de fora-de-horário)
+    if (isOutOfHours && !hasActiveAttendance) {
       return (
         <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-orange-500/50 text-orange-600 dark:text-orange-400">
           Fora do horário

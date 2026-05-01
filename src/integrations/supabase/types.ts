@@ -5165,6 +5165,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      try_claim_off_hours_notice: {
+        Args: { p_conversation_id: string; p_cooldown_minutes?: number }
+        Returns: boolean
+      }
       unmute_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined
