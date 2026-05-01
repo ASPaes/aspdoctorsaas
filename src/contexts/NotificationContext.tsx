@@ -7,7 +7,7 @@ import {
   useState,
   useCallback,
 } from "react";
-import { useLocation, useNavigate, matchPath } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
