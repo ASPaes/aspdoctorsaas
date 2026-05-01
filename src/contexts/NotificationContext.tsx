@@ -113,7 +113,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const uid = user?.id;
