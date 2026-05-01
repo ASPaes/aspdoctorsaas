@@ -1,4 +1,4 @@
-import { Bell, Check, CheckCheck, ExternalLink } from "lucide-react";
+import { Bell, Check, CheckCheck, ExternalLink, Eye } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/hooks/useNotifications";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
