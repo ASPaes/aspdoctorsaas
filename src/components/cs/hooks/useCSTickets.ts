@@ -102,50 +102,52 @@ export function useCSTickets(filters?: TicketsFilter) {
   return useQuery({
     queryKey: ['cs-tickets', filters, tid],
     queryFn: async () => {
-      let query = supabase
-        .from('cs_tickets')
-        .select(`
-          *,
-          cliente:clientes!cs_tickets_cliente_id_fkey (
-            id, razao_social, nome_fantasia, mensalidade, cancelado, telefone_whatsapp
-          ),
-          owner:funcionarios!cs_tickets_owner_id_fkey (
-            id, nome, cargo, ativo, email
-          ),
-          criado_por:funcionarios!cs_tickets_criado_por_id_fkey (
-            id, nome, cargo, ativo, email
-          )
-        `)
-        .order('criado_em', { ascending: false });
+      const data = await fetchAllRows<any>(() => {
+        let query = supabase
+          .from('cs_tickets')
+          .select(`
+            *,
+            cliente:clientes!cs_tickets_cliente_id_fkey (
+              id, razao_social, nome_fantasia, mensalidade, cancelado, telefone_whatsapp
+            ),
+            owner:funcionarios!cs_tickets_owner_id_fkey (
+              id, nome, cargo, ativo, email
+            ),
+            criado_por:funcionarios!cs_tickets_criado_por_id_fkey (
+              id, nome, cargo, ativo, email
+            )
+          `)
+          .order('criado_em', { ascending: false });
 
-      if (filters?.status && filters.status.length > 0) {
-        query = query.in('status', filters.status);
-      }
-      if (filters?.prioridade && filters.prioridade.length > 0) {
-        query = query.in('prioridade', filters.prioridade);
-      }
-      if (filters?.tipo && filters.tipo.length > 0) {
-        query = query.in('tipo', filters.tipo);
-      }
-      if (filters?.owner_id) {
-        query = query.eq('owner_id', filters.owner_id);
-      }
-      if (filters?.cliente_id) {
-        query = query.eq('cliente_id', filters.cliente_id);
-      }
-      if (filters?.escalado !== undefined) {
-        query = query.eq('escalado', filters.escalado);
-      }
-      if (filters?.search) {
-        const escaped = escapeLike(filters.search);
-        query = query.or(`assunto.ilike.%${escaped}%,descricao_curta.ilike.%${escaped}%`);
-      }
-      if (tid) {
-        query = query.eq('tenant_id', tid);
-      }
+        if (filters?.status && filters.status.length > 0) {
+          query = query.in('status', filters.status);
+        }
+        if (filters?.prioridade && filters.prioridade.length > 0) {
+          query = query.in('prioridade', filters.prioridade);
+        }
+        if (filters?.tipo && filters.tipo.length > 0) {
+          query = query.in('tipo', filters.tipo);
+        }
+        if (filters?.owner_id) {
+          query = query.eq('owner_id', filters.owner_id);
+        }
+        if (filters?.cliente_id) {
+          query = query.eq('cliente_id', filters.cliente_id);
+        }
+        if (filters?.escalado !== undefined) {
+          query = query.eq('escalado', filters.escalado);
+        }
+        if (filters?.search) {
+          const escaped = escapeLike(filters.search);
+          query = query.or(`assunto.ilike.%${escaped}%,descricao_curta.ilike.%${escaped}%`);
+        }
+        if (tid) {
+          query = query.eq('tenant_id', tid);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
+        return query;
+      });
+
       return data as unknown as CSTicket[];
     },
   });
