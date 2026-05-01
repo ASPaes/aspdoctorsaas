@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 
 function tf(q: any, tenantId: string | null) {
   return tenantId ? q.eq("tenant_id", tenantId) : q;
