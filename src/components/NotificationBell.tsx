@@ -1,4 +1,4 @@
-import { Bell, Check, CheckCheck, ExternalLink } from "lucide-react";
+import { Bell, Check, CheckCheck, ExternalLink, Eye } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/hooks/useNotifications";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -83,9 +83,21 @@ export function NotificationBell() {
                 >
                   <span className="text-sm mt-0.5 shrink-0">{severityIcon(item.notification.severity)}</span>
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-sm leading-tight truncate", !item.read_at && "font-medium")}>
-                      {item.notification.title}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <p className={cn("text-sm leading-tight truncate flex-1", !item.read_at && "font-medium")}>
+                        {item.notification.title}
+                      </p>
+                      {item.silent_mode && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
+                          </TooltipTrigger>
+                          <TooltipContent className="text-xs">
+                            Monitorando outro setor
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                     {(() => {
                       const unreadCount = item.notification.metadata?.unread_count ?? 1;
                       const hasMultiple = unreadCount > 1;

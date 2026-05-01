@@ -226,6 +226,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             notification_id: string;
             tenant_id: string;
             delivered_at: string;
+            silent_mode: boolean;
           };
 
           // Update badge optimistically
@@ -266,6 +267,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
             queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
             return;
+          }
+
+          // CASO MONITOR: admin/head que está vendo notification de outro setor
+          // (silent_mode=true) - aparece no sino mas sem som/toast/native
+          if (recipient.silent_mode) {
+            return; // já incrementou unreadCount lá em cima e invalidou queries
           }
 
           let mode: AlertMode;
