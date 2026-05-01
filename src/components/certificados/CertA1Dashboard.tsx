@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLookups } from "@/hooks/useLookups";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { format, addDays, subDays, startOfMonth, endOfMonth, differenceInMinutes, parseISO } from "date-fns";
 import { DateRangePicker, DateRange } from "@/components/ui/date-range-picker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
@@ -76,22 +77,25 @@ export function CertA1Dashboard() {
   const { data: metrics, isLoading } = useQuery({
     queryKey: ["cert-a1-dashboard", periodoInicioStr, periodoFimStr, tid],
     queryFn: async () => {
-      let vendasQuery = tf(supabase
-        .from("certificado_a1_vendas")
-        .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
-        .not("data_venda", "is", null));
-      if (periodoInicioStr && periodoFimStr) {
-        vendasQuery = vendasQuery.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
-      }
-      const { data: vendas } = await vendasQuery;
+      const vendas = await fetchAllRows<any>(() => {
+        let q = tf(supabase
+          .from("certificado_a1_vendas")
+          .select("id, cliente_id, valor_venda, status, vendedor_id, data_venda, created_at")
+          .not("data_venda", "is", null));
+        if (periodoInicioStr && periodoFimStr) {
+          q = q.gte("data_venda", periodoInicioStr).lte("data_venda", periodoFimStr);
+        }
+        return q;
+      });
 
       const clienteIds = [...new Set((vendas ?? []).map(v => v.cliente_id))];
       let clientesMap: Record<string, { razao_social: string | null; nome_fantasia: string | null; telefone_whatsapp: string | null }> = {};
       if (clienteIds.length > 0) {
-        const { data: clientes } = await tf(supabase
+        // Paginar pra suportar listas grandes; .in() respeita o filtro mas o resultado ainda trunca em 1000
+        const clientes = await fetchAllRows<any>(() => tf(supabase
           .from("clientes")
           .select("id, razao_social, nome_fantasia, telefone_whatsapp")
-          .in("id", clienteIds as string[]));
+          .in("id", clienteIds as string[])));
         (clientes ?? []).forEach(c => { clientesMap[c.id] = { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, telefone_whatsapp: c.telefone_whatsapp }; });
       }
 
@@ -112,13 +116,13 @@ export function CertA1Dashboard() {
       const minus20Str = format(subDays(today, 20), "yyyy-MM-dd");
       const plus30Str = format(addDays(today, 30), "yyyy-MM-dd");
 
-      const { data: certClientes } = await tf(supabase
+      const certClientes = await fetchAllRows<any>(() => tf(supabase
         .from("clientes")
         .select("id, cert_a1_vencimento")
         .eq("cancelado", false)
         .not("cert_a1_vencimento", "is", null)
         .gte("cert_a1_vencimento", minus20Str)
-        .lte("cert_a1_vencimento", plus30Str)) as any;
+        .lte("cert_a1_vencimento", plus30Str)));
 
       const oportunidadesJanela = certClientes?.length || 0;
       const vencendo30 = certClientes?.filter((c: any) => c.cert_a1_vencimento >= todayStr && c.cert_a1_vencimento <= plus30Str).length || 0;

@@ -126,13 +126,13 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesInicioCount = clientesInicioAtivos.length;
 
       // Movimentos antes do período
-      const { data: movimentosInicioRaw } = await tf(supabase
+      const movimentosInicioRaw = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
-        .lt('data_movimento', periodoInicioStr));
+        .lt('data_movimento', periodoInicioStr)));
 
       const movimentosInicioMap: Record<string, number> = {};
       movimentosInicioRaw?.forEach(m => {
@@ -151,11 +151,11 @@ export function useDashboardData(filters: DashboardFilters) {
       const earlyChurnRate = novosCount > 0 ? cancelamentosEarly / novosCount : 0;
 
       // 6. CAC
-      const { data: cacData } = await tf(supabase
+      const cacData = await fetchAllRows<any>(() => tf(supabase
         .from('cac_despesas')
         .select('valor_alocado, unidade_base_id')
         .lte('mes_inicial', periodoFimStr)
-        .eq('ativo', true));
+        .eq('ativo', true)));
 
       const cacTotal = cacData
         ?.filter(d => !filters.unidadeBaseId || !d.unidade_base_id || d.unidade_base_id === filters.unidadeBaseId)
@@ -165,14 +165,14 @@ export function useDashboardData(filters: DashboardFilters) {
       // 7. Movimentos MRR
       let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0;
 
-      const { data: movimentosPeriodo } = await tf(supabase
+      const movimentosPeriodo = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', periodoInicioStr)
         .lte('data_movimento', periodoFimStr)
         .eq('status', 'ativo')
         .is('estornado_por', null)
-        .is('estorno_de', null));
+        .is('estorno_de', null)));
 
       // Build set of ALL clients matching current filters (ativos + cancelados no período)
       // to correctly filter movimentos by fornecedor/unidade
@@ -193,12 +193,12 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // Movimentos inativados no período (churn por reversão)
-      const { data: movimentosInativados } = await tf(supabase
+      const movimentosInativados = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .eq('status', 'inativo')
         .gte('inativado_em', periodoInicioStr)
-        .lte('inativado_em', periodoFimStr + 'T23:59:59'));
+        .lte('inativado_em', periodoFimStr + 'T23:59:59')));
 
       let churnReversao = 0;
       movimentosInativados?.forEach(m => {
@@ -209,13 +209,13 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
       // Todos movimentos ativos até fim do período
-      const { data: todosMovimentosAtivos } = await tf(supabase
+      const todosMovimentosAtivos = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
-        .lte('data_movimento', periodoFimStr));
+        .lte('data_movimento', periodoFimStr)));
 
       const movimentosPorCliente: Record<string, number> = {};
       todosMovimentosAtivos?.forEach(m => {
@@ -292,30 +292,32 @@ export function useDashboardData(filters: DashboardFilters) {
       const prevMonthStart = format(startOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
       const prevMonthEnd = format(endOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
 
-      let prevNovosQuery = supabase
-        .from('clientes')
-        .select('id, mensalidade, valor_ativacao')
-        .gte('data_cadastro', prevMonthStart)
-        .lte('data_cadastro', prevMonthEnd)
-        .eq('cancelado', false);
-      if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
-      if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
-      if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
-      const { data: prevNovos } = await prevNovosQuery;
+      const prevNovos = await fetchAllRows<any>(() => {
+        let prevNovosQuery = supabase
+          .from('clientes')
+          .select('id, mensalidade, valor_ativacao')
+          .gte('data_cadastro', prevMonthStart)
+          .lte('data_cadastro', prevMonthEnd)
+          .eq('cancelado', false);
+        if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
+        if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
+        if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
+        return prevNovosQuery;
+      });
 
       const prevNovosClientes = prevNovos?.length ?? null;
       const prevNewMrr = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) : null;
       const prevTotalImplantacao = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0) : null;
 
       // Previous month movimentos for upsell/cross-sell delta
-      const { data: prevMovimentos } = await tf(supabase
+      const prevMovimentos = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('tipo, valor_delta, cliente_id')
         .gte('data_movimento', prevMonthStart)
         .lte('data_movimento', prevMonthEnd)
         .eq('status', 'ativo')
         .is('estornado_por', null)
-        .is('estorno_de', null));
+        .is('estorno_de', null)));
 
       // Build prev month client set for filtering
       const prevClientesFiltered = new Set((prevNovos || []).map(c => c.id));
@@ -454,12 +456,13 @@ export function useDashboardData(filters: DashboardFilters) {
       // === DISTRIBUTIONS ===
       // Need lookup names
       const [
-        { data: estados }, { data: cidades }, { data: segmentos },
+        { data: estados }, cidades, { data: segmentos },
         { data: areasAtuacao }, { data: fornecedores }, { data: motivosCancelamento },
         { data: origensVenda },
       ] = await Promise.all([
         supabase.from('estados').select('id, sigla, nome'),
-        supabase.from('cidades').select('id, nome, estado_id'),
+        // cidades: tabela global ~5.5k linhas — paginar pra não truncar em 1000
+        fetchAllRows<any>(() => supabase.from('cidades').select('id, nome, estado_id')),
         tf(supabase.from('segmentos').select('id, nome')),
         tf(supabase.from('areas_atuacao').select('id, nome')),
         tf(supabase.from('fornecedores').select('id, nome')),

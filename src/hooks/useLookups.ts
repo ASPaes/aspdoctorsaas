@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 
 function tf(q: any, tenantId: string | null) {
   return tenantId ? q.eq("tenant_id", tenantId) : q;
@@ -24,8 +25,10 @@ export function useLookups(estadoId?: number | null) {
     staleTime: 30 * 60 * 1000,
     queryFn: async () => {
       if (!estadoId) return [];
-      const { data, error } = await supabase.from("cidades").select("id, nome, codigo_ibge").eq("estado_id", estadoId).order("nome");
-      if (error) throw error;
+      // MG sozinho tem >850 cidades; usar paginação para evitar truncamento futuro
+      const data = await fetchAllRows<any>(() =>
+        supabase.from("cidades").select("id, nome, codigo_ibge").eq("estado_id", estadoId).order("nome")
+      );
       return data;
     },
     enabled: !!estadoId,

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { differenceInHours, differenceInDays, parseISO, isWithinInterval, endOfDay, subDays } from 'date-fns';
 import type { CSTicket, CSTicketStatus, CSTicketPrioridade, CSIndicacaoStatus } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import { fetchAllRows } from '@/lib/supabasePaginate';
 
 export interface CSDashboardFilters {
   periodoInicio: Date;
@@ -85,45 +86,35 @@ export function useCSDashboardData(filters: CSDashboardFilters) {
     queryFn: async (): Promise<CSDashboardData> => {
       const now = new Date();
 
-      let ticketsQuery = tf(supabase
-        .from('cs_tickets')
-        .select(`
-          *,
-          cliente:clientes!cs_tickets_cliente_id_fkey (
-            id, razao_social, nome_fantasia, mensalidade, cancelado
-          ),
-          owner:funcionarios!cs_tickets_owner_id_fkey (
-            id, nome, cargo, ativo
-          )
-        `));
-
-      if (filters.ownerId) {
-        ticketsQuery = ticketsQuery.eq('owner_id', filters.ownerId);
-      }
-
-      // Parallel queries: tickets + active clients + last contact per client
-      const clientesAtivosQuery = tf(supabase
-        .from('clientes')
-        .select('id, razao_social, nome_fantasia, mensalidade, data_cadastro, cnpj, fornecedor_id')
-        .eq('cancelado', false));
-
-      const fornecedoresQuery = tf(supabase
-        .from('fornecedores')
-        .select('id, nome'));
-
-      const [ticketsResult, clientesResult, fornecedoresResult] = await Promise.all([
-        ticketsQuery,
-        clientesAtivosQuery,
-        fornecedoresQuery,
+      // Parallel queries: tickets + active clients + fornecedores — todas paginadas
+      const [allTicketsRaw, clientesAtivos, fornecedoresList] = await Promise.all([
+        fetchAllRows<any>(() => {
+          let q = tf(supabase
+            .from('cs_tickets')
+            .select(`
+              *,
+              cliente:clientes!cs_tickets_cliente_id_fkey (
+                id, razao_social, nome_fantasia, mensalidade, cancelado
+              ),
+              owner:funcionarios!cs_tickets_owner_id_fkey (
+                id, nome, cargo, ativo
+              )
+            `));
+          if (filters.ownerId) {
+            q = q.eq('owner_id', filters.ownerId);
+          }
+          return q;
+        }),
+        fetchAllRows<any>(() => tf(supabase
+          .from('clientes')
+          .select('id, razao_social, nome_fantasia, mensalidade, data_cadastro, cnpj, fornecedor_id')
+          .eq('cancelado', false))),
+        fetchAllRows<any>(() => tf(supabase
+          .from('fornecedores')
+          .select('id, nome'))),
       ]);
 
-      if (ticketsResult.error) throw ticketsResult.error;
-      if (clientesResult.error) throw clientesResult.error;
-      if (fornecedoresResult.error) throw fornecedoresResult.error;
-
-      const allTicketsRaw = ticketsResult.data || [];
-      const clientesAtivos = clientesResult.data || [];
-      const fornecedoresMap = new Map((fornecedoresResult.data || []).map((f: any) => [f.id, f.nome]));
+      const fornecedoresMap = new Map((fornecedoresList || []).map((f: any) => [f.id, f.nome]));
 
       const allTickets = (allTicketsRaw || []) as unknown as CSTicket[];
       const interval = { start: filters.periodoInicio, end: endOfDay(filters.periodoFim) };

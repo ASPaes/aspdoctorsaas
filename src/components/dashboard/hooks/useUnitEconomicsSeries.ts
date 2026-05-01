@@ -87,9 +87,9 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       });
 
       // === QUERY B: CAC despesas ===
-      const { data: cacDespesas } = await tf(supabase
+      const cacDespesas = await fetchAllRows<any>(() => tf(supabase
         .from('cac_despesas')
-        .select('valor_alocado, mes_inicial, mes_final, unidade_base_id'));
+        .select('valor_alocado, mes_inicial, mes_final, unidade_base_id')));
 
       const clients = (allClientes || []).filter(c => {
         if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;

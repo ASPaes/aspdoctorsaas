@@ -6,6 +6,7 @@ import { escapeLike } from "@/lib/utils";
 import { useLookups } from "@/hooks/useLookups";
 import { useCertA1Filters } from "@/hooks/useCertA1Filters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { ptBR } from "date-fns/locale";
@@ -107,40 +108,42 @@ export default function CertificadosA1() {
       // If "somente ganho" is active, fetch sold client IDs first
       let ganhoIds: string[] | null = null;
       if (somenteGanho) {
-        const { data: vendas } = await tf(supabase.from("certificado_a1_vendas").select("cliente_id").eq("status", "ganho"));
+        const vendas = await fetchAllRows<any>(() => tf(supabase.from("certificado_a1_vendas").select("cliente_id").eq("status", "ganho")));
         ganhoIds = [...new Set((vendas ?? []).map((v: any) => v.cliente_id))] as string[];
         if (ganhoIds.length === 0) return [];
       }
 
-      let q = tf(supabase.from("clientes" as any)
-        .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, telefone_whatsapp, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
-        .eq("cancelado", false)) as any;
+      const data = await fetchAllRows<any>(() => {
+        let q = tf(supabase.from("clientes" as any)
+          .select("id, razao_social, nome_fantasia, cnpj, codigo_sequencial, telefone_contato, telefone_whatsapp, cert_a1_vencimento, cert_a1_ultima_venda_em, cert_a1_ultimo_vendedor_id")
+          .eq("cancelado", false)) as any;
 
-      if (ganhoIds) {
-        q = q.in("id", ganhoIds);
-      }
-
-      if (debouncedSearch) {
-        const s = `%${escapeLike(debouncedSearch)}%`;
-        const trimmed = debouncedSearch.trim();
-        const isNumeric = /^\d+$/.test(trimmed);
-        if (isNumeric) {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${trimmed}`);
-        } else {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+        if (ganhoIds) {
+          q = q.in("id", ganhoIds);
         }
-      }
 
-      // Date filter from quick filter
-      if (quickFilterDates.de) q = q.gte("cert_a1_vencimento", quickFilterDates.de);
-      if (quickFilterDates.ate) q = q.lte("cert_a1_vencimento", quickFilterDates.ate);
+        if (debouncedSearch) {
+          const s = `%${escapeLike(debouncedSearch)}%`;
+          const trimmed = debouncedSearch.trim();
+          const isNumeric = /^\d+$/.test(trimmed);
+          if (isNumeric) {
+            q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${trimmed}`);
+          } else {
+            q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
+          }
+        }
 
-      // Sort
-      const nullsFirst = sortDir === "asc";
-      q = q.order(sortField, { ascending: sortDir === "asc", nullsFirst });
+        // Date filter from quick filter
+        if (quickFilterDates.de) q = q.gte("cert_a1_vencimento", quickFilterDates.de);
+        if (quickFilterDates.ate) q = q.lte("cert_a1_vencimento", quickFilterDates.ate);
 
-      const { data, error } = await q;
-      if (error) throw error;
+        // Sort
+        const nullsFirst = sortDir === "asc";
+        q = q.order(sortField, { ascending: sortDir === "asc", nullsFirst });
+
+        return q;
+      });
+
       return data as any[];
     },
   });
