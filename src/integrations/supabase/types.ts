@@ -720,6 +720,7 @@ export type Database = {
           data_ativacao: string | null
           data_cadastro: string | null
           data_cancelamento: string | null
+          data_reajuste: string | null
           data_venda: string | null
           dia_vencimento_mrr: number | null
           email: string | null
@@ -777,6 +778,7 @@ export type Database = {
           data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
+          data_reajuste?: string | null
           data_venda?: string | null
           dia_vencimento_mrr?: number | null
           email?: string | null
@@ -834,6 +836,7 @@ export type Database = {
           data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
+          data_reajuste?: string | null
           data_venda?: string | null
           dia_vencimento_mrr?: number | null
           email?: string | null

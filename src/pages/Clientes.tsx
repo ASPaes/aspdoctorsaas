@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 
-type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
+type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
 type SortDir = "asc" | "desc";
 
 function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
@@ -398,7 +398,7 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id, telefone_whatsapp, telefone_contato";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, data_reajuste, unidade_base_id, telefone_whatsapp, telefone_contato";
       let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -928,6 +928,7 @@ export default function Clientes() {
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR Atual"],
                 ["data_ativacao", "Dt. Ativação"],
+                ["data_reajuste", "Data de Reajuste"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
                 <TableHead key={field}>
@@ -945,14 +946,14 @@ export default function Clientes() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 10 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : !clientes?.length ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -972,6 +973,7 @@ export default function Clientes() {
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
                   <TableCell>{getMrrAtual(c) > 0 ? `R$ ${getMrrAtual(c).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-xs">{c.data_ativacao ? format(parseISO(c.data_ativacao), "dd/MM/yyyy") : "—"}</TableCell>
+                  <TableCell className="text-xs">{(c as any).data_reajuste ? format(parseISO((c as any).data_reajuste), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                       c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
