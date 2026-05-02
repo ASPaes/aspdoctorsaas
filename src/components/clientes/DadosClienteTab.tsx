@@ -590,8 +590,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <Select
               value={field.value?.toString() ?? ""}
               onValueChange={(v) => {
-                field.onChange(v ? Number(v) : null);
-                form.setValue("cidade_id", null);
+                const newId = v ? Number(v) : null;
+                const previousId = field.value;
+                field.onChange(newId);
+                // Só zera cidade se houve mudança REAL (evita zerar na inicialização do form.reset)
+                if (previousId !== null && previousId !== undefined && previousId !== newId) {
+                  form.setValue("cidade_id", null);
+                }
               }}
             >
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
