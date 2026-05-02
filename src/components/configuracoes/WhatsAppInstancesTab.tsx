@@ -55,6 +55,7 @@ interface Instance {
   phone_number: string | null;
   status: string;
   provider_type: string;
+  is_active: boolean;
   created_at: string;
 }
 
