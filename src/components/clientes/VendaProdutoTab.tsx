@@ -101,6 +101,14 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
               <FormMessage />
             </FormItem>
           )} />
+
+          <FormField control={form.control} name="data_reajuste" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Data de Reajuste</FormLabel>
+              <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
         </div>
       </div>
 
