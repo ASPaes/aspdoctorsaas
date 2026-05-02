@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   Plus,
   Loader2,
@@ -46,6 +47,7 @@ import {
   Eye,
   EyeOff,
   Phone,
+  PowerOff,
 } from "lucide-react";
 
 interface Instance {
