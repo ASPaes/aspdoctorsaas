@@ -120,6 +120,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
     form.setValue('zapi_client_token', secrets.zapi_client_token || '');
     form.setValue('meta_access_token', secrets.meta_access_token || '');
     form.setValue('meta_app_secret', secrets.meta_app_secret || '');
+    form.setValue('meta_verify_token', secrets.meta_verify_token || '');
   }, [secrets]);
 
   const onSubmit = async (values: FormValues) => {
