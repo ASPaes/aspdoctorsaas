@@ -209,7 +209,7 @@ export default function ClienteForm() {
       razao_social: null, nome_fantasia: null, cnpj: null, email: "",
       telefone_contato: null, telefone_whatsapp: null, telefone_whatsapp_contato: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
-      data_venda: null, funcionario_id: null, origem_venda_id: null, recorrencia: undefined as any,
+      data_venda: null, data_reajuste: null, funcionario_id: null, origem_venda_id: null, recorrencia: undefined as any,
       produto_id: null, observacao_negociacao: null,
       data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
       valor_ativacao: null as any,
