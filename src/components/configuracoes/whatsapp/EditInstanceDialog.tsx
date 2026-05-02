@@ -87,6 +87,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       meta_phone_number_id: instance.meta_phone_number_id || '',
       meta_access_token: '',
       meta_app_secret: '',
+      meta_verify_token: '',
     },
   });
 
