@@ -135,7 +135,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
           instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : null,
           provider_type: values.provider_type,
           ...((!isMeta && !isZapi) && { api_url: values.api_url, api_key: values.api_key }),
-          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token, meta_app_secret: values.meta_app_secret }),
+          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token, meta_app_secret: values.meta_app_secret, meta_verify_token: values.meta_verify_token }),
           ...(isZapi && { zapi_instance_id: values.zapi_instance_id, zapi_token: values.zapi_token, zapi_client_token: values.zapi_client_token }),
         },
       });
