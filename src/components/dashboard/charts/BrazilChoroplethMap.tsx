@@ -143,9 +143,9 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                 </div>
                 {selectedStateCities && selectedStateCities.length > 0 && (
                   <div className="space-y-2">
-                    <p className="font-semibold text-sm text-muted-foreground">Top 10 Cidades</p>
-                    <div className="space-y-1 max-h-[320px] overflow-y-auto">
-                      {selectedStateCities.slice(0, 10).map((city, i) => (
+                    <p className="font-semibold text-sm text-muted-foreground">Cidades</p>
+                    <div className="space-y-1 max-h-[600px] overflow-y-auto pr-1">
+                      {selectedStateCities.map((city, i) => (
                         <div key={city.nome} className={cn('flex justify-between items-center py-2 px-3 rounded-lg', i === 0 ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50')}>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-muted-foreground text-sm w-5">{i + 1}</span>
