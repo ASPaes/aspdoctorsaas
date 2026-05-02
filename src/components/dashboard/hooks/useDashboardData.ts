@@ -488,7 +488,7 @@ export function useDashboardData(filters: DashboardFilters) {
       (motivosCancelamento as any)?.forEach((m: any) => { motivoMap[m.id] = m.descricao; });
       const origemMap = lookupMap(origensVenda as any, 'nome');
 
-      const buildDistribution = (items: any[], fkField: string, nameMap: Record<number, string>): DistributionDataPoint[] => {
+      const buildDistribution = (items: any[], fkField: string, nameMap: Record<number, string>, limit: number | null = 10): DistributionDataPoint[] => {
         const counts: Record<string, number> = {};
         items.forEach(c => {
           const id = c[fkField];
@@ -498,14 +498,14 @@ export function useDashboardData(filters: DashboardFilters) {
           }
         });
         const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1;
-        return Object.entries(counts)
+        const sorted = Object.entries(counts)
           .map(([name, value]) => ({ name, value, percent: value / total }))
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 10);
+          .sort((a, b) => b.value - a.value);
+        return limit !== null ? sorted.slice(0, limit) : sorted;
       };
 
       const activeClients = clientesAtivos || [];
-      const porEstado = buildDistribution(activeClients, 'estado_id', estadoMap);
+      const porEstado = buildDistribution(activeClients, 'estado_id', estadoMap, null);
       const porCidade = buildDistribution(activeClients, 'cidade_id', cidadeMap);
       const porSegmento = buildDistribution(activeClients, 'segmento_id', segmentoMap);
       const porAreaAtuacao = buildDistribution(activeClients, 'area_atuacao_id', areaMap);
@@ -533,7 +533,7 @@ export function useDashboardData(filters: DashboardFilters) {
       Object.values(topCidadesByEstado).forEach(arr => arr.sort((a, b) => b.qtd - a.qtd));
 
       // Convert estado distribution to use sigla for map compatibility
-      const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap);
+      const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap, null);
 
       // Per-state breakdowns for segmento, area_atuacao, fornecedor
       const buildByEstado = (fkField: string, nameMap: Record<number, string>) => {
