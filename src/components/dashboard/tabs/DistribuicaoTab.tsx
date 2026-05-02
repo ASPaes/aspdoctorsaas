@@ -101,7 +101,7 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
 
       {/* Top 10 Cidades */}
       <BarChartCard
-        title={selectedState ? `Top 10 Cidades — ${SIGLA_TO_NAME[selectedState] || selectedState}` : 'Top 10 Cidades (Qtde Clientes)'}
+        title={selectedState ? `Cidades — ${SIGLA_TO_NAME[selectedState] || selectedState}` : 'Cidades (Qtde Clientes)'}
         data={filteredCidades}
         tvMode={tvMode}
         height={tvMode ? 450 : 350}
