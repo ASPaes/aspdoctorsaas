@@ -60,7 +60,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
     return 'hsl(145 53% 26%)';
   };
 
-  const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value).slice(0, tvMode ? 12 : 10), [data, tvMode]);
+  const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
   const selectedStateData = selectedState ? stateDataMap[selectedState] : null;
   const selectedStateCities = selectedState ? topCidadesByEstado[selectedState] : null;
 
