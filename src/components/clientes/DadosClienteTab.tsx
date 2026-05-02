@@ -605,8 +605,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           </FormItem>
         )} />
 
-        <FormField key={`cidade-field-${cidades.length}`} control={form.control} name="cidade_id" render={({ field }) => {
-          const cidadeValue = field.value?.toString() ?? "";
+        <FormField control={form.control} name="cidade_id" render={({ field }) => {
+          const cidadeValue = form.watch("cidade_id")?.toString() ?? "";
           const cidadeInList = cidades.some(c => c.id.toString() === cidadeValue);
           return (
           <FormItem>
