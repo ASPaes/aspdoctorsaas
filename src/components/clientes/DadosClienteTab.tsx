@@ -612,6 +612,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
           <FormItem>
             <FormLabel>Cidade</FormLabel>
             <Select
+              key={cidadeInList ? "matched" : "pending"}
               value={cidadeValue}
               onValueChange={(v) => field.onChange(v ? Number(v) : null)}
               disabled={!form.watch("estado_id")}
@@ -619,7 +620,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione o estado primeiro..." /></SelectTrigger></FormControl>
               <SelectContent>
                 {cidadeValue && !cidadeInList && (
-                  <SelectItem value={cidadeValue} disabled>Carregando…</SelectItem>
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">Carregando cidades…</div>
                 )}
                 {cidades.map((c) => (
                   <SelectItem key={c.id} value={c.id.toString()}>{c.nome}</SelectItem>
