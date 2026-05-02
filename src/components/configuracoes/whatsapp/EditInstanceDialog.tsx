@@ -29,6 +29,7 @@ const formSchema = z.object({
   meta_phone_number_id: z.string().optional(),
   meta_access_token: z.string().optional(),
   meta_app_secret: z.string().optional(),
+  meta_verify_token: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
