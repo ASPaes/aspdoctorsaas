@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
-import { RefreshCw, Pencil, Trash2, Copy, Link } from "lucide-react";
+import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff } from "lucide-react";
 import { toast } from "sonner";
 import { EditInstanceDialog } from "./EditInstanceDialog";
 
@@ -24,6 +24,7 @@ interface Instance {
   updated_at: string;
   ignore_group_messages?: boolean;
   meta_phone_number_id?: string | null;
+  is_active?: boolean;
 }
 
 interface InstanceCardProps {
@@ -31,9 +32,12 @@ interface InstanceCardProps {
 }
 
 export const InstanceCard = ({ instance }: InstanceCardProps) => {
-  const { testConnection, deleteInstance, updateInstance } = useWhatsAppInstances();
+  const { testConnection, deleteInstance, updateInstance, setActive } = useWhatsAppInstances();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+
+  const isActive = instance.is_active !== false;
 
   const handleToggleIgnoreGroups = async (checked: boolean) => {
     try {
@@ -42,6 +46,33 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
     } catch {
       toast.error("Erro ao atualizar configuração");
     }
+  };
+
+  const handleToggleActive = (checked: boolean) => {
+    if (!checked) {
+      setShowDeactivateDialog(true);
+    } else {
+      setActive.mutate(
+        { id: instance.id, active: true },
+        {
+          onSuccess: () => toast.success("Instância ativada. Edite-a para reinserir as credenciais."),
+          onError: (e: any) => toast.error(e?.message || "Erro ao ativar instância"),
+        }
+      );
+    }
+  };
+
+  const confirmDeactivate = () => {
+    setActive.mutate(
+      { id: instance.id, active: false },
+      {
+        onSuccess: () => {
+          toast.success("Instância desativada e desconectada do provedor");
+          setShowDeactivateDialog(false);
+        },
+        onError: (e: any) => toast.error(e?.message || "Erro ao desativar instância"),
+      }
+    );
   };
 
   const base = import.meta.env.VITE_SUPABASE_URL;
@@ -76,6 +107,7 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   };
 
   const getStatusColor = () => {
+    if (!isActive) return "bg-muted-foreground";
     switch (instance.status) {
       case "connected": return "bg-green-500";
       case "connecting": return "bg-yellow-500";
@@ -84,6 +116,7 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   };
 
   const getStatusText = () => {
+    if (!isActive) return "Inativa";
     switch (instance.status) {
       case "connected": return "Conectado";
       case "connecting": return "Conectando";
@@ -102,13 +135,13 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
 
   return (
     <>
-      <Card>
+      <Card className={!isActive ? "opacity-70" : ""}>
         <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="space-y-1 min-w-0">
               <CardTitle className="flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-full ${getStatusColor()}`} />
-                {instance.display_name || instance.instance_name}
+                <div className={`h-3 w-3 rounded-full shrink-0 ${getStatusColor()}`} />
+                <span className="truncate">{instance.display_name || instance.instance_name}</span>
               </CardTitle>
               <Badge variant="outline" className="text-xs">
                 {instance.instance_name}
@@ -116,6 +149,17 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               <Badge variant="secondary" className="text-xs ml-1">
                 {getProviderLabel()}
               </Badge>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <Switch
+                checked={isActive}
+                disabled={setActive.isPending}
+                onCheckedChange={handleToggleActive}
+                aria-label="Ativar/desativar instância"
+              />
+              <span className="text-[10px] text-muted-foreground">
+                {isActive ? "Ativa" : "Inativa"}
+              </span>
             </div>
           </div>
         </CardHeader>
@@ -157,12 +201,13 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
               id={`ignore-groups-${instance.id}`}
               checked={instance.ignore_group_messages !== false}
               onCheckedChange={handleToggleIgnoreGroups}
+              disabled={!isActive}
             />
           </div>
         </CardContent>
 
         <CardFooter className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testConnection.isPending}>
+          <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testConnection.isPending || !isActive}>
             <RefreshCw className={`h-4 w-4 ${testConnection.isPending ? "animate-spin" : ""}`} />
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
@@ -173,6 +218,32 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
           </Button>
         </CardFooter>
       </Card>
+
+      <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <PowerOff className="h-5 w-5 text-destructive" />
+              Desativar instância?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A instância será desconectada do provedor ({getProviderLabel()}) e suas credenciais (API Key, Tokens) serão <strong>permanentemente apagadas</strong>.
+              <br /><br />
+              O histórico de conversas e mensagens será preservado, mas para reativar você precisará editar a instância e reinserir todas as credenciais.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={setActive.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeactivate}
+              disabled={setActive.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {setActive.isPending ? "Desativando..." : "Desativar e apagar credenciais"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
