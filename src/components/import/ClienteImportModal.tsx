@@ -513,6 +513,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           numero:                   ['numerodoendereco', 'nro', 'num', 'numero', 'número'],
           data_cadastro:            ['datacadastro', 'datadecadastro', 'dtcadastro', 'data de cadastro'],
           data_venda:               ['datavenda', 'datadevendas', 'dtvenda', 'data da venda'],
+          data_reajuste:            ['datareajuste', 'datadereajuste', 'dtreajuste', 'data de reajuste', 'reajuste'],
           data_ativacao:            ['dataativacao', 'datadeativacao', 'dtativacao', 'data de ativação', 'data de ativacao'],
           razao_social:             ['razaosocial', 'razao', 'razaosocialempresa', 'razão social'],
           nome_fantasia:            ['fantasia', 'nomefantasia', 'nome fantasia'],
@@ -1028,6 +1029,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           contato_fone: safePhone(v.contato_fone),
           contato_aniversario: toNullableDate(v.contato_aniversario),
           data_venda: toNullableDate(v.data_venda),
+          data_reajuste: toNullableDate(v.data_reajuste),
           data_ativacao: toNullableDate(v.data_ativacao),
           recorrencia: (RECORRENCIA_VALIDA.includes((v.recorrencia ?? "").trim().toLowerCase())
             ? (v.recorrencia ?? "").trim().toLowerCase()
