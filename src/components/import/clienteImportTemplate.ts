@@ -338,6 +338,7 @@ export const HEADER_LABELS: Record<string, string> = {
   contato_aniversario: 'Data de Aniversário',
   // Produto / Contrato
   data_venda: 'Data da Venda',
+  data_reajuste: 'Data de Reajuste',
   produto: 'Produto',
   recorrencia: 'Recorrência',
   valor_ativacao: 'Valor de Ativação',
