@@ -803,6 +803,31 @@ export default function WhatsAppInstancesTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Deactivate Confirmation ── */}
+      <AlertDialog open={!!deactivateTarget} onOpenChange={() => setDeactivateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar instância?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A instância <strong>{deactivateTarget?.display_name || deactivateTarget?.instance_name}</strong> será desconectada
+              do provedor ({PROVIDER_LABEL[deactivateTarget?.provider_type || ""] || deactivateTarget?.provider_type}) e
+              <strong> todas as credenciais (API Keys, Tokens) serão apagadas</strong>. Para reativar, será necessário cadastrar
+              os dados novamente. As conversas e mensagens serão preservadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deactivateTarget && deactivateMutation.mutate(deactivateTarget.id)}
+              disabled={deactivateMutation.isPending}
+            >
+              {deactivateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Desativar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
