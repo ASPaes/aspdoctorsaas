@@ -395,6 +395,7 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   contato_fone:               { section: 'Contato', why: 'Telefone do contato para atendimento.' },
   contato_aniversario:        { section: 'Contato', why: 'Data de aniversário do contato para ações de relacionamento.' },
   data_venda:                 { section: 'Produto/Contrato', why: 'Marca o início do ciclo de vida do cliente no sistema. Usado para calcular LTV, cohort e MRR.' },
+  data_reajuste:              { section: 'Produto/Contrato', why: 'Data prevista para o próximo reajuste do contrato. Não obrigatório. Útil para acompanhar quando o cliente terá o valor da mensalidade revisado.' },
   produto:                    { section: 'Produto/Contrato', why: 'O que foi vendido ao cliente. Base para análise de MRR por produto.' },
   recorrencia:                { section: 'Produto/Contrato', why: 'Periodicidade do pagamento. Define o ciclo de cobrança e o cálculo de MRR anualizado.' },
   valor_ativacao:             { section: 'Produto/Contrato', why: 'Receita única da ativação. Compõe o cálculo de receita total e CAC.' },
