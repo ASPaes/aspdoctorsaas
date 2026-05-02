@@ -639,11 +639,11 @@ export default function WhatsAppInstancesTab() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Access Token *</Label>
+                  <Label>Access Token {!editingId && "*"}</Label>
                   <div className="relative">
                     <Input
                       type={showMetaToken ? "text" : "password"}
-                      placeholder="token de acesso Meta"
+                      placeholder={editingId ? "deixe vazio para manter o atual" : "token de acesso Meta"}
                       value={form.meta_access_token}
                       onChange={(e) => setForm((f) => ({ ...f, meta_access_token: e.target.value }))}
                       autoComplete="off"
@@ -660,13 +660,13 @@ export default function WhatsAppInstancesTab() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Verify Token *</Label>
+                  <Label>Verify Token {!editingId && "*"}</Label>
                   <div className="relative">
                     <Input
                       type={showMetaVerifyToken ? "text" : "password"}
                       value={form.meta_verify_token}
                       onChange={(e) => setForm((f) => ({ ...f, meta_verify_token: e.target.value }))}
-                      placeholder="meu-token-verificacao"
+                      placeholder={editingId ? "deixe vazio para manter o atual" : "meu-token-verificacao"}
                       autoComplete="off"
                     />
                     <Button
@@ -684,13 +684,13 @@ export default function WhatsAppInstancesTab() {
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>App Secret *</Label>
+                  <Label>App Secret {!editingId && "*"}</Label>
                   <div className="relative">
                     <Input
                       type={showMetaAppSecret ? "text" : "password"}
                       value={form.meta_app_secret}
                       onChange={(e) => setForm((f) => ({ ...f, meta_app_secret: e.target.value }))}
-                      placeholder="app-secret-da-meta"
+                      placeholder={editingId ? "deixe vazio para manter o atual" : "app-secret-da-meta"}
                       autoComplete="off"
                     />
                     <Button
