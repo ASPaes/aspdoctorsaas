@@ -126,7 +126,7 @@ export default function WhatsAppInstancesTab() {
     queryKey: ["whatsapp-instances", tid],
     queryFn: async () => {
       const { data, error } = await tf(
-        supabase.from("whatsapp_instances").select("id, instance_name, display_name, phone_number, status, provider_type, created_at")
+        supabase.from("whatsapp_instances").select("id, instance_name, display_name, phone_number, status, provider_type, is_active, created_at")
       ).order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Instance[];
