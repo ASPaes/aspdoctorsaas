@@ -50,6 +50,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { cn } from "@/lib/utils";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import {
   FK_FIELDS,
   REQUIRED_FIELDS,
