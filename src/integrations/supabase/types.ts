@@ -3888,6 +3888,7 @@ export type Database = {
           ignore_group_messages: boolean
           instance_id_external: string | null
           instance_name: string
+          is_active: boolean
           meta_business_id: string | null
           meta_phone_number_id: string | null
           meta_waba_id: string | null
@@ -3906,6 +3907,7 @@ export type Database = {
           ignore_group_messages?: boolean
           instance_id_external?: string | null
           instance_name: string
+          is_active?: boolean
           meta_business_id?: string | null
           meta_phone_number_id?: string | null
           meta_waba_id?: string | null
@@ -3924,6 +3926,7 @@ export type Database = {
           ignore_group_messages?: boolean
           instance_id_external?: string | null
           instance_name?: string
+          is_active?: boolean
           meta_business_id?: string | null
           meta_phone_number_id?: string | null
           meta_waba_id?: string | null

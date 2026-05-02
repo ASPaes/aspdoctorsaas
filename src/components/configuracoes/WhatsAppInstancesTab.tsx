@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   Plus,
   Loader2,
@@ -46,6 +47,7 @@ import {
   Eye,
   EyeOff,
   Phone,
+  PowerOff,
 } from "lucide-react";
 
 interface Instance {
@@ -55,6 +57,7 @@ interface Instance {
   phone_number: string | null;
   status: string;
   provider_type: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -117,6 +120,8 @@ export default function WhatsAppInstancesTab() {
   const [showMetaAppSecret, setShowMetaAppSecret] = useState(false);
   const [showMetaVerifyToken, setShowMetaVerifyToken] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Instance | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<Instance | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
 
@@ -125,7 +130,7 @@ export default function WhatsAppInstancesTab() {
     queryKey: ["whatsapp-instances", tid],
     queryFn: async () => {
       const { data, error } = await tf(
-        supabase.from("whatsapp_instances").select("id, instance_name, display_name, phone_number, status, provider_type, created_at")
+        supabase.from("whatsapp_instances").select("id, instance_name, display_name, phone_number, status, provider_type, is_active, created_at")
       ).order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Instance[];
@@ -339,6 +344,43 @@ export default function WhatsAppInstancesTab() {
     },
   });
 
+  // ── Deactivate (logout no provedor + apaga credenciais) ──
+  const deactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke("deactivate-whatsapp-instance", {
+        body: { instance_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
+      setDeactivateTarget(null);
+      toast({ title: "Instância desativada", description: "Desconectada do provedor e credenciais removidas." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao desativar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // ── Activate (apenas habilita flag — credenciais devem ser inseridas via edição) ──
+  const activate = async (inst: Instance) => {
+    setActivatingId(inst.id);
+    try {
+      const { error } = await (supabase.from("whatsapp_instances") as any)
+        .update({ is_active: true })
+        .eq("id", inst.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
+      toast({ title: "Instância ativada", description: "Edite-a para reinserir as credenciais do provedor." });
+    } catch (err: any) {
+      toast({ title: "Erro ao ativar", description: err.message, variant: "destructive" });
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   // ── Test Connection ──
   const testConnection = async (id: string) => {
     setTestingId(id);
@@ -431,20 +473,37 @@ export default function WhatsAppInstancesTab() {
             const st = STATUS_MAP[inst.status] ?? { label: inst.status, variant: "outline" as const };
             const providerLabel = PROVIDER_LABEL[inst.provider_type] ?? inst.provider_type;
             return (
-              <Card key={inst.id}>
+              <Card key={inst.id} className={!inst.is_active ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base truncate">
                       {inst.display_name || inst.instance_name}
                     </CardTitle>
-                    <Badge variant={st.variant} className="shrink-0">
-                      {inst.status === "connected" ? (
-                        <Wifi className="h-3 w-3 mr-1" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {inst.is_active ? (
+                        <Badge variant={st.variant}>
+                          {inst.status === "connected" ? (
+                            <Wifi className="h-3 w-3 mr-1" />
+                          ) : (
+                            <WifiOff className="h-3 w-3 mr-1" />
+                          )}
+                          {st.label}
+                        </Badge>
                       ) : (
-                        <WifiOff className="h-3 w-3 mr-1" />
+                        <Badge variant="outline">
+                          <PowerOff className="h-3 w-3 mr-1" />
+                          Inativa
+                        </Badge>
                       )}
-                      {st.label}
-                    </Badge>
+                      <Switch
+                        checked={inst.is_active}
+                        disabled={activatingId === inst.id || deactivateMutation.isPending}
+                        onCheckedChange={(checked) => {
+                          if (checked) activate(inst);
+                          else setDeactivateTarget(inst);
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {inst.display_name && (
@@ -467,7 +526,7 @@ export default function WhatsAppInstancesTab() {
                       variant="outline"
                       size="sm"
                       onClick={() => testConnection(inst.id)}
-                      disabled={testingId === inst.id}
+                      disabled={testingId === inst.id || !inst.is_active}
                     >
                       {testingId === inst.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -740,6 +799,31 @@ export default function WhatsAppInstancesTab() {
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Deactivate Confirmation ── */}
+      <AlertDialog open={!!deactivateTarget} onOpenChange={() => setDeactivateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar instância?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A instância <strong>{deactivateTarget?.display_name || deactivateTarget?.instance_name}</strong> será desconectada
+              do provedor ({PROVIDER_LABEL[deactivateTarget?.provider_type || ""] || deactivateTarget?.provider_type}) e
+              <strong> todas as credenciais (API Keys, Tokens) serão apagadas</strong>. Para reativar, será necessário cadastrar
+              os dados novamente. As conversas e mensagens serão preservadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deactivateTarget && deactivateMutation.mutate(deactivateTarget.id)}
+              disabled={deactivateMutation.isPending}
+            >
+              {deactivateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Desativar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
