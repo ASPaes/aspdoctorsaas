@@ -12,19 +12,26 @@ interface Instance {
   provider_type: string;
   instance_id_external: string | null;
   webhook_url: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export const useWhatsAppInstances = () => {
+interface UseWhatsAppInstancesOptions {
+  includeInactive?: boolean;
+}
+
+export const useWhatsAppInstances = (options: UseWhatsAppInstancesOptions = {}) => {
+  const { includeInactive = false } = options;
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const { data: instances = [], isLoading, error } = useQuery({
-    queryKey: ['whatsapp', 'instances', tid],
+    queryKey: ['whatsapp', 'instances', tid, includeInactive],
     queryFn: async () => {
       let q = supabase.from('whatsapp_instances').select('*').order('created_at', { ascending: false });
       if (tid) q = q.eq('tenant_id', tid);
+      if (!includeInactive) q = q.eq('is_active', true);
       const { data, error } = await q;
       if (error) throw error;
       return data as Instance[];
