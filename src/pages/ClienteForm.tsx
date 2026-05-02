@@ -321,7 +321,7 @@ export default function ClienteForm() {
       telefone_whatsapp_contato: (c as any).telefone_whatsapp_contato ? formatBRPhone(normalizeBRPhone((c as any).telefone_whatsapp_contato)) : (c.telefone_whatsapp ? formatBRPhone(normalizeBRPhone(c.telefone_whatsapp)) : null),
       estado_id: c.estado_id, cidade_id: c.cidade_id,
       area_atuacao_id: c.area_atuacao_id, segmento_id: c.segmento_id, modelo_contrato_id: (c as any).modelo_contrato_id,
-      observacao_cliente: c.observacao_cliente, data_venda: c.data_venda,
+      observacao_cliente: c.observacao_cliente, data_venda: c.data_venda, data_reajuste: (c as any).data_reajuste ?? null,
       funcionario_id: c.funcionario_id, origem_venda_id: (c as any).origem_venda_id ?? null,
       recorrencia: c.recorrencia as any, produto_id: c.produto_id,
       observacao_negociacao: c.observacao_negociacao,
