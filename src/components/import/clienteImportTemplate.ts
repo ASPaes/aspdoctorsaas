@@ -135,6 +135,7 @@ const TEMPLATE_COMPLETO_EXEMPLO = TEMPLATE_COMPLETO_HEADERS.map(h => {
     contato_nome: 'João Silva',
     contato_cpf: '12345678901',
     contato_fone: '(11) 98888-0000',
+    data_reajuste: '2025-01-15',
     data_ativacao: '2024-02-01',
     dia_vencimento_mrr: '10',
     valor_ativacao: '499.90',
