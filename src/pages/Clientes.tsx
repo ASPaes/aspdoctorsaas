@@ -928,18 +928,14 @@ export default function Clientes() {
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR Atual"],
                 ["data_ativacao", "Dt. Ativação"],
-                [null, "Data de Reajuste"],
+                ["data_reajuste", "Data de Reajuste"],
                 ["cancelado", "Status"],
-              ] as [SortField | null, string][]).map(([field, label]) => (
-                <TableHead key={field ?? label}>
-                  {field ? (
-                    <button className="flex items-center font-medium hover:text-foreground" onClick={() => toggleSort(field)}>
-                      {label}
-                      <SortIcon field={field} />
-                    </button>
-                  ) : (
-                    <span className="font-medium">{label}</span>
-                  )}
+              ] as [SortField, string][]).map(([field, label]) => (
+                <TableHead key={field}>
+                  <button className="flex items-center font-medium hover:text-foreground" onClick={() => toggleSort(field)}>
+                    {label}
+                    <SortIcon field={field} />
+                  </button>
                 </TableHead>
               ))}
               <TableHead className="w-[40px]"></TableHead>
