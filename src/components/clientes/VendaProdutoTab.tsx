@@ -32,10 +32,18 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
       <div className="rounded-lg border bg-card p-4 space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações do Contrato</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {/* Linha 1: Data Venda | Origem Venda | Modelo de Contrato */}
+          {/* Linha 1: Data Venda | Data de Reajuste | Origem Venda */}
           <FormField control={form.control} name="data_venda" render={({ field }) => (
             <FormItem>
               <FormLabel>Data da Venda *</FormLabel>
+              <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+
+          <FormField control={form.control} name="data_reajuste" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Data de Reajuste</FormLabel>
               <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -56,6 +64,7 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
             </FormItem>
           )} />
 
+          {/* Linha 2: Modelo de Contrato | Recorrência | Funcionário */}
           <FormField control={form.control} name="modelo_contrato_id" render={({ field }) => (
             <FormItem>
               <FormLabel>Modelo de Contrato *</FormLabel>
@@ -71,7 +80,6 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
             </FormItem>
           )} />
 
-          {/* Linha 2: Recorrência | Funcionário */}
           <FormField control={form.control} name="recorrencia" render={({ field }) => (
             <FormItem>
               <FormLabel>Recorrência *</FormLabel>
@@ -98,14 +106,6 @@ export default function VendaProdutoTab({ form, funcionarios = [], produtos = []
                   ))}
                 </SelectContent>
               </Select>
-              <FormMessage />
-            </FormItem>
-          )} />
-
-          <FormField control={form.control} name="data_reajuste" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Data de Reajuste</FormLabel>
-              <FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />

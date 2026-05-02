@@ -4504,6 +4504,7 @@ export type Database = {
           data_ativacao: string | null
           data_cadastro: string | null
           data_cancelamento: string | null
+          data_reajuste: string | null
           data_venda: string | null
           email: string | null
           estado_id: number | null
@@ -4556,6 +4557,7 @@ export type Database = {
           data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
+          data_reajuste?: string | null
           data_venda?: string | null
           email?: string | null
           estado_id?: number | null
@@ -4608,6 +4610,7 @@ export type Database = {
           data_ativacao?: string | null
           data_cadastro?: string | null
           data_cancelamento?: string | null
+          data_reajuste?: string | null
           data_venda?: string | null
           email?: string | null
           estado_id?: number | null
