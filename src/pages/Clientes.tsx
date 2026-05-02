@@ -448,9 +448,28 @@ export default function Clientes() {
     placeholderData: (prev) => prev,
   });
 
-  const clientes = queryResult?.rows ?? [];
+  const clientesRaw = queryResult?.rows ?? [];
   const totalCount = queryResult?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Fetch data_reajuste separadamente da tabela clientes (não existe na vw_clientes_financeiro)
+  const visibleIds = useMemo(() => clientesRaw.map((c: any) => c.id).filter(Boolean), [clientesRaw]);
+  const { data: reajusteMap } = useQuery({
+    queryKey: ["clientes_data_reajuste", tid, visibleIds],
+    enabled: visibleIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await tf(supabase.from("clientes").select("id, data_reajuste").in("id", visibleIds)) as any;
+      if (error) throw error;
+      const m = new Map<string, string | null>();
+      (data || []).forEach((r: any) => m.set(r.id, r.data_reajuste));
+      return m;
+    },
+  });
+
+  const clientes = useMemo(
+    () => clientesRaw.map((c: any) => ({ ...c, data_reajuste: reajusteMap?.get(c.id) ?? null })),
+    [clientesRaw, reajusteMap]
+  );
 
   // Store navigation IDs for in-form navigation
   useEffect(() => {
