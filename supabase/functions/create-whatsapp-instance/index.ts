@@ -52,7 +52,30 @@ Deno.serve(async (req) => {
     const isMeta = provider_type === 'meta_cloud';
     const isZapi = provider_type === 'zapi';
 
-    // 1. Criar instÃ¢ncia
+    // Normaliza meta_phone_number_id (string vazia -> null)
+    const metaPhoneId = isMeta && meta_phone_number_id && String(meta_phone_number_id).trim() !== ''
+      ? String(meta_phone_number_id).trim()
+      : null;
+
+    // Pré-checagem: evitar violação de unique constraint em meta_phone_number_id
+    if (metaPhoneId) {
+      const { data: existing } = await supabase
+        .from('whatsapp_instances')
+        .select('id, tenant_id, display_name')
+        .eq('meta_phone_number_id', metaPhoneId)
+        .maybeSingle();
+      if (existing) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Já existe uma instância cadastrada com este Phone Number ID (${metaPhoneId}).`,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
+    // 1. Criar instância
     const { data: instanceResult, error: instanceError } = await supabase
       .from('whatsapp_instances')
       .insert({
@@ -61,7 +84,7 @@ Deno.serve(async (req) => {
         instance_name,
         provider_type: provider_type || 'self_hosted',
         instance_id_external: instance_id_external || (isZapi ? (zapi_instance_id || null) : null),
-        ...(isMeta && meta_phone_number_id ? { meta_phone_number_id } : {}),
+        ...(metaPhoneId ? { meta_phone_number_id: metaPhoneId } : {}),
       })
       .select()
       .single();
