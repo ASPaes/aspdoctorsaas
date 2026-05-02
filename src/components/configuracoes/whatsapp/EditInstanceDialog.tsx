@@ -29,6 +29,7 @@ const formSchema = z.object({
   meta_phone_number_id: z.string().optional(),
   meta_access_token: z.string().optional(),
   meta_app_secret: z.string().optional(),
+  meta_verify_token: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -64,6 +65,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
         zapi_client_token?: string;
         meta_access_token?: string;
         meta_app_secret?: string;
+        meta_verify_token?: string;
       };
     },
     enabled: open,
@@ -85,6 +87,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       meta_phone_number_id: instance.meta_phone_number_id || '',
       meta_access_token: '',
       meta_app_secret: '',
+      meta_verify_token: '',
     },
   });
 
@@ -104,6 +107,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       meta_phone_number_id: instance.meta_phone_number_id || '',
       meta_access_token: '',
       meta_app_secret: '',
+      meta_verify_token: '',
     });
   }, [instance]);
 
@@ -116,6 +120,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
     form.setValue('zapi_client_token', secrets.zapi_client_token || '');
     form.setValue('meta_access_token', secrets.meta_access_token || '');
     form.setValue('meta_app_secret', secrets.meta_app_secret || '');
+    form.setValue('meta_verify_token', secrets.meta_verify_token || '');
   }, [secrets]);
 
   const onSubmit = async (values: FormValues) => {
@@ -130,7 +135,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
           instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : null,
           provider_type: values.provider_type,
           ...((!isMeta && !isZapi) && { api_url: values.api_url, api_key: values.api_key }),
-          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token, meta_app_secret: values.meta_app_secret }),
+          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token, meta_app_secret: values.meta_app_secret, meta_verify_token: values.meta_verify_token }),
           ...(isZapi && { zapi_instance_id: values.zapi_instance_id, zapi_token: values.zapi_token, zapi_client_token: values.zapi_client_token }),
         },
       });
@@ -251,6 +256,17 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                   <FormItem>
                     <FormLabel>Access Token (Permanente)</FormLabel>
                     <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="meta_verify_token" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Verify Token</FormLabel>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Token de verificação usado na configuração do webhook da Meta.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )} />
