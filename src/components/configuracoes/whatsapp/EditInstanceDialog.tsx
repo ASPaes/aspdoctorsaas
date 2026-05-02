@@ -65,6 +65,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
         zapi_client_token?: string;
         meta_access_token?: string;
         meta_app_secret?: string;
+        meta_verify_token?: string;
       };
     },
     enabled: open,
