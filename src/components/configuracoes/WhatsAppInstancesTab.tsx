@@ -120,6 +120,8 @@ export default function WhatsAppInstancesTab() {
   const [showMetaAppSecret, setShowMetaAppSecret] = useState(false);
   const [showMetaVerifyToken, setShowMetaVerifyToken] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Instance | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<Instance | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [checkingAll, setCheckingAll] = useState(false);
 
