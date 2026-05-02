@@ -946,14 +946,14 @@ export default function Clientes() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 10 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : !clientes?.length ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -973,6 +973,7 @@ export default function Clientes() {
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
                   <TableCell>{getMrrAtual(c) > 0 ? `R$ ${getMrrAtual(c).toFixed(2)}` : "—"}</TableCell>
                   <TableCell className="text-xs">{c.data_ativacao ? format(parseISO(c.data_ativacao), "dd/MM/yyyy") : "—"}</TableCell>
+                  <TableCell className="text-xs">{(c as any).data_reajuste ? format(parseISO((c as any).data_reajuste), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
                       c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
