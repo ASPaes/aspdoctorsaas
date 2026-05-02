@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 
-type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "cancelado";
+type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
 type SortDir = "asc" | "desc";
 
 function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
@@ -398,8 +398,7 @@ export default function Clientes() {
         };
       }
 
-      // Nota: data_reajuste NÃO existe na view vw_clientes_financeiro; é buscado separadamente da tabela clientes abaixo.
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, unidade_base_id, telefone_whatsapp, telefone_contato";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, data_reajuste, unidade_base_id, telefone_whatsapp, telefone_contato";
       let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -448,28 +447,9 @@ export default function Clientes() {
     placeholderData: (prev) => prev,
   });
 
-  const clientesRaw = queryResult?.rows ?? [];
+  const clientes = queryResult?.rows ?? [];
   const totalCount = queryResult?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-
-  // Fetch data_reajuste separadamente da tabela clientes (não existe na vw_clientes_financeiro)
-  const visibleIds = useMemo(() => clientesRaw.map((c: any) => c.id).filter(Boolean), [clientesRaw]);
-  const { data: reajusteMap } = useQuery({
-    queryKey: ["clientes_data_reajuste", tid, visibleIds],
-    enabled: visibleIds.length > 0,
-    queryFn: async () => {
-      const { data, error } = await tf(supabase.from("clientes").select("id, data_reajuste").in("id", visibleIds)) as any;
-      if (error) throw error;
-      const m = new Map<string, string | null>();
-      (data || []).forEach((r: any) => m.set(r.id, r.data_reajuste));
-      return m;
-    },
-  });
-
-  const clientes = useMemo(
-    () => clientesRaw.map((c: any) => ({ ...c, data_reajuste: reajusteMap?.get(c.id) ?? null })),
-    [clientesRaw, reajusteMap]
-  );
 
   // Store navigation IDs for in-form navigation
   useEffect(() => {
@@ -948,18 +928,14 @@ export default function Clientes() {
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR Atual"],
                 ["data_ativacao", "Dt. Ativação"],
-                [null, "Data de Reajuste"],
+                ["data_reajuste", "Data de Reajuste"],
                 ["cancelado", "Status"],
-              ] as [SortField | null, string][]).map(([field, label]) => (
-                <TableHead key={field ?? label}>
-                  {field ? (
-                    <button className="flex items-center font-medium hover:text-foreground" onClick={() => toggleSort(field)}>
-                      {label}
-                      <SortIcon field={field} />
-                    </button>
-                  ) : (
-                    <span className="font-medium">{label}</span>
-                  )}
+              ] as [SortField, string][]).map(([field, label]) => (
+                <TableHead key={field}>
+                  <button className="flex items-center font-medium hover:text-foreground" onClick={() => toggleSort(field)}>
+                    {label}
+                    <SortIcon field={field} />
+                  </button>
                 </TableHead>
               ))}
               <TableHead className="w-[40px]"></TableHead>
