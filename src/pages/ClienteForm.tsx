@@ -82,6 +82,7 @@ const clienteSchema = z.object({
   modelo_contrato_id: z.number().nullable().refine(v => v !== null, { message: "Modelo de Contrato obrigatório" }),
   observacao_cliente: z.string().nullable(),
   data_venda: noFutureDate("Data da Venda").refine(v => !!v, { message: "Data da Venda obrigatória" }),
+  data_reajuste: z.string().nullable(),
   funcionario_id: z.number().nullable(),
   origem_venda_id: z.number().nullable().refine(v => v !== null, { message: "Origem da Venda obrigatória" }),
   recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
