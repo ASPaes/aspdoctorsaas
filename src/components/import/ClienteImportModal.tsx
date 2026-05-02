@@ -513,6 +513,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           numero:                   ['numerodoendereco', 'nro', 'num', 'numero', 'número'],
           data_cadastro:            ['datacadastro', 'datadecadastro', 'dtcadastro', 'data de cadastro'],
           data_venda:               ['datavenda', 'datadevendas', 'dtvenda', 'data da venda'],
+          data_reajuste:            ['datareajuste', 'datadereajuste', 'dtreajuste', 'data de reajuste', 'reajuste'],
           data_ativacao:            ['dataativacao', 'datadeativacao', 'dtativacao', 'data de ativação', 'data de ativacao'],
           razao_social:             ['razaosocial', 'razao', 'razaosocialempresa', 'razão social'],
           nome_fantasia:            ['fantasia', 'nomefantasia', 'nome fantasia'],
