@@ -473,20 +473,37 @@ export default function WhatsAppInstancesTab() {
             const st = STATUS_MAP[inst.status] ?? { label: inst.status, variant: "outline" as const };
             const providerLabel = PROVIDER_LABEL[inst.provider_type] ?? inst.provider_type;
             return (
-              <Card key={inst.id}>
+              <Card key={inst.id} className={!inst.is_active ? "opacity-60" : ""}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base truncate">
                       {inst.display_name || inst.instance_name}
                     </CardTitle>
-                    <Badge variant={st.variant} className="shrink-0">
-                      {inst.status === "connected" ? (
-                        <Wifi className="h-3 w-3 mr-1" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {inst.is_active ? (
+                        <Badge variant={st.variant}>
+                          {inst.status === "connected" ? (
+                            <Wifi className="h-3 w-3 mr-1" />
+                          ) : (
+                            <WifiOff className="h-3 w-3 mr-1" />
+                          )}
+                          {st.label}
+                        </Badge>
                       ) : (
-                        <WifiOff className="h-3 w-3 mr-1" />
+                        <Badge variant="outline">
+                          <PowerOff className="h-3 w-3 mr-1" />
+                          Inativa
+                        </Badge>
                       )}
-                      {st.label}
-                    </Badge>
+                      <Switch
+                        checked={inst.is_active}
+                        disabled={activatingId === inst.id || deactivateMutation.isPending}
+                        onCheckedChange={(checked) => {
+                          if (checked) activate(inst);
+                          else setDeactivateTarget(inst);
+                        }}
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {inst.display_name && (
@@ -509,7 +526,7 @@ export default function WhatsAppInstancesTab() {
                       variant="outline"
                       size="sm"
                       onClick={() => testConnection(inst.id)}
-                      disabled={testingId === inst.id}
+                      disabled={testingId === inst.id || !inst.is_active}
                     >
                       {testingId === inst.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
