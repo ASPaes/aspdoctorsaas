@@ -50,6 +50,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { cn } from "@/lib/utils";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 import {
   FK_FIELDS,
   REQUIRED_FIELDS,
@@ -846,12 +847,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     // Carregar apenas cidades dos estados presentes no CSV
     let cidadesDataArr: { id: number; nome: string; estado_id: number }[] = [];
     if (relevantEstadoIds.length > 0) {
-      const { data: cidadesRaw } = await supabase
-        .from('cidades')
-        .select('id, nome, estado_id')
-        .in('estado_id', relevantEstadoIds)
-        .limit(10000);
-      cidadesDataArr = (cidadesRaw ?? []) as { id: number; nome: string; estado_id: number }[];
+      cidadesDataArr = await fetchAllRows<{ id: number; nome: string; estado_id: number }>(() =>
+        supabase.from('cidades').select('id, nome, estado_id').in('estado_id', relevantEstadoIds)
+      );
     }
     const cidadeComEstado: Record<string, number> = {};
     const cidadeSoNome: Record<string, number> = {};
