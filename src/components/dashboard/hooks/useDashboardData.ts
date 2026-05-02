@@ -533,7 +533,7 @@ export function useDashboardData(filters: DashboardFilters) {
       Object.values(topCidadesByEstado).forEach(arr => arr.sort((a, b) => b.qtd - a.qtd));
 
       // Convert estado distribution to use sigla for map compatibility
-      const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap);
+      const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap, null);
 
       // Per-state breakdowns for segmento, area_atuacao, fornecedor
       const buildByEstado = (fkField: string, nameMap: Record<number, string>) => {
