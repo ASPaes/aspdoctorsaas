@@ -34,6 +34,7 @@ export const FRIENDLY_TO_SYSTEM: Record<string, string> = {
   'Telefone do Contato': 'contato_fone',
   'Aniversário do Contato': 'contato_aniversario',
   'Data da Venda': 'data_venda',
+  'Data de Reajuste': 'data_reajuste',
   'Produto': 'produto',
   'Recorrência': 'recorrencia',
   'Valor de Ativação': 'valor_ativacao',
