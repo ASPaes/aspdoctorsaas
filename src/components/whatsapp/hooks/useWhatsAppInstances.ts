@@ -130,5 +130,28 @@ export const useWhatsAppInstances = (options: UseWhatsAppInstancesOptions = {}) 
     },
   });
 
-  return { instances, isLoading, error, createInstance, updateInstance, deleteInstance, testConnection };
+  const setActive = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      if (!active) {
+        // Desativar: chama edge function para logout no provedor + apaga credenciais
+        const { data, error } = await supabase.functions.invoke('deactivate-whatsapp-instance', {
+          body: { instance_id: id },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        return data;
+      }
+      // Ativar: apenas atualiza flag (credenciais devem ser reinseridas via edição)
+      const { error } = await (supabase.from('whatsapp_instances') as any)
+        .update({ is_active: true, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      return { ok: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'instances'] });
+    },
+  });
+
+  return { instances, isLoading, error, createInstance, updateInstance, deleteInstance, testConnection, setActive };
 };
