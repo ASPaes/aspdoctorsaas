@@ -609,11 +609,6 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <FormMessage />
           </FormItem>
         )} />
-
-        {/* DEBUG TEMPORÁRIO - REMOVER APÓS DIAGNÓSTICO */}
-        <div className="col-span-3 text-xs bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 p-2 rounded font-mono">
-          DEBUG: estado_id={String(form.watch("estado_id"))} | cidade_id={String(form.watch("cidade_id"))} | cidades.length={cidades.length} | primeiras 3 cidades=[{cidades.slice(0,3).map(c => `${c.id}:${c.nome}`).join(", ")}]
-        </div>
         <FormField control={form.control} name="cidade_id" render={({ field }) => {
           const cidadeValue = form.watch("cidade_id")?.toString() ?? "";
           const cidadeInList = cidades.some(c => c.id.toString() === cidadeValue);
