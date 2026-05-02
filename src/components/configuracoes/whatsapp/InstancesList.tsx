@@ -3,7 +3,7 @@ import { InstanceCard } from "./InstanceCard";
 import { Loader2 } from "lucide-react";
 
 export const InstancesList = () => {
-  const { instances, isLoading } = useWhatsAppInstances();
+  const { instances, isLoading } = useWhatsAppInstances({ includeInactive: true });
 
   if (isLoading) {
     return (
