@@ -191,9 +191,12 @@ export default function WhatsAppInstancesTab() {
         if (!form.zapi_token.trim()) throw new Error("Token Z-API é obrigatório");
       } else if (form.provider_type === "meta_cloud") {
         if (!form.meta_phone_number_id.trim()) throw new Error("Phone Number ID é obrigatório");
-        if (!form.meta_access_token.trim()) throw new Error("Access Token é obrigatório");
-        if (!form.meta_app_secret.trim()) throw new Error("App Secret é obrigatório");
-        if (!form.meta_verify_token.trim()) throw new Error("Verify Token é obrigatório");
+        // Ao editar, secrets ficam no Vault e não vêm preenchidos: campo vazio = manter atual
+        if (!editingId) {
+          if (!form.meta_access_token.trim()) throw new Error("Access Token é obrigatório");
+          if (!form.meta_app_secret.trim()) throw new Error("App Secret é obrigatório");
+          if (!form.meta_verify_token.trim()) throw new Error("Verify Token é obrigatório");
+        }
       }
 
       if (editingId) {
