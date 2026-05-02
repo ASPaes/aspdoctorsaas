@@ -928,6 +928,7 @@ export default function Clientes() {
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR Atual"],
                 ["data_ativacao", "Dt. Ativação"],
+                ["data_reajuste", "Data de Reajuste"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
                 <TableHead key={field}>
