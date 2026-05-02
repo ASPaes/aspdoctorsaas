@@ -60,7 +60,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
     return 'hsl(145 53% 26%)';
   };
 
-  const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value).slice(0, tvMode ? 12 : 10), [data, tvMode]);
+  const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
   const selectedStateData = selectedState ? stateDataMap[selectedState] : null;
   const selectedStateCities = selectedState ? topCidadesByEstado[selectedState] : null;
 
@@ -143,9 +143,9 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                 </div>
                 {selectedStateCities && selectedStateCities.length > 0 && (
                   <div className="space-y-2">
-                    <p className="font-semibold text-sm text-muted-foreground">Top 10 Cidades</p>
-                    <div className="space-y-1 max-h-[320px] overflow-y-auto">
-                      {selectedStateCities.slice(0, 10).map((city, i) => (
+                    <p className="font-semibold text-sm text-muted-foreground">Cidades</p>
+                    <div className="space-y-1 max-h-[600px] overflow-y-auto pr-1">
+                      {selectedStateCities.map((city, i) => (
                         <div key={city.nome} className={cn('flex justify-between items-center py-2 px-3 rounded-lg', i === 0 ? 'bg-primary/10 border border-primary/20' : 'bg-muted/50')}>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-muted-foreground text-sm w-5">{i + 1}</span>
@@ -160,22 +160,24 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="font-semibold text-base">Top Estados</p>
+                <p className="font-semibold text-base">Estados</p>
                 <p className="text-xs text-muted-foreground mb-2">📍 Clique no estado para filtrar abaixo</p>
-                {sortedData.map((item, i) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted/80"
-                    onClick={() => onSelectState(item.name.trim().toUpperCase())}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-muted-foreground text-sm w-5">{i + 1}</span>
-                      <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: getColor(item.name.trim().toUpperCase()) }} />
-                      <span className="truncate text-sm font-medium">{SIGLA_TO_NAME[item.name.trim().toUpperCase()] || item.name}</span>
+                <div className="space-y-2 max-h-[680px] overflow-y-auto pr-1">
+                  {sortedData.map((item, i) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted/80"
+                      onClick={() => onSelectState(item.name.trim().toUpperCase())}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-muted-foreground text-sm w-5">{i + 1}</span>
+                        <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: getColor(item.name.trim().toUpperCase()) }} />
+                        <span className="truncate text-sm font-medium">{SIGLA_TO_NAME[item.name.trim().toUpperCase()] || item.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-base">{item.value}</span>
                     </div>
-                    <span className="font-mono font-bold text-base">{item.value}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>

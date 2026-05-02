@@ -44,7 +44,7 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
     const cities = distributions.topCidadesByEstado[selectedState];
     if (!cities || cities.length === 0) return [];
     const total = cities.reduce((s, c) => s + c.qtd, 0) || 1;
-    return cities.slice(0, 10).map(c => ({ name: c.nome, value: c.qtd, percent: c.qtd / total }));
+    return cities.map(c => ({ name: c.nome, value: c.qtd, percent: c.qtd / total }));
   }, [selectedState, distributions]);
 
   // Segmento — top 5, filtered by state
@@ -101,7 +101,7 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
 
       {/* Top 10 Cidades */}
       <BarChartCard
-        title={selectedState ? `Top 10 Cidades — ${SIGLA_TO_NAME[selectedState] || selectedState}` : 'Top 10 Cidades (Qtde Clientes)'}
+        title={selectedState ? `Cidades — ${SIGLA_TO_NAME[selectedState] || selectedState}` : 'Cidades (Qtde Clientes)'}
         data={filteredCidades}
         tvMode={tvMode}
         height={tvMode ? 450 : 350}
