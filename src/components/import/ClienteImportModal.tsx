@@ -1029,6 +1029,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           contato_fone: safePhone(v.contato_fone),
           contato_aniversario: toNullableDate(v.contato_aniversario),
           data_venda: toNullableDate(v.data_venda),
+          data_reajuste: toNullableDate(v.data_reajuste),
           data_ativacao: toNullableDate(v.data_ativacao),
           recorrencia: (RECORRENCIA_VALIDA.includes((v.recorrencia ?? "").trim().toLowerCase())
             ? (v.recorrencia ?? "").trim().toLowerCase()
