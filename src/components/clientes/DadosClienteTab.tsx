@@ -617,7 +617,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
               onValueChange={(v) => field.onChange(v ? Number(v) : null)}
               disabled={!form.watch("estado_id")}
             >
-              <FormControl><SelectTrigger><SelectValue placeholder="Selecione o estado primeiro..." /></SelectTrigger></FormControl>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder={!form.watch("estado_id") ? "Selecione o estado primeiro..." : "Selecione a cidade..."}>
+                    {cidadeValue ? (cidades.find(c => c.id.toString() === cidadeValue)?.nome ?? "Carregando...") : null}
+                  </SelectValue>
+                </SelectTrigger>
+              </FormControl>
               <SelectContent>
                 {cidadeValue && !cidadeInList && (
                   <div className="px-2 py-1.5 text-sm text-muted-foreground">Carregando cidades…</div>
