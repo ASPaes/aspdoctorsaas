@@ -260,6 +260,17 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                   </FormItem>
                 )} />
 
+                <FormField control={form.control} name="meta_verify_token" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Verify Token</FormLabel>
+                    <FormControl><Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} /></FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Token de verificação usado na configuração do webhook da Meta.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="meta_app_secret" render={({ field }) => (
                   <FormItem>
                     <FormLabel>App Secret</FormLabel>
