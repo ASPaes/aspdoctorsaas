@@ -849,7 +849,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
       const { data: cidadesRaw } = await supabase
         .from('cidades')
         .select('id, nome, estado_id')
-        .in('estado_id', relevantEstadoIds);
+        .in('estado_id', relevantEstadoIds)
+        .limit(10000);
       cidadesDataArr = (cidadesRaw ?? []) as { id: number; nome: string; estado_id: number }[];
     }
     const cidadeComEstado: Record<string, number> = {};
