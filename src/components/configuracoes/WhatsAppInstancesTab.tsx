@@ -344,6 +344,43 @@ export default function WhatsAppInstancesTab() {
     },
   });
 
+  // ── Deactivate (logout no provedor + apaga credenciais) ──
+  const deactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke("deactivate-whatsapp-instance", {
+        body: { instance_id: id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
+      setDeactivateTarget(null);
+      toast({ title: "Instância desativada", description: "Desconectada do provedor e credenciais removidas." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao desativar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // ── Activate (apenas habilita flag — credenciais devem ser inseridas via edição) ──
+  const activate = async (inst: Instance) => {
+    setActivatingId(inst.id);
+    try {
+      const { error } = await (supabase.from("whatsapp_instances") as any)
+        .update({ is_active: true })
+        .eq("id", inst.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-instances"] });
+      toast({ title: "Instância ativada", description: "Edite-a para reinserir as credenciais do provedor." });
+    } catch (err: any) {
+      toast({ title: "Erro ao ativar", description: err.message, variant: "destructive" });
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   // ── Test Connection ──
   const testConnection = async (id: string) => {
     setTestingId(id);
