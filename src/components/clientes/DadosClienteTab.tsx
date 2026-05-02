@@ -623,7 +623,12 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
             <Select
               key={cidadeInList ? "matched" : "pending"}
               value={cidadeValue}
-              onValueChange={(v) => field.onChange(v ? Number(v) : null)}
+              onValueChange={(v) => {
+                // Ignora chamadas com valor vazio: o Radix dispara isso quando value não bate com SelectItems
+                // ainda não montados. Para deselecionar cidade, usuário precisa trocar de estado.
+                if (!v) return;
+                field.onChange(Number(v));
+              }}
               disabled={!form.watch("estado_id")}
             >
               <FormControl>
