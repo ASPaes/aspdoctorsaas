@@ -184,17 +184,34 @@ export default function WhatsAppRelatorio() {
                 <User className="h-3.5 w-3.5" />
                 Meus dados
               </button>
-              <button
-                onClick={() => setAgentFilter("all")}
-                className={`flex items-center gap-1.5 px-3 h-full text-xs font-medium transition-colors ${
-                  agentFilter === "all"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:bg-muted"
-                }`}
+              <Select
+                value={selectedDepartmentId ?? "__all__"}
+                onValueChange={(v) => {
+                  setSelectedDepartmentId(v === "__all__" ? null : v);
+                  setAgentFilter("all");
+                }}
               >
-                <Building2 className="h-3.5 w-3.5" />
-                {selectedDepartment?.name ?? "Todos os setores"}
-              </button>
+                <SelectTrigger
+                  className={`h-full border-0 rounded-none gap-1.5 px-3 text-xs font-medium transition-colors focus:ring-0 focus:ring-offset-0 ${
+                    agentFilter === "all"
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-background text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Building2 className="h-3.5 w-3.5" />
+                  <SelectValue>
+                    {selectedDepartment?.name ?? "Todos os setores"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos os setores</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
