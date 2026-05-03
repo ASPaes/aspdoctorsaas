@@ -28,11 +28,12 @@ interface Props {
   data: DistributionDataPoint[];
   tvMode?: boolean;
   topCidadesByEstado?: Record<string, { nome: string; qtd: number }[]>;
+  citiesGeo?: CityGeoPoint[];
   selectedState: string | null;
   onSelectState: (sigla: string | null) => void;
 }
 
-export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, selectedState, onSelectState }: Props) {
+export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
 
   const stateDataMap = useMemo(() => {
