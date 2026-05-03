@@ -47,6 +47,7 @@ export interface AttendanceMetricsFilters {
   dateRange: { from: Date; to: Date };
   departmentId?: string | null;
   agentId?: string | null;
+  instanceId?: string | null;
 }
 
 function parseStats(raw: any) {
