@@ -66,6 +66,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const stateItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Scroll suave ao centro da tela quando um estado é selecionado
   useEffect(() => {
@@ -77,6 +78,17 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
       });
     }
   }, [selectedState]);
+
+  // Auto-scroll do item da lista quando hover no estado do mapa
+  useEffect(() => {
+    if (hoveredState && stateItemRefs.current[hoveredState]) {
+      stateItemRefs.current[hoveredState]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    }
+  }, [hoveredState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,20 +278,30 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                 <p className="font-semibold text-base">Estados</p>
                 <p className="text-xs text-muted-foreground mb-2">📍 Clique no estado para filtrar abaixo</p>
                 <div className="space-y-2 max-h-[680px] overflow-y-auto pr-1">
-                  {sortedData.map((item, i) => (
-                    <div
-                      key={item.name}
-                      className="flex items-center justify-between gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted/80"
-                      onClick={() => onSelectState(item.name.trim().toUpperCase())}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-muted-foreground text-sm w-5">{i + 1}</span>
-                        <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: getColor(item.name.trim().toUpperCase()) }} />
-                        <span className="truncate text-sm font-medium">{SIGLA_TO_NAME[item.name.trim().toUpperCase()] || item.name}</span>
+                  {sortedData.map((item, i) => {
+                    const sigla = item.name.trim().toUpperCase();
+                    const isHovered = hoveredState === sigla;
+                    return (
+                      <div
+                        key={item.name}
+                        ref={el => { stateItemRefs.current[sigla] = el; }}
+                        className={cn(
+                          'flex items-center justify-between gap-2 p-2 rounded-lg cursor-pointer transition-all',
+                          isHovered
+                            ? 'bg-primary/10 border border-primary/30 scale-105 shadow-sm'
+                            : 'border border-transparent hover:bg-muted/80'
+                        )}
+                        onClick={() => onSelectState(sigla)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-muted-foreground text-sm w-5">{i + 1}</span>
+                          <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: getColor(sigla) }} />
+                          <span className="truncate text-sm font-medium">{SIGLA_TO_NAME[sigla] || item.name}</span>
+                        </div>
+                        <span className="font-mono font-bold text-base">{item.value}</span>
                       </div>
-                      <span className="font-mono font-bold text-base">{item.value}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
