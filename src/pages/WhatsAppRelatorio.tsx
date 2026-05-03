@@ -592,7 +592,11 @@ export default function WhatsAppRelatorio() {
                     <TableBody>
                       {(sla.agentRanking ?? []).map((agent) => (
                         <TableRow key={agent.agentId}>
-                          <TableCell className="font-medium">{agent.agentId?.slice(0, 8) ?? "—"}</TableCell>
+                          <TableCell className="font-medium">
+                            {agent.agentName
+                              || agent.agentEmail
+                              || (agent.agentId ? `Agente ${agent.agentId.slice(0, 8)}` : "—")}
+                          </TableCell>
                           <TableCell className="text-right">{agent.totalAttendances}</TableCell>
                           <TableCell className="text-right">{agent.closedAttendances}</TableCell>
                           <TableCell className="text-right">{formatSecondsToDisplay(agent.avgResolutionSeconds)}</TableCell>
