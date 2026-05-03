@@ -30,6 +30,8 @@ export interface AttendanceSLAMetrics {
 
   agentRanking: Array<{
     agentId: string;
+    agentName: string | null;
+    agentEmail: string | null;
     totalAttendances: number;
     closedAttendances: number;
     avgResolutionSeconds: number;
@@ -115,6 +117,8 @@ export function useAttendanceMetrics(filters: AttendanceMetricsFilters) {
         const fcr = Number(r.fcr_count ?? 0);
         return {
           agentId: r.assigned_to,
+          agentName: r.agent_name ?? null,
+          agentEmail: r.agent_email ?? null,
           totalAttendances: Number(r.total_attendances ?? 0),
           closedAttendances: closed,
           avgResolutionSeconds: Math.round(Number(r.avg_resolution_sec ?? 0)),

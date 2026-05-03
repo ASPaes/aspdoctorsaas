@@ -592,7 +592,11 @@ export default function WhatsAppRelatorio() {
                     <TableBody>
                       {(sla.agentRanking ?? []).map((agent) => (
                         <TableRow key={agent.agentId}>
-                          <TableCell className="font-medium">{agent.agentId?.slice(0, 8) ?? "—"}</TableCell>
+                          <TableCell className="font-medium">
+                            {agent.agentName
+                              || agent.agentEmail
+                              || (agent.agentId ? `Agente ${agent.agentId.slice(0, 8)}` : "—")}
+                          </TableCell>
                           <TableCell className="text-right">{agent.totalAttendances}</TableCell>
                           <TableCell className="text-right">{agent.closedAttendances}</TableCell>
                           <TableCell className="text-right">{formatSecondsToDisplay(agent.avgResolutionSeconds)}</TableCell>
@@ -602,37 +606,6 @@ export default function WhatsAppRelatorio() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Legacy Agent Performance Table */}
-          {metrics.agentPerformance.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Performance por Agente (Conversas)</CardTitle></CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2 text-xs text-muted-foreground">Agente</th>
-                        <th className="text-right p-2 text-xs text-muted-foreground">Conversas</th>
-                        <th className="text-right p-2 text-xs text-muted-foreground">Encerradas</th>
-                        <th className="text-right p-2 text-xs text-muted-foreground">Tempo Resp.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.agentPerformance.map((a) => (
-                        <tr key={a.agentId} className="border-b last:border-0">
-                          <td className="p-2 font-medium">{a.agentName}</td>
-                          <td className="p-2 text-right">{a.totalConversations}</td>
-                          <td className="p-2 text-right">{a.closedConversations}</td>
-                          <td className="p-2 text-right">{a.avgResponseTimeMinutes.toFixed(0)} min</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </CardContent>
             </Card>
