@@ -47,6 +47,7 @@ export interface AttendanceMetricsFilters {
   dateRange: { from: Date; to: Date };
   departmentId?: string | null;
   agentId?: string | null;
+  instanceId?: string | null;
 }
 
 function parseStats(raw: any) {
@@ -90,6 +91,7 @@ export function useAttendanceMetrics(filters: AttendanceMetricsFilters) {
       filters.dateRange.to.toISOString(),
       filters.departmentId,
       filters.agentId,
+      filters.instanceId,
       tid,
     ],
     enabled: !!tid && !!filters.dateRange.from && !!filters.dateRange.to,
@@ -104,6 +106,7 @@ export function useAttendanceMetrics(filters: AttendanceMetricsFilters) {
           p_to: filters.dateRange.to.toISOString(),
           p_department_id: filters.departmentId || null,
           p_agent_id: filters.agentId || null,
+          p_instance_id: filters.instanceId || null,
         }
       );
       if (error) throw error;

@@ -4922,6 +4922,7 @@ export type Database = {
           p_agent_id?: string
           p_department_id?: string
           p_from: string
+          p_instance_id?: string
           p_tenant_id: string
           p_to: string
         }
