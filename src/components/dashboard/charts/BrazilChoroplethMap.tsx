@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DistributionDataPoint, CityGeoPoint } from '../types';
 
 const GEO_URL = '/data/brazil-states.geojson';
@@ -173,8 +172,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                 <span>Voltar ao Brasil</span>
               </button>
             )}
-            <TooltipProvider delayDuration={0}>
-              <ComposableMap
+            <ComposableMap
                 projection="geoMercator"
                 projectionConfig={{ scale: tvMode ? 1500 : 1160, center: [-54, -15] }}
                 className={cn('w-full mx-auto', tvMode ? 'h-[900px] max-w-[900px]' : 'h-[750px] max-w-[750px]')}
@@ -193,31 +191,29 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                         const isHovered = hoveredState === sigla;
                         const isSelected = selectedState === sigla;
                         const val = stateDataMap[sigla]?.value || 0;
+                        const stateName = SIGLA_TO_NAME[sigla] || geoName;
+                        const tooltipText = val > 0
+                          ? `${stateName} — ${val} ${val === 1 ? 'cliente' : 'clientes'}`
+                          : `${stateName} — sem clientes`;
 
                         return (
-                          <Tooltip key={geo.rsmKey}>
-                            <TooltipTrigger asChild>
-                              <Geography
-                                geography={geo}
-                                fill={getColor(sigla)}
-                                stroke={isSelected ? 'hsl(145 53% 34%)' : 'hsl(var(--border))'}
-                                strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / currentView.zoom}
-                                style={{
-                                  default: { outline: 'none', cursor: 'pointer' },
-                                  hover: { outline: 'none', cursor: 'pointer', filter: 'brightness(1.1)' },
-                                  pressed: { outline: 'none' },
-                                }}
-                                onMouseEnter={() => setHoveredState(sigla)}
-                                onMouseLeave={() => setHoveredState(null)}
-                                onClick={() => onSelectState(selectedState === sigla ? null : sigla)}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="text-sm">
-                              <p className="font-bold">{SIGLA_TO_NAME[sigla] || geoName}</p>
-                              <p className="text-muted-foreground">{val} clientes</p>
-                              <p className="text-xs text-muted-foreground mt-1">Clique para filtrar</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <Geography
+                            key={geo.rsmKey}
+                            geography={geo}
+                            fill={getColor(sigla)}
+                            stroke={isSelected ? 'hsl(145 53% 34%)' : 'hsl(var(--border))'}
+                            strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / currentView.zoom}
+                            style={{
+                              default: { outline: 'none', cursor: 'pointer' },
+                              hover: { outline: 'none', cursor: 'pointer', filter: 'brightness(1.1)' },
+                              pressed: { outline: 'none' },
+                            }}
+                            onMouseEnter={() => setHoveredState(sigla)}
+                            onMouseLeave={() => setHoveredState(null)}
+                            onClick={() => onSelectState(selectedState === sigla ? null : sigla)}
+                          >
+                            <title>{tooltipText}</title>
+                          </Geography>
                         );
                       })
                     }
@@ -238,7 +234,6 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                   ))}
                 </ZoomableGroup>
               </ComposableMap>
-            </TooltipProvider>
           </div>
 
           {/* Sidebar */}
