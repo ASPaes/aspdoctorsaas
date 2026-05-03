@@ -94,6 +94,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
   const providerType = form.watch("provider_type");
 
   useEffect(() => {
+    if (!open) return;
     form.reset({
       display_name: instance.display_name || '',
       instance_name: instance.instance_name,
@@ -109,7 +110,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       meta_app_secret: '',
       meta_verify_token: '',
     });
-  }, [instance]);
+  }, [instance, open]);
 
   useEffect(() => {
     if (!secrets) return;
@@ -141,8 +142,13 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       });
       toast.success("Instância atualizada com sucesso!");
       onOpenChange(false);
-    } catch {
-      toast.error("Erro ao atualizar instância");
+    } catch (e: any) {
+      const msg = e?.message || '';
+      if (msg.includes('whatsapp_instances_tenant_id_instance_name_key') || e?.code === '23505') {
+        toast.error(`Já existe outra instância com o nome "${values.instance_name}". Escolha um Nome da Instância único.`);
+      } else {
+        toast.error(msg || "Erro ao atualizar instância");
+      }
     }
   };
 
