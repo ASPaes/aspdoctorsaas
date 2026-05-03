@@ -23,37 +23,34 @@ const SIGLA_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.entries(NAME_TO_SIGLA).map(([k, v]) => [v, k])
 );
 
-const STATE_VIEW: Record<string, { center: [number, number]; zoom: number }> = {
-  AC: { center: [-70.0, -9.0], zoom: 5 },
-  AL: { center: [-36.5, -9.6], zoom: 7 },
-  AM: { center: [-64.6, -4.0], zoom: 2.5 },
-  AP: { center: [-52.0, 1.0], zoom: 5 },
-  BA: { center: [-42.0, -12.5], zoom: 3 },
-  CE: { center: [-39.5, -5.5], zoom: 4.5 },
-  DF: { center: [-47.9, -15.8], zoom: 12 },
-  ES: { center: [-40.5, -19.5], zoom: 6 },
-  GO: { center: [-49.5, -15.5], zoom: 3.5 },
-  MA: { center: [-45.5, -5.5], zoom: 3.5 },
-  MG: { center: [-44.5, -18.5], zoom: 3.5 },
-  MS: { center: [-54.5, -20.5], zoom: 3.5 },
-  MT: { center: [-55.5, -13.0], zoom: 2.8 },
-  PA: { center: [-52.5, -4.0], zoom: 2.5 },
-  PB: { center: [-36.5, -7.2], zoom: 6 },
-  PE: { center: [-37.5, -8.5], zoom: 4.5 },
-  PI: { center: [-43.0, -7.5], zoom: 3.5 },
-  PR: { center: [-51.5, -24.5], zoom: 4.5 },
-  RJ: { center: [-43.0, -22.5], zoom: 6 },
-  RN: { center: [-36.5, -5.7], zoom: 6 },
-  RO: { center: [-62.5, -10.5], zoom: 4 },
-  RR: { center: [-61.5, 2.0], zoom: 4 },
-  RS: { center: [-53.0, -30.0], zoom: 4 },
-  SC: { center: [-50.5, -27.0], zoom: 5.5 },
-  SE: { center: [-37.3, -10.5], zoom: 8 },
-  SP: { center: [-48.5, -22.0], zoom: 4.5 },
-  TO: { center: [-48.0, -10.5], zoom: 4 },
-};
-
 const DEFAULT_VIEW = { center: [-54, -15] as [number, number], zoom: 1 };
+
+type ViewConfig = { center: [number, number]; zoom: number };
+
+function computeBoundsFromGeometry(geometry: any): { minLng: number; maxLng: number; minLat: number; maxLat: number } {
+  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  const walk = (coords: any) => {
+    if (typeof coords[0] === 'number') {
+      const [lng, lat] = coords;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    } else {
+      coords.forEach(walk);
+    }
+  };
+  walk(geometry.coordinates);
+  return { minLng, maxLng, minLat, maxLat };
+}
+
+function computeViewFromFeature(feature: any): ViewConfig {
+  const b = computeBoundsFromGeometry(feature.geometry);
+  const center: [number, number] = [(b.minLng + b.maxLng) / 2, (b.minLat + b.maxLat) / 2];
+  const span = Math.max(b.maxLng - b.minLng, b.maxLat - b.minLat);
+  const zoom = Math.min(12, Math.max(1.5, (41 / span) * 0.7));
+  return { center, zoom };
+}
 
 interface Props {
   title: string;
@@ -67,6 +64,25 @@ interface Props {
 
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
+  const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(GEO_URL)
+      .then(r => r.json())
+      .then((geojson: any) => {
+        if (cancelled) return;
+        const map: Record<string, ViewConfig> = {};
+        (geojson.features || []).forEach((feature: any) => {
+          const sigla = NAME_TO_SIGLA[feature?.properties?.name];
+          if (!sigla) return;
+          map[sigla] = computeViewFromFeature(feature);
+        });
+        setStateViewMap(map);
+      })
+      .catch(err => console.error('Failed to load state geometries for zoom:', err));
+    return () => { cancelled = true; };
+  }, []);
 
   // ESC fecha o zoom
   useEffect(() => {
@@ -78,7 +94,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
     return () => window.removeEventListener('keydown', handler);
   }, [selectedState, onSelectState]);
 
-  const currentView = selectedState ? (STATE_VIEW[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
+  const currentView = selectedState ? (stateViewMap[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
 
   const stateDataMap = useMemo(() => {
     const map: Record<string, DistributionDataPoint> = {};
