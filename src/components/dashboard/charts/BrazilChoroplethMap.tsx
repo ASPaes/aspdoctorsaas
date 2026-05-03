@@ -66,6 +66,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const stateItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Scroll suave ao centro da tela quando um estado é selecionado
   useEffect(() => {
@@ -77,6 +78,17 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
       });
     }
   }, [selectedState]);
+
+  // Auto-scroll do item da lista quando hover no estado do mapa
+  useEffect(() => {
+    if (hoveredState && stateItemRefs.current[hoveredState]) {
+      stateItemRefs.current[hoveredState]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    }
+  }, [hoveredState]);
 
   useEffect(() => {
     let cancelled = false;
