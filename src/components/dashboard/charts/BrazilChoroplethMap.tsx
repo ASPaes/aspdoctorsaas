@@ -123,23 +123,20 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                     })
                   }
                 </Geographies>
-                {[...citiesGeo].sort((a, b) => a.qtd - b.qtd).map((city) => {
-                  const r = 2 + Math.sqrt(city.qtd) * 1.8;
-                  return (
-                    <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
-                      <circle
-                        r={r}
-                        fill="hsl(145 53% 34%)"
-                        fillOpacity={0.7}
-                        stroke="white"
-                        strokeWidth={0.6}
-                        style={{ pointerEvents: 'auto', cursor: 'default' }}
-                      >
-                        <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
-                      </circle>
-                    </Marker>
-                  );
-                })}
+                {citiesGeo.map((city) => (
+                  <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
+                    <circle
+                      r={5}
+                      fill="hsl(145 53% 34%)"
+                      fillOpacity={0.7}
+                      stroke="white"
+                      strokeWidth={0.6}
+                      style={{ pointerEvents: 'auto', cursor: 'default' }}
+                    >
+                      <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
+                    </circle>
+                  </Marker>
+                ))}
               </ComposableMap>
             </TooltipProvider>
           </div>
