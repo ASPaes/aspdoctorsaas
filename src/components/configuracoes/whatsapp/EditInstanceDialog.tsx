@@ -94,6 +94,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
   const providerType = form.watch("provider_type");
 
   useEffect(() => {
+    if (!open) return;
     form.reset({
       display_name: instance.display_name || '',
       instance_name: instance.instance_name,
@@ -109,7 +110,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       meta_app_secret: '',
       meta_verify_token: '',
     });
-  }, [instance]);
+  }, [instance, open]);
 
   useEffect(() => {
     if (!secrets) return;
