@@ -64,6 +64,25 @@ interface Props {
 
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
+  const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(GEO_URL)
+      .then(r => r.json())
+      .then((geojson: any) => {
+        if (cancelled) return;
+        const map: Record<string, ViewConfig> = {};
+        (geojson.features || []).forEach((feature: any) => {
+          const sigla = NAME_TO_SIGLA[feature?.properties?.name];
+          if (!sigla) return;
+          map[sigla] = computeViewFromFeature(feature);
+        });
+        setStateViewMap(map);
+      })
+      .catch(err => console.error('Failed to load state geometries for zoom:', err));
+    return () => { cancelled = true; };
+  }, []);
 
   // ESC fecha o zoom
   useEffect(() => {
@@ -75,7 +94,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
     return () => window.removeEventListener('keydown', handler);
   }, [selectedState, onSelectState]);
 
-  const currentView = selectedState ? (STATE_VIEW[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
+  const currentView = selectedState ? (stateViewMap[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
 
   const stateDataMap = useMemo(() => {
     const map: Record<string, DistributionDataPoint> = {};
