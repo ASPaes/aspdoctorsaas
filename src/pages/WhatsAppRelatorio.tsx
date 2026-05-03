@@ -132,6 +132,7 @@ export default function WhatsAppRelatorio() {
     },
     departmentId: effectiveDepartmentId || undefined,
     agentId: effectiveAgentId || undefined,
+    instanceId: instanceId || undefined,
   });
 
   const trendTotal = metrics?.previousPeriod?.total
