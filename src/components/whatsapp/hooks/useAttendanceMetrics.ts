@@ -30,6 +30,8 @@ export interface AttendanceSLAMetrics {
 
   agentRanking: Array<{
     agentId: string;
+    agentName: string | null;
+    agentEmail: string | null;
     totalAttendances: number;
     closedAttendances: number;
     avgResolutionSeconds: number;
