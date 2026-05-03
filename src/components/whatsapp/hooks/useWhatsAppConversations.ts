@@ -81,7 +81,14 @@ function applyBaseFilter(q: any, tid: string | null, filters?: ConversationsFilt
 function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilters) {
   q = applyBaseFilter(q, tid, filters);
   if (filters?.status) q = q.eq('status', filters.status);
-  if (filters?.assignedTo) q = q.eq('assigned_to', filters.assignedTo);
+  if (filters?.assignedTo) {
+    // Traz conversas atribuídas ao operador filtrado OU conversas sem atribuição (fila).
+    // Conversas em fila (assigned_to IS NULL) precisam aparecer mesmo com filtro de operador ativo,
+    // senão o operador perde visão de novos clientes que chegam para atender.
+    // O filtro client-side por bucket (in_progress/waiting/closed) garante que conversas em fila
+    // só apareçam na pill "Aguardando", e atendimentos em andamento só apareçam na pill "Em andamento".
+    q = q.or(`assigned_to.eq.${filters.assignedTo},assigned_to.is.null`);
+  }
   if (filters?.unassigned) q = q.is('assigned_to', null);
   return q;
 }
