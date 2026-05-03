@@ -543,6 +543,24 @@ export function useDashboardData(filters: DashboardFilters) {
       });
       Object.values(topCidadesByEstado).forEach(arr => arr.sort((a, b) => b.qtd - a.qtd));
 
+      // Cities with geo for map markers
+      const cityCounts: Record<number, number> = {};
+      activeClients.forEach((c: any) => {
+        if (c.cidade_id && cidadeGeoMap[c.cidade_id]) {
+          cityCounts[c.cidade_id] = (cityCounts[c.cidade_id] || 0) + 1;
+        }
+      });
+      const citiesGeo: import('../types').CityGeoPoint[] = Object.entries(cityCounts).map(([cidadeId, qtd]) => {
+        const geo = cidadeGeoMap[Number(cidadeId)];
+        return {
+          nome: geo.nome,
+          uf: estadoSiglaMap[geo.estadoId] || '',
+          latitude: geo.lat,
+          longitude: geo.lng,
+          qtd,
+        };
+      });
+
       // Convert estado distribution to use sigla for map compatibility
       const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap, null);
 
