@@ -653,3 +653,11 @@ function WhatsAppRelatorioContent() {
     </div>
   );
 }
+
+export default function WhatsAppRelatorio() {
+  return (
+    <DepartmentFilterProvider>
+      <WhatsAppRelatorioContent />
+    </DepartmentFilterProvider>
+  );
+}
