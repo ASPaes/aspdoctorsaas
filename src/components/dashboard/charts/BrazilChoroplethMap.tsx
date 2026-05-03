@@ -151,7 +151,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
       <CardContent className="p-0">
         <div className="flex flex-col lg:flex-row">
           {/* Map */}
-          <div className="flex-1 relative p-4">
+          <div ref={mapContainerRef} className="flex-1 relative p-4">
             {selectedState && (
               <button
                 onClick={() => onSelectState(null)}
