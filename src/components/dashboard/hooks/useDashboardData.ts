@@ -481,6 +481,17 @@ export function useDashboardData(filters: DashboardFilters) {
       const estadoMap = lookupMap(estados, 'nome');
       const estadoSiglaMap = lookupMap(estados, 'sigla');
       const cidadeMap = lookupMap(cidades, 'nome');
+      const cidadeGeoMap: Record<number, { nome: string; lat: number; lng: number; estadoId: number }> = {};
+      (cidades || []).forEach((c: any) => {
+        if (c.latitude != null && c.longitude != null) {
+          cidadeGeoMap[c.id] = {
+            nome: String(c.nome),
+            lat: Number(c.latitude),
+            lng: Number(c.longitude),
+            estadoId: Number(c.estado_id),
+          };
+        }
+      });
       const segmentoMap = lookupMap(segmentos as any, 'nome');
       const areaMap = lookupMap(areasAtuacao as any, 'nome');
       const fornecedorMap = lookupMap(fornecedores as any, 'nome');
