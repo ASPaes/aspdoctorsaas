@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
-import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
+import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { DistributionDataPoint } from '../types';
+import type { DistributionDataPoint, CityGeoPoint } from '../types';
 
 const GEO_URL = '/data/brazil-states.geojson';
 
