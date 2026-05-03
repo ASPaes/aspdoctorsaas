@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useDepartmentFilter, DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,7 +91,7 @@ function MetricCard({
   );
 }
 
-export default function WhatsAppRelatorio() {
+function WhatsAppRelatorioContent() {
   const navigate = useNavigate();
   const { instances } = useWhatsAppInstances();
   const { profile, user } = useAuth();
