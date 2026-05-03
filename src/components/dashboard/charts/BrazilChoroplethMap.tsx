@@ -68,6 +68,18 @@ interface Props {
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
 
+  // ESC fecha o zoom
+  useEffect(() => {
+    if (!selectedState) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onSelectState(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedState, onSelectState]);
+
+  const currentView = selectedState ? (STATE_VIEW[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
+
   const stateDataMap = useMemo(() => {
     const map: Record<string, DistributionDataPoint> = {};
     data.forEach(d => {
