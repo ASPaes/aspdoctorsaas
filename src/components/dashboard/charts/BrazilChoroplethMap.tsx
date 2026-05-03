@@ -65,6 +65,18 @@ interface Props {
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll suave ao centro da tela quando um estado é selecionado
+  useEffect(() => {
+    if (selectedState && mapContainerRef.current) {
+      mapContainerRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      });
+    }
+  }, [selectedState]);
 
   useEffect(() => {
     let cancelled = false;
