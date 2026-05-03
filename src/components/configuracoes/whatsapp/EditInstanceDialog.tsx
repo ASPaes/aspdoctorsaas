@@ -142,8 +142,13 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       });
       toast.success("Instância atualizada com sucesso!");
       onOpenChange(false);
-    } catch {
-      toast.error("Erro ao atualizar instância");
+    } catch (e: any) {
+      const msg = e?.message || '';
+      if (msg.includes('whatsapp_instances_tenant_id_instance_name_key') || e?.code === '23505') {
+        toast.error(`Já existe outra instância com o nome "${values.instance_name}". Escolha um Nome da Instância único.`);
+      } else {
+        toast.error(msg || "Erro ao atualizar instância");
+      }
     }
   };
 
