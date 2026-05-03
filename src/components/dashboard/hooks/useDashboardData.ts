@@ -464,7 +464,7 @@ export function useDashboardData(filters: DashboardFilters) {
       ] = await Promise.all([
         supabase.from('estados').select('id, sigla, nome'),
         // cidades: tabela global ~5.5k linhas — paginar pra não truncar em 1000
-        fetchAllRows<any>(() => supabase.from('cidades').select('id, nome, estado_id')),
+        fetchAllRows<any>(() => supabase.from('cidades').select('id, nome, estado_id, latitude, longitude')),
         tf(supabase.from('segmentos').select('id, nome')),
         tf(supabase.from('areas_atuacao').select('id, nome')),
         tf(supabase.from('fornecedores').select('id, nome')),
