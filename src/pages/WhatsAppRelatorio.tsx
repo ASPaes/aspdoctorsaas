@@ -96,7 +96,7 @@ export default function WhatsAppRelatorio() {
   const { instances } = useWhatsAppInstances();
   const { profile, user } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
-  const { selectedDepartmentId, selectedDepartment } = useDepartmentFilter();
+  const { selectedDepartmentId, selectedDepartment, setSelectedDepartmentId, departments } = useDepartmentFilter();
   const { data: userDepartmentId } = useUserDepartment();
   const [agentFilter, setAgentFilter] = useState<"all" | "me">("me");
 
