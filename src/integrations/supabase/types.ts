@@ -546,18 +546,24 @@ export type Database = {
           codigo_ibge: string | null
           estado_id: number
           id: number
+          latitude: number | null
+          longitude: number | null
           nome: string
         }
         Insert: {
           codigo_ibge?: string | null
           estado_id: number
           id?: number
+          latitude?: number | null
+          longitude?: number | null
           nome: string
         }
         Update: {
           codigo_ibge?: string | null
           estado_id?: number
           id?: number
+          latitude?: number | null
+          longitude?: number | null
           nome?: string
         }
         Relationships: [

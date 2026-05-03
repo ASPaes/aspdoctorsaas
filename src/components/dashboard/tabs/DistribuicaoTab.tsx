@@ -95,6 +95,7 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
         data={distributions.porEstado}
         tvMode={tvMode}
         topCidadesByEstado={distributions.topCidadesByEstado}
+        citiesGeo={distributions.citiesGeo}
         selectedState={selectedState}
         onSelectState={setSelectedState}
       />

@@ -84,6 +84,14 @@ export interface DistributionDataPoint {
   percent: number;
 }
 
+export interface CityGeoPoint {
+  nome: string;
+  uf: string;
+  latitude: number;
+  longitude: number;
+  qtd: number;
+}
+
 export interface TimeSeriesData {
   mrrEvolution: ChartDataPoint[];
   faturamentoEvolution: ChartDataPoint[];
@@ -105,6 +113,7 @@ export interface DistributionData {
   segmentoByEstado?: Record<string, DistributionDataPoint[]>;
   areaAtuacaoByEstado?: Record<string, DistributionDataPoint[]>;
   fornecedorByEstado?: Record<string, DistributionDataPoint[]>;
+  citiesGeo?: CityGeoPoint[];
   // Vendas: distribuições baseadas nos novos clientes do período
   porOrigemVendaNovos?: DistributionDataPoint[];
   porFornecedorNovos?: DistributionDataPoint[];

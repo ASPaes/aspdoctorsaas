@@ -464,7 +464,7 @@ export function useDashboardData(filters: DashboardFilters) {
       ] = await Promise.all([
         supabase.from('estados').select('id, sigla, nome'),
         // cidades: tabela global ~5.5k linhas — paginar pra não truncar em 1000
-        fetchAllRows<any>(() => supabase.from('cidades').select('id, nome, estado_id')),
+        fetchAllRows<any>(() => supabase.from('cidades').select('id, nome, estado_id, latitude, longitude')),
         tf(supabase.from('segmentos').select('id, nome')),
         tf(supabase.from('areas_atuacao').select('id, nome')),
         tf(supabase.from('fornecedores').select('id, nome')),
@@ -481,6 +481,17 @@ export function useDashboardData(filters: DashboardFilters) {
       const estadoMap = lookupMap(estados, 'nome');
       const estadoSiglaMap = lookupMap(estados, 'sigla');
       const cidadeMap = lookupMap(cidades, 'nome');
+      const cidadeGeoMap: Record<number, { nome: string; lat: number; lng: number; estadoId: number }> = {};
+      (cidades || []).forEach((c: any) => {
+        if (c.latitude != null && c.longitude != null) {
+          cidadeGeoMap[c.id] = {
+            nome: String(c.nome),
+            lat: Number(c.latitude),
+            lng: Number(c.longitude),
+            estadoId: Number(c.estado_id),
+          };
+        }
+      });
       const segmentoMap = lookupMap(segmentos as any, 'nome');
       const areaMap = lookupMap(areasAtuacao as any, 'nome');
       const fornecedorMap = lookupMap(fornecedores as any, 'nome');
@@ -532,6 +543,24 @@ export function useDashboardData(filters: DashboardFilters) {
       });
       Object.values(topCidadesByEstado).forEach(arr => arr.sort((a, b) => b.qtd - a.qtd));
 
+      // Cities with geo for map markers
+      const cityCounts: Record<number, number> = {};
+      activeClients.forEach((c: any) => {
+        if (c.cidade_id && cidadeGeoMap[c.cidade_id]) {
+          cityCounts[c.cidade_id] = (cityCounts[c.cidade_id] || 0) + 1;
+        }
+      });
+      const citiesGeo: import('../types').CityGeoPoint[] = Object.entries(cityCounts).map(([cidadeId, qtd]) => {
+        const geo = cidadeGeoMap[Number(cidadeId)];
+        return {
+          nome: geo.nome,
+          uf: estadoSiglaMap[geo.estadoId] || '',
+          latitude: geo.lat,
+          longitude: geo.lng,
+          qtd,
+        };
+      });
+
       // Convert estado distribution to use sigla for map compatibility
       const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap, null);
 
@@ -561,7 +590,7 @@ export function useDashboardData(filters: DashboardFilters) {
         porCidade, porEstado: porEstadoSigla, porFornecedor, porMotivoCancelamento,
         porOrigemVenda, porSegmento, porAreaAtuacao, topCidadesByEstado,
         segmentoByEstado, areaAtuacaoByEstado, fornecedorByEstado,
-        porOrigemVendaNovos, porFornecedorNovos,
+        porOrigemVendaNovos, porFornecedorNovos, citiesGeo,
       });
 
       // === BUILD LIST ITEMS ===

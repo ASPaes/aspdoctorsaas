@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
-import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
+import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { DistributionDataPoint } from '../types';
+import type { DistributionDataPoint, CityGeoPoint } from '../types';
 
 const GEO_URL = '/data/brazil-states.geojson';
 
@@ -28,11 +28,12 @@ interface Props {
   data: DistributionDataPoint[];
   tvMode?: boolean;
   topCidadesByEstado?: Record<string, { nome: string; qtd: number }[]>;
+  citiesGeo?: CityGeoPoint[];
   selectedState: string | null;
   onSelectState: (sigla: string | null) => void;
 }
 
-export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, selectedState, onSelectState }: Props) {
+export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
 
   const stateDataMap = useMemo(() => {
@@ -122,6 +123,23 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                     })
                   }
                 </Geographies>
+                {[...citiesGeo].sort((a, b) => a.qtd - b.qtd).map((city) => {
+                  const r = 2 + Math.sqrt(city.qtd) * 1.8;
+                  return (
+                    <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
+                      <circle
+                        r={r}
+                        fill="hsl(145 53% 34%)"
+                        fillOpacity={0.7}
+                        stroke="white"
+                        strokeWidth={0.6}
+                        style={{ pointerEvents: 'auto', cursor: 'default' }}
+                      >
+                        <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
+                      </circle>
+                    </Marker>
+                  );
+                })}
               </ComposableMap>
             </TooltipProvider>
           </div>
