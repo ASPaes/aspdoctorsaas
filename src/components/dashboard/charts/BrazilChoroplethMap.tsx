@@ -124,63 +124,79 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
         <div className="flex flex-col lg:flex-row">
           {/* Map */}
           <div className="flex-1 relative p-4">
+            {selectedState && (
+              <button
+                onClick={() => onSelectState(null)}
+                className="absolute top-6 left-6 z-10 flex items-center gap-2 px-3 py-2 bg-background border rounded-lg shadow-md hover:bg-muted text-sm font-medium transition-colors"
+              >
+                <span aria-hidden="true">←</span>
+                <span>Voltar ao Brasil</span>
+              </button>
+            )}
             <TooltipProvider delayDuration={0}>
               <ComposableMap
                 projection="geoMercator"
                 projectionConfig={{ scale: tvMode ? 1500 : 1160, center: [-54, -15] }}
                 className={cn('w-full mx-auto', tvMode ? 'h-[900px] max-w-[900px]' : 'h-[750px] max-w-[750px]')}
               >
-                <Geographies geography={GEO_URL}>
-                  {({ geographies }) =>
-                    geographies.map(geo => {
-                      const geoName = geo.properties.name as string;
-                      const sigla = NAME_TO_SIGLA[geoName] || '';
-                      const isHovered = hoveredState === sigla;
-                      const isSelected = selectedState === sigla;
-                      const val = stateDataMap[sigla]?.value || 0;
+                <ZoomableGroup
+                  center={currentView.center}
+                  zoom={currentView.zoom}
+                  minZoom={1}
+                  maxZoom={12}
+                >
+                  <Geographies geography={GEO_URL}>
+                    {({ geographies }) =>
+                      geographies.map(geo => {
+                        const geoName = geo.properties.name as string;
+                        const sigla = NAME_TO_SIGLA[geoName] || '';
+                        const isHovered = hoveredState === sigla;
+                        const isSelected = selectedState === sigla;
+                        const val = stateDataMap[sigla]?.value || 0;
 
-                      return (
-                        <Tooltip key={geo.rsmKey}>
-                          <TooltipTrigger asChild>
-                            <Geography
-                              geography={geo}
-                              fill={getColor(sigla)}
-                              stroke={isSelected ? 'hsl(145 53% 34%)' : 'hsl(var(--border))'}
-                              strokeWidth={isSelected ? 2.5 : isHovered ? 1.5 : 0.5}
-                              style={{
-                                default: { outline: 'none', cursor: 'pointer' },
-                                hover: { outline: 'none', cursor: 'pointer', filter: 'brightness(1.1)' },
-                                pressed: { outline: 'none' },
-                              }}
-                              onMouseEnter={() => setHoveredState(sigla)}
-                              onMouseLeave={() => setHoveredState(null)}
-                              onClick={() => onSelectState(selectedState === sigla ? null : sigla)}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-sm">
-                            <p className="font-bold">{SIGLA_TO_NAME[sigla] || geoName}</p>
-                            <p className="text-muted-foreground">{val} clientes</p>
-                            <p className="text-xs text-muted-foreground mt-1">Clique para filtrar</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })
-                  }
-                </Geographies>
-                {citiesGeo.map((city) => (
-                  <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
-                    <circle
-                      r={5}
-                      fill="hsl(145 53% 34%)"
-                      fillOpacity={0.7}
-                      stroke="white"
-                      strokeWidth={0.6}
-                      style={{ pointerEvents: 'auto', cursor: 'default' }}
-                    >
-                      <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
-                    </circle>
-                  </Marker>
-                ))}
+                        return (
+                          <Tooltip key={geo.rsmKey}>
+                            <TooltipTrigger asChild>
+                              <Geography
+                                geography={geo}
+                                fill={getColor(sigla)}
+                                stroke={isSelected ? 'hsl(145 53% 34%)' : 'hsl(var(--border))'}
+                                strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / currentView.zoom}
+                                style={{
+                                  default: { outline: 'none', cursor: 'pointer' },
+                                  hover: { outline: 'none', cursor: 'pointer', filter: 'brightness(1.1)' },
+                                  pressed: { outline: 'none' },
+                                }}
+                                onMouseEnter={() => setHoveredState(sigla)}
+                                onMouseLeave={() => setHoveredState(null)}
+                                onClick={() => onSelectState(selectedState === sigla ? null : sigla)}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-sm">
+                              <p className="font-bold">{SIGLA_TO_NAME[sigla] || geoName}</p>
+                              <p className="text-muted-foreground">{val} clientes</p>
+                              <p className="text-xs text-muted-foreground mt-1">Clique para filtrar</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })
+                    }
+                  </Geographies>
+                  {citiesGeo.map((city) => (
+                    <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
+                      <circle
+                        r={5 / currentView.zoom}
+                        fill="hsl(145 53% 34%)"
+                        fillOpacity={0.7}
+                        stroke="white"
+                        strokeWidth={0.6 / currentView.zoom}
+                        style={{ pointerEvents: 'auto', cursor: 'default' }}
+                      >
+                        <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
+                      </circle>
+                    </Marker>
+                  ))}
+                </ZoomableGroup>
               </ComposableMap>
             </TooltipProvider>
           </div>
