@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +65,18 @@ interface Props {
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll suave ao centro da tela quando um estado é selecionado
+  useEffect(() => {
+    if (selectedState && mapContainerRef.current) {
+      mapContainerRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      });
+    }
+  }, [selectedState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,7 +151,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
       <CardContent className="p-0">
         <div className="flex flex-col lg:flex-row">
           {/* Map */}
-          <div className="flex-1 relative p-4">
+          <div ref={mapContainerRef} className="flex-1 relative p-4">
             {selectedState && (
               <button
                 onClick={() => onSelectState(null)}
