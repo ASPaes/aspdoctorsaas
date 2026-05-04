@@ -1,7 +1,11 @@
 import { useState, useRef, useCallback, useEffect, KeyboardEvent, DragEvent, ClipboardEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useMetaWindow } from "@/hooks/useMetaWindow";
+import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, Paperclip, Maximize2, Minimize2 } from "lucide-react";
+import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { AIComposerButton } from "./input/AIComposerButton";
@@ -46,6 +50,29 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const sendMutation = useWhatsAppSend();
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const isBlocked = presenceBlocked || !!disabled;
+
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  const { data: metaWindow } = useMetaWindow(conversationId);
+  const isMeta = metaWindow?.isMeta === true;
+  const requiresTemplate = metaWindow?.requiresTemplate === true;
+
+  const { data: contactInfo } = useQuery({
+    queryKey: ["conversation-contact-phone", conversationId],
+    enabled: !!conversationId && isMeta,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_conversations")
+        .select("contact_id, whatsapp_contacts!inner(phone_number)")
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const contactPhone =
+    (contactInfo as any)?.whatsapp_contacts?.phone_number ?? null;
 
   const { macros, incrementUsage } = useWhatsAppMacros();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
@@ -281,6 +308,27 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       />
 
       <div className="p-4">
+        {requiresTemplate && (
+          <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 mb-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-600 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                Janela de 24h fechada
+              </p>
+              <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
+                Esta instância Meta exige template aprovado para iniciar contato.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowTemplatePicker(true)}
+              disabled={isBlocked || !contactPhone}
+            >
+              Enviar template
+            </Button>
+          </div>
+        )}
+
         {isBlocked && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -317,6 +365,24 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             <Paperclip className="w-5 h-5" />
           </Button>
 
+          {isMeta && !requiresTemplate && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setShowTemplatePicker(true)}
+                  disabled={sendMutation.isPending || isBlocked || !contactPhone}
+                  aria-label="Enviar template Meta"
+                >
+                  <FileText className="w-5 h-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Enviar template Meta</TooltipContent>
+            </Tooltip>
+          )}
+
           <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
 
           <div className="relative flex-1">
@@ -326,7 +392,13 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={isBlocked ? "Voc\u{00EA} precisa estar ATIVO para atender." : "Digite uma mensagem..."}
+              placeholder={
+                isBlocked
+                  ? "Voc\u{00EA} precisa estar ATIVO para atender."
+                  : requiresTemplate
+                  ? "Janela de 24h fechada \u2014 use um template Meta"
+                  : "Digite uma mensagem..."
+              }
               className="resize-none pr-8"
               style={{
                 minHeight: '44px',
@@ -334,7 +406,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={isBlocked}
+              disabled={isBlocked || requiresTemplate}
             />
             <Button
               type="button"
@@ -349,7 +421,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           </div>
 
           {hasContent ? (
-            <Button onClick={handleSend} size="icon" disabled={isBlocked}>
+            <Button onClick={handleSend} size="icon" disabled={isBlocked || requiresTemplate}>
               <Send className="w-4 h-4" />
             </Button>
           ) : (
@@ -360,6 +432,15 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         </div>
         <p className="text-xs text-muted-foreground mt-1">Enter para enviar, Shift+Enter para nova linha</p>
       </div>
+
+      {isMeta && metaWindow?.instanceId && contactPhone && (
+        <MetaTemplatePicker
+          open={showTemplatePicker}
+          onOpenChange={setShowTemplatePicker}
+          instanceId={metaWindow.instanceId}
+          to={contactPhone}
+        />
+      )}
     </div>
   );
 }
