@@ -459,7 +459,7 @@ export default function SuperMonitor() {
             <HelpTooltip text="Quantas vezes a inteligência artificial foi usada — sugestões de resposta, composição de mensagens, análise de sentimento, resumos e transcrição de áudio." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0) + (todayIncluded ? (todayMetrics?.ai_calls ?? 0) : 0)).toLocaleString('pt-BR')}
+            {filteredTenants.reduce((s: number, t: any) => s + aiCalls(t), 0).toLocaleString('pt-BR')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
             {todayIncluded
