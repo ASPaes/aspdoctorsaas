@@ -407,7 +407,7 @@ export default function SuperMonitor() {
             <HelpTooltip text="Total de mensagens enviadas e recebidas por todas as instâncias do WhatsApp. O número grande é o acumulado histórico. 'Hoje' mostra somente o dia atual — atualiza ao clicar em Atualizar." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--color-text-primary)', lineHeight: 1 }}>
-            {(filteredTenants.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0) + (todayIncluded ? (todayMetrics?.messages_sent ?? 0) + (todayMetrics?.messages_received ?? 0) : 0)).toLocaleString('pt-BR')}
+            {filteredTenants.reduce((s: number, t: any) => s + (t.messages_sent || 0) + (t.messages_received || 0), 0).toLocaleString('pt-BR')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>
             {todayIncluded
