@@ -4892,7 +4892,9 @@ export type Database = {
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
       cleanup_notification_dispatch_queue: { Args: never; Returns: number }
       collect_db_metrics_snapshot: { Args: never; Returns: undefined }
-      collect_tenant_daily_metrics: { Args: never; Returns: undefined }
+      collect_tenant_daily_metrics:
+        | { Args: never; Returns: undefined }
+        | { Args: { p_date?: string }; Returns: undefined }
       create_access_invite: {
         Args: {
           p_access_status?: string
