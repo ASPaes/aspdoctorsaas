@@ -4203,6 +4203,84 @@ export type Database = {
           },
         ]
       }
+      whatsapp_meta_templates: {
+        Row: {
+          body_text: string | null
+          body_variables_count: number
+          buttons: Json | null
+          category: string
+          components: Json | null
+          created_at: string
+          footer_text: string | null
+          header_content: string | null
+          header_type: string | null
+          id: string
+          instance_id: string
+          language: string
+          meta_template_id: string | null
+          name: string
+          status: string
+          synced_at: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          body_text?: string | null
+          body_variables_count?: number
+          buttons?: Json | null
+          category: string
+          components?: Json | null
+          created_at?: string
+          footer_text?: string | null
+          header_content?: string | null
+          header_type?: string | null
+          id?: string
+          instance_id: string
+          language: string
+          meta_template_id?: string | null
+          name: string
+          status: string
+          synced_at?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          body_text?: string | null
+          body_variables_count?: number
+          buttons?: Json | null
+          category?: string
+          components?: Json | null
+          created_at?: string
+          footer_text?: string | null
+          header_content?: string | null
+          header_type?: string | null
+          id?: string
+          instance_id?: string
+          language?: string
+          meta_template_id?: string | null
+          name?: string
+          status?: string
+          synced_at?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_meta_templates_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_meta_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_reactions: {
         Row: {
           conversation_id: string
