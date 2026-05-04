@@ -20,17 +20,12 @@ export function useTenantUsageData(filters: TenantUsageFilters) {
     enabled,
     ...opts,
     queryFn: async () => {
-      const _y = new Date();
-      _y.setDate(_y.getDate() - 1);
-      const yesterdayStr = `${_y.getFullYear()}-${String(_y.getMonth() + 1).padStart(2, '0')}-${String(_y.getDate()).padStart(2, '0')}`;
-      const effectiveDateTo = queryDateTo > yesterdayStr ? yesterdayStr : queryDateTo;
-      if (effectiveDateTo < queryDateFrom) return [];
       const { data } = await supabase
         .from('tenant_daily_metrics')
         .select('*')
         .eq('tenant_id', tenantId)
         .gte('metric_date', queryDateFrom)
-        .lte('metric_date', effectiveDateTo)
+        .lte('metric_date', queryDateTo)
         .order('metric_date', { ascending: false });
       return data ?? [];
     },
