@@ -22,6 +22,7 @@ export default function PainelUso() {
   const { profile } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
