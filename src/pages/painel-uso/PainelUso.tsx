@@ -22,6 +22,7 @@ export default function PainelUso() {
   const { profile } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
@@ -50,7 +51,7 @@ export default function PainelUso() {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayIncluded = queryDateTo >= todayStr;
 
-  const { dailyMetrics, instances, todayMetrics, aiCostMetrics, tenantStorage } = useTenantUsageData({
+  const { dailyMetrics, instances, todayMetrics, aiCostMetrics, tenantStorage, messagesBreakdown } = useTenantUsageData({
     tenantId: effectiveTenantId || '',
     queryDateFrom,
     queryDateTo,
@@ -170,6 +171,26 @@ export default function PainelUso() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '0.5px solid hsl(var(--border))', marginBottom: 4 }}>
+        {([
+          { key: 'overview' as const, label: 'Visão Geral' },
+          { key: 'details' as const, label: 'Detalhes' },
+        ]).map(t => (
+          <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
+            style={{
+              padding: '8px 14px', fontSize: 13,
+              fontWeight: activeTab === t.key ? 500 : 400,
+              color: activeTab === t.key ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+              borderBottom: activeTab === t.key ? '2px solid hsl(var(--foreground))' : '2px solid transparent',
+              background: 'transparent', cursor: 'pointer', marginBottom: -1,
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (<>
       {/* Linha 1: 4 KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {/* Mensagens */}
@@ -334,6 +355,67 @@ export default function PainelUso() {
           )}
         </div>
       </div>
+      </>)}
+
+      {activeTab === 'details' && (<>
+        {/* Mensagens por Instância */}
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={labelStyle}>mensagens por instância</div>
+            <HelpTooltip text="Total de mensagens trocadas em cada instância WhatsApp no período." />
+          </div>
+          {(() => {
+            const rows = (messagesBreakdown?.by_instance as any[]) ?? [];
+            if (rows.length === 0) return <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 8 }}>Sem mensagens no período.</div>;
+            const maxTotal = Math.max(...rows.map((r: any) => r.total), 1);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                {rows.map((row: any) => (
+                  <div key={row.instance_id}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{row.instance_name}</span>
+                      <MiniBar value={row.total} max={maxTotal} color="#3b82f6" />
+                      <span style={{ textAlign: 'right', fontWeight: 600 }}>{Number(row.total).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2, paddingLeft: 0 }}>
+                      ↑ {row.sent} enviadas · ↓ {row.received} recebidas
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Mensagens por Setor */}
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={labelStyle}>mensagens por setor</div>
+            <HelpTooltip text="Distribuição das mensagens entre os setores de atendimento. 'Sem setor' inclui conversas sem departamento atribuído." />
+          </div>
+          {(() => {
+            const rows = (messagesBreakdown?.by_department as any[]) ?? [];
+            if (rows.length === 0) return <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 8 }}>Sem mensagens no período.</div>;
+            const maxTotal = Math.max(...rows.map((r: any) => r.total), 1);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                {rows.map((row: any, i: number) => (
+                  <div key={row.department_id ?? `none-${i}`}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, fontStyle: row.department_id ? 'normal' : 'italic', color: row.department_id ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))' }}>{row.department_name}</span>
+                      <MiniBar value={row.total} max={maxTotal} color="#10b981" />
+                      <span style={{ textAlign: 'right', fontWeight: 600 }}>{Number(row.total).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
+                      ↑ {row.sent} enviadas · ↓ {row.received} recebidas
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </>)}
     </div>
   );
 }
