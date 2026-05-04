@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, Bell } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, Bell, BarChart3 } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +30,7 @@ const ALL_NAV_ITEMS = [
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, adminOnly: false },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, adminOnly: false },
   { title: "Chat", url: "/whatsapp", icon: MessageCircle, adminOnly: false },
+  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, adminOnly: true },
   { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: true },
 ];
 

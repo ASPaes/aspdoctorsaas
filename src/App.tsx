@@ -34,6 +34,7 @@ const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
 const SuperMonitor = lazy(() => import("@/pages/SuperMonitor"));
+const PainelUso = lazy(() => import("@/pages/painel-uso/PainelUso"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 
 const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
@@ -94,6 +95,7 @@ const App = () => (
               <Route path="/whatsapp/contatos" element={<WhatsAppContatos />} />
               <Route path="/whatsapp/relatorio" element={<WhatsAppRelatorio />} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
+              <Route path="/painel-uso" element={<PainelUso />} />
 
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>
