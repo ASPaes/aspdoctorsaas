@@ -176,7 +176,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>mensagens</div>
-            <HelpTooltip content="Total de mensagens enviadas + recebidas no período." />
+            <HelpTooltip text="Total de mensagens enviadas + recebidas no período." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'hsl(var(--foreground))', lineHeight: 1 }}>{totalMsgs.toLocaleString('pt-BR')}</div>
           <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 4 }}>{queryDateFrom} – {queryDateTo}</div>
@@ -201,7 +201,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>conversas encerradas</div>
-            <HelpTooltip content="Quantidade de atendimentos finalizados no período." />
+            <HelpTooltip text="Quantidade de atendimentos finalizados no período." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'hsl(var(--foreground))', lineHeight: 1 }}>{totalConvs.toLocaleString('pt-BR')}</div>
           <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 4 }}>no período</div>
@@ -211,7 +211,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>chamadas IA</div>
-            <HelpTooltip content="Total de chamadas a funções de IA (sugestão, composição, sentimento, resumo, transcrição)." />
+            <HelpTooltip text="Total de chamadas a funções de IA (sugestão, composição, sentimento, resumo, transcrição)." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'hsl(var(--foreground))', lineHeight: 1 }}>{totalAI.toLocaleString('pt-BR')}</div>
           <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 4 }}>{queryDateFrom} – {queryDateTo}</div>
@@ -230,7 +230,7 @@ export default function PainelUso() {
         <div style={{ ...panelStyle, borderColor: disconnected.length > 0 ? '#eab308' : '#22c55e' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>instâncias whatsapp</div>
-            <HelpTooltip content="Status das instâncias WhatsApp configuradas." />
+            <HelpTooltip text="Status das instâncias WhatsApp configuradas." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, color: 'hsl(var(--foreground))', lineHeight: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
             {disconnected.length > 0 ? <WifiOff size={18} color="#ca8a04" /> : <Wifi size={18} color="#16a34a" />}
@@ -253,7 +253,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>storage</div>
-            <HelpTooltip content="Espaço utilizado em armazenamento (mídias, áudios, anexos)." />
+            <HelpTooltip text="Espaço utilizado em armazenamento (mídias, áudios, anexos)." />
           </div>
           {tenantStorage ? (
             <>
@@ -273,7 +273,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>uso de IA por função</div>
-            <HelpTooltip content="Distribuição das chamadas IA entre as funções no período." />
+            <HelpTooltip text="Distribuição das chamadas IA entre as funções no período." />
           </div>
           {totalAI === 0 ? (
             <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>Sem uso de IA no período.</div>
@@ -294,7 +294,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>custo estimado IA (USD)</div>
-            <HelpTooltip content="Custo estimado das chamadas de IA no período." />
+            <HelpTooltip text="Custo estimado das chamadas de IA no período." />
           </div>
           <div style={{ fontSize: 22, fontWeight: 500, lineHeight: 1, color: totalCost > 0 ? '#16a34a' : 'hsl(var(--foreground))' }}>
             ${totalCost.toFixed(2)}
@@ -313,7 +313,7 @@ export default function PainelUso() {
         <div style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={labelStyle}>suas instâncias</div>
-            <HelpTooltip content="Lista das suas instâncias WhatsApp e status atual." />
+            <HelpTooltip text="Lista das suas instâncias WhatsApp e status atual." />
           </div>
           {instances.length === 0 ? (
             <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>Nenhuma instância configurada.</div>
