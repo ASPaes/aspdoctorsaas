@@ -16,21 +16,11 @@ export function useMonitorData(filters: MonitorFilters) {
   const { data: tenantMetrics = [] } = useQuery({
     queryKey: ['monitor-tenant-metrics', queryDateFrom, queryDateTo, refreshKey],
     queryFn: async () => {
-      // tenant_daily_metrics agora é populado em tempo real para o dia atual
-      // (cron horário no Supabase). Como o painel já soma get_today_metrics (RPC live)
-      // sobre o acumulado, precisamos limitar a leitura aqui até ontem para evitar
-      // dupla contagem. Hoje é responsabilidade exclusiva da RPC live.
-      const _y = new Date();
-      _y.setDate(_y.getDate() - 1);
-      const yesterdayStr = `${_y.getFullYear()}-${String(_y.getMonth() + 1).padStart(2, '0')}-${String(_y.getDate()).padStart(2, '0')}`;
-      const effectiveDateTo = queryDateTo > yesterdayStr ? yesterdayStr : queryDateTo;
-      // Se o filtro é só hoje (ou futuro), não há nada a ler em tdm.
-      if (effectiveDateTo < queryDateFrom) return [];
       const { data } = await (supabase as any)
         .from('tenant_daily_metrics')
         .select('*, tenants(nome)')
         .gte('metric_date', queryDateFrom)
-        .lte('metric_date', effectiveDateTo)
+        .lte('metric_date', queryDateTo)
         .order('metric_date', { ascending: false })
         .order('messages_sent', { ascending: false });
       return data ?? [];
