@@ -62,6 +62,7 @@ export function useClienteSearch(searchTerm: string) {
       return data || [];
     },
     enabled: debouncedTerm.length >= 2,
+    staleTime: 30 * 1000, // 30s — busca dinâmica, ainda assim cacheável
   });
 
   return {
