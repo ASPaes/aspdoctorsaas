@@ -68,7 +68,7 @@ export const AudioRecorder = ({ onSend, onCancel }: AudioRecorderProps) => {
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/ogg" });
+        const blob = new Blob(chunksRef.current as BlobPart[], { type: "audio/ogg" });
         setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
         setIsPreviewing(true);
