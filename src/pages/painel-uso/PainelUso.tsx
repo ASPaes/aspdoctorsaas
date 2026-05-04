@@ -355,6 +355,67 @@ export default function PainelUso() {
           )}
         </div>
       </div>
+      </>)}
+
+      {activeTab === 'details' && (<>
+        {/* Mensagens por Instância */}
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={labelStyle}>mensagens por instância</div>
+            <HelpTooltip text="Total de mensagens trocadas em cada instância WhatsApp no período." />
+          </div>
+          {(() => {
+            const rows = (messagesBreakdown?.by_instance as any[]) ?? [];
+            if (rows.length === 0) return <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 8 }}>Sem mensagens no período.</div>;
+            const maxTotal = Math.max(...rows.map((r: any) => r.total), 1);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                {rows.map((row: any) => (
+                  <div key={row.instance_id}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{row.instance_name}</span>
+                      <MiniBar value={row.total} max={maxTotal} color="#3b82f6" />
+                      <span style={{ textAlign: 'right', fontWeight: 600 }}>{Number(row.total).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2, paddingLeft: 0 }}>
+                      ↑ {row.sent} enviadas · ↓ {row.received} recebidas
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Mensagens por Setor */}
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={labelStyle}>mensagens por setor</div>
+            <HelpTooltip text="Distribuição das mensagens entre os setores de atendimento. 'Sem setor' inclui conversas sem departamento atribuído." />
+          </div>
+          {(() => {
+            const rows = (messagesBreakdown?.by_department as any[]) ?? [];
+            if (rows.length === 0) return <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 8 }}>Sem mensagens no período.</div>;
+            const maxTotal = Math.max(...rows.map((r: any) => r.total), 1);
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                {rows.map((row: any, i: number) => (
+                  <div key={row.department_id ?? `none-${i}`}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, fontStyle: row.department_id ? 'normal' : 'italic', color: row.department_id ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))' }}>{row.department_name}</span>
+                      <MiniBar value={row.total} max={maxTotal} color="#10b981" />
+                      <span style={{ textAlign: 'right', fontWeight: 600 }}>{Number(row.total).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
+                      ↑ {row.sent} enviadas · ↓ {row.received} recebidas
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </>)}
     </div>
   );
 }
