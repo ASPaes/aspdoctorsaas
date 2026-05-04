@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import { X, Send, StopCircle, Headphones, Trash2, RotateCcw } from "lucide-react";
 import type { MediaSendParams } from "./types";
 import { useToast } from "@/hooks/use-toast";
+// @ts-ignore — opus-recorder não tem tipos TS
+import Recorder from "opus-recorder";
+// Vite resolve `?url` e copia o worker pro bundle
+// @ts-ignore
+import encoderWorkerUrl from "opus-recorder/dist/encoderWorker.min.js?url";
 
 interface AudioRecorderProps {
   onSend: (params: MediaSendParams) => void;
@@ -15,133 +20,122 @@ export const AudioRecorder = ({ onSend, onCancel }: AudioRecorderProps) => {
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const recorderRef = useRef<any>(null);
+  const chunksRef = useRef<Uint8Array[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     startRecording();
     return () => {
-      stopRecording();
+      cleanupRecorder();
       if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const cleanupRecorder = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (recorderRef.current) {
+      try {
+        recorderRef.current.stop();
+      } catch {}
+      try {
+        recorderRef.current.close?.();
+      } catch {}
+      recorderRef.current = null;
+    }
+  };
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      // WhatsApp requires OGG/Opus format. Use it if supported, fallback to webm.
-      const preferredMime = 'audio/ogg;codecs=opus';
-      const fallbackMime = 'audio/webm;codecs=opus';
-      const mimeToUse = MediaRecorder.isTypeSupported(preferredMime) ? preferredMime : fallbackMime;
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: mimeToUse });
-      mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mediaRecorder.start();
+      const recorder = new Recorder({
+        encoderPath: encoderWorkerUrl,
+        encoderApplication: 2049, // VoIP/voice
+        encoderFrameSize: 20,
+        encoderSampleRate: 48000,
+        numberOfChannels: 1, // mono — Meta requer mono pra ogg/opus
+        streamPages: false,
+        recordingGain: 1,
+      });
+
+      recorder.ondataavailable = (typedArray: Uint8Array) => {
+        chunksRef.current.push(typedArray);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current as BlobPart[], { type: "audio/ogg" });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        setIsPreviewing(true);
+      };
+
+      await recorder.start();
+      recorderRef.current = recorder;
       setIsRecording(true);
-      timerRef.current = setInterval(() => setDuration(prev => prev + 1), 1000);
+      timerRef.current = setInterval(
+        () => setDuration((prev) => prev + 1),
+        1000,
+      );
     } catch (error) {
-      toast({ title: "Erro ao gravar áudio", description: "Não foi possível acessar o microfone.", variant: "destructive" });
+      console.error("[AudioRecorder] Erro ao iniciar gravação:", error);
+      toast({
+        title: "Erro ao gravar áudio",
+        description: "Não foi possível acessar o microfone.",
+        variant: "destructive",
+      });
       onCancel();
     }
   };
 
-  const stopRecording = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-  };
-
   const handleStopRecording = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
-    mediaRecorderRef.current.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/ogg;codecs=opus' });
-      setAudioBlob(blob);
-      setAudioUrl(URL.createObjectURL(blob));
-      setIsPreviewing(true);
-    };
-    mediaRecorderRef.current.stop();
-    stopRecording();
+    if (!recorderRef.current || !isRecording) return;
+    try {
+      recorderRef.current.stop();
+    } catch (err) {
+      console.error("[AudioRecorder] Erro ao parar:", err);
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setIsRecording(false);
   };
 
   const handleRerecord = () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
-    setAudioBlob(null); setAudioUrl(null); setIsPreviewing(false); setDuration(0);
+    setAudioBlob(null);
+    setAudioUrl(null);
+    setIsPreviewing(false);
+    setDuration(0);
     startRecording();
   };
 
   const handleConfirmSend = async () => {
     if (!audioBlob) return;
-
-    try {
-      // Convert WebM to WAV using native Web Audio API
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      // Get mono channel data
-      const samples = audioBuffer.getChannelData(0);
-      const sampleRate = audioBuffer.sampleRate;
-      
-      // Encode as WAV
-      const wavBuffer = new ArrayBuffer(44 + samples.length * 2);
-      const view = new DataView(wavBuffer);
-      
-      // WAV header
-      const writeString = (offset: number, str: string) => {
-        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-      };
-      writeString(0, 'RIFF');
-      view.setUint32(4, 36 + samples.length * 2, true);
-      writeString(8, 'WAVE');
-      writeString(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
-      view.setUint16(22, 1, true); // mono
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeString(36, 'data');
-      view.setUint32(40, samples.length * 2, true);
-      
-      // Write samples
-      for (let i = 0; i < samples.length; i++) {
-        const s = Math.max(-1, Math.min(1, samples[i]));
-        view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-      }
-      
-      const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
-      await audioContext.close();
-      
-      const reader = new FileReader();
-      reader.readAsDataURL(wavBlob);
-      reader.onloadend = () => {
-        onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: 'audio/wav' });
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-      };
-    } catch (err) {
-      console.error('Audio conversion failed, sending original:', err);
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = () => {
-        onSend({ messageType: 'audio', mediaBase64: reader.result as string, mediaMimetype: audioBlob.type });
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
-      };
-    }
+    const reader = new FileReader();
+    reader.readAsDataURL(audioBlob);
+    reader.onloadend = () => {
+      onSend({
+        messageType: "audio",
+        mediaBase64: reader.result as string,
+        mediaMimetype: "audio/ogg",
+      });
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
   };
 
   const handleCancel = () => {
-    if (mediaRecorderRef.current && isRecording) mediaRecorderRef.current.stop();
-    stopRecording();
+    cleanupRecorder();
     onCancel();
   };
 
-  const formatDuration = (seconds: number) => `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
+  const formatDuration = (seconds: number) =>
+    `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
 
   if (isPreviewing && audioUrl) {
     return (
