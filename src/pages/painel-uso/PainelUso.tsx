@@ -171,6 +171,26 @@ export default function PainelUso() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '0.5px solid hsl(var(--border))', marginBottom: 4 }}>
+        {([
+          { key: 'overview' as const, label: 'Visão Geral' },
+          { key: 'details' as const, label: 'Detalhes' },
+        ]).map(t => (
+          <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
+            style={{
+              padding: '8px 14px', fontSize: 13,
+              fontWeight: activeTab === t.key ? 500 : 400,
+              color: activeTab === t.key ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+              borderBottom: activeTab === t.key ? '2px solid hsl(var(--foreground))' : '2px solid transparent',
+              background: 'transparent', cursor: 'pointer', marginBottom: -1,
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (<>
       {/* Linha 1: 4 KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         {/* Mensagens */}
