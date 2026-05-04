@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertTriangle, Info } from "lucide-react";
+import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
 
 interface ContactOption {
   label: string;
@@ -130,6 +131,12 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  const isMetaInstance = useMemo(() => {
+    const inst = instances.find((i) => i.id === instanceId);
+    return (inst as any)?.provider_type === "meta_cloud";
+  }, [instances, instanceId]);
 
   const { data: openConv, isLoading: isCheckingOpen } = useCheckOpenConversation(phone, instanceId);
   const queryClient = useQueryClient();
@@ -260,6 +267,18 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       onOpenChange(false);
       resetForm();
       onCreated?.(openConv.conversationId);
+      return;
+    }
+
+    // Meta Cloud: janela 24h exige template aprovado para iniciar contato.
+    // O envio do template (via MetaTemplatePicker) cria contato + conversa + atendimento.
+    if (isMetaInstance) {
+      const cleanPhone = phone.replace(/\D/g, "");
+      if (cleanPhone.length < 10) {
+        toast.error("Telefone inválido");
+        return;
+      }
+      setShowTemplatePicker(true);
       return;
     }
 
@@ -602,12 +621,51 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             )
           )}
 
+          {isMetaInstance && phone.replace(/\D/g, "").length >= 10 && !openConv?.exists && !isCheckingOpen && (
+            <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 p-3">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-blue-800 dark:text-blue-300">
+                  Instância Meta — primeiro contato
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  Será necessário enviar um template aprovado. Custo aplicável conforme tabela Meta.
+                </p>
+              </div>
+            </div>
+          )}
+
           <Button onClick={handleCreate} disabled={createConversation.isPending || isCheckingOpen || waCheck === 'checking' || (tab === "cliente" && !!selectedCliente && !phone) || (!!openConv?.exists && !openConv?.isOwnUser)} className="w-full">
             {(createConversation.isPending || waCheck === 'checking') ? (
               <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Verificando...</>
-            ) : 'Iniciar Conversa'}
+            ) : (isMetaInstance && !openConv?.exists ? 'Escolher template' : 'Iniciar Conversa')}
           </Button>
         </div>
+
+        {isMetaInstance && instanceId && phone.replace(/\D/g, "").length >= 10 && (
+          <MetaTemplatePicker
+            open={showTemplatePicker}
+            onOpenChange={setShowTemplatePicker}
+            instanceId={instanceId}
+            to={phone.replace(/\D/g, "")}
+            onSent={async (result) => {
+              if (selectedCliente) {
+                try {
+                  await supabase
+                    .from("whatsapp_conversations")
+                    .update({ metadata: { cliente_id: selectedCliente.id } as any })
+                    .eq("id", result.conversation_id);
+                } catch {
+                  // ignora — metadata é nice-to-have, conversa já está criada
+                }
+              }
+              toast.success("Template enviado e conversa iniciada");
+              onOpenChange(false);
+              resetForm();
+              onCreated?.(result.conversation_id);
+            }}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
