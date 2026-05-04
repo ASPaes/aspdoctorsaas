@@ -20,7 +20,7 @@ export function useMetaWindow(conversationId: string | null | undefined) {
     queryFn: async () => {
       const { data: conv, error: convErr } = await supabase
         .from('whatsapp_conversations')
-        .select('id, instance_id, whatsapp_instances!inner(provider_type)')
+        .select('id, instance_id, whatsapp_instances!whatsapp_conversations_instance_id_fkey(provider_type)')
         .eq('id', conversationId!)
         .single();
       if (convErr) throw convErr;
