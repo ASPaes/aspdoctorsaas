@@ -95,6 +95,7 @@ const App = () => (
               <Route path="/whatsapp/contatos" element={<WhatsAppContatos />} />
               <Route path="/whatsapp/relatorio" element={<WhatsAppRelatorio />} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
+              <Route path="/painel-uso" element={<PainelUso />} />
 
               {/* Super Admin routes */}
               <Route element={<SuperAdminGuard />}>
