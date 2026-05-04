@@ -51,7 +51,7 @@ export default function PainelUso() {
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayIncluded = queryDateTo >= todayStr;
 
-  const { dailyMetrics, instances, todayMetrics, aiCostMetrics, tenantStorage } = useTenantUsageData({
+  const { dailyMetrics, instances, todayMetrics, aiCostMetrics, tenantStorage, messagesBreakdown } = useTenantUsageData({
     tenantId: effectiveTenantId || '',
     queryDateFrom,
     queryDateTo,
