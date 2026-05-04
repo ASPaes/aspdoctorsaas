@@ -31,6 +31,7 @@ export function useClienteLinkSuggestion(
       return data;
     },
     enabled: !!linkedClienteId,
+    staleTime: 5 * 60 * 1000, // 5 min — cliente vinculado raramente muda durante chat
   });
 
   // Suggest a match by phone number
@@ -74,6 +75,7 @@ export function useClienteLinkSuggestion(
       return match ? { id: match.id, razao_social: match.razao_social, nome_fantasia: match.nome_fantasia, codigo_sequencial: match.codigo_sequencial } : null;
     },
     enabled: !linkedClienteId && !!phoneNumber,
+    staleTime: 5 * 60 * 1000, // 5 min — sugestão por phone é estável
   });
 
   const linkMutation = useMutation({
