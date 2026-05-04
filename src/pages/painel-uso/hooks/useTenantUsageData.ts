@@ -85,6 +85,21 @@ export function useTenantUsageData(filters: TenantUsageFilters) {
     },
   });
 
+  // 6. Breakdown de mensagens por instância e por setor (RPC dedicada)
+  const { data: messagesBreakdown } = useQuery({
+    queryKey: ['tenant-usage-msg-breakdown', tenantId, queryDateFrom, queryDateTo, refreshKey],
+    enabled,
+    ...opts,
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_tenant_messages_breakdown' as any, {
+        p_tenant_id: tenantId,
+        p_from: queryDateFrom,
+        p_to: queryDateTo,
+      });
+      return data as any;
+    },
+  });
+
   const tenantStorage = (storageMetrics?.by_tenant as any[] | undefined)
     ?.find((t: any) => t.tenant_id === tenantId) ?? null;
 
@@ -94,5 +109,6 @@ export function useTenantUsageData(filters: TenantUsageFilters) {
     todayMetrics,
     aiCostMetrics,
     tenantStorage,
+    messagesBreakdown,
   };
 }

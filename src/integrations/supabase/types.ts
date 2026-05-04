@@ -5093,6 +5093,10 @@ export type Database = {
           name: string
         }[]
       }
+      get_tenant_messages_breakdown: {
+        Args: { p_from: string; p_tenant_id: string; p_to: string }
+        Returns: Json
+      }
       get_tenant_users_with_email: {
         Args: { p_tenant_id: string }
         Returns: {
