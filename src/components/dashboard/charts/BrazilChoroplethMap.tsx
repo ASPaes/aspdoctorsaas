@@ -214,7 +214,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                             geography={geo}
                             fill={getColor(sigla)}
                             stroke={isSelected ? 'hsl(145 53% 34%)' : 'hsl(var(--border))'}
-                            strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / currentView.zoom}
+                            strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / position.zoom}
                             style={{
                               default: { outline: 'none', cursor: 'pointer' },
                               hover: { outline: 'none', cursor: 'pointer', filter: 'brightness(1.1)' },
