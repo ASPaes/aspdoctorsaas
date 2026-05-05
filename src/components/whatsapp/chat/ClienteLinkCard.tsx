@@ -37,7 +37,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     isUnlinking,
     candidates,
     isAmbiguous,
-  } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendanceId);
+  } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendanceId, conversation.tenant_id);
 
   const canEdit = !isAttendanceClosed || isAdminOrHead;
 
