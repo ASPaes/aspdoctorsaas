@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { MapPin, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DistributionDataPoint, CityGeoPoint } from '../types';
@@ -71,6 +70,17 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   });
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const stateItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [openCity, setOpenCity] = useState<{ city: CityGeoPoint; x: number; y: number } | null>(null);
+
+  // Fecha o popover ao apertar ESC
+  useEffect(() => {
+    if (!openCity) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenCity(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [openCity]);
 
   // Scroll suave ao centro da tela quando um estado é selecionado
   useEffect(() => {
@@ -231,37 +241,42 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                     }
                   </Geographies>
                   {citiesGeo.map((city) => {
-                    const screenRadius = Math.max(4, 8 / Math.sqrt(position.zoom));
+                    const screenRadius = Math.max(7, 8 / Math.sqrt(position.zoom));
                     const r = screenRadius / position.zoom;
                     const hitRadius = Math.max(10, screenRadius * 1.5) / position.zoom;
+                    const cityKey = `${city.uf}-${city.nome}`;
+                    const isActive = openCity?.city && `${openCity.city.uf}-${openCity.city.nome}` === cityKey;
                     return (
-                      <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
-                        <HoverCard openDelay={100} closeDelay={50}>
-                          <HoverCardTrigger asChild>
-                            <g style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
-                              <circle r={hitRadius} fill="transparent" />
-                              <circle
-                                r={r}
-                                fill="hsl(145 53% 34%)"
-                                fillOpacity={0.75}
-                                stroke="white"
-                                strokeWidth={1.2}
-                                vectorEffect="non-scaling-stroke"
-                              />
-                            </g>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-72 p-3 z-50" side="top" sideOffset={8}>
-                            <p className="font-semibold text-sm">{city.nome}</p>
-                            <p className="text-xs text-muted-foreground mb-2">
-                              {city.qtd} {city.qtd === 1 ? 'cliente' : 'clientes'}
-                            </p>
-                            <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
-                              {city.clientes.map((nome, i) => (
-                                <p key={i} className="text-xs leading-tight">• {nome}</p>
-                              ))}
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
+                      <Marker key={cityKey} coordinates={[city.longitude, city.latitude]}>
+                        <g
+                          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const target = e.currentTarget as SVGGElement;
+                            const rect = target.getBoundingClientRect();
+                            setOpenCity(prev => {
+                              if (prev?.city && `${prev.city.uf}-${prev.city.nome}` === cityKey) {
+                                return null;
+                              }
+                              return {
+                                city,
+                                x: rect.left + rect.width / 2,
+                                y: rect.top,
+                              };
+                            });
+                          }}
+                        >
+                          <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
+                          <circle r={hitRadius} fill="transparent" />
+                          <circle
+                            r={r}
+                            fill="hsl(145 53% 34%)"
+                            fillOpacity={isActive ? 1 : 0.85}
+                            stroke="white"
+                            strokeWidth={isActive ? 2 : 1.2}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        </g>
                       </Marker>
                     );
                   })}
@@ -336,6 +351,44 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
           </div>
         </div>
       </CardContent>
+      {openCity && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpenCity(null)}
+          />
+          <div
+            className="fixed z-50 w-72 bg-popover text-popover-foreground border rounded-md shadow-lg p-3"
+            style={{
+              left: Math.min(Math.max(openCity.x - 144, 8), window.innerWidth - 296),
+              top: Math.max(openCity.y - 12, 8),
+              transform: 'translateY(-100%)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <p className="font-semibold text-sm">{openCity.city.nome}</p>
+                <p className="text-xs text-muted-foreground">
+                  {openCity.city.qtd} {openCity.city.qtd === 1 ? 'cliente' : 'clientes'}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenCity(null)}
+                className="p-1 hover:bg-muted rounded-full -mt-1 -mr-1"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
+              {openCity.city.clientes.map((nome, i) => (
+                <p key={i} className="text-xs leading-tight">• {nome}</p>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
