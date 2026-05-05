@@ -65,6 +65,10 @@ interface Props {
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
+  const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
+    coordinates: DEFAULT_VIEW.center,
+    zoom: DEFAULT_VIEW.zoom,
+  });
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const stateItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
