@@ -1541,6 +1541,42 @@ export type Database = {
           },
         ]
       }
+      data_integrity_issues: {
+        Row: {
+          attendance_id: string | null
+          auto_fixed: boolean | null
+          conversation_id: string | null
+          details: Json | null
+          detected_at: string
+          fixed_at: string | null
+          id: string
+          issue_type: string
+          tenant_id: string | null
+        }
+        Insert: {
+          attendance_id?: string | null
+          auto_fixed?: boolean | null
+          conversation_id?: string | null
+          details?: Json | null
+          detected_at?: string
+          fixed_at?: string | null
+          id?: string
+          issue_type: string
+          tenant_id?: string | null
+        }
+        Update: {
+          attendance_id?: string | null
+          auto_fixed?: boolean | null
+          conversation_id?: string | null
+          details?: Json | null
+          detected_at?: string
+          fixed_at?: string | null
+          id?: string
+          issue_type?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       db_health_action_log: {
         Row: {
           check_name: string
@@ -4985,6 +5021,13 @@ export type Database = {
       fn_effective_chat_limit: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
+      }
+      fn_fix_orphan_closed_attendances: {
+        Args: never
+        Returns: {
+          detected: number
+          fixed: number
+        }[]
       }
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
       fn_process_ura_timeouts: { Args: never; Returns: Json }

@@ -53,11 +53,38 @@ export const useWhatsAppActions = () => {
       // Fetch active attendance early so we can scope the summary
       const { data: activeAtt } = await supabase
         .from('support_attendances')
-        .select('id, opened_at, assumed_at, attendance_code')
+        .select(`
+          id, opened_at, assumed_at, attendance_code,
+          tenant_id, cliente_id, contact_id,
+          contact:whatsapp_contacts(phone_number)
+        `)
         .eq('conversation_id', conversationId)
         .neq('status', 'closed')
         .limit(1)
         .maybeSingle();
+
+      // Validação rigorosa: bloquear encerramento se há candidatos e cliente_id NULL
+      if (activeAtt && !activeAtt.cliente_id) {
+        const phoneNumber = (activeAtt.contact as any)?.phone_number as string | undefined;
+        if (phoneNumber && phoneNumber.replace(/\D/g, '').length >= 10) {
+          const { data: candidatos, error: candErr } = await supabase.rpc(
+            'get_clientes_candidatos_by_phone',
+            { p_tenant_id: activeAtt.tenant_id, p_phone: phoneNumber }
+          );
+          if (candErr) {
+            console.error('[closeConversation] Erro ao buscar candidatos:', candErr);
+          } else {
+            const count = candidatos?.length ?? 0;
+            if (count >= 1) {
+              throw new Error(
+                count === 1
+                  ? 'Vincule o cliente antes de encerrar este atendimento. Encontramos 1 cliente compatível com o telefone do contato.'
+                  : `Vincule o cliente antes de encerrar este atendimento. Encontramos ${count} clientes compatíveis com o telefone do contato.`
+              );
+            }
+          }
+        }
+      }
 
       // Summary generation removed — finalize-attendance handles it
 
@@ -249,8 +276,10 @@ export const useWhatsAppActions = () => {
       queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['kb-draft'] });
     },
-    onError: () => {
-      toast.error('Erro ao encerrar conversa');
+    onError: (err: any) => {
+      const msg = err?.message || 'Erro ao encerrar conversa';
+      toast.error(msg);
+      // Rollback otimista: invalidar para refazer fetch do estado real
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
     },
