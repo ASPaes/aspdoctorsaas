@@ -5008,6 +5008,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_clientes_candidatos_by_phone: {
+        Args: { p_phone: string; p_tenant_id: string }
+        Returns: {
+          cancelado: boolean
+          cliente_id: string
+          codigo_sequencial: number
+          fonte_match: string
+          fornecedor_nome: string
+          nome_fantasia: string
+          razao_social: string
+        }[]
+      }
       get_database_projection: { Args: never; Returns: Json }
       get_duplicate_contacts: {
         Args: { p_tenant_id: string }
@@ -5269,6 +5281,10 @@ export type Database = {
               message_timestamp: string
             }[]
           }
+      set_attendance_cliente: {
+        Args: { p_attendance_id: string; p_cliente_id: string }
+        Returns: undefined
+      }
       should_create_recipient: {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
