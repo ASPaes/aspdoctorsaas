@@ -70,6 +70,17 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   });
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const stateItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [openCity, setOpenCity] = useState<{ city: CityGeoPoint; x: number; y: number } | null>(null);
+
+  // Fecha o popover ao apertar ESC
+  useEffect(() => {
+    if (!openCity) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenCity(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [openCity]);
 
   // Scroll suave ao centro da tela quando um estado é selecionado
   useEffect(() => {
