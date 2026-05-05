@@ -171,15 +171,27 @@ export function useClienteLinkSuggestion(
   // 4) Mutação unlink
   const unlinkMutation = useMutation({
     mutationFn: async () => {
-      if (attendanceId) {
+      let resolvedAttendanceId = attendanceId;
+      if (!resolvedAttendanceId) {
+        const { data: active } = await supabase
+          .from('support_attendances')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .neq('status', 'closed')
+          .order('opened_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        resolvedAttendanceId = active?.id ?? null;
+      }
+
+      if (resolvedAttendanceId) {
         const { error } = await supabase.rpc('set_attendance_cliente', {
-          p_attendance_id: attendanceId,
+          p_attendance_id: resolvedAttendanceId,
           p_cliente_id: null,
         });
         if (error) throw error;
         return;
       }
-
       const newMetadata = { ...(currentMetadata || {}) } as any;
       delete newMetadata.cliente_id;
       const { error } = await supabase
