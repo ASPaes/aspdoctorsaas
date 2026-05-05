@@ -24,7 +24,8 @@ export function useClienteLinkSuggestion(
   conversationId: string,
   phoneNumber: string,
   currentMetadata: Record<string, unknown> | null,
-  attendanceId: string | null
+  attendanceId: string | null,
+  tenantId: string | null,
 ) {
   const queryClient = useQueryClient();
   const linkedClienteId = (currentMetadata as any)?.cliente_id as string | undefined;
@@ -47,29 +48,19 @@ export function useClienteLinkSuggestion(
 
   // 2) Candidatos via RPC (UNION dedup das 2 fontes)
   const candidatesQuery = useQuery({
-    queryKey: ['cliente-candidatos-by-phone', phoneNumber],
+    queryKey: ['cliente-candidatos-by-phone', tenantId, phoneNumber],
     queryFn: async (): Promise<ClienteCandidato[]> => {
       if (!phoneNumber) return [];
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tenant_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.tenant_id) return [];
+      if (!tenantId) return [];
 
       const { data, error } = await supabase.rpc('get_clientes_candidatos_by_phone', {
-        p_tenant_id: profile.tenant_id,
+        p_tenant_id: tenantId,
         p_phone: phoneNumber,
       });
       if (error) throw error;
       return (data ?? []) as ClienteCandidato[];
     },
-    enabled: !!phoneNumber,
+    enabled: !!phoneNumber && !!tenantId,
     staleTime: 60_000,
   });
 
