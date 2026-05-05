@@ -10,15 +10,26 @@ interface LinkedCliente {
   codigo_sequencial: number;
 }
 
+export interface ClienteCandidato {
+  cliente_id: string;
+  codigo_sequencial: number | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  fornecedor_nome: string | null;
+  cancelado: boolean;
+  fonte_match: string;
+}
+
 export function useClienteLinkSuggestion(
   conversationId: string,
   phoneNumber: string,
-  currentMetadata: Record<string, unknown> | null
+  currentMetadata: Record<string, unknown> | null,
+  attendanceId: string | null
 ) {
   const queryClient = useQueryClient();
   const linkedClienteId = (currentMetadata as any)?.cliente_id as string | undefined;
 
-  // If already linked, fetch the linked cliente
+  // 1) Cliente já vinculado (carrega detalhes leves)
   const linkedQuery = useQuery({
     queryKey: ['cliente-linked', linkedClienteId],
     queryFn: async (): Promise<LinkedCliente | null> => {
@@ -31,55 +42,62 @@ export function useClienteLinkSuggestion(
       return data;
     },
     enabled: !!linkedClienteId,
-    staleTime: 5 * 60 * 1000, // 5 min — cliente vinculado raramente muda durante chat
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Suggest a match by phone number
-  const suggestionQuery = useQuery({
-    queryKey: ['cliente-suggestion', phoneNumber],
-    queryFn: async (): Promise<LinkedCliente | null> => {
-      if (!phoneNumber) return null;
-      const digits = phoneNumber.replace(/\D/g, '');
-      if (digits.length < 10) return null;
+  // 2) Candidatos via RPC (UNION dedup das 2 fontes)
+  const candidatesQuery = useQuery({
+    queryKey: ['cliente-candidatos-by-phone', phoneNumber],
+    queryFn: async (): Promise<ClienteCandidato[]> => {
+      if (!phoneNumber) return [];
 
-      // Get current user's tenant via RLS
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('tenant_id')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('user_id', user.id)
         .single();
 
-      if (!profile?.tenant_id) return null;
+      if (!profile?.tenant_id) return [];
 
-      // Try exact match on digits within same tenant
-      const { data } = await supabase
-        .from('clientes')
-        .select('id, razao_social, nome_fantasia, codigo_sequencial, telefone_whatsapp')
-        .eq('cancelado', false)
-        .eq('tenant_id', profile.tenant_id)
-        .not('telefone_whatsapp', 'is', null)
-        .limit(50);
-
-      if (!data) return null;
-
-      // Normalize and compare
-      const match = data.find((c) => {
-        const cDigits = (c.telefone_whatsapp || '').replace(/\D/g, '');
-        if (!cDigits) return false;
-        // Compare last 10-11 digits to handle country code variations
-        const dCore = digits.replace(/^55/, '');
-        const cCore = cDigits.replace(/^55/, '');
-        return dCore.length >= 10 && dCore === cCore;
+      const { data, error } = await supabase.rpc('get_clientes_candidatos_by_phone', {
+        p_tenant_id: profile.tenant_id,
+        p_phone: phoneNumber,
       });
-
-      return match ? { id: match.id, razao_social: match.razao_social, nome_fantasia: match.nome_fantasia, codigo_sequencial: match.codigo_sequencial } : null;
+      if (error) throw error;
+      return (data ?? []) as ClienteCandidato[];
     },
-    enabled: !linkedClienteId && !!phoneNumber,
-    staleTime: 5 * 60 * 1000, // 5 min — sugestão por phone é estável
+    enabled: !!phoneNumber,
+    staleTime: 60_000,
   });
 
+  const candidates = candidatesQuery.data ?? [];
+
+  const suggestedCliente: LinkedCliente | null =
+    !linkedClienteId && candidates.length === 1
+      ? {
+          id: candidates[0].cliente_id,
+          razao_social: candidates[0].razao_social,
+          nome_fantasia: candidates[0].nome_fantasia,
+          codigo_sequencial: candidates[0].codigo_sequencial ?? 0,
+        }
+      : null;
+
+  // 3) Mutação link
   const linkMutation = useMutation({
     mutationFn: async (clienteId: string) => {
+      if (attendanceId) {
+        const { error } = await supabase.rpc('set_attendance_cliente', {
+          p_attendance_id: attendanceId,
+          p_cliente_id: clienteId,
+        });
+        if (error) throw error;
+        return;
+      }
+
+      // LEGACY (sem attendanceId)
       const newMetadata = { ...(currentMetadata || {}), cliente_id: clienteId } as any;
       const { error } = await supabase
         .from('whatsapp_conversations')
@@ -87,9 +105,7 @@ export function useClienteLinkSuggestion(
         .eq('id', conversationId);
       if (error) throw error;
 
-      // --- Auto-create cliente_contatos if phone differs from principal ---
       try {
-        // 1) Get contact_id from conversation
         const { data: conv } = await supabase
           .from('whatsapp_conversations')
           .select('contact_id')
@@ -97,7 +113,6 @@ export function useClienteLinkSuggestion(
           .single();
         if (!conv?.contact_id) return;
 
-        // 2) Get contact phone + name
         const { data: contact } = await supabase
           .from('whatsapp_contacts')
           .select('phone_number, name')
@@ -105,7 +120,6 @@ export function useClienteLinkSuggestion(
           .single();
         if (!contact?.phone_number) return;
 
-        // 3) Get cliente principal phone + tenant
         const { data: cliente } = await supabase
           .from('clientes')
           .select('telefone_whatsapp, tenant_id')
@@ -114,13 +128,10 @@ export function useClienteLinkSuggestion(
         if (!cliente) return;
 
         const contactDigits = normalizeBRPhone(contact.phone_number);
-        const mainDigits = normalizeBRPhone(cliente.telefone_whatsapp || '');
         const contactCore = coreDigits(contact.phone_number);
         const mainCore = coreDigits(cliente.telefone_whatsapp || '');
 
-        // Only create if different and valid
         if (contactCore.length >= 10 && contactCore !== mainCore) {
-          // Check for existing
           const { data: existing } = await supabase
             .from('cliente_contatos')
             .select('id')
@@ -139,19 +150,31 @@ export function useClienteLinkSuggestion(
           }
         }
       } catch (e) {
-        console.warn('[link-cliente] Erro ao criar contato adicional:', e);
+        console.warn('[link-cliente legacy] Erro ao criar contato adicional:', e);
       }
     },
     onSuccess: () => {
       toast.success('Cliente vinculado com sucesso');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['cliente-linked'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
+      queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
     },
-    onError: () => toast.error('Erro ao vincular cliente'),
+    onError: (err: any) => toast.error(`Erro ao vincular cliente: ${err?.message ?? 'desconhecido'}`),
   });
 
+  // 4) Mutação unlink
   const unlinkMutation = useMutation({
     mutationFn: async () => {
+      if (attendanceId) {
+        const { error } = await supabase.rpc('set_attendance_cliente', {
+          p_attendance_id: attendanceId,
+          p_cliente_id: null,
+        });
+        if (error) throw error;
+        return;
+      }
+
       const newMetadata = { ...(currentMetadata || {}) } as any;
       delete newMetadata.cliente_id;
       const { error } = await supabase
@@ -164,18 +187,22 @@ export function useClienteLinkSuggestion(
       toast.success('Vínculo removido');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['cliente-linked'] });
-      queryClient.invalidateQueries({ queryKey: ['cliente-suggestion'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
+      queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
     },
-    onError: () => toast.error('Erro ao desvincular'),
+    onError: (err: any) => toast.error(`Erro ao desvincular: ${err?.message ?? 'desconhecido'}`),
   });
 
   return {
     linkedCliente: linkedQuery.data || null,
-    suggestedCliente: linkedClienteId ? null : (suggestionQuery.data || null),
+    suggestedCliente: linkedClienteId ? null : suggestedCliente,
     isLinked: !!linkedClienteId,
     linkCliente: (clienteId: string) => linkMutation.mutate(clienteId),
     unlinkCliente: () => unlinkMutation.mutate(),
     isLinking: linkMutation.isPending,
     isUnlinking: unlinkMutation.isPending,
+    candidates,
+    isAmbiguous: !linkedClienteId && candidates.length >= 2,
+    hasNoCandidates: !candidatesQuery.isLoading && candidates.length === 0,
   };
 }
