@@ -55,7 +55,7 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const isSuperAdmin = profile?.is_super_admin === true;
-  const isAdmin = isSuperAdmin || profile?.role === "admin";
+  const isAdmin = isSuperAdmin || profile?.role === "admin" || profile?.role === "head";
   const navItems = ALL_NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
 
   // Fetch funcionario name, cargo and department
