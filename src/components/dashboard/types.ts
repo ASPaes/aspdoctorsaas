@@ -90,6 +90,7 @@ export interface CityGeoPoint {
   latitude: number;
   longitude: number;
   qtd: number;
+  clientes: string[];
 }
 
 export interface TimeSeriesData {

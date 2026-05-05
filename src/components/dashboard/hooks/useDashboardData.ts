@@ -49,7 +49,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesRaw = await fetchAllRows<any>(() => {
         let q = supabase
           .from('vw_clientes_financeiro')
-          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id')
+          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
@@ -545,9 +545,13 @@ export function useDashboardData(filters: DashboardFilters) {
 
       // Cities with geo for map markers
       const cityCounts: Record<number, number> = {};
+      const cityClientes: Record<number, string[]> = {};
       activeClients.forEach((c: any) => {
         if (c.cidade_id && cidadeGeoMap[c.cidade_id]) {
           cityCounts[c.cidade_id] = (cityCounts[c.cidade_id] || 0) + 1;
+          if (!cityClientes[c.cidade_id]) cityClientes[c.cidade_id] = [];
+          const nome = (c.nome_fantasia?.trim()) || (c.razao_social?.trim()) || '(sem nome)';
+          cityClientes[c.cidade_id].push(nome);
         }
       });
       const citiesGeo: import('../types').CityGeoPoint[] = Object.entries(cityCounts).map(([cidadeId, qtd]) => {
@@ -558,6 +562,7 @@ export function useDashboardData(filters: DashboardFilters) {
           latitude: geo.lat,
           longitude: geo.lng,
           qtd,
+          clientes: (cityClientes[Number(cidadeId)] || []).sort((a, b) => a.localeCompare(b, 'pt-BR')),
         };
       });
 

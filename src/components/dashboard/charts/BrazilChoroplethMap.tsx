@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { MapPin, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DistributionDataPoint, CityGeoPoint } from '../types';
@@ -64,6 +65,10 @@ interface Props {
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
+  const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
+    coordinates: DEFAULT_VIEW.center,
+    zoom: DEFAULT_VIEW.zoom,
+  });
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const stateItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -116,6 +121,12 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [selectedState, onSelectState]);
+
+  // Sincroniza position quando o estado selecionado muda
+  useEffect(() => {
+    const view = selectedState ? (stateViewMap[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
+    setPosition({ coordinates: view.center, zoom: view.zoom });
+  }, [selectedState, stateViewMap]);
 
   const currentView = selectedState ? (stateViewMap[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
 
@@ -178,10 +189,11 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                 className={cn('w-full mx-auto', tvMode ? 'h-[900px] max-w-[900px]' : 'h-[750px] max-w-[750px]')}
               >
                 <ZoomableGroup
-                  center={currentView.center}
-                  zoom={currentView.zoom}
+                  center={position.coordinates}
+                  zoom={position.zoom}
                   minZoom={1}
                   maxZoom={12}
+                  onMoveEnd={({ coordinates, zoom }) => setPosition({ coordinates: coordinates as [number, number], zoom })}
                 >
                   <Geographies geography={GEO_URL}>
                     {({ geographies }) =>
@@ -202,7 +214,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                             geography={geo}
                             fill={getColor(sigla)}
                             stroke={isSelected ? 'hsl(145 53% 34%)' : 'hsl(var(--border))'}
-                            strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / currentView.zoom}
+                            strokeWidth={(isSelected ? 2.5 : isHovered ? 1.5 : 0.5) / position.zoom}
                             style={{
                               default: { outline: 'none', cursor: 'pointer' },
                               hover: { outline: 'none', cursor: 'pointer', filter: 'brightness(1.1)' },
@@ -220,16 +232,29 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                   </Geographies>
                   {citiesGeo.map((city) => (
                     <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
-                      <circle
-                        r={5 / currentView.zoom}
-                        fill="hsl(145 53% 34%)"
-                        fillOpacity={0.7}
-                        stroke="white"
-                        strokeWidth={0.6 / currentView.zoom}
-                        style={{ pointerEvents: 'auto', cursor: 'default' }}
-                      >
-                        <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
-                      </circle>
+                      <HoverCard openDelay={100} closeDelay={50}>
+                        <HoverCardTrigger asChild>
+                          <circle
+                            r={3 / position.zoom}
+                            fill="hsl(145 53% 34%)"
+                            fillOpacity={0.7}
+                            stroke="white"
+                            strokeWidth={0.6 / position.zoom}
+                            style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                          />
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-64 p-3" side="top">
+                          <p className="font-semibold text-sm">{city.nome}</p>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {city.qtd} {city.qtd === 1 ? 'cliente' : 'clientes'}
+                          </p>
+                          <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
+                            {city.clientes.map((nome, i) => (
+                              <p key={i} className="text-xs">• {nome}</p>
+                            ))}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                     </Marker>
                   ))}
                 </ZoomableGroup>
