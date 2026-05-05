@@ -241,37 +241,42 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                     }
                   </Geographies>
                   {citiesGeo.map((city) => {
-                    const screenRadius = Math.max(4, 8 / Math.sqrt(position.zoom));
+                    const screenRadius = Math.max(7, 8 / Math.sqrt(position.zoom));
                     const r = screenRadius / position.zoom;
                     const hitRadius = Math.max(10, screenRadius * 1.5) / position.zoom;
+                    const cityKey = `${city.uf}-${city.nome}`;
+                    const isActive = openCity?.city && `${openCity.city.uf}-${openCity.city.nome}` === cityKey;
                     return (
-                      <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
-                        <HoverCard openDelay={100} closeDelay={50}>
-                          <HoverCardTrigger asChild>
-                            <g style={{ pointerEvents: 'auto', cursor: 'pointer' }}>
-                              <circle r={hitRadius} fill="transparent" />
-                              <circle
-                                r={r}
-                                fill="hsl(145 53% 34%)"
-                                fillOpacity={0.75}
-                                stroke="white"
-                                strokeWidth={1.2}
-                                vectorEffect="non-scaling-stroke"
-                              />
-                            </g>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-72 p-3 z-50" side="top" sideOffset={8}>
-                            <p className="font-semibold text-sm">{city.nome}</p>
-                            <p className="text-xs text-muted-foreground mb-2">
-                              {city.qtd} {city.qtd === 1 ? 'cliente' : 'clientes'}
-                            </p>
-                            <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
-                              {city.clientes.map((nome, i) => (
-                                <p key={i} className="text-xs leading-tight">• {nome}</p>
-                              ))}
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
+                      <Marker key={cityKey} coordinates={[city.longitude, city.latitude]}>
+                        <g
+                          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const target = e.currentTarget as SVGGElement;
+                            const rect = target.getBoundingClientRect();
+                            setOpenCity(prev => {
+                              if (prev?.city && `${prev.city.uf}-${prev.city.nome}` === cityKey) {
+                                return null;
+                              }
+                              return {
+                                city,
+                                x: rect.left + rect.width / 2,
+                                y: rect.top,
+                              };
+                            });
+                          }}
+                        >
+                          <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
+                          <circle r={hitRadius} fill="transparent" />
+                          <circle
+                            r={r}
+                            fill="hsl(145 53% 34%)"
+                            fillOpacity={isActive ? 1 : 0.85}
+                            stroke="white"
+                            strokeWidth={isActive ? 2 : 1.2}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                        </g>
                       </Marker>
                     );
                   })}
