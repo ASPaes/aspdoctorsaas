@@ -189,10 +189,11 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                 className={cn('w-full mx-auto', tvMode ? 'h-[900px] max-w-[900px]' : 'h-[750px] max-w-[750px]')}
               >
                 <ZoomableGroup
-                  center={currentView.center}
-                  zoom={currentView.zoom}
+                  center={position.coordinates}
+                  zoom={position.zoom}
                   minZoom={1}
                   maxZoom={12}
+                  onMoveEnd={({ coordinates, zoom }) => setPosition({ coordinates: coordinates as [number, number], zoom })}
                 >
                   <Geographies geography={GEO_URL}>
                     {({ geographies }) =>
