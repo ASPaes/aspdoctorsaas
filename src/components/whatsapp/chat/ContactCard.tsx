@@ -26,7 +26,8 @@ export function parseVCard(vcard: string | null): { name: string; phones: string
     if (line.startsWith('FN:')) {
       name = line.substring(3).trim();
     }
-    if (line.toUpperCase().startsWith('TEL')) {
+    // Aceita "TEL:...", "TEL;...", "item1.TEL;...", "item2.TEL;..." (vCard 3.0 property grouping)
+    if (/^(?:[A-Za-z0-9-]+\.)?TEL[;:]/i.test(line)) {
       const colonIdx = line.indexOf(':');
       if (colonIdx !== -1) {
         const phone = line.substring(colonIdx + 1).trim();
