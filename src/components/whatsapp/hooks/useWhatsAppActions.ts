@@ -276,8 +276,10 @@ export const useWhatsAppActions = () => {
       queryClient.invalidateQueries({ queryKey: ['latest-closed-attendance', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['kb-draft'] });
     },
-    onError: () => {
-      toast.error('Erro ao encerrar conversa');
+    onError: (err: any) => {
+      const msg = err?.message || 'Erro ao encerrar conversa';
+      toast.error(msg);
+      // Rollback otimista: invalidar para refazer fetch do estado real
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
     },
