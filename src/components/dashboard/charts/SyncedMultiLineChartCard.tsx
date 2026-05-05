@@ -57,6 +57,8 @@ export function SyncedMultiLineChartCard({
                   fontSize: tvMode ? 16 : 12,
                   color: 'hsl(var(--foreground))',
                 }}
+                itemStyle={{ color: 'hsl(var(--foreground))', fontSize: '0.8125rem' }}
+                labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
                 formatter={(value: number | null, name: string) => {
                   if (value === null || value === undefined) return ['—', name];
                   const line = lines.find(l => l.dataKey === name);
