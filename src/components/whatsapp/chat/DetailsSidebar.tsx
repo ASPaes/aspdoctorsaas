@@ -24,6 +24,7 @@ import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useKBDraft } from "../hooks/useKBDraft";
 import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
+import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
 import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
@@ -83,6 +84,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
 
   const closedAttendanceId = latestClosedAttendance?.id || null;
   const { draft: kbDraft, isLoading: kbLoading, submitForReview, isSubmitting: kbSubmitting } = useKBDraft(closedAttendanceId);
+
+  const { attendanceId: relevantAttendanceId, isClosed: isRelevantClosed } = useRelevantAttendance(conversation.id);
 
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const isClienteLinked = !!(metadata?.cliente_id);
@@ -198,7 +201,12 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           )}
 
           {/* ─── Cliente Link ─── */}
-          <ClienteLinkCard conversation={conversation} />
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
 
           {/* ─── Tags ─── */}
           {contact?.tags && contact.tags.length > 0 && (

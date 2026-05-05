@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link2, Unlink, Building2, Loader2, ChevronDown, Cake, ExternalLink, Search } from "lucide-react";
-import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
+import { useClienteLinkSuggestion, type ClienteCandidato } from "../hooks/useClienteLinkSuggestion";
 import { useLinkedClienteDetails } from "../hooks/useLinkedClienteDetails";
 import { useClienteSearch } from "../hooks/useClienteSearch";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -14,9 +14,12 @@ import { ptBR } from "date-fns/locale";
 
 interface Props {
   conversation: ConversationWithContact;
+  attendanceId?: string | null;
+  isAttendanceClosed?: boolean;
+  isAdminOrHead?: boolean;
 }
 
-export function ClienteLinkCard({ conversation }: Props) {
+export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanceClosed = false, isAdminOrHead = false }: Props) {
   const navigate = useNavigate();
   const phoneNumber = conversation.contact?.phone_number || "";
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
@@ -32,11 +35,23 @@ export function ClienteLinkCard({ conversation }: Props) {
     unlinkCliente,
     isLinking,
     isUnlinking,
-  } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata);
+    candidates,
+    isAmbiguous,
+  } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendanceId);
+
+  const canEdit = !isAttendanceClosed || isAdminOrHead;
 
   const clienteId = isLinked ? (metadata?.cliente_id as string) : null;
   const { data: clienteDetails } = useLinkedClienteDetails(clienteId);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : "");
+
+  // Auto-link silencioso: 1 candidato + permissão para editar
+  useEffect(() => {
+    if (suggestedCliente && canEdit && !isLinking && !isLinked) {
+      linkCliente(suggestedCliente.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedCliente?.id, canEdit, isLinked]);
 
   if (isLinked && linkedCliente) {
     const isBirthday = clienteDetails?.contato_aniversario
@@ -58,7 +73,6 @@ export function ClienteLinkCard({ conversation }: Props) {
           #{linkedCliente.codigo_sequencial} — {linkedCliente.nome_fantasia || linkedCliente.razao_social || "Sem nome"}
         </p>
 
-        {/* Birthday alert */}
         {isBirthday && (
           <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 rounded-md px-2 py-1.5 text-xs font-medium">
             <Cake className="h-3.5 w-3.5 shrink-0" />
@@ -66,7 +80,6 @@ export function ClienteLinkCard({ conversation }: Props) {
           </div>
         )}
 
-        {/* Key info — always visible */}
         {clienteDetails && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] mt-1">
             {clienteDetails.unidade_base && (
@@ -98,7 +111,6 @@ export function ClienteLinkCard({ conversation }: Props) {
           </div>
         )}
 
-        {/* Collapsible secondary info */}
         {clienteDetails && (
           <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
             <CollapsibleTrigger asChild>
@@ -156,17 +168,69 @@ export function ClienteLinkCard({ conversation }: Props) {
             <ExternalLink className="h-3 w-3" />
             Abrir Cadastro
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 text-[10px] text-destructive hover:text-destructive gap-1"
-            onClick={unlinkCliente}
-            disabled={isUnlinking}
-          >
-            {isUnlinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlink className="h-3 w-3" />}
-            Desvincular
-          </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-[10px] text-destructive hover:text-destructive gap-1"
+              onClick={unlinkCliente}
+              disabled={isUnlinking}
+            >
+              {isUnlinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlink className="h-3 w-3" />}
+              Desvincular
+            </Button>
+          )}
         </div>
+      </div>
+    );
+  }
+
+  if (isAmbiguous && canEdit) {
+    return (
+      <div className="bg-accent/40 border border-accent rounded-md p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-accent-foreground shrink-0" />
+          <span className="text-xs font-medium text-accent-foreground">Selecione o cliente</span>
+          <Badge variant="secondary" className="text-[10px] ml-auto shrink-0">{candidates.length} candidatos</Badge>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Este telefone está vinculado a mais de um cliente. Escolha qual:</p>
+        <div className="space-y-1.5 max-h-60 overflow-y-auto">
+          {candidates.map((c: ClienteCandidato) => (
+            <button
+              key={c.cliente_id}
+              className="w-full text-left px-2 py-2 rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50"
+              onClick={() => linkCliente(c.cliente_id)}
+              disabled={isLinking}
+            >
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <span className="text-xs font-medium truncate">
+                  <span className="text-muted-foreground">#{c.codigo_sequencial ?? "?"}</span>{" "}
+                  {c.nome_fantasia || c.razao_social || "Sem nome"}
+                </span>
+                {isLinking ? (
+                  <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                ) : (
+                  <Link2 className="h-3 w-3 shrink-0 text-muted-foreground" />
+                )}
+              </div>
+              {c.fornecedor_nome && (
+                <p className="text-[10px] text-muted-foreground truncate mt-0.5">{c.fornecedor_nome}</p>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isAmbiguous && !canEdit) {
+    return (
+      <div className="bg-muted/50 border border-border rounded-md p-3">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs font-medium text-muted-foreground">Aguardando vínculo</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">Múltiplos clientes possíveis. Apenas admin/head pode vincular.</p>
       </div>
     );
   }
@@ -184,21 +248,22 @@ export function ClienteLinkCard({ conversation }: Props) {
             #{suggestedCliente.codigo_sequencial} — {suggestedCliente.nome_fantasia || suggestedCliente.razao_social}
           </span>
         </p>
-        <Button
-          size="sm"
-          variant="default"
-          className="h-7 text-xs gap-1 w-full"
-          onClick={() => linkCliente(suggestedCliente.id)}
-          disabled={isLinking}
-        >
-          {isLinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
-          Vincular
-        </Button>
+        {canEdit && (
+          <Button
+            size="sm"
+            variant="default"
+            className="h-7 text-xs gap-1 w-full"
+            onClick={() => linkCliente(suggestedCliente.id)}
+            disabled={isLinking}
+          >
+            {isLinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+            Vincular
+          </Button>
+        )}
       </div>
     );
   }
 
-  // No suggestion found — show manual link option
   return (
     <div className="bg-muted/50 border border-border rounded-md p-3 space-y-2">
       <div className="flex items-center justify-between">
@@ -206,20 +271,24 @@ export function ClienteLinkCard({ conversation }: Props) {
           <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="text-xs font-medium text-muted-foreground">Cliente</span>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 text-[10px] gap-1"
-          onClick={() => setSearchOpen(!searchOpen)}
-        >
-          <Search className="h-3 w-3" />
-          Vincular
-        </Button>
+        {canEdit && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-[10px] gap-1"
+            onClick={() => setSearchOpen(!searchOpen)}
+          >
+            <Search className="h-3 w-3" />
+            Vincular
+          </Button>
+        )}
       </div>
       {!searchOpen && (
-        <p className="text-[10px] text-muted-foreground">Nenhum cliente vinculado. Clique em "Vincular" para buscar.</p>
+        <p className="text-[10px] text-muted-foreground">
+          {canEdit ? 'Nenhum cliente vinculado. Clique em "Vincular" para buscar.' : "Nenhum cliente vinculado."}
+        </p>
       )}
-      {searchOpen && (
+      {searchOpen && canEdit && (
         <div className="space-y-2">
           <Input
             value={searchTerm}
