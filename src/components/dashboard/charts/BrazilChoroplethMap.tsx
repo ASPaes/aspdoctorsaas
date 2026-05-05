@@ -232,16 +232,29 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                   </Geographies>
                   {citiesGeo.map((city) => (
                     <Marker key={`${city.uf}-${city.nome}`} coordinates={[city.longitude, city.latitude]}>
-                      <circle
-                        r={5 / currentView.zoom}
-                        fill="hsl(145 53% 34%)"
-                        fillOpacity={0.7}
-                        stroke="white"
-                        strokeWidth={0.6 / currentView.zoom}
-                        style={{ pointerEvents: 'auto', cursor: 'default' }}
-                      >
-                        <title>{`${city.nome} — ${city.qtd} ${city.qtd === 1 ? 'cliente' : 'clientes'}`}</title>
-                      </circle>
+                      <HoverCard openDelay={100} closeDelay={50}>
+                        <HoverCardTrigger asChild>
+                          <circle
+                            r={3 / position.zoom}
+                            fill="hsl(145 53% 34%)"
+                            fillOpacity={0.7}
+                            stroke="white"
+                            strokeWidth={0.6 / position.zoom}
+                            style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                          />
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-64 p-3" side="top">
+                          <p className="font-semibold text-sm">{city.nome}</p>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {city.qtd} {city.qtd === 1 ? 'cliente' : 'clientes'}
+                          </p>
+                          <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
+                            {city.clientes.map((nome, i) => (
+                              <p key={i} className="text-xs">• {nome}</p>
+                            ))}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
                     </Marker>
                   ))}
                 </ZoomableGroup>
