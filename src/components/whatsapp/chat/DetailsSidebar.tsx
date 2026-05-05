@@ -201,7 +201,12 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
           )}
 
           {/* ─── Cliente Link ─── */}
-          <ClienteLinkCard conversation={conversation} />
+          <ClienteLinkCard
+            conversation={conversation}
+            attendanceId={relevantAttendanceId}
+            isAttendanceClosed={isRelevantClosed}
+            isAdminOrHead={isAdminOrHead}
+          />
 
           {/* ─── Tags ─── */}
           {contact?.tags && contact.tags.length > 0 && (
