@@ -85,6 +85,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const closedAttendanceId = latestClosedAttendance?.id || null;
   const { draft: kbDraft, isLoading: kbLoading, submitForReview, isSubmitting: kbSubmitting } = useKBDraft(closedAttendanceId);
 
+  const { attendanceId: relevantAttendanceId, isClosed: isRelevantClosed } = useRelevantAttendance(conversation.id);
+
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
   const isClienteLinked = !!(metadata?.cliente_id);
 
