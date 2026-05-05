@@ -56,7 +56,7 @@ export const useClienteCandidatos = (
     queryKey: ['cliente-candidatos', attendanceQuery.data?.tenant_id, contactPhone],
     queryFn: async (): Promise<ClienteCandidato[]> => {
       if (!attendanceQuery.data?.tenant_id || !contactPhone) return [];
-      const { data, error } = await (supabase.rpc as any)('get_clientes_candidatos_by_phone', {
+      const { data, error } = await supabase.rpc('get_clientes_candidatos_by_phone', {
         p_tenant_id: attendanceQuery.data.tenant_id,
         p_phone: contactPhone,
       });
@@ -70,7 +70,7 @@ export const useClienteCandidatos = (
   const setClienteMutation = useMutation({
     mutationFn: async (clienteId: string | null) => {
       if (!attendanceId) throw new Error('attendanceId é obrigatório');
-      const { error } = await (supabase.rpc as any)('set_attendance_cliente', {
+      const { error } = await supabase.rpc('set_attendance_cliente', {
         p_attendance_id: attendanceId,
         p_cliente_id: clienteId,
       });
