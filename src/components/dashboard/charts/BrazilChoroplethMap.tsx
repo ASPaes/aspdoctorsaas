@@ -351,6 +351,44 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
           </div>
         </div>
       </CardContent>
+      {openCity && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpenCity(null)}
+          />
+          <div
+            className="fixed z-50 w-72 bg-popover text-popover-foreground border rounded-md shadow-lg p-3"
+            style={{
+              left: Math.min(Math.max(openCity.x - 144, 8), window.innerWidth - 296),
+              top: Math.max(openCity.y - 12, 8),
+              transform: 'translateY(-100%)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <p className="font-semibold text-sm">{openCity.city.nome}</p>
+                <p className="text-xs text-muted-foreground">
+                  {openCity.city.qtd} {openCity.city.qtd === 1 ? 'cliente' : 'clientes'}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenCity(null)}
+                className="p-1 hover:bg-muted rounded-full -mt-1 -mr-1"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
+              {openCity.city.clientes.map((nome, i) => (
+                <p key={i} className="text-xs leading-tight">• {nome}</p>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
