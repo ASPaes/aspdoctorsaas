@@ -24,6 +24,7 @@ import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useKBDraft } from "../hooks/useKBDraft";
 import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
+import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
 import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
