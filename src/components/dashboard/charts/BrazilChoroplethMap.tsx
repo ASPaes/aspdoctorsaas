@@ -122,6 +122,12 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
     return () => window.removeEventListener('keydown', handler);
   }, [selectedState, onSelectState]);
 
+  // Sincroniza position quando o estado selecionado muda
+  useEffect(() => {
+    const view = selectedState ? (stateViewMap[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
+    setPosition({ coordinates: view.center, zoom: view.zoom });
+  }, [selectedState, stateViewMap]);
+
   const currentView = selectedState ? (stateViewMap[selectedState] || DEFAULT_VIEW) : DEFAULT_VIEW;
 
   const stateDataMap = useMemo(() => {
