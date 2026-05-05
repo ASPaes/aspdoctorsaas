@@ -79,16 +79,30 @@ export function useClienteLinkSuggestion(
   // 3) Mutação link
   const linkMutation = useMutation({
     mutationFn: async (clienteId: string) => {
-      if (attendanceId) {
+      // Resolver attendanceId em runtime — elimina race com useRelevantAttendance
+      let resolvedAttendanceId = attendanceId;
+      if (!resolvedAttendanceId) {
+        const { data: active } = await supabase
+          .from('support_attendances')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .neq('status', 'closed')
+          .order('opened_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        resolvedAttendanceId = active?.id ?? null;
+      }
+
+      if (resolvedAttendanceId) {
         const { error } = await supabase.rpc('set_attendance_cliente', {
-          p_attendance_id: attendanceId,
+          p_attendance_id: resolvedAttendanceId,
           p_cliente_id: clienteId,
         });
         if (error) throw error;
         return;
       }
 
-      // LEGACY (sem attendanceId)
+      // LEGACY (conversa sem atendimento — raro)
       const newMetadata = { ...(currentMetadata || {}), cliente_id: clienteId } as any;
       const { error } = await supabase
         .from('whatsapp_conversations')
