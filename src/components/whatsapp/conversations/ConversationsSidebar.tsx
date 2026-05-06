@@ -410,6 +410,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       onRemove: () => setFilters(f => ({ ...f, assignedToAgent: undefined })),
     });
   }
+  if (filters.autoReplyDisabledOnly) {
+    activeFilterBadges.push({
+      key: "autoReplyDisabledOnly",
+      label: "Auto-respostas pausadas",
+      onRemove: () => setFilters(f => ({ ...f, autoReplyDisabledOnly: false })),
+    });
+  }
 
   return (
     <div className="flex flex-col h-full border-r border-border">
