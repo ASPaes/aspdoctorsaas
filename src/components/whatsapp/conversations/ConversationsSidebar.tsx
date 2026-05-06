@@ -174,8 +174,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     let waiting = 0;
     let closed = 0;
     let afterHours = 0;
+    let paused = 0;
 
     for (const conv of conversations) {
+      if (conv.auto_reply_disabled === true) paused++;
       const state = getStateForConv(conv);
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
@@ -202,7 +204,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
-    return { inProgress, waiting, closed, afterHours };
+    return { inProgress, waiting, closed, afterHours, paused };
   }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
@@ -251,6 +253,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
+    } else if (activePill === "paused") {
+      result = result.filter(c => c.auto_reply_disabled === true);
     } else if (activePill === "closed") {
       result = result.filter(c => {
         if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
@@ -472,6 +476,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           waitingCount={pillCounts.waiting}
           closedCount={pillCounts.closed}
           afterHoursCount={pillCounts.afterHours}
+          pausedCount={pillCounts.paused}
+          showPausedPill={isAdmin}
         />
       </div>
       )}
