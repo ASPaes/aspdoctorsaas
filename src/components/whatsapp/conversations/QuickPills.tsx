@@ -32,7 +32,7 @@ export function QuickPills({ active, onChange, inProgressCount, waitingCount, cl
 
   return (
     <div className="flex gap-1 px-3 pb-2 overflow-x-auto">
-      {pills.map((p) => {
+      {pills.filter(p => !p.adminOnly || showPausedPill).map((p) => {
         const count = getCount(p.key);
         return (
           <button
