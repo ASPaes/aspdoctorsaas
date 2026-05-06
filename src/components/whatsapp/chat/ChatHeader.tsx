@@ -57,6 +57,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
