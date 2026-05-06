@@ -256,7 +256,7 @@ function WhatsAppContent() {
     if (selected) {
       return (
         <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
-            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
           <AgentPresenceOverlay />
         </div>
       );
