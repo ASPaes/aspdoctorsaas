@@ -584,6 +584,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           }
         }}
       />
+
+      <CleanupConversationDialog
+        open={showCleanupDialog}
+        onOpenChange={setShowCleanupDialog}
+        conversationId={conversation.id}
+        isCleaning={isCleaningMessages}
+        onConfirm={(cutoffIso) => {
+          cleanupMessages({ conversationId: conversation.id, fromTimestamp: cutoffIso });
+          setShowCleanupDialog(false);
+        }}
+      />
     </div>
   );
 }
