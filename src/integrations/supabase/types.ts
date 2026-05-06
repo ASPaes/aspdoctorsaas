@@ -3684,6 +3684,10 @@ export type Database = {
       whatsapp_conversations: {
         Row: {
           assigned_to: string | null
+          auto_reply_disabled: boolean
+          auto_reply_disabled_at: string | null
+          auto_reply_disabled_by: string | null
+          auto_reply_disabled_reason: string | null
           category: string | null
           contact_id: string
           created_at: string
@@ -3709,6 +3713,10 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          auto_reply_disabled?: boolean
+          auto_reply_disabled_at?: string | null
+          auto_reply_disabled_by?: string | null
+          auto_reply_disabled_reason?: string | null
           category?: string | null
           contact_id: string
           created_at?: string
@@ -3734,6 +3742,10 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          auto_reply_disabled?: boolean
+          auto_reply_disabled_at?: string | null
+          auto_reply_disabled_by?: string | null
+          auto_reply_disabled_reason?: string | null
           category?: string | null
           contact_id?: string
           created_at?: string
@@ -4957,6 +4969,10 @@ export type Database = {
       decrypt_api_key: {
         Args: { p_encrypted: string; p_encryption_key: string }
         Returns: string
+      }
+      delete_conversation_permanent: {
+        Args: { p_conversation_id: string }
+        Returns: Json
       }
       dismiss_notification: {
         Args: { p_recipient_id: string }
