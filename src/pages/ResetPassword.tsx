@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput, isPasswordValid } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ export default function ResetPassword() {
   const [checking, setChecking] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const navigate = useNavigate();
+  const passwordValid = isPasswordValid(password);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -48,6 +49,7 @@ export default function ResetPassword() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordValid) return;
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
@@ -81,9 +83,16 @@ export default function ResetPassword() {
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Nova senha</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required minLength={8} />
+              <PasswordInput
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Crie uma senha forte"
+                required
+                autoComplete="new-password"
+              />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !passwordValid}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Atualizar senha
             </Button>

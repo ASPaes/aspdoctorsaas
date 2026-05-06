@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { PasswordInput, isPasswordValid } from "@/components/ui/password-input";
 
 interface AccessInviteInfo {
   email: string;
@@ -25,6 +26,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const passwordValid = isPasswordValid(password);
 
   // Access invite state
   const [accessInvite, setAccessInvite] = useState<AccessInviteInfo | null>(null);
@@ -58,6 +60,7 @@ export default function Signup() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordValid) return;
     setLoading(true);
 
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -195,17 +198,16 @@ export default function Signup() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Crie uma senha forte"
                 required
-                minLength={6}
+                autoComplete="new-password"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !passwordValid}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Cadastrar
             </Button>
