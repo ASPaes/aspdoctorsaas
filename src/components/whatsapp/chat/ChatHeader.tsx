@@ -25,6 +25,7 @@ import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
+import { ConfirmClienteModal } from "./ConfirmClienteModal";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
