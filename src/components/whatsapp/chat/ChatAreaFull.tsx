@@ -36,11 +36,13 @@ interface Props {
   onDepartmentTransferred?: () => void;
   highlightMessageId?: string | null;
   onHighlightShown?: () => void;
+  pendingAction?: string | null;
+  onPendingActionConsumed?: () => void;
 }
 
 type DeleteMode = 'panel_only' | 'everyone';
 
-export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred, highlightMessageId, onHighlightShown }: Props) {
+export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred, highlightMessageId, onHighlightShown, pendingAction, onPendingActionConsumed }: Props) {
   const [showDetails, setShowDetails] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const { status: presenceStatus, isBlocked: presenceBlocked } = useAgentPresence();
