@@ -68,7 +68,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
   const availability = useAgentAvailability();
 
   // Client link status
