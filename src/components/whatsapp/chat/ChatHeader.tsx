@@ -284,13 +284,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => {
-                      if (!csatEnabled) {
-                        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
-                      } else {
-                        setShowCloseModal(true);
-                      }
-                    }}
+                    onClick={() => setShowConfirmCliente(true)}
                     aria-label="Encerrar conversa"
                   >
                     <XCircle className="h-4 w-4" />
