@@ -427,16 +427,15 @@ export function CleanupConversationDialog({ open, onOpenChange, conversationId, 
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting || isResuming}>
             Cancelar
           </Button>
-          {detectedCount === 0 ? (
-            <Button variant="default" onClick={onResume} disabled={isResuming}>
-              <Volume2 className="h-4 w-4 mr-2" />
-              {isResuming ? "Reativando..." : "Reativar conversa"}
-            </Button>
-          ) : (
+          <Button variant="secondary" onClick={onResume} disabled={isResuming || isDeleting}>
+            <Volume2 className="h-4 w-4 mr-2" />
+            {isResuming ? "Reativando..." : "Reativar conversa"}
+          </Button>
+          {detectedCount > 0 && (
             <Button variant="destructive" onClick={handleSubmit} disabled={!canConfirm}>
               <Trash2 className="h-4 w-4 mr-2" />
               {isDeleting ? "Excluindo..." : `Excluir ${selectedCount} mensagem(ns)`}
