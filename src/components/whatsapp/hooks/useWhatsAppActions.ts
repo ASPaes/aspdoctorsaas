@@ -412,8 +412,8 @@ export const useWhatsAppActions = () => {
     isMarkingUnread: markAsUnreadMutation.isPending,
     pauseAutoReply: pauseAutoReplyMutation.mutate,
     isPausingAutoReply: pauseAutoReplyMutation.isPending,
-    cleanupMessages: cleanupMessagesMutation.mutate,
-    isCleaningMessages: cleanupMessagesMutation.isPending,
+    deleteMessagesByIds: deleteMessagesByIdsMutation.mutate,
+    isDeletingMessages: deleteMessagesByIdsMutation.isPending,
     updateContact: updateContactMutation.mutate,
     isUpdatingContact: updateContactMutation.isPending,
   };
