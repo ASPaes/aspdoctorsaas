@@ -470,6 +470,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onConversationChanged={onNavigateToConversation}
       />
 
+      <ConfirmClienteModal
+        open={showConfirmCliente}
+        onOpenChange={setShowConfirmCliente}
+        conversationId={conversation.id}
+        tenantId={conversation.tenant_id}
+        phoneNumber={phoneNumber}
+        onConfirmed={handleClienteConfirmed}
+        onCancel={() => setShowConfirmCliente(false)}
+      />
+
       {/* Modal de confirmação de encerramento */}
       <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
         <DialogContent className="sm:max-w-md">
