@@ -18,6 +18,11 @@ interface QueueIndicatorProps {
 
 export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
+  // DEM-0005: somente Admin/Head/Super Admin pode transferir conversas
+  const isAdminOrHead =
+    profile?.is_super_admin === true ||
+    profile?.role === "admin" ||
+    profile?.role === "head";
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
@@ -94,7 +99,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
         </Button>
-      ) : (
+      ) : isAdminOrHead ? (
         <Button
           variant="outline"
           size="icon"
@@ -104,7 +109,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
         >
           <ArrowRightLeft className="h-3 w-3" />
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }
