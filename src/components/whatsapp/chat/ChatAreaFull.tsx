@@ -211,6 +211,8 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onClose={onClose}
           onNavigateToConversation={onNavigateToConversation}
           onDepartmentTransferred={onDepartmentTransferred}
+          pendingAction={pendingAction}
+          onPendingActionConsumed={onPendingActionConsumed}
         />
         <ChatMessages
           conversationId={conversation.id}
