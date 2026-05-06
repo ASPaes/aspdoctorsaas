@@ -61,6 +61,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
