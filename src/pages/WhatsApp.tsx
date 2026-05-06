@@ -20,6 +20,7 @@ import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOv
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
@@ -80,12 +81,15 @@ function WhatsAppContent() {
     return () => { supabase.removeChannel(channel); };
   }, [selected?.id]);
 
-  // Auto-select conversation from URL param ?conversation=<id>
+  // Auto-select conversation from URL param ?conversation=<id>&action=<action>
   useEffect(() => {
     const convId = searchParams.get("conversation");
+    const action = searchParams.get("action");
     if (!convId) return;
     if (selected?.id === convId) {
+      if (action) setPendingAction(action);
       searchParams.delete("conversation");
+      searchParams.delete("action");
       setSearchParams(searchParams, { replace: true });
       return;
     }
@@ -97,11 +101,14 @@ function WhatsAppContent() {
         .maybeSingle();
       if (data) {
         setSelected(data as unknown as ConversationWithContact);
+        if (action) setPendingAction(action);
         searchParams.delete("conversation");
+        searchParams.delete("action");
         setSearchParams(searchParams, { replace: true });
       } else {
         toast.error("Conversa não encontrada ou sem permissão de acesso.");
         searchParams.delete("conversation");
+        searchParams.delete("action");
         setSearchParams(searchParams, { replace: true });
       }
     })();
@@ -249,7 +256,7 @@ function WhatsAppContent() {
     if (selected) {
       return (
         <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
-            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
           <AgentPresenceOverlay />
         </div>
       );
@@ -272,7 +279,7 @@ function WhatsAppContent() {
           </ResizablePanel>
           <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
           <ResizablePanel defaultSize={75} className="relative h-full">
-            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
             <AgentPresenceOverlay />
           </ResizablePanel>
         </ResizablePanelGroup>

@@ -47,9 +47,11 @@ interface Props {
   onClose?: () => void;
   onNavigateToConversation?: (conversationId: string) => void;
   onDepartmentTransferred?: () => void;
+  pendingAction?: string | null;
+  onPendingActionConsumed?: () => void;
 }
 
-export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
+export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred, pendingAction, onPendingActionConsumed }: Props) {
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages, resumeAutoReply, isResumingAutoReply } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
@@ -70,6 +72,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
+
+  // Auto-abre o dialog de limpeza quando navegado com ?action=cleanup
+  useEffect(() => {
+    if (pendingAction === "cleanup" && conversation?.id) {
+      setShowCleanupDialog(true);
+      onPendingActionConsumed?.();
+    }
+  }, [pendingAction, conversation?.id, onPendingActionConsumed]);
   const availability = useAgentAvailability();
 
   // Client link status
