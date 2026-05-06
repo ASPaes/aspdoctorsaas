@@ -217,6 +217,19 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
             </Select>
           </div>
         )}
+
+        {isAdmin && (
+          <div className="flex items-center justify-between">
+            <Label htmlFor="auto-reply-disabled-only" className="text-xs font-medium text-muted-foreground">
+              Somente com auto-respostas pausadas
+            </Label>
+            <Switch
+              id="auto-reply-disabled-only"
+              checked={!!filters.autoReplyDisabledOnly}
+              onCheckedChange={(v) => onChange({ ...filters, autoReplyDisabledOnly: v })}
+            />
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
