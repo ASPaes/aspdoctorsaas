@@ -27,6 +27,38 @@ export const useWhatsAppActions = () => {
   const { user } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
 
+  const pauseAutoReplyMutation = useMutation({
+    mutationFn: async ({ conversationId, reason }: { conversationId: string; reason?: string }) => {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update({
+          auto_reply_disabled: true,
+          auto_reply_disabled_at: nowIso,
+          auto_reply_disabled_by: user?.id ?? null,
+          auto_reply_disabled_reason: reason ?? null,
+          updated_at: nowIso,
+        })
+        .eq('id', conversationId);
+      if (error) throw error;
+      return conversationId;
+    },
+    onMutate: async ({ conversationId }) => {
+      patchConversation(queryClient, conversationId, {
+        auto_reply_disabled: true,
+        auto_reply_disabled_at: new Date().toISOString(),
+        auto_reply_disabled_by: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Auto-respostas interrompidas para esta conversa');
+    },
+    onError: () => {
+      toast.error('Erro ao interromper auto-respostas');
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+  });
+
   const archiveMutation = useMutation({
     mutationFn: async (conversationId: string) => {
       const { error } = await supabase
@@ -351,6 +383,8 @@ export const useWhatsAppActions = () => {
     isReopening: reopenMutation.isPending,
     markAsUnread: markAsUnreadMutation.mutate,
     isMarkingUnread: markAsUnreadMutation.isPending,
+    pauseAutoReply: pauseAutoReplyMutation.mutate,
+    isPausingAutoReply: pauseAutoReplyMutation.isPending,
     updateContact: updateContactMutation.mutate,
     isUpdatingContact: updateContactMutation.isPending,
   };
