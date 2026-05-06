@@ -476,6 +476,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           waitingCount={pillCounts.waiting}
           closedCount={pillCounts.closed}
           afterHoursCount={pillCounts.afterHours}
+          pausedCount={pillCounts.paused}
+          showPausedPill={isAdmin}
         />
       </div>
       )}
