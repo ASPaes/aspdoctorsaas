@@ -265,6 +265,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     }
     // "all" → no bucket filter (show all non-closed by default is already handled by query)
 
+    if (filters.autoReplyDisabledOnly) {
+      result = result.filter((c) => c.auto_reply_disabled === true);
+    }
+
     // Sort
     switch (filters.sortBy) {
       case "oldest":
