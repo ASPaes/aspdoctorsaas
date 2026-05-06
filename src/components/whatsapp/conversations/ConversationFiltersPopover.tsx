@@ -20,6 +20,7 @@ export interface FiltersState {
   instanceId: string | undefined;
   assignedToMe: boolean;
   assignedToAgent: string | undefined;
+  autoReplyDisabledOnly?: boolean;
 }
 
 interface Props {
