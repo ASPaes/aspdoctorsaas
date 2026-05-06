@@ -20,6 +20,7 @@ import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOv
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const createConversation = useCreateConversation();
