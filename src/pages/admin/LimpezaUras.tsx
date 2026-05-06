@@ -75,7 +75,7 @@ export default function LimpezaUras() {
   }
 
   const handleOpenConversation = (row: UraBattleRow) => {
-    navigate(`/whatsapp?conv=${row.conversation_id}&action=cleanup`);
+    navigate(`/whatsapp?conversation=${row.conversation_id}&action=cleanup`);
   };
 
   const formatDateTime = (iso: string) => {
