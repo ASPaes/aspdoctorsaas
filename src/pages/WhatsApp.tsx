@@ -81,12 +81,15 @@ function WhatsAppContent() {
     return () => { supabase.removeChannel(channel); };
   }, [selected?.id]);
 
-  // Auto-select conversation from URL param ?conversation=<id>
+  // Auto-select conversation from URL param ?conversation=<id>&action=<action>
   useEffect(() => {
     const convId = searchParams.get("conversation");
+    const action = searchParams.get("action");
     if (!convId) return;
     if (selected?.id === convId) {
+      if (action) setPendingAction(action);
       searchParams.delete("conversation");
+      searchParams.delete("action");
       setSearchParams(searchParams, { replace: true });
       return;
     }
@@ -98,11 +101,14 @@ function WhatsAppContent() {
         .maybeSingle();
       if (data) {
         setSelected(data as unknown as ConversationWithContact);
+        if (action) setPendingAction(action);
         searchParams.delete("conversation");
+        searchParams.delete("action");
         setSearchParams(searchParams, { replace: true });
       } else {
         toast.error("Conversa não encontrada ou sem permissão de acesso.");
         searchParams.delete("conversation");
+        searchParams.delete("action");
         setSearchParams(searchParams, { replace: true });
       }
     })();
