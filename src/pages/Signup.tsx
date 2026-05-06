@@ -26,6 +26,7 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const passwordValid = isPasswordValid(password);
 
   // Access invite state
   const [accessInvite, setAccessInvite] = useState<AccessInviteInfo | null>(null);
