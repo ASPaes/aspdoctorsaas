@@ -279,7 +279,7 @@ function WhatsAppContent() {
           </ResizablePanel>
           <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
           <ResizablePanel defaultSize={75} className="relative h-full">
-            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} />
+            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
             <AgentPresenceOverlay />
           </ResizablePanel>
         </ResizablePanelGroup>
