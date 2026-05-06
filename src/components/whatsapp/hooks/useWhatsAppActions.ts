@@ -59,6 +59,38 @@ export const useWhatsAppActions = () => {
     },
   });
 
+  const resumeAutoReplyMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      const { error } = await supabase
+        .from('whatsapp_conversations')
+        .update({
+          auto_reply_disabled: false,
+          auto_reply_disabled_at: null,
+          auto_reply_disabled_by: null,
+          auto_reply_disabled_reason: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+      if (error) throw error;
+      return conversationId;
+    },
+    onMutate: async (conversationId) => {
+      patchConversation(queryClient, conversationId, {
+        auto_reply_disabled: false,
+        auto_reply_disabled_at: null,
+        auto_reply_disabled_by: null,
+        auto_reply_disabled_reason: null,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Auto-respostas reativadas para esta conversa');
+    },
+    onError: () => {
+      toast.error('Erro ao reativar auto-respostas');
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+  });
+
   const deleteMessagesByIdsMutation = useMutation({
     mutationFn: async ({ conversationId, messageIds }: { conversationId: string; messageIds: string[] }) => {
       const { data, error } = await supabase.rpc('delete_messages_by_ids' as any, {
@@ -412,6 +444,8 @@ export const useWhatsAppActions = () => {
     isMarkingUnread: markAsUnreadMutation.isPending,
     pauseAutoReply: pauseAutoReplyMutation.mutate,
     isPausingAutoReply: pauseAutoReplyMutation.isPending,
+    resumeAutoReply: resumeAutoReplyMutation.mutate,
+    isResumingAutoReply: resumeAutoReplyMutation.isPending,
     deleteMessagesByIds: deleteMessagesByIdsMutation.mutate,
     isDeletingMessages: deleteMessagesByIdsMutation.isPending,
     updateContact: updateContactMutation.mutate,

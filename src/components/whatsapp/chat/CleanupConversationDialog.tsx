@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, Trash2, Sparkles, Filter } from "lucide-react";
+import { AlertTriangle, Trash2, Sparkles, Filter, Volume2 } from "lucide-react";
 import { useWhatsAppMessages } from "../hooks/useWhatsAppMessages";
 
 // Tunables
@@ -156,9 +156,11 @@ interface Props {
   conversationId: string;
   isDeleting: boolean;
   onConfirm: (messageIds: string[]) => void;
+  isResuming: boolean;
+  onResume: () => void;
 }
 
-export function CleanupConversationDialog({ open, onOpenChange, conversationId, isDeleting, onConfirm }: Props) {
+export function CleanupConversationDialog({ open, onOpenChange, conversationId, isDeleting, onConfirm, isResuming, onResume }: Props) {
   const { messages } = useWhatsAppMessages(open ? conversationId : null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmText, setConfirmText] = useState("");
@@ -426,13 +428,20 @@ export function CleanupConversationDialog({ open, onOpenChange, conversationId, 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting || isResuming}>
             Cancelar
           </Button>
-          <Button variant="destructive" onClick={handleSubmit} disabled={!canConfirm}>
-            <Trash2 className="h-4 w-4 mr-2" />
-            {isDeleting ? "Excluindo..." : `Excluir ${selectedCount} mensagem(ns)`}
-          </Button>
+          {detectedCount === 0 ? (
+            <Button variant="default" onClick={onResume} disabled={isResuming}>
+              <Volume2 className="h-4 w-4 mr-2" />
+              {isResuming ? "Reativando..." : "Reativar conversa"}
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={handleSubmit} disabled={!canConfirm}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              {isDeleting ? "Excluindo..." : `Excluir ${selectedCount} mensagem(ns)`}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
