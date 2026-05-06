@@ -4970,8 +4970,8 @@ export type Database = {
         Args: { p_encrypted: string; p_encryption_key: string }
         Returns: string
       }
-      delete_messages_from_cutoff: {
-        Args: { p_conversation_id: string; p_from_timestamp: string }
+      delete_messages_by_ids: {
+        Args: { p_message_ids: string[] }
         Returns: Json
       }
       dismiss_notification: {
