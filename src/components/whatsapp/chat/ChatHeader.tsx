@@ -50,7 +50,7 @@ interface Props {
 }
 
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
-  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, cleanupMessages, isCleaningMessages } = useWhatsAppActions();
+  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
   
@@ -589,9 +589,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={showCleanupDialog}
         onOpenChange={setShowCleanupDialog}
         conversationId={conversation.id}
-        isCleaning={isCleaningMessages}
-        onConfirm={(cutoffIso) => {
-          cleanupMessages({ conversationId: conversation.id, fromTimestamp: cutoffIso });
+        isDeleting={isDeletingMessages}
+        onConfirm={(messageIds) => {
+          deleteMessagesByIds({ conversationId: conversation.id, messageIds });
           setShowCleanupDialog(false);
         }}
       />
