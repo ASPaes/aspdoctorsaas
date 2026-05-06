@@ -60,6 +60,7 @@ export default function Signup() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordValid) return;
     setLoading(true);
 
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
