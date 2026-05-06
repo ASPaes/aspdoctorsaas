@@ -145,7 +145,7 @@ export function CleanupConversationDialog({ open, onOpenChange, conversationId, 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 overflow-y-auto pr-1">
           {detected.cutoffTimestamp ? (
             <div className="flex items-start gap-2 p-3 rounded-md border border-primary/30 bg-primary/5">
               <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
