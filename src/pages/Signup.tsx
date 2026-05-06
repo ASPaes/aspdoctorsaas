@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { PasswordInput, isPasswordValid } from "@/components/ui/password-input";
 
 interface AccessInviteInfo {
   email: string;
