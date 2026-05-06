@@ -21,6 +21,10 @@ export interface ConversationWithContact {
   metadata: Record<string, any> | null;
   tenant_id: string;
   is_last_message_from_me: boolean;
+  auto_reply_disabled?: boolean;
+  auto_reply_disabled_at?: string | null;
+  auto_reply_disabled_by?: string | null;
+  auto_reply_disabled_reason?: string | null;
   opened_out_of_hours?: boolean;
   opened_out_of_hours_at?: string | null;
   sender_signature_mode?: string;
