@@ -20,6 +20,7 @@ export interface FiltersState {
   instanceId: string | undefined;
   assignedToMe: boolean;
   assignedToAgent: string | undefined;
+  autoReplyDisabledOnly?: boolean;
 }
 
 interface Props {
@@ -86,10 +87,11 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
     (filters.status ? 1 : 0) +
     (filters.instanceId ? 1 : 0) +
     (filters.assignedToMe ? 1 : 0) +
-    (filters.assignedToAgent ? 1 : 0);
+    (filters.assignedToAgent ? 1 : 0) +
+    (filters.autoReplyDisabledOnly ? 1 : 0);
 
   const handleClear = () => {
-    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined });
+    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false });
   };
 
   return (
@@ -213,6 +215,19 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="flex items-center justify-between">
+            <Label htmlFor="auto-reply-disabled-only" className="text-xs font-medium text-muted-foreground">
+              Somente com auto-respostas pausadas
+            </Label>
+            <Switch
+              id="auto-reply-disabled-only"
+              checked={!!filters.autoReplyDisabledOnly}
+              onCheckedChange={(v) => onChange({ ...filters, autoReplyDisabledOnly: v })}
+            />
           </div>
         )}
       </PopoverContent>

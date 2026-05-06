@@ -70,6 +70,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     instanceId: saved?.instanceId ?? undefined,
     assignedToMe: saved?.assignedToMe ?? false,
     assignedToAgent: saved?.assignedToAgent ?? undefined,
+    autoReplyDisabledOnly: saved?.autoReplyDisabledOnly ?? false,
   });
 
   const persist = (patch: Record<string, any>) => {
@@ -92,6 +93,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         instanceId: next.instanceId,
         assignedToMe: next.assignedToMe,
         assignedToAgent: next.assignedToAgent,
+        autoReplyDisabledOnly: next.autoReplyDisabledOnly,
       });
       return next;
     });
@@ -174,10 +176,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     let waiting = 0;
     let closed = 0;
     let afterHours = 0;
-    let paused = 0;
 
     for (const conv of conversations) {
-      if (conv.auto_reply_disabled === true) paused++;
       const state = getStateForConv(conv);
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
@@ -204,7 +204,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
-    return { inProgress, waiting, closed, afterHours, paused };
+    return { inProgress, waiting, closed, afterHours };
   }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
@@ -253,8 +253,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
-    } else if (activePill === "paused") {
-      result = result.filter(c => c.auto_reply_disabled === true);
     } else if (activePill === "closed") {
       result = result.filter(c => {
         if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
@@ -266,6 +264,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
     // "all" → no bucket filter (show all non-closed by default is already handled by query)
+
+    if (filters.autoReplyDisabledOnly) {
+      result = result.filter((c) => c.auto_reply_disabled === true);
+    }
 
     // Sort
     switch (filters.sortBy) {
@@ -408,6 +410,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       onRemove: () => setFilters(f => ({ ...f, assignedToAgent: undefined })),
     });
   }
+  if (filters.autoReplyDisabledOnly) {
+    activeFilterBadges.push({
+      key: "autoReplyDisabledOnly",
+      label: "Auto-respostas pausadas",
+      onRemove: () => setFilters(f => ({ ...f, autoReplyDisabledOnly: false })),
+    });
+  }
 
   return (
     <div className="flex flex-col h-full border-r border-border">
@@ -476,8 +485,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           waitingCount={pillCounts.waiting}
           closedCount={pillCounts.closed}
           afterHoursCount={pillCounts.afterHours}
-          pausedCount={pillCounts.paused}
-          showPausedPill={isAdmin}
         />
       </div>
       )}
