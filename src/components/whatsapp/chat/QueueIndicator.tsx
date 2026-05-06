@@ -99,7 +99,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
         </Button>
-      ) : (
+      ) : isAdminOrHead ? (
         <Button
           variant="outline"
           size="icon"
@@ -109,7 +109,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
         >
           <ArrowRightLeft className="h-3 w-3" />
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }
