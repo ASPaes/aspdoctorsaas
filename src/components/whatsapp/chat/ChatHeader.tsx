@@ -6,7 +6,7 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -26,6 +26,7 @@ import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
+import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -48,7 +49,7 @@ interface Props {
 }
 
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
-  const { archiveConversation, closeConversation, reopenConversation, markAsUnread } = useWhatsAppActions();
+  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
   
@@ -58,6 +59,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
+  const [showInterruptDialog, setShowInterruptDialog] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -335,6 +337,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     <Archive className="h-4 w-4 mr-2" /> Arquivar
                   </DropdownMenuItem>
                 )}
+                {!conversation.auto_reply_disabled && (
+                  <DropdownMenuItem onClick={() => setShowInterruptDialog(true)} disabled={isPausingAutoReply}>
+                    <VolumeX className="h-4 w-4 mr-2" /> Interromper auto-respostas
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
                   <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
                 </DropdownMenuItem>
@@ -354,6 +361,22 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         {/* Row 2: Context chips — single line, overflow hidden */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 pl-10">
           <SignatureControl conversationId={conversation.id} />
+
+          {conversation.auto_reply_disabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-amber-500/50 text-amber-600 dark:text-amber-400">
+                  <VolumeX className="h-2.5 w-2.5" />
+                  Auto-respostas pausadas
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {conversation.auto_reply_disabled_at
+                  ? `Pausada em ${new Date(conversation.auto_reply_disabled_at).toLocaleString('pt-BR')}`
+                  : 'Pausada por um atendente'}
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {!(conversation.opened_out_of_hours && statusLabel === 'Encerrada' && (!attendance || attendance.status !== 'in_progress')) && (
             <Badge variant={statusVariant as any} className={`text-[10px] h-4 shrink-0 whitespace-nowrap ${statusLabel === 'Fora do horário' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : ''}`}>
@@ -526,6 +549,18 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           </div>
         </DialogContent>
       </Dialog>
+
+      <InterruptAutoReplyDialog
+        open={showInterruptDialog}
+        onOpenChange={setShowInterruptDialog}
+        isPausing={isPausingAutoReply}
+        onConfirmPause={({ close }) => {
+          pauseAutoReply({ conversationId: conversation.id });
+          if (close) {
+            closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true });
+          }
+        }}
+      />
     </div>
   );
 }
