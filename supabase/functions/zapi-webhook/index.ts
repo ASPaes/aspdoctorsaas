@@ -12,8 +12,6 @@ Deno.serve((req) => {
     });
   }
 
-  // Resposta imediata (<50ms) para evitar timeout/retry da Z-API.
-  // Processamento real continua em background até o limite do worker.
   // @ts-ignore - EdgeRuntime é fornecido pelo Supabase Edge runtime
   EdgeRuntime.waitUntil(
     processZapiWebhook(req).catch((err) => {
@@ -26,7 +24,6 @@ Deno.serve((req) => {
   });
 });
 
-// Normaliza nÃºmero BR: adiciona 9 para celulares com 8 dÃ­gitos locais
 function normalizeZapiPhone(raw: string): string {
   let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
   digits = digits.split('@')[0];
@@ -39,6 +36,18 @@ function normalizeZapiPhone(raw: string): string {
   return digits;
 }
 
+/**
+ * DEM lid (Nível 1): detecta JID anômalo (provável WhatsApp Linked ID).
+ * APENAS marca flag informativa em whatsapp_conversations.metadata.has_lid_anomalies.
+ * NÃO bloqueia processamento, NÃO altera fluxo. Comportamento atual 100% preservado.
+ */
+function isLidAnomalous(rawJid: string): boolean {
+  if (!rawJid) return false;
+  const beforeAt = rawJid.split('@')[0];
+  const digits = beforeAt.replace(/\D/g, '');
+  return digits.length >= 14;
+}
+
 async function processZapiWebhook(req: Request): Promise<void> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -48,13 +57,12 @@ async function processZapiWebhook(req: Request): Promise<void> {
   try {
     payload = await req.json();
   } catch {
-    console.error(`${LOG} Payload invÃ¡lido`);
+    console.error(`${LOG} Payload inválido`);
     return;
   }
 
   console.log(`${LOG} Payload:`, JSON.stringify(payload).substring(0, 400));
 
-  // ââ Identificar instÃ¢ncia pelo zapi_instance_id ââââââââââââââ
   const zapiInstanceId = payload?.instanceId || payload?.instance?.id || null;
   if (!zapiInstanceId) {
     console.warn(`${LOG} instanceId ausente no payload`);
@@ -75,7 +83,6 @@ async function processZapiWebhook(req: Request): Promise<void> {
 
   const secrets = await getInstanceSecrets(supabase, instanceRow.id);
 
-  // ── Validar token de segurança ───────────────────────────────────────────
   const zapiWebhookToken = secrets?.zapi_webhook_token || null;
   if (zapiWebhookToken) {
     const receivedToken =
@@ -98,20 +105,18 @@ async function processZapiWebhook(req: Request): Promise<void> {
     .maybeSingle();
 
   if (!instance?.tenant_id) {
-    console.warn(`${LOG} tenant_id nÃ£o encontrado`);
+    console.warn(`${LOG} tenant_id não encontrado`);
     return;
   }
 
   const type = payload?.type || payload?.event || '';
   console.log(`${LOG} Evento: ${type} | instance: ${instance.instance_name}`);
 
-  // ââ Status de conexÃ£o âââââââââââââââââââââââââââââââââââââââââ
   if (type === 'connected' || type === 'disconnected') {
     await supabase.from('whatsapp_instances').update({ status: type, updated_at: new Date().toISOString() }).eq('id', instanceId);
     return;
   }
 
-  // ââ Status de mensagem ââââââââââââââââââââââââââââââââââââââââ
   if (type === 'MessageStatusCallback') {
     const messageId = payload?.messageId || payload?.id;
     const status = payload?.status;
@@ -122,19 +127,16 @@ async function processZapiWebhook(req: Request): Promise<void> {
     return;
   }
 
-  // ââ Mensagens recebidas âââââââââââââââââââââââââââââââââââââââ
   if (type !== 'ReceivedCallback' && !payload?.isMessage) {
     console.log(`${LOG} Evento ignorado: ${type}`);
     return;
   }
 
-  // Ignorar mensagens enviadas pelo agente (jÃ¡ salvas pelo send-whatsapp-message)
   if (payload?.fromMe === true || payload?.isFromMe === true) {
     console.log(`${LOG} Mensagem fromMe ignorada`);
     return;
   }
 
-  // Filtro de grupos — ignorar se instância configurada para não receber grupos
   const rawJid = payload?.phone || payload?.from || '';
   const isGroup =
     rawJid.includes('@g.us') ||
@@ -154,9 +156,20 @@ async function processZapiWebhook(req: Request): Promise<void> {
     }
   }
 
-  // ââ Normalizar payload Z-API â NormalizedInboundMessage ââââââ
   const rawPhone = payload?.phone || payload?.from || '';
   if (!rawPhone) { console.warn(`${LOG} Telefone ausente`); return; }
+
+  // DEM lid Nível 1: detectar JID anômalo (apenas informativo)
+  const lidAnomalous = !isGroup && isLidAnomalous(rawPhone);
+  if (lidAnomalous) {
+    const senderName = payload?.senderName || payload?.name || '<vazio>';
+    const hasContent = !!(payload?.text?.message || payload?.body || payload?.message);
+    console.warn(
+      `${LOG} JID lid anômalo detectado: rawPhone=${rawPhone} ` +
+      `senderName=${senderName} hasContent=${hasContent} ` +
+      `tenant=${instance.tenant_id} instance=${instance.instance_name}`
+    );
+  }
 
   const normalizedPhone = normalizeZapiPhone(rawPhone);
   const messageId = payload?.messageId || payload?.id || `zapi_${Date.now()}`;
@@ -248,4 +261,49 @@ async function processZapiWebhook(req: Request): Promise<void> {
 
   console.log(`${LOG} Delegando para processInboundMessage: ${normalizedPhone}`);
   await processInboundMessage(supabase, normalized);
+
+  // DEM lid Nível 1: marcar conversa pós-processamento se foi caso anômalo
+  if (lidAnomalous) {
+    try {
+      const { data: contactRow } = await supabase
+        .from('whatsapp_contacts')
+        .select('id')
+        .eq('tenant_id', instance.tenant_id)
+        .eq('phone_number', normalizedPhone)
+        .maybeSingle();
+
+      if (!contactRow) {
+        console.warn(`${LOG} [lid-flag] Contato não encontrado: phone=${normalizedPhone}`);
+      } else {
+        const { data: convRow } = await supabase
+          .from('whatsapp_conversations')
+          .select('id, metadata')
+          .eq('contact_id', contactRow.id)
+          .order('last_message_at', { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!convRow) {
+          console.warn(`${LOG} [lid-flag] Conversa não encontrada: contact=${contactRow.id}`);
+        } else {
+          const currentMeta = (convRow.metadata as Record<string, unknown>) || {};
+          if (currentMeta.has_lid_anomalies !== true) {
+            const newMeta = { ...currentMeta, has_lid_anomalies: true };
+            const { error: updErr } = await supabase
+              .from('whatsapp_conversations')
+              .update({ metadata: newMeta, updated_at: new Date().toISOString() })
+              .eq('id', convRow.id);
+            if (updErr) {
+              console.error(`${LOG} [lid-flag] Erro ao atualizar metadata:`, updErr);
+            } else {
+              console.log(`${LOG} [lid-flag] Flag has_lid_anomalies=true setada em conversation ${convRow.id}`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      // Falha aqui NUNCA pode quebrar o fluxo principal — só loga.
+      console.error(`${LOG} [lid-flag] Exception ao marcar conversa:`, err);
+    }
+  }
 }
