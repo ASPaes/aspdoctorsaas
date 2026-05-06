@@ -6,7 +6,7 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -27,6 +27,7 @@ import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
+import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -49,7 +50,7 @@ interface Props {
 }
 
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred }: Props) {
-  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply } = useWhatsAppActions();
+  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, cleanupMessages, isCleaningMessages } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
   
@@ -60,13 +61,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
   const hasMultipleInstances = instances.length > 1;
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
   const availability = useAgentAvailability();
 
   // Client link status
@@ -461,6 +464,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         </div>
       </div>
 
+      {conversation.auto_reply_disabled && isAdmin && (
+        <div className="border-b border-border bg-amber-500/10 px-3 py-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-xs text-amber-700 dark:text-amber-300 truncate">
+              Conversa pausada por briga de URA. Você pode limpar as mensagens automáticas.
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+            onClick={() => setShowCleanupDialog(true)}
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Limpar mensagens
+          </Button>
+        </div>
+      )}
+
       {/* CS Ticket Alert Banner */}
       <CSTicketAlert sentiment={sentimentData} conversation={conversation} variant="banner" />
 
@@ -559,6 +582,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           if (close) {
             closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, skipClosureMessage: true });
           }
+        }}
+      />
+
+      <CleanupConversationDialog
+        open={showCleanupDialog}
+        onOpenChange={setShowCleanupDialog}
+        conversationId={conversation.id}
+        isCleaning={isCleaningMessages}
+        onConfirm={(cutoffIso) => {
+          cleanupMessages({ conversationId: conversation.id, fromTimestamp: cutoffIso });
+          setShowCleanupDialog(false);
         }}
       />
     </div>

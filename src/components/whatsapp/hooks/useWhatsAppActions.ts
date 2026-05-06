@@ -59,6 +59,32 @@ export const useWhatsAppActions = () => {
     },
   });
 
+  const cleanupMessagesMutation = useMutation({
+    mutationFn: async ({ conversationId, fromTimestamp }: { conversationId: string; fromTimestamp: string }) => {
+      const { data, error } = await supabase.rpc('delete_messages_from_cutoff' as any, {
+        p_conversation_id: conversationId,
+        p_from_timestamp: fromTimestamp,
+      });
+      if (error) throw error;
+      return data as { success: boolean; messages_deleted: number; cutoff_timestamp: string };
+    },
+    onSuccess: (data, variables) => {
+      toast.success(`${data.messages_deleted} mensagem(ns) excluída(s) permanentemente`);
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || 'Erro ao excluir mensagens';
+      if (msg.includes('forbidden')) {
+        toast.error('Você não tem permissão para excluir mensagens');
+      } else if (msg.includes('not found')) {
+        toast.error('Conversa não encontrada');
+      } else {
+        toast.error(msg);
+      }
+    },
+  });
+
   const archiveMutation = useMutation({
     mutationFn: async (conversationId: string) => {
       const { error } = await supabase
@@ -385,6 +411,8 @@ export const useWhatsAppActions = () => {
     isMarkingUnread: markAsUnreadMutation.isPending,
     pauseAutoReply: pauseAutoReplyMutation.mutate,
     isPausingAutoReply: pauseAutoReplyMutation.isPending,
+    cleanupMessages: cleanupMessagesMutation.mutate,
+    isCleaningMessages: cleanupMessagesMutation.isPending,
     updateContact: updateContactMutation.mutate,
     isUpdatingContact: updateContactMutation.isPending,
   };
