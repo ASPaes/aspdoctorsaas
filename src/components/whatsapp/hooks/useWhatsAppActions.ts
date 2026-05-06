@@ -59,26 +59,27 @@ export const useWhatsAppActions = () => {
     },
   });
 
-  const cleanupMessagesMutation = useMutation({
-    mutationFn: async ({ conversationId, fromTimestamp }: { conversationId: string; fromTimestamp: string }) => {
-      const { data, error } = await supabase.rpc('delete_messages_from_cutoff' as any, {
-        p_conversation_id: conversationId,
-        p_from_timestamp: fromTimestamp,
+  const deleteMessagesByIdsMutation = useMutation({
+    mutationFn: async ({ conversationId, messageIds }: { conversationId: string; messageIds: string[] }) => {
+      const { data, error } = await supabase.rpc('delete_messages_by_ids' as any, {
+        p_message_ids: messageIds,
       });
       if (error) throw error;
-      return data as { success: boolean; messages_deleted: number; cutoff_timestamp: string };
+      return { ...(data as { success: boolean; messages_deleted: number; requested: number }), conversationId };
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       toast.success(`${data.messages_deleted} mensagem(ns) excluída(s) permanentemente`);
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', variables.conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', data.conversationId] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
     },
     onError: (err: any) => {
       const msg = err?.message || 'Erro ao excluir mensagens';
       if (msg.includes('forbidden')) {
         toast.error('Você não tem permissão para excluir mensagens');
-      } else if (msg.includes('not found')) {
-        toast.error('Conversa não encontrada');
+      } else if (msg.includes('too_many')) {
+        toast.error('Muitas mensagens selecionadas (máx 5000)');
+      } else if (msg.includes('no_ids')) {
+        toast.error('Nenhuma mensagem selecionada');
       } else {
         toast.error(msg);
       }
