@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Filter, X } from "lucide-react";
+import { Filter, X, Sparkles } from "lucide-react";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -228,6 +229,19 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
               checked={!!filters.autoReplyDisabledOnly}
               onCheckedChange={(v) => onChange({ ...filters, autoReplyDisabledOnly: v })}
             />
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="pt-2 border-t">
+            <Link
+              to="/admin/limpeza-uras"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 text-xs text-primary hover:underline"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Detectar brigas de URA →
+            </Link>
           </div>
         )}
       </PopoverContent>

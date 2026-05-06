@@ -5245,6 +5245,27 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      scan_ura_battle_conversations: {
+        Args: {
+          p_days?: number
+          p_min_our_per_bucket?: number
+          p_min_their_per_bucket?: number
+        }
+        Returns: {
+          battle_buckets: number
+          contact_name: string
+          conversation_id: string
+          conversation_status: string
+          conversation_updated_at: string
+          instance_id: string
+          is_paused: boolean
+          phone_number: string
+          total_battle_msgs: number
+          worst_at: string
+          worst_our: number
+          worst_their: number
+        }[]
+      }
       search_conversations_by_contact: {
         Args: {
           p_instance_ids?: string[]
