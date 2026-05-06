@@ -253,6 +253,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
+    } else if (activePill === "paused") {
+      result = result.filter(c => c.auto_reply_disabled === true);
     } else if (activePill === "closed") {
       result = result.filter(c => {
         if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
