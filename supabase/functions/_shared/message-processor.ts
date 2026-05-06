@@ -928,6 +928,15 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     return;
   }
 
+  // Pausa manual: técnico interrompeu auto-respostas para evitar briga de URA.
+  // A mensagem do cliente já foi persistida e o unread_count atualizado acima;
+  // aqui apenas pulamos toda a automação (URA, business hours, CSAT, billing,
+  // criação de atendimento, sentiment, categorização).
+  if (currentConv?.auto_reply_disabled === true) {
+    console.log(`[processor] auto_reply_disabled=true — skipping automation for conversation ${conversationId}`);
+    return;
+  }
+
   triggerAutoSentiment(supabase, conversationId, supabaseUrl);
   triggerAutoCategorization(supabase, conversationId, supabaseUrl);
 
