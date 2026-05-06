@@ -27,6 +27,7 @@ import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
+import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
