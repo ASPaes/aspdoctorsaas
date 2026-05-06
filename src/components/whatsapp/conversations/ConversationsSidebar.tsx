@@ -204,7 +204,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
-    return { inProgress, waiting, closed, afterHours };
+    return { inProgress, waiting, closed, afterHours, paused };
   }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
