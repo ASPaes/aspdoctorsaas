@@ -87,10 +87,11 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
     (filters.status ? 1 : 0) +
     (filters.instanceId ? 1 : 0) +
     (filters.assignedToMe ? 1 : 0) +
-    (filters.assignedToAgent ? 1 : 0);
+    (filters.assignedToAgent ? 1 : 0) +
+    (filters.autoReplyDisabledOnly ? 1 : 0);
 
   const handleClear = () => {
-    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined });
+    onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false });
   };
 
   return (
