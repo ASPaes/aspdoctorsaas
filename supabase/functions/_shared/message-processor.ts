@@ -893,7 +893,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
 
   if (messageType === 'audio' && savedMsg.id) fetch(`${supabaseUrl}/functions/v1/transcribe-whatsapp-audio`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` }, body: JSON.stringify({ messageId: savedMsg.id }) }).catch(() => {});
 
-  const { data: currentConv } = await supabase.from('whatsapp_conversations').select('last_message_at, unread_count').eq('id', conversationId).single();
+  const { data: currentConv } = await supabase.from('whatsapp_conversations').select('last_message_at, unread_count, auto_reply_disabled').eq('id', conversationId).single();
   const isNewer = !currentConv?.last_message_at || timestamp >= currentConv.last_message_at;
   const upd: Record<string, any> = {};
   if (isNewer) { upd.last_message_at = timestamp; upd.last_message_preview = content.substring(0, 200); upd.is_last_message_from_me = fromMe; }
@@ -925,6 +925,15 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     const onlyOut = await isOutboundOnlyConversation(supabase, conversationId);
     if (onlyOut) { await supabase.from('whatsapp_conversations').update({ status: 'closed', updated_at: nowIso }).eq('id', conversationId).neq('status', 'closed'); }
     else { supabase.from('whatsapp_conversations').update({ first_agent_message_at: nowIso, updated_at: nowIso }).eq('id', conversationId).is('first_agent_message_at', null).then(() => {}).catch(() => {}); ensureAttendanceForOperatorMessage(supabase, conversationId, contactId, tenantId).then(() => incrementAttendanceCounter(supabase, conversationId, 'agent')).catch(() => {}); }
+    return;
+  }
+
+  // Pausa manual: técnico interrompeu auto-respostas para evitar briga de URA.
+  // A mensagem do cliente já foi persistida e o unread_count atualizado acima;
+  // aqui apenas pulamos toda a automação (URA, business hours, CSAT, billing,
+  // criação de atendimento, sentiment, categorização).
+  if (currentConv?.auto_reply_disabled === true) {
+    console.log(`[processor] auto_reply_disabled=true — skipping automation for conversation ${conversationId}`);
     return;
   }
 
