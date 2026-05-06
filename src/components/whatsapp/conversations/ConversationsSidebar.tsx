@@ -174,8 +174,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     let waiting = 0;
     let closed = 0;
     let afterHours = 0;
+    let paused = 0;
 
     for (const conv of conversations) {
+      if (conv.auto_reply_disabled === true) paused++;
       const state = getStateForConv(conv);
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
