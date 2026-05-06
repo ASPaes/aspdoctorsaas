@@ -464,6 +464,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         </div>
       </div>
 
+      {conversation.auto_reply_disabled && isAdmin && (
+        <div className="border-b border-border bg-amber-500/10 px-3 py-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-xs text-amber-700 dark:text-amber-300 truncate">
+              Conversa pausada por briga de URA. Você pode limpar as mensagens automáticas.
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+            onClick={() => setShowCleanupDialog(true)}
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Limpar mensagens
+          </Button>
+        </div>
+      )}
+
       {/* CS Ticket Alert Banner */}
       <CSTicketAlert sentiment={sentimentData} conversation={conversation} variant="banner" />
 
