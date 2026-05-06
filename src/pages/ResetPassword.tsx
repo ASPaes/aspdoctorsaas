@@ -49,6 +49,7 @@ export default function ResetPassword() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordValid) return;
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
