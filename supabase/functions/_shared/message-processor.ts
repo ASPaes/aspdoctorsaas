@@ -893,7 +893,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
 
   if (messageType === 'audio' && savedMsg.id) fetch(`${supabaseUrl}/functions/v1/transcribe-whatsapp-audio`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` }, body: JSON.stringify({ messageId: savedMsg.id }) }).catch(() => {});
 
-  const { data: currentConv } = await supabase.from('whatsapp_conversations').select('last_message_at, unread_count').eq('id', conversationId).single();
+  const { data: currentConv } = await supabase.from('whatsapp_conversations').select('last_message_at, unread_count, auto_reply_disabled').eq('id', conversationId).single();
   const isNewer = !currentConv?.last_message_at || timestamp >= currentConv.last_message_at;
   const upd: Record<string, any> = {};
   if (isNewer) { upd.last_message_at = timestamp; upd.last_message_preview = content.substring(0, 200); upd.is_last_message_from_me = fromMe; }
