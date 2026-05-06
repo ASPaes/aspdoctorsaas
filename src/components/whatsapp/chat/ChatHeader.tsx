@@ -25,6 +25,7 @@ import { SignatureControl } from "./SignatureControl";
 import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
+import { ConfirmClienteModal } from "./ConfirmClienteModal";
 
 import { useSenderMap } from "../hooks/useSenderMap";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -56,6 +57,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -89,6 +91,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       .eq('id', conversation.id);
     queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
   }, [conversation.id, queryClient]);
+
+  const handleClienteConfirmed = useCallback(() => {
+    setShowConfirmCliente(false);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id]);
 
   const { effectiveTenantId: tid } = useTenantFilter();
   const convDeptId = (conversation as any).department_id;
@@ -282,13 +293,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => {
-                      if (!csatEnabled) {
-                        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
-                      } else {
-                        setShowCloseModal(true);
-                      }
-                    }}
+                    onClick={() => setShowConfirmCliente(true)}
                     aria-label="Encerrar conversa"
                   >
                     <XCircle className="h-4 w-4" />
@@ -463,6 +468,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onOpenChange={setIsChangeInstanceOpen}
         conversation={conversation}
         onConversationChanged={onNavigateToConversation}
+      />
+
+      <ConfirmClienteModal
+        open={showConfirmCliente}
+        onOpenChange={setShowConfirmCliente}
+        conversationId={conversation.id}
+        tenantId={conversation.tenant_id}
+        phoneNumber={phoneNumber}
+        onConfirmed={handleClienteConfirmed}
+        onCancel={() => setShowConfirmCliente(false)}
       />
 
       {/* Modal de confirmação de encerramento */}
