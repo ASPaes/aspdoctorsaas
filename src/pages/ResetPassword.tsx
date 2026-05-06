@@ -83,9 +83,16 @@ export default function ResetPassword() {
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Nova senha</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required minLength={8} />
+              <PasswordInput
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Crie uma senha forte"
+                required
+                autoComplete="new-password"
+              />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !passwordValid}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Atualizar senha
             </Button>
