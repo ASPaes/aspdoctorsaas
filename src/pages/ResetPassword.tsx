@@ -15,6 +15,7 @@ export default function ResetPassword() {
   const [checking, setChecking] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const navigate = useNavigate();
+  const passwordValid = isPasswordValid(password);
 
   useEffect(() => {
     const url = new URL(window.location.href);
