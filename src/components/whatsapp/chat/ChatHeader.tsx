@@ -589,9 +589,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={showCleanupDialog}
         onOpenChange={setShowCleanupDialog}
         conversationId={conversation.id}
-        isCleaning={isCleaningMessages}
-        onConfirm={(cutoffIso) => {
-          cleanupMessages({ conversationId: conversation.id, fromTimestamp: cutoffIso });
+        isDeleting={isDeletingMessages}
+        onConfirm={(messageIds) => {
+          deleteMessagesByIds({ conversationId: conversation.id, messageIds });
           setShowCleanupDialog(false);
         }}
       />
