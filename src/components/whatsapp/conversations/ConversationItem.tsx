@@ -65,6 +65,25 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const timeStr = formatTime(conv.last_message_at);
 
+  const formatScheduled = (ts: string) => {
+    try {
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return "";
+      const opts: Intl.DateTimeFormatOptions = { timeZone: timezone };
+      return new Intl.DateTimeFormat("pt-BR", {
+        ...opts,
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    } catch {
+      return "";
+    }
+  };
+
+  const isScheduled = !!attendance?.scheduled_until && new Date(attendance.scheduled_until) > new Date();
+
   const isOutOfHours = conv.opened_out_of_hours === true;
   const hasActiveAttendance = !!attendance && (attendance.status === "waiting" || attendance.status === "in_progress");
 
