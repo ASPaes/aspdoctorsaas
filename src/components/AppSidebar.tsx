@@ -25,13 +25,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const ALL_NAV_ITEMS = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: true },
-  { title: "Clientes", url: "/clientes", icon: Users, adminOnly: false },
-  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, adminOnly: false },
-  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, adminOnly: false },
-  { title: "Chat", url: "/whatsapp", icon: MessageCircle, adminOnly: false },
-  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, adminOnly: true },
-  { title: "Configurações", url: "/configuracoes", icon: Settings, adminOnly: true },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, requiredRoles: ["admin", "head"] },
+  { title: "Clientes", url: "/clientes", icon: Users },
+  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
+  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
+  { title: "Chat", url: "/whatsapp", icon: MessageCircle },
+  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, requiredRoles: ["admin"] },
+  { title: "Configurações", url: "/configuracoes", icon: Settings, requiredRoles: ["admin"] },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -55,8 +55,11 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const isSuperAdmin = profile?.is_super_admin === true;
-  const isAdmin = isSuperAdmin || profile?.role === "admin" || profile?.role === "head";
-  const navItems = ALL_NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
+  const navItems = ALL_NAV_ITEMS.filter(item => {
+    if (!item.requiredRoles) return true;
+    if (isSuperAdmin) return true;
+    return item.requiredRoles.includes(profile?.role ?? "");
+  });
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
