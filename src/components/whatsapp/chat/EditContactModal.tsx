@@ -10,6 +10,7 @@ import { useClienteSearch } from '../hooks/useClienteSearch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { maskPhoneBR } from '@/lib/masks';
+import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
 import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
 
 interface EditContactModalProps {
@@ -23,7 +24,7 @@ interface EditContactModalProps {
   isNewContact?: boolean;
 }
 
-interface ContactFormData { name: string; notes: string; }
+interface ContactFormData { name: string; notes: string; phone: string; }
 
 export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
@@ -33,18 +34,18 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
   const [linkedCliente, setLinkedCliente] = useState<{ id: string; label: string } | null>(null);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : '');
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
-    defaultValues: { name: contactName, notes: contactNotes || '' },
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<ContactFormData>({
+    defaultValues: { name: contactName, notes: contactNotes || '', phone: contactPhone ? maskPhoneBR(contactPhone) : '' },
   });
 
   useEffect(() => {
     if (open) {
-      reset({ name: contactName, notes: contactNotes || '' });
+      reset({ name: contactName, notes: contactNotes || '', phone: contactPhone ? maskPhoneBR(contactPhone) : '' });
       setLinkedCliente(null);
       setSearchOpen(false);
       setSearchTerm('');
     }
-  }, [open, contactName, contactNotes, reset]);
+  }, [open, contactName, contactNotes, contactPhone, reset]);
 
   const onSubmit = async (data: ContactFormData) => {
     if (isNewContact) {
@@ -130,8 +131,22 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         setIsSaving(false);
       }
     } else {
+      const normalized = normalizeBRPhone(data.phone || '');
+      const originalNormalized = normalizeBRPhone(contactPhone || '');
+      const phoneChanged = normalized !== originalNormalized;
+      if (phoneChanged && !isValidBRPhone(normalized)) {
+        toast.error('Telefone inválido');
+        return;
+      }
       updateContact(
-        { contactId, data: { name: data.name, notes: data.notes || null } },
+        {
+          contactId,
+          data: {
+            name: data.name,
+            notes: data.notes || null,
+            ...(phoneChanged ? { phone_number: normalized } : {}),
+          },
+        },
         { onSuccess: () => { onOpenChange(false); onSuccess?.(); } }
       );
     }
@@ -148,8 +163,23 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Telefone</Label>
-              <Input value={contactPhone ? maskPhoneBR(contactPhone) : ''} disabled className="bg-muted" />
+              <Label htmlFor="phone">Telefone {!isNewContact && '*'}</Label>
+              {isNewContact ? (
+                <Input value={contactPhone ? maskPhoneBR(contactPhone) : ''} disabled className="bg-muted" />
+              ) : (
+                <>
+                  <Input
+                    id="phone"
+                    value={watch('phone') || ''}
+                    onChange={(e) => setValue('phone', maskBRPhoneLive(e.target.value), { shouldDirty: true })}
+                    placeholder="+55 (DD) 9XXXX-XXXX"
+                    inputMode="tel"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Edite caso o número esteja com um dígito a mais (ex: 9 extra) e impeça o envio.
+                  </p>
+                </>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
