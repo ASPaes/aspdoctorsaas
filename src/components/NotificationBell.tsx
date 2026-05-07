@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function NotificationBell() {
-  const { unreadCount, notifications, markRead, dismiss, markAllRead } = useNotifications();
+  const { unreadCount, notifications, markRead, dismiss, markAllRead, dismissAll } = useNotifications();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
