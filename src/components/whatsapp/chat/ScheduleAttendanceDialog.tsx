@@ -91,7 +91,7 @@ export function ScheduleAttendanceDialog({
       },
     },
     {
-      label: "Próxima segunda 9h",
+      label: "Próx. seg 9h",
       compute: () => {
         const d = new Date();
         const dow = d.getDay();
