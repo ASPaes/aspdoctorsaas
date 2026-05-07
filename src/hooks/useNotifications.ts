@@ -161,6 +161,7 @@ export function useNotifications() {
     markRead: markReadMutation.mutate,
     dismiss: dismissMutation.mutate,
     markAllRead,
+    dismissAll,
   };
 }
 
