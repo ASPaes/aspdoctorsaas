@@ -152,11 +152,14 @@ export function ScheduleAttendanceDialog({
         </DialogHeader>
 
         {isEditing && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-            Agendado até{" "}
-            <strong>
-              {format(new Date(currentScheduledUntil!), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-            </strong>
+          <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0">
+              Agendado até{" "}
+              <strong className="font-semibold">
+                {format(new Date(currentScheduledUntil!), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </strong>
+            </span>
           </div>
         )}
 
@@ -177,13 +180,14 @@ export function ScheduleAttendanceDialog({
             />
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {presets.map((p) => (
               <Button
                 key={p.label}
                 type="button"
                 variant="outline"
                 size="sm"
+                className="w-full text-xs"
                 onClick={() => applyPreset(p.compute)}
               >
                 {p.label}
@@ -196,28 +200,36 @@ export function ScheduleAttendanceDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between sm:gap-2">
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
             disabled={isScheduling || isUnscheduling}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          {isEditing && (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            {isEditing && (
+              <Button
+                variant="outline"
+                onClick={onConfirmUnschedule}
+                disabled={isScheduling || isUnscheduling}
+                className="w-full sm:w-auto"
+              >
+                <X className="h-4 w-4 mr-2" />
+                {isUnscheduling ? "Removendo..." : "Remover"}
+              </Button>
+            )}
             <Button
-              variant="outline"
-              onClick={onConfirmUnschedule}
+              onClick={handleConfirm}
               disabled={isScheduling || isUnscheduling}
+              className="w-full sm:w-auto"
             >
-              <X className="h-4 w-4 mr-2" />
-              {isUnscheduling ? "Removendo..." : "Remover agendamento"}
+              <CalendarClock className="h-4 w-4 mr-2" />
+              {isScheduling ? "Agendando..." : isEditing ? "Atualizar" : "Agendar"}
             </Button>
-          )}
-          <Button onClick={handleConfirm} disabled={isScheduling || isUnscheduling}>
-            <CalendarClock className="h-4 w-4 mr-2" />
-            {isScheduling ? "Agendando..." : isEditing ? "Atualizar" : "Agendar"}
-          </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
