@@ -191,14 +191,23 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         continue;
       }
 
-      // Non-admin visibility
+      const bucket = getConversationBucket(state);
+
+      // Non-admin: "Atendendo" conta só os meus, "Fila" conta todos sem agente
       if (!isAdmin && user?.id) {
-        const att = attendanceMap.get(conv.id);
-        if (att && att.status === "in_progress" && att.assigned_to !== user.id) continue;
-        if (att && (att.status === "closed" || att.status === "inactive_closed") && att.assigned_to !== user.id) continue;
+        if (bucket === "in_progress") {
+          const isMyConv = (conv as any).assigned_to === user.id;
+          const att = attendanceMap.get(conv.id);
+          const isMyAtt = att?.assigned_to === user.id;
+          if (!isMyConv && !isMyAtt) continue;
+        }
+        if (bucket === "closed") {
+          const att = attendanceMap.get(conv.id);
+          if (att && att.assigned_to !== user.id) continue;
+        }
+        // "waiting_in_hours" e "waiting_out_of_hours" → visível para todos do setor
       }
 
-      const bucket = getConversationBucket(state);
       switch (bucket) {
         case "in_progress": inProgress++; break;
         case "waiting_in_hours": waiting++; break;
@@ -238,20 +247,18 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
 
-    // Non-admin visibility
-    if (!isAdmin && user?.id) {
-      result = result.filter(c => {
-        const att = attendanceMap.get(c.id);
-        if (!att) return true;
-        if (att.status === "waiting" && !att.assigned_to) return true;
-        if (att.assigned_to === user.id) return true;
-        return false;
-      });
-    }
-
-    // Pill filters using centralized bucket logic (with fallback)
+    // Pill filters com visibilidade por papel
     if (activePill === "in_progress") {
-      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "in_progress");
+      result = result.filter(c => {
+        if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
+        if (!isAdmin && user?.id) {
+          const isMyConv = (c as any).assigned_to === user.id;
+          const att = attendanceMap.get(c.id);
+          const isMyAtt = att?.assigned_to === user.id;
+          if (!isMyConv && !isMyAtt) return false;
+        }
+        return true;
+      });
     } else if (activePill === "waiting") {
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
@@ -266,7 +273,12 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         return true;
       });
     }
-    // "all" → no bucket filter (show all non-closed by default is already handled by query)
+    if (activePill === "all" && !isAdmin && user?.id) {
+      result = result.filter(c => {
+        if (!(c as any).assigned_to) return true;
+        return (c as any).assigned_to === user.id;
+      });
+    }
 
     if (filters.autoReplyDisabledOnly) {
       result = result.filter((c) => c.auto_reply_disabled === true);
