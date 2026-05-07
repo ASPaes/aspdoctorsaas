@@ -146,7 +146,7 @@ export default function TeamPresencePopover() {
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-0">
+      <PopoverContent align="start" className="w-80 p-0 max-h-[70vh] flex flex-col">
         <div className="px-3 py-2 border-b border-border">
           <h4 className="text-sm font-semibold">Equipe online</h4>
           <p className="text-xs text-muted-foreground">
