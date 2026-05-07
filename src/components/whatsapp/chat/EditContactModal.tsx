@@ -131,8 +131,22 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
         setIsSaving(false);
       }
     } else {
+      const normalized = normalizeBRPhone(data.phone || '');
+      const originalNormalized = normalizeBRPhone(contactPhone || '');
+      const phoneChanged = normalized !== originalNormalized;
+      if (phoneChanged && !isValidBRPhone(normalized)) {
+        toast.error('Telefone inválido');
+        return;
+      }
       updateContact(
-        { contactId, data: { name: data.name, notes: data.notes || null } },
+        {
+          contactId,
+          data: {
+            name: data.name,
+            notes: data.notes || null,
+            ...(phoneChanged ? { phone_number: normalized } : {}),
+          },
+        },
         { onSuccess: () => { onOpenChange(false); onSuccess?.(); } }
       );
     }
