@@ -2605,6 +2605,9 @@ export type Database = {
           reopen_count: number | null
           reopened_at: string | null
           reopened_from: string | null
+          scheduled_at: string | null
+          scheduled_by: string | null
+          scheduled_until: string | null
           seq_number: number
           status: string
           tenant_id: string
@@ -2661,6 +2664,9 @@ export type Database = {
           reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
+          scheduled_at?: string | null
+          scheduled_by?: string | null
+          scheduled_until?: string | null
           seq_number?: number
           status?: string
           tenant_id: string
@@ -2717,6 +2723,9 @@ export type Database = {
           reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
+          scheduled_at?: string | null
+          scheduled_by?: string | null
+          scheduled_until?: string | null
           seq_number?: number
           status?: string
           tenant_id?: string
@@ -5270,6 +5279,10 @@ export type Database = {
           worst_their: number
         }[]
       }
+      schedule_attendance: {
+        Args: { p_attendance_id: string; p_scheduled_until: string }
+        Returns: Json
+      }
       search_conversations_by_contact: {
         Args: {
           p_instance_ids?: string[]
@@ -5389,6 +5402,10 @@ export type Database = {
       unmute_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined
+      }
+      unschedule_attendance: {
+        Args: { p_attendance_id: string }
+        Returns: Json
       }
       validate_access_invite: {
         Args: { p_invite_id: string }
