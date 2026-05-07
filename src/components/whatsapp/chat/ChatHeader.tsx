@@ -196,6 +196,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     return conversation.status;
   }, [attendance, conversation.status]);
 
+  const scheduledUntil = (attendance as any)?.scheduled_until ?? null;
+  const isScheduled = !!scheduledUntil && new Date(scheduledUntil) > new Date();
+  const canSchedule = effectiveStatus === "in_progress" && (isAdmin || (assignedTo && assignedTo === user?.id));
+
   let computedStatusLabel: string;
   let computedStatusVariant: string;
 
