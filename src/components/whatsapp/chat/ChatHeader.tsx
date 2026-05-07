@@ -6,7 +6,9 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2 } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock } from "lucide-react";
+import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
+import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -52,7 +54,7 @@ interface Props {
 }
 
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred, pendingAction, onPendingActionConsumed }: Props) {
-  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages, resumeAutoReply, isResumingAutoReply } = useWhatsAppActions();
+  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages, resumeAutoReply, isResumingAutoReply, scheduleAttendance, isSchedulingAttendance, unscheduleAttendance, isUnschedulingAttendance } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
   
@@ -64,6 +66,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
