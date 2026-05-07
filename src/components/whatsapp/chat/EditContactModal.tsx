@@ -10,6 +10,7 @@ import { useClienteSearch } from '../hooks/useClienteSearch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { maskPhoneBR } from '@/lib/masks';
+import { normalizeBRPhone, isValidBRPhone, maskBRPhoneLive } from '@/lib/phoneBR';
 import { Link2, Search, Loader2, X, Building2 } from 'lucide-react';
 
 interface EditContactModalProps {
