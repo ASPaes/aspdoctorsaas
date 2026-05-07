@@ -650,6 +650,23 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           setShowCleanupDialog(false);
         }}
       />
+      <ScheduleAttendanceDialog
+        open={showScheduleDialog}
+        onOpenChange={setShowScheduleDialog}
+        currentScheduledUntil={scheduledUntil}
+        isScheduling={isSchedulingAttendance}
+        isUnscheduling={isUnschedulingAttendance}
+        onConfirmSchedule={(iso) => {
+          if (!attendance?.id) return;
+          scheduleAttendance({ attendanceId: attendance.id, scheduledUntilIso: iso });
+          setShowScheduleDialog(false);
+        }}
+        onConfirmUnschedule={() => {
+          if (!attendance?.id) return;
+          unscheduleAttendance(attendance.id);
+          setShowScheduleDialog(false);
+        }}
+      />
     </div>
   );
 }
