@@ -53,8 +53,15 @@ export function useTeamPresence() {
       const userIds = presenceRows.map((r) => r.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("user_id, funcionario_id, max_concurrent_chats")
+        .select("user_id, funcionario_id, max_concurrent_chats, status")
         .in("user_id", userIds);
+
+      // Filtrar apenas operadores com perfil ativo
+      const activeProfileUserIds = new Set(
+        (profiles || [])
+          .filter((p: any) => p.status === 'ativo')
+          .map((p: any) => p.user_id)
+      );
 
       // Buscar max_concurrent_chats dos profiles
       const chatLimitMap: Record<string, number | null> = {};
