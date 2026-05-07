@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Archive, CheckCheck, AlertTriangle } from "lucide-react";
+import { Archive, CheckCheck, AlertTriangle, CalendarClock } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -65,10 +65,38 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
   const timeStr = formatTime(conv.last_message_at);
 
+  const formatScheduled = (ts: string) => {
+    try {
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return "";
+      const opts: Intl.DateTimeFormatOptions = { timeZone: timezone };
+      return new Intl.DateTimeFormat("pt-BR", {
+        ...opts,
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    } catch {
+      return "";
+    }
+  };
+
+  const isScheduled = !!attendance?.scheduled_until && new Date(attendance.scheduled_until) > new Date();
+
   const isOutOfHours = conv.opened_out_of_hours === true;
   const hasActiveAttendance = !!attendance && (attendance.status === "waiting" || attendance.status === "in_progress");
 
   const attendanceBadge = (() => {
+    // Prioridade máxima: agendado (sobrescreve outros estados visuais)
+    if (isScheduled && attendance?.scheduled_until) {
+      return (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-0.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+          <CalendarClock className="h-2.5 w-2.5" />
+          {formatScheduled(attendance.scheduled_until)}
+        </Badge>
+      );
+    }
     // Prioridade: "Fora do horário" sempre que não houver atendimento ATIVO
     // (atendimento closed no histórico não invalida estado de fora-de-horário)
     if (isOutOfHours && !hasActiveAttendance) {
