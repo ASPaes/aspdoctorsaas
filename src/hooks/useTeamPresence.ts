@@ -13,6 +13,8 @@ export interface TeamMemberPresence {
   pause_reason_name: string | null;
   agent_name: string;
   agent_email: string | null;
+  max_concurrent_chats: number | null;
+  active_chat_count: number;
 }
 
 export function useTeamPresence() {
