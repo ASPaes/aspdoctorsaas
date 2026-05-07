@@ -23,7 +23,7 @@ export function useTeamPresence() {
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
 
-  const { data: members = [], isLoading } = useQuery({
+  const { data: members = [], isLoading, refetch } = useQuery({
     queryKey: ["team_presence", tid],
     enabled: !!tid && !!isAdmin,
     refetchInterval: 10_000,
@@ -148,5 +148,5 @@ export function useTeamPresence() {
     };
   }, [tid, isAdmin, queryClient]);
 
-  return { members, isLoading, isAdmin: !!isAdmin };
+  return { members, isLoading, isAdmin: !!isAdmin, refetch };
 }

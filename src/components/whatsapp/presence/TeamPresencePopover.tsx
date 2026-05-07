@@ -46,7 +46,7 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
   const heartbeatAgo = member.last_heartbeat_at
     ? now - new Date(member.last_heartbeat_at).getTime()
     : Infinity;
-  const heartbeatStale = heartbeatAgo > 120_000; // > 2 min
+  const heartbeatStale = heartbeatAgo > 300_000; // > 5 min (evita falsos positivos)
 
   const statusConfig = {
     active: { label: "Ativo", dotClass: "bg-green-500", icon: <Zap className="h-3 w-3" /> },
@@ -119,8 +119,13 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
 }
 
 export default function TeamPresencePopover() {
-  const { members, isLoading, isAdmin } = useTeamPresence();
+  const [open, setOpen] = useState(false);
+  const { members, isLoading, isAdmin, refetch } = useTeamPresence();
   const now = useNow(1000);
+
+  useEffect(() => {
+    if (open) refetch();
+  }, [open, refetch]);
 
   if (!isAdmin) return null;
 
@@ -128,7 +133,7 @@ export default function TeamPresencePopover() {
   const pausedCount = members.filter((m) => m.status === "paused").length;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs font-medium">
           <Users className="h-3.5 w-3.5" />
