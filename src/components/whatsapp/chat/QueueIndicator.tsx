@@ -18,11 +18,6 @@ interface QueueIndicatorProps {
 
 export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
-  // DEM-0005: somente Admin/Head/Super Admin pode transferir conversas
-  const isAdminOrHead =
-    profile?.is_super_admin === true ||
-    profile?.role === "admin" ||
-    profile?.role === "head";
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
   // Use attendance status as source of truth (it updates via realtime)
