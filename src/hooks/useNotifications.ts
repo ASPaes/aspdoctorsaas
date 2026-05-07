@@ -141,6 +141,19 @@ export function useNotifications() {
     queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
   }, [uid, tid, queryClient]);
 
+  // Dismiss all notifications for current user
+  const dismissAll = useCallback(async () => {
+    if (!uid || !tid) return;
+    await supabase
+      .from("notification_recipients")
+      .update({ dismissed_at: new Date().toISOString(), read_at: new Date().toISOString() } as any)
+      .eq("tenant_id", tid)
+      .eq("user_id", uid)
+      .is("dismissed_at", null);
+    queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+  }, [uid, tid, queryClient]);
+
   return {
     unreadCount,
     notifications,
@@ -148,6 +161,7 @@ export function useNotifications() {
     markRead: markReadMutation.mutate,
     dismiss: dismissMutation.mutate,
     markAllRead,
+    dismissAll,
   };
 }
 
