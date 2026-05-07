@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Search, Plus, MessageSquare, BarChart3, Users, X, FileSearch } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 
@@ -107,6 +108,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const availability = useAgentAvailability();
   const { instances } = useWhatsAppInstances();
   const { filteredInstanceIds, selectedDepartmentId } = useDepartmentFilter();
   const instanceMap = useMemo(() => {
