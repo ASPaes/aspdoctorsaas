@@ -419,18 +419,32 @@ export const useWhatsAppActions = () => {
   });
 
   const updateContactMutation = useMutation({
-    mutationFn: async ({ contactId, data }: { contactId: string; data: { name: string; notes: string | null } }) => {
+    mutationFn: async ({ contactId, data }: { contactId: string; data: { name: string; notes: string | null; phone_number?: string } }) => {
+      const patch: Record<string, any> = {
+        name: data.name,
+        notes: data.notes,
+        updated_at: new Date().toISOString(),
+      };
+      if (data.phone_number) patch.phone_number = data.phone_number;
       const { error } = await supabase
         .from('whatsapp_contacts')
-        .update({ name: data.name, notes: data.notes, updated_at: new Date().toISOString() })
+        .update(patch)
         .eq('id', contactId);
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Contato atualizado com sucesso');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'contacts'] });
     },
-    onError: () => { toast.error('Erro ao atualizar contato'); },
+    onError: (err: any) => {
+      const msg = err?.message || '';
+      if (msg.includes('duplicate') || msg.includes('unique')) {
+        toast.error('Já existe um contato com este número');
+      } else {
+        toast.error('Erro ao atualizar contato');
+      }
+    },
   });
 
   const scheduleAttendanceMutation = useMutation({
