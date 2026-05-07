@@ -88,6 +88,15 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const hasActiveAttendance = !!attendance && (attendance.status === "waiting" || attendance.status === "in_progress");
 
   const attendanceBadge = (() => {
+    // Prioridade máxima: agendado (sobrescreve outros estados visuais)
+    if (isScheduled && attendance?.scheduled_until) {
+      return (
+        <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-0.5 border-amber-500/50 text-amber-600 dark:text-amber-400">
+          <CalendarClock className="h-2.5 w-2.5" />
+          {formatScheduled(attendance.scheduled_until)}
+        </Badge>
+      );
+    }
     // Prioridade: "Fora do horário" sempre que não houver atendimento ATIVO
     // (atendimento closed no histórico não invalida estado de fora-de-horário)
     if (isOutOfHours && !hasActiveAttendance) {
