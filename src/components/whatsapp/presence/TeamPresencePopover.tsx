@@ -46,7 +46,7 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
   const heartbeatAgo = member.last_heartbeat_at
     ? now - new Date(member.last_heartbeat_at).getTime()
     : Infinity;
-  const heartbeatStale = heartbeatAgo > 120_000; // > 2 min
+  const heartbeatStale = heartbeatAgo > 300_000; // > 5 min (evita falsos positivos)
 
   const statusConfig = {
     active: { label: "Ativo", dotClass: "bg-green-500", icon: <Zap className="h-3 w-3" /> },
@@ -63,16 +63,24 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
         <div className="flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full shrink-0 ${cfg.dotClass}`} />
           <span className="text-sm font-medium truncate">{member.agent_name}</span>
-          {member.status !== 'offline' && member.max_concurrent_chats != null && member.max_concurrent_chats > 0 && (
-            <span className={`text-[10px] font-medium px-1 py-0.5 rounded-full shrink-0 ${
-              member.active_chat_count >= member.max_concurrent_chats
-                ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                : member.active_chat_count >= member.max_concurrent_chats - 1
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-            }`}>
-              {member.active_chat_count}/{member.max_concurrent_chats}
-            </span>
+          {member.status !== 'offline' && (
+            (() => {
+              const hasLimit = member.max_concurrent_chats != null && member.max_concurrent_chats > 0;
+              const count = member.active_chat_count;
+              if (!hasLimit && count === 0) return null;
+              const colorClass = !hasLimit
+                ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                : count >= member.max_concurrent_chats!
+                  ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                  : count >= member.max_concurrent_chats! - 1
+                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400';
+              return (
+                <span className={`text-[10px] font-medium px-1 py-0.5 rounded-full shrink-0 ${colorClass}`}>
+                  {hasLimit ? `${count}/${member.max_concurrent_chats}` : `${count}`}
+                </span>
+              );
+            })()
           )}
           {heartbeatStale && member.status !== "offline" && (
             <WifiOff className="h-3 w-3 text-destructive shrink-0" />
@@ -119,8 +127,13 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
 }
 
 export default function TeamPresencePopover() {
-  const { members, isLoading, isAdmin } = useTeamPresence();
+  const [open, setOpen] = useState(false);
+  const { members, isLoading, isAdmin, refetch } = useTeamPresence();
   const now = useNow(1000);
+
+  useEffect(() => {
+    if (open) refetch();
+  }, [open, refetch]);
 
   if (!isAdmin) return null;
 
@@ -128,7 +141,7 @@ export default function TeamPresencePopover() {
   const pausedCount = members.filter((m) => m.status === "paused").length;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs font-medium">
           <Users className="h-3.5 w-3.5" />
