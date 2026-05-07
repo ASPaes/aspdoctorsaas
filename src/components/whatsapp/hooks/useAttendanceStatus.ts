@@ -11,6 +11,7 @@ export interface AttendanceInfo {
   closed_at: string | null;
   department_id: string | null;
   created_from: string | null;
+  scheduled_until: string | null;
 }
 
 /**
@@ -48,7 +49,7 @@ export function useAttendanceStatus(
       const { data: activeRows } = await supabase
         .from("support_attendances")
         .select(
-          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from"
+          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until"
         )
         .in("conversation_id", conversationIds)
         .in("status", ["waiting", "in_progress"])
@@ -68,6 +69,7 @@ export function useAttendanceStatus(
               closed_at: row.closed_at,
               department_id: row.department_id,
               created_from: row.created_from || null,
+              scheduled_until: (row as any).scheduled_until ?? null,
             });
           }
         }
@@ -80,7 +82,7 @@ export function useAttendanceStatus(
           const { data: closedRows } = await supabase
             .from("support_attendances")
             .select(
-              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from"
+              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until"
             )
             .in("conversation_id", missingIds)
             .in("status", ["closed", "inactive_closed"])
@@ -97,6 +99,7 @@ export function useAttendanceStatus(
                   closed_at: row.closed_at,
                   department_id: row.department_id,
                   created_from: row.created_from || null,
+                  scheduled_until: (row as any).scheduled_until ?? null,
                 });
               }
             }
@@ -128,6 +131,7 @@ export function useAttendanceStatus(
         closed_at: row.closed_at,
         department_id: row.department_id,
         created_from: row.created_from || null,
+        scheduled_until: row.scheduled_until ?? null,
       };
 
       // setQueriesData updates ALL matching queries regardless of their specific key

@@ -433,6 +433,59 @@ export const useWhatsAppActions = () => {
     onError: () => { toast.error('Erro ao atualizar contato'); },
   });
 
+  const scheduleAttendanceMutation = useMutation({
+    mutationFn: async ({ attendanceId, scheduledUntilIso }: { attendanceId: string; scheduledUntilIso: string }) => {
+      const { data, error } = await supabase.rpc('schedule_attendance' as any, {
+        p_attendance_id: attendanceId,
+        p_scheduled_until: scheduledUntilIso,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Atendimento agendado');
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || '';
+      if (msg.includes('forbidden')) {
+        toast.error('Apenas Admin/Head ou o atendente atribuído podem agendar.');
+      } else if (msg.includes('must_be_in_progress')) {
+        toast.error('Apenas atendimentos em andamento podem ser agendados.');
+      } else if (msg.includes('exceeds_max_60_days')) {
+        toast.error('A data máxima é 60 dias a partir de hoje.');
+      } else if (msg.includes('must_be_future')) {
+        toast.error('A data precisa ser futura.');
+      } else {
+        toast.error('Erro ao agendar atendimento.');
+      }
+    },
+  });
+
+  const unscheduleAttendanceMutation = useMutation({
+    mutationFn: async (attendanceId: string) => {
+      const { data, error } = await supabase.rpc('unschedule_attendance' as any, {
+        p_attendance_id: attendanceId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Agendamento removido');
+      queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || '';
+      if (msg.includes('forbidden')) {
+        toast.error('Sem permissão para remover este agendamento.');
+      } else {
+        toast.error('Erro ao remover agendamento.');
+      }
+    },
+  });
+
   return {
     archiveConversation: archiveMutation.mutate,
     isArchiving: archiveMutation.isPending,
@@ -450,5 +503,9 @@ export const useWhatsAppActions = () => {
     isDeletingMessages: deleteMessagesByIdsMutation.isPending,
     updateContact: updateContactMutation.mutate,
     isUpdatingContact: updateContactMutation.isPending,
+    scheduleAttendance: scheduleAttendanceMutation.mutate,
+    isSchedulingAttendance: scheduleAttendanceMutation.isPending,
+    unscheduleAttendance: unscheduleAttendanceMutation.mutate,
+    isUnschedulingAttendance: unscheduleAttendanceMutation.isPending,
   };
 };

@@ -6,7 +6,9 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2 } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock } from "lucide-react";
+import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
+import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -52,7 +54,7 @@ interface Props {
 }
 
 export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred, pendingAction, onPendingActionConsumed }: Props) {
-  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages, resumeAutoReply, isResumingAutoReply } = useWhatsAppActions();
+  const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages, resumeAutoReply, isResumingAutoReply, scheduleAttendance, isSchedulingAttendance, unscheduleAttendance, isUnschedulingAttendance } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
   
@@ -64,6 +66,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -193,6 +196,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     return conversation.status;
   }, [attendance, conversation.status]);
 
+  const scheduledUntil = (attendance as any)?.scheduled_until ?? null;
+  const isScheduled = !!scheduledUntil && new Date(scheduledUntil) > new Date();
+  const canSchedule = effectiveStatus === "in_progress" && (isAdmin || (assignedTo && assignedTo === user?.id));
+
   let computedStatusLabel: string;
   let computedStatusVariant: string;
 
@@ -301,6 +308,25 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
             </Tooltip>
 
+            {canSchedule && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-7 w-7 shrink-0 ${isScheduled ? "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10" : ""}`}
+                    onClick={() => setShowScheduleDialog(true)}
+                    aria-label={isScheduled ? "Editar agendamento" : "Agendar atendimento"}
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {isScheduled ? "Editar agendamento" : "Agendar atendimento"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {conversation.status === "active" && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -387,6 +413,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 {conversation.auto_reply_disabled_at
                   ? `Pausada em ${new Date(conversation.auto_reply_disabled_at).toLocaleString('pt-BR')}`
                   : 'Pausada por um atendente'}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {isScheduled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-amber-500/50 text-amber-600 dark:text-amber-400">
+                  <CalendarClock className="h-2.5 w-2.5" />
+                  Agendado até {format(new Date(scheduledUntil!), "dd/MM HH:mm")}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Não encerra por inatividade nem conta no SLA até a data
               </TooltipContent>
             </Tooltip>
           )}
@@ -608,6 +648,23 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onResume={() => {
           resumeAutoReply(conversation.id);
           setShowCleanupDialog(false);
+        }}
+      />
+      <ScheduleAttendanceDialog
+        open={showScheduleDialog}
+        onOpenChange={setShowScheduleDialog}
+        currentScheduledUntil={scheduledUntil}
+        isScheduling={isSchedulingAttendance}
+        isUnscheduling={isUnschedulingAttendance}
+        onConfirmSchedule={(iso) => {
+          if (!attendance?.id) return;
+          scheduleAttendance({ attendanceId: attendance.id, scheduledUntilIso: iso });
+          setShowScheduleDialog(false);
+        }}
+        onConfirmUnschedule={() => {
+          if (!attendance?.id) return;
+          unscheduleAttendance(attendance.id);
+          setShowScheduleDialog(false);
         }}
       />
     </div>
