@@ -417,6 +417,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Tooltip>
           )}
 
+          {isScheduled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-amber-500/50 text-amber-600 dark:text-amber-400">
+                  <CalendarClock className="h-2.5 w-2.5" />
+                  Agendado até {format(new Date(scheduledUntil!), "dd/MM HH:mm")}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Não encerra por inatividade nem conta no SLA até a data
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {!(conversation.opened_out_of_hours && statusLabel === 'Encerrada' && (!attendance || attendance.status !== 'in_progress')) && (
             <Badge variant={statusVariant as any} className={`text-[10px] h-4 shrink-0 whitespace-nowrap ${statusLabel === 'Fora do horário' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : ''}`}>
               {statusLabel}
