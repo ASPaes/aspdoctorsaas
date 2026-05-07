@@ -23,7 +23,7 @@ interface EditContactModalProps {
   isNewContact?: boolean;
 }
 
-interface ContactFormData { name: string; notes: string; }
+interface ContactFormData { name: string; notes: string; phone: string; }
 
 export function EditContactModal({ open, onOpenChange, contactId, contactName, contactPhone, contactNotes, onSuccess, isNewContact }: EditContactModalProps) {
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
