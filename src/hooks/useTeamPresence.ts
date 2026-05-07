@@ -105,7 +105,7 @@ export function useTeamPresence() {
         (profiles || []).map((p) => [p.user_id, p.funcionario_id])
       );
 
-      const result: TeamMemberPresence[] = presenceRows.map((row) => {
+      const result: TeamMemberPresence[] = presenceRows.filter((row) => activeProfileUserIds.has(row.user_id)).map((row) => {
         const funcId = profileFuncMap[row.user_id];
         const func = funcId ? funcMap[funcId] : null;
         return {
