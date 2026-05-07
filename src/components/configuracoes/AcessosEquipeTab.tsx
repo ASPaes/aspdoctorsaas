@@ -546,31 +546,8 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         .eq("id", funcId)
         .eq("tenant_id", tenantId!);
       if (error) throw error;
-
-      const { data: profileRow } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("funcionario_id", funcId)
-        .eq("tenant_id", tenantId!)
-        .maybeSingle();
-
-      const userId = profileRow?.user_id;
-      if (!userId) return;
-
-      await supabase
-        .from("support_department_members")
-        .delete()
-        .eq("user_id", userId)
-        .eq("tenant_id", tenantId!);
-
-      if (deptId) {
-        await supabase.from("support_department_members").insert({
-          tenant_id: tenantId!,
-          department_id: deptId,
-          user_id: userId,
-          is_active: true,
-        });
-      }
+      // Sync com support_department_members é feito automaticamente
+      // pelo trigger trg_sync_funcionario_dept_to_members no banco.
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.users(tenantId) });
