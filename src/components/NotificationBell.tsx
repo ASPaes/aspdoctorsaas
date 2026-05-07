@@ -58,14 +58,21 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0" sideOffset={8}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-3 py-2">
+        <div className="flex items-center justify-between border-b px-3 py-2 gap-2">
           <span className="text-sm font-semibold">Notificações</span>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={markAllRead}>
-              <CheckCheck className="h-3 w-3" />
-              Marcar todas
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={markAllRead}>
+                <CheckCheck className="h-3 w-3" />
+                Marcar todas
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => dismissAll()}>
+                Limpar todas
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Lista */}
