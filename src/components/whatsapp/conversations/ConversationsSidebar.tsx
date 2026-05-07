@@ -23,6 +23,7 @@ import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAgentAvailability } from "@/hooks/useAgentAvailability";
 
 interface Props {
   selectedId: string | null;
@@ -423,7 +424,23 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       {/* Header */}
       <div className="p-3 border-b border-border space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Conversas</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">Conversas</h2>
+            {availability.isEnabled && availability.status !== 'unlimited' && (
+              <Badge
+                variant="outline"
+                className={`text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap ${
+                  availability.status === 'full'
+                    ? 'border-red-500/50 text-red-600 dark:text-red-400'
+                    : availability.status === 'warn'
+                      ? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+                      : 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+                }`}
+              >
+                {availability.current}/{availability.limit}
+              </Badge>
+            )}
+          </div>
           <div className="flex items-center gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
