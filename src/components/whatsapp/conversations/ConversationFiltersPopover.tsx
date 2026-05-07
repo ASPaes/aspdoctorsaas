@@ -53,8 +53,9 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
   const { data: tenantUsers } = useTenantUsers();
 
   // Resolve funcionario names for agents
+  const tenantUsersKey = (tenantUsers ?? []).map((u) => `${u.user_id}:${u.funcionario_id ?? ""}:${u.status}`).join(",");
   const agentOptions = useQuery({
-    queryKey: ["whatsapp-agent-options", tenantUsers],
+    queryKey: ["whatsapp-agent-options", tenantUsersKey],
     enabled: isAdmin && !!tenantUsers && tenantUsers.length > 0,
     queryFn: async () => {
       if (!tenantUsers) return [];
