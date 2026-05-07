@@ -17,12 +17,16 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
 
   const handleItemClick = (item: NotificationItem) => {
-    if (!item.read_at) {
-      markRead(item.id);
-    }
+    // Se a notificação leva a uma conversa, dispensar (sumir do sino) ao navegar
     if (item.notification.action_url) {
+      dismiss(item.id);
       setOpen(false);
       navigate(item.notification.action_url);
+      return;
+    }
+    // Caso contrário, apenas marcar como lida
+    if (!item.read_at) {
+      markRead(item.id);
     }
   };
 
@@ -52,9 +56,13 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0" sideOffset={8}>
+      <PopoverContent
+        align="end"
+        className="w-80 p-0 flex flex-col max-h-[480px]"
+        sideOffset={8}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-3 py-2">
+        <div className="flex items-center justify-between border-b px-3 py-2 shrink-0">
           <span className="text-sm font-semibold">Notificações</span>
           {unreadCount > 0 && (
             <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={markAllRead}>
@@ -65,7 +73,7 @@ export function NotificationBell() {
         </div>
 
         {/* List */}
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="flex-1 min-h-0">
           {notifications.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
               Nenhuma notificação

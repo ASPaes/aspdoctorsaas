@@ -4974,6 +4974,10 @@ export type Database = {
         Args: { p_message_ids: string[] }
         Returns: Json
       }
+      dismiss_conversation_notifications: {
+        Args: { p_conversation_id: string }
+        Returns: number
+      }
       dismiss_notification: {
         Args: { p_recipient_id: string }
         Returns: undefined

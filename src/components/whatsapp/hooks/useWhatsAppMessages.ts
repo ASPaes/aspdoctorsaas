@@ -139,13 +139,22 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 
   useEffect(() => {
     if (conversationId) {
+      // Zerar unread_count na conversa (badge da sidebar)
       supabase
         .from('whatsapp_conversations')
         .update({ unread_count: 0 })
         .eq('id', conversationId)
         .then();
+
+      // Dispensar todas as notificações dessa conversa (sino)
+      supabase
+        .rpc('dismiss_conversation_notifications' as any, { p_conversation_id: conversationId })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+          queryClient.invalidateQueries({ queryKey: ['notifications-list'] });
+        });
     }
-  }, [conversationId]);
+  }, [conversationId, queryClient]);
 
   const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
