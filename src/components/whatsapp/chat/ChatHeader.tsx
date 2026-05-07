@@ -308,6 +308,25 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
             </Tooltip>
 
+            {canSchedule && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-7 w-7 shrink-0 ${isScheduled ? "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10" : ""}`}
+                    onClick={() => setShowScheduleDialog(true)}
+                    aria-label={isScheduled ? "Editar agendamento" : "Agendar atendimento"}
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  {isScheduled ? "Editar agendamento" : "Agendar atendimento"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {conversation.status === "active" && (
               <Tooltip>
                 <TooltipTrigger asChild>
