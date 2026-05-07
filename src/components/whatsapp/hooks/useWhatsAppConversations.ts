@@ -106,7 +106,8 @@ export function useConversationCounts(filters?: ConversationsFilters) {
 
   return useQuery({
     queryKey: ['whatsapp', 'conversation-counts', filters, tid],
-    staleTime: 60_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const [countResult, unreadResult, waitingResult] = await Promise.all([
@@ -173,7 +174,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 10_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       let query = supabase
@@ -239,12 +241,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
           const deptChanged = existing.department_id !== updated.department_id;
           if (assignedChanged || deptChanged) {
             const now = Date.now();
-            if (now - invalidateThrottleRef.current > 1000) {
+            if (now - invalidateThrottleRef.current > 500) {
               invalidateThrottleRef.current = now;
-              setTimeout(() => {
-                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-                queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
-              }, 100);
+              // Invalidação imediata sem delay para atribuições automáticas
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+              queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversation-counts'] });
             }
             return old;
           }
