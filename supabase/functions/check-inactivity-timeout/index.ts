@@ -29,6 +29,7 @@ interface AttendanceRow {
   last_customer_message_at: string | null;
   last_operator_message_at: string | null;
   inactivity_warning_sent_at: string | null;
+  scheduled_until: string | null;
 }
 
 interface ContactRow {
@@ -283,10 +284,12 @@ serve(async (req) => {
 
     // Busca limitada — prioriza atendimentos com aviso já enviado (próximos de fechar)
     // e depois os mais antigos sem aviso (próximos de receber aviso)
+    const nowIso = new Date().toISOString();
     const { data: rows, error } = await supabase
       .from("support_attendances")
-      .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at")
+      .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at, scheduled_until")
       .eq("status", "in_progress")
+      .or(`scheduled_until.is.null,scheduled_until.lte.${nowIso}`)
       .order("inactivity_warning_sent_at", { ascending: true, nullsFirst: false })
       .order("last_operator_message_at", { ascending: true, nullsFirst: true })
       .limit(MAX_BATCH_SIZE);
