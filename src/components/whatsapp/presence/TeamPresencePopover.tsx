@@ -153,7 +153,7 @@ export default function TeamPresencePopover() {
             {activeCount} ativo{activeCount !== 1 ? "s" : ""} · {pausedCount} pausado{pausedCount !== 1 ? "s" : ""}
           </p>
         </div>
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="flex-1 overflow-auto">
           <div className="px-2 py-1">
             {isLoading ? (
               <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>
