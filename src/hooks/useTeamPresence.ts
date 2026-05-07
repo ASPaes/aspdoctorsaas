@@ -110,6 +110,8 @@ export function useTeamPresence() {
           pause_reason_name: row.pause_reason_id ? reasonMap[row.pause_reason_id] || null : null,
           agent_name: func?.nome || row.user_id.slice(0, 8),
           agent_email: func?.email || null,
+          max_concurrent_chats: chatLimitMap[row.user_id] ?? null,
+          active_chat_count: chatCountMap[row.user_id] ?? 0,
         };
       });
 
