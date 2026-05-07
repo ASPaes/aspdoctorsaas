@@ -33,18 +33,18 @@ export function EditContactModal({ open, onOpenChange, contactId, contactName, c
   const [linkedCliente, setLinkedCliente] = useState<{ id: string; label: string } | null>(null);
   const { results: searchResults, isLoading: isSearching } = useClienteSearch(searchOpen ? searchTerm : '');
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<ContactFormData>({
-    defaultValues: { name: contactName, notes: contactNotes || '' },
+  const { register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<ContactFormData>({
+    defaultValues: { name: contactName, notes: contactNotes || '', phone: contactPhone ? maskPhoneBR(contactPhone) : '' },
   });
 
   useEffect(() => {
     if (open) {
-      reset({ name: contactName, notes: contactNotes || '' });
+      reset({ name: contactName, notes: contactNotes || '', phone: contactPhone ? maskPhoneBR(contactPhone) : '' });
       setLinkedCliente(null);
       setSearchOpen(false);
       setSearchTerm('');
     }
-  }, [open, contactName, contactNotes, reset]);
+  }, [open, contactName, contactNotes, contactPhone, reset]);
 
   const onSubmit = async (data: ContactFormData) => {
     if (isNewContact) {
