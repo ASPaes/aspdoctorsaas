@@ -2,7 +2,7 @@ import { Bell, Check, CheckCheck, ExternalLink, Eye } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/hooks/useNotifications";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
@@ -56,13 +56,9 @@ export function NotificationBell() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-80 p-0 flex flex-col max-h-[480px]"
-        sideOffset={8}
-      >
+      <PopoverContent align="end" className="w-80 p-0" sideOffset={8}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-3 py-2 shrink-0">
+        <div className="flex items-center justify-between border-b px-3 py-2">
           <span className="text-sm font-semibold">Notificações</span>
           {unreadCount > 0 && (
             <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={markAllRead}>
@@ -72,90 +68,88 @@ export function NotificationBell() {
           )}
         </div>
 
-        {/* List */}
-        <ScrollArea className="flex-1 min-h-0">
-          {notifications.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              Nenhuma notificação
-            </div>
-          ) : (
-            <div className="divide-y">
-              {notifications.map((item) => (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors",
-                    !item.read_at && "bg-accent/20"
-                  )}
-                  onClick={() => handleItemClick(item)}
-                >
-                  <span className="text-sm mt-0.5 shrink-0">{severityIcon(item.notification.severity)}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <p className={cn("text-sm leading-tight truncate flex-1", !item.read_at && "font-medium")}>
-                        {item.notification.title}
-                      </p>
-                      {item.silent_mode && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
-                          </TooltipTrigger>
-                          <TooltipContent className="text-xs">
-                            Monitorando outro setor
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                    {(() => {
-                      const unreadCount = item.notification.metadata?.unread_count ?? 1;
-                      const hasMultiple = unreadCount > 1;
-                      return (
-                        <>
-                          {hasMultiple && (
-                            <p className="text-[10px] text-primary font-medium mt-0.5">
-                              {unreadCount} mensagens novas
-                            </p>
-                          )}
-                          {item.notification.body && (
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">
-                              {item.notification.body}
-                            </p>
-                          )}
-                        </>
-                      );
-                    })()}
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {formatDistanceToNow(new Date(item.delivered_at), { addSuffix: true, locale: ptBR })}
+        {/* Lista */}
+        {notifications.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            Nenhuma notificação
+          </div>
+        ) : (
+          <div className="max-h-[420px] overflow-y-auto divide-y">
+            {notifications.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "flex items-start gap-2 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors",
+                  !item.read_at && "bg-accent/20"
+                )}
+                onClick={() => handleItemClick(item)}
+              >
+                <span className="text-sm mt-0.5 shrink-0">{severityIcon(item.notification.severity)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <p className={cn("text-sm leading-tight truncate flex-1", !item.read_at && "font-medium")}>
+                      {item.notification.title}
                     </p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 mt-0.5">
-                    {!item.read_at && (
+                    {item.silent_mode && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              markRead(item.id);
-                            }}
-                          >
-                            <Check className="h-3 w-3" />
-                          </Button>
+                          <Eye className="h-3 w-3 text-muted-foreground shrink-0" />
                         </TooltipTrigger>
-                        <TooltipContent>Marcar como lida</TooltipContent>
+                        <TooltipContent className="text-xs">
+                          Monitorando outro setor
+                        </TooltipContent>
                       </Tooltip>
                     )}
-                    {item.notification.action_url && (
-                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                    )}
                   </div>
+                  {(() => {
+                    const unreadCount = item.notification.metadata?.unread_count ?? 1;
+                    const hasMultiple = unreadCount > 1;
+                    return (
+                      <>
+                        {hasMultiple && (
+                          <p className="text-[10px] text-primary font-medium mt-0.5">
+                            {unreadCount} mensagens novas
+                          </p>
+                        )}
+                        {item.notification.body && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {item.notification.body}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {formatDistanceToNow(new Date(item.delivered_at), { addSuffix: true, locale: ptBR })}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+                <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                  {!item.read_at && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markRead(item.id);
+                          }}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Marcar como lida</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {item.notification.action_url && (
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
