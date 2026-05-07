@@ -16,6 +16,7 @@ import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldAlert } from "lucide-react";
 import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
+import { ScheduleReminderBanner } from "@/components/whatsapp/ScheduleReminderBanner";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
