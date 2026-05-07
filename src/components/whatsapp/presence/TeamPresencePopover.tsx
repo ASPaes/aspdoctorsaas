@@ -63,6 +63,17 @@ function MemberRow({ member, now }: { member: TeamMemberPresence; now: number })
         <div className="flex items-center gap-1.5">
           <span className={`h-2 w-2 rounded-full shrink-0 ${cfg.dotClass}`} />
           <span className="text-sm font-medium truncate">{member.agent_name}</span>
+          {member.status !== 'offline' && member.max_concurrent_chats != null && member.max_concurrent_chats > 0 && (
+            <span className={`text-[10px] font-medium px-1 py-0.5 rounded-full shrink-0 ${
+              member.active_chat_count >= member.max_concurrent_chats
+                ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                : member.active_chat_count >= member.max_concurrent_chats - 1
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+            }`}>
+              {member.active_chat_count}/{member.max_concurrent_chats}
+            </span>
+          )}
           {heartbeatStale && member.status !== "offline" && (
             <WifiOff className="h-3 w-3 text-destructive shrink-0" />
           )}
@@ -135,14 +146,14 @@ export default function TeamPresencePopover() {
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-0">
+      <PopoverContent align="start" className="w-80 p-0 max-h-[70vh] flex flex-col">
         <div className="px-3 py-2 border-b border-border">
           <h4 className="text-sm font-semibold">Equipe online</h4>
           <p className="text-xs text-muted-foreground">
             {activeCount} ativo{activeCount !== 1 ? "s" : ""} · {pausedCount} pausado{pausedCount !== 1 ? "s" : ""}
           </p>
         </div>
-        <ScrollArea className="max-h-80">
+        <ScrollArea className="flex-1 overflow-auto">
           <div className="px-2 py-1">
             {isLoading ? (
               <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>

@@ -13,6 +13,8 @@ export interface TeamMemberPresence {
   pause_reason_name: string | null;
   agent_name: string;
   agent_email: string | null;
+  max_concurrent_chats: number | null;
+  active_chat_count: number;
 }
 
 export function useTeamPresence() {
@@ -51,8 +53,31 @@ export function useTeamPresence() {
       const userIds = presenceRows.map((r) => r.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("user_id, funcionario_id")
+        .select("user_id, funcionario_id, max_concurrent_chats")
         .in("user_id", userIds);
+
+      // Buscar max_concurrent_chats dos profiles
+      const chatLimitMap: Record<string, number | null> = {};
+      (profiles || []).forEach((p: any) => {
+        chatLimitMap[p.user_id] = p.max_concurrent_chats ?? null;
+      });
+
+      // Contar atendimentos ativos por agente (in_progress, excluindo agendados futuros)
+      const chatCountMap: Record<string, number> = {};
+      const { data: activeCounts } = await supabase
+        .from("support_attendances")
+        .select("assigned_to")
+        .eq("tenant_id", tid!)
+        .eq("status", "in_progress")
+        .in("assigned_to", userIds);
+
+      if (activeCounts) {
+        for (const row of activeCounts) {
+          if (row.assigned_to) {
+            chatCountMap[row.assigned_to] = (chatCountMap[row.assigned_to] || 0) + 1;
+          }
+        }
+      }
 
       const funcIds = (profiles || [])
         .map((p) => p.funcionario_id)
@@ -85,6 +110,8 @@ export function useTeamPresence() {
           pause_reason_name: row.pause_reason_id ? reasonMap[row.pause_reason_id] || null : null,
           agent_name: func?.nome || row.user_id.slice(0, 8),
           agent_email: func?.email || null,
+          max_concurrent_chats: chatLimitMap[row.user_id] ?? null,
+          active_chat_count: chatCountMap[row.user_id] ?? 0,
         };
       });
 
