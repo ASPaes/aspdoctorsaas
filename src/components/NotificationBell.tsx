@@ -17,12 +17,16 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
 
   const handleItemClick = (item: NotificationItem) => {
-    if (!item.read_at) {
-      markRead(item.id);
-    }
+    // Se a notificação leva a uma conversa, dispensar (sumir do sino) ao navegar
     if (item.notification.action_url) {
+      dismiss(item.id);
       setOpen(false);
       navigate(item.notification.action_url);
+      return;
+    }
+    // Caso contrário, apenas marcar como lida
+    if (!item.read_at) {
+      markRead(item.id);
     }
   };
 
