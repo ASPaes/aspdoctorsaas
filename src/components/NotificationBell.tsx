@@ -2,7 +2,7 @@ import { Bell, Check, CheckCheck, ExternalLink, Eye } from "lucide-react";
 import { useNotifications, NotificationItem } from "@/hooks/useNotifications";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
