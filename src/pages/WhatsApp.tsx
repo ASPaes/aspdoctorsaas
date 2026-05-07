@@ -16,6 +16,7 @@ import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldAlert } from "lucide-react";
 import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
+import { ScheduleReminderBanner } from "@/components/whatsapp/ScheduleReminderBanner";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
@@ -255,34 +256,43 @@ function WhatsAppContent() {
   if (isMobile) {
     if (selected) {
       return (
-        <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
-            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
-          <AgentPresenceOverlay />
+        <div className="flex flex-col gap-2 h-[calc(100vh-7rem)]">
+          <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
+          <div className="flex-1 min-h-0 rounded-lg border border-border overflow-hidden bg-background relative">
+              <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
+            <AgentPresenceOverlay />
+          </div>
         </div>
       );
     }
     return (
-      <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background relative">
-          <div className="w-full h-full">
-            <ConversationsSidebar selectedId={null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
-          </div>
-        <AgentPresenceOverlay />
+      <div className="flex flex-col gap-2 h-[calc(100vh-7rem)]">
+        <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
+        <div className="flex-1 min-h-0 rounded-lg border border-border overflow-hidden bg-background relative">
+            <div className="w-full h-full">
+              <ConversationsSidebar selectedId={null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
+            </div>
+          <AgentPresenceOverlay />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] rounded-lg border border-border overflow-hidden bg-background w-full max-w-full relative">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          <ResizablePanel defaultSize={25} minSize={24} maxSize={40}>
-            <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
-          </ResizablePanel>
-          <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
-          <ResizablePanel defaultSize={75} className="relative h-full">
-            <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
-            <AgentPresenceOverlay />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+    <div className="flex flex-col gap-2 h-[calc(100vh-7rem)]">
+      <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
+      <div className="flex-1 min-h-0 rounded-lg border border-border overflow-hidden bg-background w-full max-w-full relative">
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={25} minSize={24} maxSize={40}>
+              <ConversationsSidebar selectedId={selected?.id ?? null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
+            </ResizablePanel>
+            <ResizableHandle className="w-1.5 bg-muted hover:bg-muted-foreground/20 transition-colors" />
+            <ResizablePanel defaultSize={75} className="relative h-full">
+              <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
+              <AgentPresenceOverlay />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+      </div>
     </div>
   );
 }
