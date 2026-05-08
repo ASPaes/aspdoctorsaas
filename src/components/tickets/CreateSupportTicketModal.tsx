@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
 
 interface Props {
   open: boolean;
@@ -22,8 +23,9 @@ const Req = () => <span className="text-destructive">*</span>;
 export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  const [clienteId, setClienteId] = useState<string>("");
-  const [clienteSearch, setClienteSearch] = useState("");
+  const [clienteSearchTerm, setClienteSearchTerm] = useState("");
+  const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
+  const { results: clienteResults, isLoading: isSearchingClientes } = useClienteSearch(clienteSearchTerm);
   const [produtoId, setProdutoId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
@@ -36,8 +38,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
-    setClienteId("");
-    setClienteSearch("");
+    setSelectedCliente(null);
+    setClienteSearchTerm("");
     setProdutoId("");
     setCategoryId("");
     setSubcategoryId("");
@@ -52,19 +54,6 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   useEffect(() => {
     if (open) reset();
   }, [open]);
-
-  const { data: clientes = [] } = useQuery({
-    queryKey: ["create_manual_ticket_clientes", tid],
-    enabled: open && !!tid,
-    queryFn: async () => {
-      const { data, error } = await (supabase.from("clientes" as any) as any)
-        .select("id, nome_fantasia, produto_id")
-        .eq("tenant_id", tid)
-        .order("nome_fantasia");
-      if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome_fantasia: string; produto_id: number | null }>;
-    },
-  });
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["create_manual_ticket_produtos", tid],
@@ -143,7 +132,11 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   }, [produtoId]);
 
   const handleSubmit = async () => {
-    if (!clienteId || !produtoId || !categoryId || !subcategoryId || !serviceTypeId || !canalOrigem) {
+    if (!selectedCliente) {
+      toast.error("Selecione um cliente");
+      return;
+    }
+    if (!produtoId || !categoryId || !subcategoryId || !serviceTypeId || !canalOrigem) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
@@ -155,7 +148,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setIsSubmitting(true);
     try {
       const { error } = await (supabase.rpc as any)("create_manual_ticket", {
-        p_cliente_id: clienteId,
+        p_cliente_id: selectedCliente.id,
         p_produto_id: Number(produtoId),
         p_category_id: categoryId,
         p_subcategory_id: subcategoryId,
@@ -195,31 +188,70 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
           {/* Cliente */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Cliente <Req /></Label>
-            <Input
-              placeholder="Buscar cliente..."
-              value={clienteSearch}
-              onChange={(e) => setClienteSearch(e.target.value)}
-              className="h-10"
-            />
-            <Select value={clienteId} onValueChange={(val) => {
-              setClienteId(val);
-              const found = clientes.find((c: any) => c.id === val);
-              if (found?.produto_id) setProdutoId(String(found.produto_id));
-            }}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="Selecione o cliente..." />
-              </SelectTrigger>
-              <SelectContent>
-                {clientes
-                  .filter((c: any) => {
-                    if (!clienteSearch.trim()) return true;
-                    return (c.nome_fantasia ?? "").toLowerCase().includes(clienteSearch.toLowerCase());
-                  })
-                  .map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome_fantasia}</SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            {selectedCliente ? (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-input bg-muted/30 px-3 py-2">
+                <span className="text-sm truncate">
+                  <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
+                  {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0"
+                  onClick={() => {
+                    setSelectedCliente(null);
+                    setProdutoId("");
+                    setClienteSearchTerm("");
+                  }}
+                >
+                  Trocar
+                </Button>
+              </div>
+            ) : (
+              <div className="relative space-y-1">
+                <Input
+                  value={clienteSearchTerm}
+                  onChange={(e) => setClienteSearchTerm(e.target.value)}
+                  placeholder="Buscar por nome, CNPJ ou código..."
+                  className="h-10"
+                  autoFocus
+                />
+                {isSearchingClientes && (
+                  <div className="absolute right-3 top-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                {clienteResults.length > 0 && (
+                  <div className="max-h-48 overflow-y-auto rounded-md border border-input bg-popover">
+                    {clienteResults.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
+                        onClick={() => {
+                          setSelectedCliente(c);
+                          setClienteSearchTerm("");
+                          (supabase.from("clientes" as any) as any)
+                            .select("produto_id")
+                            .eq("id", c.id)
+                            .maybeSingle()
+                            .then(({ data }: any) => {
+                              if (data?.produto_id) setProdutoId(String(data.produto_id));
+                            });
+                        }}
+                      >
+                        <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                        {c.nome_fantasia || c.razao_social}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {clienteResults.length === 0 && clienteSearchTerm.length >= 2 && !isSearchingClientes && (
+                  <p className="text-xs text-muted-foreground px-1">Nenhum cliente encontrado</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Produto */}
