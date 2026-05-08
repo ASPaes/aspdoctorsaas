@@ -168,7 +168,7 @@ export default function SupportTickets() {
           <h1 className="text-2xl font-bold">Tickets Suporte</h1>
           <Badge variant="secondary" className="text-xs">{filteredTickets.length}</Badge>
         </div>
-        <Button size="sm" onClick={() => toast.info("Em breve")}>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
           Novo ticket
         </Button>
