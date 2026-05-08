@@ -23,10 +23,42 @@ function useDepartmentOptions() {
   return data ?? [];
 }
 
+function useProductOptions() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { data } = useQuery({
+    queryKey: ["products_for_crud", tid],
+    queryFn: async () => {
+      let q = (supabase.from("produtos" as any) as any).select("id, nome").order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []).map((p: any) => ({ value: p.id, label: p.nome }));
+    },
+  });
+  return data ?? [];
+}
+
+function useCategoryOptions() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { data } = useQuery({
+    queryKey: ["service_categories_for_crud", tid],
+    queryFn: async () => {
+      let q = (supabase.from("service_categories" as any) as any).select("id, nome").eq("ativo", true).order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []).map((c: any) => ({ value: c.id, label: c.nome }));
+    },
+  });
+  return data ?? [];
+}
+
 export default function CadastrosTab() {
   const [syncing, setSyncing] = useState(false);
   const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
+  const productOptions = useProductOptions();
+  const categoryOptions = useCategoryOptions();
 
   // Validate department belongs to the effective tenant before saving funcionario
   const validateFuncionario = async (payload: Record<string, any>, _isEdit: boolean): Promise<string | void> => {
@@ -113,6 +145,44 @@ export default function CadastrosTab() {
         { key: "average_minutes", label: "Tempo médio (min)" },
         { key: "sort_order", label: "Ordem" },
         { key: "is_active", label: "Ativo", type: "boolean" },
+      ],
+    },
+    {
+      value: "categorias_servico",
+      label: "Categorias Serviço",
+      table: "service_categories",
+      queryKey: "crud_service_categories",
+      orderBy: "nome",
+      selectQuery: "*, produtos:produto_id(nome)",
+      columns: [
+        { key: "nome", label: "Nome" },
+        { key: "produto_id", label: "Produto (opcional)", type: "select", options: productOptions, render: (_val: any, row: any) => row.produtos?.nome ?? "Universal" },
+        { key: "ativo", label: "Ativo", type: "boolean" },
+      ],
+    },
+    {
+      value: "subcategorias_servico",
+      label: "Subcategorias",
+      table: "service_subcategories",
+      queryKey: "crud_service_subcategories",
+      orderBy: "nome",
+      selectQuery: "*, service_categories:category_id(nome), produtos:produto_id(nome)",
+      columns: [
+        { key: "nome", label: "Nome" },
+        { key: "category_id", label: "Categoria", type: "select", valueType: "string", options: categoryOptions, render: (_val: any, row: any) => row.service_categories?.nome ?? "—" },
+        { key: "produto_id", label: "Produto (opcional)", type: "select", options: productOptions, render: (_val: any, row: any) => row.produtos?.nome ?? "Herda da categoria" },
+        { key: "ativo", label: "Ativo", type: "boolean" },
+      ],
+    },
+    {
+      value: "tipos_servico",
+      label: "Tipos Serviço",
+      table: "service_types",
+      queryKey: "crud_service_types",
+      orderBy: "nome",
+      columns: [
+        { key: "nome", label: "Nome" },
+        { key: "ativo", label: "Ativo", type: "boolean" },
       ],
     },
   ];

@@ -2371,6 +2371,141 @@ export type Database = {
         }
         Relationships: []
       }
+      service_categories: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          produto_id: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          produto_id?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          produto_id?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_categories_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_subcategories: {
+        Row: {
+          ativo: boolean
+          category_id: string
+          created_at: string
+          id: string
+          nome: string
+          produto_id: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          category_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          produto_id?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          category_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          produto_id?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_subcategories_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_subcategories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_types: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_types_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       super_admins: {
         Row: {
           created_at: string
@@ -3144,63 +3279,128 @@ export type Database = {
         }
         Relationships: []
       }
+      support_ticket_sequences: {
+        Row: {
+          ano: number
+          last_seq: number
+          tenant_id: string
+        }
+        Insert: {
+          ano: number
+          last_seq?: number
+          tenant_id: string
+        }
+        Update: {
+          ano?: number
+          last_seq?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_sequences_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_tickets: {
         Row: {
           aberto_em: string
-          agendado_para: string
+          agendado_para: string | null
           assunto: string
-          attendance_id: string
+          attendance_id: string | null
           atualizado_em: string
+          canal_origem: string
+          category_id: string | null
           cliente_id: string
+          closed_by: string | null
           concluido_em: string | null
+          contact_id: string | null
           criado_por: string | null
+          department_id: string | null
           descricao: string | null
           fornecedor_id: number | null
           id: string
           motivo_cancelamento: string | null
+          observacao_agente: string | null
+          observacao_ia: string | null
+          parent_ticket_id: string | null
           prioridade: Database["public"]["Enums"]["support_ticket_prioridade"]
+          produto_id: number | null
           responsavel_user_id: string | null
+          service_type_id: string | null
           status: Database["public"]["Enums"]["support_ticket_status"]
+          subcategory_id: string | null
           tenant_id: string
+          ticket_code: string | null
           tipo: Database["public"]["Enums"]["support_ticket_tipo"]
+          tipo_horario: string | null
         }
         Insert: {
           aberto_em?: string
-          agendado_para: string
+          agendado_para?: string | null
           assunto: string
-          attendance_id: string
+          attendance_id?: string | null
           atualizado_em?: string
+          canal_origem?: string
+          category_id?: string | null
           cliente_id: string
+          closed_by?: string | null
           concluido_em?: string | null
+          contact_id?: string | null
           criado_por?: string | null
+          department_id?: string | null
           descricao?: string | null
           fornecedor_id?: number | null
           id?: string
           motivo_cancelamento?: string | null
+          observacao_agente?: string | null
+          observacao_ia?: string | null
+          parent_ticket_id?: string | null
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
+          produto_id?: number | null
           responsavel_user_id?: string | null
+          service_type_id?: string | null
           status?: Database["public"]["Enums"]["support_ticket_status"]
+          subcategory_id?: string | null
           tenant_id: string
+          ticket_code?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
+          tipo_horario?: string | null
         }
         Update: {
           aberto_em?: string
-          agendado_para?: string
+          agendado_para?: string | null
           assunto?: string
-          attendance_id?: string
+          attendance_id?: string | null
           atualizado_em?: string
+          canal_origem?: string
+          category_id?: string | null
           cliente_id?: string
+          closed_by?: string | null
           concluido_em?: string | null
+          contact_id?: string | null
           criado_por?: string | null
+          department_id?: string | null
           descricao?: string | null
           fornecedor_id?: number | null
           id?: string
           motivo_cancelamento?: string | null
+          observacao_agente?: string | null
+          observacao_ia?: string | null
+          parent_ticket_id?: string | null
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
+          produto_id?: number | null
           responsavel_user_id?: string | null
+          service_type_id?: string | null
           status?: Database["public"]["Enums"]["support_ticket_status"]
+          subcategory_id?: string | null
           tenant_id?: string
+          ticket_code?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
+          tipo_horario?: string | null
         }
         Relationships: [
           {
@@ -3218,6 +3418,13 @@ export type Database = {
             referencedColumns: ["attendance_id"]
           },
           {
+            foreignKeyName: "support_tickets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "support_tickets_cliente_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -3232,10 +3439,52 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "support_tickets_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "support_tickets_fornecedor_fkey"
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_parent_ticket_id_fkey"
+            columns: ["parent_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "service_subcategories"
             referencedColumns: ["id"]
           },
           {
@@ -4964,6 +5213,34 @@ export type Database = {
         }
         Returns: string
       }
+      create_child_ticket: {
+        Args: {
+          p_agendado_para?: string
+          p_canal_origem?: string
+          p_observacao_agente: string
+          p_parent_ticket_id: string
+          p_responsavel_uid?: string
+          p_status?: string
+        }
+        Returns: string
+      }
+      create_manual_ticket: {
+        Args: {
+          p_agendado_para?: string
+          p_canal_origem: string
+          p_category_id: string
+          p_cliente_id: string
+          p_contact_id?: string
+          p_department_id?: string
+          p_observacao_agente?: string
+          p_produto_id: number
+          p_service_type_id: string
+          p_status?: string
+          p_subcategory_id: string
+          p_tipo_horario?: string
+        }
+        Returns: string
+      }
       create_tenant_for_new_user:
         | { Args: { p_nome: string }; Returns: string }
         | {
@@ -4975,6 +5252,19 @@ export type Database = {
             }
             Returns: string
           }
+      create_ticket_from_closure: {
+        Args: {
+          p_attendance_id: string
+          p_category_id: string
+          p_observacao_agente?: string
+          p_observacao_ia?: string
+          p_produto_id: number
+          p_service_type_id: string
+          p_subcategory_id: string
+          p_tipo_horario?: string
+        }
+        Returns: string
+      }
       current_department_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       current_user_department_id: { Args: never; Returns: string }
@@ -4992,6 +5282,10 @@ export type Database = {
       }
       dismiss_notification: {
         Args: { p_recipient_id: string }
+        Returns: undefined
+      }
+      dismiss_pending_closure: {
+        Args: { p_attendance_id: string; p_motivo?: string }
         Returns: undefined
       }
       email_domain: { Args: { email: string }; Returns: string }
@@ -5152,6 +5446,33 @@ export type Database = {
           visual_notifications_enabled: boolean
         }[]
       }
+      get_pending_closures: {
+        Args: {
+          p_agent_id?: string
+          p_date_from?: string
+          p_date_to?: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          agent_name: string
+          ai_category: string
+          ai_summary: string
+          assigned_to: string
+          attendance_code: string
+          attendance_id: string
+          cliente_id: string
+          cliente_nome: string
+          closed_at: string
+          closure_type: string
+          contact_id: string
+          contact_name: string
+          contact_phone: string
+          department_name: string
+          msg_agent_count: number
+          msg_customer_count: number
+        }[]
+      }
       get_storage_metrics: { Args: never; Returns: Json }
       get_storage_projection: { Args: never; Returns: Json }
       get_tenant_access_users: {
@@ -5252,6 +5573,7 @@ export type Database = {
         Args: { p_tenant: string }
         Returns: number
       }
+      next_ticket_code: { Args: { p_tenant_id: string }; Returns: string }
       norm_txt: { Args: { t: string }; Returns: string }
       process_maintenance_queue: { Args: never; Returns: undefined }
       process_notification_dispatch_queue: {
