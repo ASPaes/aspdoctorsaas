@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
 
 interface Props {
   open: boolean;
@@ -22,8 +23,9 @@ const Req = () => <span className="text-destructive">*</span>;
 export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  const [clienteId, setClienteId] = useState<string>("");
-  const [clienteSearch, setClienteSearch] = useState("");
+  const [clienteSearchTerm, setClienteSearchTerm] = useState("");
+  const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
+  const { results: clienteResults, isLoading: isSearchingClientes } = useClienteSearch(clienteSearchTerm);
   const [produtoId, setProdutoId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
@@ -36,8 +38,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
-    setClienteId("");
-    setClienteSearch("");
+    setSelectedCliente(null);
+    setClienteSearchTerm("");
     setProdutoId("");
     setCategoryId("");
     setSubcategoryId("");
