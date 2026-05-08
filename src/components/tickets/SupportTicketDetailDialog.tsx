@@ -304,7 +304,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <MessageCircle className="h-4 w-4 mr-1.5" />
           Ver chat
         </Button>
-        <Button size="sm" variant="outline" onClick={() => toast.info("Em breve")}>
+        <Button size="sm" variant="outline" onClick={() => setChildOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
           Ticket filho
         </Button>
