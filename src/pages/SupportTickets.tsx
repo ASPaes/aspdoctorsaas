@@ -86,6 +86,20 @@ export default function SupportTickets() {
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.ticketId) {
+        setSelectedTicketId(detail.ticketId);
+        setDetailOpen(true);
+      }
+    };
+    window.addEventListener("open-ticket-detail", handler);
+    return () => window.removeEventListener("open-ticket-detail", handler);
+  }, []);
 
   const cutoffDate = useMemo(() => {
     const days = PERIOD_DAYS[period];
