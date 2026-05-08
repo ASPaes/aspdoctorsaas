@@ -383,16 +383,6 @@ export function CreateSupportTicketModal({
                 />
               </div>
 
-              {aiSummary && (
-                <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                    <Bot className="h-3.5 w-3.5 text-primary" />
-                    Resumo da IA
-                  </div>
-                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{aiSummary}</p>
-                </div>
-              )}
-
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Tipo de horário</Label>
                 <Select value={tipoHorario} onValueChange={setTipoHorario}>
