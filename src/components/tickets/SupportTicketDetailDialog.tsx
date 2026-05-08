@@ -276,7 +276,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {/* Ticket pai */}
       {ticket.parent && (
         <button
-          onClick={() => toast.info("Em breve")}
+          onClick={() => {
+            onOpenChange(false);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: ticket.parent.id } }));
+            }, 300);
+          }}
           className="w-full border border-border rounded-lg p-2.5 flex items-center gap-2 hover:border-primary/40 transition-colors"
         >
           <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
