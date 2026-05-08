@@ -83,6 +83,8 @@ export default function SupportTickets() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all"); // TODO: implementar filtro por atendente
   const [search, setSearch] = useState<string>("");
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const cutoffDate = useMemo(() => {
     const days = PERIOD_DAYS[period];
