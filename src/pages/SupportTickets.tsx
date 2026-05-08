@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { toast } from "sonner";
 
 const STATUS_LABELS: Record<string, string> = {
