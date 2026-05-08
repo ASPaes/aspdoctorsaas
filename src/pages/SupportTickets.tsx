@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -85,6 +86,20 @@ export default function SupportTickets() {
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.ticketId) {
+        setSelectedTicketId(detail.ticketId);
+        setDetailOpen(true);
+      }
+    };
+    window.addEventListener("open-ticket-detail", handler);
+    return () => window.removeEventListener("open-ticket-detail", handler);
+  }, []);
 
   const cutoffDate = useMemo(() => {
     const days = PERIOD_DAYS[period];
@@ -153,7 +168,7 @@ export default function SupportTickets() {
           <h1 className="text-2xl font-bold">Tickets Suporte</h1>
           <Badge variant="secondary" className="text-xs">{filteredTickets.length}</Badge>
         </div>
-        <Button size="sm" onClick={() => toast.info("Em breve")}>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
           Novo ticket
         </Button>
@@ -279,6 +294,14 @@ export default function SupportTickets() {
           })}
         </div>
       )}
+
+      <CreateSupportTicketModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+        }}
+      />
 
       <SupportTicketDetailDialog
         ticketId={selectedTicketId}

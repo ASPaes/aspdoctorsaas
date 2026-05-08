@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight,
@@ -70,6 +71,8 @@ interface Props {
 export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Props) {
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState<"details" | "timeline">("details");
+  const [childOpen, setChildOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
 
@@ -273,7 +276,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {/* Ticket pai */}
       {ticket.parent && (
         <button
-          onClick={() => toast.info("Em breve")}
+          onClick={() => {
+            onOpenChange(false);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: ticket.parent.id } }));
+            }, 300);
+          }}
           className="w-full border border-border rounded-lg p-2.5 flex items-center gap-2 hover:border-primary/40 transition-colors"
         >
           <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -296,7 +304,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <MessageCircle className="h-4 w-4 mr-1.5" />
           Ver chat
         </Button>
-        <Button size="sm" variant="outline" onClick={() => toast.info("Em breve")}>
+        <Button size="sm" variant="outline" onClick={() => setChildOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
           Ticket filho
         </Button>
@@ -368,7 +376,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       when: c.aberto_em,
       node: (
         <button
-          onClick={() => toast.info("Em breve")}
+          onClick={() => {
+            onOpenChange(false);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: c.id } }));
+            }, 300);
+          }}
           className="w-full text-left border border-blue-500/30 rounded-lg p-3 hover:border-blue-500/60 transition-colors"
         >
           <div className="flex items-center gap-2 mb-1">
@@ -417,63 +430,84 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     </div>
   );
 
+  const childDialog = (
+    <CreateChildTicketDialog
+      open={childOpen}
+      onOpenChange={setChildOpen}
+      parentTicketId={ticketId ?? ""}
+      parentTicketCode={ticket?.ticket_code ?? ""}
+      parentClienteName={ticket?.clientes?.nome_fantasia}
+      parentCategoria={breadcrumb}
+      onCreated={() => {
+        queryClient.invalidateQueries({ queryKey: ["support_ticket_children", ticketId] });
+        queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      }}
+    />
+  );
+
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="h-[95vh] p-0">
-          <SheetHeader className="px-4 py-3 border-b">
-            <SheetTitle>Detalhes do Ticket</SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col h-[calc(95vh-60px)]">
-            <div className="flex gap-2 p-2 border-b shrink-0">
-              <Button
-                variant={mobileView === "details" ? "default" : "outline"}
-                size="sm" className="flex-1"
-                onClick={() => setMobileView("details")}
-              >Detalhes</Button>
-              <Button
-                variant={mobileView === "timeline" ? "default" : "outline"}
-                size="sm" className="flex-1 gap-1"
-                onClick={() => setMobileView("timeline")}
-              >
-                <MessageCircle className="h-4 w-4" />Timeline
-              </Button>
+      <>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="bottom" className="h-[95vh] p-0">
+            <SheetHeader className="px-4 py-3 border-b">
+              <SheetTitle>Detalhes do Ticket</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col h-[calc(95vh-60px)]">
+              <div className="flex gap-2 p-2 border-b shrink-0">
+                <Button
+                  variant={mobileView === "details" ? "default" : "outline"}
+                  size="sm" className="flex-1"
+                  onClick={() => setMobileView("details")}
+                >Detalhes</Button>
+                <Button
+                  variant={mobileView === "timeline" ? "default" : "outline"}
+                  size="sm" className="flex-1 gap-1"
+                  onClick={() => setMobileView("timeline")}
+                >
+                  <MessageCircle className="h-4 w-4" />Timeline
+                </Button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {isLoading ? loadingNode : (
+                  <ScrollArea className="h-full">
+                    {mobileView === "details"
+                      ? <div className="p-4">{detailsContent}</div>
+                      : timelineContent}
+                  </ScrollArea>
+                )}
+              </div>
             </div>
-            <div className="flex-1 overflow-hidden">
-              {isLoading ? loadingNode : (
-                <ScrollArea className="h-full">
-                  {mobileView === "details"
-                    ? <div className="p-4">{detailsContent}</div>
-                    : timelineContent}
-                </ScrollArea>
-              )}
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+        {childDialog}
+      </>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b shrink-0">
-          <DialogTitle>Detalhes do Ticket</DialogTitle>
-        </DialogHeader>
-        <div className="px-6 py-4">
-          {isLoading ? loadingNode : (
-            <div className="flex h-[calc(90vh-80px)] gap-4">
-              <ScrollArea className="flex-1 min-w-0">
-                <div className="pr-4 pb-4">{detailsContent}</div>
-              </ScrollArea>
-              <div className="w-[380px] shrink-0 border-l flex flex-col min-h-0">
-                <ScrollArea className="flex-1">{timelineContent}</ScrollArea>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b shrink-0">
+            <DialogTitle>Detalhes do Ticket</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-4">
+            {isLoading ? loadingNode : (
+              <div className="flex h-[calc(90vh-80px)] gap-4">
+                <ScrollArea className="flex-1 min-w-0">
+                  <div className="pr-4 pb-4">{detailsContent}</div>
+                </ScrollArea>
+                <div className="w-[380px] shrink-0 border-l flex flex-col min-h-0">
+                  <ScrollArea className="flex-1">{timelineContent}</ScrollArea>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      {childDialog}
+    </>
   );
 }
 
