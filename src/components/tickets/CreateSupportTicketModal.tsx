@@ -5,14 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Loader2, Check, ChevronsUpDown, Ticket } from "lucide-react";
+import { Loader2, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -26,6 +23,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const [clienteId, setClienteId] = useState<string>("");
+  const [clienteSearch, setClienteSearch] = useState("");
   const [produtoId, setProdutoId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
@@ -35,11 +33,11 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [status, setStatus] = useState<string>("concluido");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
-  const [clienteOpen, setClienteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
     setClienteId("");
+    setClienteSearch("");
     setProdutoId("");
     setCategoryId("");
     setSubcategoryId("");
@@ -123,13 +121,6 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
-  // Auto-fill produto on cliente change
-  useEffect(() => {
-    if (!clienteId) return;
-    const c = clientes.find((x) => x.id === clienteId);
-    if (c?.produto_id) setProdutoId(String(c.produto_id));
-  }, [clienteId, clientes]);
-
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(
@@ -150,8 +141,6 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setCategoryId("");
     setSubcategoryId("");
   }, [produtoId]);
-
-  const selectedCliente = clientes.find((c) => c.id === clienteId);
 
   const handleSubmit = async () => {
     if (!clienteId || !produtoId || !categoryId || !subcategoryId || !serviceTypeId || !canalOrigem) {
@@ -206,48 +195,31 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
           {/* Cliente */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Cliente <Req /></Label>
-            <Popover open={clienteOpen} onOpenChange={setClienteOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  className="w-full justify-between h-10 font-normal"
-                >
-                  <span className="truncate">
-                    {selectedCliente?.nome_fantasia || "Selecione..."}
-                  </span>
-                  <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Buscar cliente..." />
-                  <CommandList>
-                    <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {clientes.map((c) => (
-                        <CommandItem
-                          key={c.id}
-                          value={c.nome_fantasia}
-                          onSelect={() => {
-                            setClienteId(c.id);
-                            setClienteOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              clienteId === c.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {c.nome_fantasia}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <Input
+              placeholder="Buscar cliente..."
+              value={clienteSearch}
+              onChange={(e) => setClienteSearch(e.target.value)}
+              className="h-10"
+            />
+            <Select value={clienteId} onValueChange={(val) => {
+              setClienteId(val);
+              const found = clientes.find((c: any) => c.id === val);
+              if (found?.produto_id) setProdutoId(String(found.produto_id));
+            }}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Selecione o cliente..." />
+              </SelectTrigger>
+              <SelectContent>
+                {clientes
+                  .filter((c: any) => {
+                    if (!clienteSearch.trim()) return true;
+                    return (c.nome_fantasia ?? "").toLowerCase().includes(clienteSearch.toLowerCase());
+                  })
+                  .map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome_fantasia}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Produto */}
