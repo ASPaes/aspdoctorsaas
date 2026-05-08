@@ -39,6 +39,7 @@ const LimpezaUras = lazy(() => import("@/pages/admin/LimpezaUras"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 
 const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
+const SupportTickets = lazy(() => import("@/pages/SupportTickets"));
 const ConfiguracoesNotificacoes = lazy(() => import("@/pages/ConfiguracoesNotificacoes"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
@@ -95,6 +96,7 @@ const App = () => (
               <Route path="/whatsapp" element={<WhatsApp />} />
               <Route path="/whatsapp/contatos" element={<WhatsAppContatos />} />
               <Route path="/whatsapp/relatorio" element={<WhatsAppRelatorio />} />
+              <Route path="/tickets" element={<SupportTickets />} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
               <Route path="/painel-uso" element={<PainelUso />} />
               <Route path="/admin/limpeza-uras" element={<LimpezaUras />} />
