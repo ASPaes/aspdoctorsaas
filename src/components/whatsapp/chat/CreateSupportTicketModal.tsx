@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, Ticket, LinkIcon, Building2, Bot, Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,13 @@ interface Props {
   contactId: string | null;
   departmentId: string | null;
   aiSummary: string | null;
+  aiTopics?: string[] | null;
+  aiKeywords?: string[] | null;
+  aiProblem?: string | null;
+  aiSolution?: string | null;
+  sentimentLabel?: string | null;
+  sentimentConfidence?: number | null;
+  sentimentSummary?: string | null;
 }
 
 export function CreateSupportTicketModal({
@@ -30,6 +38,13 @@ export function CreateSupportTicketModal({
   clienteId,
   clienteNome,
   aiSummary,
+  aiTopics,
+  aiKeywords,
+  aiProblem,
+  aiSolution,
+  sentimentLabel,
+  sentimentConfidence,
+  sentimentSummary,
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -222,6 +237,72 @@ export function CreateSupportTicketModal({
             </Alert>
           )}
 
+          {(!!aiTopics?.length || !!sentimentLabel || !!aiSummary || !!aiProblem) && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                <Bot className="h-3.5 w-3.5 text-primary" />
+                Contexto IA
+              </div>
+
+              {aiTopics && aiTopics.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Tópicos identificados</p>
+                  <div className="flex flex-wrap gap-1">
+                    {aiTopics.map((topic, i) => (
+                      <Badge key={i} variant="secondary" className="text-[10px]">{topic}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sentimentLabel && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">Sentimento:</span>
+                  <Badge
+                    variant={sentimentLabel === "negative" ? "destructive" : "secondary"}
+                    className="text-[10px] capitalize"
+                  >
+                    {sentimentLabel === "negative" ? "Negativo" : sentimentLabel === "positive" ? "Positivo" : "Neutro"}
+                  </Badge>
+                  {sentimentConfidence != null && (
+                    <span className="text-[10px] text-muted-foreground">({Math.round(sentimentConfidence * 100)}%)</span>
+                  )}
+                </div>
+              )}
+
+              {(sentimentSummary || aiSummary) && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-4">
+                    {sentimentSummary || aiSummary}
+                  </p>
+                </div>
+              )}
+
+              {aiProblem && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Problema</p>
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-4">{aiProblem}</p>
+                </div>
+              )}
+
+              {aiSolution && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Solução</p>
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-4">{aiSolution}</p>
+                </div>
+              )}
+
+              {aiKeywords && aiKeywords.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {aiKeywords.map((kw, i) => (
+                    <Badge key={i} variant="outline" className="text-[10px] font-normal">{kw}</Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <fieldset disabled={!hasCliente} className={!hasCliente ? "opacity-50 pointer-events-none" : ""}>
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -301,16 +382,6 @@ export function CreateSupportTicketModal({
                   className="text-xs min-h-[80px] resize-none"
                 />
               </div>
-
-              {aiSummary && (
-                <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                    <Bot className="h-3.5 w-3.5 text-primary" />
-                    Resumo da IA
-                  </div>
-                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{aiSummary}</p>
-                </div>
-              )}
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Tipo de horário</Label>
