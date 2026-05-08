@@ -329,7 +329,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
 
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit" disabled={updateInstance.isPending || (open && !secrets)}>
+              <Button type="submit" disabled={updateInstance.isPending}>
                 {updateInstance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar
               </Button>
             </div>
