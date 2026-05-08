@@ -230,7 +230,7 @@ export default function SupportTickets() {
             return (
               <button
                 key={t.id}
-                onClick={() => toast.info("Em breve")}
+                onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
                 className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-start gap-4">
