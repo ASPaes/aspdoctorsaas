@@ -13,11 +13,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertTriangle, MessageSquare } from 'lucide-react';
+import { Loader2, AlertTriangle, MessageSquare, RefreshCw } from 'lucide-react';
 import { useMetaTemplates, type MetaTemplate } from '@/hooks/useMetaTemplates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Props {
   open: boolean;
@@ -37,8 +38,10 @@ export function MetaTemplatePicker({
   const [selected, setSelected] = useState<MetaTemplate | null>(null);
   const [parameters, setParameters] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { data: templates, isLoading, error } = useMetaTemplates(instanceId);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!open) {
@@ -108,11 +111,46 @@ export function MetaTemplatePicker({
     }
   };
 
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke('sync-meta-templates', {
+        body: { instance_id: instanceId },
+      });
+      if (invokeErr) throw invokeErr;
+      if (!data?.success) throw new Error(data?.error || 'Falha na sincronização');
+      toast({
+        title: 'Templates sincronizados',
+        description: `${data.upserts} template(s) atualizado(s), ${data.deleted} removido(s).`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['meta-templates', instanceId] });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao sincronizar',
+        description: err?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Enviar template Meta</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Enviar template Meta</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSync}
+              disabled={syncing || !instanceId}
+            >
+              {syncing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              Sincronizar
+            </Button>
+          </div>
           <DialogDescription>
             Selecione um template aprovado para enviar a {to}.
           </DialogDescription>
