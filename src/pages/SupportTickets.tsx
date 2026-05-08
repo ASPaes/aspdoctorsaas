@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { toast } from "sonner";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -82,6 +83,8 @@ export default function SupportTickets() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all"); // TODO: implementar filtro por atendente
   const [search, setSearch] = useState<string>("");
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const cutoffDate = useMemo(() => {
     const days = PERIOD_DAYS[period];
@@ -227,7 +230,7 @@ export default function SupportTickets() {
             return (
               <button
                 key={t.id}
-                onClick={() => toast.info("Em breve")}
+                onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
                 className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
               >
                 <div className="flex items-start gap-4">
@@ -276,6 +279,12 @@ export default function SupportTickets() {
           })}
         </div>
       )}
+
+      <SupportTicketDetailDialog
+        ticketId={selectedTicketId}
+        open={detailOpen}
+        onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
+      />
     </div>
   );
 }
