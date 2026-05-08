@@ -1,0 +1,385 @@
+import { useState, useEffect, useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Loader2, Check, ChevronsUpDown, Ticket } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated?: () => void;
+}
+
+const Req = () => <span className="text-destructive">*</span>;
+
+export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Props) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  const [clienteId, setClienteId] = useState<string>("");
+  const [produtoId, setProdutoId] = useState<string>("");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [subcategoryId, setSubcategoryId] = useState<string>("");
+  const [serviceTypeId, setServiceTypeId] = useState<string>("");
+  const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
+  const [tipoHorario, setTipoHorario] = useState<string>("comercial");
+  const [status, setStatus] = useState<string>("concluido");
+  const [agendadoPara, setAgendadoPara] = useState<string>("");
+  const [observacaoAgente, setObservacaoAgente] = useState<string>("");
+  const [clienteOpen, setClienteOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const reset = () => {
+    setClienteId("");
+    setProdutoId("");
+    setCategoryId("");
+    setSubcategoryId("");
+    setServiceTypeId("");
+    setCanalOrigem("telefone");
+    setTipoHorario("comercial");
+    setStatus("concluido");
+    setAgendadoPara("");
+    setObservacaoAgente("");
+  };
+
+  useEffect(() => {
+    if (open) reset();
+  }, [open]);
+
+  const { data: clientes = [] } = useQuery({
+    queryKey: ["create_manual_ticket_clientes", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("clientes" as any) as any)
+        .select("id, nome_fantasia, produto_id")
+        .eq("tenant_id", tid)
+        .order("nome_fantasia");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome_fantasia: string; produto_id: number | null }>;
+    },
+  });
+
+  const { data: produtos = [] } = useQuery({
+    queryKey: ["create_manual_ticket_produtos", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["create_manual_ticket_categories", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_categories" as any) as any)
+        .select("id, nome, produto_id")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+    },
+  });
+
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ["create_manual_ticket_subcategories", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_subcategories" as any) as any)
+        .select("id, nome, category_id")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; category_id: string }>;
+    },
+  });
+
+  const { data: serviceTypes = [] } = useQuery({
+    queryKey: ["create_manual_ticket_service_types", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_types" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  // Auto-fill produto on cliente change
+  useEffect(() => {
+    if (!clienteId) return;
+    const c = clientes.find((x) => x.id === clienteId);
+    if (c?.produto_id) setProdutoId(String(c.produto_id));
+  }, [clienteId, clientes]);
+
+  const produtoIdNum = produtoId ? Number(produtoId) : null;
+
+  const filteredCategories = useMemo(
+    () => categories.filter((c) => c.produto_id === produtoIdNum || c.produto_id === null),
+    [categories, produtoIdNum]
+  );
+
+  const filteredSubcategories = useMemo(
+    () => subcategories.filter((s) => s.category_id === categoryId),
+    [subcategories, categoryId]
+  );
+
+  useEffect(() => {
+    setSubcategoryId("");
+  }, [categoryId]);
+
+  useEffect(() => {
+    setCategoryId("");
+    setSubcategoryId("");
+  }, [produtoId]);
+
+  const selectedCliente = clientes.find((c) => c.id === clienteId);
+
+  const handleSubmit = async () => {
+    if (!clienteId || !produtoId || !categoryId || !subcategoryId || !serviceTypeId || !canalOrigem) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+    if (status === "agendado" && !agendadoPara) {
+      toast.error("Informe a data de agendamento");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await (supabase.rpc as any)("create_manual_ticket", {
+        p_cliente_id: clienteId,
+        p_produto_id: Number(produtoId),
+        p_category_id: categoryId,
+        p_subcategory_id: subcategoryId,
+        p_service_type_id: serviceTypeId,
+        p_canal_origem: canalOrigem,
+        p_tipo_horario: tipoHorario,
+        p_observacao_agente: observacaoAgente || null,
+        p_status: status,
+        p_agendado_para: status === "agendado" ? new Date(agendadoPara).toISOString() : null,
+        p_contact_id: null,
+        p_department_id: null,
+      });
+
+      if (error) throw error;
+
+      toast.success("Ticket criado com sucesso");
+      onCreated?.();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error("Erro ao criar ticket: " + (err?.message || "desconhecido"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Ticket className="h-5 w-5 text-primary" />
+            Novo ticket manual
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          {/* Cliente */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Cliente <Req /></Label>
+            <Popover open={clienteOpen} onOpenChange={setClienteOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between h-10 font-normal"
+                >
+                  <span className="truncate">
+                    {selectedCliente?.nome_fantasia || "Selecione..."}
+                  </span>
+                  <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar cliente..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {clientes.map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          value={c.nome_fantasia}
+                          onSelect={() => {
+                            setClienteId(c.id);
+                            setClienteOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              clienteId === c.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {c.nome_fantasia}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Produto */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Produto <Req /></Label>
+            <Select value={produtoId} onValueChange={setProdutoId}>
+              <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                {produtos.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Categoria + Subcategoria */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Categoria <Req /></Label>
+              <Select value={categoryId} onValueChange={setCategoryId} disabled={!produtoId}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  {filteredCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Subcategoria <Req /></Label>
+              <Select value={subcategoryId} onValueChange={setSubcategoryId} disabled={!categoryId}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  {filteredSubcategories.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Tipo de serviço */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Tipo de serviço <Req /></Label>
+            <Select value={serviceTypeId} onValueChange={setServiceTypeId}>
+              <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                {serviceTypes.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Canal + Horário */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Canal de origem <Req /></Label>
+              <Select value={canalOrigem} onValueChange={setCanalOrigem}>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="telefone">Telefone</SelectItem>
+                  <SelectItem value="presencial">Presencial</SelectItem>
+                  <SelectItem value="email">E-mail</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Tipo de horário</Label>
+              <Select value={tipoHorario} onValueChange={setTipoHorario}>
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comercial">Comercial</SelectItem>
+                  <SelectItem value="plantao">Plantão</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Status + Agendamento */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="aberto">Aberto</SelectItem>
+                  <SelectItem value="agendado">Agendado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {status === "agendado" && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Agendado para <Req /></Label>
+                <Input
+                  type="datetime-local"
+                  className="h-10"
+                  value={agendadoPara}
+                  onChange={(e) => setAgendadoPara(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Observação */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Observação do agente</Label>
+            <Textarea
+              rows={4}
+              value={observacaoAgente}
+              onChange={(e) => setObservacaoAgente(e.target.value)}
+              placeholder="Descreva o atendimento..."
+              className="resize-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              Criar ticket
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
