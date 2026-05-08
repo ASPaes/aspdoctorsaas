@@ -27,6 +27,8 @@ const formSchema = z.object({
   zapi_client_token: z.string().optional(),
   // Meta Cloud
   meta_phone_number_id: z.string().optional(),
+  meta_waba_id: z.string().optional(),
+  meta_business_id: z.string().optional(),
   meta_access_token: z.string().optional(),
   meta_app_secret: z.string().optional(),
   meta_verify_token: z.string().optional(),
@@ -42,6 +44,8 @@ interface EditInstanceDialogProps {
     provider_type: string;
     instance_id_external: string | null;
     meta_phone_number_id?: string | null;
+    meta_waba_id?: string | null;
+    meta_business_id?: string | null;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -85,6 +89,8 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       zapi_token: '',
       zapi_client_token: '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
+      meta_waba_id: instance.meta_waba_id || '',
+      meta_business_id: instance.meta_business_id || '',
       meta_access_token: '',
       meta_app_secret: '',
       meta_verify_token: '',
@@ -106,6 +112,8 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       zapi_token: '',
       zapi_client_token: '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
+      meta_waba_id: instance.meta_waba_id || '',
+      meta_business_id: instance.meta_business_id || '',
       meta_access_token: '',
       meta_app_secret: '',
       meta_verify_token: '',
@@ -136,7 +144,14 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
           instance_id_external: values.provider_type === 'cloud' ? values.instance_id_external : null,
           provider_type: values.provider_type,
           ...((!isMeta && !isZapi) && { api_url: values.api_url, api_key: values.api_key }),
-          ...(isMeta && { meta_phone_number_id: values.meta_phone_number_id, meta_access_token: values.meta_access_token, meta_app_secret: values.meta_app_secret, meta_verify_token: values.meta_verify_token }),
+          ...(isMeta && {
+            meta_phone_number_id: values.meta_phone_number_id,
+            meta_access_token: values.meta_access_token,
+            meta_app_secret: values.meta_app_secret,
+            meta_verify_token: values.meta_verify_token,
+            meta_waba_id: values.meta_waba_id || null,
+            meta_business_id: values.meta_business_id || null,
+          }),
           ...(isZapi && { zapi_instance_id: values.zapi_instance_id, zapi_token: values.zapi_token, zapi_client_token: values.zapi_client_token }),
         },
       });
@@ -258,6 +273,26 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
                     <FormMessage />
                   </FormItem>
                 )} />
+                <FormField control={form.control} name="meta_waba_id" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WABA ID</FormLabel>
+                    <FormControl><Input placeholder="ID da conta WhatsApp Business" autoComplete="off" {...field} /></FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Encontrado em: Meta Business Suite → Configurações → WhatsApp → Contas do WhatsApp Business.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="meta_business_id" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Business ID</FormLabel>
+                    <FormControl><Input placeholder="ID do portfólio de negócios" autoComplete="off" {...field} /></FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Encontrado em: Meta Business Suite → Configurações → Informações da empresa.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={form.control} name="meta_access_token" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Access Token (Permanente)</FormLabel>
@@ -292,7 +327,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
 
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit" disabled={updateInstance.isPending}>
+              <Button type="submit" disabled={updateInstance.isPending || (open && !secrets)}>
                 {updateInstance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar
               </Button>
             </div>
