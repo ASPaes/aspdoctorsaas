@@ -376,7 +376,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       when: c.aberto_em,
       node: (
         <button
-          onClick={() => toast.info("Em breve")}
+          onClick={() => {
+            onOpenChange(false);
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: c.id } }));
+            }, 300);
+          }}
           className="w-full text-left border border-blue-500/30 rounded-lg p-3 hover:border-blue-500/60 transition-colors"
         >
           <div className="flex items-center gap-2 mb-1">
