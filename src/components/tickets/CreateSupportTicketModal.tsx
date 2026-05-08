@@ -5,14 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Loader2, Check, ChevronsUpDown, Ticket } from "lucide-react";
+import { Loader2, Ticket } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
