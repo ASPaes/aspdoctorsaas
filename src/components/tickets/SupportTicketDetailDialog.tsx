@@ -71,6 +71,8 @@ interface Props {
 export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Props) {
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState<"details" | "timeline">("details");
+  const [childOpen, setChildOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
 
