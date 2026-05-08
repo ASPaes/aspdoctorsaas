@@ -7,6 +7,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -169,12 +170,13 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Editar Instância</DialogTitle>
           <DialogDescription>Atualize as informações da instância</DialogDescription>
         </DialogHeader>
         <Form {...form}>
+          <ScrollArea className="flex-1 overflow-auto pr-2">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
             <FormField control={form.control} name="provider_type" render={({ field }) => (
@@ -333,6 +335,7 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
             </div>
 
           </form>
+          </ScrollArea>
         </Form>
       </DialogContent>
     </Dialog>
