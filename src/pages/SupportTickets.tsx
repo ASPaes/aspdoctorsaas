@@ -279,6 +279,12 @@ export default function SupportTickets() {
           })}
         </div>
       )}
+
+      <SupportTicketDetailDialog
+        ticketId={selectedTicketId}
+        open={detailOpen}
+        onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
+      />
     </div>
   );
 }
