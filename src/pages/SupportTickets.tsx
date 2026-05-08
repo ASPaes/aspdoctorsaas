@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
 
 const STATUS_LABELS: Record<string, string> = {
