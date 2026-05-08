@@ -295,6 +295,14 @@ export default function SupportTickets() {
         </div>
       )}
 
+      <CreateSupportTicketModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+        }}
+      />
+
       <SupportTicketDetailDialog
         ticketId={selectedTicketId}
         open={detailOpen}
