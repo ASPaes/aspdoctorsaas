@@ -27,6 +27,8 @@ const formSchema = z.object({
   zapi_client_token: z.string().optional(),
   // Meta Cloud
   meta_phone_number_id: z.string().optional(),
+  meta_waba_id: z.string().optional(),
+  meta_business_id: z.string().optional(),
   meta_access_token: z.string().optional(),
   meta_app_secret: z.string().optional(),
   meta_verify_token: z.string().optional(),
@@ -42,6 +44,8 @@ interface EditInstanceDialogProps {
     provider_type: string;
     instance_id_external: string | null;
     meta_phone_number_id?: string | null;
+    meta_waba_id?: string | null;
+    meta_business_id?: string | null;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -85,6 +89,8 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       zapi_token: '',
       zapi_client_token: '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
+      meta_waba_id: instance.meta_waba_id || '',
+      meta_business_id: instance.meta_business_id || '',
       meta_access_token: '',
       meta_app_secret: '',
       meta_verify_token: '',
@@ -106,6 +112,8 @@ export const EditInstanceDialog = ({ instance, open, onOpenChange }: EditInstanc
       zapi_token: '',
       zapi_client_token: '',
       meta_phone_number_id: instance.meta_phone_number_id || '',
+      meta_waba_id: instance.meta_waba_id || '',
+      meta_business_id: instance.meta_business_id || '',
       meta_access_token: '',
       meta_app_secret: '',
       meta_verify_token: '',
