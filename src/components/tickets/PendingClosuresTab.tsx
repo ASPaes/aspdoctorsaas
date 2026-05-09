@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Bot, Inbox, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ClassifyClosureModal } from "@/components/tickets/ClassifyClosureModal";
@@ -36,12 +38,7 @@ type PendingClosure = {
   msg_agent_count: number;
 };
 
-const PERIOD_OPTIONS: Record<string, number | null> = {
-  "7": 7,
-  "30": 30,
-  "90": 90,
-  all: null,
-};
+
 
 function formatDate(s: string) {
   try {
@@ -79,20 +76,12 @@ export function PendingClosuresTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
 
-  const [period, setPeriod] = useState<string>("7");
+  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 7), to: new Date() });
   const [agenteFilter, setAgenteFilter] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [classifyTarget, setClassifyTarget] = useState<PendingClosure | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
-
-  const cutoffDate = useMemo(() => {
-    const days = PERIOD_OPTIONS[period];
-    if (!days) return null;
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString();
-  }, [period]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["pending_closures_agents", tid],
@@ -111,15 +100,15 @@ export function PendingClosuresTab() {
   });
 
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ["pending_closures", tid, agenteFilter, period],
+    queryKey: ["pending_closures", tid, agenteFilter, dateRange.from.toISOString(), dateRange.to.toISOString()],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_pending_closures", {
         p_limit: 50,
         p_offset: 0,
         p_agent_id: agenteFilter || null,
-        p_date_from: cutoffDate || null,
-        p_date_to: null,
+        p_date_from: dateRange.from.toISOString(),
+        p_date_to: new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate(), 23, 59, 59).toISOString(),
       });
       if (error) throw error;
       return (data ?? []) as PendingClosure[];
@@ -261,17 +250,7 @@ export function PendingClosuresTab() {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="h-9 w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Últimos 7 dias</SelectItem>
-            <SelectItem value="30">Últimos 30 dias</SelectItem>
-            <SelectItem value="90">Últimos 90 dias</SelectItem>
-            <SelectItem value="all">Tudo</SelectItem>
-          </SelectContent>
-        </Select>
+        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
 
         <Select value={agenteFilter || "_all"} onValueChange={(v) => setAgenteFilter(v === "_all" ? "" : v)}>
           <SelectTrigger className="h-9 w-[220px]">

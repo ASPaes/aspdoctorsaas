@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock } from "lucide-react";
+import { subDays } from "date-fns";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
 import { Button } from "@/components/ui/button";
@@ -32,12 +34,6 @@ const STATUS_CLASSES: Record<string, string> = {
   cancelado: "bg-red-500/10 text-red-400 border-red-500/20 opacity-70",
 };
 
-const PERIOD_DAYS: Record<string, number | null> = {
-  "7": 7,
-  "30": 30,
-  "90": 90,
-  all: null,
-};
 
 function ChannelIcon({ canal }: { canal: string | null }) {
   const cls = "h-4 w-4 text-muted-foreground";
@@ -81,7 +77,7 @@ interface TicketRow {
 
 export default function SupportTickets() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const [period, setPeriod] = useState<string>("30");
+  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
   const [produtoFilter, setProdutoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all"); // TODO: implementar filtro por atendente
@@ -104,13 +100,7 @@ export default function SupportTickets() {
     return () => window.removeEventListener("open-ticket-detail", handler);
   }, []);
 
-  const cutoffDate = useMemo(() => {
-    const days = PERIOD_DAYS[period];
-    if (days == null) return null;
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString();
-  }, [period]);
+
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["support_tickets_produtos", tid],
@@ -126,9 +116,14 @@ export default function SupportTickets() {
   });
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, cutoffDate, produtoFilter, statusFilter],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter],
     enabled: !!tid,
     queryFn: async () => {
+      const fromISO = dateRange.from.toISOString();
+      const toDate = new Date(dateRange.to);
+      toDate.setHours(23, 59, 59, 999);
+      const toISO = toDate.toISOString();
+
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
           id, ticket_code, assunto, status, prioridade, canal_origem, tipo_horario,
@@ -140,10 +135,11 @@ export default function SupportTickets() {
           service_types:service_type_id(nome)
         `)
         .eq("tenant_id", tid)
+        .gte("aberto_em", fromISO)
+        .lte("aberto_em", toISO)
         .order("aberto_em", { ascending: false })
         .limit(100);
 
-      if (cutoffDate) q = q.gte("aberto_em", cutoffDate);
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
 
@@ -193,15 +189,7 @@ export default function SupportTickets() {
 
         <TabsContent value="tickets" className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="90">Últimos 90 dias</SelectItem>
-                <SelectItem value="all">Tudo</SelectItem>
-              </SelectContent>
-            </Select>
+            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
 
             <Select value={produtoFilter} onValueChange={setProdutoFilter}>
               <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Produto" /></SelectTrigger>
