@@ -30,14 +30,6 @@ interface Props {
   closedAt: string | null;
 }
 
-const mediaLabels: Record<string, string> = {
-  image: "📷 Imagem",
-  audio: "🎵 Áudio",
-  video: "🎬 Vídeo",
-  document: "📎 Documento",
-  sticker: "🏷️ Sticker",
-};
-
 function formatDateLabel(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("pt-BR", {
