@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X, Headphones } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X, Headphones, LayoutList, Columns3, BarChart3 } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -19,6 +19,7 @@ import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDet
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: "Aberto",
@@ -95,7 +96,22 @@ export default function SupportTickets() {
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [ticketsView, setTicketsView] = useState("lista");
   const queryClient = useQueryClient();
+
+  const handleKanbanStatusChange = async (ticketId: string, newStatus: string) => {
+    try {
+      const { error } = await (supabase.rpc as any)("update_ticket_status", {
+        p_ticket_id: ticketId,
+        p_new_status: newStatus,
+      });
+      if (error) throw error;
+      toast.success("Status atualizado");
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+    } catch (err: any) {
+      toast.error("Erro ao atualizar: " + (err.message ?? ""));
+    }
+  };
 
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -567,76 +583,110 @@ export default function SupportTickets() {
             </div>
           )}
 
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <Inbox className="h-12 w-12 mb-3 opacity-40" />
-              <p className="text-sm">Nenhum ticket encontrado</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredTickets.map((t) => {
-                const breadcrumb = [
-                  t.produtos?.nome,
-                  t.service_categories?.nome,
-                  t.service_subcategories?.nome,
-                ].filter(Boolean).join(" › ");
-                const tipoServico = t.service_types?.nome;
+          {/* Sub-abas de visualização */}
+          <div className="flex items-center gap-1 border-b border-border">
+            <button
+              onClick={() => setTicketsView("lista")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t-md transition-colors ${ticketsView === "lista" ? "bg-card border border-b-0 border-border font-medium text-foreground -mb-px" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <LayoutList className="h-4 w-4" />
+              Lista
+            </button>
+            <button
+              onClick={() => setTicketsView("kanban")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t-md transition-colors ${ticketsView === "kanban" ? "bg-card border border-b-0 border-border font-medium text-foreground -mb-px" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Columns3 className="h-4 w-4" />
+              Kanban
+            </button>
+          </div>
 
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
-                    className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="shrink-0 min-w-[110px]">
-                        <p className="font-mono text-sm font-semibold text-primary">{t.ticket_code ?? "—"}</p>
-                        {t.parent_ticket_id && (
-                          <Badge variant="outline" className="mt-1 text-[10px]">↳ vinculado</Badge>
-                        )}
-                      </div>
+          {ticketsView === "lista" && (
+            isLoading ? (
+              <div className="space-y-2">
+                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+              </div>
+            ) : filteredTickets.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Inbox className="h-12 w-12 mb-3 opacity-40" />
+                <p className="text-sm">Nenhum ticket encontrado</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredTickets.map((t) => {
+                  const breadcrumb = [
+                    t.produtos?.nome,
+                    t.service_categories?.nome,
+                    t.service_subcategories?.nome,
+                  ].filter(Boolean).join(" › ");
+                  const tipoServico = t.service_types?.nome;
 
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium truncate">
-                            {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
-                          </p>
-                          <Badge className={`text-[10px] border ${STATUS_CLASSES[t.status] ?? ""}`}>
-                            {STATUS_LABELS[t.status] ?? t.status}
-                          </Badge>
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
+                      className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="shrink-0 min-w-[110px]">
+                          <p className="font-mono text-sm font-semibold text-primary">{t.ticket_code ?? "—"}</p>
+                          {t.parent_ticket_id && (
+                            <Badge variant="outline" className="mt-1 text-[10px]">↳ vinculado</Badge>
+                          )}
                         </div>
-                        {breadcrumb && (
-                          <p className="text-xs text-muted-foreground truncate">
-                            {breadcrumb}
-                            {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
-                          </p>
-                        )}
-                        {t.assunto && (
-                          <p className="text-xs text-muted-foreground truncate">{t.assunto}</p>
-                        )}
-                        {t.agendado_para && (
-                          <p className="text-[11px] text-yellow-400 flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Agendado: {formatDate(t.agendado_para)}
-                          </p>
-                        )}
-                      </div>
 
-                      <div className="shrink-0 flex flex-col items-end gap-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <ChannelIcon canal={t.canal_origem} />
-                          <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium truncate">
+                              {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
+                            </p>
+                            <Badge className={`text-[10px] border ${STATUS_CLASSES[t.status] ?? ""}`}>
+                              {STATUS_LABELS[t.status] ?? t.status}
+                            </Badge>
+                          </div>
+                          {breadcrumb && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {breadcrumb}
+                              {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
+                            </p>
+                          )}
+                          {t.assunto && (
+                            <p className="text-xs text-muted-foreground truncate">{t.assunto}</p>
+                          )}
+                          {t.agendado_para && (
+                            <p className="text-[11px] text-yellow-400 flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Agendado: {formatDate(t.agendado_para)}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="shrink-0 flex flex-col items-end gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <ChannelIcon canal={t.canal_origem} />
+                            <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {ticketsView === "kanban" && (
+            isLoading ? (
+              <div className="flex gap-3 overflow-x-auto">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[60vh] min-w-[260px] w-[260px]" />)}
+              </div>
+            ) : (
+              <TicketsKanbanView
+                tickets={filteredTickets.filter((t: any) => t.status !== "cancelado")}
+                onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
+                onStatusChange={handleKanbanStatusChange}
+              />
+            )
           )}
         </TabsContent>
 
