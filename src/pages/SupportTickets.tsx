@@ -318,6 +318,33 @@ export default function SupportTickets() {
         </TabsList>
 
         <TabsContent value="tickets" className="space-y-4">
+          {/* Metric cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Abertos</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.abertos}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Concluídos</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.concluidos}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Agendados</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-yellow-400">{ticketMetrics.agendados}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Aguardando</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-orange-400">{ticketMetrics.aguardando}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Cancelados</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-red-400">{ticketMetrics.cancelados}</p>
+            </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
