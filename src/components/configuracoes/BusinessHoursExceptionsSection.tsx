@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff } from "lucide-react";
+import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff, Download } from "lucide-react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface Exception {
@@ -30,6 +30,62 @@ const TYPE_LABELS: Record<string, string> = {
   collective_leave: "Folga coletiva",
 };
 
+function calcularPascoa(ano: number): Date {
+  const a = ano % 19;
+  const b = Math.floor(ano / 100);
+  const c = ano % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(ano, mes - 1, dia);
+}
+
+function addDias(d: Date, n: number): Date {
+  const novo = new Date(d);
+  novo.setDate(novo.getDate() + n);
+  return novo;
+}
+
+function ymd(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getFeriadosNacionais(ano: number): { date: string; name: string }[] {
+  const pascoa = calcularPascoa(ano);
+  const sextaSanta = addDias(pascoa, -2);
+  const corpusChristi = addDias(pascoa, 60);
+
+  return [
+    { date: `${ano}-01-01`, name: "Confraternização Universal" },
+    { date: ymd(sextaSanta), name: "Sexta-feira da Paixão" },
+    { date: `${ano}-04-21`, name: "Tiradentes" },
+    { date: `${ano}-05-01`, name: "Dia do Trabalhador" },
+    { date: ymd(corpusChristi), name: "Corpus Christi" },
+    { date: `${ano}-09-07`, name: "Independência do Brasil" },
+    { date: `${ano}-10-12`, name: "Nossa Senhora Aparecida" },
+    { date: `${ano}-11-02`, name: "Finados" },
+    { date: `${ano}-11-15`, name: "Proclamação da República" },
+    { date: `${ano}-11-20`, name: "Consciência Negra" },
+    { date: `${ano}-12-25`, name: "Natal" },
+  ];
+}
+
+const ANOS_DISPONIVEIS = (() => {
+  const atual = new Date().getFullYear();
+  return [atual, atual + 1, atual + 2];
+})();
+
 export default function BusinessHoursExceptionsSection() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { toast } = useToast();
@@ -41,7 +97,9 @@ export default function BusinessHoursExceptionsSection() {
   const [formType, setFormType] = useState<string>("holiday");
   const [formName, setFormName] = useState("");
 
-  // ─── Query ────────────────────────────────────────────────────
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importAno, setImportAno] = useState(ANOS_DISPONIVEIS[0]);
+
   const { data: exceptions = [], isLoading } = useQuery<Exception[]>({
     queryKey: ["business-hours-exceptions", tid],
     enabled: !!tid,
@@ -56,7 +114,11 @@ export default function BusinessHoursExceptionsSection() {
     },
   });
 
-  // ─── Mutations ────────────────────────────────────────────────
+  const datasJaCadastradas = useMemo(
+    () => new Set(exceptions.map((e) => e.date)),
+    [exceptions]
+  );
+
   const upsertMutation = useMutation({
     mutationFn: async () => {
       if (!formDate || !tid) throw new Error("Data obrigatória");
@@ -111,7 +173,52 @@ export default function BusinessHoursExceptionsSection() {
     },
   });
 
-  // ─── Dialog helpers ───────────────────────────────────────────
+  const importMutation = useMutation({
+    mutationFn: async (ano: number) => {
+      if (!tid) throw new Error("tenant_id ausente");
+      const lista = getFeriadosNacionais(ano);
+      const novos = lista.filter((f) => !datasJaCadastradas.has(f.date));
+      if (novos.length === 0) {
+        return { inseridos: 0, ignorados: lista.length };
+      }
+      const payload = novos.map((f) => ({
+        tenant_id: tid,
+        date: f.date,
+        type: "holiday",
+        name: f.name,
+        is_closed: true,
+      }));
+      const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
+        .insert(payload);
+      if (error) {
+        if (error.code !== "23505") throw error;
+      }
+      return { inseridos: novos.length, ignorados: lista.length - novos.length };
+    },
+    onSuccess: ({ inseridos, ignorados }) => {
+      qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
+      if (inseridos === 0) {
+        toast({ title: "Nenhum feriado novo", description: `Todos os ${ignorados} feriados nacionais já estavam cadastrados.` });
+      } else {
+        toast({ title: "Feriados importados!", description: `${inseridos} adicionado${inseridos > 1 ? "s" : ""}${ignorados > 0 ? `, ${ignorados} já existia${ignorados > 1 ? "m" : ""}` : ""}.` });
+      }
+      setImportDialogOpen(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao importar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const previewImport = useMemo(() => {
+    const lista = getFeriadosNacionais(importAno);
+    return lista.map((f) => ({
+      ...f,
+      jaExiste: datasJaCadastradas.has(f.date),
+    }));
+  }, [importAno, datasJaCadastradas]);
+
+  const totalNovos = previewImport.filter((p) => !p.jaExiste).length;
+
   const openAdd = useCallback(() => {
     setEditingId(null);
     setFormDate(undefined);
@@ -146,7 +253,11 @@ export default function BusinessHoursExceptionsSection() {
           Dias em que o atendimento é considerado fechado, independentemente da grade semanal.
         </p>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportDialogOpen(true)}>
+            <Download className="h-4 w-4 mr-1" />
+            Importar feriados nacionais
+          </Button>
           <Button size="sm" onClick={openAdd}>
             <Plus className="h-4 w-4 mr-1" />
             Adicionar dia
@@ -275,6 +386,81 @@ export default function BusinessHoursExceptionsSection() {
               >
                 {upsertMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
                 {editingId ? "Salvar" : "Adicionar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Import Dialog ── */}
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Importar feriados nacionais</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Importa os feriados nacionais oficiais brasileiros (não-facultativos). Feriados já cadastrados são ignorados.
+              </p>
+
+              {/* Year selector */}
+              <div className="space-y-1.5">
+                <Label>Ano</Label>
+                <Select value={String(importAno)} onValueChange={(v) => setImportAno(Number(v))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ANOS_DISPONIVEIS.map((a) => (
+                      <SelectItem key={a} value={String(a)}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Preview */}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-24">Data</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead className="w-28 text-right">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewImport.map((f) => (
+                      <TableRow key={f.date}>
+                        <TableCell className="font-medium text-sm">
+                          {format(parseISO(f.date), "dd/MM/yyyy")}
+                        </TableCell>
+                        <TableCell className="text-sm">{f.name}</TableCell>
+                        <TableCell className="text-right">
+                          {f.jaExiste ? (
+                            <span className="text-xs text-muted-foreground">Já existe</span>
+                          ) : (
+                            <span className="text-xs text-green-500 font-medium">Será adicionado</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="text-sm">
+                {totalNovos === 0
+                  ? "Todos os feriados nacionais deste ano já estão cadastrados."
+                  : `${totalNovos} novo${totalNovos > 1 ? "s" : ""} feriado${totalNovos > 1 ? "s" : ""} ser${totalNovos > 1 ? "ão" : "á"} adicionado${totalNovos > 1 ? "s" : ""}.`}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
+              <Button
+                onClick={() => importMutation.mutate(importAno)}
+                disabled={totalNovos === 0 || importMutation.isPending}
+              >
+                {importMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                Importar {totalNovos > 0 ? `(${totalNovos})` : ""}
               </Button>
             </DialogFooter>
           </DialogContent>
