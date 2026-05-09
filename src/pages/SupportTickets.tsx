@@ -77,7 +77,7 @@ interface TicketRow {
 
 export default function SupportTickets() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const [period, setPeriod] = useState<string>("30");
+  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
   const [produtoFilter, setProdutoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all"); // TODO: implementar filtro por atendente
@@ -100,13 +100,7 @@ export default function SupportTickets() {
     return () => window.removeEventListener("open-ticket-detail", handler);
   }, []);
 
-  const cutoffDate = useMemo(() => {
-    const days = PERIOD_DAYS[period];
-    if (days == null) return null;
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString();
-  }, [period]);
+
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["support_tickets_produtos", tid],
