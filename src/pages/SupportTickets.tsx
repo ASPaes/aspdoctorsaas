@@ -191,6 +191,26 @@ export default function SupportTickets() {
     setSubcategoriaFilter("all");
   }, [categoriaFilter]);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (produtoFilter !== "all") count++;
+    if (atendenteFilter !== "all") count++;
+    if (categoriaFilter !== "all") count++;
+    if (subcategoriaFilter !== "all") count++;
+    if (canalFilter !== "all") count++;
+    if (serviceTypeFilters.length > 0) count++;
+    return count;
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters]);
+
+  const clearAdvancedFilters = () => {
+    setProdutoFilter("all");
+    setAtendenteFilter("all");
+    setCategoriaFilter("all");
+    setSubcategoriaFilter("all");
+    setCanalFilter("all");
+    setServiceTypeFilters([]);
+  };
+
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
     enabled: !!tid,
