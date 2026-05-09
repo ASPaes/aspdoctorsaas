@@ -161,6 +161,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
       if (atendenteFilter !== "all") q = q.eq("assigned_to", atendenteFilter);
       if (departamentoFilter !== "all") q = q.eq("department_id", departamentoFilter);
       if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
+      if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
       if (error) throw error;
