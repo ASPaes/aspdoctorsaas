@@ -231,6 +231,9 @@ export default function ClienteForm() {
   const estadoId = form.watch("estado_id");
   const cancelado = form.watch("cancelado");
   const [confirmReactivateOpen, setConfirmReactivateOpen] = useState(false);
+  const [showReativarDialog, setShowReativarDialog] = useState(false);
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const lookups = useLookups(estadoId);
 
   // Draft persistence
