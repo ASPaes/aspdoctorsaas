@@ -16,6 +16,7 @@ import {
 } from './types';
 import type { CSGlobalFilters } from '@/pages/CustomerSuccess';
 import { Building2, User, AlertTriangle, Calendar, MoreVertical, Eye, Edit, ArrowRight, GripVertical } from 'lucide-react';
+import { getCurrentFuncionarioId } from './utils/getCurrentFuncionarioId';
 
 interface CSKanbanProps {
   onViewTicket: (ticket: CSTicket) => void;
@@ -139,11 +140,13 @@ export function CSKanban({ onViewTicket, onEditTicket, filters }: CSKanbanProps)
     try {
       await updateTicket.mutateAsync(updates as any);
       if (previousStatus && previousStatus !== newStatus) {
+        const criadoPorId = await getCurrentFuncionarioId();
         await supabase.from('cs_ticket_updates').insert({
           ticket_id: ticketId,
           tipo: 'mudanca_status' as const,
           conteudo: `Status alterado de "${CS_TICKET_STATUS_LABELS[previousStatus]}" para "${CS_TICKET_STATUS_LABELS[newStatus]}"`,
           privado: false,
+          criado_por_id: criadoPorId,
         });
       }
     } catch {
