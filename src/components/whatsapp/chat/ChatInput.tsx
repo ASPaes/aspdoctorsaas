@@ -394,17 +394,16 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           </div>
         )}
 
-        {(() => {
-          const pendingTags = detectTags(message);
-          if (pendingTags.length === 0) return null;
-          return (
-            <div className="mb-1 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30">
-              <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                📝 Preencha: {pendingTags.map((t) => `{{${t}}}`).join(", ")}
-              </p>
-            </div>
-          );
-        })()}
+        {activeMacro && (
+          <MacroFillCard
+            template={activeMacro.content}
+            permiteEdicaoLivre={activeMacro.permite_edicao_livre}
+            onCancel={handleMacroCardCancel}
+            onEditFreely={handleMacroEditFreely}
+            onSend={handleMacroCardSend}
+            isSending={sendMutation.isPending}
+          />
+        )}
 
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} />}
