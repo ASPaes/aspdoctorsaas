@@ -250,17 +250,7 @@ export function PendingClosuresTab() {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="h-9 w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Últimos 7 dias</SelectItem>
-            <SelectItem value="30">Últimos 30 dias</SelectItem>
-            <SelectItem value="90">Últimos 90 dias</SelectItem>
-            <SelectItem value="all">Tudo</SelectItem>
-          </SelectContent>
-        </Select>
+        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
 
         <Select value={agenteFilter || "_all"} onValueChange={(v) => setAgenteFilter(v === "_all" ? "" : v)}>
           <SelectTrigger className="h-9 w-[220px]">
