@@ -80,7 +80,9 @@ export default function SupportTickets() {
   const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
   const [produtoFilter, setProdutoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [atendenteFilter, setAtendenteFilter] = useState<string>("all"); // TODO: implementar filtro por atendente
+  const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
+  const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
+  const [canalFilter, setCanalFilter] = useState<string>("all");
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -115,8 +117,38 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: agentes = [] } = useQuery({
+    queryKey: ["support_tickets_agentes", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+    },
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["support_tickets_categories", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_categories" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -142,6 +174,9 @@ export default function SupportTickets() {
 
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
+      if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
+      if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
 
       const { data, error } = await q;
       if (error) throw error;
@@ -211,10 +246,34 @@ export default function SupportTickets() {
               </SelectContent>
             </Select>
 
-            <Select value={atendenteFilter} onValueChange={setAtendenteFilter} disabled>
+            <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
               <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Atendente" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os atendentes</SelectItem>
+                {agentes.map((a) => (
+                  <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as categorias</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={canalFilter} onValueChange={setCanalFilter}>
+              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os canais</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="telefone">Telefone</SelectItem>
+                <SelectItem value="presencial">Presencial</SelectItem>
+                <SelectItem value="email">E-mail</SelectItem>
               </SelectContent>
             </Select>
 
