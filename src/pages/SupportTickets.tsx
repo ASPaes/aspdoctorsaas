@@ -584,6 +584,10 @@ export default function SupportTickets() {
           )}
         </TabsContent>
 
+        <TabsContent value="atendimentos" className="mt-4">
+          <AttendancesTab />
+        </TabsContent>
+
         <TabsContent value="pending">
           <PendingClosuresTab />
         </TabsContent>
