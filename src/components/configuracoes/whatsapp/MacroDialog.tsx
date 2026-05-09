@@ -191,6 +191,21 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
               </div>
             )}
 
+            <FormField control={form.control} name="permite_edicao_livre" render={({ field }) => (
+              <FormItem className="flex items-start justify-between gap-3 rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <FormLabel>Permitir edição livre</FormLabel>
+                  <p className="text-xs text-muted-foreground">
+                    Quando ativo, o atendente pode editar todo o texto da mensagem (não apenas os campos {`{{tag}}`}).
+                    Use com cuidado: aumenta a flexibilidade mas perde o padrão fixo.
+                  </p>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
               <Button type="submit" disabled={isPending}>
