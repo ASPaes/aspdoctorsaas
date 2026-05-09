@@ -582,27 +582,40 @@ export default function ClienteForm() {
                 </CardTitle>
                 <CardDescription>Ative para registrar o cancelamento do cliente</CardDescription>
               </div>
-              <FormField control={form.control} name="cancelado" render={({ field }) => (
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={(next) => {
-                      if (field.value && !next) {
-                        const hasData =
-                          !!form.getValues("data_cancelamento") ||
-                          form.getValues("motivo_cancelamento_id") != null ||
-                          !!form.getValues("observacao_cancelamento");
-                        if (hasData) {
-                          setConfirmReactivateOpen(true);
-                          return;
+              <div className="flex items-center gap-3">
+                {isEditing && id && cancelado && isAdmin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10"
+                    onClick={() => setShowReativarDialog(true)}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reativar
+                  </Button>
+                )}
+                <FormField control={form.control} name="cancelado" render={({ field }) => (
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(next) => {
+                        if (field.value && !next) {
+                          const hasData =
+                            !!form.getValues("data_cancelamento") ||
+                            form.getValues("motivo_cancelamento_id") != null ||
+                            !!form.getValues("observacao_cancelamento");
+                          if (hasData) {
+                            setConfirmReactivateOpen(true);
+                            return;
+                          }
                         }
-                      }
-                      field.onChange(next);
-                    }}
-                    aria-label="Ativar ou desativar cancelamento do cliente"
-                  />
-                </FormControl>
-              )} />
+                        field.onChange(next);
+                      }}
+                      aria-label="Ativar ou desativar cancelamento do cliente"
+                    />
+                  </FormControl>
+                )} />
             </CardHeader>
             {cancelado && (
               <CardContent>
