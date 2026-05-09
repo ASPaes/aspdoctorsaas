@@ -35,6 +35,9 @@ import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
+import { ReativarClienteDialog } from "@/components/clientes/ReativarClienteDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { RefreshCw } from "lucide-react";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
@@ -228,6 +231,9 @@ export default function ClienteForm() {
   const estadoId = form.watch("estado_id");
   const cancelado = form.watch("cancelado");
   const [confirmReactivateOpen, setConfirmReactivateOpen] = useState(false);
+  const [showReativarDialog, setShowReativarDialog] = useState(false);
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const lookups = useLookups(estadoId);
 
   // Draft persistence
@@ -576,27 +582,41 @@ export default function ClienteForm() {
                 </CardTitle>
                 <CardDescription>Ative para registrar o cancelamento do cliente</CardDescription>
               </div>
-              <FormField control={form.control} name="cancelado" render={({ field }) => (
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={(next) => {
-                      if (field.value && !next) {
-                        const hasData =
-                          !!form.getValues("data_cancelamento") ||
-                          form.getValues("motivo_cancelamento_id") != null ||
-                          !!form.getValues("observacao_cancelamento");
-                        if (hasData) {
-                          setConfirmReactivateOpen(true);
-                          return;
+              <div className="flex items-center gap-3">
+                {isEditing && id && cancelado && isAdmin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10"
+                    onClick={() => setShowReativarDialog(true)}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Reativar
+                  </Button>
+                )}
+                <FormField control={form.control} name="cancelado" render={({ field }) => (
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(next) => {
+                        if (field.value && !next) {
+                          const hasData =
+                            !!form.getValues("data_cancelamento") ||
+                            form.getValues("motivo_cancelamento_id") != null ||
+                            !!form.getValues("observacao_cancelamento");
+                          if (hasData) {
+                            setConfirmReactivateOpen(true);
+                            return;
+                          }
                         }
-                      }
-                      field.onChange(next);
-                    }}
-                    aria-label="Ativar ou desativar cancelamento do cliente"
-                  />
-                </FormControl>
-              )} />
+                        field.onChange(next);
+                      }}
+                      aria-label="Ativar ou desativar cancelamento do cliente"
+                    />
+                  </FormControl>
+                )} />
+              </div>
             </CardHeader>
             {cancelado && (
               <CardContent>
@@ -657,6 +677,21 @@ export default function ClienteForm() {
           mensalidadeBase={form.watch("mensalidade") ?? 0}
           custoBase={form.watch("custo_operacao") ?? 0}
           funcionarios={(lookups.funcionarios.data ?? []).map((f: any) => ({ id: f.id, nome: f.nome }))}
+        />
+      )}
+
+      {isEditing && id && (
+        <ReativarClienteDialog
+          open={showReativarDialog}
+          onOpenChange={setShowReativarDialog}
+          clienteId={id}
+          clienteNome={form.watch("nome_fantasia") || form.watch("razao_social") || ""}
+          mensalidade={form.watch("mensalidade") ?? null}
+          dataCancelamento={form.watch("data_cancelamento") ?? null}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['cliente', id] });
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+          }}
         />
       )}
     </div>

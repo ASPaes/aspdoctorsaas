@@ -62,6 +62,8 @@ export interface KPIMetrics {
   crossSellMrr: number;
   downsellMrr: number;
   mrrAjustado: number;
+  reativacaoMrr: number;
+  reativacoesQtd: number;
 
   // Ranking de funcionários
   funcionariosRanking: { nome: string; mrr: number; clientes: number }[];
