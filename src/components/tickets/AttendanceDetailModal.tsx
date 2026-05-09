@@ -67,6 +67,7 @@ function closureVariant(closure: string): { label: string; className: string } {
 
 export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Props) {
   const isMobile = useIsMobile();
+  const [chatOpen, setChatOpen] = useState(false);
 
   const { data: att, isLoading } = useQuery({
     queryKey: ["attendance_detail", attendanceId],
