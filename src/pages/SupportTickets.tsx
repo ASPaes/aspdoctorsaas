@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
@@ -83,6 +85,8 @@ export default function SupportTickets() {
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
+  const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>([]);
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -147,8 +151,47 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ["support_tickets_subcategories", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_subcategories" as any) as any)
+        .select("id, nome, category_id")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; category_id: string }>;
+    },
+  });
+
+  const { data: serviceTypes = [] } = useQuery({
+    queryKey: ["support_tickets_service_types", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_types" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const filteredSubcategories = useMemo(
+    () => categoriaFilter === "all"
+      ? subcategories
+      : subcategories.filter((s) => s.category_id === categoriaFilter),
+    [subcategories, categoriaFilter]
+  );
+
+  useEffect(() => {
+    setSubcategoriaFilter("all");
+  }, [categoriaFilter]);
+
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -177,6 +220,8 @@ export default function SupportTickets() {
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
+      if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
+      if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
 
       const { data, error } = await q;
       if (error) throw error;
@@ -266,6 +311,16 @@ export default function SupportTickets() {
               </SelectContent>
             </Select>
 
+            <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter} disabled={categoriaFilter === "all"}>
+              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Subcategoria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas subcategorias</SelectItem>
+                {filteredSubcategories.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={canalFilter} onValueChange={setCanalFilter}>
               <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
               <SelectContent>
@@ -276,6 +331,56 @@ export default function SupportTickets() {
                 <SelectItem value="email">E-mail</SelectItem>
               </SelectContent>
             </Select>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 text-sm font-normal">
+                  <Filter className="h-3.5 w-3.5 mr-1.5" />
+                  {serviceTypeFilters.length === 0
+                    ? "Tipo serviço"
+                    : `${serviceTypeFilters.length} tipo${serviceTypeFilters.length > 1 ? "s" : ""}`}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="max-h-72 overflow-y-auto space-y-1">
+                  {serviceTypes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-2 py-1.5">Nenhum tipo cadastrado</p>
+                  ) : (
+                    serviceTypes.map((t) => {
+                      const checked = serviceTypeFilters.includes(t.id);
+                      return (
+                        <label
+                          key={t.id}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => {
+                              setServiceTypeFilters((prev) =>
+                                v ? [...prev, t.id] : prev.filter((id) => id !== t.id)
+                              );
+                            }}
+                          />
+                          <span className="flex-1 truncate">{t.nome}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                {serviceTypeFilters.length > 0 && (
+                  <div className="border-t border-border mt-2 pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs h-7"
+                      onClick={() => setServiceTypeFilters([])}
+                    >
+                      Limpar seleção
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
 
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
