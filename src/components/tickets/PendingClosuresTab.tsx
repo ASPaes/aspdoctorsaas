@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Bot, Inbox, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ClassifyClosureModal } from "@/components/tickets/ClassifyClosureModal";
@@ -36,12 +38,7 @@ type PendingClosure = {
   msg_agent_count: number;
 };
 
-const PERIOD_OPTIONS: Record<string, number | null> = {
-  "7": 7,
-  "30": 30,
-  "90": 90,
-  all: null,
-};
+
 
 function formatDate(s: string) {
   try {
