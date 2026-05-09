@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { MediaContent } from "@/components/whatsapp/chat/MediaContent";
 
 interface Props {
   open: boolean;
@@ -28,14 +29,6 @@ interface Props {
   openedAt: string | null;
   closedAt: string | null;
 }
-
-const mediaLabels: Record<string, string> = {
-  image: "📷 Imagem",
-  audio: "🎵 Áudio",
-  video: "🎬 Vídeo",
-  document: "📎 Documento",
-  sticker: "🏷️ Sticker",
-};
 
 function formatDateLabel(iso: string): string {
   const d = new Date(iso);
@@ -74,7 +67,7 @@ export function AttendanceChatHistoryModal({
     queryFn: async () => {
       let q = (supabase.from("whatsapp_messages" as any) as any)
         .select(
-          "id, content, audio_transcription, is_from_me, sender_name, sender_role, message_type, media_kind, media_url, media_path, timestamp, deleted_at"
+          "id, content, audio_transcription, is_from_me, sender_name, sender_role, message_type, media_kind, media_url, media_path, media_filename, media_ext, media_size_bytes, media_mimetype, timestamp, deleted_at"
         )
         .eq("conversation_id", conversationId)
         .is("deleted_at", null)
@@ -197,15 +190,17 @@ export function AttendanceChatHistoryModal({
                 );
               }
               const { msg, showSender, tightTop } = item;
+              const hasMedia =
+                (msg.message_type === "image" ||
+                  msg.message_type === "audio" ||
+                  msg.message_type === "video" ||
+                  msg.message_type === "document") &&
+                !!msg.media_url;
               const isSystem =
                 msg.message_type === "system" ||
-                (!msg.sender_name && !msg.is_from_me && !msg.content?.trim());
+                (!msg.sender_name && !msg.is_from_me && !msg.content?.trim() && !hasMedia);
               const isClient = !msg.is_from_me;
-              const textContent = msg.content || msg.audio_transcription || "";
-              const mediaLabel =
-                msg.media_kind && !msg.content?.trim()
-                  ? mediaLabels[msg.media_kind]
-                  : null;
+              const textContent = msg.content || "";
 
               if (isSystem) {
                 return (
@@ -258,23 +253,27 @@ export function AttendanceChatHistoryModal({
                         )}
                       </div>
                     )}
-                    {mediaLabel && (
-                      <div className="text-sm">
-                        <div>{mediaLabel}</div>
-                        {msg.audio_transcription && (
-                          <div className="text-xs italic text-muted-foreground mt-1">
-                            💬 {msg.audio_transcription}
-                          </div>
-                        )}
+                    {hasMedia && (
+                      <div className="mb-1">
+                        <MediaContent
+                          messageId={msg.id}
+                          messageType={msg.message_type}
+                          mediaUrl={msg.media_url}
+                          mediaFilename={msg.media_filename}
+                          mediaExt={msg.media_ext}
+                          mediaSizeBytes={msg.media_size_bytes}
+                          mediaKind={msg.media_kind}
+                          mediaMimetype={msg.media_mimetype}
+                        />
                       </div>
                     )}
-                    {textContent && !mediaLabel && (
+                    {msg.message_type === "audio" && msg.audio_transcription && (
+                      <div className="text-xs italic text-muted-foreground mt-1">
+                        💬 {msg.audio_transcription}
+                      </div>
+                    )}
+                    {textContent && textContent.trim() && msg.message_type !== "audio" && (
                       <div className="text-sm whitespace-pre-wrap break-words">
-                        {textContent}
-                      </div>
-                    )}
-                    {textContent && mediaLabel && (
-                      <div className="text-sm whitespace-pre-wrap break-words mt-1">
                         {textContent}
                       </div>
                     )}
