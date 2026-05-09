@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -5,9 +6,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Bot, Clock, MessageCircle, TicketCheck, ArrowUpRight, User, Phone, Loader2 } from "lucide-react";
+import { Bot, Clock, MessageCircle, TicketCheck, ArrowUpRight, User, Phone, Loader2, MessageSquareText } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 
 interface Props {
   attendanceId: string | null;
@@ -65,6 +67,7 @@ function closureVariant(closure: string): { label: string; className: string } {
 
 export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Props) {
   const isMobile = useIsMobile();
+  const [chatOpen, setChatOpen] = useState(false);
 
   const { data: att, isLoading } = useQuery({
     queryKey: ["attendance_detail", attendanceId],
@@ -162,6 +165,16 @@ export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Prop
                     {closureVariant(att.closure_type).label}
                   </Badge>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 ml-auto"
+                  onClick={() => setChatOpen(true)}
+                  disabled={!att?.conversation_id}
+                >
+                  <MessageSquareText className="h-3.5 w-3.5" />
+                  Ver conversa
+                </Button>
               </div>
 
               {/* Contato + Cliente */}
@@ -340,28 +353,46 @@ export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Prop
     </ScrollArea>
   );
 
+  const chatModal = (
+    <AttendanceChatHistoryModal
+      open={chatOpen}
+      onOpenChange={setChatOpen}
+      conversationId={att?.conversation_id ?? null}
+      attendanceCode={att?.attendance_code ?? ""}
+      contactName={att?.whatsapp_contacts?.name}
+      openedAt={att?.opened_at ?? null}
+      closedAt={att?.closed_at ?? null}
+    />
+  );
+
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
-          <SheetHeader className="px-4 py-3 border-b shrink-0">
-            <SheetTitle>Detalhes do atendimento</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden">{content}</div>
-        </SheetContent>
-      </Sheet>
+      <>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+          <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
+            <SheetHeader className="px-4 py-3 border-b shrink-0">
+              <SheetTitle>Detalhes do atendimento</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-hidden">{content}</div>
+          </SheetContent>
+        </Sheet>
+        {chatModal}
+      </>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b shrink-0">
-          <DialogTitle>Detalhes do atendimento</DialogTitle>
-        </DialogHeader>
-        <div className="max-h-[calc(90vh-72px)] overflow-hidden">{content}</div>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl max-h-[90vh] p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 py-4 border-b shrink-0">
+            <DialogTitle>Detalhes do atendimento</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[calc(90vh-72px)] overflow-hidden">{content}</div>
+        </DialogContent>
+      </Dialog>
+      {chatModal}
+    </>
   );
 }
 
