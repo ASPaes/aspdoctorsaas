@@ -641,12 +641,17 @@ export default function SupportTickets() {
         </TabsContent>
 
         <TabsContent value="atendimentos" className="mt-4">
-          <AttendancesTab />
+          {(() => {
+            const Comp = AttendancesTab as any;
+            return <Comp isAdminOrHead={isAdminOrHead} userId={userId} />;
+          })()}
         </TabsContent>
 
-        <TabsContent value="pending">
-          <PendingClosuresTab />
-        </TabsContent>
+        {isAdminOrHead && (
+          <TabsContent value="pending">
+            <PendingClosuresTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       <CreateSupportTicketModal
