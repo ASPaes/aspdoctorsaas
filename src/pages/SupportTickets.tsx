@@ -263,6 +263,11 @@ export default function SupportTickets() {
         .order("aberto_em", { ascending: false })
         .limit(100);
 
+      // Agente vê apenas seus tickets
+      if (!isAdminOrHead && userId) {
+        q = q.eq("responsavel_user_id", userId);
+      }
+
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
