@@ -76,6 +76,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     (contactInfo as any)?.whatsapp_contacts?.phone_number ?? null;
 
   const { macros, incrementUsage } = useWhatsAppMacros();
+  const { detectTags } = useMacroTags();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
 
   // Auto-resize textarea
