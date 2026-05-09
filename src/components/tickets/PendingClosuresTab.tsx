@@ -76,20 +76,12 @@ export function PendingClosuresTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
 
-  const [period, setPeriod] = useState<string>("7");
+  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 7), to: new Date() });
   const [agenteFilter, setAgenteFilter] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [classifyTarget, setClassifyTarget] = useState<PendingClosure | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
-
-  const cutoffDate = useMemo(() => {
-    const days = PERIOD_OPTIONS[period];
-    if (!days) return null;
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return d.toISOString();
-  }, [period]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["pending_closures_agents", tid],
@@ -108,15 +100,20 @@ export function PendingClosuresTab() {
   });
 
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ["pending_closures", tid, agenteFilter, period],
+    queryKey: ["pending_closures", tid, agenteFilter, dateRange.from.toISOString(), dateRange.to.toISOString()],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_pending_closures", {
         p_limit: 50,
         p_offset: 0,
         p_agent_id: agenteFilter || null,
-        p_date_from: cutoffDate || null,
-        p_date_to: null,
+        p_date_from: dateRange.from.toISOString(),
+        p_date_to: new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate(), 23, 59, 59).toISOString(),
+      });
+      if (error) throw error;
+      return (data ?? []) as PendingClosure[];
+    },
+  });
       });
       if (error) throw error;
       return (data ?? []) as PendingClosure[];
