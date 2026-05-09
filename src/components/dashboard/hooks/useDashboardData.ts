@@ -366,6 +366,7 @@ export function useDashboardData(filters: DashboardFilters) {
         netNewMrr, nrr, grr, cacPayback, margemContribuicao, concentracaoTop10,
         receitaAtivacao: totalImplantacao,
         upsellMrr, crossSellMrr, downsellMrr, mrrAjustado: mrrTotalAtual,
+        reativacaoMrr, reativacoesQtd,
         funcionariosRanking, quickRatio, revenuePerFuncionario,
       });
 
