@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X, Headphones } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
+import { AttendancesTab } from "@/components/tickets/AttendancesTab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -296,6 +297,10 @@ export default function SupportTickets() {
             Tickets
             <Badge variant="secondary" className="text-xs ml-1">{filteredTickets.length}</Badge>
           </TabsTrigger>
+          <TabsTrigger value="atendimentos" className="gap-1.5">
+            <Headphones className="h-4 w-4" />
+            Atendimentos
+          </TabsTrigger>
           <TabsTrigger value="pending" className="gap-2">
             <Clock className="h-4 w-4" />
             Pendentes
@@ -577,6 +582,10 @@ export default function SupportTickets() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="atendimentos" className="mt-4">
+          <AttendancesTab />
         </TabsContent>
 
         <TabsContent value="pending">
