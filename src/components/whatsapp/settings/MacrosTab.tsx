@@ -17,6 +17,8 @@ import {
 import { Plus, Pencil, Trash2, Loader2, Zap, Hash } from "lucide-react";
 import { useWhatsAppMacros, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MacroTagsManager } from "@/components/configuracoes/whatsapp/MacroTagsManager";
 
 interface MacroForm {
   title: string;
@@ -29,6 +31,23 @@ interface MacroForm {
 const EMPTY_FORM: MacroForm = { title: "", content: "", shortcut: "", category: "", is_active: true };
 
 export default function MacrosTab() {
+  return (
+    <Tabs defaultValue="macros" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="macros">Macros</TabsTrigger>
+        <TabsTrigger value="tags">Tags</TabsTrigger>
+      </TabsList>
+      <TabsContent value="macros">
+        <MacrosList />
+      </TabsContent>
+      <TabsContent value="tags">
+        <MacroTagsManager />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function MacrosList() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { macros, isLoading, createMacro, updateMacro, deleteMacro, isCreating, isUpdating, isDeleting } = useWhatsAppMacros();
   const [dialogOpen, setDialogOpen] = useState(false);
