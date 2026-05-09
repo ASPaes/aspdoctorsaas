@@ -328,10 +328,12 @@ export default function SupportTickets() {
             <Headphones className="h-4 w-4" />
             Atendimentos
           </TabsTrigger>
-          <TabsTrigger value="pending" className="gap-2">
-            <Clock className="h-4 w-4" />
-            Pendentes
-          </TabsTrigger>
+          {isAdminOrHead && (
+            <TabsTrigger value="pending" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Pendentes
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="tickets" className="space-y-4">
