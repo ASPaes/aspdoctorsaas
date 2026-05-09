@@ -5860,6 +5860,10 @@ export type Database = {
         Args: { p_attendance_id: string }
         Returns: Json
       }
+      update_ticket_status: {
+        Args: { p_new_status: string; p_ticket_id: string }
+        Returns: undefined
+      }
       validate_access_invite: {
         Args: { p_invite_id: string }
         Returns: {

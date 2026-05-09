@@ -18,6 +18,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: "Aberto",
@@ -95,6 +96,17 @@ export default function SupportTickets() {
   const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data?.user?.id ?? null);
+    });
+  }, []);
+
+  const { data: profile } = useProfile(userId ?? undefined);
+  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -227,7 +239,7 @@ export default function SupportTickets() {
   };
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -250,6 +262,11 @@ export default function SupportTickets() {
         .lte("aberto_em", toISO)
         .order("aberto_em", { ascending: false })
         .limit(100);
+
+      // Agente vê apenas seus tickets
+      if (!isAdminOrHead && userId) {
+        q = q.eq("responsavel_user_id", userId);
+      }
 
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
@@ -292,7 +309,7 @@ export default function SupportTickets() {
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets Suporte</h1>
         </div>
-        {activeTab === "tickets" && (
+        {activeTab === "tickets" && isAdminOrHead && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             Novo ticket
@@ -311,10 +328,12 @@ export default function SupportTickets() {
             <Headphones className="h-4 w-4" />
             Atendimentos
           </TabsTrigger>
-          <TabsTrigger value="pending" className="gap-2">
-            <Clock className="h-4 w-4" />
-            Pendentes
-          </TabsTrigger>
+          {isAdminOrHead && (
+            <TabsTrigger value="pending" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Pendentes
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="tickets" className="space-y-4">
@@ -622,12 +641,17 @@ export default function SupportTickets() {
         </TabsContent>
 
         <TabsContent value="atendimentos" className="mt-4">
-          <AttendancesTab />
+          {(() => {
+            const Comp = AttendancesTab as any;
+            return <Comp isAdminOrHead={isAdminOrHead} userId={userId} />;
+          })()}
         </TabsContent>
 
-        <TabsContent value="pending">
-          <PendingClosuresTab />
-        </TabsContent>
+        {isAdminOrHead && (
+          <TabsContent value="pending">
+            <PendingClosuresTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       <CreateSupportTicketModal
