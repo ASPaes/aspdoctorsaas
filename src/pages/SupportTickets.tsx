@@ -297,6 +297,10 @@ export default function SupportTickets() {
             Tickets
             <Badge variant="secondary" className="text-xs ml-1">{filteredTickets.length}</Badge>
           </TabsTrigger>
+          <TabsTrigger value="atendimentos" className="gap-1.5">
+            <Headphones className="h-4 w-4" />
+            Atendimentos
+          </TabsTrigger>
           <TabsTrigger value="pending" className="gap-2">
             <Clock className="h-4 w-4" />
             Pendentes
