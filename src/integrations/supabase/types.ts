@@ -4329,6 +4329,39 @@ export type Database = {
           },
         ]
       }
+      whatsapp_macro_tags: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          criado_em: string
+          criado_por: string | null
+          id: string
+          nome: string
+          ordem: number
+          tenant_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          tenant_id: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_macros: {
         Row: {
           category: string | null
