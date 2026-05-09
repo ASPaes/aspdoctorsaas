@@ -311,6 +311,16 @@ export default function SupportTickets() {
               </SelectContent>
             </Select>
 
+            <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter} disabled={categoriaFilter === "all"}>
+              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Subcategoria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas subcategorias</SelectItem>
+                {filteredSubcategories.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={canalFilter} onValueChange={setCanalFilter}>
               <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
               <SelectContent>
@@ -321,6 +331,56 @@ export default function SupportTickets() {
                 <SelectItem value="email">E-mail</SelectItem>
               </SelectContent>
             </Select>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 text-sm font-normal">
+                  <Filter className="h-3.5 w-3.5 mr-1.5" />
+                  {serviceTypeFilters.length === 0
+                    ? "Tipo serviço"
+                    : `${serviceTypeFilters.length} tipo${serviceTypeFilters.length > 1 ? "s" : ""}`}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="max-h-72 overflow-y-auto space-y-1">
+                  {serviceTypes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-2 py-1.5">Nenhum tipo cadastrado</p>
+                  ) : (
+                    serviceTypes.map((t) => {
+                      const checked = serviceTypeFilters.includes(t.id);
+                      return (
+                        <label
+                          key={t.id}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => {
+                              setServiceTypeFilters((prev) =>
+                                v ? [...prev, t.id] : prev.filter((id) => id !== t.id)
+                              );
+                            }}
+                          />
+                          <span className="flex-1 truncate">{t.nome}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                {serviceTypeFilters.length > 0 && (
+                  <div className="border-t border-border mt-2 pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs h-7"
+                      onClick={() => setServiceTypeFilters([])}
+                    >
+                      Limpar seleção
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
 
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
