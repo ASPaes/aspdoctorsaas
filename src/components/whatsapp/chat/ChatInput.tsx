@@ -15,6 +15,7 @@ import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
 import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
+import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
@@ -75,6 +76,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     (contactInfo as any)?.whatsapp_contacts?.phone_number ?? null;
 
   const { macros, incrementUsage } = useWhatsAppMacros();
+  const { detectTags } = useMacroTags();
   const { suggestions, isLoading: isLoadingSmartReplies, isRefreshing, refresh, error: smartReplyError } = useSmartReply(conversationId);
 
   // Auto-resize textarea
@@ -253,15 +255,26 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const handleMacroSelect = (macro: any) => {
-    // Remove o trigger ("/macro: ..." ou "/...") do final e insere o conteúdo da macro
     const newMessage = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, (m) => {
       const leadingSpace = m.startsWith(" ") ? " " : "";
       return leadingSpace + macro.content;
     });
-    setMessage(newMessage || macro.content);
+    const finalMessage = newMessage || macro.content;
+    setMessage(finalMessage);
     incrementUsage(macro.id);
     setShowMacroSuggestions(false);
-    setTimeout(() => textareaRef.current?.focus(), 0);
+
+    setTimeout(() => {
+      if (!textareaRef.current) return;
+      textareaRef.current.focus();
+      const firstTagMatch = finalMessage.match(/\{\{[^}]+\}\}/);
+      if (firstTagMatch && firstTagMatch.index !== undefined) {
+        const start = firstTagMatch.index;
+        const end = start + firstTagMatch[0].length;
+        textareaRef.current.selectionStart = start;
+        textareaRef.current.selectionEnd = end;
+      }
+    }, 0);
   };
 
   const handleSmartReplySelect = (text: string) => {
@@ -346,6 +359,18 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
             <AttachmentChip file={attachedFile} onRemove={() => { setAttachedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} />
           </div>
         )}
+
+        {(() => {
+          const pendingTags = detectTags(message);
+          if (pendingTags.length === 0) return null;
+          return (
+            <div className="mb-1 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30">
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                📝 Preencha: {pendingTags.map((t) => `{{${t}}}`).join(", ")}
+              </p>
+            </div>
+          );
+        })()}
 
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} />}

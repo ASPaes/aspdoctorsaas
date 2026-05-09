@@ -1,5 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
+import { useMacroTags } from "@/components/whatsapp/hooks/useMacroTags";
+import { AlertTriangle } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -36,11 +38,36 @@ interface MacroDialogProps {
 
 export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
   const { createMacro, updateMacro, isCreating, isUpdating } = useWhatsAppMacros();
+  const { tags: allTags, detectTags, isKnownTag } = useMacroTags();
+  const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { title: "", content: "", shortcut: "", category: "" },
   });
+
+  const watchedContent = form.watch("content");
+  const detectedTags = detectTags(watchedContent || "");
+  const unknownTags = detectedTags.filter((t) => !isKnownTag(t));
+
+  const insertTagAtCursor = (tagName: string) => {
+    const textarea = contentTextareaRef.current;
+    const placeholder = `{{${tagName}}}`;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const current = form.getValues("content") || "";
+    const newContent = current.substring(0, start) + placeholder + current.substring(end);
+    form.setValue("content", newContent);
+    setTimeout(() => {
+      if (contentTextareaRef.current) {
+        const newPos = start + placeholder.length;
+        contentTextareaRef.current.selectionStart = newPos;
+        contentTextareaRef.current.selectionEnd = newPos;
+        contentTextareaRef.current.focus();
+      }
+    }, 0);
+  };
 
   useEffect(() => {
     if (open) {
@@ -115,10 +142,50 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
             <FormField control={form.control} name="content" render={({ field }) => (
               <FormItem>
                 <FormLabel>Conteúdo</FormLabel>
-                <FormControl><Textarea placeholder="Digite o texto da macro..." rows={4} {...field} /></FormControl>
+                <FormControl>
+                  <Textarea
+                    placeholder="Digite o texto da macro... Use {{Nome do cliente}} para placeholders editáveis."
+                    rows={4}
+                    {...field}
+                    ref={(el) => {
+                      field.ref(el);
+                      contentTextareaRef.current = el;
+                    }}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
+
+            {allTags.length > 0 && (
+              <div className="space-y-2 rounded-md border p-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground">Inserir tag no cursor:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {allTags.map((tag) => (
+                    <Button
+                      key={tag.id}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs font-mono"
+                      onClick={() => insertTagAtCursor(tag.nome)}
+                    >
+                      {`{{${tag.nome}}}`}
+                    </Button>
+                  ))}
+                </div>
+                {unknownTags.length > 0 && (
+                  <div className="flex items-start gap-2 mt-2 text-xs text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <p>
+                      Tag{unknownTags.length > 1 ? "s" : ""} não cadastrada{unknownTags.length > 1 ? "s" : ""}:{" "}
+                      {unknownTags.map((t) => `{{${t}}}`).join(", ")}. Cadastre na aba{" "}
+                      <strong>Tags</strong> ou remova do texto.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
