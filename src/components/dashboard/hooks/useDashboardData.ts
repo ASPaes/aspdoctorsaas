@@ -15,6 +15,7 @@ const defaultMetrics: KPIMetrics = {
   prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
   netNewMrr: 0, nrr: 0, grr: 0, cacPayback: 0, margemContribuicao: 0, concentracaoTop10: 0, receitaAtivacao: 0,
   upsellMrr: 0, crossSellMrr: 0, downsellMrr: 0, mrrAjustado: 0,
+  reativacaoMrr: 0, reativacoesQtd: 0,
   funcionariosRanking: [], quickRatio: 0, revenuePerFuncionario: 0,
 };
 
