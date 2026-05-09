@@ -137,7 +137,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
