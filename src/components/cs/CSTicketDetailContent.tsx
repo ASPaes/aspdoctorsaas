@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useCSTicket, useUpdateCSTicket, useFuncionariosAtivos, useDeleteCSTicket } from './hooks/useCSTickets';
+import { getCurrentFuncionarioId } from './utils/getCurrentFuncionarioId';
 import {
   CS_TICKET_TIPO_LABELS, CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_TICKET_IMPACTO_LABELS, CS_INDICACAO_STATUS_LABELS,
   type CSTicket, type CSTicketStatus, type CSTicketPrioridade, type CSTicketTipo, type CSTicketImpacto, type CSIndicacaoStatus,
@@ -127,8 +128,10 @@ export function CSTicketDetailContent({ ticket, mode, onClose }: CSTicketDetailC
 
   const addUpdate = useMutation({
     mutationFn: async (data: { conteudo: string; tipo: string }) => {
+      const criadoPorId = await getCurrentFuncionarioId();
       const { error } = await supabase.from('cs_ticket_updates').insert([{
         ticket_id: currentTicket!.id, tipo: data.tipo, conteudo: data.conteudo, privado: true,
+        criado_por_id: criadoPorId,
       }] as any);
       if (error) throw error;
     },
