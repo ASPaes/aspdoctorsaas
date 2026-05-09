@@ -52,7 +52,12 @@ function formatDur(secs: number | null): string {
   return `${Math.floor(secs / 3600)}h${Math.floor((secs % 3600) / 60)}m`;
 }
 
-function AttendancesTab() {
+interface Props {
+  isAdminOrHead?: boolean;
+  userId?: string | null;
+}
+
+function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -104,7 +109,7 @@ function AttendancesTab() {
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -113,7 +118,7 @@ function AttendancesTab() {
         p_date_from: dateRange.from.toISOString(),
         p_date_to: toEnd.toISOString(),
         p_status: statusFilter !== "all" ? statusFilter : null,
-        p_agent_id: atendenteFilter !== "all" ? atendenteFilter : null,
+        p_agent_id: !isAdminOrHead && userId ? userId : (atendenteFilter !== "all" ? atendenteFilter : null),
         p_department_id: departamentoFilter !== "all" ? departamentoFilter : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
       });
@@ -132,7 +137,7 @@ function AttendancesTab() {
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -156,6 +161,7 @@ function AttendancesTab() {
       if (atendenteFilter !== "all") q = q.eq("assigned_to", atendenteFilter);
       if (departamentoFilter !== "all") q = q.eq("department_id", departamentoFilter);
       if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
+      if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
       if (error) throw error;
@@ -270,18 +276,20 @@ function AttendancesTab() {
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[420px] p-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Atendente</label>
-                <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {agentes.map((a: any) => (
-                      <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAdminOrHead && (
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Atendente</label>
+                  <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {agentes.map((a: any) => (
+                        <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Departamento</label>
                 <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
