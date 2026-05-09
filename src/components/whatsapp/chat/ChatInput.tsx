@@ -255,15 +255,26 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const handleMacroSelect = (macro: any) => {
-    // Remove o trigger ("/macro: ..." ou "/...") do final e insere o conteúdo da macro
     const newMessage = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, (m) => {
       const leadingSpace = m.startsWith(" ") ? " " : "";
       return leadingSpace + macro.content;
     });
-    setMessage(newMessage || macro.content);
+    const finalMessage = newMessage || macro.content;
+    setMessage(finalMessage);
     incrementUsage(macro.id);
     setShowMacroSuggestions(false);
-    setTimeout(() => textareaRef.current?.focus(), 0);
+
+    setTimeout(() => {
+      if (!textareaRef.current) return;
+      textareaRef.current.focus();
+      const firstTagMatch = finalMessage.match(/\{\{[^}]+\}\}/);
+      if (firstTagMatch && firstTagMatch.index !== undefined) {
+        const start = firstTagMatch.index;
+        const end = start + firstTagMatch[0].length;
+        textareaRef.current.selectionStart = start;
+        textareaRef.current.selectionEnd = end;
+      }
+    }, 0);
   };
 
   const handleSmartReplySelect = (text: string) => {
