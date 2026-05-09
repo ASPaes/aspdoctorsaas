@@ -616,6 +616,7 @@ export default function ClienteForm() {
                     />
                   </FormControl>
                 )} />
+              </div>
             </CardHeader>
             {cancelado && (
               <CardContent>
