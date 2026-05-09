@@ -309,7 +309,7 @@ export default function SupportTickets() {
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets Suporte</h1>
         </div>
-        {activeTab === "tickets" && (
+        {activeTab === "tickets" && isAdminOrHead && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             Novo ticket
