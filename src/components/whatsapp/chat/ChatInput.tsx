@@ -257,26 +257,58 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const handleMacroSelect = (macro: any) => {
+    incrementUsage(macro.id);
+    setShowMacroSuggestions(false);
+
+    const hasTags = /\{\{[^}]+\}\}/.test(macro.content || "");
+
+    if (hasTags) {
+      const cleaned = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, "").trimEnd();
+      setMessage(cleaned);
+      setActiveMacro({
+        id: macro.id,
+        content: macro.content,
+        permite_edicao_livre: macro.permite_edicao_livre ?? false,
+      });
+      return;
+    }
+
     const newMessage = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, (m) => {
       const leadingSpace = m.startsWith(" ") ? " " : "";
       return leadingSpace + macro.content;
     });
-    const finalMessage = newMessage || macro.content;
-    setMessage(finalMessage);
-    incrementUsage(macro.id);
-    setShowMacroSuggestions(false);
+    setMessage(newMessage || macro.content);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
 
-    setTimeout(() => {
-      if (!textareaRef.current) return;
-      textareaRef.current.focus();
-      const firstTagMatch = finalMessage.match(/\{\{[^}]+\}\}/);
-      if (firstTagMatch && firstTagMatch.index !== undefined) {
-        const start = firstTagMatch.index;
-        const end = start + firstTagMatch[0].length;
-        textareaRef.current.selectionStart = start;
-        textareaRef.current.selectionEnd = end;
+  const handleMacroCardCancel = () => {
+    setActiveMacro(null);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  const handleMacroCardSend = (finalText: string) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    sendMutation.mutate(
+      { conversationId, content: finalText, messageType: "text", quotedMessageId: replyTo?.message_id || undefined },
+      {
+        onSuccess: () => {
+          setActiveMacro(null);
+          onCancelReply?.();
+          setTimeout(() => textareaRef.current?.focus(), 50);
+        },
+        onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
-    }, 0);
+    );
+  };
+
+  const handleMacroEditFreely = () => {
+    if (!activeMacro) return;
+    setMessage(activeMacro.content);
+    setActiveMacro(null);
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
   const handleSmartReplySelect = (text: string) => {
