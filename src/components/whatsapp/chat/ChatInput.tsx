@@ -15,6 +15,7 @@ import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
 import { useWhatsAppMacros } from "../hooks/useWhatsAppMacros";
+import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
