@@ -118,7 +118,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         p_date_from: dateRange.from.toISOString(),
         p_date_to: toEnd.toISOString(),
         p_status: statusFilter !== "all" ? statusFilter : null,
-        p_agent_id: atendenteFilter !== "all" ? atendenteFilter : null,
+        p_agent_id: !isAdminOrHead && userId ? userId : (atendenteFilter !== "all" ? atendenteFilter : null),
         p_department_id: departamentoFilter !== "all" ? departamentoFilter : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
       });
