@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CS_UPDATE_TIPO_LABELS, type CSTicketUpdate, type CSUpdateTipo } from './types';
+import { getCurrentFuncionarioId } from "./utils/getCurrentFuncionarioId";
 import { MessageSquare, ArrowUpDown, UserCheck, AlertTriangle, Sparkles, CheckCircle, Send, Loader2, Lock, Eye, ArrowDown, Filter, ChevronDown, MessageCircle } from 'lucide-react';
 
 interface CSTimelineEnhancedProps {
@@ -108,7 +109,11 @@ export function CSTimelineEnhanced({ ticketId, clientePhone, isStickyMode = fals
 
   const addUpdate = useMutation({
     mutationFn: async (d: { conteudo: string; tipo: CSUpdateTipo; privado: boolean }) => {
-      const { error } = await supabase.from('cs_ticket_updates').insert({ ticket_id: ticketId, tipo: d.tipo, conteudo: d.conteudo, privado: d.privado } as any);
+      const criadoPorId = await getCurrentFuncionarioId();
+      const { error } = await supabase.from('cs_ticket_updates').insert({
+        ticket_id: ticketId, tipo: d.tipo, conteudo: d.conteudo, privado: d.privado,
+        criado_por_id: criadoPorId,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['cs-ticket-updates-paginated', ticketId] }); setNewComment(''); toast.success('Comentário adicionado'); },
