@@ -103,6 +103,34 @@ function AttendancesTab() {
   toDate.setHours(23, 59, 59, 999);
   const toISO = toDate.toISOString();
 
+  const { data: metrics } = useQuery({
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter],
+    enabled: !!tid,
+    queryFn: async () => {
+      const toEnd = new Date(dateRange.to);
+      toEnd.setHours(23, 59, 59, 999);
+      const { data, error } = await (supabase.rpc as any)("get_attendance_summary_metrics", {
+        p_date_from: dateRange.from.toISOString(),
+        p_date_to: toEnd.toISOString(),
+        p_status: statusFilter !== "all" ? statusFilter : null,
+        p_agent_id: atendenteFilter !== "all" ? atendenteFilter : null,
+        p_department_id: departamentoFilter !== "all" ? departamentoFilter : null,
+        p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
+      });
+      if (error) throw error;
+      return data as {
+        total: number;
+        avg_wait_seconds: number;
+        avg_handle_seconds: number;
+        avg_first_response_seconds: number;
+        avg_csat: number;
+        csat_count: number;
+        total_closed: number;
+        total_open: number;
+      };
+    },
+  });
+
   const { data: result, isLoading } = useQuery({
     queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page],
     enabled: !!tid,
