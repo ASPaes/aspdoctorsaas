@@ -246,10 +246,34 @@ export default function SupportTickets() {
               </SelectContent>
             </Select>
 
-            <Select value={atendenteFilter} onValueChange={setAtendenteFilter} disabled>
+            <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
               <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Atendente" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os atendentes</SelectItem>
+                {agentes.map((a) => (
+                  <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as categorias</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={canalFilter} onValueChange={setCanalFilter}>
+              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os canais</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="telefone">Telefone</SelectItem>
+                <SelectItem value="presencial">Presencial</SelectItem>
+                <SelectItem value="email">E-mail</SelectItem>
               </SelectContent>
             </Select>
 
