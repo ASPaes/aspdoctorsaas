@@ -393,16 +393,15 @@ export default function BusinessHoursExceptionsSection() {
 
         {/* ── Import Dialog ── */}
         <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col gap-0 p-0">
+            <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
               <DialogTitle>Importar feriados nacionais</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4 min-h-0">
               <p className="text-sm text-muted-foreground">
                 Importa os feriados nacionais oficiais brasileiros (não-facultativos). Feriados já cadastrados são ignorados.
               </p>
 
-              {/* Year selector */}
               <div className="space-y-1.5">
                 <Label>Ano</Label>
                 <Select value={String(importAno)} onValueChange={(v) => setImportAno(Number(v))}>
@@ -417,28 +416,27 @@ export default function BusinessHoursExceptionsSection() {
                 </Select>
               </div>
 
-              {/* Preview */}
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-24">Data</TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead className="w-28 text-right">Status</TableHead>
+                      <TableHead className="text-xs">Data</TableHead>
+                      <TableHead className="text-xs">Nome</TableHead>
+                      <TableHead className="text-xs text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {previewImport.map((f) => (
-                      <TableRow key={f.date}>
-                        <TableCell className="font-medium text-sm">
+                      <TableRow key={f.date} className={f.jaExiste ? "opacity-50" : ""}>
+                        <TableCell className="text-xs font-medium">
                           {format(parseISO(f.date), "dd/MM/yyyy")}
                         </TableCell>
-                        <TableCell className="text-sm">{f.name}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-xs">{f.name}</TableCell>
+                        <TableCell className="text-xs text-right">
                           {f.jaExiste ? (
-                            <span className="text-xs text-muted-foreground">Já existe</span>
+                            <span className="text-muted-foreground">Já existe</span>
                           ) : (
-                            <span className="text-xs text-green-500 font-medium">Será adicionado</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">Será adicionado</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -447,19 +445,20 @@ export default function BusinessHoursExceptionsSection() {
                 </Table>
               </div>
 
-              <div className="text-sm">
+              <p className="text-xs text-muted-foreground">
                 {totalNovos === 0
                   ? "Todos os feriados nacionais deste ano já estão cadastrados."
                   : `${totalNovos} novo${totalNovos > 1 ? "s" : ""} feriado${totalNovos > 1 ? "s" : ""} ser${totalNovos > 1 ? "ão" : "á"} adicionado${totalNovos > 1 ? "s" : ""}.`}
-              </div>
+              </p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 py-4 border-t shrink-0">
               <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
               <Button
                 onClick={() => importMutation.mutate(importAno)}
                 disabled={totalNovos === 0 || importMutation.isPending}
               >
                 {importMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                <Download className="h-4 w-4 mr-1" />
                 Importar {totalNovos > 0 ? `(${totalNovos})` : ""}
               </Button>
             </DialogFooter>
