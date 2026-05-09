@@ -18,6 +18,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: "Aberto",
