@@ -1,0 +1,166 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { X, Send, Edit3, AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface Fragment {
+  type: "text" | "tag";
+  value: string;
+}
+
+interface Props {
+  template: string;
+  permiteEdicaoLivre: boolean;
+  onCancel: () => void;
+  onEditFreely: () => void;
+  onSend: (finalText: string) => void;
+  isSending?: boolean;
+}
+
+function parseTemplate(template: string): Fragment[] {
+  const fragments: Fragment[] = [];
+  const regex = /\{\{([^}]+)\}\}/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(template)) !== null) {
+    if (m.index > lastIndex) {
+      fragments.push({ type: "text", value: template.substring(lastIndex, m.index) });
+    }
+    fragments.push({ type: "tag", value: m[1].trim() });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < template.length) {
+    fragments.push({ type: "text", value: template.substring(lastIndex) });
+  }
+  return fragments;
+}
+
+export function MacroFillCard({ template, permiteEdicaoLivre, onCancel, onEditFreely, onSend, isSending }: Props) {
+  const fragments = useMemo(() => parseTemplate(template), [template]);
+
+  const tagOccurrences = useMemo(() => {
+    return fragments
+      .map((f, idx) => ({ frag: f, idx }))
+      .filter((x) => x.frag.type === "tag");
+  }, [fragments]);
+
+  const [values, setValues] = useState<Record<number, string>>({});
+  const firstInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => firstInputRef.current?.focus(), 0);
+  }, []);
+
+  const allFilled = tagOccurrences.every(({ idx }) => (values[idx] || "").trim() !== "");
+
+  const finalText = useMemo(() => {
+    return fragments
+      .map((f, idx) => (f.type === "text" ? f.value : values[idx] || `{{${f.value}}}`))
+      .join("");
+  }, [fragments, values]);
+
+  const emptyTags = tagOccurrences
+    .filter(({ idx }) => !(values[idx] || "").trim())
+    .map(({ frag }) => frag.value);
+
+  const handleSend = () => {
+    if (!allFilled || isSending) return;
+    onSend(finalText);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, currentIdx: number) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const idxs = tagOccurrences.map((o) => o.idx);
+      const lastIdx = idxs[idxs.length - 1];
+      if (currentIdx === lastIdx && allFilled) {
+        handleSend();
+      }
+    }
+  };
+
+  return (
+    <Card className="p-3 mb-2 border-primary/40 bg-primary/5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-medium">📋 Preencher template</p>
+        <div className="flex items-center gap-1">
+          {permiteEdicaoLivre && (
+            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={onEditFreely}>
+              <Edit3 className="h-3.5 w-3.5 mr-1" />
+              Editar livremente
+            </Button>
+          )}
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={onCancel} aria-label="Cancelar">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2 mb-3">
+        {tagOccurrences.map(({ frag, idx }, i) => (
+          <div key={`${idx}-${i}`} className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">{frag.value}</label>
+            <Input
+              ref={i === 0 ? firstInputRef : undefined}
+              value={values[idx] || ""}
+              onChange={(e) => setValues((v) => ({ ...v, [idx]: e.target.value }))}
+              onKeyDown={(e) => handleKeyDown(e, idx)}
+              placeholder={`Digite: ${frag.value.toLowerCase()}`}
+              className="h-8 text-sm"
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-md border bg-background p-2 mb-3">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Preview</p>
+        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+          {fragments.map((f, idx) => {
+            if (f.type === "text") return <span key={idx}>{f.value}</span>;
+            const value = (values[idx] || "").trim();
+            if (value) {
+              return (
+                <span key={idx} className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  {value}
+                </span>
+              );
+            }
+            return (
+              <span key={idx} className="text-amber-600 dark:text-amber-400 font-mono text-xs">
+                {`{{${f.value}}}`}
+              </span>
+            );
+          })}
+        </p>
+      </div>
+
+      {!allFilled && (
+        <div className="flex items-start gap-2 mb-3 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <p>
+            Preencha {emptyTags.length === 1 ? "o campo" : "os campos"}:{" "}
+            {emptyTags.map((t) => `"${t}"`).join(", ")}
+          </p>
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleSend}
+          disabled={!allFilled || isSending}
+          className={cn(!allFilled && "opacity-50")}
+        >
+          <Send className="h-3.5 w-3.5 mr-1" />
+          {isSending ? "Enviando..." : "Enviar"}
+        </Button>
+      </div>
+    </Card>
+  );
+}
