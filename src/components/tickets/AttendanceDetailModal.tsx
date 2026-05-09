@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -5,9 +6,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Bot, Clock, MessageCircle, TicketCheck, ArrowUpRight, User, Phone, Loader2 } from "lucide-react";
+import { Bot, Clock, MessageCircle, TicketCheck, ArrowUpRight, User, Phone, Loader2, MessageSquareText } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 
 interface Props {
   attendanceId: string | null;
