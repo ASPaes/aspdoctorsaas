@@ -11,8 +11,27 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MacroTagsManager } from "./MacroTagsManager";
 
 export function MacrosManager() {
+  return (
+    <Tabs defaultValue="macros" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="macros">Macros</TabsTrigger>
+        <TabsTrigger value="tags">Tags</TabsTrigger>
+      </TabsList>
+      <TabsContent value="macros">
+        <MacrosList />
+      </TabsContent>
+      <TabsContent value="tags">
+        <MacroTagsManager />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function MacrosList() {
   const { macros, isLoading, deleteMacro } = useWhatsAppMacros();
   const [showDialog, setShowDialog] = useState(false);
   const [editingMacro, setEditingMacro] = useState<WhatsAppMacro | undefined>();
