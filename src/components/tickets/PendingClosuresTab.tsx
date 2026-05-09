@@ -114,11 +114,6 @@ export function PendingClosuresTab() {
       return (data ?? []) as PendingClosure[];
     },
   });
-      });
-      if (error) throw error;
-      return (data ?? []) as PendingClosure[];
-    },
-  });
 
   const toggleOne = (id: string) => {
     setSelected((s) => {
