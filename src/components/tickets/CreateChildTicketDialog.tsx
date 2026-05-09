@@ -59,11 +59,21 @@ export function CreateChildTicketDialog({
     enabled: open && !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("profiles" as any) as any)
-        .select("id, full_name, email")
-        .eq("tenant_id", tid)
-        .order("full_name");
+        .select("user_id, funcionario:funcionarios!profiles_funcionario_id_fkey(id, nome, email, ativo)")
+        .eq("tenant_id", tid);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>;
+      const rows = (data ?? []) as Array<{
+        user_id: string;
+        funcionario: { id: number; nome: string; email: string | null; ativo: boolean } | null;
+      }>;
+      return rows
+        .filter((r) => r.funcionario && r.funcionario.ativo)
+        .map((r) => ({
+          id: r.user_id,
+          full_name: r.funcionario!.nome,
+          email: r.funcionario!.email,
+        }))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name));
     },
   });
 
