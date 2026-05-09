@@ -47,6 +47,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendMutation = useWhatsAppSend();
