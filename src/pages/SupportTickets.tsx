@@ -275,6 +275,16 @@ export default function SupportTickets() {
     );
   }, [tickets, search]);
 
+  const ticketMetrics = useMemo(() => {
+    const total = filteredTickets.length;
+    const abertos = filteredTickets.filter((t: any) => t.status === "aberto").length;
+    const concluidos = filteredTickets.filter((t: any) => t.status === "concluido").length;
+    const agendados = filteredTickets.filter((t: any) => t.status === "agendado").length;
+    const aguardando = filteredTickets.filter((t: any) => t.status === "aguardando_terceiro").length;
+    const cancelados = filteredTickets.filter((t: any) => t.status === "cancelado").length;
+    return { total, abertos, concluidos, agendados, aguardando, cancelados };
+  }, [filteredTickets]);
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
