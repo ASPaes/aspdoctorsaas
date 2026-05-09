@@ -210,6 +210,26 @@ export function useDashboardData(filters: DashboardFilters) {
         }
       });
 
+
+      // === REATIVAÇÕES NO PERÍODO ===
+      const reativacoesPeriodo = await fetchAllRows<any>(() => {
+        let q = supabase
+          .from('clientes_reativacoes_historico' as any)
+          .select('cliente_id, mensalidade_reativada, data_reativacao')
+          .gte('data_reativacao', periodoInicioStr)
+          .lte('data_reativacao', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+
+      let reativacaoMrr = 0;
+      let reativacoesQtd = 0;
+      reativacoesPeriodo?.forEach((r: any) => {
+        if (needsClientFilter && !allClientesFiltered.has(r.cliente_id)) return;
+        reativacaoMrr += Number(r.mensalidade_reativada) || 0;
+        reativacoesQtd += 1;
+      });
+
       // Todos movimentos ativos até fim do período
       const todosMovimentosAtivos = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
