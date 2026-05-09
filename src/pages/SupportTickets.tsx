@@ -34,12 +34,6 @@ const STATUS_CLASSES: Record<string, string> = {
   cancelado: "bg-red-500/10 text-red-400 border-red-500/20 opacity-70",
 };
 
-const PERIOD_DAYS: Record<string, number | null> = {
-  "7": 7,
-  "30": 30,
-  "90": 90,
-  all: null,
-};
 
 function ChannelIcon({ canal }: { canal: string | null }) {
   const cls = "h-4 w-4 text-muted-foreground";
