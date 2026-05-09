@@ -109,7 +109,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
