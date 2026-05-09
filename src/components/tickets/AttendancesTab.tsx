@@ -200,6 +200,38 @@ function AttendancesTab() {
 
   return (
     <div className="space-y-3">
+      {metrics && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{metrics.total}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.total_closed} encerrados · {metrics.total_open} abertos</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TME médio</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.avg_wait_seconds)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Tempo de espera</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TPR médio</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.avg_first_response_seconds)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Primeira resposta</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TMA médio</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.avg_handle_seconds)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Tempo atendimento</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">CSAT médio</p>
+            <p className={`text-2xl font-semibold font-mono mt-0.5 ${metrics.avg_csat >= 4 ? "text-green-400" : metrics.avg_csat >= 3 ? "text-yellow-400" : "text-red-400"}`}>
+              {metrics.avg_csat > 0 ? metrics.avg_csat : "—"}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.csat_count} avaliações</p>
+          </div>
+        </div>
+      )}
+
       {/* Filtros primários */}
       <div className="flex flex-wrap items-center gap-2">
         <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
