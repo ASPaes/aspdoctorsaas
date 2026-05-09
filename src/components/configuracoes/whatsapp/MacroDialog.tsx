@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useWhatsAppMacros, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
+import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -24,6 +25,7 @@ const formSchema = z.object({
   content: z.string().min(1, "Conteúdo obrigatório"),
   shortcut: z.string().optional(),
   category: z.string().optional(),
+  permite_edicao_livre: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -43,7 +45,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: "", content: "", shortcut: "", category: "" },
+    defaultValues: { title: "", content: "", shortcut: "", category: "", permite_edicao_livre: false },
   });
 
   const watchedContent = form.watch("content");
@@ -76,6 +78,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
         content: macro?.content || "",
         shortcut: macro?.shortcut || "",
         category: macro?.category || "",
+        permite_edicao_livre: macro?.permite_edicao_livre ?? false,
       });
     }
   }, [open, macro, form]);
@@ -86,6 +89,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
       content: values.content,
       shortcut: values.shortcut || null,
       category: values.category || null,
+      permite_edicao_livre: values.permite_edicao_livre,
     };
 
     if (macro) {
@@ -186,6 +190,21 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
                 )}
               </div>
             )}
+
+            <FormField control={form.control} name="permite_edicao_livre" render={({ field }) => (
+              <FormItem className="flex items-start justify-between gap-3 rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <FormLabel>Permitir edição livre</FormLabel>
+                  <p className="text-xs text-muted-foreground">
+                    Quando ativo, o atendente pode editar todo o texto da mensagem (não apenas os campos {`{{tag}}`}).
+                    Use com cuidado: aumenta a flexibilidade mas perde o padrão fixo.
+                  </p>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )} />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

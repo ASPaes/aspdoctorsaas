@@ -11,6 +11,7 @@ import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { AIComposerButton } from "./input/AIComposerButton";
 import { AudioRecorder } from "./input/AudioRecorder";
 import { MacroSuggestions } from "./input/MacroSuggestions";
+import { MacroFillCard } from "./input/MacroFillCard";
 import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
@@ -46,6 +47,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendMutation = useWhatsAppSend();
@@ -255,26 +257,58 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   };
 
   const handleMacroSelect = (macro: any) => {
+    incrementUsage(macro.id);
+    setShowMacroSuggestions(false);
+
+    const hasTags = /\{\{[^}]+\}\}/.test(macro.content || "");
+
+    if (hasTags) {
+      const cleaned = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, "").trimEnd();
+      setMessage(cleaned);
+      setActiveMacro({
+        id: macro.id,
+        content: macro.content,
+        permite_edicao_livre: macro.permite_edicao_livre ?? false,
+      });
+      return;
+    }
+
     const newMessage = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, (m) => {
       const leadingSpace = m.startsWith(" ") ? " " : "";
       return leadingSpace + macro.content;
     });
-    const finalMessage = newMessage || macro.content;
-    setMessage(finalMessage);
-    incrementUsage(macro.id);
-    setShowMacroSuggestions(false);
+    setMessage(newMessage || macro.content);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
 
-    setTimeout(() => {
-      if (!textareaRef.current) return;
-      textareaRef.current.focus();
-      const firstTagMatch = finalMessage.match(/\{\{[^}]+\}\}/);
-      if (firstTagMatch && firstTagMatch.index !== undefined) {
-        const start = firstTagMatch.index;
-        const end = start + firstTagMatch[0].length;
-        textareaRef.current.selectionStart = start;
-        textareaRef.current.selectionEnd = end;
+  const handleMacroCardCancel = () => {
+    setActiveMacro(null);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
+
+  const handleMacroCardSend = (finalText: string) => {
+    if (isBlocked) {
+      toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    sendMutation.mutate(
+      { conversationId, content: finalText, messageType: "text", quotedMessageId: replyTo?.message_id || undefined },
+      {
+        onSuccess: () => {
+          setActiveMacro(null);
+          onCancelReply?.();
+          setTimeout(() => textareaRef.current?.focus(), 50);
+        },
+        onError: (err: any) => { toast.error(err.message || "Erro ao enviar mensagem"); },
       }
-    }, 0);
+    );
+  };
+
+  const handleMacroEditFreely = () => {
+    if (!activeMacro) return;
+    setMessage(activeMacro.content);
+    setActiveMacro(null);
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
   const handleSmartReplySelect = (text: string) => {
@@ -360,17 +394,16 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           </div>
         )}
 
-        {(() => {
-          const pendingTags = detectTags(message);
-          if (pendingTags.length === 0) return null;
-          return (
-            <div className="mb-1 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30">
-              <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                📝 Preencha: {pendingTags.map((t) => `{{${t}}}`).join(", ")}
-              </p>
-            </div>
-          );
-        })()}
+        {activeMacro && (
+          <MacroFillCard
+            template={activeMacro.content}
+            permiteEdicaoLivre={activeMacro.permite_edicao_livre}
+            onCancel={handleMacroCardCancel}
+            onEditFreely={handleMacroEditFreely}
+            onSend={handleMacroCardSend}
+            isSending={sendMutation.isPending}
+          />
+        )}
 
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} />}
@@ -418,7 +451,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                isBlocked
+                activeMacro
+                  ? "Preencha o template acima..."
+                  : isBlocked
                   ? "Voc\u{00EA} precisa estar ATIVO para atender."
                   : requiresTemplate
                   ? "Janela de 24h fechada \u2014 use um template Meta"
@@ -431,7 +466,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={isBlocked || requiresTemplate}
+              disabled={isBlocked || requiresTemplate || !!activeMacro}
             />
             <Button
               type="button"

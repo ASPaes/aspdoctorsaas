@@ -13,6 +13,7 @@ export interface WhatsAppMacro {
   is_global: boolean;
   is_active: boolean;
   usage_count: number;
+  permite_edicao_livre: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
