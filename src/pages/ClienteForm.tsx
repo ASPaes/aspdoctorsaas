@@ -679,6 +679,21 @@ export default function ClienteForm() {
           funcionarios={(lookups.funcionarios.data ?? []).map((f: any) => ({ id: f.id, nome: f.nome }))}
         />
       )}
+
+      {isEditing && id && (
+        <ReativarClienteDialog
+          open={showReativarDialog}
+          onOpenChange={setShowReativarDialog}
+          clienteId={id}
+          clienteNome={form.watch("nome_fantasia") || form.watch("razao_social") || ""}
+          mensalidade={form.watch("mensalidade") ?? null}
+          dataCancelamento={form.watch("data_cancelamento") ?? null}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['cliente', id] });
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+          }}
+        />
+      )}
     </div>
   );
 }
