@@ -97,6 +97,17 @@ export default function SupportTickets() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data?.user?.id ?? null);
+    });
+  }, []);
+
+  const { data: profile } = useProfile(userId ?? undefined);
+  const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
