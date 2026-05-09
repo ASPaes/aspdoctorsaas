@@ -270,9 +270,9 @@ export function useDashboardData(filters: DashboardFilters) {
       const ltvReais = ticketMedioAjustado * ltvMeses;
       const ltvCac = cac > 0 ? ltvReais / cac : 0;
       const churnMrrTotal = mrrCancelado + churnReversao;
-      const netNewMrr = newMrr + upsellMrr + crossSellMrr - downsellMrr - churnMrrTotal;
+      const netNewMrr = newMrr + upsellMrr + crossSellMrr + reativacaoMrr - downsellMrr - churnMrrTotal;
       const grr = mrrInicio > 0 ? Math.max(0, (mrrInicio - churnMrrTotal - downsellMrr) / mrrInicio) : 1;
-      const nrr = mrrInicio > 0 ? (mrrInicio + upsellMrr + crossSellMrr - downsellMrr - churnMrrTotal) / mrrInicio : 1;
+      const nrr = mrrInicio > 0 ? (mrrInicio + upsellMrr + crossSellMrr + reativacaoMrr - downsellMrr - churnMrrTotal) / mrrInicio : 1;
 
       const lucroBrutoTotal = clientesAtivos?.reduce((sum, c) => sum + (Number(c.lucro_bruto) || 0), 0) || 0;
       const lucroBrutoMensal = clientesCount > 0 ? lucroBrutoTotal / clientesCount : 0;
@@ -286,7 +286,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const concentracaoTop10 = mrrTotalAtual > 0 ? top10Mrr / mrrTotalAtual : 0;
 
       // Quick Ratio
-      const expansionMrr = upsellMrr + crossSellMrr;
+      const expansionMrr = upsellMrr + crossSellMrr + reativacaoMrr;
       const contractionMrr = downsellMrr + churnMrrTotal;
       const quickRatio = contractionMrr > 0 ? (newMrr + expansionMrr) / contractionMrr : newMrr + expansionMrr > 0 ? Infinity : 0;
 
