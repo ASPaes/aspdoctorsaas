@@ -96,7 +96,22 @@ export default function SupportTickets() {
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [ticketsView, setTicketsView] = useState("lista");
   const queryClient = useQueryClient();
+
+  const handleKanbanStatusChange = async (ticketId: string, newStatus: string) => {
+    try {
+      const { error } = await (supabase.rpc as any)("update_ticket_status", {
+        p_ticket_id: ticketId,
+        p_new_status: newStatus,
+      });
+      if (error) throw error;
+      toast.success("Status atualizado");
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+    } catch (err: any) {
+      toast.error("Erro ao atualizar: " + (err.message ?? ""));
+    }
+  };
 
   const [userId, setUserId] = useState<string | null>(null);
 
