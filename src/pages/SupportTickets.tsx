@@ -169,134 +169,155 @@ export default function SupportTickets() {
         <div className="flex items-center gap-2">
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets Suporte</h1>
-          <Badge variant="secondary" className="text-xs">{filteredTickets.length}</Badge>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Novo ticket
-        </Button>
+        {activeTab === "tickets" && (
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Novo ticket
+          </Button>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="7">Últimos 7 dias</SelectItem>
-            <SelectItem value="30">Últimos 30 dias</SelectItem>
-            <SelectItem value="90">Últimos 90 dias</SelectItem>
-            <SelectItem value="all">Tudo</SelectItem>
-          </SelectContent>
-        </Select>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="tickets" className="gap-2">
+            <TicketCheck className="h-4 w-4" />
+            Tickets
+            <Badge variant="secondary" className="text-xs ml-1">{filteredTickets.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pending" className="gap-2">
+            <Clock className="h-4 w-4" />
+            Pendentes
+          </TabsTrigger>
+        </TabsList>
 
-        <Select value={produtoFilter} onValueChange={setProdutoFilter}>
-          <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Produto" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os produtos</SelectItem>
-            {produtos.map((p) => (
-              <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <TabsContent value="tickets" className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={period} onValueChange={setPeriod}>
+              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="90">Últimos 90 dias</SelectItem>
+                <SelectItem value="all">Tudo</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([v, l]) => (
-              <SelectItem key={v} value={v}>{l}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <Select value={produtoFilter} onValueChange={setProdutoFilter}>
+              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Produto" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os produtos</SelectItem>
+                {produtos.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <Select value={atendenteFilter} onValueChange={setAtendenteFilter} disabled>
-          <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Atendente" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os atendentes</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([v, l]) => (
+                  <SelectItem key={v} value={v}>{l}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por código ou assunto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 pl-9 text-sm"
-          />
-        </div>
-      </div>
+            <Select value={atendenteFilter} onValueChange={setAtendenteFilter} disabled>
+              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Atendente" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os atendentes</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-        </div>
-      ) : filteredTickets.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <Inbox className="h-12 w-12 mb-3 opacity-40" />
-          <p className="text-sm">Nenhum ticket encontrado</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredTickets.map((t) => {
-            const breadcrumb = [
-              t.produtos?.nome,
-              t.service_categories?.nome,
-              t.service_subcategories?.nome,
-            ].filter(Boolean).join(" › ");
-            const tipoServico = t.service_types?.nome;
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por código ou assunto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 pl-9 text-sm"
+              />
+            </div>
+          </div>
 
-            return (
-              <button
-                key={t.id}
-                onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
-                className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 min-w-[110px]">
-                    <p className="font-mono text-sm font-semibold text-primary">{t.ticket_code ?? "—"}</p>
-                    {t.parent_ticket_id && (
-                      <Badge variant="outline" className="mt-1 text-[10px]">↳ vinculado</Badge>
-                    )}
-                  </div>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+            </div>
+          ) : filteredTickets.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Inbox className="h-12 w-12 mb-3 opacity-40" />
+              <p className="text-sm">Nenhum ticket encontrado</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredTickets.map((t) => {
+                const breadcrumb = [
+                  t.produtos?.nome,
+                  t.service_categories?.nome,
+                  t.service_subcategories?.nome,
+                ].filter(Boolean).join(" › ");
+                const tipoServico = t.service_types?.nome;
 
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium truncate">
-                        {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
-                      </p>
-                      <Badge className={`text-[10px] border ${STATUS_CLASSES[t.status] ?? ""}`}>
-                        {STATUS_LABELS[t.status] ?? t.status}
-                      </Badge>
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
+                    className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 min-w-[110px]">
+                        <p className="font-mono text-sm font-semibold text-primary">{t.ticket_code ?? "—"}</p>
+                        {t.parent_ticket_id && (
+                          <Badge variant="outline" className="mt-1 text-[10px]">↳ vinculado</Badge>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium truncate">
+                            {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
+                          </p>
+                          <Badge className={`text-[10px] border ${STATUS_CLASSES[t.status] ?? ""}`}>
+                            {STATUS_LABELS[t.status] ?? t.status}
+                          </Badge>
+                        </div>
+                        {breadcrumb && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {breadcrumb}
+                            {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
+                          </p>
+                        )}
+                        {t.assunto && (
+                          <p className="text-xs text-muted-foreground truncate">{t.assunto}</p>
+                        )}
+                        {t.agendado_para && (
+                          <p className="text-[11px] text-yellow-400 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Agendado: {formatDate(t.agendado_para)}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <ChannelIcon canal={t.canal_origem} />
+                          <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
+                        </div>
+                      </div>
                     </div>
-                    {breadcrumb && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {breadcrumb}
-                        {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
-                      </p>
-                    )}
-                    {t.assunto && (
-                      <p className="text-xs text-muted-foreground truncate">{t.assunto}</p>
-                    )}
-                    {t.agendado_para && (
-                      <p className="text-[11px] text-yellow-400 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Agendado: {formatDate(t.agendado_para)}
-                      </p>
-                    )}
-                  </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
 
-                  <div className="shrink-0 flex flex-col items-end gap-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <ChannelIcon canal={t.canal_origem} />
-                      <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+        <TabsContent value="pending">
+          <PendingClosuresTab />
+        </TabsContent>
+      </Tabs>
 
       <CreateSupportTicketModal
         open={createOpen}
