@@ -5490,6 +5490,17 @@ export type Database = {
         }
         Returns: Json
       }
+      get_attendance_summary_metrics: {
+        Args: {
+          p_agent_id?: string
+          p_closure_type?: string
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       get_clientes_candidatos_by_phone: {
         Args: { p_phone: string; p_tenant_id: string }
         Returns: {
