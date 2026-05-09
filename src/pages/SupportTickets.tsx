@@ -211,6 +211,20 @@ export default function SupportTickets() {
     setServiceTypeFilters([]);
   };
 
+  const getFilterLabel = (type: string, value: string): string => {
+    switch (type) {
+      case "produto": return produtos.find(p => String(p.id) === value)?.nome ?? value;
+      case "atendente": return agentes.find(a => a.user_id === value)?.nome ?? value;
+      case "categoria": return categories.find(c => c.id === value)?.nome ?? value;
+      case "subcategoria": return filteredSubcategories.find(s => s.id === value)?.nome ?? value;
+      case "canal": {
+        const labels: Record<string, string> = { whatsapp: "WhatsApp", telefone: "Telefone", presencial: "Presencial", email: "E-mail" };
+        return labels[value] ?? value;
+      }
+      default: return value;
+    }
+  };
+
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
     enabled: !!tid,
