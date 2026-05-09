@@ -208,18 +208,18 @@ function AttendancesTab() {
             <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.total_closed} encerrados · {metrics.total_open} abertos</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TME médio</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.avg_wait_seconds)}</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TME MEDIANA</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.median_wait_seconds)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Tempo de espera</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TPR médio</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.avg_first_response_seconds)}</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TPR MEDIANA</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.median_first_response_seconds)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Primeira resposta</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TMA médio</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.avg_handle_seconds)}</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">TMA MEDIANA</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.median_handle_seconds)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Tempo atendimento</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
