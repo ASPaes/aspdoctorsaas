@@ -116,9 +116,14 @@ export default function SupportTickets() {
   });
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, cutoffDate, produtoFilter, statusFilter],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter],
     enabled: !!tid,
     queryFn: async () => {
+      const fromISO = dateRange.from.toISOString();
+      const toDate = new Date(dateRange.to);
+      toDate.setHours(23, 59, 59, 999);
+      const toISO = toDate.toISOString();
+
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
           id, ticket_code, assunto, status, prioridade, canal_origem, tipo_horario,
@@ -130,10 +135,11 @@ export default function SupportTickets() {
           service_types:service_type_id(nome)
         `)
         .eq("tenant_id", tid)
+        .gte("aberto_em", fromISO)
+        .lte("aberto_em", toISO)
         .order("aberto_em", { ascending: false })
         .limit(100);
 
-      if (cutoffDate) q = q.gte("aberto_em", cutoffDate);
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
 
@@ -183,15 +189,7 @@ export default function SupportTickets() {
 
         <TabsContent value="tickets" className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="90">Últimos 90 dias</SelectItem>
-                <SelectItem value="all">Tudo</SelectItem>
-              </SelectContent>
-            </Select>
+            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
 
             <Select value={produtoFilter} onValueChange={setProdutoFilter}>
               <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Produto" /></SelectTrigger>
