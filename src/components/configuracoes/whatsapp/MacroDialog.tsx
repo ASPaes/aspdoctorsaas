@@ -45,7 +45,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { title: "", content: "", shortcut: "", category: "" },
+    defaultValues: { title: "", content: "", shortcut: "", category: "", permite_edicao_livre: false },
   });
 
   const watchedContent = form.watch("content");
