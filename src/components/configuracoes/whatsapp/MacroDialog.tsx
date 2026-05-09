@@ -38,11 +38,36 @@ interface MacroDialogProps {
 
 export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
   const { createMacro, updateMacro, isCreating, isUpdating } = useWhatsAppMacros();
+  const { tags: allTags, detectTags, isKnownTag } = useMacroTags();
+  const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { title: "", content: "", shortcut: "", category: "" },
   });
+
+  const watchedContent = form.watch("content");
+  const detectedTags = detectTags(watchedContent || "");
+  const unknownTags = detectedTags.filter((t) => !isKnownTag(t));
+
+  const insertTagAtCursor = (tagName: string) => {
+    const textarea = contentTextareaRef.current;
+    const placeholder = `{{${tagName}}}`;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const current = form.getValues("content") || "";
+    const newContent = current.substring(0, start) + placeholder + current.substring(end);
+    form.setValue("content", newContent);
+    setTimeout(() => {
+      if (contentTextareaRef.current) {
+        const newPos = start + placeholder.length;
+        contentTextareaRef.current.selectionStart = newPos;
+        contentTextareaRef.current.selectionEnd = newPos;
+        contentTextareaRef.current.focus();
+      }
+    }, 0);
+  };
 
   useEffect(() => {
     if (open) {
