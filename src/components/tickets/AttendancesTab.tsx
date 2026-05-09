@@ -52,7 +52,12 @@ function formatDur(secs: number | null): string {
   return `${Math.floor(secs / 3600)}h${Math.floor((secs % 3600) / 60)}m`;
 }
 
-function AttendancesTab() {
+interface Props {
+  isAdminOrHead?: boolean;
+  userId?: string | null;
+}
+
+function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const [statusFilter, setStatusFilter] = useState<string>("all");
