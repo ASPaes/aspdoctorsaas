@@ -89,6 +89,7 @@ export default function SupportTickets() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("tickets");
   const queryClient = useQueryClient();
 
   useEffect(() => {
