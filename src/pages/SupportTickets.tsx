@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -92,6 +92,7 @@ export default function SupportTickets() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("tickets");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -190,6 +191,26 @@ export default function SupportTickets() {
     setSubcategoriaFilter("all");
   }, [categoriaFilter]);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (produtoFilter !== "all") count++;
+    if (atendenteFilter !== "all") count++;
+    if (categoriaFilter !== "all") count++;
+    if (subcategoriaFilter !== "all") count++;
+    if (canalFilter !== "all") count++;
+    if (serviceTypeFilters.length > 0) count++;
+    return count;
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters]);
+
+  const clearAdvancedFilters = () => {
+    setProdutoFilter("all");
+    setAtendenteFilter("all");
+    setCategoriaFilter("all");
+    setSubcategoriaFilter("all");
+    setCanalFilter("all");
+    setServiceTypeFilters([]);
+  };
+
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
     enabled: !!tid,
@@ -268,21 +289,10 @@ export default function SupportTickets() {
         </TabsList>
 
         <TabsContent value="tickets" className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-
-            <Select value={produtoFilter} onValueChange={setProdutoFilter}>
-              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Produto" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os produtos</SelectItem>
-                {produtos.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-9 w-[150px] text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
                 {Object.entries(STATUS_LABELS).map(([v, l]) => (
@@ -290,99 +300,7 @@ export default function SupportTickets() {
                 ))}
               </SelectContent>
             </Select>
-
-            <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Atendente" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os atendentes</SelectItem>
-                {agentes.map((a) => (
-                  <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
-              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Categoria" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as categorias</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter} disabled={categoriaFilter === "all"}>
-              <SelectTrigger className="h-9 w-[160px] text-sm"><SelectValue placeholder="Subcategoria" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas subcategorias</SelectItem>
-                {filteredSubcategories.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={canalFilter} onValueChange={setCanalFilter}>
-              <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os canais</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="telefone">Telefone</SelectItem>
-                <SelectItem value="presencial">Presencial</SelectItem>
-                <SelectItem value="email">E-mail</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 text-sm font-normal">
-                  <Filter className="h-3.5 w-3.5 mr-1.5" />
-                  {serviceTypeFilters.length === 0
-                    ? "Tipo serviço"
-                    : `${serviceTypeFilters.length} tipo${serviceTypeFilters.length > 1 ? "s" : ""}`}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-2" align="start">
-                <div className="max-h-72 overflow-y-auto space-y-1">
-                  {serviceTypes.length === 0 ? (
-                    <p className="text-xs text-muted-foreground px-2 py-1.5">Nenhum tipo cadastrado</p>
-                  ) : (
-                    serviceTypes.map((t) => {
-                      const checked = serviceTypeFilters.includes(t.id);
-                      return (
-                        <label
-                          key={t.id}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(v) => {
-                              setServiceTypeFilters((prev) =>
-                                v ? [...prev, t.id] : prev.filter((id) => id !== t.id)
-                              );
-                            }}
-                          />
-                          <span className="flex-1 truncate">{t.nome}</span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-                {serviceTypeFilters.length > 0 && (
-                  <div className="border-t border-border mt-2 pt-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-xs h-7"
-                      onClick={() => setServiceTypeFilters([])}
-                    >
-                      Limpar seleção
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
-
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por código ou assunto..."
@@ -391,6 +309,117 @@ export default function SupportTickets() {
                 className="h-9 pl-9 text-sm"
               />
             </div>
+            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`h-9 gap-1.5 text-sm ${activeFilterCount > 0 ? "border-primary text-primary" : ""}`}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px] rounded-full">{activeFilterCount}</Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-[460px] p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Produto</label>
+                    <Select value={produtoFilter} onValueChange={setProdutoFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os produtos</SelectItem>
+                        {produtos.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Atendente</label>
+                    <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {agentes.map((a) => (
+                          <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                    <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Subcategoria</label>
+                    <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter} disabled={categoriaFilter === "all"}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder={categoriaFilter === "all" ? "Selecione categoria..." : "Todas"} /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {filteredSubcategories.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Canal de origem</label>
+                    <Select value={canalFilter} onValueChange={setCanalFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="telefone">Telefone</SelectItem>
+                        <SelectItem value="presencial">Presencial</SelectItem>
+                        <SelectItem value="email">E-mail</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tipo de serviço</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-full justify-between text-sm font-normal">
+                          {serviceTypeFilters.length === 0 ? "Todos" : `${serviceTypeFilters.length} selecionado${serviceTypeFilters.length > 1 ? "s" : ""}`}
+                          <Filter className="h-3 w-3 ml-1 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-52 p-2">
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {serviceTypes.map((t) => (
+                            <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm">
+                              <Checkbox
+                                checked={serviceTypeFilters.includes(t.id)}
+                                onCheckedChange={(v) => setServiceTypeFilters(prev => v ? [...prev, t.id] : prev.filter(id => id !== t.id))}
+                              />
+                              {t.nome}
+                            </label>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+                {activeFilterCount > 0 && (
+                  <div className="flex justify-end pt-3 mt-3 border-t">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>
+                      Limpar filtros
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
 
           {isLoading ? (
