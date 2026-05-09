@@ -120,9 +120,9 @@ function AttendancesTab() {
       if (error) throw error;
       return data as {
         total: number;
-        avg_wait_seconds: number;
-        avg_handle_seconds: number;
-        avg_first_response_seconds: number;
+        median_wait_seconds: number;
+        median_handle_seconds: number;
+        median_first_response_seconds: number;
         avg_csat: number;
         csat_count: number;
         total_closed: number;
