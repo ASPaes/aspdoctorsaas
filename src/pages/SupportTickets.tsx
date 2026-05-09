@@ -211,6 +211,20 @@ export default function SupportTickets() {
     setServiceTypeFilters([]);
   };
 
+  const getFilterLabel = (type: string, value: string): string => {
+    switch (type) {
+      case "produto": return produtos.find(p => String(p.id) === value)?.nome ?? value;
+      case "atendente": return agentes.find(a => a.user_id === value)?.nome ?? value;
+      case "categoria": return categories.find(c => c.id === value)?.nome ?? value;
+      case "subcategoria": return filteredSubcategories.find(s => s.id === value)?.nome ?? value;
+      case "canal": {
+        const labels: Record<string, string> = { whatsapp: "WhatsApp", telefone: "Telefone", presencial: "Presencial", email: "E-mail" };
+        return labels[value] ?? value;
+      }
+      default: return value;
+    }
+  };
+
   const { data: tickets = [], isLoading } = useQuery({
     queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
     enabled: !!tid,
@@ -421,6 +435,76 @@ export default function SupportTickets() {
               </PopoverContent>
             </Popover>
           </div>
+
+          {activeFilterCount > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] text-muted-foreground mr-1">Filtros:</span>
+              {produtoFilter !== "all" && (
+                <button
+                  onClick={() => setProdutoFilter("all")}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {getFilterLabel("produto", produtoFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {atendenteFilter !== "all" && (
+                <button
+                  onClick={() => setAtendenteFilter("all")}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {getFilterLabel("atendente", atendenteFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {categoriaFilter !== "all" && (
+                <button
+                  onClick={() => { setCategoriaFilter("all"); setSubcategoriaFilter("all"); }}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {getFilterLabel("categoria", categoriaFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {subcategoriaFilter !== "all" && (
+                <button
+                  onClick={() => setSubcategoriaFilter("all")}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {getFilterLabel("subcategoria", subcategoriaFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {canalFilter !== "all" && (
+                <button
+                  onClick={() => setCanalFilter("all")}
+                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {getFilterLabel("canal", canalFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {serviceTypeFilters.length > 0 && serviceTypeFilters.map((stId) => {
+                const st = serviceTypes.find((t) => t.id === stId);
+                return (
+                  <button
+                    key={stId}
+                    onClick={() => setServiceTypeFilters((prev) => prev.filter((id) => id !== stId))}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    {st?.nome ?? stId}
+                    <X className="h-3 w-3" />
+                  </button>
+                );
+              })}
+              <button
+                onClick={clearAdvancedFilters}
+                className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
+              >
+                Limpar todos
+              </button>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="space-y-2">
