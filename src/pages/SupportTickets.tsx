@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
@@ -83,6 +85,8 @@ export default function SupportTickets() {
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
+  const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
+  const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>([]);
   const [search, setSearch] = useState<string>("");
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
