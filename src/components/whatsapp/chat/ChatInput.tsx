@@ -451,7 +451,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                isBlocked
+                activeMacro
+                  ? "Preencha o template acima..."
+                  : isBlocked
                   ? "Voc\u{00EA} precisa estar ATIVO para atender."
                   : requiresTemplate
                   ? "Janela de 24h fechada \u2014 use um template Meta"
@@ -464,7 +466,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
                 maxHeight: isExpanded ? '400px' : '200px',
                 overflowY: isExpanded ? 'auto' : undefined,
               }}
-              disabled={isBlocked || requiresTemplate}
+              disabled={isBlocked || requiresTemplate || !!activeMacro}
             />
             <Button
               type="button"
