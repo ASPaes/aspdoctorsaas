@@ -727,6 +727,7 @@ export type Database = {
           data_cadastro: string | null
           data_cancelamento: string | null
           data_reajuste: string | null
+          data_reativacao: string | null
           data_venda: string | null
           dia_vencimento_mrr: number | null
           email: string | null
@@ -748,9 +749,11 @@ export type Database = {
           observacao_cancelamento: string | null
           observacao_cliente: string | null
           observacao_negociacao: string | null
+          observacao_reativacao: string | null
           origem_venda_id: number | null
           produto_id: number | null
           razao_social: string | null
+          reativado_por_user_id: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id: number | null
           telefone_contato: string | null
@@ -785,6 +788,7 @@ export type Database = {
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_reajuste?: string | null
+          data_reativacao?: string | null
           data_venda?: string | null
           dia_vencimento_mrr?: number | null
           email?: string | null
@@ -806,9 +810,11 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
+          observacao_reativacao?: string | null
           origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
+          reativado_por_user_id?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id?: number | null
           telefone_contato?: string | null
@@ -843,6 +849,7 @@ export type Database = {
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_reajuste?: string | null
+          data_reativacao?: string | null
           data_venda?: string | null
           dia_vencimento_mrr?: number | null
           email?: string | null
@@ -864,9 +871,11 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
+          observacao_reativacao?: string | null
           origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
+          reativado_por_user_id?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id?: number | null
           telefone_contato?: string | null
@@ -988,6 +997,63 @@ export type Database = {
             columns: ["modelo_contrato_id"]
             isOneToOne: false
             referencedRelation: "modelos_contrato"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes_reativacoes_historico: {
+        Row: {
+          cliente_id: string
+          criado_em: string
+          data_cancelamento_anterior: string | null
+          data_reativacao: string
+          id: string
+          mensalidade_reativada: number
+          motivo: string | null
+          motivo_cancelamento_anterior_id: number | null
+          observacao: string | null
+          reativado_por: string
+          tenant_id: string
+        }
+        Insert: {
+          cliente_id: string
+          criado_em?: string
+          data_cancelamento_anterior?: string | null
+          data_reativacao: string
+          id?: string
+          mensalidade_reativada: number
+          motivo?: string | null
+          motivo_cancelamento_anterior_id?: number | null
+          observacao?: string | null
+          reativado_por: string
+          tenant_id: string
+        }
+        Update: {
+          cliente_id?: string
+          criado_em?: string
+          data_cancelamento_anterior?: string | null
+          data_reativacao?: string
+          id?: string
+          mensalidade_reativada?: number
+          motivo?: string | null
+          motivo_cancelamento_anterior_id?: number | null
+          observacao?: string | null
+          reativado_por?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_reativacoes_historico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_reativacoes_historico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
             referencedColumns: ["id"]
           },
         ]
@@ -4901,6 +4967,7 @@ export type Database = {
           data_cadastro: string | null
           data_cancelamento: string | null
           data_reajuste: string | null
+          data_reativacao: string | null
           data_venda: string | null
           email: string | null
           estado_id: number | null
@@ -4925,9 +4992,11 @@ export type Database = {
           observacao_cancelamento: string | null
           observacao_cliente: string | null
           observacao_negociacao: string | null
+          observacao_reativacao: string | null
           origem_venda_id: number | null
           produto_id: number | null
           razao_social: string | null
+          reativado_por_user_id: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id: number | null
           telefone_contato: string | null
@@ -4954,6 +5023,7 @@ export type Database = {
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_reajuste?: string | null
+          data_reativacao?: string | null
           data_venda?: string | null
           email?: string | null
           estado_id?: number | null
@@ -4978,9 +5048,11 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
+          observacao_reativacao?: string | null
           origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
+          reativado_por_user_id?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id?: number | null
           telefone_contato?: string | null
@@ -5007,6 +5079,7 @@ export type Database = {
           data_cadastro?: string | null
           data_cancelamento?: string | null
           data_reajuste?: string | null
+          data_reativacao?: string | null
           data_venda?: string | null
           email?: string | null
           estado_id?: number | null
@@ -5031,9 +5104,11 @@ export type Database = {
           observacao_cancelamento?: string | null
           observacao_cliente?: string | null
           observacao_negociacao?: string | null
+          observacao_reativacao?: string | null
           origem_venda_id?: number | null
           produto_id?: number | null
           razao_social?: string | null
+          reativado_por_user_id?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id?: number | null
           telefone_contato?: string | null
@@ -5578,6 +5653,10 @@ export type Database = {
       process_maintenance_queue: { Args: never; Returns: undefined }
       process_notification_dispatch_queue: {
         Args: { p_batch_size?: number }
+        Returns: Json
+      }
+      reativar_cliente: {
+        Args: { p_cliente_id: string; p_motivo?: string; p_observacao?: string }
         Returns: Json
       }
       require_active_profile: { Args: never; Returns: boolean }
