@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useWhatsAppMacros, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
+import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
@@ -24,6 +25,7 @@ const formSchema = z.object({
   content: z.string().min(1, "Conteúdo obrigatório"),
   shortcut: z.string().optional(),
   category: z.string().optional(),
+  permite_edicao_livre: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof formSchema>;
