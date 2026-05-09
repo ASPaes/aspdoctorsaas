@@ -165,6 +165,16 @@ export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Prop
                     {closureVariant(att.closure_type).label}
                   </Badge>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 ml-auto"
+                  onClick={() => setChatOpen(true)}
+                  disabled={!att?.conversation_id}
+                >
+                  <MessageSquareText className="h-3.5 w-3.5" />
+                  Ver conversa
+                </Button>
               </div>
 
               {/* Contato + Cliente */}
