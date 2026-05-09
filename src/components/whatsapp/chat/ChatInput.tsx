@@ -11,6 +11,7 @@ import { EmojiPickerButton } from "./input/EmojiPickerButton";
 import { AIComposerButton } from "./input/AIComposerButton";
 import { AudioRecorder } from "./input/AudioRecorder";
 import { MacroSuggestions } from "./input/MacroSuggestions";
+import { MacroFillCard } from "./input/MacroFillCard";
 import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
 import { AttachmentChip } from "./input/AttachmentChip";
