@@ -5,6 +5,7 @@ import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
+import { AttendancesTab } from "@/components/tickets/AttendancesTab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
