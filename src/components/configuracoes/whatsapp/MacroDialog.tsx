@@ -78,6 +78,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
         content: macro?.content || "",
         shortcut: macro?.shortcut || "",
         category: macro?.category || "",
+        permite_edicao_livre: macro?.permite_edicao_livre ?? false,
       });
     }
   }, [open, macro, form]);
@@ -88,6 +89,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
       content: values.content,
       shortcut: values.shortcut || null,
       category: values.category || null,
+      permite_edicao_livre: values.permite_edicao_livre,
     };
 
     if (macro) {
