@@ -276,18 +276,20 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[420px] p-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Atendente</label>
-                <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {agentes.map((a: any) => (
-                      <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAdminOrHead && (
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Atendente</label>
+                  <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {agentes.map((a: any) => (
+                        <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">Departamento</label>
                 <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
