@@ -151,8 +151,47 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ["support_tickets_subcategories", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_subcategories" as any) as any)
+        .select("id, nome, category_id")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; category_id: string }>;
+    },
+  });
+
+  const { data: serviceTypes = [] } = useQuery({
+    queryKey: ["support_tickets_service_types", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_types" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tid)
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const filteredSubcategories = useMemo(
+    () => categoriaFilter === "all"
+      ? subcategories
+      : subcategories.filter((s) => s.category_id === categoriaFilter),
+    [subcategories, categoriaFilter]
+  );
+
+  useEffect(() => {
+    setSubcategoriaFilter("all");
+  }, [categoriaFilter]);
+
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -181,6 +220,8 @@ export default function SupportTickets() {
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
+      if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
+      if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
 
       const { data, error } = await q;
       if (error) throw error;
