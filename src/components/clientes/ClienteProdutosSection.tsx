@@ -91,6 +91,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
+  const [reajusteDialog, setReajusteDialog] = useState<{
+    open: boolean; clienteProdutoId?: string; produtoNome?: string;
+  }>({ open: false });
 
   if (!clienteId) return null;
 
