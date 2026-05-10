@@ -55,6 +55,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setObservacaoAgente("");
     setDepartamentoId("");
     setResponsavelId("");
+    setClienteContatoId("");
+    setPrevisaoEncerramento("");
   };
 
   useEffect(() => {
