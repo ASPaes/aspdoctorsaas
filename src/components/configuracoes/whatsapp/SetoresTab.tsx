@@ -468,7 +468,7 @@ export default function SetoresTab() {
                     />
                   </div>
 
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-6 flex-wrap">
                     <div className="flex items-center gap-2">
                       <Switch
                         checked={formActive}
@@ -485,7 +485,18 @@ export default function SetoresTab() {
                       />
                       <Label htmlFor="dept-fallback">Setor Fallback</Label>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={requiresTicket}
+                        onCheckedChange={setRequiresTicket}
+                        id="dept-requires-ticket"
+                      />
+                      <Label htmlFor="dept-requires-ticket">Exigir ticket ao encerrar chat</Label>
+                    </div>
                   </div>
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    Quando ativo, o agente será obrigado a classificar o atendimento (criar ticket) antes de encerrar conversas deste setor.
+                  </p>
 
                   <Button
                     onClick={handleSave}
