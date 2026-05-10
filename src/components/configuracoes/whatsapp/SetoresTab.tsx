@@ -51,6 +51,7 @@ interface Department {
   is_default_fallback: boolean;
   default_instance_id: string | null;
   tenant_id: string;
+  requires_ticket_on_close: boolean;
 }
 
 interface DeptInstance {
@@ -98,6 +99,7 @@ export default function SetoresTab() {
   const [formDesc, setFormDesc] = useState("");
   const [formActive, setFormActive] = useState(true);
   const [formFallback, setFormFallback] = useState(false);
+  const [requiresTicket, setRequiresTicket] = useState(false);
 
   // ========== Queries ==========
 
@@ -181,6 +183,7 @@ export default function SetoresTab() {
         is_active: formActive,
         is_default_fallback: formFallback,
         tenant_id: tid,
+        requires_ticket_on_close: requiresTicket,
       };
 
       if (isCreating) {
@@ -189,10 +192,10 @@ export default function SetoresTab() {
           .insert(payload);
         if (error) throw error;
       } else if (selectedId) {
-        const { name, slug: s, description, is_active, is_default_fallback } = payload;
+        const { name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close } = payload;
         const { error } = await supabase
           .from("support_departments")
-          .update({ name, slug: s, description, is_active, is_default_fallback })
+          .update({ name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close })
           .eq("id", selectedId);
         if (error) throw error;
       }
@@ -320,6 +323,7 @@ export default function SetoresTab() {
       setFormDesc(dept.description ?? "");
       setFormActive(dept.is_active);
       setFormFallback(dept.is_default_fallback);
+      setRequiresTicket(dept.requires_ticket_on_close ?? false);
     },
     []
   );
@@ -331,6 +335,7 @@ export default function SetoresTab() {
     setFormDesc("");
     setFormActive(true);
     setFormFallback(false);
+    setRequiresTicket(false);
   }, []);
 
   const handleSave = () => {
