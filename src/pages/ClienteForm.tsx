@@ -419,7 +419,7 @@ export default function ClienteForm() {
             <p className="text-sm text-muted-foreground">
               Preencha os dados do cliente e contrato
             </p>
-            {isEditing && <MissingFieldsIndicator form={form} />}
+            
           </div>
 
           {/* Prev/Next navigation */}
