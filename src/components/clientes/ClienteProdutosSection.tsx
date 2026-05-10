@@ -516,7 +516,7 @@ function ProdutoDialog({
 
 // ============ Modulo Dialog ============
 function ModuloDialog({
-  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved,
+  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved, produtoDataAtivacao,
 }: {
   open: boolean;
   edit: ClienteProdutoModulo | null;
@@ -525,6 +525,7 @@ function ModuloDialog({
   tid: string | null;
   onClose: () => void;
   onSaved: () => void;
+  produtoDataAtivacao?: string | null;
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
@@ -540,9 +541,9 @@ function ModuloDialog({
       setVlrMensal(edit?.vlr_mensal ?? 0);
       setVlrCusto(edit?.vlr_custo ?? 0);
       setVlrAtivacao(edit?.vlr_ativacao ?? 0);
-      setDataAt(edit?.data_ativacao ?? "");
+      setDataAt(edit?.data_ativacao ?? produtoDataAtivacao ?? "");
     }
-  }, [open, edit]);
+  }, [open, edit, produtoDataAtivacao]);
 
   const catalogoQuery = useQuery<{ id: string; nome: string; descricao: string | null }[]>({
     queryKey: ["catalogo_modulos_produto", tid, produtoId],
