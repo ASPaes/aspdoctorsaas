@@ -26,7 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save, Eye, EyeOff } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
