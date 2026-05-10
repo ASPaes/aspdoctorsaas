@@ -516,6 +516,8 @@ function ContratoDialog({
         funcionario_id: idOrNull(funcionarioId),
         origem_venda_id: idOrNull(origemVendaId),
         forma_pagamento_ativacao_id: idOrNull(formaPgtoId),
+        forma_pagamento_mensalidade_id: formaPgtoMensalidadeId ? Number(formaPgtoMensalidadeId) : null,
+        dia_vencimento: diaVencimento ? Number(diaVencimento) : null,
         vlr_total_mensal: vlrMensal,
         vlr_total_ativacao: vlrAtivacao,
         link_assinatura: linkAssinatura || null,
