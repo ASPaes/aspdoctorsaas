@@ -156,6 +156,44 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: clienteContatos = [] } = useQuery({
+    queryKey: ["cliente_contatos_ticket", selectedCliente?.id],
+    enabled: !!selectedCliente?.id,
+    queryFn: async () => {
+      const { data: cli } = await (supabase.from("clientes" as any) as any)
+        .select("contato_nome, contato_fone")
+        .eq("id", selectedCliente!.id)
+        .maybeSingle();
+      const { data: contatos, error } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id, nome, fone, email, cargo")
+        .eq("cliente_id", selectedCliente!.id)
+        .order("nome");
+      if (error) throw error;
+      const result: Array<{ id: string; nome: string; fone: string | null; email: string | null; cargo: string | null; isPrincipal: boolean }> = [];
+      if (cli?.contato_nome) {
+        result.push({
+          id: "principal",
+          nome: cli.contato_nome,
+          fone: cli.contato_fone ?? null,
+          email: null,
+          cargo: "Contato principal",
+          isPrincipal: true,
+        });
+      }
+      (contatos ?? []).forEach((c: any) => {
+        result.push({
+          id: c.id,
+          nome: c.nome,
+          fone: c.fone ?? null,
+          email: c.email ?? null,
+          cargo: c.cargo ?? null,
+          isPrincipal: false,
+        });
+      });
+      return result;
+    },
+  });
+
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(
