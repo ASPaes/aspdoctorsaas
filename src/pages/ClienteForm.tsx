@@ -26,6 +26,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save, Eye, EyeOff } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
