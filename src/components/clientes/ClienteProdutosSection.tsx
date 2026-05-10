@@ -402,6 +402,26 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         onMRRSuggest={(d) => setMrrDialog({ open: true, ...d })}
       />
 
+      <ReajusteModulosDialog
+        open={reajusteDialog.open}
+        onOpenChange={(o) => setReajusteDialog(prev => ({ ...prev, open: o }))}
+        clienteProdutoId={reajusteDialog.clienteProdutoId ?? ''}
+        produtoNome={reajusteDialog.produtoNome ?? ''}
+        modulos={(modulosByProduto[reajusteDialog.clienteProdutoId ?? ''] ?? [])
+          .filter((m: any) => m.ativo)
+          .map((m: any) => ({
+            id: m.id,
+            nome: m.produto_modulos?.nome ?? '',
+            vlr_mensal: Number(m.vlr_mensal) || 0,
+            vlr_custo: Number(m.vlr_custo) || 0,
+            ativo: m.ativo,
+          }))}
+        tenantId={tid}
+        clienteId={clienteId}
+        onSuccess={invalidateAll}
+        onMRRSuggest={(d) => setMrrDialog({ open: true, ...d, moduloId: null })}
+      />
+
       <SugestaoMRRDialog
         open={mrrDialog.open}
         onOpenChange={(o) => setMrrDialog(prev => ({ ...prev, open: o }))}
