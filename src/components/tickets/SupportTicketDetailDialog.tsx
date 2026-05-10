@@ -148,6 +148,65 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     },
   });
 
+  const { data: events = [], refetch: refetchEvents } = useQuery({
+    queryKey: ["support_ticket_events", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_ticket_events" as any) as any)
+        .select("id, user_id, event_type, content, old_value, new_value, created_at")
+        .eq("ticket_id", ticketId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        user_id: string;
+        event_type: string;
+        content: string | null;
+        old_value: string | null;
+        new_value: string | null;
+        created_at: string;
+      }>;
+    },
+  });
+
+  const { data: eventAgents = [] } = useQuery({
+    queryKey: ["ticket_event_agents", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }));
+    },
+  });
+
+  const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !ticketId) return;
+    setAddingComment(true);
+    try {
+      const { error } = await (supabase.rpc as any)("add_ticket_event", {
+        p_ticket_id: ticketId,
+        p_event_type: "comment",
+        p_content: newComment.trim(),
+      });
+      if (error) throw error;
+      toast.success("Ocorrência registrada");
+      setNewComment("");
+      refetchEvents();
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setAddingComment(false);
+    }
+  };
+
   const breadcrumb = ticket ? [
     ticket.produtos?.nome,
     ticket.service_categories?.nome,
