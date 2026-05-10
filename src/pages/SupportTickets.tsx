@@ -20,6 +20,8 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: "Aberto",
