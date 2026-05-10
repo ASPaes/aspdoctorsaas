@@ -490,6 +490,7 @@ function ContratoDialog({
       setRecorrencia("mensal");
       setModeloContratoId(NONE); setFuncionarioId(NONE);
       setOrigemVendaId(NONE); setFormaPgtoId(NONE);
+      setFormaPgtoMensalidadeId(""); setDiaVencimento("");
       setVlrMensal(null); setVlrAtivacao(null);
       setDataProxReajuste(""); setIndiceReajuste(NONE);
       setLinkAssinatura(""); setAssinadoEm(""); setObs("");
