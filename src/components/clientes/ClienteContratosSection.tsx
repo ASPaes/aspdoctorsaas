@@ -665,6 +665,28 @@ function ContratoDialog({
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Forma Pgto Mensalidade">
+                <Select
+                  value={formaPgtoMensalidadeId === "" ? NONE : formaPgtoMensalidadeId}
+                  onValueChange={(v) => setFormaPgtoMensalidadeId(v === NONE ? "" : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>— Nenhum —</SelectItem>
+                    {formasPgto.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Dia Vencimento">
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  placeholder="Dia"
+                  value={diaVencimento}
+                  onChange={(e) => setDiaVencimento(e.target.value)}
+                />
+              </Field>
             </div>
           </Section>
 
