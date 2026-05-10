@@ -228,9 +228,17 @@ export default function FinanceiroCard({
 
         {/* Seção 2: Pipeline MRR */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            Composição MRR
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+              Composição MRR
+            </p>
+            {isEditing && onOpenMrrModal && (
+              <Button type="button" variant="outline" size="sm" onClick={onOpenMrrModal}>
+                <ArrowUpDown className="h-4 w-4 mr-1" />
+                Movimentos MRR
+              </Button>
+            )}
+          </div>
           <div className="flex flex-col md:flex-row md:items-stretch">
             {/* MRR Base */}
             <div className="flex-1 border border-border/60 bg-card p-3 rounded-md md:rounded-r-none md:border-r-0">
