@@ -702,6 +702,163 @@ export type Database = {
           },
         ]
       }
+      cliente_produto_modulos: {
+        Row: {
+          ativo: boolean
+          cliente_produto_id: string
+          created_at: string
+          data_ativacao: string | null
+          data_inativacao: string | null
+          id: string
+          modulo_id: string
+          tenant_id: string
+          updated_at: string
+          vlr_ativacao: number | null
+          vlr_custo: number | null
+          vlr_mensal: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_produto_id: string
+          created_at?: string
+          data_ativacao?: string | null
+          data_inativacao?: string | null
+          id?: string
+          modulo_id: string
+          tenant_id: string
+          updated_at?: string
+          vlr_ativacao?: number | null
+          vlr_custo?: number | null
+          vlr_mensal?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_produto_id?: string
+          created_at?: string
+          data_ativacao?: string | null
+          data_inativacao?: string | null
+          id?: string
+          modulo_id?: string
+          tenant_id?: string
+          updated_at?: string
+          vlr_ativacao?: number | null
+          vlr_custo?: number | null
+          vlr_mensal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_produto_modulos_cliente_produto_id_fkey"
+            columns: ["cliente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produto_modulos_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produto_modulos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cliente_produtos: {
+        Row: {
+          ativo: boolean
+          cliente_id: string
+          codigo_fornecedor: string | null
+          created_at: string
+          data_ativacao: string | null
+          data_cancelamento: string | null
+          fornecedor_id: number | null
+          id: string
+          link_portal_fornecedor: string | null
+          produto_id: number
+          tenant_id: string
+          updated_at: string
+          vlr_ativacao: number | null
+          vlr_custo: number | null
+          vlr_mensal: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id: string
+          codigo_fornecedor?: string | null
+          created_at?: string
+          data_ativacao?: string | null
+          data_cancelamento?: string | null
+          fornecedor_id?: number | null
+          id?: string
+          link_portal_fornecedor?: string | null
+          produto_id: number
+          tenant_id: string
+          updated_at?: string
+          vlr_ativacao?: number | null
+          vlr_custo?: number | null
+          vlr_mensal?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string
+          codigo_fornecedor?: string | null
+          created_at?: string
+          data_ativacao?: string | null
+          data_cancelamento?: string | null
+          fornecedor_id?: number | null
+          id?: string
+          link_portal_fornecedor?: string | null
+          produto_id?: number
+          tenant_id?: string
+          updated_at?: string
+          vlr_ativacao?: number | null
+          vlr_custo?: number | null
+          vlr_mensal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_produtos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           area_atuacao_id: number | null
@@ -1249,6 +1406,217 @@ export type Database = {
             columns: ["ura_default_department_id"]
             isOneToOne: false
             referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contrato_itens: {
+        Row: {
+          cliente_produto_id: string | null
+          contrato_id: string
+          descricao: string | null
+          id: string
+          modulo_id: string | null
+          vlr_ativacao: number | null
+          vlr_mensal: number | null
+        }
+        Insert: {
+          cliente_produto_id?: string | null
+          contrato_id: string
+          descricao?: string | null
+          id?: string
+          modulo_id?: string | null
+          vlr_ativacao?: number | null
+          vlr_mensal?: number | null
+        }
+        Update: {
+          cliente_produto_id?: string | null
+          contrato_id?: string
+          descricao?: string | null
+          id?: string
+          modulo_id?: string | null
+          vlr_ativacao?: number | null
+          vlr_mensal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_itens_cliente_produto_id_fkey"
+            columns: ["cliente_produto_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_itens_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_itens_modulo_id_fkey"
+            columns: ["modulo_id"]
+            isOneToOne: false
+            referencedRelation: "produto_modulos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratos: {
+        Row: {
+          arquivo_nome: string | null
+          arquivo_url: string | null
+          assinado_em: string | null
+          cancelado_em: string | null
+          cliente_id: string
+          contrato_pai_id: string | null
+          created_at: string
+          data_fim: string | null
+          data_inicio: string | null
+          data_proximo_reajuste: string | null
+          data_venda: string | null
+          fidelidade_meses: number | null
+          forma_pagamento_ativacao_id: number | null
+          funcionario_id: number | null
+          id: string
+          indice_reajuste: string | null
+          link_assinatura: string | null
+          modelo_contrato_id: number | null
+          motivo_cancelamento: string | null
+          multa_rescisoria_pct: number | null
+          numero: string
+          observacoes: string | null
+          origem_venda_id: number | null
+          prazo_meses: number | null
+          recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
+          status: string
+          tenant_id: string
+          tipo: Database["public"]["Enums"]["contrato_tipo"]
+          updated_at: string
+          vlr_total_ativacao: number | null
+          vlr_total_mensal: number | null
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          arquivo_url?: string | null
+          assinado_em?: string | null
+          cancelado_em?: string | null
+          cliente_id: string
+          contrato_pai_id?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          data_proximo_reajuste?: string | null
+          data_venda?: string | null
+          fidelidade_meses?: number | null
+          forma_pagamento_ativacao_id?: number | null
+          funcionario_id?: number | null
+          id?: string
+          indice_reajuste?: string | null
+          link_assinatura?: string | null
+          modelo_contrato_id?: number | null
+          motivo_cancelamento?: string | null
+          multa_rescisoria_pct?: number | null
+          numero?: string
+          observacoes?: string | null
+          origem_venda_id?: number | null
+          prazo_meses?: number | null
+          recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
+          status?: string
+          tenant_id: string
+          tipo?: Database["public"]["Enums"]["contrato_tipo"]
+          updated_at?: string
+          vlr_total_ativacao?: number | null
+          vlr_total_mensal?: number | null
+        }
+        Update: {
+          arquivo_nome?: string | null
+          arquivo_url?: string | null
+          assinado_em?: string | null
+          cancelado_em?: string | null
+          cliente_id?: string
+          contrato_pai_id?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          data_proximo_reajuste?: string | null
+          data_venda?: string | null
+          fidelidade_meses?: number | null
+          forma_pagamento_ativacao_id?: number | null
+          funcionario_id?: number | null
+          id?: string
+          indice_reajuste?: string | null
+          link_assinatura?: string | null
+          modelo_contrato_id?: number | null
+          motivo_cancelamento?: string | null
+          multa_rescisoria_pct?: number | null
+          numero?: string
+          observacoes?: string | null
+          origem_venda_id?: number | null
+          prazo_meses?: number | null
+          recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
+          status?: string
+          tenant_id?: string
+          tipo?: Database["public"]["Enums"]["contrato_tipo"]
+          updated_at?: string
+          vlr_total_ativacao?: number | null
+          vlr_total_mensal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_contrato_pai_id_fkey"
+            columns: ["contrato_pai_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_forma_pagamento_ativacao_id_fkey"
+            columns: ["forma_pagamento_ativacao_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_modelo_contrato_id_fkey"
+            columns: ["modelo_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "modelos_contrato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_origem_venda_id_fkey"
+            columns: ["origem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "origens_venda"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -1959,6 +2327,8 @@ export type Database = {
       movimentos_mrr: {
         Row: {
           cliente_id: string
+          cliente_produto_modulo_id: string | null
+          contrato_id: string | null
           criado_em: string
           custo_delta: number
           data_movimento: string
@@ -1978,6 +2348,8 @@ export type Database = {
         }
         Insert: {
           cliente_id: string
+          cliente_produto_modulo_id?: string | null
+          contrato_id?: string | null
           criado_em?: string
           custo_delta?: number
           data_movimento: string
@@ -1997,6 +2369,8 @@ export type Database = {
         }
         Update: {
           cliente_id?: string
+          cliente_produto_modulo_id?: string | null
+          contrato_id?: string | null
           criado_em?: string
           custo_delta?: number
           data_movimento?: string
@@ -2027,6 +2401,20 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_cliente_produto_modulo_id_fkey"
+            columns: ["cliente_produto_modulo_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_produto_modulos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentos_mrr_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
             referencedColumns: ["id"]
           },
           {
@@ -2277,6 +2665,54 @@ export type Database = {
           tenant_id?: string | null
         }
         Relationships: []
+      }
+      produto_modulos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          produto_id: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          produto_id: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          produto_id?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_modulos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_modulos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       produtos: {
         Row: {
@@ -5891,6 +6327,7 @@ export type Database = {
       }
     }
     Enums: {
+      contrato_tipo: "base" | "aditivo"
       cs_avulsa_status: "previsto" | "confirmado" | "realizado" | "perdido"
       cs_avulsa_tipo:
         | "instalacao"
@@ -6070,6 +6507,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      contrato_tipo: ["base", "aditivo"],
       cs_avulsa_status: ["previsto", "confirmado", "realizado", "perdido"],
       cs_avulsa_tipo: [
         "instalacao",
