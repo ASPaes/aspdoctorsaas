@@ -15,20 +15,20 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
+
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
+
 import {
   Select,
   SelectContent,
@@ -68,7 +68,6 @@ import {
   Trash2,
   Loader2,
   Copy,
-  Building2,
   Plus,
   Save,
   Check,
@@ -108,13 +107,6 @@ interface Department {
   default_instance_id: string | null;
 }
 
-interface DeptInstance {
-  id: string;
-  department_id: string;
-  instance_id: string;
-  is_active: boolean;
-}
-
 interface Funcionario {
   id: number;
   nome: string;
@@ -124,26 +116,12 @@ interface Funcionario {
   department_id: string | null;
 }
 
-// ========== Helpers ==========
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 const accessEquipeQueryKeys = {
   users: (tenantId?: string) => ["tenant-access-users", tenantId] as const,
   dropdownDepartments: (tenantId?: string) => ["tenant-departments-list", tenantId] as const,
   inviteFuncionarios: (tenantId?: string) => ["funcionarios-for-invite", tenantId] as const,
   pendingInvites: (tenantId?: string) => ["access-invites-pending", tenantId] as const,
   pendingApprovals: (tenantId?: string) => ["pending-approvals", tenantId] as const,
-  departments: (tenantId?: string) => ["support_departments", tenantId] as const,
-  departmentInstances: (tenantId?: string, departmentId?: string | null) =>
-    ["support_department_instances", tenantId, departmentId] as const,
 };
 
 function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: string) {
@@ -152,8 +130,6 @@ function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: str
   queryClient.removeQueries({ queryKey: ["funcionarios-for-invite"] });
   queryClient.removeQueries({ queryKey: ["access-invites-pending"] });
   queryClient.removeQueries({ queryKey: ["pending-approvals"] });
-  queryClient.removeQueries({ queryKey: ["support_departments"] });
-  queryClient.removeQueries({ queryKey: ["support_department_instances"] });
 
   if (!tenantId) return;
 
@@ -162,7 +138,6 @@ function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: str
   queryClient.setQueryData(accessEquipeQueryKeys.inviteFuncionarios(tenantId), []);
   queryClient.setQueryData(accessEquipeQueryKeys.pendingInvites(tenantId), []);
   queryClient.setQueryData(accessEquipeQueryKeys.pendingApprovals(tenantId), []);
-  queryClient.setQueryData(accessEquipeQueryKeys.departments(tenantId), []);
 }
 
 // ========== Admin-only cells (Limite & Competências) ==========
@@ -280,7 +255,7 @@ export default function AcessosEquipeTab() {
         void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
         void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingInvites(tenantId) });
         void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId) });
-        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
+        
       }
     }
   }, [tenantId, queryClient]);
@@ -288,8 +263,6 @@ export default function AcessosEquipeTab() {
   return (
     <div className="space-y-8">
       <UsersSection tenantId={tenantId} />
-      <Separator />
-      <DepartmentsSection tenantId={tenantId} />
     </div>
   );
 }
@@ -1320,375 +1293,3 @@ function AccessStatusBadge({ status }: { status: string | null }) {
   );
 }
 
-// ==========================================
-// B) DEPARTMENTS SECTION
-// ==========================================
-
-function DepartmentsSection({ tenantId }: { tenantId: string | undefined }) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { instances } = useWhatsAppInstances();
-
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [formName, setFormName] = useState("");
-  const [formDesc, setFormDesc] = useState("");
-  const [formActive, setFormActive] = useState(true);
-  const [formFallback, setFormFallback] = useState(false);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
-
-  // Reset selection when tenant changes
-  const prevTenantRef = useRef(tenantId);
-  useEffect(() => {
-    if (prevTenantRef.current !== tenantId) {
-      prevTenantRef.current = tenantId;
-      setSelectedId(null);
-      setIsCreating(false);
-      setFormName("");
-      setFormDesc("");
-      setFormActive(true);
-      setFormFallback(false);
-    }
-  }, [tenantId]);
-
-  // Departments — filter by tenant
-  const { data: departments = [], isLoading } = useQuery({
-    queryKey: accessEquipeQueryKeys.departments(tenantId),
-    enabled: !!tenantId,
-    placeholderData: [],
-    queryFn: async () => {
-      let q = supabase
-        .from("support_departments")
-        .select("*")
-        .order("name");
-      if (tenantId) q = q.eq("tenant_id", tenantId);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  // Linked instances for selected dept
-  const { data: deptInstances = [] } = useQuery<DeptInstance[]>({
-    queryKey: accessEquipeQueryKeys.departmentInstances(tenantId, selectedId),
-    enabled: !!selectedId && !!tenantId,
-    placeholderData: [],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_department_instances")
-        .select("*")
-        .eq("department_id", selectedId!)
-        .eq("tenant_id", tenantId!);
-      if (error) throw error;
-      return (data ?? []) as DeptInstance[];
-    },
-  });
-
-  const selectedDept = departments.find((d: any) => d.id === selectedId);
-  const linkedInstanceIds = new Set(deptInstances.map((di) => di.instance_id));
-
-  // Mutations
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const slug = slugify(formName);
-      if (!slug) throw new Error("Nome inválido");
-      if (!tenantId) throw new Error("Tenant não identificado");
-
-      const payload = {
-        name: formName.trim(),
-        slug,
-        description: formDesc.trim() || null,
-        is_active: formActive,
-        is_default_fallback: formFallback,
-        tenant_id: tenantId,
-      };
-
-      if (isCreating) {
-        const { error } = await supabase.from("support_departments").insert(payload);
-        if (error) throw error;
-      } else if (selectedId) {
-        const { name, slug: s, description, is_active, is_default_fallback } = payload;
-        const { error } = await supabase
-          .from("support_departments")
-          .update({ name, slug: s, description, is_active, is_default_fallback })
-          .eq("id", selectedId);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
-      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.dropdownDepartments(tenantId) });
-      toast({ title: "Setor salvo!" });
-      setIsCreating(false);
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const toggleInstanceMutation = useMutation({
-    mutationFn: async ({ instanceId, linked }: { instanceId: string; linked: boolean }) => {
-      if (!selectedId || !tenantId) return;
-      if (linked) {
-        await supabase
-          .from("support_department_instances")
-          .delete()
-          .eq("department_id", selectedId)
-          .eq("instance_id", instanceId)
-          .eq("tenant_id", tenantId);
-        if (selectedDept?.default_instance_id === instanceId) {
-          await supabase
-            .from("support_departments")
-            .update({ default_instance_id: null })
-            .eq("id", selectedId)
-            .eq("tenant_id", tenantId);
-        }
-      } else {
-        await supabase.from("support_department_instances").insert({
-          department_id: selectedId,
-          instance_id: instanceId,
-          tenant_id: tenantId,
-        });
-      }
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: accessEquipeQueryKeys.departmentInstances(tenantId, selectedId),
-      });
-      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
-    },
-  });
-
-  const setDefaultInstanceMutation = useMutation({
-    mutationFn: async (instanceId: string | null) => {
-      if (!selectedId) return;
-      const { error } = await supabase
-        .from("support_departments")
-        .update({ default_instance_id: instanceId })
-        .eq("id", selectedId)
-        .eq("tenant_id", tenantId!);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
-      toast({ title: "Instância padrão atualizada" });
-    },
-  });
-
-  const selectDept = (dept: any) => {
-    setSelectedId(dept.id);
-    setIsCreating(false);
-    setFormName(dept.name);
-    setFormDesc(dept.description ?? "");
-    setFormActive(dept.is_active);
-    setFormFallback(dept.is_default_fallback);
-  };
-
-  const startCreate = () => {
-    setSelectedId(null);
-    setIsCreating(true);
-    setFormName("");
-    setFormDesc("");
-    setFormActive(true);
-    setFormFallback(false);
-  };
-
-  const handleSave = () => {
-    if (!formActive && selectedDept?.is_active) {
-      setConfirmDeactivate(true);
-      return;
-    }
-    saveMutation.mutate();
-  };
-
-  const showDetail = isCreating || selectedId;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Setores
-        </h2>
-        <Button size="sm" onClick={startCreate}>
-          <Plus className="h-4 w-4 mr-1" />
-          Novo Setor
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <Skeleton className="h-32 w-full" />
-      ) : (
-        <div className="flex gap-4">
-          {/* Left: dept list */}
-          <div className="hidden md:block w-56 shrink-0 space-y-1.5">
-            {departments.length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">Nenhum setor</p>
-            )}
-            {departments.map((d: any) => (
-              <button
-                key={d.id}
-                onClick={() => selectDept(d)}
-                className={`w-full text-left rounded-md border px-3 py-2 text-sm transition-colors hover:bg-accent ${
-                  selectedId === d.id ? "border-primary bg-accent" : "border-border"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-medium truncate flex-1">{d.name}</span>
-                  {!d.is_active && <Badge variant="secondary" className="text-xs">Inativo</Badge>}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile selector */}
-          <div className="md:hidden w-full">
-            <Select
-              value={selectedId ?? ""}
-              onValueChange={(v) => {
-                const dept = departments.find((d: any) => d.id === v);
-                if (dept) selectDept(dept);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um setor" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((d: any) => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Right: detail */}
-          <div className="flex-1 min-w-0">
-            {!showDetail ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  <Building2 className="mx-auto h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">Selecione um setor ou crie um novo</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {/* Dept form */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">
-                      {isCreating ? "Novo Setor" : "Editar Setor"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Nome</Label>
-                      <Input
-                        value={formName}
-                        onChange={(e) => setFormName(e.target.value)}
-                        placeholder="Ex: Suporte Técnico"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Descrição</Label>
-                      <Textarea
-                        value={formDesc}
-                        onChange={(e) => setFormDesc(e.target.value)}
-                        placeholder="Opcional"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <Switch checked={formActive} onCheckedChange={setFormActive} id="dept-active-eq" />
-                        <Label htmlFor="dept-active-eq" className="text-sm">Ativo</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={formFallback} onCheckedChange={setFormFallback} id="dept-fallback-eq" />
-                        <Label htmlFor="dept-fallback-eq" className="text-sm">Fallback</Label>
-                      </div>
-                    </div>
-                    <Button onClick={handleSave} disabled={!formName.trim() || saveMutation.isPending} size="sm">
-                      {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                      <Save className="h-4 w-4" />
-                      Salvar
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Instances */}
-                {!isCreating && selectedId && instances.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Instâncias do Setor</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="space-y-2">
-                        {instances.map((inst) => {
-                          const isLinked = linkedInstanceIds.has(inst.id);
-                          return (
-                            <div key={inst.id} className="flex items-center gap-2">
-                              <Checkbox
-                                checked={isLinked}
-                                onCheckedChange={() =>
-                                  toggleInstanceMutation.mutate({ instanceId: inst.id, linked: isLinked })
-                                }
-                              />
-                              <span className="text-sm">{inst.display_name || inst.instance_name}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {linkedInstanceIds.size > 0 && (
-                        <div className="space-y-1 pt-2 border-t">
-                          <Label className="text-xs">Instância Padrão</Label>
-                          <Select
-                            value={selectedDept?.default_instance_id ?? "none"}
-                            onValueChange={(v) =>
-                              setDefaultInstanceMutation.mutate(v === "none" ? null : v)
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Nenhuma</SelectItem>
-                              {instances
-                                .filter((i) => linkedInstanceIds.has(i.id))
-                                .map((i) => (
-                                  <SelectItem key={i.id} value={i.id}>
-                                    {i.display_name || i.instance_name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Confirm deactivate */}
-      <AlertDialog open={confirmDeactivate} onOpenChange={setConfirmDeactivate}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Desativar setor?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O setor "{formName}" ficará inativo. Funcionários vinculados não serão removidos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => saveMutation.mutate()}>
-              Desativar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
