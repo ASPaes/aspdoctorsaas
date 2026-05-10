@@ -3883,6 +3883,7 @@ export type Database = {
           atualizado_em: string
           canal_origem: string
           category_id: string | null
+          cliente_contato_id: string | null
           cliente_id: string
           closed_by: string | null
           concluido_em: string | null
@@ -3896,6 +3897,7 @@ export type Database = {
           observacao_agente: string | null
           observacao_ia: string | null
           parent_ticket_id: string | null
+          previsao_encerramento: string | null
           prioridade: Database["public"]["Enums"]["support_ticket_prioridade"]
           produto_id: number | null
           responsavel_user_id: string | null
@@ -3915,6 +3917,7 @@ export type Database = {
           atualizado_em?: string
           canal_origem?: string
           category_id?: string | null
+          cliente_contato_id?: string | null
           cliente_id: string
           closed_by?: string | null
           concluido_em?: string | null
@@ -3928,6 +3931,7 @@ export type Database = {
           observacao_agente?: string | null
           observacao_ia?: string | null
           parent_ticket_id?: string | null
+          previsao_encerramento?: string | null
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
           produto_id?: number | null
           responsavel_user_id?: string | null
@@ -3947,6 +3951,7 @@ export type Database = {
           atualizado_em?: string
           canal_origem?: string
           category_id?: string | null
+          cliente_contato_id?: string | null
           cliente_id?: string
           closed_by?: string | null
           concluido_em?: string | null
@@ -3960,6 +3965,7 @@ export type Database = {
           observacao_agente?: string | null
           observacao_ia?: string | null
           parent_ticket_id?: string | null
+          previsao_encerramento?: string | null
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
           produto_id?: number | null
           responsavel_user_id?: string | null
@@ -3991,6 +3997,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_cliente_contato_id_fkey"
+            columns: ["cliente_contato_id"]
+            isOneToOne: false
+            referencedRelation: "cliente_contatos"
             referencedColumns: ["id"]
           },
           {
@@ -5884,6 +5897,26 @@ export type Database = {
             }
             Returns: string
           }
+        | {
+            Args: {
+              p_agendado_para?: string
+              p_canal_origem: string
+              p_category_id: string
+              p_cliente_contato_id?: string
+              p_cliente_id: string
+              p_contact_id?: string
+              p_department_id?: string
+              p_observacao_agente?: string
+              p_previsao_encerramento?: string
+              p_produto_id: number
+              p_responsavel_user_id?: string
+              p_service_type_id: string
+              p_status?: string
+              p_subcategory_id: string
+              p_tipo_horario?: string
+            }
+            Returns: string
+          }
       create_tenant_for_new_user:
         | { Args: { p_nome: string }; Returns: string }
         | {
@@ -6392,10 +6425,20 @@ export type Database = {
         Args: { p_attendance_id: string }
         Returns: Json
       }
-      update_ticket_status: {
-        Args: { p_new_status: string; p_ticket_id: string }
-        Returns: undefined
-      }
+      update_ticket_status:
+        | {
+            Args: { p_new_status: string; p_ticket_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_agendado_para?: string
+              p_new_status: string
+              p_previsao_encerramento?: string
+              p_ticket_id: string
+            }
+            Returns: undefined
+          }
       validate_access_invite: {
         Args: { p_invite_id: string }
         Returns: {
