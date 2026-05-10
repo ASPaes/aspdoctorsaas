@@ -109,6 +109,20 @@ export default function FinanceiroCard({
     enabled: !!clienteId,
   });
 
+  const { data: totalAtivacao } = useQuery({
+    queryKey: ["cliente_produtos_ativacao", clienteId],
+    queryFn: async () => {
+      if (!clienteId) return 0;
+      const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
+        .select("vlr_ativacao")
+        .eq("cliente_id", clienteId)
+        .eq("ativo", true);
+      if (error) return 0;
+      return (data ?? []).reduce((s: number, p: any) => s + (Number(p.vlr_ativacao) || 0), 0);
+    },
+    enabled: !!clienteId,
+  });
+
   const movimentosAtivos = (movimentos ?? []).filter(
     (m) => m.status === "ativo" && !m.estornado_por && !m.estorno_de && m.tipo !== "venda_avulsa"
   );
