@@ -42,6 +42,7 @@ import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstan
 import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
+import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import KBTab from "@/components/configuracoes/KBTab";
