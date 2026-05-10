@@ -448,6 +448,8 @@ function ContratoDialog({
   const [funcionarioId, setFuncionarioId] = useState<string>(NONE);
   const [origemVendaId, setOrigemVendaId] = useState<string>(NONE);
   const [formaPgtoId, setFormaPgtoId] = useState<string>(NONE);
+  const [formaPgtoMensalidadeId, setFormaPgtoMensalidadeId] = useState<string>("");
+  const [diaVencimento, setDiaVencimento] = useState<string>("");
   const [vlrMensal, setVlrMensal] = useState<number | null>(null);
   const [vlrAtivacao, setVlrAtivacao] = useState<number | null>(null);
   const [dataProxReajuste, setDataProxReajuste] = useState<string>("");
