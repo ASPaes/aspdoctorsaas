@@ -245,6 +245,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_contact_id: null,
         p_department_id: departamentoId || null,
         p_responsavel_user_id: responsavelId || null,
+        p_cliente_contato_id: clienteContatoId && clienteContatoId !== "principal" ? clienteContatoId : null,
+        p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
       });
 
       if (error) throw error;
