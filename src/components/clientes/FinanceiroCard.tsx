@@ -83,7 +83,6 @@ function MiniCard({ label, value, tone = "neutral", sub, kpiKey }: MiniCardProps
 
 export default function FinanceiroCard({
   form,
-  formasPagamento,
   clienteId,
   isEditing,
   onOpenMrrModal,
