@@ -31,6 +31,7 @@ import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
+import FinanceiroCard from "@/components/clientes/FinanceiroCard";
 import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
