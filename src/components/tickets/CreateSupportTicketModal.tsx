@@ -35,6 +35,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [status, setStatus] = useState<string>("concluido");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
+  const [departamentoId, setDepartamentoId] = useState("");
+  const [responsavelId, setResponsavelId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
@@ -49,10 +51,20 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setStatus("concluido");
     setAgendadoPara("");
     setObservacaoAgente("");
+    setDepartamentoId("");
+    setResponsavelId("");
   };
 
   useEffect(() => {
     if (open) reset();
+  }, [open]);
+
+  useEffect(() => {
+    if (open && !responsavelId) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user?.id) setResponsavelId(data.user.id);
+      });
+    }
   }, [open]);
 
   const { data: produtos = [] } = useQuery({
@@ -107,6 +119,36 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         .order("nome");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const { data: departamentos = [] } = useQuery({
+    queryKey: ["create_ticket_departamentos", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
+  });
+
+  const { data: agentes = [] } = useQuery({
+    queryKey: ["create_ticket_agentes", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
     },
   });
 
