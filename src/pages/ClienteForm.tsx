@@ -542,7 +542,6 @@ export default function ClienteForm() {
           {isEditing && id && (
             <FinanceiroCard
               form={form}
-              formasPagamento={lookups.formasPagamento.data ?? []}
               clienteId={id}
               isEditing={isEditing}
               onOpenMrrModal={() => setMrrModalOpen(true)}
