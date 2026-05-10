@@ -579,9 +579,20 @@ function ProdutoDialog({
           </div>
           <div className="space-y-1">
             <Label>Valor Ativação</Label>
-            <NumericInput value={vlrAt} onChange={setVlrAt} suffix="R$" />
+            <NumericInput value={vlrAt} onChange={setVlrAt} decimals={2} placeholder="0,00" suffix="R$" />
+          </div>
+          <div className="space-y-1">
+            <Label>Valor Mensal</Label>
+            <NumericInput value={vlrMensal} onChange={setVlrMensal} decimals={2} placeholder="0,00" suffix="R$" />
+          </div>
+          <div className="space-y-1">
+            <Label>Custo Operação</Label>
+            <NumericInput value={vlrCusto} onChange={setVlrCusto} decimals={2} placeholder="0,00" suffix="R$" />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Se este produto terá módulos detalhados, os valores serão recalculados automaticamente.
+        </p>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button type="button" onClick={handleSave} disabled={saving}>
