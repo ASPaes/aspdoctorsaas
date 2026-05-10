@@ -74,6 +74,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
           <TabsTrigger value="pausas">Pausas</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
+          <TabsTrigger value="setores">Setores</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
           {isAdmin && <TabsTrigger value="ferramentas">Duplicidades</TabsTrigger>}
         </TabsList>
@@ -107,6 +108,10 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
 
         <TabsContent value="atribuicao" className="mt-4">
           <AssignmentRulesManager />
+        </TabsContent>
+
+        <TabsContent value="setores" className="mt-4">
+          <SetoresTab />
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
