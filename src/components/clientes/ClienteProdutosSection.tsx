@@ -31,9 +31,19 @@ import {
   ExternalLink, Loader2, Puzzle,
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
+import SugestaoMRRDialog from "./SugestaoMRRDialog";
 
 interface Props {
   clienteId: string;
+}
+
+interface MRRDialogState {
+  open: boolean;
+  tipo: "upsell" | "cross_sell" | "downsell";
+  valorDelta: number;
+  custoDelta: number;
+  descricao: string;
+  moduloId?: string | null;
 }
 
 interface ClienteProduto {
