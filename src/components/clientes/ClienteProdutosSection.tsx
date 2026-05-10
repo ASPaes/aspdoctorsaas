@@ -28,10 +28,11 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle,
+  ExternalLink, Loader2, Puzzle, Percent,
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
+import ReajusteModulosDialog from "./ReajusteModulosDialog";
 
 interface Props {
   clienteId: string;
