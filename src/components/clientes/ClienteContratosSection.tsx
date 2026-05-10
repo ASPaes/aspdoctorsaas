@@ -59,10 +59,13 @@ interface Contrato {
   status: string;
   cancelado_em: string | null;
   motivo_cancelamento: string | null;
+  dia_vencimento: number | null;
+  forma_pagamento_mensalidade_id: number | null;
   modelos_contrato?: { nome: string } | null;
   funcionarios?: { nome: string } | null;
   origens_venda?: { nome: string } | null;
   formas_pagamento?: { nome: string } | null;
+  formas_pagamento_mensalidade?: { nome: string } | null;
   contrato_pai?: { numero: string } | null;
 }
 
