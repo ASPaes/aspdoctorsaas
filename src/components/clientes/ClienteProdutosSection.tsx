@@ -219,6 +219,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           (produtosQuery.data ?? []).map(p => {
             const isOpen = !!expanded[p.id];
             const mods = modulosByProduto[p.id] ?? [];
+            const modsAtivos = (modulosByProduto[p.id] ?? []).filter(m => m.ativo).length;
             return (
               <Collapsible key={p.id} open={isOpen} onOpenChange={(o) => setExpanded(s => ({ ...s, [p.id]: o }))}>
                 <div className="border rounded-md bg-card">
@@ -231,11 +232,21 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
                       <div className="font-semibold truncate">{p.produtos?.nome ?? "—"}</div>
                       <div className="text-sm text-muted-foreground truncate">{p.fornecedores?.nome ?? "—"}</div>
-                      <div className="text-sm font-mono truncate">{p.codigo_fornecedor ?? "—"}</div>
                       <div>
                         <Badge variant={p.ativo ? "default" : "secondary"} className="shrink-0">
                           R$ {fmtBRL(p.vlr_mensal)}/mês
                         </Badge>
+                        {" "}
+                        <Badge variant="outline" className="shrink-0 text-muted-foreground">
+                          Custo: R$ {fmtBRL(p.vlr_custo)}
+                        </Badge>
+                      </div>
+                      <div>
+                        {modsAtivos > 0 ? (
+                          <Badge variant="outline">{modsAtivos} módulo{modsAtivos > 1 ? "s" : ""}</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sem módulos</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
