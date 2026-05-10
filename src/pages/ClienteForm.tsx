@@ -529,39 +529,71 @@ export default function ClienteForm() {
             </CardContent>
           </Card>
 
-          {/* Card: Produto / Contrato */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5 text-primary" />
-                Produto / Contrato
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <VendaProdutoTab
-                form={form}
-                funcionarios={lookups.funcionarios.data ?? []}
-                produtos={lookups.produtos.data ?? []}
-                fornecedores={lookups.fornecedores?.data ?? []}
-                origensVenda={lookups.origensVenda?.data ?? []}
-                modelosContrato={lookups.modelosContrato.data ?? []}
-              />
-              <FinanceiroTab
-                form={form}
-                formasPagamento={lookups.formasPagamento.data ?? []}
-                clienteId={id}
-                isEditing={isEditing}
-                onOpenMrrModal={() => setMrrModalOpen(true)}
-              />
-            </CardContent>
-          </Card>
-
           {isEditing && id && (
             <ClienteProdutosSection clienteId={id} />
           )}
 
           {isEditing && id && (
             <ClienteContratosSection clienteId={id} />
+          )}
+
+          {isEditing && id && (
+            <FinanceiroCard
+              form={form}
+              formasPagamento={lookups.formasPagamento.data ?? []}
+              clienteId={id}
+              isEditing={isEditing}
+              onOpenMrrModal={() => setMrrModalOpen(true)}
+            />
+          )}
+
+          {isEditing && id && (
+            <div className="space-y-2">
+              <Separator />
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowLegacy(!showLegacy)}
+                >
+                  {showLegacy ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                  {showLegacy ? "Ocultar cards legados" : "Mostrar cards legados"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {(!isEditing || showLegacy) && (
+            <>
+              {/* Card: Produto / Contrato (legado) */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Produto / Contrato
+                    {isEditing && <Badge variant="outline" className="ml-2 text-[10px]">Legado</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <VendaProdutoTab
+                    form={form}
+                    funcionarios={lookups.funcionarios.data ?? []}
+                    produtos={lookups.produtos.data ?? []}
+                    fornecedores={lookups.fornecedores?.data ?? []}
+                    origensVenda={lookups.origensVenda?.data ?? []}
+                    modelosContrato={lookups.modelosContrato.data ?? []}
+                  />
+                  <FinanceiroTab
+                    form={form}
+                    formasPagamento={lookups.formasPagamento.data ?? []}
+                    clienteId={id}
+                    isEditing={isEditing}
+                    onOpenMrrModal={() => setMrrModalOpen(true)}
+                  />
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Card: Certificado A1 */}
