@@ -255,7 +255,7 @@ export default function AcessosEquipeTab() {
         void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.inviteFuncionarios(tenantId) });
         void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingInvites(tenantId) });
         void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.pendingApprovals(tenantId) });
-        void queryClient.invalidateQueries({ queryKey: accessEquipeQueryKeys.departments(tenantId) });
+        
       }
     }
   }, [tenantId, queryClient]);
