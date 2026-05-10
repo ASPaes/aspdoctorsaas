@@ -85,6 +85,7 @@ export default function CadastrosTab() {
         { key: "name", label: "Nome" },
         { key: "slug", label: "Slug" },
         { key: "description", label: "Descrição" },
+        { key: "requires_ticket_on_close", label: "Ticket obrigatório", type: "boolean" },
         { key: "is_active", label: "Ativo", type: "boolean" },
       ],
     },
