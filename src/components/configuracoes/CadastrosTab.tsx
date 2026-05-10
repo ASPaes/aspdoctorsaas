@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import CrudTable, { type ColumnDef } from "@/components/CrudTable";
+import ProdutosModulosTab from "./ProdutosModulosTab";
 
 function useDepartmentOptions() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -214,10 +215,15 @@ export default function CadastrosTab() {
 
       <Tabs defaultValue="setores">
         <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="produtos">Produtos</TabsTrigger>
           {tabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
           ))}
         </TabsList>
+
+        <TabsContent value="produtos">
+          <ProdutosModulosTab />
+        </TabsContent>
 
         {tabs.map((t) => (
           <TabsContent key={t.value} value={t.value}>
