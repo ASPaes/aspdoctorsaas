@@ -1294,6 +1294,3 @@ function AccessStatusBadge({ status }: { status: string | null }) {
   );
 }
 
-// ==========================================
-// B) DEPARTMENTS SECTION
-// ==========================================
