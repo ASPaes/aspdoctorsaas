@@ -366,6 +366,16 @@ export default function ClienteForm() {
     clearDraft();
   }, [clienteQuery.data]);
 
+  // Sync trigger-controlled fields (mensalidade is recalculated by DB triggers)
+  useEffect(() => {
+    if (!clienteQuery.data || !clienteLoadedRef.current) return;
+    const dbMensalidade = Number(clienteQuery.data.mensalidade) || 0;
+    const currentMensalidade = form.getValues("mensalidade");
+    if (dbMensalidade !== currentMensalidade) {
+      form.setValue("mensalidade", dbMensalidade, { shouldDirty: false });
+    }
+  }, [clienteQuery.data?.mensalidade]);
+
   const mutation = useMutation({
     mutationFn: async (values: ClienteFormValues) => {
       const payload: any = {
