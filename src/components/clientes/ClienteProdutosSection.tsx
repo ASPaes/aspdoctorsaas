@@ -361,6 +361,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         tid={tid}
         onClose={() => setModuloDialog({ open: false })}
         onSaved={invalidateAll}
+        produtoDataAtivacao={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.data_ativacao ?? null}
       />
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
