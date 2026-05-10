@@ -108,6 +108,7 @@ export default function ClienteContratosSection({ clienteId }: Props) {
              funcionarios:funcionario_id(nome),
              origens_venda:origem_venda_id(nome),
              formas_pagamento:forma_pagamento_ativacao_id(nome),
+             formas_pagamento_mensalidade:forma_pagamento_mensalidade_id(nome),
              contrato_pai:contrato_pai_id(numero)`
           )
           .eq("cliente_id", clienteId)
