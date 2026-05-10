@@ -20,6 +20,8 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const STATUS_LABELS: Record<string, string> = {
   aberto: "Aberto",
@@ -99,7 +101,20 @@ export default function SupportTickets() {
   const [ticketsView, setTicketsView] = useState("lista");
   const queryClient = useQueryClient();
 
+  const [kanbanAgendadoOpen, setKanbanAgendadoOpen] = useState(false);
+  const [kanbanPendingMove, setKanbanPendingMove] = useState<{ ticketId: string; newStatus: string } | null>(null);
+  const [kanbanAgendadoPara, setKanbanAgendadoPara] = useState("");
+  const [kanbanPrevisao, setKanbanPrevisao] = useState("");
+
   const handleKanbanStatusChange = async (ticketId: string, newStatus: string) => {
+    if (newStatus === "agendado") {
+      setKanbanPendingMove({ ticketId, newStatus });
+      setKanbanAgendadoPara("");
+      setKanbanPrevisao("");
+      setKanbanAgendadoOpen(true);
+      return;
+    }
+
     try {
       const { error } = await (supabase.rpc as any)("update_ticket_status", {
         p_ticket_id: ticketId,
@@ -108,8 +123,29 @@ export default function SupportTickets() {
       if (error) throw error;
       toast.success("Status atualizado");
       queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
     } catch (err: any) {
       toast.error("Erro ao atualizar: " + (err.message ?? ""));
+    }
+  };
+
+  const handleConfirmAgendado = async () => {
+    if (!kanbanPendingMove) return;
+    try {
+      const { error } = await (supabase.rpc as any)("update_ticket_status", {
+        p_ticket_id: kanbanPendingMove.ticketId,
+        p_new_status: "agendado",
+        p_agendado_para: kanbanAgendadoPara ? new Date(kanbanAgendadoPara).toISOString() : null,
+        p_previsao_encerramento: kanbanPrevisao ? new Date(kanbanPrevisao).toISOString() : null,
+      });
+      if (error) throw error;
+      toast.success("Ticket agendado");
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
+      setKanbanAgendadoOpen(false);
+      setKanbanPendingMove(null);
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
     }
   };
 
@@ -717,6 +753,42 @@ export default function SupportTickets() {
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
       />
+
+      <Dialog open={kanbanAgendadoOpen} onOpenChange={(o) => { if (!o) { setKanbanAgendadoOpen(false); setKanbanPendingMove(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agendar ticket</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Agendado para *</Label>
+              <Input
+                type="datetime-local"
+                value={kanbanAgendadoPara}
+                onChange={(e) => setKanbanAgendadoPara(e.target.value)}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Previsão de encerramento</Label>
+              <Input
+                type="datetime-local"
+                value={kanbanPrevisao}
+                onChange={(e) => setKanbanPrevisao(e.target.value)}
+                className="h-10"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setKanbanAgendadoOpen(false); setKanbanPendingMove(null); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmAgendado} disabled={!kanbanAgendadoPara}>
+              Confirmar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
