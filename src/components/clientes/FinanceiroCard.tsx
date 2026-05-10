@@ -6,17 +6,14 @@ import { useEspelhoFinanceiro } from "@/hooks/useEspelhoFinanceiro";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
-import { Calculator, ArrowUpDown, TrendingUp, TrendingDown } from "lucide-react";
+import { Percent, ArrowUpDown, TrendingUp, TrendingDown } from "lucide-react";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
 
 interface FinanceiroCardProps {
   form: UseFormReturn<ClienteFormValues>;
-  formasPagamento: { id: number; nome: string }[];
   clienteId?: string;
   isEditing?: boolean;
   onOpenMrrModal?: () => void;
