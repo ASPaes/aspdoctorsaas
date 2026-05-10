@@ -396,9 +396,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           <div className="flex flex-wrap gap-4">
             <div className="font-semibold">Total Mensal: <span className="text-primary">R$ {fmtBRL(totalMensal)}</span></div>
             <div className="font-semibold">Total Custo: <span className="text-muted-foreground">R$ {fmtBRL(totalCusto)}</span></div>
+            {totalAtivacao > 0 && (
+              <div className="font-semibold">Total Ativação: <span className="text-amber-500">R$ {fmtBRL(totalAtivacao)}</span></div>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">Mensalidade do cliente é recalculada automaticamente.</div>
         </div>
+        {ativos.length > 0 && contratosCount === 0 && (
+          <p className="text-xs text-amber-500 mt-2">
+            ⚠ Nenhum contrato ativo encontrado. Considere adicionar um contrato para formalizar os produtos.
+          </p>
+        )}
       </CardContent>
 
       <ProdutoDialog
