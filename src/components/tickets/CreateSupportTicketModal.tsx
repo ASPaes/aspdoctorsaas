@@ -37,6 +37,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
   const [departamentoId, setDepartamentoId] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
+  const [clienteContatoId, setClienteContatoId] = useState("");
+  const [previsaoEncerramento, setPrevisaoEncerramento] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
@@ -53,6 +55,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setObservacaoAgente("");
     setDepartamentoId("");
     setResponsavelId("");
+    setClienteContatoId("");
+    setPrevisaoEncerramento("");
   };
 
   useEffect(() => {
@@ -152,6 +156,44 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: clienteContatos = [] } = useQuery({
+    queryKey: ["cliente_contatos_ticket", selectedCliente?.id],
+    enabled: !!selectedCliente?.id,
+    queryFn: async () => {
+      const { data: cli } = await (supabase.from("clientes" as any) as any)
+        .select("contato_nome, contato_fone")
+        .eq("id", selectedCliente!.id)
+        .maybeSingle();
+      const { data: contatos, error } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id, nome, fone, email, cargo")
+        .eq("cliente_id", selectedCliente!.id)
+        .order("nome");
+      if (error) throw error;
+      const result: Array<{ id: string; nome: string; fone: string | null; email: string | null; cargo: string | null; isPrincipal: boolean }> = [];
+      if (cli?.contato_nome) {
+        result.push({
+          id: "principal",
+          nome: cli.contato_nome,
+          fone: cli.contato_fone ?? null,
+          email: null,
+          cargo: "Contato principal",
+          isPrincipal: true,
+        });
+      }
+      (contatos ?? []).forEach((c: any) => {
+        result.push({
+          id: c.id,
+          nome: c.nome,
+          fone: c.fone ?? null,
+          email: c.email ?? null,
+          cargo: c.cargo ?? null,
+          isPrincipal: false,
+        });
+      });
+      return result;
+    },
+  });
+
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(
@@ -203,6 +245,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_contact_id: null,
         p_department_id: departamentoId || null,
         p_responsavel_user_id: responsavelId || null,
+        p_cliente_contato_id: clienteContatoId && clienteContatoId !== "principal" ? clienteContatoId : null,
+        p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
       });
 
       if (error) throw error;
@@ -275,6 +319,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
                         onClick={() => {
                           setSelectedCliente(c);
                           setClienteSearchTerm("");
+                          setClienteContatoId("");
                           (supabase.from("clientes" as any) as any)
                             .select("produto_id")
                             .eq("id", c.id)
@@ -350,7 +395,42 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
             </Select>
           </div>
 
-          {/* Canal + Horário */}
+          {/* Contato + Previsão */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Contato do cliente</Label>
+              <Select value={clienteContatoId} onValueChange={setClienteContatoId} disabled={!selectedCliente}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder={selectedCliente ? "Selecione o contato..." : "Selecione um cliente primeiro"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clienteContatos.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{c.nome}</span>
+                        {c.isPrincipal && <span className="text-[10px] text-primary font-medium">Principal</span>}
+                        {c.cargo && !c.isPrincipal && <span className="text-[10px] text-muted-foreground">({c.cargo})</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {clienteContatos.length === 0 && selectedCliente && (
+                    <div className="p-2 text-xs text-muted-foreground text-center">Nenhum contato cadastrado</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Previsão de encerramento</Label>
+              <Input
+                type="datetime-local"
+                value={previsaoEncerramento}
+                onChange={(e) => setPrevisaoEncerramento(e.target.value)}
+                className="h-10"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Setor</Label>
