@@ -556,7 +556,7 @@ function ProdutoDialog({
 
 // ============ Modulo Dialog ============
 function ModuloDialog({
-  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved, produtoDataAtivacao,
+  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved, produtoDataAtivacao, onMRRSuggest,
 }: {
   open: boolean;
   edit: ClienteProdutoModulo | null;
@@ -566,6 +566,7 @@ function ModuloDialog({
   onClose: () => void;
   onSaved: () => void;
   produtoDataAtivacao?: string | null;
+  onMRRSuggest?: (data: { tipo: "upsell"; valorDelta: number; custoDelta: number; descricao: string; moduloId?: string | null }) => void;
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
