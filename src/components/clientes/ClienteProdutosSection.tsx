@@ -512,6 +512,8 @@ function ProdutoDialog({
         link_portal_fornecedor: link || null,
         data_ativacao: dataAt || null,
         vlr_ativacao: vlrAt,
+        vlr_mensal: vlrMensal || 0,
+        vlr_custo: vlrCusto || 0,
       };
       if (isEdit && edit) {
         const { error } = await (supabase.from("cliente_produtos" as any) as any)
