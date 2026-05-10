@@ -59,10 +59,13 @@ interface Contrato {
   status: string;
   cancelado_em: string | null;
   motivo_cancelamento: string | null;
+  dia_vencimento: number | null;
+  forma_pagamento_mensalidade_id: number | null;
   modelos_contrato?: { nome: string } | null;
   funcionarios?: { nome: string } | null;
   origens_venda?: { nome: string } | null;
   formas_pagamento?: { nome: string } | null;
+  formas_pagamento_mensalidade?: { nome: string } | null;
   contrato_pai?: { numero: string } | null;
 }
 
@@ -105,6 +108,7 @@ export default function ClienteContratosSection({ clienteId }: Props) {
              funcionarios:funcionario_id(nome),
              origens_venda:origem_venda_id(nome),
              formas_pagamento:forma_pagamento_ativacao_id(nome),
+             formas_pagamento_mensalidade:forma_pagamento_mensalidade_id(nome),
              contrato_pai:contrato_pai_id(numero)`
           )
           .eq("cliente_id", clienteId)
@@ -302,6 +306,8 @@ export default function ClienteContratosSection({ clienteId }: Props) {
                         <DetailItem label="Consultor" value={c.funcionarios?.nome} />
                         <DetailItem label="Origem Venda" value={c.origens_venda?.nome} />
                         <DetailItem label="Forma Pgto Ativação" value={c.formas_pagamento?.nome} />
+                        <DetailItem label="Forma Pgto Mensalidade" value={c.formas_pagamento_mensalidade?.nome} />
+                        <DetailItem label="Dia Vencimento" value={c.dia_vencimento ?? "—"} />
                         <DetailItem label="Data Início" value={fmtDate(c.data_inicio)} />
                         <DetailItem label="Data Fim" value={c.data_fim ? fmtDate(c.data_fim) : "Indeterminado"} />
                         <DetailItem label="Prazo (meses)" value={c.prazo_meses ?? "—"} />
@@ -442,6 +448,8 @@ function ContratoDialog({
   const [funcionarioId, setFuncionarioId] = useState<string>(NONE);
   const [origemVendaId, setOrigemVendaId] = useState<string>(NONE);
   const [formaPgtoId, setFormaPgtoId] = useState<string>(NONE);
+  const [formaPgtoMensalidadeId, setFormaPgtoMensalidadeId] = useState<string>("");
+  const [diaVencimento, setDiaVencimento] = useState<string>("");
   const [vlrMensal, setVlrMensal] = useState<number | null>(null);
   const [vlrAtivacao, setVlrAtivacao] = useState<number | null>(null);
   const [dataProxReajuste, setDataProxReajuste] = useState<string>("");
@@ -465,6 +473,8 @@ function ContratoDialog({
       setFuncionarioId(edit.funcionario_id?.toString() ?? NONE);
       setOrigemVendaId(edit.origem_venda_id?.toString() ?? NONE);
       setFormaPgtoId(edit.forma_pagamento_ativacao_id?.toString() ?? NONE);
+      setFormaPgtoMensalidadeId(edit.forma_pagamento_mensalidade_id ? String(edit.forma_pagamento_mensalidade_id) : "");
+      setDiaVencimento(edit.dia_vencimento != null ? String(edit.dia_vencimento) : "");
       setVlrMensal(edit.vlr_total_mensal != null ? Number(edit.vlr_total_mensal) : null);
       setVlrAtivacao(edit.vlr_total_ativacao != null ? Number(edit.vlr_total_ativacao) : null);
       setDataProxReajuste(edit.data_proximo_reajuste ?? "");
@@ -480,6 +490,7 @@ function ContratoDialog({
       setRecorrencia("mensal");
       setModeloContratoId(NONE); setFuncionarioId(NONE);
       setOrigemVendaId(NONE); setFormaPgtoId(NONE);
+      setFormaPgtoMensalidadeId(""); setDiaVencimento("");
       setVlrMensal(null); setVlrAtivacao(null);
       setDataProxReajuste(""); setIndiceReajuste(NONE);
       setLinkAssinatura(""); setAssinadoEm(""); setObs("");
@@ -505,6 +516,8 @@ function ContratoDialog({
         funcionario_id: idOrNull(funcionarioId),
         origem_venda_id: idOrNull(origemVendaId),
         forma_pagamento_ativacao_id: idOrNull(formaPgtoId),
+        forma_pagamento_mensalidade_id: formaPgtoMensalidadeId ? Number(formaPgtoMensalidadeId) : null,
+        dia_vencimento: diaVencimento ? Number(diaVencimento) : null,
         vlr_total_mensal: vlrMensal,
         vlr_total_ativacao: vlrAtivacao,
         link_assinatura: linkAssinatura || null,
@@ -651,6 +664,28 @@ function ContratoDialog({
                     {formasPgto.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field label="Forma Pgto Mensalidade">
+                <Select
+                  value={formaPgtoMensalidadeId === "" ? NONE : formaPgtoMensalidadeId}
+                  onValueChange={(v) => setFormaPgtoMensalidadeId(v === NONE ? "" : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>— Nenhum —</SelectItem>
+                    {formasPgto.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Dia Vencimento">
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  placeholder="Dia"
+                  value={diaVencimento}
+                  onChange={(e) => setDiaVencimento(e.target.value)}
+                />
               </Field>
             </div>
           </Section>
