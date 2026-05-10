@@ -287,6 +287,19 @@ export default function FinanceiroCard({
           </div>
         </div>
 
+        {(totalAtivacao ?? 0) > 0 && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                Total Ativação (produtos)
+              </p>
+              <p className="text-lg font-bold mt-0.5 text-amber-500">
+                {fmt(totalAtivacao ?? 0)}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Seção 3: Espelho Financeiro (admin/super_admin only) */}
         {isFinanceiroAdmin && (
           <>
