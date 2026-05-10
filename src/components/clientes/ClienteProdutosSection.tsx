@@ -481,6 +481,8 @@ function ProdutoDialog({
   const [link, setLink] = useState("");
   const [dataAt, setDataAt] = useState("");
   const [vlrAt, setVlrAt] = useState<number | null>(null);
+  const [vlrMensal, setVlrMensal] = useState<number | null>(null);
+  const [vlrCusto, setVlrCusto] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Reset on open
@@ -492,6 +494,8 @@ function ProdutoDialog({
       setLink(edit?.link_portal_fornecedor ?? "");
       setDataAt(edit?.data_ativacao ?? "");
       setVlrAt(edit?.vlr_ativacao ?? null);
+      setVlrMensal(edit?.vlr_mensal ? Number(edit.vlr_mensal) || null : null);
+      setVlrCusto(edit?.vlr_custo ? Number(edit.vlr_custo) || null : null);
     }
   }, [open, edit]);
 
@@ -508,6 +512,8 @@ function ProdutoDialog({
         link_portal_fornecedor: link || null,
         data_ativacao: dataAt || null,
         vlr_ativacao: vlrAt,
+        vlr_mensal: vlrMensal || 0,
+        vlr_custo: vlrCusto || 0,
       };
       if (isEdit && edit) {
         const { error } = await (supabase.from("cliente_produtos" as any) as any)
@@ -573,9 +579,20 @@ function ProdutoDialog({
           </div>
           <div className="space-y-1">
             <Label>Valor Ativação</Label>
-            <NumericInput value={vlrAt} onChange={setVlrAt} suffix="R$" />
+            <NumericInput value={vlrAt} onChange={setVlrAt} decimals={2} placeholder="0,00" suffix="R$" />
+          </div>
+          <div className="space-y-1">
+            <Label>Valor Mensal</Label>
+            <NumericInput value={vlrMensal} onChange={setVlrMensal} decimals={2} placeholder="0,00" suffix="R$" />
+          </div>
+          <div className="space-y-1">
+            <Label>Custo Operação</Label>
+            <NumericInput value={vlrCusto} onChange={setVlrCusto} decimals={2} placeholder="0,00" suffix="R$" />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Se este produto terá módulos detalhados, os valores serão recalculados automaticamente.
+        </p>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button type="button" onClick={handleSave} disabled={saving}>
