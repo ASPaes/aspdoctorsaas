@@ -28,10 +28,11 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle,
+  ExternalLink, Loader2, Puzzle, Percent,
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
+import ReajusteModulosDialog from "./ReajusteModulosDialog";
 
 interface Props {
   clienteId: string;
@@ -90,6 +91,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
+  const [reajusteDialog, setReajusteDialog] = useState<{
+    open: boolean; clienteProdutoId?: string; produtoNome?: string;
+  }>({ open: false });
 
   if (!clienteId) return null;
 
@@ -345,9 +349,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                         )}
                       </div>
 
-                      <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
-                        <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
+                          <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
+                        </Button>
+                        <Button
+                          type="button" variant="outline" size="sm"
+                          onClick={() => setReajusteDialog({ open: true, clienteProdutoId: p.id, produtoNome: p.produtos?.nome ?? '' })}
+                          disabled={modsAtivos === 0}
+                        >
+                          <Percent className="h-4 w-4 mr-1" /> Reajuste %
+                        </Button>
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </div>
@@ -387,6 +400,26 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         onSaved={invalidateAll}
         produtoDataAtivacao={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.data_ativacao ?? null}
         onMRRSuggest={(d) => setMrrDialog({ open: true, ...d })}
+      />
+
+      <ReajusteModulosDialog
+        open={reajusteDialog.open}
+        onOpenChange={(o) => setReajusteDialog(prev => ({ ...prev, open: o }))}
+        clienteProdutoId={reajusteDialog.clienteProdutoId ?? ''}
+        produtoNome={reajusteDialog.produtoNome ?? ''}
+        modulos={(modulosByProduto[reajusteDialog.clienteProdutoId ?? ''] ?? [])
+          .filter((m: any) => m.ativo)
+          .map((m: any) => ({
+            id: m.id,
+            nome: m.produto_modulos?.nome ?? '',
+            vlr_mensal: Number(m.vlr_mensal) || 0,
+            vlr_custo: Number(m.vlr_custo) || 0,
+            ativo: m.ativo,
+          }))}
+        tenantId={tid}
+        clienteId={clienteId}
+        onSuccess={invalidateAll}
+        onMRRSuggest={(d) => setMrrDialog({ open: true, ...d, moduloId: null })}
       />
 
       <SugestaoMRRDialog
