@@ -279,21 +279,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                     <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
                       <div className="font-semibold truncate">{p.produtos?.nome ?? "—"}</div>
                       <div className="text-sm text-muted-foreground truncate">{p.fornecedores?.nome ?? "—"}</div>
-                      <div>
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <Badge variant={p.ativo ? "default" : "secondary"} className="shrink-0">
                           R$ {fmtBRL(p.vlr_mensal)}/mês
                         </Badge>
-                        {" "}
                         <Badge variant="outline" className="shrink-0 text-muted-foreground">
                           Custo: R$ {fmtBRL(p.vlr_custo)}
                         </Badge>
                         {Number(p.vlr_ativacao) > 0 && (
-                          <>
-                            {" "}
-                            <Badge variant="outline" className="shrink-0 text-amber-500 border-amber-500/30">
-                              Ativ: R$ {fmtBRL(p.vlr_ativacao)}
-                            </Badge>
-                          </>
+                          <Badge variant="outline" className="shrink-0 text-amber-500 border-amber-500/30">
+                            Ativ: R$ {fmtBRL(p.vlr_ativacao)}
+                          </Badge>
                         )}
                       </div>
                       <div>
