@@ -35,6 +35,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [status, setStatus] = useState<string>("concluido");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
+  const [departamentoId, setDepartamentoId] = useState("");
+  const [responsavelId, setResponsavelId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
@@ -49,10 +51,20 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setStatus("concluido");
     setAgendadoPara("");
     setObservacaoAgente("");
+    setDepartamentoId("");
+    setResponsavelId("");
   };
 
   useEffect(() => {
     if (open) reset();
+  }, [open]);
+
+  useEffect(() => {
+    if (open && !responsavelId) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user?.id) setResponsavelId(data.user.id);
+      });
+    }
   }, [open]);
 
   const { data: produtos = [] } = useQuery({
@@ -110,6 +122,36 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: departamentos = [] } = useQuery({
+    queryKey: ["create_ticket_departamentos", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
+  });
+
+  const { data: agentes = [] } = useQuery({
+    queryKey: ["create_ticket_agentes", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+    },
+  });
+
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(
@@ -159,7 +201,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_status: status,
         p_agendado_para: status === "agendado" ? new Date(agendadoPara).toISOString() : null,
         p_contact_id: null,
-        p_department_id: null,
+        p_department_id: departamentoId || null,
+        p_responsavel_user_id: responsavelId || null,
       });
 
       if (error) throw error;
@@ -309,6 +352,34 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           {/* Canal + Horário */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Setor</Label>
+              <Select value={departamentoId} onValueChange={setDepartamentoId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione o setor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {departamentos.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Responsável <Req /></Label>
+              <Select value={responsavelId} onValueChange={setResponsavelId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentes.map((a) => (
+                    <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Canal de origem <Req /></Label>
               <Select value={canalOrigem} onValueChange={setCanalOrigem}>
