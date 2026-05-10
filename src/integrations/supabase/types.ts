@@ -1475,8 +1475,10 @@ export type Database = {
           data_inicio: string | null
           data_proximo_reajuste: string | null
           data_venda: string | null
+          dia_vencimento: number | null
           fidelidade_meses: number | null
           forma_pagamento_ativacao_id: number | null
+          forma_pagamento_mensalidade_id: number | null
           funcionario_id: number | null
           id: string
           indice_reajuste: string | null
@@ -1508,8 +1510,10 @@ export type Database = {
           data_inicio?: string | null
           data_proximo_reajuste?: string | null
           data_venda?: string | null
+          dia_vencimento?: number | null
           fidelidade_meses?: number | null
           forma_pagamento_ativacao_id?: number | null
+          forma_pagamento_mensalidade_id?: number | null
           funcionario_id?: number | null
           id?: string
           indice_reajuste?: string | null
@@ -1541,8 +1545,10 @@ export type Database = {
           data_inicio?: string | null
           data_proximo_reajuste?: string | null
           data_venda?: string | null
+          dia_vencimento?: number | null
           fidelidade_meses?: number | null
           forma_pagamento_ativacao_id?: number | null
+          forma_pagamento_mensalidade_id?: number | null
           funcionario_id?: number | null
           id?: string
           indice_reajuste?: string | null
@@ -1587,6 +1593,13 @@ export type Database = {
           {
             foreignKeyName: "contratos_forma_pagamento_ativacao_id_fkey"
             columns: ["forma_pagamento_ativacao_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_forma_pagamento_mensalidade_id_fkey"
+            columns: ["forma_pagamento_mensalidade_id"]
             isOneToOne: false
             referencedRelation: "formas_pagamento"
             referencedColumns: ["id"]
