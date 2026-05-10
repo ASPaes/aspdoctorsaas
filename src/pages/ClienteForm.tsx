@@ -558,6 +558,10 @@ export default function ClienteForm() {
             <ClienteProdutosSection clienteId={id} />
           )}
 
+          {isEditing && id && (
+            <ClienteContratosSection clienteId={id} />
+          )}
+
           {/* Card: Certificado A1 */}
           <CertificadoA1Section
             clienteId={id}
