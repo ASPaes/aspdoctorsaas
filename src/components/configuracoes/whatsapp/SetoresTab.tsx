@@ -420,6 +420,9 @@ export default function SetoresTab() {
                 {d.is_default_fallback && (
                   <Badge variant="outline" className="text-xs">Fallback</Badge>
                 )}
+                {d.requires_ticket_on_close && (
+                  <Badge variant="outline" className="text-[10px]">Ticket obrigatório</Badge>
+                )}
               </div>
             </button>
           ))}
