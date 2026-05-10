@@ -6,13 +6,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
-  TicketCheck, ArrowUpRight,
+  TicketCheck, ArrowUpRight, Send,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -62,6 +64,11 @@ function formatDateTime(iso: string | null | undefined): string {
   return `${dd}/${mm}/${yy} ${hh}:${mi}`;
 }
 
+function formatEvtDate(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 interface Props {
   ticketId: string | null;
   open: boolean;
@@ -72,7 +79,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState<"details" | "timeline">("details");
   const [childOpen, setChildOpen] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [addingComment, setAddingComment] = useState(false);
   const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
 
@@ -137,6 +147,65 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       return data as any;
     },
   });
+
+  const { data: events = [], refetch: refetchEvents } = useQuery({
+    queryKey: ["support_ticket_events", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_ticket_events" as any) as any)
+        .select("id, user_id, event_type, content, old_value, new_value, created_at")
+        .eq("ticket_id", ticketId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        user_id: string;
+        event_type: string;
+        content: string | null;
+        old_value: string | null;
+        new_value: string | null;
+        created_at: string;
+      }>;
+    },
+  });
+
+  const { data: eventAgents = [] } = useQuery({
+    queryKey: ["ticket_event_agents", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }));
+    },
+  });
+
+  const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !ticketId) return;
+    setAddingComment(true);
+    try {
+      const { error } = await (supabase.rpc as any)("add_ticket_event", {
+        p_ticket_id: ticketId,
+        p_event_type: "comment",
+        p_content: newComment.trim(),
+      });
+      if (error) throw error;
+      toast.success("Ocorrência registrada");
+      setNewComment("");
+      refetchEvents();
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setAddingComment(false);
+    }
+  };
 
   const breadcrumb = ticket ? [
     ticket.produtos?.nome,
@@ -421,6 +490,81 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           ))}
         </div>
       )}
+
+      {/* Timeline de ocorrências */}
+      <div className="pt-4 border-t space-y-3">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">Ocorrências</p>
+          {events.length > 0 && (
+            <Badge variant="outline" className="text-[10px]">{events.length}</Badge>
+          )}
+        </div>
+
+        {/* Formulário de nova ocorrência */}
+        <div className="flex gap-2">
+          <Textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Registrar ocorrência..."
+            className="min-h-[60px] text-sm flex-1"
+            rows={2}
+          />
+          <Button
+            size="sm"
+            className="self-end h-9"
+            onClick={handleAddComment}
+            disabled={!newComment.trim() || addingComment}
+          >
+            {addingComment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+
+        {events.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-3">Nenhuma ocorrência registrada</p>
+        ) : (
+          <div className="space-y-0 border-l-2 border-border ml-2">
+            {events.map((evt) => (
+              <div key={evt.id} className="relative pl-5 pb-4">
+                <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
+                  evt.event_type === "comment" ? "bg-primary" :
+                  evt.event_type === "status_change" ? "bg-blue-400" :
+                  evt.event_type === "created" ? "bg-green-400" :
+                  "bg-muted-foreground"
+                }`} />
+
+                {evt.event_type === "comment" ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-medium">{getAgentName(evt.user_id)}</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md px-2.5 py-1.5">{evt.content}</p>
+                  </div>
+                ) : evt.event_type === "status_change" ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
+                    <span className="text-xs">alterou status:</span>
+                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.old_value ?? ""] ?? evt.old_value}</Badge>
+                    <span className="text-[10px]">→</span>
+                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.new_value ?? ""] ?? evt.new_value}</Badge>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {evt.event_type === "created" ? "Ticket criado" :
+                       evt.event_type === "closed" ? "Ticket encerrado" :
+                       evt.event_type === "assignment_change" ? `Responsável alterado: ${evt.old_value ?? "—"} → ${evt.new_value ?? "—"}` :
+                       evt.event_type}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 
