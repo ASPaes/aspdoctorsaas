@@ -31,9 +31,19 @@ import {
   ExternalLink, Loader2, Puzzle,
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
+import SugestaoMRRDialog from "./SugestaoMRRDialog";
 
 interface Props {
   clienteId: string;
+}
+
+interface MRRDialogState {
+  open: boolean;
+  tipo: "upsell" | "cross_sell" | "downsell";
+  valorDelta: number;
+  custoDelta: number;
+  descricao: string;
+  moduloId?: string | null;
 }
 
 interface ClienteProduto {
@@ -77,6 +87,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     open: boolean; clienteProdutoId?: string; produtoId?: number; edit?: ClienteProdutoModulo | null;
   }>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<ClienteProduto | null>(null);
+  const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
+    open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
+  });
 
   if (!clienteId) return null;
 
@@ -177,9 +190,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         .eq("id", m.id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, m) => {
       toast({ title: "Módulo atualizado" });
       invalidateAll();
+      // Se foi inativação (estava ativo) e tinha valor mensal, sugerir downsell
+      if (m.ativo && (Number(m.vlr_mensal) || 0) > 0) {
+        setMrrDialog({
+          open: true,
+          tipo: "downsell",
+          valorDelta: -(Number(m.vlr_mensal) || 0),
+          custoDelta: -(Number(m.vlr_custo) || 0),
+          descricao: `Módulo ${m.produto_modulos?.nome ?? ""} inativado`,
+          moduloId: m.id,
+        });
+      }
     },
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
@@ -362,6 +386,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         onClose={() => setModuloDialog({ open: false })}
         onSaved={invalidateAll}
         produtoDataAtivacao={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.data_ativacao ?? null}
+        onMRRSuggest={(d) => setMrrDialog({ open: true, ...d })}
+      />
+
+      <SugestaoMRRDialog
+        open={mrrDialog.open}
+        onOpenChange={(o) => setMrrDialog(prev => ({ ...prev, open: o }))}
+        clienteId={clienteId}
+        tenantId={tid}
+        tipo={mrrDialog.tipo}
+        valorDelta={mrrDialog.valorDelta}
+        custoDelta={mrrDialog.custoDelta}
+        descricaoSugerida={mrrDialog.descricao}
+        moduloId={mrrDialog.moduloId}
+        onRegistrado={invalidateAll}
       />
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
@@ -518,7 +556,7 @@ function ProdutoDialog({
 
 // ============ Modulo Dialog ============
 function ModuloDialog({
-  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved, produtoDataAtivacao,
+  open, edit, clienteProdutoId, produtoId, tid, onClose, onSaved, produtoDataAtivacao, onMRRSuggest,
 }: {
   open: boolean;
   edit: ClienteProdutoModulo | null;
@@ -528,6 +566,7 @@ function ModuloDialog({
   onClose: () => void;
   onSaved: () => void;
   produtoDataAtivacao?: string | null;
+  onMRRSuggest?: (data: { tipo: "upsell"; valorDelta: number; custoDelta: number; descricao: string; moduloId?: string | null }) => void;
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
@@ -591,6 +630,16 @@ function ModuloDialog({
       toast({ title: isEdit ? "Módulo atualizado" : "Módulo adicionado" });
       onSaved();
       onClose();
+      if (!isEdit && (vlrMensal || 0) > 0) {
+        const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
+        onMRRSuggest?.({
+          tipo: "upsell",
+          valorDelta: vlrMensal || 0,
+          custoDelta: vlrCusto || 0,
+          descricao: `Módulo ${nomeModulo} adicionado`,
+          moduloId: null,
+        });
+      }
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
