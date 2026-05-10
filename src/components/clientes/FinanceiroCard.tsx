@@ -164,8 +164,8 @@ export default function FinanceiroCard({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Calculator className="h-5 w-5 text-primary" />
-          Financeiro
+          <Percent className="h-5 w-5 text-primary" />
+          Custos da Operação
         </CardTitle>
         {isEditing && onOpenMrrModal && (
           <Button type="button" variant="outline" size="sm" onClick={onOpenMrrModal}>
@@ -176,34 +176,7 @@ export default function FinanceiroCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Seção 1: Campos editáveis */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <FormField
-            control={form.control}
-            name="forma_pagamento_mensalidade_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Forma Pgto Mensalidade</FormLabel>
-                <Select
-                  value={field.value?.toString() ?? ""}
-                  onValueChange={(v) => field.onChange(v ? Number(v) : null)}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {formasPagamento.map((f) => (
-                      <SelectItem key={f.id} value={f.id.toString()}>
-                        {f.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="imposto_percentual"
@@ -236,29 +209,6 @@ export default function FinanceiroCard({
                     placeholder="0,00"
                     decimals={2}
                     suffix="%"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="dia_vencimento_mrr"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Dia do Vencimento</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={31}
-                    placeholder="Dia"
-                    value={field.value ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      field.onChange(v ? Number(v) : null);
-                    }}
                   />
                 </FormControl>
                 <FormMessage />
