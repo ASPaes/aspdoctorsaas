@@ -481,6 +481,8 @@ function ProdutoDialog({
   const [link, setLink] = useState("");
   const [dataAt, setDataAt] = useState("");
   const [vlrAt, setVlrAt] = useState<number | null>(null);
+  const [vlrMensal, setVlrMensal] = useState<number | null>(null);
+  const [vlrCusto, setVlrCusto] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Reset on open
@@ -492,6 +494,8 @@ function ProdutoDialog({
       setLink(edit?.link_portal_fornecedor ?? "");
       setDataAt(edit?.data_ativacao ?? "");
       setVlrAt(edit?.vlr_ativacao ?? null);
+      setVlrMensal(edit?.vlr_mensal ? Number(edit.vlr_mensal) || null : null);
+      setVlrCusto(edit?.vlr_custo ? Number(edit.vlr_custo) || null : null);
     }
   }, [open, edit]);
 
