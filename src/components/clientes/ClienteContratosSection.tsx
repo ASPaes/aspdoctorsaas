@@ -306,6 +306,8 @@ export default function ClienteContratosSection({ clienteId }: Props) {
                         <DetailItem label="Consultor" value={c.funcionarios?.nome} />
                         <DetailItem label="Origem Venda" value={c.origens_venda?.nome} />
                         <DetailItem label="Forma Pgto Ativação" value={c.formas_pagamento?.nome} />
+                        <DetailItem label="Forma Pgto Mensalidade" value={c.formas_pagamento_mensalidade?.nome} />
+                        <DetailItem label="Dia Vencimento" value={c.dia_vencimento ?? "—"} />
                         <DetailItem label="Data Início" value={fmtDate(c.data_inicio)} />
                         <DetailItem label="Data Fim" value={c.data_fim ? fmtDate(c.data_fim) : "Indeterminado"} />
                         <DetailItem label="Prazo (meses)" value={c.prazo_meses ?? "—"} />
