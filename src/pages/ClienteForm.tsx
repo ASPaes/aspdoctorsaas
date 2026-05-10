@@ -316,15 +316,20 @@ export default function ClienteForm() {
     clearDraft();
   }, [clienteQuery.data]);
 
-  // Sync trigger-controlled fields (mensalidade is recalculated by DB triggers)
+  // Sync trigger-controlled fields (mensalidade + custo_operacao recalculados por DB triggers)
   useEffect(() => {
     if (!clienteQuery.data || !clienteLoadedRef.current) return;
     const dbMensalidade = Number(clienteQuery.data.mensalidade) || 0;
+    const dbCusto = Number(clienteQuery.data.custo_operacao) || 0;
     const currentMensalidade = form.getValues("mensalidade");
+    const currentCusto = form.getValues("custo_operacao");
     if (dbMensalidade !== currentMensalidade) {
       form.setValue("mensalidade", dbMensalidade, { shouldDirty: false });
     }
-  }, [clienteQuery.data?.mensalidade]);
+    if (dbCusto !== currentCusto) {
+      form.setValue("custo_operacao", dbCusto, { shouldDirty: false });
+    }
+  }, [clienteQuery.data?.mensalidade, clienteQuery.data?.custo_operacao]);
 
   const mutation = useMutation({
     mutationFn: async (values: ClienteFormValues) => {

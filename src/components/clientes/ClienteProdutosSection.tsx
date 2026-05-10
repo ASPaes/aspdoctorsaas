@@ -216,6 +216,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const ativos = (produtosQuery.data ?? []).filter(p => p.ativo);
   const totalMensal = ativos.reduce((s, p) => s + (Number(p.vlr_mensal) || 0), 0);
   const totalCusto = ativos.reduce((s, p) => s + (Number(p.vlr_custo) || 0), 0);
+  const totalAtivacao = ativos.reduce((s, p) => s + (Number(p.vlr_ativacao) || 0), 0);
+
+  const { data: contratosCount } = useQuery({
+    queryKey: ["contratos_count_check", tid, clienteId],
+    queryFn: async () => {
+      const { count, error } = await (supabase.from("contratos" as any) as any)
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", clienteId)
+        .eq("status", "ativo");
+      if (error) return 0;
+      return count ?? 0;
+    },
+    enabled: !!clienteId,
+  });
 
   return (
     <Card>
@@ -268,6 +282,14 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                         <Badge variant="outline" className="shrink-0 text-muted-foreground">
                           Custo: R$ {fmtBRL(p.vlr_custo)}
                         </Badge>
+                        {Number(p.vlr_ativacao) > 0 && (
+                          <>
+                            {" "}
+                            <Badge variant="outline" className="shrink-0 text-amber-500 border-amber-500/30">
+                              Ativ: R$ {fmtBRL(p.vlr_ativacao)}
+                            </Badge>
+                          </>
+                        )}
                       </div>
                       <div>
                         {modsAtivos > 0 ? (
@@ -374,9 +396,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           <div className="flex flex-wrap gap-4">
             <div className="font-semibold">Total Mensal: <span className="text-primary">R$ {fmtBRL(totalMensal)}</span></div>
             <div className="font-semibold">Total Custo: <span className="text-muted-foreground">R$ {fmtBRL(totalCusto)}</span></div>
+            {totalAtivacao > 0 && (
+              <div className="font-semibold">Total Ativação: <span className="text-amber-500">R$ {fmtBRL(totalAtivacao)}</span></div>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">Mensalidade do cliente é recalculada automaticamente.</div>
         </div>
+        {ativos.length > 0 && contratosCount === 0 && (
+          <p className="text-xs text-amber-500 mt-2">
+            ⚠ Nenhum contrato ativo encontrado. Considere adicionar um contrato para formalizar os produtos.
+          </p>
+        )}
       </CardContent>
 
       <ProdutoDialog

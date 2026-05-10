@@ -109,6 +109,20 @@ export default function FinanceiroCard({
     enabled: !!clienteId,
   });
 
+  const { data: totalAtivacao } = useQuery({
+    queryKey: ["cliente_produtos_ativacao", clienteId],
+    queryFn: async () => {
+      if (!clienteId) return 0;
+      const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
+        .select("vlr_ativacao")
+        .eq("cliente_id", clienteId)
+        .eq("ativo", true);
+      if (error) return 0;
+      return (data ?? []).reduce((s: number, p: any) => s + (Number(p.vlr_ativacao) || 0), 0);
+    },
+    enabled: !!clienteId,
+  });
+
   const movimentosAtivos = (movimentos ?? []).filter(
     (m) => m.status === "ativo" && !m.estornado_por && !m.estorno_de && m.tipo !== "venda_avulsa"
   );
@@ -161,17 +175,11 @@ export default function FinanceiroCard({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Percent className="h-5 w-5 text-primary" />
           Custos da Operação
         </CardTitle>
-        {isEditing && onOpenMrrModal && (
-          <Button type="button" variant="outline" size="sm" onClick={onOpenMrrModal}>
-            <ArrowUpDown className="h-4 w-4 mr-2" />
-            Movimentos MRR
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Seção 1: Campos editáveis */}
@@ -220,9 +228,17 @@ export default function FinanceiroCard({
 
         {/* Seção 2: Pipeline MRR */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
-            Composição MRR
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+              Composição MRR
+            </p>
+            {isEditing && onOpenMrrModal && (
+              <Button type="button" variant="outline" size="sm" onClick={onOpenMrrModal}>
+                <ArrowUpDown className="h-4 w-4 mr-1" />
+                Movimentos MRR
+              </Button>
+            )}
+          </div>
           <div className="flex flex-col md:flex-row md:items-stretch">
             {/* MRR Base */}
             <div className="flex-1 border border-border/60 bg-card p-3 rounded-md md:rounded-r-none md:border-r-0">
@@ -270,6 +286,19 @@ export default function FinanceiroCard({
             </div>
           </div>
         </div>
+
+        {(totalAtivacao ?? 0) > 0 && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+                Total Ativação (produtos)
+              </p>
+              <p className="text-lg font-bold mt-0.5 text-amber-500">
+                {fmt(totalAtivacao ?? 0)}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Seção 3: Espelho Financeiro (admin/super_admin only) */}
         {isFinanceiroAdmin && (
