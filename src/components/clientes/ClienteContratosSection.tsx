@@ -473,6 +473,8 @@ function ContratoDialog({
       setFuncionarioId(edit.funcionario_id?.toString() ?? NONE);
       setOrigemVendaId(edit.origem_venda_id?.toString() ?? NONE);
       setFormaPgtoId(edit.forma_pagamento_ativacao_id?.toString() ?? NONE);
+      setFormaPgtoMensalidadeId(edit.forma_pagamento_mensalidade_id ? String(edit.forma_pagamento_mensalidade_id) : "");
+      setDiaVencimento(edit.dia_vencimento != null ? String(edit.dia_vencimento) : "");
       setVlrMensal(edit.vlr_total_mensal != null ? Number(edit.vlr_total_mensal) : null);
       setVlrAtivacao(edit.vlr_total_ativacao != null ? Number(edit.vlr_total_ativacao) : null);
       setDataProxReajuste(edit.data_proximo_reajuste ?? "");
