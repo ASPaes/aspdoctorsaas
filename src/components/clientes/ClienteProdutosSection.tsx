@@ -630,6 +630,16 @@ function ModuloDialog({
       toast({ title: isEdit ? "Módulo atualizado" : "Módulo adicionado" });
       onSaved();
       onClose();
+      if (!isEdit && (vlrMensal || 0) > 0) {
+        const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
+        onMRRSuggest?.({
+          tipo: "upsell",
+          valorDelta: vlrMensal || 0,
+          custoDelta: vlrCusto || 0,
+          descricao: `Módulo ${nomeModulo} adicionado`,
+          moduloId: null,
+        });
+      }
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
