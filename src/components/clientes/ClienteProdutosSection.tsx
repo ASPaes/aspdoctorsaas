@@ -190,9 +190,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         .eq("id", m.id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, m) => {
       toast({ title: "Módulo atualizado" });
       invalidateAll();
+      // Se foi inativação (estava ativo) e tinha valor mensal, sugerir downsell
+      if (m.ativo && (Number(m.vlr_mensal) || 0) > 0) {
+        setMrrDialog({
+          open: true,
+          tipo: "downsell",
+          valorDelta: -(Number(m.vlr_mensal) || 0),
+          custoDelta: -(Number(m.vlr_custo) || 0),
+          descricao: `Módulo ${m.produto_modulos?.nome ?? ""} inativado`,
+          moduloId: m.id,
+        });
+      }
     },
     onError: (err: any) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
   });
