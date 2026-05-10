@@ -37,6 +37,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
   const [departamentoId, setDepartamentoId] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
+  const [clienteContatoId, setClienteContatoId] = useState("");
+  const [previsaoEncerramento, setPrevisaoEncerramento] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
