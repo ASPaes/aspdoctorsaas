@@ -490,6 +490,81 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           ))}
         </div>
       )}
+
+      {/* Timeline de ocorrências */}
+      <div className="pt-4 border-t space-y-3">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">Ocorrências</p>
+          {events.length > 0 && (
+            <Badge variant="outline" className="text-[10px]">{events.length}</Badge>
+          )}
+        </div>
+
+        {/* Formulário de nova ocorrência */}
+        <div className="flex gap-2">
+          <Textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Registrar ocorrência..."
+            className="min-h-[60px] text-sm flex-1"
+            rows={2}
+          />
+          <Button
+            size="sm"
+            className="self-end h-9"
+            onClick={handleAddComment}
+            disabled={!newComment.trim() || addingComment}
+          >
+            {addingComment ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+
+        {events.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-3">Nenhuma ocorrência registrada</p>
+        ) : (
+          <div className="space-y-0 border-l-2 border-border ml-2">
+            {events.map((evt) => (
+              <div key={evt.id} className="relative pl-5 pb-4">
+                <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
+                  evt.event_type === "comment" ? "bg-primary" :
+                  evt.event_type === "status_change" ? "bg-blue-400" :
+                  evt.event_type === "created" ? "bg-green-400" :
+                  "bg-muted-foreground"
+                }`} />
+
+                {evt.event_type === "comment" ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-medium">{getAgentName(evt.user_id)}</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap bg-muted/30 rounded-md px-2.5 py-1.5">{evt.content}</p>
+                  </div>
+                ) : evt.event_type === "status_change" ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
+                    <span className="text-xs">alterou status:</span>
+                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.old_value ?? ""] ?? evt.old_value}</Badge>
+                    <span className="text-[10px]">→</span>
+                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.new_value ?? ""] ?? evt.new_value}</Badge>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {evt.event_type === "created" ? "Ticket criado" :
+                       evt.event_type === "closed" ? "Ticket encerrado" :
+                       evt.event_type === "assignment_change" ? `Responsável alterado: ${evt.old_value ?? "—"} → ${evt.new_value ?? "—"}` :
+                       evt.event_type}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 
