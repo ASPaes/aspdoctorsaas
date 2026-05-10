@@ -35,6 +35,7 @@ import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection";
+import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ReativarClienteDialog } from "@/components/clientes/ReativarClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
