@@ -218,15 +218,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const totalCusto = ativos.reduce((s, p) => s + (Number(p.vlr_custo) || 0), 0);
   const totalAtivacao = ativos.reduce((s, p) => s + (Number(p.vlr_ativacao) || 0), 0);
 
-  const { data: contratosCount } = useQuery({
-    queryKey: ["contratos_count_check", tid, clienteId],
+  const { data: contratosInfo } = useQuery({
+    queryKey: ["contratos_totais_check", tid, clienteId],
     queryFn: async () => {
-      const { count, error } = await (supabase.from("contratos" as any) as any)
-        .select("id", { count: "exact", head: true })
+      const { data, error } = await (supabase.from("contratos" as any) as any)
+        .select("vlr_total_mensal, vlr_total_ativacao")
         .eq("cliente_id", clienteId)
         .eq("status", "ativo");
-      if (error) return 0;
-      return count ?? 0;
+      if (error) return { count: 0, totalMensal: 0, totalAtivacao: 0 };
+      const rows = data ?? [];
+      return {
+        count: rows.length,
+        totalMensal: rows.reduce((s: number, c: any) => s + (Number(c.vlr_total_mensal) || 0), 0),
+        totalAtivacao: rows.reduce((s: number, c: any) => s + (Number(c.vlr_total_ativacao) || 0), 0),
+      };
     },
     enabled: !!clienteId,
   });
@@ -402,11 +407,50 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           </div>
           <div className="text-xs text-muted-foreground">Mensalidade do cliente é recalculada automaticamente.</div>
         </div>
-        {ativos.length > 0 && contratosCount === 0 && (
-          <p className="text-xs text-amber-500 mt-2">
-            ⚠ Nenhum contrato ativo encontrado. Considere adicionar um contrato para formalizar os produtos.
-          </p>
-        )}
+        {ativos.length > 0 && (() => {
+          const ct = contratosInfo ?? { count: 0, totalMensal: 0, totalAtivacao: 0 };
+
+          if (ct.count === 0) {
+            return (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-500 mt-2 space-y-1">
+                <p className="font-medium">⚠ Nenhum contrato ativo encontrado.</p>
+                <p>Adicione um contrato para formalizar os produtos (R$ {fmtBRL(totalMensal)}/mês).</p>
+              </div>
+            );
+          }
+
+          const diffMensal = Math.abs(totalMensal - ct.totalMensal);
+          const diffAtivacao = Math.abs(totalAtivacao - ct.totalAtivacao);
+
+          if (diffMensal > 0.01 || diffAtivacao > 0.01) {
+            return (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-500 mt-2 space-y-1">
+                <p className="font-medium">⚠ Os valores dos contratos divergem dos produtos.</p>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div>
+                    <span className="text-muted-foreground">Mensal produtos:</span> R$ {fmtBRL(totalMensal)}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Mensal contratos:</span> R$ {fmtBRL(ct.totalMensal)}
+                  </div>
+                  {totalAtivacao > 0 && (
+                    <>
+                      <div>
+                        <span className="text-muted-foreground">Ativação produtos:</span> R$ {fmtBRL(totalAtivacao)}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Ativação contratos:</span> R$ {fmtBRL(ct.totalAtivacao)}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <p className="mt-1">Atualize o contrato existente, insira um aditivo ou registre um movimento MRR para conciliar.</p>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
       </CardContent>
 
       <ProdutoDialog
