@@ -108,13 +108,6 @@ interface Department {
   default_instance_id: string | null;
 }
 
-interface DeptInstance {
-  id: string;
-  department_id: string;
-  instance_id: string;
-  is_active: boolean;
-}
-
 interface Funcionario {
   id: number;
   nome: string;
@@ -141,9 +134,6 @@ const accessEquipeQueryKeys = {
   inviteFuncionarios: (tenantId?: string) => ["funcionarios-for-invite", tenantId] as const,
   pendingInvites: (tenantId?: string) => ["access-invites-pending", tenantId] as const,
   pendingApprovals: (tenantId?: string) => ["pending-approvals", tenantId] as const,
-  departments: (tenantId?: string) => ["support_departments", tenantId] as const,
-  departmentInstances: (tenantId?: string, departmentId?: string | null) =>
-    ["support_department_instances", tenantId, departmentId] as const,
 };
 
 function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: string) {
@@ -152,8 +142,6 @@ function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: str
   queryClient.removeQueries({ queryKey: ["funcionarios-for-invite"] });
   queryClient.removeQueries({ queryKey: ["access-invites-pending"] });
   queryClient.removeQueries({ queryKey: ["pending-approvals"] });
-  queryClient.removeQueries({ queryKey: ["support_departments"] });
-  queryClient.removeQueries({ queryKey: ["support_department_instances"] });
 
   if (!tenantId) return;
 
@@ -162,7 +150,6 @@ function resetAccessEquipeTenantQueries(queryClient: QueryClient, tenantId?: str
   queryClient.setQueryData(accessEquipeQueryKeys.inviteFuncionarios(tenantId), []);
   queryClient.setQueryData(accessEquipeQueryKeys.pendingInvites(tenantId), []);
   queryClient.setQueryData(accessEquipeQueryKeys.pendingApprovals(tenantId), []);
-  queryClient.setQueryData(accessEquipeQueryKeys.departments(tenantId), []);
 }
 
 // ========== Admin-only cells (Limite & Competências) ==========
@@ -288,8 +275,6 @@ export default function AcessosEquipeTab() {
   return (
     <div className="space-y-8">
       <UsersSection tenantId={tenantId} />
-      <Separator />
-      <DepartmentsSection tenantId={tenantId} />
     </div>
   );
 }
