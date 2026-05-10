@@ -542,6 +542,10 @@ export default function ClienteForm() {
             </CardContent>
           </Card>
 
+          {isEditing && id && (
+            <ClienteProdutosSection clienteId={id} />
+          )}
+
           {/* Card: Certificado A1 */}
           <CertificadoA1Section
             clienteId={id}
