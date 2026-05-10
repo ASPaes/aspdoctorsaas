@@ -386,6 +386,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         onClose={() => setModuloDialog({ open: false })}
         onSaved={invalidateAll}
         produtoDataAtivacao={produtosQuery.data?.find(p => p.id === moduloDialog.clienteProdutoId)?.data_ativacao ?? null}
+        onMRRSuggest={(d) => setMrrDialog({ open: true, ...d })}
+      />
+
+      <SugestaoMRRDialog
+        open={mrrDialog.open}
+        onOpenChange={(o) => setMrrDialog(prev => ({ ...prev, open: o }))}
+        clienteId={clienteId}
+        tenantId={tid}
+        tipo={mrrDialog.tipo}
+        valorDelta={mrrDialog.valorDelta}
+        custoDelta={mrrDialog.custoDelta}
+        descricaoSugerida={mrrDialog.descricao}
+        moduloId={mrrDialog.moduloId}
+        onRegistrado={invalidateAll}
       />
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
