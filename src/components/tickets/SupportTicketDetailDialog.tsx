@@ -6,13 +6,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
-  TicketCheck, ArrowUpRight,
+  TicketCheck, ArrowUpRight, Send,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -62,6 +64,11 @@ function formatDateTime(iso: string | null | undefined): string {
   return `${dd}/${mm}/${yy} ${hh}:${mi}`;
 }
 
+function formatEvtDate(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 interface Props {
   ticketId: string | null;
   open: boolean;
@@ -72,7 +79,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState<"details" | "timeline">("details");
   const [childOpen, setChildOpen] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [addingComment, setAddingComment] = useState(false);
   const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
 
