@@ -268,6 +268,14 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                         <Badge variant="outline" className="shrink-0 text-muted-foreground">
                           Custo: R$ {fmtBRL(p.vlr_custo)}
                         </Badge>
+                        {Number(p.vlr_ativacao) > 0 && (
+                          <>
+                            {" "}
+                            <Badge variant="outline" className="shrink-0 text-amber-500 border-amber-500/30">
+                              Ativ: R$ {fmtBRL(p.vlr_ativacao)}
+                            </Badge>
+                          </>
+                        )}
                       </div>
                       <div>
                         {modsAtivos > 0 ? (
