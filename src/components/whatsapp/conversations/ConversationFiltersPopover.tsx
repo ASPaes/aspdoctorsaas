@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Filter, X, Sparkles } from "lucide-react";
+import { Filter, X, Sparkles, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
@@ -48,11 +50,10 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
   const [open, setOpen] = useState(false);
+  const [operadorOpen, setOperadorOpen] = useState(false);
 
-  // For admin: load agents (users with funcionario linked)
   const { data: tenantUsers } = useTenantUsers();
 
-  // Resolve funcionario names for agents
   const tenantUsersKey = (tenantUsers ?? []).map((u) => `${u.user_id}:${u.funcionario_id ?? ""}:${u.status}`).join(",");
   const agentOptions = useQuery({
     queryKey: ["whatsapp-agent-options", tenantUsersKey],
@@ -84,6 +85,19 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
     },
   });
 
+  const sortedAgents = useMemo(() => {
+    return [...(agentOptions.data ?? [])].sort((a, b) =>
+      a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" })
+    );
+  }, [agentOptions.data]);
+
+  const selectedOperadorLabel = useMemo(() => {
+    if (!filters.assignedToAgent) return "Todos";
+    if (filters.assignedToAgent === "__unassigned__") return "Na Fila (sem operador)";
+    const found = sortedAgents.find((a) => a.userId === filters.assignedToAgent);
+    return found?.label ?? "Operador";
+  }, [filters.assignedToAgent, sortedAgents]);
+
   const activeCount =
     (filters.sortBy !== "recent" ? 1 : 0) +
     (filters.status ? 1 : 0) +
@@ -99,7 +113,7 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 relative">
+        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 relative">
           <Filter className="h-4 w-4" />
           {activeCount > 0 && (
             <Badge
@@ -115,34 +129,91 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold">Filtros</span>
           {activeCount > 0 && (
-            <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={handleClear}>
+            <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={handleClear}>
               <X className="h-3 w-3 mr-1" />
               Limpar
             </Button>
           )}
         </div>
 
-        {/* Operador — role-aware */}
         {isAdmin ? (
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Operador</label>
-            <Select
-              value={filters.assignedToAgent || "all"}
-              onValueChange={(v) => onChange({ ...filters, assignedToAgent: v === "all" ? undefined : v, assignedToMe: false })}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="__unassigned__">Na Fila (sem operador)</SelectItem>
-                {(agentOptions.data ?? []).map((a) => (
-                  <SelectItem key={a.userId} value={a.userId}>
-                    {a.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={operadorOpen} onOpenChange={setOperadorOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={operadorOpen}
+                  className="w-full h-8 justify-between text-xs font-normal"
+                >
+                  <span className="truncate">{selectedOperadorLabel}</span>
+                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[260px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar operador..." className="h-9 text-xs" />
+                  <CommandList>
+                    <CommandEmpty>Nenhum operador encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="Todos"
+                        onSelect={() => {
+                          onChange({ ...filters, assignedToAgent: undefined, assignedToMe: false });
+                          setOperadorOpen(false);
+                        }}
+                        className="text-xs"
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-3.5 w-3.5",
+                            !filters.assignedToAgent ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        Todos
+                      </CommandItem>
+                      <CommandItem
+                        value="Na Fila sem operador"
+                        onSelect={() => {
+                          onChange({ ...filters, assignedToAgent: "__unassigned__", assignedToMe: false });
+                          setOperadorOpen(false);
+                        }}
+                        className="text-xs"
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-3.5 w-3.5",
+                            filters.assignedToAgent === "__unassigned__" ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        Na Fila (sem operador)
+                      </CommandItem>
+                      {sortedAgents.map((a) => (
+                        <CommandItem
+                          key={a.userId}
+                          value={a.label}
+                          onSelect={() => {
+                            onChange({ ...filters, assignedToAgent: a.userId, assignedToMe: false });
+                            setOperadorOpen(false);
+                          }}
+                          className="text-xs"
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-3.5 w-3.5",
+                              filters.assignedToAgent === a.userId ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {a.label}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : (
           <div className="flex items-center justify-between">
@@ -157,7 +228,6 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
           </div>
         )}
 
-        {/* Ordenação */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Ordenação</label>
           <Select
@@ -177,7 +247,6 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
           </Select>
         </div>
 
-        {/* Status */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Status</label>
           <Select
@@ -197,7 +266,6 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
           </Select>
         </div>
 
-        {/* Instância */}
         {instances.length > 1 && (
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Instância</label>
