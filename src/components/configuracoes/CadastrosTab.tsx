@@ -108,10 +108,6 @@ export default function CadastrosTab() {
       ],
     },
     {
-      value: "produtos", label: "Produtos", table: "produtos", queryKey: "crud_produtos", orderBy: "nome",
-      columns: [{ key: "nome", label: "Nome" }],
-    },
-    {
       value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
