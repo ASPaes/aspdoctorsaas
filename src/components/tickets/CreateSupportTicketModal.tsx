@@ -317,6 +317,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
                         onClick={() => {
                           setSelectedCliente(c);
                           setClienteSearchTerm("");
+                          setClienteContatoId("");
                           (supabase.from("clientes" as any) as any)
                             .select("produto_id")
                             .eq("id", c.id)
