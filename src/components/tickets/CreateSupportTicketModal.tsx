@@ -395,7 +395,42 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
             </Select>
           </div>
 
-          {/* Canal + Horário */}
+          {/* Contato + Previsão */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Contato do cliente</Label>
+              <Select value={clienteContatoId} onValueChange={setClienteContatoId} disabled={!selectedCliente}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder={selectedCliente ? "Selecione o contato..." : "Selecione um cliente primeiro"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clienteContatos.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{c.nome}</span>
+                        {c.isPrincipal && <span className="text-[10px] text-primary font-medium">Principal</span>}
+                        {c.cargo && !c.isPrincipal && <span className="text-[10px] text-muted-foreground">({c.cargo})</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {clienteContatos.length === 0 && selectedCliente && (
+                    <div className="p-2 text-xs text-muted-foreground text-center">Nenhum contato cadastrado</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Previsão de encerramento</Label>
+              <Input
+                type="datetime-local"
+                value={previsaoEncerramento}
+                onChange={(e) => setPrevisaoEncerramento(e.target.value)}
+                className="h-10"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Setor</Label>
