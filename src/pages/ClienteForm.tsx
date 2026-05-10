@@ -87,24 +87,24 @@ const clienteSchema = z.object({
   cidade_id: z.number().nullable(),
   area_atuacao_id: z.number().nullable(),
   segmento_id: z.number().nullable(),
-  modelo_contrato_id: z.number().nullable().refine(v => v !== null, { message: "Modelo de Contrato obrigatório" }),
+  modelo_contrato_id: z.number().nullable(),
   observacao_cliente: z.string().nullable(),
-  data_venda: noFutureDate("Data da Venda").refine(v => !!v, { message: "Data da Venda obrigatória" }),
+  data_venda: noFutureDate("Data da Venda"),
   data_reajuste: z.string().nullable(),
   funcionario_id: z.number().nullable(),
-  origem_venda_id: z.number().nullable().refine(v => v !== null, { message: "Origem da Venda obrigatória" }),
+  origem_venda_id: z.number().nullable(),
   recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
-  produto_id: z.number().nullable().refine(v => v !== null, { message: "Produto obrigatório" }),
+  produto_id: z.number().nullable(),
   observacao_negociacao: z.string().nullable(),
   data_ativacao: noFutureDate("Data de Ativação"),
-  fornecedor_id: z.number().nullable().refine(v => v !== null, { message: "Fornecedor obrigatório" }),
+  fornecedor_id: z.number().nullable(),
   codigo_fornecedor: z.string().nullable(),
   link_portal_fornecedor: z.string().nullable(),
   valor_ativacao: z.number().nullable(),
   forma_pagamento_ativacao_id: z.number().nullable(),
-  mensalidade: z.number({ invalid_type_error: "Mensalidade obrigatória" }).min(0, "Deve ser >= 0"),
+  mensalidade: z.number().nullable(),
   forma_pagamento_mensalidade_id: z.number().nullable(),
-  custo_operacao: z.number({ invalid_type_error: "Custo Operação obrigatório" }).min(0, "Deve ser >= 0"),
+  custo_operacao: z.number().nullable(),
   imposto_percentual: z.number({ invalid_type_error: "Imposto obrigatório" }).min(0).max(100),
   custo_fixo_percentual: z.number({ invalid_type_error: "Custo Fixo obrigatório" }).min(0).max(100),
   cancelado: z.boolean(),
@@ -129,61 +129,6 @@ const clienteSchema = z.object({
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
-
-// Helper component to show missing required fields
-function MissingFieldsIndicator({ form }: { form: UseFormReturn<ClienteFormValues> }) {
-  const values = form.watch();
-  
-  const fieldLabels: Record<string, string> = {
-    cnpj: "CNPJ/CPF",
-    email: "E-mail",
-    telefone_whatsapp: "WhatsApp Financeiro",
-    data_venda: "Data Venda",
-    origem_venda_id: "Origem",
-    recorrencia: "Recorrência",
-    produto_id: "Produto",
-    fornecedor_id: "Fornecedor",
-    modelo_contrato_id: "Modelo Contrato",
-  };
-
-  const missingFields: string[] = [];
-  const warningFields: string[] = [];
-
-  // Check required fields
-  if (!values.cnpj || (values.cnpj.replace(/\D/g, "").length !== 11 && values.cnpj.replace(/\D/g, "").length < 14)) missingFields.push(fieldLabels.cnpj);
-  if (!values.email) missingFields.push(fieldLabels.email);
-  if (!values.telefone_whatsapp || !isValidBRPhone(normalizeBRPhone(values.telefone_whatsapp))) missingFields.push(fieldLabels.telefone_whatsapp);
-  if (!values.data_venda) missingFields.push(fieldLabels.data_venda);
-  if (!values.origem_venda_id) missingFields.push(fieldLabels.origem_venda_id);
-  if (!values.recorrencia) missingFields.push(fieldLabels.recorrencia);
-  if (!values.produto_id) missingFields.push(fieldLabels.produto_id);
-  if (!values.fornecedor_id) missingFields.push(fieldLabels.fornecedor_id);
-  if (!values.modelo_contrato_id) missingFields.push(fieldLabels.modelo_contrato_id);
-  if (values.mensalidade === null || values.mensalidade === undefined) missingFields.push("Mensalidade");
-
-  // Warning fields (not required but recommended)
-  if (values.valor_ativacao === null || values.valor_ativacao === undefined) warningFields.push("Valor Ativação");
-  if (values.custo_operacao === null || values.custo_operacao === undefined) missingFields.push("Custo Operação");
-  if (values.imposto_percentual === null || values.imposto_percentual === undefined) missingFields.push("Imposto");
-  if (values.custo_fixo_percentual === null || values.custo_fixo_percentual === undefined) missingFields.push("Custo Fixo");
-
-  if (missingFields.length === 0 && warningFields.length === 0) return null;
-
-  return (
-    <div className="text-xs mt-1 space-y-0.5">
-      {missingFields.length > 0 && (
-        <p className="text-muted-foreground">
-          Campos obrigatórios pendentes: <span className="text-destructive font-medium">{missingFields.join(", ")}</span>
-        </p>
-      )}
-      {warningFields.length > 0 && (
-        <p className="text-muted-foreground">
-          Recomendado preencher: <span className="text-amber-600 dark:text-amber-400 font-medium">{warningFields.join(", ")}</span>
-        </p>
-      )}
-    </div>
-  );
-}
 
 export default function ClienteForm() {
   const { id } = useParams();
@@ -474,7 +419,7 @@ export default function ClienteForm() {
             <p className="text-sm text-muted-foreground">
               Preencha os dados do cliente e contrato
             </p>
-            {isEditing && <MissingFieldsIndicator form={form} />}
+            
           </div>
 
           {/* Prev/Next navigation */}
