@@ -201,7 +201,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_status: status,
         p_agendado_para: status === "agendado" ? new Date(agendadoPara).toISOString() : null,
         p_contact_id: null,
-        p_department_id: null,
+        p_department_id: departamentoId || null,
+        p_responsavel_user_id: responsavelId || null,
       });
 
       if (error) throw error;
@@ -351,6 +352,34 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           {/* Canal + Horário */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Setor</Label>
+              <Select value={departamentoId} onValueChange={setDepartamentoId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione o setor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {departamentos.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Responsável <Req /></Label>
+              <Select value={responsavelId} onValueChange={setResponsavelId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentes.map((a) => (
+                    <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Canal de origem <Req /></Label>
               <Select value={canalOrigem} onValueChange={setCanalOrigem}>
