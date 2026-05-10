@@ -3627,6 +3627,7 @@ export type Database = {
           is_active: boolean
           is_default_fallback: boolean
           name: string
+          requires_ticket_on_close: boolean
           show_in_ura: boolean
           slug: string
           tenant_id: string
@@ -3642,6 +3643,7 @@ export type Database = {
           is_active?: boolean
           is_default_fallback?: boolean
           name: string
+          requires_ticket_on_close?: boolean
           show_in_ura?: boolean
           slug: string
           tenant_id: string
@@ -3657,6 +3659,7 @@ export type Database = {
           is_active?: boolean
           is_default_fallback?: boolean
           name?: string
+          requires_ticket_on_close?: boolean
           show_in_ura?: boolean
           slug?: string
           tenant_id?: string
@@ -3793,6 +3796,57 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      support_ticket_events: {
+        Row: {
+          content: string | null
+          created_at: string
+          event_type: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          tenant_id: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          tenant_id: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          tenant_id?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_ticket_sequences: {
         Row: {
@@ -5723,6 +5777,16 @@ export type Database = {
         Returns: undefined
       }
       accept_invite: { Args: { p_token: string }; Returns: undefined }
+      add_ticket_event: {
+        Args: {
+          p_content?: string
+          p_event_type?: string
+          p_new_value?: string
+          p_old_value?: string
+          p_ticket_id: string
+        }
+        Returns: string
+      }
       agent_presence_extend_pause: {
         Args: { p_minutes: number; p_tenant_id: string }
         Returns: undefined
@@ -5784,23 +5848,42 @@ export type Database = {
         }
         Returns: string
       }
-      create_manual_ticket: {
-        Args: {
-          p_agendado_para?: string
-          p_canal_origem: string
-          p_category_id: string
-          p_cliente_id: string
-          p_contact_id?: string
-          p_department_id?: string
-          p_observacao_agente?: string
-          p_produto_id: number
-          p_service_type_id: string
-          p_status?: string
-          p_subcategory_id: string
-          p_tipo_horario?: string
-        }
-        Returns: string
-      }
+      create_manual_ticket:
+        | {
+            Args: {
+              p_agendado_para?: string
+              p_canal_origem: string
+              p_category_id: string
+              p_cliente_id: string
+              p_contact_id?: string
+              p_department_id?: string
+              p_observacao_agente?: string
+              p_produto_id: number
+              p_service_type_id: string
+              p_status?: string
+              p_subcategory_id: string
+              p_tipo_horario?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_agendado_para?: string
+              p_canal_origem: string
+              p_category_id: string
+              p_cliente_id: string
+              p_contact_id?: string
+              p_department_id?: string
+              p_observacao_agente?: string
+              p_produto_id: number
+              p_responsavel_user_id?: string
+              p_service_type_id: string
+              p_status?: string
+              p_subcategory_id: string
+              p_tipo_horario?: string
+            }
+            Returns: string
+          }
       create_tenant_for_new_user:
         | { Args: { p_nome: string }; Returns: string }
         | {
