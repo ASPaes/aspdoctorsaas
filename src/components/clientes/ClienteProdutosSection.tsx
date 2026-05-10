@@ -349,9 +349,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                         )}
                       </div>
 
-                      <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
-                        <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
+                          <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
+                        </Button>
+                        <Button
+                          type="button" variant="outline" size="sm"
+                          onClick={() => setReajusteDialog({ open: true, clienteProdutoId: p.id, produtoNome: p.produtos?.nome ?? '' })}
+                          disabled={modsAtivos === 0}
+                        >
+                          <Percent className="h-4 w-4 mr-1" /> Reajuste %
+                        </Button>
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </div>
