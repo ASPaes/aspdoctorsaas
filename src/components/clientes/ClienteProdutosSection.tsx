@@ -216,6 +216,20 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const ativos = (produtosQuery.data ?? []).filter(p => p.ativo);
   const totalMensal = ativos.reduce((s, p) => s + (Number(p.vlr_mensal) || 0), 0);
   const totalCusto = ativos.reduce((s, p) => s + (Number(p.vlr_custo) || 0), 0);
+  const totalAtivacao = ativos.reduce((s, p) => s + (Number(p.vlr_ativacao) || 0), 0);
+
+  const { data: contratosCount } = useQuery({
+    queryKey: ["contratos_count_check", tid, clienteId],
+    queryFn: async () => {
+      const { count, error } = await (supabase.from("contratos" as any) as any)
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", clienteId)
+        .eq("status", "ativo");
+      if (error) return 0;
+      return count ?? 0;
+    },
+    enabled: !!clienteId,
+  });
 
   return (
     <Card>
