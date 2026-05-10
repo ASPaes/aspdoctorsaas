@@ -197,7 +197,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           Produtos & Módulos
           <Badge variant="secondary" className="ml-2">{ativos.length} ativo{ativos.length === 1 ? "" : "s"}</Badge>
         </CardTitle>
-        <Button size="sm" onClick={() => setProdutoDialog({ open: true, edit: null })}>
+        <Button type="button" size="sm" onClick={() => setProdutoDialog({ open: true, edit: null })}>
           <Plus className="h-4 w-4 mr-1" /> Adicionar Produto
         </Button>
       </CardHeader>
@@ -211,7 +211,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
           <div className="text-center py-8 text-muted-foreground border border-dashed rounded-md">
             <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Nenhum produto vinculado a este cliente.</p>
-            <Button variant="link" size="sm" onClick={() => setProdutoDialog({ open: true, edit: null })}>
+            <Button type="button" variant="link" size="sm" onClick={() => setProdutoDialog({ open: true, edit: null })}>
               Adicionar primeiro produto
             </Button>
           </div>
@@ -225,7 +225,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                 <div className="border rounded-md bg-card">
                   <div className="flex items-center gap-2 p-3">
                     <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0">
                         {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </Button>
                     </CollapsibleTrigger>
@@ -250,10 +250,10 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setProdutoDialog({ open: true, edit: p })}>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setProdutoDialog({ open: true, edit: p })}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDelete(p)}>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setConfirmDelete(p)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -307,10 +307,10 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     <Badge variant={m.ativo ? "default" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
+                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => toggleModuloMut.mutate(m)} disabled={toggleModuloMut.isPending}>
+                                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => toggleModuloMut.mutate(m)} disabled={toggleModuloMut.isPending}>
                                       {m.ativo ? "Inativar" : "Reativar"}
                                     </Button>
                                   </TableCell>
@@ -321,7 +321,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                         )}
                       </div>
 
-                      <Button variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: null })}>
                         <Plus className="h-4 w-4 mr-1" /> <Puzzle className="h-4 w-4 mr-1" /> Adicionar Módulo
                       </Button>
                     </div>
@@ -373,8 +373,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
             <AlertDialogAction
+              type="button"
               onClick={() => {
                 if (confirmDelete) deleteProdutoMut.mutate(confirmDelete.id);
                 setConfirmDelete(null);
@@ -505,8 +506,8 @@ function ProdutoDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button type="button" onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Salvar
           </Button>
         </DialogFooter>
@@ -635,8 +636,8 @@ function ModuloDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button type="button" onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Salvar
           </Button>
         </DialogFooter>
