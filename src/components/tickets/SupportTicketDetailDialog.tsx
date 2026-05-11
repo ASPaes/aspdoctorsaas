@@ -1068,6 +1068,18 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                     <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.new_value ?? ""] ?? evt.new_value}</Badge>
                     <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
+                ) : evt.event_type === "ai_summary" ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Bot className="h-3.5 w-3.5 text-blue-400" />
+                      <span className="text-xs text-muted-foreground">{evt.content}</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                    </div>
+                    <details className="bg-blue-500/5 border border-blue-500/20 rounded-md px-2.5 py-1.5">
+                      <summary className="text-[11px] text-blue-400 cursor-pointer hover:underline">Ver resumo IA</summary>
+                      <p className="text-xs text-muted-foreground mt-1.5 whitespace-pre-wrap">{evt.new_value}</p>
+                    </details>
+                  </div>
                 ) : (
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
