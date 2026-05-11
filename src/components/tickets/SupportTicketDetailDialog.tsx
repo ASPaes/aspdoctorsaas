@@ -203,19 +203,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
-  const { data: clienteContatos = [] } = useQuery({
-    queryKey: ["ticket_detail_contatos", ticket?.cliente_id],
-    enabled: !!ticket?.cliente_id,
+  const ticketClienteId = ticket?.cliente_id ?? ticket?.clientes?.id ?? null;
+
+  const { data: clienteContatos = [], refetch: refetchContatos } = useQuery({
+    queryKey: ["ticket_detail_contatos", ticketClienteId],
+    enabled: !!ticketClienteId,
     queryFn: async () => {
-      const clienteId = ticket?.cliente_id ?? ticket?.clientes?.id;
-      if (!clienteId) return [];
+      if (!ticketClienteId) return [];
       const { data: cli } = await (supabase.from("clientes" as any) as any)
         .select("contato_nome, contato_fone")
-        .eq("id", clienteId)
+        .eq("id", ticketClienteId)
         .maybeSingle();
       const { data: contatos } = await (supabase.from("cliente_contatos" as any) as any)
         .select("id, nome, fone, email, cargo")
-        .eq("cliente_id", clienteId)
+        .eq("cliente_id", ticketClienteId)
         .order("nome");
       const result: Array<{ id: string; nome: string; detalhe: string }> = [];
       if (cli?.contato_nome) {
@@ -235,6 +236,39 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       return result;
     },
   });
+
+  const handleCreateContact = async () => {
+    if (!newContactNome.trim() || !ticketClienteId) return;
+    setSavingContact(true);
+    try {
+      const { data: inserted, error } = await (supabase.from("cliente_contatos" as any) as any)
+        .insert({
+          cliente_id: ticketClienteId,
+          tenant_id: tid,
+          nome: newContactNome.trim(),
+          fone: newContactFone.trim() || null,
+          email: newContactEmail.trim() || null,
+          cargo: newContactCargo.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      toast.success("Contato adicionado");
+      setNewContactOpen(false);
+      setNewContactNome("");
+      setNewContactFone("");
+      setNewContactEmail("");
+      setNewContactCargo("");
+      await refetchContatos();
+      if (inserted?.id) {
+        handleFieldUpdate({ cliente_contato_id: inserted.id });
+      }
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setSavingContact(false);
+    }
+  };
 
   const currentContactName = useMemo(() => {
     if (ticket?.cliente_contato_id) {
