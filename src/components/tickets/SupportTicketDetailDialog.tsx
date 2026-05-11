@@ -614,33 +614,42 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         {/* Contato solicitante */}
         <div className="col-span-2 space-y-1">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Contato solicitante</span>
-          {ticket?.contact_id && !ticket?.cliente_contato_id ? (
-            <p className="text-sm h-8 flex items-center gap-2">
-              {ticket?.whatsapp_contacts?.name ?? "—"}
-              <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
-            </p>
-          ) : (
-            <Select
-              value={ticket?.cliente_contato_id ?? "none"}
-              onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
-              disabled={updating || clienteContatos.length === 0}
+          <div className="flex items-center gap-2">
+            {ticket?.contact_id && !ticket?.cliente_contato_id ? (
+              <p className="text-sm h-8 flex items-center gap-2 flex-1">
+                {ticket?.whatsapp_contacts?.name ?? "—"}
+                <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
+              </p>
+            ) : (
+              <Select
+                value={ticket?.cliente_contato_id ?? "none"}
+                onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
+                disabled={updating}
+              >
+                <SelectTrigger className="h-8 text-sm flex-1">
+                  <SelectValue placeholder="Selecione o contato..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem contato</SelectItem>
+                  {clienteContatos.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} {c.detalhe ? `(${c.detalhe})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setNewContactOpen(true)}
+              disabled={!ticketClienteId}
+              title="Adicionar contato"
             >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder={clienteContatos.length === 0 ? "Nenhum contato cadastrado" : "Selecione o contato..."} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem contato</SelectItem>
-                {clienteContatos.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{c.nome}</span>
-                      <span className="text-[10px] text-muted-foreground">{c.detalhe}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="space-y-1">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tipo horário</span>
