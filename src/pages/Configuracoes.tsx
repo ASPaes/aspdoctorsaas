@@ -294,6 +294,21 @@ export default function Configuracoes() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const [syncingCidades, setSyncingCidades] = useState(false);
+  const handleSyncCidades = async () => {
+    setSyncingCidades(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("populate-cidades", { method: "POST" });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
+      toast({ title: "Sincronização concluída", description: `${data.estados} estados e ${data.cidades} cidades sincronizados.` });
+    } catch (err: any) {
+      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncingCidades(false);
+    }
+  };
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { imposto_percentual: 13.5, custo_fixo_percentual: 8 },
