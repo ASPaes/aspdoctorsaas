@@ -31,14 +31,8 @@ interface ClienteOption {
   telefone_whatsapp?: string | null;
 }
 
-function clienteLabelInternal(c: { razao_social: string | null; nome_fantasia: string | null; codigo_sequencial: number | null }) {
-  const name = c.razao_social || c.nome_fantasia || 'Sem nome';
-  const code = c.codigo_sequencial != null ? `#${c.codigo_sequencial} ` : '';
-  return `${code}${name}`;
-}
-
 function clienteLabel(c: { razao_social: string | null; nome_fantasia: string | null; codigo_sequencial: number | null }) {
-  const name = c.nome_fantasia || c.razao_social || 'Sem nome';
+  const name = c.razao_social || c.nome_fantasia || 'Sem nome';
   const code = c.codigo_sequencial != null ? `#${c.codigo_sequencial} ` : '';
   return `${code}${name}`;
 }
