@@ -199,9 +199,16 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       queryKey: "crud_service_types",
       orderBy: "nome",
       columns: [
+        { key: "codigo", label: "Código" },
         { key: "nome", label: "Nome" },
+        { key: "descricao", label: "Descrição" },
         { key: "ativo", label: "Ativo", type: "boolean" },
       ],
+      headerActions: (
+        <Button variant="outline" size="sm" onClick={() => setImportTiposOpen(true)}>
+          <Upload className="h-4 w-4" /> Importar CSV
+        </Button>
+      ),
     },
   ];
 
