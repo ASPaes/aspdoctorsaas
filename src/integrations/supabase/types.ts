@@ -3249,6 +3249,8 @@ export type Database = {
           msg_customer_count: number
           opened_at: string
           opened_by: string | null
+          participant_label: string | null
+          participant_type: string | null
           queue_priority: number
           queue_retries: number
           queued_at: string | null
@@ -3262,6 +3264,7 @@ export type Database = {
           seq_number: number
           status: string
           tenant_id: string
+          ticket_id: string | null
           updated_at: string
           ura_asked_at: string | null
           ura_completed_at: string | null
@@ -3309,6 +3312,8 @@ export type Database = {
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          participant_label?: string | null
+          participant_type?: string | null
           queue_priority?: number
           queue_retries?: number
           queued_at?: string | null
@@ -3322,6 +3327,7 @@ export type Database = {
           seq_number?: number
           status?: string
           tenant_id: string
+          ticket_id?: string | null
           updated_at?: string
           ura_asked_at?: string | null
           ura_completed_at?: string | null
@@ -3369,6 +3375,8 @@ export type Database = {
           msg_customer_count?: number
           opened_at?: string
           opened_by?: string | null
+          participant_label?: string | null
+          participant_type?: string | null
           queue_priority?: number
           queue_retries?: number
           queued_at?: string | null
@@ -3382,6 +3390,7 @@ export type Database = {
           seq_number?: number
           status?: string
           tenant_id?: string
+          ticket_id?: string | null
           updated_at?: string
           ura_asked_at?: string | null
           ura_completed_at?: string | null
@@ -3463,6 +3472,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "support_attendances_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
           },
         ]
       }
