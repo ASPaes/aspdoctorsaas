@@ -167,7 +167,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       const { data, error } = await (supabase.from("support_ticket_events" as any) as any)
         .select("id, user_id, event_type, content, old_value, new_value, created_at")
         .eq("ticket_id", ticketId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Array<{
         id: string;
@@ -197,6 +197,56 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   });
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
+
+  const FIELD_LABELS: Record<string, string> = {
+    status: "Status",
+    responsavel_user_id: "Responsável",
+    department_id: "Setor",
+    category_id: "Categoria",
+    subcategory_id: "Subcategoria",
+    service_type_id: "Tipo de serviço",
+    produto_id: "Produto",
+    agendado_para: "Agendado para",
+    previsao_encerramento: "Previsão encerramento",
+    canal_origem: "Canal",
+    tipo_horario: "Tipo horário",
+    prioridade: "Prioridade",
+    observacao_agente: "Observação",
+    cliente_contato_id: "Contato",
+  };
+
+  const resolveValueLabel = (field: string, value: string | null): string => {
+    if (!value) return "—";
+    switch (field) {
+      case "status":
+        return STATUS_LABELS[value] ?? value;
+      case "responsavel_user_id":
+        return eventAgents.find(a => a.user_id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "department_id":
+        return departamentos.find((d: any) => d.id === value)?.name ?? value.slice(0, 8) + "...";
+      case "category_id":
+        return categories.find((c: any) => c.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "subcategory_id":
+        return subcategories.find((s: any) => s.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "service_type_id":
+        return serviceTypes.find((t: any) => t.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "produto_id":
+        return produtos.find((p: any) => String(p.id) === value)?.nome ?? value;
+      case "canal_origem": {
+        const labels: Record<string, string> = { whatsapp: "WhatsApp", telefone: "Telefone", presencial: "Presencial", email: "E-mail" };
+        return labels[value] ?? value;
+      }
+      case "tipo_horario":
+        return value === "comercial" ? "Comercial" : value === "plantao" ? "Plantão" : value;
+      case "prioridade":
+        return value.charAt(0).toUpperCase() + value.slice(1);
+      case "agendado_para":
+      case "previsao_encerramento":
+        try { return formatEvtDate(value); } catch { return value; }
+      default:
+        return value.length > 50 ? value.slice(0, 50) + "..." : value;
+    }
+  };
 
   const { data: departamentos = [] } = useQuery({
     queryKey: ["ticket_detail_departamentos", tid],
@@ -746,10 +796,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
                   evt.event_type === "comment" ? "bg-primary" :
                   evt.event_type === "status_change" ? "bg-blue-400" :
+                  evt.event_type === "assignment_change" ? "bg-purple-400" :
+                  evt.event_type === "reclassification" ? "bg-orange-400" :
+                  evt.event_type === "department_change" ? "bg-cyan-400" :
                   evt.event_type === "created" ? "bg-green-400" :
+                  evt.event_type === "closed" ? "bg-red-400" :
                   "bg-muted-foreground"
                 }`} />
-
                 {evt.event_type === "comment" ? (
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
@@ -768,14 +821,17 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                     <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {evt.event_type === "created" ? "Ticket criado" :
-                       evt.event_type === "closed" ? "Ticket encerrado" :
-                       evt.event_type === "assignment_change" ? `Responsável alterado: ${evt.old_value ?? "—"} → ${evt.new_value ?? "—"}` :
-                       evt.event_type}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
+                      <span className="text-xs">alterou <span className="font-medium">{FIELD_LABELS[evt.content ?? ""] ?? evt.content ?? evt.event_type}</span>:</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 ml-0.5">
+                      <span className="text-[11px] text-muted-foreground">{resolveValueLabel(evt.content ?? "", evt.old_value)}</span>
+                      <span className="text-[10px] text-muted-foreground">→</span>
+                      <span className="text-[11px] font-medium">{resolveValueLabel(evt.content ?? "", evt.new_value)}</span>
+                    </div>
                   </div>
                 )}
               </div>
