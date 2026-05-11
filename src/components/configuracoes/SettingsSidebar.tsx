@@ -211,13 +211,6 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           );
         })}
       </div>
-
-      <div className="px-3 pt-4 mt-4 border-t">
-        <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm" className="w-full">
-          <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-          {syncing ? "Sincronizando..." : "Sincronizar Estados/Cidades"}
-        </Button>
-      </div>
     </aside>
   );
 }
