@@ -113,6 +113,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
     queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, isAdminOrHead, userId, departamentos.map((d: any) => d.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
+      if (departamentos.length === 0 && departamentoFilter === "all") {
+        return { total: 0, median_wait_seconds: 0, median_handle_seconds: 0, median_first_response_seconds: 0, avg_csat: 0, csat_count: 0, total_closed: 0, total_open: 0 };
+      }
       const toEnd = new Date(dateRange.to);
       toEnd.setHours(23, 59, 59, 999);
       const { data, error } = await (supabase.rpc as any)("get_attendance_summary_metrics", {
@@ -161,8 +164,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
 
       // Filtrar apenas setores com ticket obrigatório
       const deptIds = departamentos.map((d: any) => d.id);
-      if (deptIds.length > 0 && departamentoFilter === "all") {
+      if (deptIds.length > 0) {
         q = q.in("department_id", deptIds);
+      } else if (departamentoFilter === "all") {
+        // Nenhum setor com ticket obrigatório — retornar vazio
+        return { items: [], total: 0 };
       }
 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
