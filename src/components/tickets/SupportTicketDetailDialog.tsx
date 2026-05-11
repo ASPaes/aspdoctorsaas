@@ -1084,6 +1084,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </DialogContent>
       </Dialog>
       {childDialog}
+      {newContactDialog}
     </>
   );
 }
