@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -108,7 +108,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
           service_types:service_type_id(nome),
-          parent:parent_ticket_id(id, ticket_code, status)
+          parent:parent_ticket_id(id, ticket_code, status),
+          whatsapp_contacts:contact_id(name, phone_number)
         `)
         .eq("id", ticketId)
         .maybeSingle();
@@ -195,6 +196,50 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   });
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
+
+  const { data: clienteContatos = [] } = useQuery({
+    queryKey: ["ticket_detail_contatos", ticket?.cliente_id],
+    enabled: !!ticket?.cliente_id,
+    queryFn: async () => {
+      const clienteId = ticket?.cliente_id ?? ticket?.clientes?.id;
+      if (!clienteId) return [];
+      const { data: cli } = await (supabase.from("clientes" as any) as any)
+        .select("contato_nome, contato_fone")
+        .eq("id", clienteId)
+        .maybeSingle();
+      const { data: contatos } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id, nome, fone, email, cargo")
+        .eq("cliente_id", clienteId)
+        .order("nome");
+      const result: Array<{ id: string; nome: string; detalhe: string }> = [];
+      if (cli?.contato_nome) {
+        result.push({
+          id: "principal",
+          nome: cli.contato_nome,
+          detalhe: cli.contato_fone ? `${cli.contato_fone} · Principal` : "Principal",
+        });
+      }
+      (contatos ?? []).forEach((c: any) => {
+        result.push({
+          id: c.id,
+          nome: c.nome,
+          detalhe: [c.cargo, c.fone, c.email].filter(Boolean).join(" · "),
+        });
+      });
+      return result;
+    },
+  });
+
+  const currentContactName = useMemo(() => {
+    if (ticket?.cliente_contato_id) {
+      const found = clienteContatos.find(c => c.id === ticket.cliente_contato_id);
+      if (found) return found.nome;
+    }
+    if (ticket?.whatsapp_contacts?.name) {
+      return ticket.whatsapp_contacts.name;
+    }
+    return null;
+  }, [ticket, clienteContatos]);
 
   const FIELD_LABELS: Record<string, string> = {
     status: "Status",
@@ -359,7 +404,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const tipoServico = ticket?.service_types?.nome;
 
   const detailsContent = !ticket ? null : (
-    <div className="space-y-4 pr-2">
+    <div className="space-y-4 pr-2 pt-1">
       {/* Header badges */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-mono text-sm font-semibold text-primary">{ticket.ticket_code ?? "—"}</span>
@@ -525,6 +570,37 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               ))}
             </SelectContent>
           </Select>
+        </div>
+        {/* Contato solicitante */}
+        <div className="col-span-2 space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Contato solicitante</span>
+          {ticket?.contact_id && !ticket?.cliente_contato_id ? (
+            <p className="text-sm h-8 flex items-center gap-2">
+              {ticket?.whatsapp_contacts?.name ?? "—"}
+              <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
+            </p>
+          ) : (
+            <Select
+              value={ticket?.cliente_contato_id ?? "none"}
+              onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
+              disabled={updating || clienteContatos.length === 0}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder={clienteContatos.length === 0 ? "Nenhum contato cadastrado" : "Selecione o contato..."} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem contato</SelectItem>
+                {clienteContatos.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{c.nome}</span>
+                      <span className="text-[10px] text-muted-foreground">{c.detalhe}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="space-y-1">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tipo horário</span>
