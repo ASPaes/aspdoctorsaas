@@ -197,6 +197,50 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
+  const { data: clienteContatos = [] } = useQuery({
+    queryKey: ["ticket_detail_contatos", ticket?.cliente_id],
+    enabled: !!ticket?.cliente_id,
+    queryFn: async () => {
+      const clienteId = ticket?.cliente_id ?? ticket?.clientes?.id;
+      if (!clienteId) return [];
+      const { data: cli } = await (supabase.from("clientes" as any) as any)
+        .select("contato_nome, contato_fone")
+        .eq("id", clienteId)
+        .maybeSingle();
+      const { data: contatos } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id, nome, fone, email, cargo")
+        .eq("cliente_id", clienteId)
+        .order("nome");
+      const result: Array<{ id: string; nome: string; detalhe: string }> = [];
+      if (cli?.contato_nome) {
+        result.push({
+          id: "principal",
+          nome: cli.contato_nome,
+          detalhe: cli.contato_fone ? `${cli.contato_fone} · Principal` : "Principal",
+        });
+      }
+      (contatos ?? []).forEach((c: any) => {
+        result.push({
+          id: c.id,
+          nome: c.nome,
+          detalhe: [c.cargo, c.fone, c.email].filter(Boolean).join(" · "),
+        });
+      });
+      return result;
+    },
+  });
+
+  const currentContactName = useMemo(() => {
+    if (ticket?.cliente_contato_id) {
+      const found = clienteContatos.find(c => c.id === ticket.cliente_contato_id);
+      if (found) return found.nome;
+    }
+    if (ticket?.whatsapp_contacts?.name) {
+      return ticket.whatsapp_contacts.name;
+    }
+    return null;
+  }, [ticket, clienteContatos]);
+
   const FIELD_LABELS: Record<string, string> = {
     status: "Status",
     responsavel_user_id: "Responsável",
