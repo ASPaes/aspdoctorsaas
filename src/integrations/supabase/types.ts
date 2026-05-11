@@ -6175,8 +6175,8 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
-          p_department_ids?: string[]
           p_status?: string
+          p_tenant_id?: string
         }
         Returns: Json
       }
