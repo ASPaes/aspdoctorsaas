@@ -28,7 +28,7 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / 1048576).toFixed(1)}MB`;
 }
 
-export function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
+function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
   const [uploading, setUploading] = useState(false);
   const queryClient = useQueryClient();
 
