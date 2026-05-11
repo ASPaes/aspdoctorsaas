@@ -54,7 +54,24 @@ function useCategoryOptions() {
   return data ?? [];
 }
 
-export default function CadastrosTab() {
+const SECTION_TO_VALUE: Record<string, string> = {
+  "modelos-contrato": "modelos_contrato",
+  "origens-venda": "origens_venda",
+  "formas-pagamento": "formas_pagamento",
+  "categorias-servico": "categorias_servico",
+  "subcategorias-servico": "subcategorias_servico",
+  "tipos-servico": "tipos_servico",
+  "motivos-cancelamento": "motivos_cancelamento",
+  "motivos-pausa": "motivos_pausa",
+  "areas-atuacao": "areas_atuacao",
+  "unidades-base": "unidades_base",
+};
+
+interface CadastrosTabProps {
+  section?: string;
+}
+
+export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
   const [syncing, setSyncing] = useState(false);
   const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
@@ -200,6 +217,23 @@ export default function CadastrosTab() {
       setSyncing(false);
     }
   };
+
+  if (section) {
+    if (section === "produtos") return <ProdutosModulosTab />;
+    const mapped = SECTION_TO_VALUE[section] ?? section;
+    const t = tabs.find((x) => x.value === mapped);
+    if (!t) return null;
+    return (
+      <CrudTable
+        table={t.table}
+        queryKey={t.queryKey}
+        columns={t.columns}
+        orderBy={t.orderBy}
+        selectQuery={t.selectQuery}
+        onBeforeSave={t.onBeforeSave}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
