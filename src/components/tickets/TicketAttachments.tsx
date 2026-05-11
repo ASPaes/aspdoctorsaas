@@ -68,17 +68,14 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
           .from('ticket-attachments')
           .getPublicUrl(path);
 
-        const { error: insertError } = await (supabase.from("support_ticket_attachments" as any) as any)
-          .insert({
-            tenant_id: tenantId,
-            ticket_id: ticketId,
-            file_name: file.name,
-            file_path: path,
-            file_url: publicUrl,
-            file_size: file.size,
-            file_type: file.type || ext,
-            uploaded_by: (await supabase.auth.getUser()).data.user?.id,
-          });
+        const { error: insertError } = await (supabase.rpc as any)("add_ticket_attachment", {
+          p_ticket_id: ticketId,
+          p_file_name: file.name,
+          p_file_path: path,
+          p_file_url: publicUrl,
+          p_file_size: file.size,
+          p_file_type: file.type || ext,
+        });
         if (insertError) throw insertError;
       }
 
