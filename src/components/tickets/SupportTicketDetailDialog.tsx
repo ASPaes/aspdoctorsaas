@@ -354,6 +354,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     prioridade: "Prioridade",
     observacao_agente: "Observação",
     cliente_contato_id: "Contato",
+    tempo_agente_minutos: "Tempo do agente",
   };
 
   const resolveValueLabel = (field: string, value: string | null): string => {
