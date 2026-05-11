@@ -63,15 +63,15 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
         }
 
         const ext = file.name.split('.').pop() ?? '';
-        const path = `${tenantId}/ticket-attachments/${ticketId}/${Date.now()}_${file.name}`;
+        const path = `${tenantId}/${ticketId}/${Date.now()}_${file.name}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('whatsapp-media')
+          .from('ticket-attachments')
           .upload(path, file);
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('whatsapp-media')
+          .from('ticket-attachments')
           .getPublicUrl(path);
 
         const { error: insertError } = await (supabase.rpc as any)("add_ticket_attachment", {
@@ -98,7 +98,7 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
   const handleDownload = async (att: any) => {
     try {
       const { data, error } = await supabase.storage
-        .from('whatsapp-media')
+        .from('ticket-attachments')
         .download(att.file_path);
       if (error) throw error;
       const url = URL.createObjectURL(data);
@@ -115,7 +115,7 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
   const handleDelete = async (att: any) => {
     if (!confirm(`Excluir "${att.file_name}"?`)) return;
     try {
-      await supabase.storage.from('whatsapp-media').remove([att.file_path]);
+      await supabase.storage.from('ticket-attachments').remove([att.file_path]);
       await (supabase.from("support_ticket_attachments" as any) as any)
         .delete().eq("id", att.id);
       toast.success("Anexo excluído");
