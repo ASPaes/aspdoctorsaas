@@ -167,7 +167,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       const { data, error } = await (supabase.from("support_ticket_events" as any) as any)
         .select("id, user_id, event_type, content, old_value, new_value, created_at")
         .eq("ticket_id", ticketId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Array<{
         id: string;
