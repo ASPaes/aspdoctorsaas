@@ -16,6 +16,7 @@ export interface ClienteCandidato {
   razao_social: string | null;
   nome_fantasia: string | null;
   fornecedor_nome: string | null;
+  telefone_whatsapp: string | null;
   cancelado: boolean;
   fonte_match: string;
 }
