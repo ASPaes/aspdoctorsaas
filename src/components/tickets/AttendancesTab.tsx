@@ -140,7 +140,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
 
   const { data: result, isLoading } = useQuery({
     queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page, isAdminOrHead, userId, departamentos.map((d: any) => d.id).join(",")],
-    enabled: !!tid,
+    enabled: !!tid && departamentos.length > 0,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
         .select(`
@@ -163,9 +163,6 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
       const deptIds = departamentos.map((d: any) => d.id);
       if (deptIds.length > 0) {
         q = q.in("department_id", deptIds);
-      } else if (departamentoFilter === "all") {
-        // Nenhum setor com ticket obrigatório — retornar vazio
-        return { items: [], total: 0 };
       }
 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
