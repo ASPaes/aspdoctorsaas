@@ -577,6 +577,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         onCancel={() => setShowConfirmCliente(false)}
       />
 
+      <ClassifyClosureModal
+        open={showClassifyModal}
+        onOpenChange={(o) => { if (!o) setShowClassifyModal(false); }}
+        attendanceId={attendance?.id ?? ""}
+        contactName={contact?.name}
+        clienteName={linkedClienteName ?? undefined}
+        clienteProdutoId={linkedCliente?.produto_id ?? null}
+        aiSummary={(attendance as any)?.ai_summary ?? null}
+        onCreated={handleClassifyCompleted}
+      />
+
       {/* Modal de confirmação de encerramento */}
       <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
         <DialogContent className="sm:max-w-md">
