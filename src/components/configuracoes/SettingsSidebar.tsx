@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, ChevronRight } from "lucide-react";
+import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const CADASTRO_SECTIONS = [
   "produtos",
