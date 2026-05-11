@@ -218,6 +218,23 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     }
   };
 
+  if (section) {
+    if (section === "produtos") return <ProdutosModulosTab />;
+    const mapped = SECTION_TO_VALUE[section] ?? section;
+    const t = tabs.find((x) => x.value === mapped);
+    if (!t) return null;
+    return (
+      <CrudTable
+        table={t.table}
+        queryKey={t.queryKey}
+        columns={t.columns}
+        orderBy={t.orderBy}
+        selectQuery={t.selectQuery}
+        onBeforeSave={t.onBeforeSave}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
