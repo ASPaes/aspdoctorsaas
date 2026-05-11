@@ -547,6 +547,25 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             {ticket.canal_origem}
           </Badge>
         )}
+        <div className="flex-1" />
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1"
+          onClick={() => setStartConvOpen(true)}
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          Conversa
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs gap-1"
+          onClick={() => setChildOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Filho
+        </Button>
       </div>
 
       {/* Classificação editável */}
