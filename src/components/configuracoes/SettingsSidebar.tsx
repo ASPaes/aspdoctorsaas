@@ -39,6 +39,21 @@ interface SettingsSidebarProps {
 
 export default function SettingsSidebar({ activeSection, onSectionChange, isAdmin }: SettingsSidebarProps) {
   const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({});
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("populate-cidades", { method: "POST" });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
+      toast.success("Sincronização concluída", { description: `${data.estados} estados e ${data.cidades} cidades sincronizados.` });
+    } catch (err: any) {
+      toast.error("Erro na sincronização", { description: err.message });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const groups: Group[] = [
     {
