@@ -16,6 +16,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
+import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText,
