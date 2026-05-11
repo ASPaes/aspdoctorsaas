@@ -15,9 +15,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
+import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
-  TicketCheck, ArrowUpRight, Send,
+  TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -92,6 +93,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [newContactEmail, setNewContactEmail] = useState("");
   const [newContactCargo, setNewContactCargo] = useState("");
   const [savingContact, setSavingContact] = useState(false);
+  const [viewChatOpen, setViewChatOpen] = useState(false);
+  const [viewChatMeta, setViewChatMeta] = useState<{ code: string; contact: string; openedAt: string | null; closedAt: string | null; conversationId: string | null }>({ code: "", contact: "", openedAt: null, closedAt: null, conversationId: null });
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -185,6 +188,58 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       }>;
     },
   });
+
+  const { data: linkedAttendances = [] } = useQuery({
+    queryKey: ["ticket_linked_attendances", ticketId, ticket?.attendance_id],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data: byTicketId } = await (supabase.from("support_attendances" as any) as any)
+        .select(`
+          id, attendance_code, status, closure_type,
+          opened_at, closed_at, handle_seconds,
+          ai_summary, participant_type, participant_label,
+          whatsapp_contacts:contact_id(name, phone_number),
+          support_departments:department_id(name)
+        `)
+        .eq("ticket_id", ticketId)
+        .order("opened_at", { ascending: false });
+
+      const originalId = ticket?.attendance_id;
+      let results = (byTicketId ?? []) as any[];
+
+      if (originalId && !results.find((a: any) => a.id === originalId)) {
+        const { data: original } = await (supabase.from("support_attendances" as any) as any)
+          .select(`
+            id, attendance_code, status, closure_type,
+            opened_at, closed_at, handle_seconds,
+            ai_summary, participant_type, participant_label,
+            whatsapp_contacts:contact_id(name, phone_number),
+            support_departments:department_id(name)
+          `)
+          .eq("id", originalId)
+          .maybeSingle();
+        if (original) results = [original, ...results];
+      }
+
+      return results;
+    },
+  });
+
+  const handleViewAttendanceChat = async (att: any) => {
+    const { data } = await (supabase.from("support_attendances" as any) as any)
+      .select("conversation_id")
+      .eq("id", att.id)
+      .maybeSingle();
+
+    setViewChatMeta({
+      code: att.attendance_code ?? "",
+      contact: att.whatsapp_contacts?.name ?? att.participant_label ?? "—",
+      openedAt: att.opened_at,
+      closedAt: att.closed_at,
+      conversationId: data?.conversation_id ?? null,
+    });
+    setViewChatOpen(true);
+  };
 
   const { data: eventAgents = [] } = useQuery({
     queryKey: ["ticket_event_agents", tid],
@@ -883,6 +938,63 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       )}
 
+      {/* Conversas vinculadas */}
+      {linkedAttendances.length > 0 && (
+        <div className="pt-4 border-t space-y-3">
+          <div className="flex items-center gap-2">
+            <Headphones className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium">Conversas vinculadas</p>
+            <Badge variant="outline" className="text-[10px]">{linkedAttendances.length}</Badge>
+          </div>
+          <div className="space-y-2">
+            {linkedAttendances.map((att: any) => {
+              const statusDot: Record<string, string> = {
+                waiting: "bg-yellow-400",
+                in_progress: "bg-blue-400",
+                closed: "bg-green-400",
+              };
+              const contactName = att.whatsapp_contacts?.name ?? att.participant_label ?? "—";
+              const isThirdParty = att.participant_type === "third_party";
+              return (
+                <button
+                  key={att.id}
+                  onClick={() => handleViewAttendanceChat(att)}
+                  className="w-full text-left border border-border rounded-lg p-3 hover:bg-muted/50 transition-colors flex items-start gap-2"
+                >
+                  <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${statusDot[att.status] ?? "bg-muted-foreground"}`} />
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-medium truncate">{contactName}</span>
+                      {isThirdParty && (
+                        <Badge variant="outline" className="text-[9px] h-4 px-1">Terceiro</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground flex-wrap">
+                      <span className="font-mono">{att.attendance_code}</span>
+                      <span>·</span>
+                      <span>
+                        {att.opened_at
+                          ? `${new Date(att.opened_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} ${new Date(att.opened_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                          : "—"}
+                      </span>
+                      <span>·</span>
+                      <span>{att.status === "closed" ? "Encerrado" : att.status === "in_progress" ? "Em andamento" : "Aguardando"}</span>
+                    </div>
+                    {att.ai_summary && (
+                      <details className="text-[11px]">
+                        <summary className="cursor-pointer text-primary hover:underline">Ver resumo IA</summary>
+                        <p className="mt-1 text-muted-foreground whitespace-pre-wrap">{att.ai_summary}</p>
+                      </details>
+                    )}
+                  </div>
+                  <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Timeline de ocorrências */}
       <div className="pt-4 border-t space-y-3">
         <div className="flex items-center gap-2">
@@ -1061,6 +1173,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </Sheet>
         {childDialog}
         {newContactDialog}
+        <AttendanceChatHistoryModal
+          open={viewChatOpen}
+          onOpenChange={setViewChatOpen}
+          conversationId={viewChatMeta.conversationId}
+          attendanceCode={viewChatMeta.code}
+          contactName={viewChatMeta.contact}
+          openedAt={viewChatMeta.openedAt}
+          closedAt={viewChatMeta.closedAt}
+        />
       </>
     );
   }
@@ -1088,6 +1209,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       </Dialog>
       {childDialog}
       {newContactDialog}
+      <AttendanceChatHistoryModal
+        open={viewChatOpen}
+        onOpenChange={setViewChatOpen}
+        conversationId={viewChatMeta.conversationId}
+        attendanceCode={viewChatMeta.code}
+        contactName={viewChatMeta.contact}
+        openedAt={viewChatMeta.openedAt}
+        closedAt={viewChatMeta.closedAt}
+      />
     </>
   );
 }
