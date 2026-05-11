@@ -528,7 +528,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         </div>
       )}
-      </div>
 
       {/* Observação do agente */}
       {ticket.observacao_agente && (
