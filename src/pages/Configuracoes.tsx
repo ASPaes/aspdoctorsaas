@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +11,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus, Upload, Users, RefreshCw } from "lucide-react";
+import { Save, Loader2, Plus, Upload, Users, RefreshCw, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
+import SettingsSidebar, { CADASTRO_SECTIONS } from "@/components/configuracoes/SettingsSidebar";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import { InstanceSetupCollapsible } from "@/components/configuracoes/whatsapp/InstanceSetupCollapsible";
@@ -58,11 +59,37 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+const ADMIN_ONLY_SECTIONS = ["acessos", "ia", "horario-plantao"];
+
+const SECTION_META: Record<string, { breadcrumb: string[]; title: string; description: string }> = {
+  percentuais: { breadcrumb: ["Financeiro", "Percentuais"], title: "Percentuais", description: "Valores padrão de imposto e custo fixo aplicados a novos clientes." },
+  "despesas-cac": { breadcrumb: ["Financeiro", "Despesas CAC"], title: "Despesas CAC", description: "Gerencie as despesas de aquisição de clientes." },
+  produtos: { breadcrumb: ["Cadastros", "Comercial", "Produtos"], title: "Produtos", description: "Catálogo de produtos e módulos da operação." },
+  fornecedores: { breadcrumb: ["Cadastros", "Comercial", "Fornecedores"], title: "Fornecedores", description: "Fornecedores de software e serviços." },
+  "modelos-contrato": { breadcrumb: ["Cadastros", "Comercial", "Modelos de contrato"], title: "Modelos de contrato", description: "Modelos de contrato disponíveis para vendas." },
+  "origens-venda": { breadcrumb: ["Cadastros", "Comercial", "Origens de venda"], title: "Origens de venda", description: "Canais e origens de aquisição de clientes." },
+  "formas-pagamento": { breadcrumb: ["Cadastros", "Comercial", "Formas de pagamento"], title: "Formas de pagamento", description: "Métodos de pagamento aceitos." },
+  setores: { breadcrumb: ["Cadastros", "Operacional", "Setores"], title: "Setores", description: "Setores de atendimento da sua operação." },
+  funcionarios: { breadcrumb: ["Cadastros", "Operacional", "Funcionários"], title: "Funcionários", description: "Equipe e colaboradores." },
+  "categorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Categorias"], title: "Categorias de serviço", description: "Categorias usadas para classificar serviços." },
+  "subcategorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Subcategorias"], title: "Subcategorias de serviço", description: "Subcategorias de detalhamento dos serviços." },
+  "tipos-servico": { breadcrumb: ["Cadastros", "Serviços", "Tipos de serviço"], title: "Tipos de serviço", description: "Tipos de serviço prestados." },
+  segmentos: { breadcrumb: ["Cadastros", "Classificação", "Segmentos"], title: "Segmentos", description: "Segmentos de mercado dos clientes." },
+  "areas-atuacao": { breadcrumb: ["Cadastros", "Classificação", "Áreas de atuação"], title: "Áreas de atuação", description: "Áreas de atuação dos clientes." },
+  "unidades-base": { breadcrumb: ["Cadastros", "Classificação", "Unidades base"], title: "Unidades base", description: "Unidades de medida base usadas no sistema." },
+  "motivos-cancelamento": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de cancelamento"], title: "Motivos de cancelamento", description: "Motivos disponíveis para cancelamento de contratos." },
+  "motivos-pausa": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de pausa"], title: "Motivos de pausa", description: "Motivos para pausa de atendimentos." },
+  acessos: { breadcrumb: ["Equipe", "Acessos & permissões"], title: "Acessos & permissões", description: "Gerencie usuários, papéis e permissões da equipe." },
+  whatsapp: { breadcrumb: ["Atendimento", "WhatsApp"], title: "WhatsApp", description: "Configurações de instâncias, atendimento, macros e segurança." },
+  ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
+  "horario-plantao": { breadcrumb: ["Atendimento", "Horário & plantão"], title: "Horário & plantão", description: "Horário de atendimento e plantões fora do expediente." },
+  kb: { breadcrumb: ["Atendimento", "Base de conhecimento"], title: "Base de conhecimento", description: "Artigos e documentos para suporte ao atendimento." },
+  importacao: { breadcrumb: ["Dados", "Importação"], title: "Importação de Dados", description: "Importe sua base de clientes a partir de um arquivo CSV ou planilha." },
+};
+
 function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [whatsappSubTab, setWhatsappSubTab] = useState("setup");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for future use
-  void 0; // placeholder
 
   return (
     <div className="space-y-4">
@@ -128,14 +155,119 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
   );
 }
 
+function PercentuaisCard({
+  form,
+  mutation,
+  bulkCustoFixo,
+}: {
+  form: ReturnType<typeof useForm<FormValues>>;
+  mutation: ReturnType<typeof useMutation<void, Error, FormValues>>;
+  bulkCustoFixo: ReturnType<typeof useMutation<void, Error, void>>;
+}) {
+  return (
+    <Card className="max-w-lg">
+      <CardHeader>
+        <CardTitle>Percentuais Financeiros</CardTitle>
+        <CardDescription>Valores padrão aplicados a novos clientes. Insira o percentual diretamente (ex: 13,5 para 13,5%).</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+            <FormField control={form.control} name="imposto_percentual" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Imposto %</FormLabel>
+                <FormControl>
+                  <NumericInput value={field.value} onChange={field.onChange} placeholder="13,50" suffix="%" />
+                </FormControl>
+                <FormDescription>Ex: 13,50 para 13,5%</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="custo_fixo_percentual" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Custo Fixo %</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormControl>
+                    <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
+                  </FormControl>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={bulkCustoFixo.isPending}>
+                              {bulkCustoFixo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Atualizar toda a base?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Isso irá alterar o Custo Fixo de <strong>todos os clientes</strong> para <strong>{field.value?.toFixed(2).replace(".", ",")}%</strong>. Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => bulkCustoFixo.mutate()}>
+                                Confirmar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Aplicar este percentual a todos os clientes</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <FormDescription>Ex: 8,00 para 8%</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Save className="h-4 w-4" />
+              Salvar
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImportacaoContent({ onOpen }: { onOpen: () => void }) {
+  return (
+    <Card className="max-w-xl">
+      <CardContent className="pt-6">
+        <div className="flex items-start gap-4">
+          <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted shrink-0">
+            <Users className="w-5 h-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <p className="text-sm font-medium">Importar Clientes</p>
+            <p className="text-xs text-muted-foreground">
+              Importe clientes em massa via CSV. Suporte a mapeamento de colunas e criação automática de registros relacionados.
+            </p>
+            <Button onClick={onOpen} className="gap-2 mt-3" size="sm">
+              <Upload className="w-4 h-4" />
+              Iniciar Importação
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Configuracoes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
 
-  // Auth context for role-based UI
   const { profile } = useAuth();
   const [importModalOpen, setImportModalOpen] = useState(false);
   const navigate = useNavigate();
@@ -146,11 +278,20 @@ export default function Configuracoes() {
     }
   }, [profile, navigate]);
 
-  const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const isAdmin = !!(profile?.role === "admin" || profile?.is_super_admin);
 
-  const ADMIN_ONLY_TABS = ["acessos", "ia", "usuarios", "horario-plantao"];
-  const rawTab = searchParams.get("tab") || "percentuais";
-  const defaultTab = (!isAdmin && ADMIN_ONLY_TABS.includes(rawTab)) ? "percentuais" : rawTab;
+  const rawSection = searchParams.get("section") || "percentuais";
+  const activeSection = (!isAdmin && ADMIN_ONLY_SECTIONS.includes(rawSection)) ? "percentuais" : rawSection;
+
+  useEffect(() => {
+    if (rawSection !== activeSection) {
+      setSearchParams({ section: activeSection }, { replace: true });
+    }
+  }, [rawSection, activeSection, setSearchParams]);
+
+  const handleSectionChange = (section: string) => {
+    setSearchParams({ section });
+  };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -225,6 +366,39 @@ export default function Configuracoes() {
     );
   }
 
+  const meta = SECTION_META[activeSection] ?? { breadcrumb: [activeSection], title: activeSection, description: "" };
+
+  const renderContent = () => {
+    if (CADASTRO_SECTIONS.includes(activeSection)) {
+      return <CadastrosTab section={activeSection} />;
+    }
+    switch (activeSection) {
+      case "percentuais":
+        return <PercentuaisCard form={form} mutation={mutation} bulkCustoFixo={bulkCustoFixo} />;
+      case "despesas-cac":
+        return <CacDespesasTab />;
+      case "acessos":
+        return isAdmin ? <AcessosEquipeTab /> : null;
+      case "whatsapp":
+        return <WhatsAppSettingsContent isAdmin={isAdmin} />;
+      case "ia":
+        return isAdmin ? <AISettingsTab /> : null;
+      case "horario-plantao":
+        return isAdmin ? <HorarioPlantaoTab /> : null;
+      case "kb":
+        return <KBTab />;
+      case "importacao":
+        return (
+          <>
+            <ImportacaoContent onOpen={() => setImportModalOpen(true)} />
+            <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -232,161 +406,33 @@ export default function Configuracoes() {
         <p className="mt-1 text-muted-foreground">Percentuais, despesas CAC, cadastros auxiliares, usuários e WhatsApp.</p>
       </div>
 
-      <Tabs defaultValue={isAdmin ? defaultTab : "percentuais"}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="percentuais">Percentuais</TabsTrigger>
-          <TabsTrigger value="cac">Despesas CAC</TabsTrigger>
-          <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
-          {isAdmin && <TabsTrigger value="acessos">🔐 Acessos & Equipe</TabsTrigger>}
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          {isAdmin && <TabsTrigger value="ia">Inteligência Artificial</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="horario-plantao">Horário & Plantão</TabsTrigger>}
-          <TabsTrigger value="kb">Base de Conhecimento</TabsTrigger>
-          <TabsTrigger value="importacao">Importação de Dados</TabsTrigger>
-        </TabsList>
+      <div className="flex border rounded-lg overflow-hidden bg-background min-h-[600px]">
+        <SettingsSidebar
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          isAdmin={isAdmin}
+        />
 
-        <TabsContent value="percentuais">
-          <Card className="max-w-lg">
-            <CardHeader>
-              <CardTitle>Percentuais Financeiros</CardTitle>
-              <CardDescription>Valores padrão aplicados a novos clientes. Insira o percentual diretamente (ex: 13,5 para 13,5%).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
-                  <FormField control={form.control} name="imposto_percentual" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Imposto %</FormLabel>
-                      <FormControl>
-                        <NumericInput value={field.value} onChange={field.onChange} placeholder="13,50" suffix="%" />
-                      </FormControl>
-                      <FormDescription>Ex: 13,50 para 13,5%</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="custo_fixo_percentual" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Custo Fixo %</FormLabel>
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <NumericInput value={field.value} onChange={field.onChange} placeholder="8,00" suffix="%" />
-                        </FormControl>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={bulkCustoFixo.isPending}>
-                                    {bulkCustoFixo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Atualizar toda a base?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Isso irá alterar o Custo Fixo de <strong>todos os clientes</strong> para <strong>{field.value?.toFixed(2).replace(".", ",")}%</strong>. Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => bulkCustoFixo.mutate()}>
-                                      Confirmar
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Aplicar este percentual a todos os clientes</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <FormDescription>Ex: 8,00 para 8%</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <Button type="submit" disabled={mutation.isPending}>
-                    {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <Save className="h-4 w-4" />
-                    Salvar
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <div className="flex-1 p-6 overflow-auto">
+          <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+            {meta.breadcrumb.map((part, i) => (
+              <span key={i} className="flex items-center gap-1">
+                {i > 0 && <ChevronRight className="h-3 w-3" />}
+                <span className={i === meta.breadcrumb.length - 1 ? "text-foreground" : ""}>{part}</span>
+              </span>
+            ))}
+          </nav>
 
-        <TabsContent value="cac">
-          <CacDespesasTab />
-        </TabsContent>
-
-        <TabsContent value="cadastros">
-          <CadastrosTab />
-        </TabsContent>
-
-        {isAdmin && (
-          <TabsContent value="acessos">
-            <AcessosEquipeTab />
-          </TabsContent>
-        )}
-
-        <TabsContent value="whatsapp">
-          <WhatsAppSettingsContent isAdmin={isAdmin} />
-        </TabsContent>
-
-        {isAdmin && (
-          <TabsContent value="ia">
-            <AISettingsTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="horario-plantao">
-            <HorarioPlantaoTab />
-          </TabsContent>
-        )}
-
-        <TabsContent value="kb">
-          <KBTab />
-        </TabsContent>
-        <TabsContent value="importacao">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                <Upload className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Importação de Dados</h2>
-                <p className="text-sm text-muted-foreground">
-                  Importe sua base de clientes a partir de um arquivo CSV ou planilha.
-                </p>
-              </div>
-            </div>
-
-            <Card className="max-w-xl">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted shrink-0">
-                    <Users className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">Importar Clientes</p>
-                    <p className="text-xs text-muted-foreground">
-                      Importe clientes em massa via CSV. Suporte a mapeamento de colunas e criação automática de registros relacionados.
-                    </p>
-                    <Button onClick={() => setImportModalOpen(true)} className="gap-2 mt-3" size="sm">
-                      <Upload className="w-4 h-4" />
-                      Iniciar Importação
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold">{meta.title}</h2>
+            {meta.description && (
+              <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
+            )}
           </div>
-          <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
-        </TabsContent>
-      </Tabs>
+
+          {renderContent()}
+        </div>
+      </div>
     </div>
   );
 }
