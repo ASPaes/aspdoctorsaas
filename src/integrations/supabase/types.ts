@@ -6425,6 +6425,10 @@ export type Database = {
         Args: { p_attendance_id: string }
         Returns: Json
       }
+      update_ticket_fields: {
+        Args: { p_fields: Json; p_ticket_id: string }
+        Returns: undefined
+      }
       update_ticket_status:
         | {
             Args: { p_new_status: string; p_ticket_id: string }
