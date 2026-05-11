@@ -55,52 +55,20 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
     setUploading(true);
     let count = 0;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast.error("Sessão expirada. Faça login novamente.");
-        return;
-      }
       for (const file of Array.from(files)) {
         const MAX_SIZE = 10 * 1024 * 1024;
         if (file.size > MAX_SIZE) {
-          toast.error(`"${file.name}" excede o limite de 10MB`);
+          toast.error(`"${file.name}" excede 10MB`);
           continue;
         }
-        const safeName = file.name
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-zA-Z0-9._-]/g, "_")
-          .replace(/_+/g, "_");
-        const path = `${tenantId}/${ticketId}/${Date.now()}_${safeName}`;
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        const res = await fetch(
-          `${supabaseUrl}/storage/v1/object/ticket-attachments/${encodeURIComponent(path)}`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "x-upsert": "true",
-              "apikey": anonKey,
-            },
-            body: file,
-          }
-        );
-        if (!res.ok) {
-          const errBody = await res.text();
-          console.error("Storage upload error:", res.status, errBody);
-          throw new Error(`Upload falhou (${res.status}): ${errBody}`);
-        }
-
-        const { error: insertError } = await (supabase.rpc as any)("add_ticket_attachment", {
-          p_ticket_id: ticketId,
-          p_file_name: file.name,
-          p_file_path: path,
-          p_file_size: file.size,
-          p_file_type: file.type || safeName.split(".").pop() || "",
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("ticketId", ticketId);
+        const { data, error } = await supabase.functions.invoke("upload-ticket-attachment", {
+          body: formData,
         });
-        if (insertError) throw insertError;
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
         count++;
       }
       if (count > 0) {
@@ -108,8 +76,9 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
         refetch();
       }
     } catch (err: any) {
-      toast.error("Erro no upload: " + (err.message ?? ""));
+      toast.error("Erro: " + (err.message ?? ""));
     } finally {
+      setUploading(true);
       setUploading(false);
       e.target.value = "";
     }
@@ -121,10 +90,11 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
       if (!session?.access_token) return;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const res = await fetch(
-        `${supabaseUrl}/storage/v1/object/ticket-attachments/${att.file_path}`,
+        `${supabaseUrl}/storage/v1/object/authenticated/ticket-attachments/${att.file_path}`,
         {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
         }
       );
@@ -137,25 +107,13 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      toast.error("Erro ao baixar: " + (err.message ?? ""));
+      toast.error("Erro: " + (err.message ?? ""));
     }
   };
 
   const handleDelete = async (att: any) => {
     if (!confirm(`Excluir "${att.file_name}"?`)) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      await fetch(
-        `${supabaseUrl}/storage/v1/object/ticket-attachments/${att.file_path}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
       await (supabase.from("support_ticket_attachments" as any) as any)
         .delete().eq("id", att.id);
       toast.success("Anexo excluído");
