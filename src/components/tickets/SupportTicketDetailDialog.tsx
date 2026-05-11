@@ -84,10 +84,19 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [childOpen, setChildOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [addingComment, setAddingComment] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [editClassification, setEditClassification] = useState(false);
+  const [showAgendadoFields, setShowAgendadoFields] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
+  useEffect(() => {
+    if (!open) {
+      setEditClassification(false);
+      setShowAgendadoFields(false);
+    }
+  }, [open]);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ["support_ticket_detail", ticketId],
