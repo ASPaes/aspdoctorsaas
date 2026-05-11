@@ -1043,6 +1043,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
                   evt.event_type === "comment" ? "bg-primary" :
                   evt.event_type === "status_change" ? "bg-blue-400" :
+                  evt.event_type === "ai_summary" ? "bg-blue-400" :
                   evt.event_type === "assignment_change" ? "bg-purple-400" :
                   evt.event_type === "reclassification" ? "bg-orange-400" :
                   evt.event_type === "department_change" ? "bg-cyan-400" :
