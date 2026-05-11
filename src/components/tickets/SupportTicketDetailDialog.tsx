@@ -845,6 +845,54 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           Ticket filho
         </Button>
       </div>
+
+      {/* Conversas vinculadas */}
+      {linkedAttendances.length > 0 && (
+        <div className="space-y-2 pt-2">
+          <Separator />
+          <div className="flex items-center gap-2">
+            <Headphones className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Conversas vinculadas</span>
+            <Badge variant="secondary" className="text-[10px]">{linkedAttendances.length}</Badge>
+          </div>
+          <div className="space-y-1.5">
+            {linkedAttendances.map((att: any) => {
+              const statusDot: Record<string, string> = {
+                waiting: "bg-yellow-400",
+                in_progress: "bg-blue-400",
+                closed: "bg-green-400",
+              };
+              const contactName = att.whatsapp_contacts?.name ?? att.participant_label ?? "—";
+              const isThirdParty = att.participant_type === "third_party";
+              return (
+                <button
+                  key={att.id}
+                  onClick={() => handleViewAttendanceChat(att)}
+                  className="w-full text-left border border-border rounded-md p-2.5 hover:border-primary/40 transition-colors flex items-center gap-2"
+                >
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${statusDot[att.status] ?? "bg-muted-foreground"}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium truncate">{contactName}</span>
+                      {isThirdParty && (
+                        <Badge variant="outline" className="text-[9px] h-4 px-1">Terceiro</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <span className="font-mono">{att.attendance_code}</span>
+                      <span>·</span>
+                      <span>{att.opened_at ? new Date(att.opened_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " + new Date(att.opened_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+                      <span>·</span>
+                      <span>{att.status === "closed" ? "Encerrado" : att.status === "in_progress" ? "Em andamento" : "Aguardando"}</span>
+                    </div>
+                  </div>
+                  <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -955,63 +1003,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Conversas vinculadas */}
-      {linkedAttendances.length > 0 && (
-        <div className="pt-4 border-t space-y-3">
-          <div className="flex items-center gap-2">
-            <Headphones className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-medium">Conversas vinculadas</p>
-            <Badge variant="outline" className="text-[10px]">{linkedAttendances.length}</Badge>
-          </div>
-          <div className="space-y-2">
-            {linkedAttendances.map((att: any) => {
-              const statusDot: Record<string, string> = {
-                waiting: "bg-yellow-400",
-                in_progress: "bg-blue-400",
-                closed: "bg-green-400",
-              };
-              const contactName = att.whatsapp_contacts?.name ?? att.participant_label ?? "—";
-              const isThirdParty = att.participant_type === "third_party";
-              return (
-                <button
-                  key={att.id}
-                  onClick={() => handleViewAttendanceChat(att)}
-                  className="w-full text-left border border-border rounded-lg p-3 hover:bg-muted/50 transition-colors flex items-start gap-2"
-                >
-                  <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${statusDot[att.status] ?? "bg-muted-foreground"}`} />
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs font-medium truncate">{contactName}</span>
-                      {isThirdParty && (
-                        <Badge variant="outline" className="text-[9px] h-4 px-1">Terceiro</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground flex-wrap">
-                      <span className="font-mono">{att.attendance_code}</span>
-                      <span>·</span>
-                      <span>
-                        {att.opened_at
-                          ? `${new Date(att.opened_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} ${new Date(att.opened_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-                          : "—"}
-                      </span>
-                      <span>·</span>
-                      <span>{att.status === "closed" ? "Encerrado" : att.status === "in_progress" ? "Em andamento" : "Aguardando"}</span>
-                    </div>
-                    {att.ai_summary && (
-                      <details className="text-[11px]">
-                        <summary className="cursor-pointer text-primary hover:underline">Ver resumo IA</summary>
-                        <p className="mt-1 text-muted-foreground whitespace-pre-wrap">{att.ai_summary}</p>
-                      </details>
-                    )}
-                  </div>
-                  <MessageSquareText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
-                </button>
-              );
-            })}
-          </div>
         </div>
       )}
 
