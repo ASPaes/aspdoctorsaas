@@ -111,14 +111,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
   }, [conversation.id, queryClient]);
 
-  const handleClienteConfirmed = useCallback(() => {
-    setShowConfirmCliente(false);
-    if (!csatEnabled) {
-      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
-    } else {
-      setShowCloseModal(true);
-    }
-  }, [csatEnabled, closeConversation, conversation.id]);
 
   const { effectiveTenantId: tid } = useTenantFilter();
   const convDeptId = (conversation as any).department_id;
