@@ -229,6 +229,7 @@ export function ConfirmClienteModal({
                       codigo_sequencial: c.codigo_sequencial,
                       razao_social: c.razao_social,
                       nome_fantasia: c.nome_fantasia,
+                      telefone_whatsapp: c.telefone_whatsapp,
                     },
                     { subtitle: c.fornecedor_nome ?? null },
                   ),
@@ -286,8 +287,9 @@ export function ConfirmClienteModal({
                       codigo_sequencial: r.codigo_sequencial,
                       razao_social: r.razao_social,
                       nome_fantasia: r.nome_fantasia,
+                      telefone_whatsapp: r.telefone_whatsapp,
                     },
-                    { subtitle: r.cnpj || r.telefone_whatsapp || null },
+                    { subtitle: r.cnpj || null },
                   ),
                 )}
               </div>
