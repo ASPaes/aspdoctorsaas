@@ -35,9 +35,11 @@ interface CrudTableProps {
   orderBy?: string;
   /** Async validation before save. Return string to block with error message, or void/undefined to proceed. */
   onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>;
+  /** Extra action buttons rendered next to the "Novo" button */
+  headerActions?: React.ReactNode;
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions }: CrudTableProps) {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
@@ -199,7 +201,8 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {headerActions}
         <Button size="sm" onClick={openNew}>
           <Plus className="h-4 w-4" /> Novo
         </Button>

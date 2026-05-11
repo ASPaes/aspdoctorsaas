@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import CrudTable, { type ColumnDef } from "@/components/CrudTable";
 import ProdutosModulosTab from "./ProdutosModulosTab";
+import ImportTiposServicoModal from "./ImportTiposServicoModal";
 
 function useDepartmentOptions() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -73,6 +74,8 @@ interface CadastrosTabProps {
 
 export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
   const [syncing, setSyncing] = useState(false);
+  const [importTiposOpen, setImportTiposOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
   const productOptions = useProductOptions();
@@ -95,7 +98,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     }
   };
 
-  const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void> }[] = [
+  const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode }[] = [
     {
       value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", orderBy: "name",
       columns: [
@@ -196,9 +199,16 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       queryKey: "crud_service_types",
       orderBy: "nome",
       columns: [
+        { key: "codigo", label: "Código" },
         { key: "nome", label: "Nome" },
+        { key: "descricao", label: "Descrição" },
         { key: "ativo", label: "Ativo", type: "boolean" },
       ],
+      headerActions: (
+        <Button variant="outline" size="sm" onClick={() => setImportTiposOpen(true)}>
+          <Upload className="h-4 w-4" /> Importar CSV
+        </Button>
+      ),
     },
   ];
 
@@ -224,14 +234,23 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     const t = tabs.find((x) => x.value === mapped);
     if (!t) return null;
     return (
-      <CrudTable
-        table={t.table}
-        queryKey={t.queryKey}
-        columns={t.columns}
-        orderBy={t.orderBy}
-        selectQuery={t.selectQuery}
-        onBeforeSave={t.onBeforeSave}
-      />
+      <>
+        <CrudTable
+          table={t.table}
+          queryKey={t.queryKey}
+          columns={t.columns}
+          orderBy={t.orderBy}
+          selectQuery={t.selectQuery}
+          onBeforeSave={t.onBeforeSave}
+          headerActions={t.headerActions}
+        />
+        <ImportTiposServicoModal
+          open={importTiposOpen}
+          onOpenChange={setImportTiposOpen}
+          tenantId={tid}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
+        />
+      </>
     );
   }
 
@@ -265,10 +284,18 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
               orderBy={t.orderBy}
               selectQuery={t.selectQuery}
               onBeforeSave={t.onBeforeSave}
+              headerActions={t.headerActions}
             />
           </TabsContent>
         ))}
       </Tabs>
+
+      <ImportTiposServicoModal
+        open={importTiposOpen}
+        onOpenChange={setImportTiposOpen}
+        tenantId={tid}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
+      />
     </div>
   );
 }
