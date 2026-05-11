@@ -15,9 +15,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
+import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
-  TicketCheck, ArrowUpRight, Send,
+  TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
