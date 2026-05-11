@@ -1232,6 +1232,19 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         openedAt={viewChatMeta.openedAt}
         closedAt={viewChatMeta.closedAt}
       />
+      <StartConversationFromTicketDialog
+        open={startConvOpen}
+        onOpenChange={setStartConvOpen}
+        ticketId={ticketId ?? ""}
+        ticketCode={ticket?.ticket_code ?? ""}
+        clienteId={ticketClienteId}
+        clienteNome={ticket?.clientes?.nome_fantasia}
+        departmentId={ticket?.department_id}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["ticket_linked_attendances", ticketId] });
+          queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+        }}
+      />
     </>
   );
 }
