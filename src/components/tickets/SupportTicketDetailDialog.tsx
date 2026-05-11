@@ -89,6 +89,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [updating, setUpdating] = useState(false);
   const [editClassification, setEditClassification] = useState(false);
   const [newContactOpen, setNewContactOpen] = useState(false);
+  const [startConvOpen, setStartConvOpen] = useState(false);
   const [newContactNome, setNewContactNome] = useState("");
   const [newContactFone, setNewContactFone] = useState("");
   const [newContactEmail, setNewContactEmail] = useState("");
