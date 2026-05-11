@@ -73,17 +73,18 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
           .replace(/_+/g, "_");
         const path = `${tenantId}/${ticketId}/${Date.now()}_${safeName}`;
 
-        const formData = new FormData();
-        formData.append("", file);
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const res = await fetch(
-          `${supabaseUrl}/storage/v1/object/ticket-attachments/${path}`,
+          `${supabaseUrl}/storage/v1/object/ticket-attachments/${encodeURIComponent(path)}`,
           {
             method: "POST",
             headers: {
               Authorization: `Bearer ${session.access_token}`,
+              "x-upsert": "true",
+              "apikey": anonKey,
             },
-            body: formData,
+            body: file,
           }
         );
         if (!res.ok) {
