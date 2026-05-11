@@ -816,11 +816,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         <Button
           size="sm"
           variant="outline"
-          disabled={!attendanceId}
-          onClick={() => toast.info("Em breve")}
+          onClick={() => setStartConvOpen(true)}
         >
           <MessageCircle className="h-4 w-4 mr-1.5" />
-          Ver chat
+          Iniciar conversa
         </Button>
         <Button size="sm" variant="outline" onClick={() => setChildOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
