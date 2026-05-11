@@ -796,10 +796,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${
                   evt.event_type === "comment" ? "bg-primary" :
                   evt.event_type === "status_change" ? "bg-blue-400" :
+                  evt.event_type === "assignment_change" ? "bg-purple-400" :
+                  evt.event_type === "reclassification" ? "bg-orange-400" :
+                  evt.event_type === "department_change" ? "bg-cyan-400" :
                   evt.event_type === "created" ? "bg-green-400" :
+                  evt.event_type === "closed" ? "bg-red-400" :
                   "bg-muted-foreground"
                 }`} />
-
                 {evt.event_type === "comment" ? (
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
@@ -818,14 +821,17 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                     <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {evt.event_type === "created" ? "Ticket criado" :
-                       evt.event_type === "closed" ? "Ticket encerrado" :
-                       evt.event_type === "assignment_change" ? `Responsável alterado: ${evt.old_value ?? "—"} → ${evt.new_value ?? "—"}` :
-                       evt.event_type}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
+                      <span className="text-xs">alterou <span className="font-medium">{FIELD_LABELS[evt.content ?? ""] ?? evt.content ?? evt.event_type}</span>:</span>
+                      <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 ml-0.5">
+                      <span className="text-[11px] text-muted-foreground">{resolveValueLabel(evt.content ?? "", evt.old_value)}</span>
+                      <span className="text-[10px] text-muted-foreground">→</span>
+                      <span className="text-[11px] font-medium">{resolveValueLabel(evt.content ?? "", evt.new_value)}</span>
+                    </div>
                   </div>
                 )}
               </div>
