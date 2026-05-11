@@ -240,6 +240,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     });
     setViewChatOpen(true);
   };
+
+  const { data: eventAgents = [] } = useQuery({
     queryKey: ["ticket_event_agents", tid],
     enabled: !!tid,
     queryFn: async () => {
