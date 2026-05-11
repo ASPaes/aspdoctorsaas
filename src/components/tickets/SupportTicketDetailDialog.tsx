@@ -17,9 +17,10 @@ import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
+import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
-  TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText,
+  TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -353,6 +354,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     prioridade: "Prioridade",
     observacao_agente: "Observação",
     cliente_contato_id: "Contato",
+    tempo_agente_minutos: "Tempo do agente",
   };
 
   const resolveValueLabel = (field: string, value: string | null): string => {
@@ -385,6 +387,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         try { return formatEvtDate(value); } catch { return value; }
       case "cliente_contato_id":
         return clienteContatos.find(c => c.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "tempo_agente_minutos":
+        return value ? `${value} min` : "—";
       default:
         return value.length > 50 ? value.slice(0, 50) + "..." : value;
     }
@@ -777,6 +781,35 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             disabled={updating}
           />
         </div>
+        {/* Tempo do agente */}
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+            <Timer className="h-3 w-3" />
+            Tempo agente (min)
+          </span>
+          <Input
+            type="number"
+            min={0}
+            className="h-8 text-sm"
+            defaultValue={ticket?.tempo_agente_minutos ?? ""}
+            key={`tempo-agente-${ticket?.tempo_agente_minutos}`}
+            placeholder="0"
+            onBlur={(e) => {
+              const val = e.target.value.trim();
+              if (val && Number(val) !== (ticket?.tempo_agente_minutos ?? 0)) {
+                handleFieldUpdate({ tempo_agente_minutos: val });
+              }
+            }}
+            disabled={updating}
+          />
+        </div>
+        {/* Tempo calculado (read-only) */}
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo calculado</span>
+          <p className="text-sm h-8 flex items-center text-muted-foreground">
+            {ticket?.tempo_calculado_minutos ? `${ticket.tempo_calculado_minutos} min` : "—"}
+          </p>
+        </div>
       </div>
 
       {/* Observação do agente */}
@@ -893,6 +926,87 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         </div>
       )}
+
+      {/* Anexos */}
+      {ticketId && tid && (
+        <div className="pt-2">
+          <Separator className="mb-3" />
+          <TicketAttachments ticketId={ticketId} tenantId={tid} canDelete />
+        </div>
+      )}
+
+      {/* Resumo IA do ticket */}
+      <div className="space-y-2 pt-2">
+        <Separator />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Resumo IA</span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1"
+              onClick={async () => {
+                try {
+                  toast.info("Gerando resumo parcial...");
+                  const { error } = await supabase.functions.invoke("summarize-ticket", {
+                    body: { ticketId, type: "partial" },
+                  });
+                  if (error) throw error;
+                  toast.success("Resumo parcial gerado");
+                  queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+                } catch (err: any) {
+                  toast.error("Erro: " + (err.message ?? "Função não disponível ainda"));
+                }
+              }}
+              disabled={updating}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Resumo parcial
+            </Button>
+            {ticket?.status === "concluido" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={async () => {
+                  try {
+                    toast.info("Gerando resumo conclusivo...");
+                    const { error } = await supabase.functions.invoke("summarize-ticket", {
+                      body: { ticketId, type: "conclusive" },
+                    });
+                    if (error) throw error;
+                    toast.success("Resumo conclusivo gerado");
+                    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+                  } catch (err: any) {
+                    toast.error("Erro: " + (err.message ?? "Função não disponível ainda"));
+                  }
+                }}
+                disabled={updating}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Resumo final
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {ticket?.resumo_parcial && (
+          <div className="bg-muted/30 rounded-lg p-3 space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground">Resumo parcial</p>
+            <p className="text-sm whitespace-pre-wrap">{ticket.resumo_parcial}</p>
+          </div>
+        )}
+
+        {ticket?.resumo_conclusivo && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+            <p className="text-[10px] uppercase text-primary">Resumo conclusivo</p>
+            <p className="text-sm whitespace-pre-wrap">{ticket.resumo_conclusivo}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 
