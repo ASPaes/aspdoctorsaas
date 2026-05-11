@@ -366,7 +366,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         <Select
           value={ticket.status ?? ""}
           onValueChange={(v) => {
-            if (v === "agendado") setShowAgendadoFields(true);
             handleFieldUpdate({ status: v });
           }}
           disabled={updating}
