@@ -56,6 +56,12 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
+        const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+        if (file.size > MAX_SIZE) {
+          toast.error(`"${file.name}" excede o limite de 10MB (${(file.size / 1048576).toFixed(1)}MB)`);
+          continue;
+        }
+
         const ext = file.name.split('.').pop() ?? '';
         const path = `${tenantId}/${ticketId}/${Date.now()}_${file.name}`;
 
