@@ -86,6 +86,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [addingComment, setAddingComment] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [editClassification, setEditClassification] = useState(false);
+  const [newContactOpen, setNewContactOpen] = useState(false);
+  const [newContactNome, setNewContactNome] = useState("");
+  const [newContactFone, setNewContactFone] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newContactCargo, setNewContactCargo] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -197,19 +203,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
-  const { data: clienteContatos = [] } = useQuery({
-    queryKey: ["ticket_detail_contatos", ticket?.cliente_id],
-    enabled: !!ticket?.cliente_id,
+  const ticketClienteId = ticket?.cliente_id ?? ticket?.clientes?.id ?? null;
+
+  const { data: clienteContatos = [], refetch: refetchContatos } = useQuery({
+    queryKey: ["ticket_detail_contatos", ticketClienteId],
+    enabled: !!ticketClienteId,
     queryFn: async () => {
-      const clienteId = ticket?.cliente_id ?? ticket?.clientes?.id;
-      if (!clienteId) return [];
+      if (!ticketClienteId) return [];
       const { data: cli } = await (supabase.from("clientes" as any) as any)
         .select("contato_nome, contato_fone")
-        .eq("id", clienteId)
+        .eq("id", ticketClienteId)
         .maybeSingle();
       const { data: contatos } = await (supabase.from("cliente_contatos" as any) as any)
         .select("id, nome, fone, email, cargo")
-        .eq("cliente_id", clienteId)
+        .eq("cliente_id", ticketClienteId)
         .order("nome");
       const result: Array<{ id: string; nome: string; detalhe: string }> = [];
       if (cli?.contato_nome) {
@@ -229,6 +236,39 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       return result;
     },
   });
+
+  const handleCreateContact = async () => {
+    if (!newContactNome.trim() || !ticketClienteId) return;
+    setSavingContact(true);
+    try {
+      const { data: inserted, error } = await (supabase.from("cliente_contatos" as any) as any)
+        .insert({
+          cliente_id: ticketClienteId,
+          tenant_id: tid,
+          nome: newContactNome.trim(),
+          fone: newContactFone.trim() || null,
+          email: newContactEmail.trim() || null,
+          cargo: newContactCargo.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      toast.success("Contato adicionado");
+      setNewContactOpen(false);
+      setNewContactNome("");
+      setNewContactFone("");
+      setNewContactEmail("");
+      setNewContactCargo("");
+      await refetchContatos();
+      if (inserted?.id) {
+        handleFieldUpdate({ cliente_contato_id: inserted.id });
+      }
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setSavingContact(false);
+    }
+  };
 
   const currentContactName = useMemo(() => {
     if (ticket?.cliente_contato_id) {
@@ -574,33 +614,42 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         {/* Contato solicitante */}
         <div className="col-span-2 space-y-1">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Contato solicitante</span>
-          {ticket?.contact_id && !ticket?.cliente_contato_id ? (
-            <p className="text-sm h-8 flex items-center gap-2">
-              {ticket?.whatsapp_contacts?.name ?? "—"}
-              <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
-            </p>
-          ) : (
-            <Select
-              value={ticket?.cliente_contato_id ?? "none"}
-              onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
-              disabled={updating || clienteContatos.length === 0}
+          <div className="flex items-center gap-2">
+            {ticket?.contact_id && !ticket?.cliente_contato_id ? (
+              <p className="text-sm h-8 flex items-center gap-2 flex-1">
+                {ticket?.whatsapp_contacts?.name ?? "—"}
+                <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
+              </p>
+            ) : (
+              <Select
+                value={ticket?.cliente_contato_id ?? "none"}
+                onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
+                disabled={updating}
+              >
+                <SelectTrigger className="h-8 text-sm flex-1">
+                  <SelectValue placeholder="Selecione o contato..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem contato</SelectItem>
+                  {clienteContatos.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} {c.detalhe ? `(${c.detalhe})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setNewContactOpen(true)}
+              disabled={!ticketClienteId}
+              title="Adicionar contato"
             >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder={clienteContatos.length === 0 ? "Nenhum contato cadastrado" : "Selecione o contato..."} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem contato</SelectItem>
-                {clienteContatos.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{c.nome}</span>
-                      <span className="text-[10px] text-muted-foreground">{c.detalhe}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="space-y-1">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tipo horário</span>
@@ -936,6 +985,43 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     />
   );
 
+  const newContactDialog = (
+    <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Novo contato</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Nome *</Label>
+            <Input value={newContactNome} onChange={(e) => setNewContactNome(e.target.value)} placeholder="Nome do contato" className="h-9" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Telefone</Label>
+              <Input value={newContactFone} onChange={(e) => setNewContactFone(e.target.value)} placeholder="(00) 00000-0000" className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">E-mail</Label>
+              <Input value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} placeholder="email@exemplo.com" className="h-9" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Cargo</Label>
+            <Input value={newContactCargo} onChange={(e) => setNewContactCargo(e.target.value)} placeholder="Ex: Gerente, Caixa" className="h-9" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setNewContactOpen(false)}>Cancelar</Button>
+          <Button onClick={handleCreateContact} disabled={savingContact || !newContactNome.trim()}>
+            {savingContact && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+            Adicionar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (isMobile) {
     return (
       <>
@@ -972,6 +1058,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </SheetContent>
         </Sheet>
         {childDialog}
+        {newContactDialog}
       </>
     );
   }
@@ -998,6 +1085,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </DialogContent>
       </Dialog>
       {childDialog}
+      {newContactDialog}
     </>
   );
 }
