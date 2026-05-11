@@ -28,6 +28,7 @@ import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
+import { ClassifyClosureModal } from "@/components/tickets/ClassifyClosureModal";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
@@ -62,6 +63,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
+  const [showClassifyModal, setShowClassifyModal] = useState(false);
+  const [pendingCloseOptions, setPendingCloseOptions] = useState<{ skipCsat: boolean; skipClosureMessage: boolean } | null>(null);
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -108,14 +111,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
   }, [conversation.id, queryClient]);
 
-  const handleClienteConfirmed = useCallback(() => {
-    setShowConfirmCliente(false);
-    if (!csatEnabled) {
-      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
-    } else {
-      setShowCloseModal(true);
-    }
-  }, [csatEnabled, closeConversation, conversation.id]);
 
   const { effectiveTenantId: tid } = useTenantFilter();
   const convDeptId = (conversation as any).department_id;
@@ -126,7 +121,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     queryFn: async () => {
       const { data } = await supabase
         .from("support_departments")
-        .select("id, name")
+        .select("id, name, requires_ticket_on_close")
         .eq("id", convDeptId)
         .single();
       return data;
@@ -145,6 +140,44 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   // Use attendance status as single source of truth for status display
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
+
+  const handleClienteConfirmed = useCallback(() => {
+    setShowConfirmCliente(false);
+
+    // Regra: se attendance já tem ticket_id (conversa iniciada a partir de ticket), pular classificação
+    const attTicketId = (attendance as any)?.ticket_id;
+    if (attTicketId) {
+      if (!csatEnabled) {
+        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+      } else {
+        setShowCloseModal(true);
+      }
+      return;
+    }
+
+    // Regra: se setor exige ticket ao encerrar, mostrar modal de classificação
+    const requiresTicket = (convDepartment as any)?.requires_ticket_on_close === true;
+    if (requiresTicket) {
+      setShowClassifyModal(true);
+      return;
+    }
+
+    // Fluxo normal: não exige ticket
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id, attendance, convDepartment]);
+
+  const handleClassifyCompleted = useCallback(() => {
+    setShowClassifyModal(false);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id]);
 
   // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
@@ -542,6 +575,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         phoneNumber={phoneNumber}
         onConfirmed={handleClienteConfirmed}
         onCancel={() => setShowConfirmCliente(false)}
+      />
+
+      <ClassifyClosureModal
+        open={showClassifyModal}
+        onOpenChange={(o) => { if (!o) setShowClassifyModal(false); }}
+        attendanceId={attendance?.id ?? ""}
+        contactName={contact?.name}
+        clienteName={linkedClienteName ?? undefined}
+        clienteProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        aiSummary={(attendance as any)?.ai_summary ?? null}
+        onCreated={handleClassifyCompleted}
       />
 
       {/* Modal de confirmação de encerramento */}
