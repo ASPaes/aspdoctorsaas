@@ -3816,6 +3816,7 @@ export type Database = {
       support_ticket_attachments: {
         Row: {
           created_at: string
+          file_data: string | null
           file_name: string
           file_path: string
           file_size: number | null
@@ -3828,6 +3829,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          file_data?: string | null
           file_name: string
           file_path: string
           file_size?: number | null
@@ -3840,6 +3842,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          file_data?: string | null
           file_name?: string
           file_path?: string
           file_size?: number | null
@@ -5872,17 +5875,30 @@ export type Database = {
         Returns: undefined
       }
       accept_invite: { Args: { p_token: string }; Returns: undefined }
-      add_ticket_attachment: {
-        Args: {
-          p_file_name: string
-          p_file_path: string
-          p_file_size?: number
-          p_file_type?: string
-          p_file_url?: string
-          p_ticket_id: string
-        }
-        Returns: string
-      }
+      add_ticket_attachment:
+        | {
+            Args: {
+              p_file_data?: string
+              p_file_name: string
+              p_file_path?: string
+              p_file_size?: number
+              p_file_type?: string
+              p_file_url?: string
+              p_ticket_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_file_name: string
+              p_file_path: string
+              p_file_size?: number
+              p_file_type?: string
+              p_file_url?: string
+              p_ticket_id: string
+            }
+            Returns: string
+          }
       add_ticket_event: {
         Args: {
           p_content?: string
@@ -6552,6 +6568,16 @@ export type Database = {
             }
             Returns: undefined
           }
+      upload_ticket_attachment: {
+        Args: {
+          p_file_content: string
+          p_file_name: string
+          p_file_size?: number
+          p_file_type?: string
+          p_ticket_id: string
+        }
+        Returns: string
+      }
       validate_access_invite: {
         Args: { p_invite_id: string }
         Returns: {
