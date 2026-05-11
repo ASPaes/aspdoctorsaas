@@ -213,6 +213,17 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           );
         })}
       </div>
+      <div className="border-t border-border px-3 py-3">
+        <button
+          type="button"
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-2 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors w-full px-2 py-1.5 disabled:opacity-50"
+        >
+          <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
+          {syncing ? "Sincronizando..." : "Sincronizar estados/cidades"}
+        </button>
+      </div>
     </aside>
   );
 }
