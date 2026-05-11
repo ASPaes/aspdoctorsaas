@@ -189,7 +189,57 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     },
   });
 
-  const { data: eventAgents = [] } = useQuery({
+  const { data: linkedAttendances = [] } = useQuery({
+    queryKey: ["ticket_linked_attendances", ticketId, ticket?.attendance_id],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data: byTicketId } = await (supabase.from("support_attendances" as any) as any)
+        .select(`
+          id, attendance_code, status, closure_type,
+          opened_at, closed_at, handle_seconds,
+          ai_summary, participant_type, participant_label,
+          whatsapp_contacts:contact_id(name, phone_number),
+          support_departments:department_id(name)
+        `)
+        .eq("ticket_id", ticketId)
+        .order("opened_at", { ascending: false });
+
+      const originalId = ticket?.attendance_id;
+      let results = (byTicketId ?? []) as any[];
+
+      if (originalId && !results.find((a: any) => a.id === originalId)) {
+        const { data: original } = await (supabase.from("support_attendances" as any) as any)
+          .select(`
+            id, attendance_code, status, closure_type,
+            opened_at, closed_at, handle_seconds,
+            ai_summary, participant_type, participant_label,
+            whatsapp_contacts:contact_id(name, phone_number),
+            support_departments:department_id(name)
+          `)
+          .eq("id", originalId)
+          .maybeSingle();
+        if (original) results = [original, ...results];
+      }
+
+      return results;
+    },
+  });
+
+  const handleViewAttendanceChat = async (att: any) => {
+    const { data } = await (supabase.from("support_attendances" as any) as any)
+      .select("conversation_id")
+      .eq("id", att.id)
+      .maybeSingle();
+
+    setViewChatMeta({
+      code: att.attendance_code ?? "",
+      contact: att.whatsapp_contacts?.name ?? att.participant_label ?? "—",
+      openedAt: att.opened_at,
+      closedAt: att.closed_at,
+      conversationId: data?.conversation_id ?? null,
+    });
+    setViewChatOpen(true);
+  };
     queryKey: ["ticket_event_agents", tid],
     enabled: !!tid,
     queryFn: async () => {
