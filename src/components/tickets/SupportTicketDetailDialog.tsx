@@ -781,6 +781,35 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             disabled={updating}
           />
         </div>
+        {/* Tempo do agente */}
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+            <Timer className="h-3 w-3" />
+            Tempo agente (min)
+          </span>
+          <Input
+            type="number"
+            min={0}
+            className="h-8 text-sm"
+            defaultValue={ticket?.tempo_agente_minutos ?? ""}
+            key={`tempo-agente-${ticket?.tempo_agente_minutos}`}
+            placeholder="0"
+            onBlur={(e) => {
+              const val = e.target.value.trim();
+              if (val && Number(val) !== (ticket?.tempo_agente_minutos ?? 0)) {
+                handleFieldUpdate({ tempo_agente_minutos: val });
+              }
+            }}
+            disabled={updating}
+          />
+        </div>
+        {/* Tempo calculado (read-only) */}
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo calculado</span>
+          <p className="text-sm h-8 flex items-center text-muted-foreground">
+            {ticket?.tempo_calculado_minutos ? `${ticket.tempo_calculado_minutos} min` : "—"}
+          </p>
+        </div>
       </div>
 
       {/* Observação do agente */}
