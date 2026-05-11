@@ -583,7 +583,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         attendanceId={attendance?.id ?? ""}
         contactName={contact?.name}
         clienteName={linkedClienteName ?? undefined}
-        clienteProdutoId={linkedCliente?.produto_id ?? null}
+        clienteProdutoId={(linkedCliente as any)?.produto_id ?? null}
         aiSummary={(attendance as any)?.ai_summary ?? null}
         onCreated={handleClassifyCompleted}
       />
