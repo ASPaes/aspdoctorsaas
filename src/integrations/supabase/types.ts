@@ -2938,7 +2938,6 @@ export type Database = {
           created_at: string
           id: string
           nome: string
-          produto_id: number | null
           tenant_id: string
           updated_at: string
         }
@@ -2948,7 +2947,6 @@ export type Database = {
           created_at?: string
           id?: string
           nome: string
-          produto_id?: number | null
           tenant_id: string
           updated_at?: string
         }
@@ -2958,7 +2956,6 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
-          produto_id?: number | null
           tenant_id?: string
           updated_at?: string
         }
@@ -2968,13 +2965,6 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "service_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_subcategories_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
           {
@@ -2989,7 +2979,9 @@ export type Database = {
       service_types: {
         Row: {
           ativo: boolean
+          codigo: string | null
           created_at: string
+          descricao: string | null
           id: string
           nome: string
           tenant_id: string
@@ -2997,7 +2989,9 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          codigo?: string | null
           created_at?: string
+          descricao?: string | null
           id?: string
           nome: string
           tenant_id: string
@@ -3005,7 +2999,9 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          codigo?: string | null
           created_at?: string
+          descricao?: string | null
           id?: string
           nome?: string
           tenant_id?: string
