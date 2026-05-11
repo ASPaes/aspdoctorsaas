@@ -291,6 +291,7 @@ export default function Configuracoes() {
 
   const handleSectionChange = (section: string) => {
     setSearchParams({ section });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const form = useForm<FormValues>({
