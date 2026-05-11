@@ -5872,6 +5872,17 @@ export type Database = {
         Returns: undefined
       }
       accept_invite: { Args: { p_token: string }; Returns: undefined }
+      add_ticket_attachment: {
+        Args: {
+          p_file_name: string
+          p_file_path: string
+          p_file_size?: number
+          p_file_type?: string
+          p_file_url?: string
+          p_ticket_id: string
+        }
+        Returns: string
+      }
       add_ticket_event: {
         Args: {
           p_content?: string
