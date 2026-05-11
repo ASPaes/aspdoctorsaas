@@ -404,7 +404,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const tipoServico = ticket?.service_types?.nome;
 
   const detailsContent = !ticket ? null : (
-    <div className="space-y-4 pr-2">
+    <div className="space-y-4 pr-2 pt-1">
       {/* Header badges */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-mono text-sm font-semibold text-primary">{ticket.ticket_code ?? "—"}</span>
