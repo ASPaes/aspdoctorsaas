@@ -54,7 +54,24 @@ function useCategoryOptions() {
   return data ?? [];
 }
 
-export default function CadastrosTab() {
+const SECTION_TO_VALUE: Record<string, string> = {
+  "modelos-contrato": "modelos_contrato",
+  "origens-venda": "origens_venda",
+  "formas-pagamento": "formas_pagamento",
+  "categorias-servico": "categorias_servico",
+  "subcategorias-servico": "subcategorias_servico",
+  "tipos-servico": "tipos_servico",
+  "motivos-cancelamento": "motivos_cancelamento",
+  "motivos-pausa": "motivos_pausa",
+  "areas-atuacao": "areas_atuacao",
+  "unidades-base": "unidades_base",
+};
+
+interface CadastrosTabProps {
+  section?: string;
+}
+
+export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
   const [syncing, setSyncing] = useState(false);
   const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
