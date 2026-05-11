@@ -294,20 +294,7 @@ export default function Configuracoes() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const [syncingCidades, setSyncingCidades] = useState(false);
-  const handleSyncCidades = async () => {
-    setSyncingCidades(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("populate-cidades", { method: "POST" });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
-      toast({ title: "Sincronização concluída", description: `${data.estados} estados e ${data.cidades} cidades sincronizados.` });
-    } catch (err: any) {
-      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
-    } finally {
-      setSyncingCidades(false);
-    }
-  };
+
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -439,18 +426,10 @@ export default function Configuracoes() {
             ))}
           </nav>
 
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">{meta.title}</h2>
-              {meta.description && (
-                <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
-              )}
-            </div>
-            {CADASTRO_SECTIONS.includes(activeSection) && (
-              <Button onClick={handleSyncCidades} disabled={syncingCidades} variant="outline" size="sm">
-                <RefreshCw className={`h-4 w-4 ${syncingCidades ? "animate-spin" : ""}`} />
-                {syncingCidades ? "Sincronizando..." : "Sincronizar Estados/Cidades"}
-              </Button>
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold">{meta.title}</h2>
+            {meta.description && (
+              <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
             )}
           </div>
 

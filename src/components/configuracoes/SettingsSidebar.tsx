@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, ChevronRight } from "lucide-react";
+import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const CADASTRO_SECTIONS = [
   "produtos",
@@ -37,6 +39,21 @@ interface SettingsSidebarProps {
 
 export default function SettingsSidebar({ activeSection, onSectionChange, isAdmin }: SettingsSidebarProps) {
   const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({});
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("populate-cidades", { method: "POST" });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
+      toast.success("Sincronização concluída", { description: `${data.estados} estados e ${data.cidades} cidades sincronizados.` });
+    } catch (err: any) {
+      toast.error("Erro na sincronização", { description: err.message });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const groups: Group[] = [
     {
@@ -166,8 +183,8 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
   };
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-muted/30 border-r py-4 flex flex-col sticky top-0 h-[calc(100vh-120px)] overflow-y-auto">
-      <div className="flex-1 space-y-4">
+    <aside className="w-56 flex-shrink-0 sticky top-0 h-[calc(100vh-120px)] flex flex-col border-r bg-muted/30">
+      <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {groups.map((group) => {
           const Icon = group.icon;
           const isCadastros = group.label === "Cadastros";
@@ -210,6 +227,17 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
             </div>
           );
         })}
+      </div>
+      <div className="border-t border-border px-3 py-3">
+        <button
+          type="button"
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-2 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors w-full px-2 py-1.5 disabled:opacity-50"
+        >
+          <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
+          {syncing ? "Sincronizando..." : "Sincronizar estados/cidades"}
+        </button>
       </div>
     </aside>
   );
