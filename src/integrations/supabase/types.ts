@@ -6190,6 +6190,7 @@ export type Database = {
           fornecedor_nome: string
           nome_fantasia: string
           razao_social: string
+          telefone_whatsapp: string
         }[]
       }
       get_database_projection: { Args: never; Returns: Json }

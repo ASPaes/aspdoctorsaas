@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Check, Search, UserX, Loader2 } from 'lucide-react';
+import { Check, Search, UserX, Loader2, Phone } from 'lucide-react';
 import { useRelevantAttendance } from '../hooks/useRelevantAttendance';
 import { useClienteLinkSuggestion, type ClienteCandidato } from '../hooks/useClienteLinkSuggestion';
 import { useClienteSearch } from '../hooks/useClienteSearch';
@@ -28,10 +28,11 @@ interface ClienteOption {
   razao_social: string | null;
   nome_fantasia: string | null;
   fornecedor_nome?: string | null;
+  telefone_whatsapp?: string | null;
 }
 
 function clienteLabel(c: { razao_social: string | null; nome_fantasia: string | null; codigo_sequencial: number | null }) {
-  const name = c.nome_fantasia || c.razao_social || 'Sem nome';
+  const name = c.razao_social || c.nome_fantasia || 'Sem nome';
   const code = c.codigo_sequencial != null ? `#${c.codigo_sequencial} ` : '';
   return `${code}${name}`;
 }
@@ -170,6 +171,15 @@ export function ConfirmClienteModal({
               <Badge variant="default" className="text-[10px]">Vinculado atualmente</Badge>
             )}
           </div>
+          {c.nome_fantasia && c.nome_fantasia !== c.razao_social && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.nome_fantasia}</p>
+          )}
+          {c.telefone_whatsapp && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate flex items-center gap-1">
+              <Phone className="h-3 w-3 shrink-0" />
+              {c.telefone_whatsapp}
+            </p>
+          )}
           {opts.subtitle && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{opts.subtitle}</p>
           )}
@@ -219,6 +229,7 @@ export function ConfirmClienteModal({
                       codigo_sequencial: c.codigo_sequencial,
                       razao_social: c.razao_social,
                       nome_fantasia: c.nome_fantasia,
+                      telefone_whatsapp: c.telefone_whatsapp,
                     },
                     { subtitle: c.fornecedor_nome ?? null },
                   ),
@@ -276,8 +287,9 @@ export function ConfirmClienteModal({
                       codigo_sequencial: r.codigo_sequencial,
                       razao_social: r.razao_social,
                       nome_fantasia: r.nome_fantasia,
+                      telefone_whatsapp: r.telefone_whatsapp,
                     },
-                    { subtitle: r.cnpj || r.telefone_whatsapp || null },
+                    { subtitle: r.cnpj || null },
                   ),
                 )}
               </div>
