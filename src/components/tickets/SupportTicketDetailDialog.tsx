@@ -1173,6 +1173,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </Sheet>
         {childDialog}
         {newContactDialog}
+        <AttendanceChatHistoryModal
+          open={viewChatOpen}
+          onOpenChange={setViewChatOpen}
+          conversationId={viewChatMeta.conversationId}
+          attendanceCode={viewChatMeta.code}
+          contactName={viewChatMeta.contact}
+          openedAt={viewChatMeta.openedAt}
+          closedAt={viewChatMeta.closedAt}
+        />
       </>
     );
   }
