@@ -214,7 +214,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
 
   return (
     <div className="space-y-3">
-      {metrics && (
+      {metrics && departamentos.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
