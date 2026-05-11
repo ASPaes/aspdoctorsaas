@@ -234,14 +234,23 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     const t = tabs.find((x) => x.value === mapped);
     if (!t) return null;
     return (
-      <CrudTable
-        table={t.table}
-        queryKey={t.queryKey}
-        columns={t.columns}
-        orderBy={t.orderBy}
-        selectQuery={t.selectQuery}
-        onBeforeSave={t.onBeforeSave}
-      />
+      <>
+        <CrudTable
+          table={t.table}
+          queryKey={t.queryKey}
+          columns={t.columns}
+          orderBy={t.orderBy}
+          selectQuery={t.selectQuery}
+          onBeforeSave={t.onBeforeSave}
+          headerActions={t.headerActions}
+        />
+        <ImportTiposServicoModal
+          open={importTiposOpen}
+          onOpenChange={setImportTiposOpen}
+          tenantId={tid}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
+        />
+      </>
     );
   }
 
@@ -275,10 +284,18 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
               orderBy={t.orderBy}
               selectQuery={t.selectQuery}
               onBeforeSave={t.onBeforeSave}
+              headerActions={t.headerActions}
             />
           </TabsContent>
         ))}
       </Tabs>
+
+      <ImportTiposServicoModal
+        open={importTiposOpen}
+        onOpenChange={setImportTiposOpen}
+        tenantId={tid}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
+      />
     </div>
   );
 }
