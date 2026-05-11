@@ -198,6 +198,56 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
+  const FIELD_LABELS: Record<string, string> = {
+    status: "Status",
+    responsavel_user_id: "Responsável",
+    department_id: "Setor",
+    category_id: "Categoria",
+    subcategory_id: "Subcategoria",
+    service_type_id: "Tipo de serviço",
+    produto_id: "Produto",
+    agendado_para: "Agendado para",
+    previsao_encerramento: "Previsão encerramento",
+    canal_origem: "Canal",
+    tipo_horario: "Tipo horário",
+    prioridade: "Prioridade",
+    observacao_agente: "Observação",
+    cliente_contato_id: "Contato",
+  };
+
+  const resolveValueLabel = (field: string, value: string | null): string => {
+    if (!value) return "—";
+    switch (field) {
+      case "status":
+        return STATUS_LABELS[value] ?? value;
+      case "responsavel_user_id":
+        return eventAgents.find(a => a.user_id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "department_id":
+        return departamentos.find((d: any) => d.id === value)?.name ?? value.slice(0, 8) + "...";
+      case "category_id":
+        return categories.find((c: any) => c.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "subcategory_id":
+        return subcategories.find((s: any) => s.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "service_type_id":
+        return serviceTypes.find((t: any) => t.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "produto_id":
+        return produtos.find((p: any) => String(p.id) === value)?.nome ?? value;
+      case "canal_origem": {
+        const labels: Record<string, string> = { whatsapp: "WhatsApp", telefone: "Telefone", presencial: "Presencial", email: "E-mail" };
+        return labels[value] ?? value;
+      }
+      case "tipo_horario":
+        return value === "comercial" ? "Comercial" : value === "plantao" ? "Plantão" : value;
+      case "prioridade":
+        return value.charAt(0).toUpperCase() + value.slice(1);
+      case "agendado_para":
+      case "previsao_encerramento":
+        try { return formatEvtDate(value); } catch { return value; }
+      default:
+        return value.length > 50 ? value.slice(0, 50) + "..." : value;
+    }
+  };
+
   const { data: departamentos = [] } = useQuery({
     queryKey: ["ticket_detail_departamentos", tid],
     enabled: !!tid,
