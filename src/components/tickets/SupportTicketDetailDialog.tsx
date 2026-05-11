@@ -322,9 +322,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     }
   };
 
-  useEffect(() => {
-    if (ticket?.status === "agendado") setShowAgendadoFields(true);
-  }, [ticket?.status]);
 
   const toLocalInput = (iso: string | null | undefined) => {
     if (!iso) return "";
