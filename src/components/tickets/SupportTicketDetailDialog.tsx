@@ -926,6 +926,87 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         </div>
       )}
+
+      {/* Anexos */}
+      {ticketId && tid && (
+        <div className="pt-2">
+          <Separator className="mb-3" />
+          <TicketAttachments ticketId={ticketId} tenantId={tid} canDelete />
+        </div>
+      )}
+
+      {/* Resumo IA do ticket */}
+      <div className="space-y-2 pt-2">
+        <Separator />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Resumo IA</span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1"
+              onClick={async () => {
+                try {
+                  toast.info("Gerando resumo parcial...");
+                  const { error } = await supabase.functions.invoke("summarize-ticket", {
+                    body: { ticketId, type: "partial" },
+                  });
+                  if (error) throw error;
+                  toast.success("Resumo parcial gerado");
+                  queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+                } catch (err: any) {
+                  toast.error("Erro: " + (err.message ?? "Função não disponível ainda"));
+                }
+              }}
+              disabled={updating}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Resumo parcial
+            </Button>
+            {ticket?.status === "concluido" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={async () => {
+                  try {
+                    toast.info("Gerando resumo conclusivo...");
+                    const { error } = await supabase.functions.invoke("summarize-ticket", {
+                      body: { ticketId, type: "conclusive" },
+                    });
+                    if (error) throw error;
+                    toast.success("Resumo conclusivo gerado");
+                    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+                  } catch (err: any) {
+                    toast.error("Erro: " + (err.message ?? "Função não disponível ainda"));
+                  }
+                }}
+                disabled={updating}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Resumo final
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {ticket?.resumo_parcial && (
+          <div className="bg-muted/30 rounded-lg p-3 space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground">Resumo parcial</p>
+            <p className="text-sm whitespace-pre-wrap">{ticket.resumo_parcial}</p>
+          </div>
+        )}
+
+        {ticket?.resumo_conclusivo && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+            <p className="text-[10px] uppercase text-primary">Resumo conclusivo</p>
+            <p className="text-sm whitespace-pre-wrap">{ticket.resumo_conclusivo}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 
