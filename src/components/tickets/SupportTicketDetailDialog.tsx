@@ -198,6 +198,93 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const getAgentName = (uid: string) => eventAgents.find((a) => a.user_id === uid)?.nome ?? "Sistema";
 
+  const { data: departamentos = [] } = useQuery({
+    queryKey: ["ticket_detail_departamentos", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name").eq("tenant_id", tid).eq("is_active", true).order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
+  });
+
+  const { data: produtos = [] } = useQuery({
+    queryKey: ["ticket_detail_produtos", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, nome").eq("tenant_id", tid).order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["ticket_detail_categories", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_categories" as any) as any)
+        .select("id, nome, produto_id").eq("tenant_id", tid).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+    },
+  });
+
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ["ticket_detail_subcategories", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_subcategories" as any) as any)
+        .select("id, nome, category_id").eq("tenant_id", tid).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string; category_id: string }>;
+    },
+  });
+
+  const { data: serviceTypes = [] } = useQuery({
+    queryKey: ["ticket_detail_service_types", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_types" as any) as any)
+        .select("id, nome").eq("tenant_id", tid).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const handleFieldUpdate = async (fields: Record<string, any>) => {
+    if (!ticketId) return;
+    setUpdating(true);
+    try {
+      const { error } = await (supabase.rpc as any)("update_ticket_fields", {
+        p_ticket_id: ticketId,
+        p_fields: fields,
+      });
+      if (error) throw error;
+      toast.success("Ticket atualizado");
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+      refetchEvents();
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (ticket?.status === "agendado") setShowAgendadoFields(true);
+  }, [ticket?.status]);
+
+  const toLocalInput = (iso: string | null | undefined) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const handleAddComment = async () => {
     if (!newComment.trim() || !ticketId) return;
     setAddingComment(true);
