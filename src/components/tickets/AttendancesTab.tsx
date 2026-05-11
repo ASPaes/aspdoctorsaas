@@ -121,8 +121,8 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         p_status: statusFilter !== "all" ? statusFilter : null,
         p_agent_id: !isAdminOrHead && userId ? userId : (atendenteFilter !== "all" ? atendenteFilter : null),
         p_department_id: departamentoFilter !== "all" ? departamentoFilter : null,
-        p_department_ids: departamentoFilter === "all" && departamentos.length > 0 ? departamentos.map((d: any) => d.id) : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
+        p_tenant_id: tid,
       });
       if (error) throw error;
       return data as {
