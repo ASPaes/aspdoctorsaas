@@ -387,6 +387,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         try { return formatEvtDate(value); } catch { return value; }
       case "cliente_contato_id":
         return clienteContatos.find(c => c.id === value)?.nome ?? value.slice(0, 8) + "...";
+      case "tempo_agente_minutos":
+        return value ? `${value} min` : "—";
       default:
         return value.length > 50 ? value.slice(0, 50) + "..." : value;
     }
