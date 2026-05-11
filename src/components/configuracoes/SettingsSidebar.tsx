@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, RefreshCw, ChevronRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { DollarSign, Database, Users, Headset, Upload, ChevronRight } from "lucide-react";
 
 export const CADASTRO_SECTIONS = [
   "produtos",
@@ -39,22 +36,7 @@ interface SettingsSidebarProps {
 }
 
 export default function SettingsSidebar({ activeSection, onSectionChange, isAdmin }: SettingsSidebarProps) {
-  const [syncing, setSyncing] = useState(false);
   const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({});
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("populate-cidades", { method: "POST" });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
-      toast({ title: "Sincronização concluída", description: `${data.estados} estados e ${data.cidades} cidades sincronizados.` });
-    } catch (err: any) {
-      toast({ title: "Erro na sincronização", description: err.message, variant: "destructive" });
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const groups: Group[] = [
     {
@@ -228,13 +210,6 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
             </div>
           );
         })}
-      </div>
-
-      <div className="px-3 pt-4 mt-4 border-t">
-        <Button onClick={handleSync} disabled={syncing} variant="outline" size="sm" className="w-full">
-          <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-          {syncing ? "Sincronizando..." : "Sincronizar Estados/Cidades"}
-        </Button>
       </div>
     </aside>
   );
