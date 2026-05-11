@@ -6420,6 +6420,18 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
       }
+      start_conversation_from_ticket: {
+        Args: {
+          p_contact_name?: string
+          p_department_id?: string
+          p_instance_id: string
+          p_participant_label?: string
+          p_participant_type?: string
+          p_phone: string
+          p_ticket_id: string
+        }
+        Returns: Json
+      }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       transfer_conversation_to_agent: {
         Args: {
