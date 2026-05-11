@@ -141,6 +141,44 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
 
+  const handleClienteConfirmed = useCallback(() => {
+    setShowConfirmCliente(false);
+
+    // Regra: se attendance já tem ticket_id (conversa iniciada a partir de ticket), pular classificação
+    const attTicketId = (attendance as any)?.ticket_id;
+    if (attTicketId) {
+      if (!csatEnabled) {
+        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+      } else {
+        setShowCloseModal(true);
+      }
+      return;
+    }
+
+    // Regra: se setor exige ticket ao encerrar, mostrar modal de classificação
+    const requiresTicket = (convDepartment as any)?.requires_ticket_on_close === true;
+    if (requiresTicket) {
+      setShowClassifyModal(true);
+      return;
+    }
+
+    // Fluxo normal: não exige ticket
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id, attendance, convDepartment]);
+
+  const handleClassifyCompleted = useCallback(() => {
+    setShowClassifyModal(false);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id]);
+
   // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
   const { getSenderLabel } = useSenderMap();
