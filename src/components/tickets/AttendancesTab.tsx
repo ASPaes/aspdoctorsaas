@@ -95,8 +95,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name")
+        .select("id, name, requires_ticket_on_close")
         .eq("tenant_id", tid)
+        .eq("requires_ticket_on_close", true)
         .order("name");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
@@ -109,7 +110,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, isAdminOrHead, userId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, isAdminOrHead, userId, departamentos.map((d: any) => d.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -120,6 +121,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         p_status: statusFilter !== "all" ? statusFilter : null,
         p_agent_id: !isAdminOrHead && userId ? userId : (atendenteFilter !== "all" ? atendenteFilter : null),
         p_department_id: departamentoFilter !== "all" ? departamentoFilter : null,
+        p_department_ids: departamentoFilter === "all" && departamentos.length > 0 ? departamentos.map((d: any) => d.id) : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
       });
       if (error) throw error;
@@ -137,7 +139,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page, isAdminOrHead, userId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page, isAdminOrHead, userId, departamentos.map((d: any) => d.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -156,6 +158,12 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         .lte("opened_at", toISO)
         .order("opened_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      // Filtrar apenas setores com ticket obrigatório
+      const deptIds = departamentos.map((d: any) => d.id);
+      if (deptIds.length > 0 && departamentoFilter === "all") {
+        q = q.in("department_id", deptIds);
+      }
 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (atendenteFilter !== "all") q = q.eq("assigned_to", atendenteFilter);

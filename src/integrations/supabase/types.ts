@@ -6175,6 +6175,7 @@ export type Database = {
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_department_ids?: string[]
           p_status?: string
         }
         Returns: Json
@@ -6554,20 +6555,15 @@ export type Database = {
         Args: { p_fields: Json; p_ticket_id: string }
         Returns: undefined
       }
-      update_ticket_status:
-        | {
-            Args: { p_new_status: string; p_ticket_id: string }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_agendado_para?: string
-              p_new_status: string
-              p_previsao_encerramento?: string
-              p_ticket_id: string
-            }
-            Returns: undefined
-          }
+      update_ticket_status: {
+        Args: {
+          p_agendado_para?: string
+          p_new_status: string
+          p_previsao_encerramento?: string
+          p_ticket_id: string
+        }
+        Returns: undefined
+      }
       upload_ticket_attachment: {
         Args: {
           p_file_content: string
