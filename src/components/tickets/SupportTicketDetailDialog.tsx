@@ -326,6 +326,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       case "agendado_para":
       case "previsao_encerramento":
         try { return formatEvtDate(value); } catch { return value; }
+      case "cliente_contato_id":
+        return clienteContatos.find(c => c.id === value)?.nome ?? value.slice(0, 8) + "...";
       default:
         return value.length > 50 ? value.slice(0, 50) + "..." : value;
     }
