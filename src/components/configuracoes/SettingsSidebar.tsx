@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, RefreshCw, ChevronRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { DollarSign, Database, Users, Headset, Upload, ChevronRight } from "lucide-react";
 
 export const CADASTRO_SECTIONS = [
   "produtos",
