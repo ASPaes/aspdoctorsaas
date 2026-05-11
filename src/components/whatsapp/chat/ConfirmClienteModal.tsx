@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Check, Search, UserX, Loader2 } from 'lucide-react';
+import { Check, Search, UserX, Loader2, Phone } from 'lucide-react';
 import { useRelevantAttendance } from '../hooks/useRelevantAttendance';
 import { useClienteLinkSuggestion, type ClienteCandidato } from '../hooks/useClienteLinkSuggestion';
 import { useClienteSearch } from '../hooks/useClienteSearch';
@@ -28,6 +28,13 @@ interface ClienteOption {
   razao_social: string | null;
   nome_fantasia: string | null;
   fornecedor_nome?: string | null;
+  telefone_whatsapp?: string | null;
+}
+
+function clienteLabelInternal(c: { razao_social: string | null; nome_fantasia: string | null; codigo_sequencial: number | null }) {
+  const name = c.razao_social || c.nome_fantasia || 'Sem nome';
+  const code = c.codigo_sequencial != null ? `#${c.codigo_sequencial} ` : '';
+  return `${code}${name}`;
 }
 
 function clienteLabel(c: { razao_social: string | null; nome_fantasia: string | null; codigo_sequencial: number | null }) {
