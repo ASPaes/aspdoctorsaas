@@ -439,18 +439,10 @@ export default function Configuracoes() {
             ))}
           </nav>
 
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">{meta.title}</h2>
-              {meta.description && (
-                <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
-              )}
-            </div>
-            {CADASTRO_SECTIONS.includes(activeSection) && (
-              <Button onClick={handleSyncCidades} disabled={syncingCidades} variant="outline" size="sm">
-                <RefreshCw className={`h-4 w-4 ${syncingCidades ? "animate-spin" : ""}`} />
-                {syncingCidades ? "Sincronizando..." : "Sincronizar Estados/Cidades"}
-              </Button>
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold">{meta.title}</h2>
+            {meta.description && (
+              <p className="text-sm text-muted-foreground mt-1">{meta.description}</p>
             )}
           </div>
 
