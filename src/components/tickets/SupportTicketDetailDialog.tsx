@@ -16,6 +16,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
+import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText,
@@ -88,6 +89,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [updating, setUpdating] = useState(false);
   const [editClassification, setEditClassification] = useState(false);
   const [newContactOpen, setNewContactOpen] = useState(false);
+  const [startConvOpen, setStartConvOpen] = useState(false);
   const [newContactNome, setNewContactNome] = useState("");
   const [newContactFone, setNewContactFone] = useState("");
   const [newContactEmail, setNewContactEmail] = useState("");
@@ -814,11 +816,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         <Button
           size="sm"
           variant="outline"
-          disabled={!attendanceId}
-          onClick={() => toast.info("Em breve")}
+          onClick={() => setStartConvOpen(true)}
         >
           <MessageCircle className="h-4 w-4 mr-1.5" />
-          Ver chat
+          Iniciar conversa
         </Button>
         <Button size="sm" variant="outline" onClick={() => setChildOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
@@ -1182,6 +1183,19 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           openedAt={viewChatMeta.openedAt}
           closedAt={viewChatMeta.closedAt}
         />
+        <StartConversationFromTicketDialog
+          open={startConvOpen}
+          onOpenChange={setStartConvOpen}
+          ticketId={ticketId ?? ""}
+          ticketCode={ticket?.ticket_code ?? ""}
+          clienteId={ticketClienteId}
+          clienteNome={ticket?.clientes?.nome_fantasia}
+          departmentId={ticket?.department_id}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ["ticket_linked_attendances", ticketId] });
+            queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+          }}
+        />
       </>
     );
   }
@@ -1217,6 +1231,19 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         contactName={viewChatMeta.contact}
         openedAt={viewChatMeta.openedAt}
         closedAt={viewChatMeta.closedAt}
+      />
+      <StartConversationFromTicketDialog
+        open={startConvOpen}
+        onOpenChange={setStartConvOpen}
+        ticketId={ticketId ?? ""}
+        ticketCode={ticket?.ticket_code ?? ""}
+        clienteId={ticketClienteId}
+        clienteNome={ticket?.clientes?.nome_fantasia}
+        departmentId={ticket?.department_id}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["ticket_linked_attendances", ticketId] });
+          queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+        }}
       />
     </>
   );
