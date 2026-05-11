@@ -86,6 +86,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [addingComment, setAddingComment] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [editClassification, setEditClassification] = useState(false);
+  const [newContactOpen, setNewContactOpen] = useState(false);
+  const [newContactNome, setNewContactNome] = useState("");
+  const [newContactFone, setNewContactFone] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newContactCargo, setNewContactCargo] = useState("");
+  const [savingContact, setSavingContact] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
