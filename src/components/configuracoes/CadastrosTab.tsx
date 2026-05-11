@@ -74,6 +74,8 @@ interface CadastrosTabProps {
 
 export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
   const [syncing, setSyncing] = useState(false);
+  const [importTiposOpen, setImportTiposOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
   const productOptions = useProductOptions();
