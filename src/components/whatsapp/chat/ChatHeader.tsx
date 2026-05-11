@@ -129,7 +129,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     queryFn: async () => {
       const { data } = await supabase
         .from("support_departments")
-        .select("id, name")
+        .select("id, name, requires_ticket_on_close")
         .eq("id", convDeptId)
         .single();
       return data;
