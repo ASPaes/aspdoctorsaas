@@ -374,105 +374,117 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         </div>
       )}
 
-      {/* Lista */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
-        </div>
-      ) : filtered.length === 0 ? (
+      {!isLoading && departamentos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Inbox className="h-10 w-10 mb-2 opacity-50" />
-          <p className="text-sm">Nenhum atendimento encontrado</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((att: any) => {
-            const agenteName = agentes.find((a: any) => a.user_id === att.assigned_to)?.nome ?? "Não atribuído";
-            return (
-              <button
-                key={att.id}
-                onClick={() => { setSelectedId(att.id); setDetailOpen(true); }}
-                className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors space-y-1.5"
-              >
-                {/* Row 1 */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs text-primary font-semibold shrink-0">
-                    {att.attendance_code}
-                  </span>
-                  <span className="text-sm font-medium truncate min-w-0">
-                    {att.whatsapp_contacts?.name ?? "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground truncate min-w-0">
-                    · {att.clientes?.nome_fantasia ?? "Sem cliente"}
-                  </span>
-                  <div className="flex-1" />
-                  <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_CLASSES[att.status] ?? ""}`}>
-                    {STATUS_LABELS[att.status] ?? att.status}
-                  </Badge>
-                  <span className="text-[11px] text-muted-foreground font-mono shrink-0">
-                    {formatDt(att.opened_at)}
-                  </span>
-                </div>
-
-                {/* Row 2 */}
-                <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 min-w-0 truncate">
-                    <User className="h-3 w-3 shrink-0" />
-                    {agenteName}
-                  </span>
-                  <span className="truncate">· {att.support_departments?.name ?? "—"}</span>
-                  {att.status === "closed" && att.closure_type && (
-                    <Badge variant="outline" className={`text-[10px] shrink-0 ${CLOSURE_CLASSES[att.closure_type] ?? ""}`}>
-                      {CLOSURE_LABELS[att.closure_type] ?? att.closure_type}
-                    </Badge>
-                  )}
-                  <div className="flex-1" />
-                  <span className="inline-flex items-center gap-1 shrink-0 font-mono">
-                    <Clock className="h-3 w-3" />
-                    TME: {formatDur(att.wait_seconds)}
-                  </span>
-                  <span className="shrink-0 font-mono">TMA: {formatDur(att.handle_seconds)}</span>
-                </div>
-
-                {/* Row 3 — Resumo IA */}
-                {att.ai_summary && (
-                  <div className="text-xs text-muted-foreground line-clamp-1">
-                    <span className="font-medium">Resumo IA:</span> {att.ai_summary}
-                  </div>
-                )}
-
-                {/* Row 4 — Contadores */}
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MessageCircle className="h-3 w-3" />
-                    {att.msg_customer_count ?? 0} msgs cliente
-                  </span>
-                  <span>· {att.msg_agent_count ?? 0} msgs agente</span>
-                </div>
-              </button>
-            );
-          })}
+          <p className="text-sm">Nenhum setor com ticket obrigatório configurado</p>
+          <p className="text-xs mt-1">Ative "Ticket obrigatório" em Configurações → WhatsApp → Setores</p>
         </div>
       )}
 
-      {/* Paginação */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <span className="text-xs text-muted-foreground">
-            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount}
-          </span>
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-muted-foreground px-2">
-              {page + 1} / {totalPages}
-            </span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {departamentos.length > 0 && (
+        <>
+          {/* Lista */}
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Inbox className="h-10 w-10 mb-2 opacity-50" />
+              <p className="text-sm">Nenhum atendimento encontrado</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((att: any) => {
+                const agenteName = agentes.find((a: any) => a.user_id === att.assigned_to)?.nome ?? "Não atribuído";
+                return (
+                  <button
+                    key={att.id}
+                    onClick={() => { setSelectedId(att.id); setDetailOpen(true); }}
+                    className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors space-y-1.5"
+                  >
+                    {/* Row 1 */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-primary font-semibold shrink-0">
+                        {att.attendance_code}
+                      </span>
+                      <span className="text-sm font-medium truncate min-w-0">
+                        {att.whatsapp_contacts?.name ?? "—"}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate min-w-0">
+                        · {att.clientes?.nome_fantasia ?? "Sem cliente"}
+                      </span>
+                      <div className="flex-1" />
+                      <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_CLASSES[att.status] ?? ""}`}>
+                        {STATUS_LABELS[att.status] ?? att.status}
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground font-mono shrink-0">
+                        {formatDt(att.opened_at)}
+                      </span>
+                    </div>
+
+                    {/* Row 2 */}
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 min-w-0 truncate">
+                        <User className="h-3 w-3 shrink-0" />
+                        {agenteName}
+                      </span>
+                      <span className="truncate">· {att.support_departments?.name ?? "—"}</span>
+                      {att.status === "closed" && att.closure_type && (
+                        <Badge variant="outline" className={`text-[10px] shrink-0 ${CLOSURE_CLASSES[att.closure_type] ?? ""}`}>
+                          {CLOSURE_LABELS[att.closure_type] ?? att.closure_type}
+                        </Badge>
+                      )}
+                      <div className="flex-1" />
+                      <span className="inline-flex items-center gap-1 shrink-0 font-mono">
+                        <Clock className="h-3 w-3" />
+                        TME: {formatDur(att.wait_seconds)}
+                      </span>
+                      <span className="shrink-0 font-mono">TMA: {formatDur(att.handle_seconds)}</span>
+                    </div>
+
+                    {/* Row 3 — Resumo IA */}
+                    {att.ai_summary && (
+                      <div className="text-xs text-muted-foreground line-clamp-1">
+                        <span className="font-medium">Resumo IA:</span> {att.ai_summary}
+                      </div>
+                    )}
+
+                    {/* Row 4 — Contadores */}
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <MessageCircle className="h-3 w-3" />
+                        {att.msg_customer_count ?? 0} msgs cliente
+                      </span>
+                      <span>· {att.msg_agent_count ?? 0} msgs agente</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-muted-foreground">
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  {page + 1} / {totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <AttendanceDetailModal
