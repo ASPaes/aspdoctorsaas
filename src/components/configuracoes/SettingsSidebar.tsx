@@ -168,8 +168,8 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
   };
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-muted/30 border-r py-4 flex flex-col sticky top-0 h-[calc(100vh-120px)] overflow-y-auto">
-      <div className="flex-1 space-y-4">
+    <aside className="w-56 flex-shrink-0 sticky top-0 h-[calc(100vh-120px)] flex flex-col border-r bg-muted/30">
+      <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {groups.map((group) => {
           const Icon = group.icon;
           const isCadastros = group.label === "Cadastros";
