@@ -6128,6 +6128,10 @@ export type Database = {
       fn_is_business_hours: { Args: { p_tenant_id: string }; Returns: boolean }
       fn_process_ura_timeouts: { Args: never; Returns: Json }
       fn_retry_waiting_conversations: { Args: never; Returns: Json }
+      fn_user_owns_ticket_attachment_path: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
       fn_user_owns_whatsapp_media_path: {
         Args: { object_name: string }
         Returns: boolean
