@@ -86,7 +86,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [addingComment, setAddingComment] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [editClassification, setEditClassification] = useState(false);
-  const [showAgendadoFields, setShowAgendadoFields] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -94,7 +93,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   useEffect(() => {
     if (!open) {
       setEditClassification(false);
-      setShowAgendadoFields(false);
     }
   }, [open]);
 
