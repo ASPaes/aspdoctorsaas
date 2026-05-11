@@ -985,6 +985,43 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     />
   );
 
+  const newContactDialog = (
+    <Dialog open={newContactOpen} onOpenChange={setNewContactOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Novo contato</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Nome *</Label>
+            <Input value={newContactNome} onChange={(e) => setNewContactNome(e.target.value)} placeholder="Nome do contato" className="h-9" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Telefone</Label>
+              <Input value={newContactFone} onChange={(e) => setNewContactFone(e.target.value)} placeholder="(00) 00000-0000" className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">E-mail</Label>
+              <Input value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} placeholder="email@exemplo.com" className="h-9" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Cargo</Label>
+            <Input value={newContactCargo} onChange={(e) => setNewContactCargo(e.target.value)} placeholder="Ex: Gerente, Caixa" className="h-9" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setNewContactOpen(false)}>Cancelar</Button>
+          <Button onClick={handleCreateContact} disabled={savingContact || !newContactNome.trim()}>
+            {savingContact && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+            Adicionar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (isMobile) {
     return (
       <>
