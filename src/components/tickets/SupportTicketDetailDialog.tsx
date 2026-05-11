@@ -17,9 +17,10 @@ import { toast } from "sonner";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
+import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
-  TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText,
+  TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
