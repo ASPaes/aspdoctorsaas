@@ -3813,6 +3813,60 @@ export type Database = {
         }
         Relationships: []
       }
+      support_ticket_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          tenant_id: string
+          ticket_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          tenant_id: string
+          ticket_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          tenant_id?: string
+          ticket_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_attachments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_ticket_events: {
         Row: {
           content: string | null
@@ -3917,9 +3971,13 @@ export type Database = {
           prioridade: Database["public"]["Enums"]["support_ticket_prioridade"]
           produto_id: number | null
           responsavel_user_id: string | null
+          resumo_conclusivo: string | null
+          resumo_parcial: string | null
           service_type_id: string | null
           status: Database["public"]["Enums"]["support_ticket_status"]
           subcategory_id: string | null
+          tempo_agente_minutos: number | null
+          tempo_calculado_minutos: number | null
           tenant_id: string
           ticket_code: string | null
           tipo: Database["public"]["Enums"]["support_ticket_tipo"]
@@ -3951,9 +4009,13 @@ export type Database = {
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
           produto_id?: number | null
           responsavel_user_id?: string | null
+          resumo_conclusivo?: string | null
+          resumo_parcial?: string | null
           service_type_id?: string | null
           status?: Database["public"]["Enums"]["support_ticket_status"]
           subcategory_id?: string | null
+          tempo_agente_minutos?: number | null
+          tempo_calculado_minutos?: number | null
           tenant_id: string
           ticket_code?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
@@ -3985,9 +4047,13 @@ export type Database = {
           prioridade?: Database["public"]["Enums"]["support_ticket_prioridade"]
           produto_id?: number | null
           responsavel_user_id?: string | null
+          resumo_conclusivo?: string | null
+          resumo_parcial?: string | null
           service_type_id?: string | null
           status?: Database["public"]["Enums"]["support_ticket_status"]
           subcategory_id?: string | null
+          tempo_agente_minutos?: number | null
+          tempo_calculado_minutos?: number | null
           tenant_id?: string
           ticket_code?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
