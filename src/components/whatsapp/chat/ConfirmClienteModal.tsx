@@ -171,6 +171,15 @@ export function ConfirmClienteModal({
               <Badge variant="default" className="text-[10px]">Vinculado atualmente</Badge>
             )}
           </div>
+          {c.nome_fantasia && c.nome_fantasia !== c.razao_social && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{c.nome_fantasia}</p>
+          )}
+          {c.telefone_whatsapp && (
+            <p className="text-xs text-muted-foreground mt-0.5 truncate flex items-center gap-1">
+              <Phone className="h-3 w-3 shrink-0" />
+              {c.telefone_whatsapp}
+            </p>
+          )}
           {opts.subtitle && (
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{opts.subtitle}</p>
           )}
