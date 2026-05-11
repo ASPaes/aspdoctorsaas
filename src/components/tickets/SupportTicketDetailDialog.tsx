@@ -490,94 +490,97 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       <Separator />
 
       {/* Metadados grid editáveis */}
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        <div>
-          <Label className="text-[10px] uppercase text-muted-foreground">Responsável</Label>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Responsável</span>
           <Select
-            value={ticket.responsavel_user_id ?? ""}
+            value={ticket?.responsavel_user_id ?? ""}
             onValueChange={(v) => handleFieldUpdate({ responsavel_user_id: v })}
             disabled={updating}
           >
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Não atribuído" />
+            </SelectTrigger>
             <SelectContent>
-              {eventAgents.map((a) => <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>)}
+              {eventAgents.map((a) => (
+                <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <Label className="text-[10px] uppercase text-muted-foreground">Setor</Label>
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Setor</span>
           <Select
-            value={ticket.department_id ?? "none"}
+            value={ticket?.department_id ?? "none"}
             onValueChange={(v) => handleFieldUpdate({ department_id: v === "none" ? null : v })}
             disabled={updating}
           >
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="—" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">—</SelectItem>
-              {departamentos.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              {departamentos.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <p className="text-[10px] uppercase text-muted-foreground">Tipo horário</p>
-          <p className="text-sm">{ticket.tipo_horario ?? "—"}</p>
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tipo horário</span>
+          <Select
+            value={ticket?.tipo_horario ?? "comercial"}
+            onValueChange={(v) => handleFieldUpdate({ tipo_horario: v })}
+            disabled={updating}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="comercial">Comercial</SelectItem>
+              <SelectItem value="plantao">Plantão</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div>
-          <p className="text-[10px] uppercase text-muted-foreground">Aberto em</p>
-          <p className="text-sm">{formatDateTime(ticket.aberto_em)}</p>
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Aberto em</span>
+          <p className="text-sm h-8 flex items-center">{ticket?.aberto_em ? new Date(ticket.aberto_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
         </div>
-        {ticket.concluido_em && (
-          <div>
-            <p className="text-[10px] uppercase text-muted-foreground">Concluído em</p>
-            <p className="text-sm">{formatDateTime(ticket.concluido_em)}</p>
-          </div>
-        )}
-        {attendance?.attendance_code && (
-          <div>
-            <p className="text-[10px] uppercase text-muted-foreground">Cód. atendimento</p>
-            <p className="text-sm font-mono">{attendance.attendance_code}</p>
-          </div>
-        )}
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Agendado para</span>
+          <Input
+            type="datetime-local"
+            className="h-8 text-sm"
+            defaultValue={ticket?.agendado_para ? new Date(ticket.agendado_para).toISOString().slice(0, 16) : ""}
+            key={`agendado-${ticket?.agendado_para}`}
+            onBlur={(e) => {
+              const val = e.target.value;
+              if (val) handleFieldUpdate({ agendado_para: new Date(val).toISOString() });
+            }}
+            disabled={updating}
+          />
+        </div>
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Previsão encerramento</span>
+          <Input
+            type="datetime-local"
+            className="h-8 text-sm"
+            defaultValue={ticket?.previsao_encerramento ? new Date(ticket.previsao_encerramento).toISOString().slice(0, 16) : ""}
+            key={`previsao-${ticket?.previsao_encerramento}`}
+            onBlur={(e) => {
+              const val = e.target.value;
+              if (val) handleFieldUpdate({ previsao_encerramento: new Date(val).toISOString() });
+            }}
+            disabled={updating}
+          />
+        </div>
       </div>
 
-      {(showAgendadoFields || ticket?.status === "agendado" || ticket?.agendado_para || ticket?.previsao_encerramento) && (
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-[10px] uppercase text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3" />Agendado para
-            </Label>
-            <Input
-              type="datetime-local"
-              defaultValue={toLocalInput(ticket.agendado_para)}
-              onBlur={(e) => {
-                const val = e.target.value;
-                if (val) handleFieldUpdate({ agendado_para: new Date(val).toISOString() });
-              }}
-              disabled={updating}
-              className="h-8 text-xs"
-            />
-          </div>
-          <div>
-            <Label className="text-[10px] uppercase text-muted-foreground">Previsão encerramento</Label>
-            <Input
-              type="datetime-local"
-              defaultValue={toLocalInput(ticket.previsao_encerramento)}
-              onBlur={(e) => {
-                const val = e.target.value;
-                if (val) handleFieldUpdate({ previsao_encerramento: new Date(val).toISOString() });
-              }}
-              disabled={updating}
-              className="h-8 text-xs"
-            />
-          </div>
-        </div>
-      )}
-
       {/* Observação do agente */}
-      {ticket.observacao_agente && (
-        <div className="border border-border rounded-lg p-3">
-          <p className="text-[10px] uppercase text-muted-foreground mb-1">Observação do agente</p>
-          <p className="text-sm whitespace-pre-wrap">{ticket.observacao_agente}</p>
+      {ticket?.observacao_agente && (
+        <div className="space-y-1">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Observação do agente</span>
+          <p className="text-sm bg-muted/30 rounded-md px-2.5 py-1.5 whitespace-pre-wrap">{ticket.observacao_agente}</p>
         </div>
       )}
 
