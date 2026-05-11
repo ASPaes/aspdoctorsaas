@@ -108,7 +108,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
           service_types:service_type_id(nome),
-          parent:parent_ticket_id(id, ticket_code, status)
+          parent:parent_ticket_id(id, ticket_code, status),
+          whatsapp_contacts:contact_id(name, phone_number)
         `)
         .eq("id", ticketId)
         .maybeSingle();
