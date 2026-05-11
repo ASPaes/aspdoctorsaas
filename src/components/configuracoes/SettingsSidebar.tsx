@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, RefreshCw } from "lucide-react";
+import { DollarSign, Database, Users, Headset, Upload, RefreshCw, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -40,6 +40,7 @@ interface SettingsSidebarProps {
 
 export default function SettingsSidebar({ activeSection, onSectionChange, isAdmin }: SettingsSidebarProps) {
   const [syncing, setSyncing] = useState(false);
+  const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({});
 
   const handleSync = async () => {
     setSyncing(true);
@@ -147,6 +148,22 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
     },
   ];
 
+  // Auto-expand subgroup containing active section
+  useEffect(() => {
+    const cadastros = groups.find((g) => g.label === "Cadastros");
+    if (!cadastros) return;
+    for (const sg of cadastros.subgroups) {
+      if (sg.label && sg.items.some((i) => i.value === activeSection)) {
+        setOpenSubgroups((prev) => (prev[sg.label!] ? prev : { ...prev, [sg.label!]: true }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
+
+  const toggleSubgroup = (label: string) => {
+    setOpenSubgroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
   const renderItem = (item: Item, indented: boolean) => {
     const isActive = activeSection === item.value;
     return (
@@ -167,7 +184,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
   };
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-muted/30 border-r py-4 flex flex-col">
+    <aside className="w-56 flex-shrink-0 bg-muted/30 border-r py-4 flex flex-col sticky top-0 h-[calc(100vh-120px)] overflow-y-auto">
       <div className="flex-1 space-y-4">
         {groups.map((group) => {
           const Icon = group.icon;
@@ -178,14 +195,36 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
                 <Icon className="h-[14px] w-[14px]" />
                 <span>{group.label}</span>
               </div>
-              {group.subgroups.map((sg, i) => (
-                <div key={i}>
-                  {sg.label && (
-                    <div className="text-xs text-muted-foreground/70 pl-7 mt-3 mb-1">{sg.label}</div>
-                  )}
-                  {sg.items.map((item) => renderItem(item, isCadastros))}
-                </div>
-              ))}
+              {group.subgroups.map((sg, i) => {
+                const isOpen = sg.label ? !!openSubgroups[sg.label] : true;
+                return (
+                  <div key={i}>
+                    {sg.label && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSubgroup(sg.label!)}
+                        className="w-full flex items-center gap-1 pl-7 pr-3 mt-3 mb-1 text-xs text-muted-foreground/70 hover:text-foreground transition cursor-pointer"
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "h-3 w-3 transition-transform duration-200",
+                            isOpen && "rotate-90",
+                          )}
+                        />
+                        <span>{sg.label}</span>
+                      </button>
+                    )}
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-all duration-200",
+                        isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
+                      )}
+                    >
+                      {sg.items.map((item) => renderItem(item, isCadastros))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
