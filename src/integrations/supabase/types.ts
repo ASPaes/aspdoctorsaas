@@ -6592,6 +6592,7 @@ export type Database = {
         Args: { p_name: string; p_secret: string }
         Returns: string
       }
+      vault_get_secret_id_by_name: { Args: { p_name: string }; Returns: string }
       vault_update_secret: {
         Args: { p_id: string; p_secret: string }
         Returns: undefined
