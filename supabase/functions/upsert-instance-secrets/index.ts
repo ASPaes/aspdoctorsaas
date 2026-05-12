@@ -121,8 +121,26 @@ Deno.serve(async (req) => {
           p_secret: val,
           p_name: secretName,
         });
-        if (error) throw error;
-        vaultId = newId;
+        if (error) {
+          // Recover from orphan vault secret: name exists but no ref row
+          if ((error as any).code === '23505') {
+            const { data: foundId, error: lookupErr } = await supabase.rpc(
+              'vault_get_secret_id_by_name',
+              { p_name: secretName },
+            );
+            if (lookupErr || !foundId) throw error;
+            const { error: updErr } = await supabase.rpc('vault_update_secret', {
+              p_id: foundId,
+              p_secret: val,
+            });
+            if (updErr) throw updErr;
+            vaultId = foundId as string;
+          } else {
+            throw error;
+          }
+        } else {
+          vaultId = newId;
+        }
       }
 
       await supabase
