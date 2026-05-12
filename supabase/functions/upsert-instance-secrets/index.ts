@@ -134,8 +134,9 @@ Deno.serve(async (req) => {
     }
 
     return json(200, { ok: true });
-  } catch (err) {
-    console.error('[upsert-instance-secrets]', err);
-    return json(500, { error: String(err) });
+  } catch (err: any) {
+    const msg = err?.message || err?.details || err?.hint || (typeof err === 'string' ? err : JSON.stringify(err));
+    console.error('[upsert-instance-secrets]', msg, err);
+    return json(500, { error: msg });
   }
 });
