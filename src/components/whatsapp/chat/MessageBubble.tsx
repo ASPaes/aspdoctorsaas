@@ -105,7 +105,7 @@ export function MessageBubble({
     return (
       <div className={cn("flex w-full mb-1", isFromMe ? "justify-end" : "justify-start")}>
         <div className={cn(
-          "max-w-[75%] min-w-0 rounded-lg px-3 py-1.5 text-sm italic opacity-70",
+          "min-w-0 rounded-lg px-3 py-1.5 text-sm italic opacity-70",
           isFromMe
             ? "ml-auto bg-primary/30 text-primary-foreground/70 rounded-br-sm"
             : "mr-auto bg-muted/50 text-foreground/70 rounded-bl-sm"
@@ -127,7 +127,7 @@ export function MessageBubble({
     return (
       <div className={cn("flex w-full mb-1", isFromMe ? "justify-end" : "justify-start")}>
         <div className={cn(
-          "max-w-[75%] min-w-0 rounded-lg px-3 py-1.5 text-sm italic opacity-60",
+          "min-w-0 rounded-lg px-3 py-1.5 text-sm italic opacity-60",
           isFromMe
             ? "ml-auto bg-primary/30 text-primary-foreground/60 rounded-br-sm"
             : "mr-auto bg-muted/50 text-foreground/60 rounded-bl-sm"
@@ -145,7 +145,7 @@ export function MessageBubble({
   if (isFailed) {
     return (
       <div className={cn("flex w-full mb-1", isFromMe ? "justify-end" : "justify-start")}>
-        <div className={cn("flex flex-col gap-1 max-w-[75%] min-w-0", isFromMe ? "ml-auto items-end" : "mr-auto items-start")}>
+        <div className={cn("flex flex-col gap-1 min-w-0", isFromMe ? "ml-auto items-end" : "mr-auto items-start")}>
           <div className={cn(
             "rounded-lg px-3 py-1.5 text-sm relative w-full min-w-0",
             isFromMe ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted text-foreground rounded-bl-sm"
@@ -182,7 +182,7 @@ export function MessageBubble({
   const bubbleContent = (
     <div
       className={cn(
-        "max-w-[75%] min-w-0 rounded-lg px-3 py-1.5 text-sm relative",
+        "min-w-0 rounded-lg px-3 py-1.5 text-sm relative",
         isFromMe
           ? "ml-auto bg-primary text-primary-foreground rounded-br-sm"
           : "mr-auto bg-muted text-foreground rounded-bl-sm"
@@ -275,7 +275,7 @@ export function MessageBubble({
   );
 
   const messageContent = (
-    <div className="flex flex-col">
+    <div className="flex flex-col max-w-[75%]">
       {bubbleContent}
       {reactions && reactions.length > 0 && (
         <div className={cn("flex gap-0.5 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
