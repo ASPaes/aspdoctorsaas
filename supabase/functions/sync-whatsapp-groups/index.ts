@@ -13,6 +13,7 @@ interface SyncedGroup {
   name: string;
   pictureUrl?: string | null;
   participantCount?: number | null;
+  participants?: { phone: string; name: string | null; admin: boolean }[];
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -35,7 +36,7 @@ async function fetchEvolutionGroups(
     headers['apikey'] = secrets.api_key || '';
   }
 
-  const url = `${baseUrl}/group/fetchAllGroups/${identifier}?getParticipants=false`;
+  const url = `${baseUrl}/group/fetchAllGroups/${identifier}?getParticipants=true`;
   console.log(`${LOG} Evolution GET ${url}`);
   const res = await fetch(url, { headers });
   if (!res.ok) {
@@ -50,6 +51,11 @@ async function fetchEvolutionGroups(
       name: g.subject || g.name || '',
       pictureUrl: g.profilePictureUrl ?? null,
       participantCount: g.size ?? null,
+      participants: (g.participants || []).map((p: any) => ({
+        phone: (p.id || p.jid || '').replace('@s.whatsapp.net', '').replace(/@.*/, ''),
+        name: p.name || p.pushName || null,
+        admin: p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin === true || p.isSuperAdmin === true,
+      })),
     }))
     .filter((g: SyncedGroup) => !!g.jid);
 }
@@ -76,6 +82,11 @@ async function fetchZapiGroups(secrets: InstanceSecrets): Promise<SyncedGroup[]>
         name: g.name || g.subject || '',
         pictureUrl: g.image ?? null,
         participantCount: Array.isArray(g.participants) ? g.participants.length : (g.size ?? null),
+        participants: (g.participants || []).map((p: any) => ({
+          phone: (p.phone || p.id || '').replace(/\D/g, ''),
+          name: p.name || p.displayName || null,
+          admin: p.admin === true || p.isAdmin === true,
+        })),
       };
     })
     .filter((g: SyncedGroup) => !!g.jid);
@@ -140,6 +151,7 @@ Deno.serve(async (req) => {
         group_name: g.name,
         group_picture_url: g.pictureUrl ?? null,
         participant_count: g.participantCount ?? null,
+        participants: JSON.stringify(g.participants || []),
         last_synced_at: nowIso,
         updated_at: nowIso,
       }));
