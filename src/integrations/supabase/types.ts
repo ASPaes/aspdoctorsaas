@@ -4618,8 +4618,10 @@ export type Database = {
           current_instance_id: string | null
           department_id: string | null
           first_agent_message_at: string | null
+          group_jid: string | null
           id: string
           instance_id: string | null
+          is_group: boolean
           is_last_message_from_me: boolean
           last_message_at: string | null
           last_message_preview: string | null
@@ -4647,8 +4649,10 @@ export type Database = {
           current_instance_id?: string | null
           department_id?: string | null
           first_agent_message_at?: string | null
+          group_jid?: string | null
           id?: string
           instance_id?: string | null
+          is_group?: boolean
           is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
@@ -4676,8 +4680,10 @@ export type Database = {
           current_instance_id?: string | null
           department_id?: string | null
           first_agent_message_at?: string | null
+          group_jid?: string | null
           id?: string
           instance_id?: string | null
+          is_group?: boolean
           is_last_message_from_me?: boolean
           last_message_at?: string | null
           last_message_preview?: string | null
@@ -4727,6 +4733,59 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_groups: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          group_jid: string
+          group_name: string | null
+          group_picture_url: string | null
+          id: string
+          instance_id: string
+          last_synced_at: string | null
+          participant_count: number | null
+          retention_days: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          group_jid: string
+          group_name?: string | null
+          group_picture_url?: string | null
+          id?: string
+          instance_id: string
+          last_synced_at?: string | null
+          participant_count?: number | null
+          retention_days?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          group_jid?: string
+          group_name?: string | null
+          group_picture_url?: string | null
+          id?: string
+          instance_id?: string
+          last_synced_at?: string | null
+          participant_count?: number | null
+          retention_days?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_groups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
         ]
@@ -5941,6 +6000,7 @@ export type Database = {
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
+      cleanup_group_messages: { Args: never; Returns: undefined }
       cleanup_notification_dispatch_queue: { Args: never; Returns: number }
       collect_db_metrics_snapshot: { Args: never; Returns: undefined }
       collect_tenant_daily_metrics:
