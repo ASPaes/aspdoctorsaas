@@ -21,7 +21,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
@@ -515,6 +517,13 @@ export default function Clientes() {
     return m;
   }, [lookups.unidadesBase.data]);
 
+  // Módulos filtrados pelo produto selecionado (se houver)
+  const filteredModulos = useMemo(() => {
+    const all = lookups.produtoModulos.data || [];
+    if (!produtoId) return all;
+    return all.filter((m) => String(m.produto_id) === produtoId);
+  }, [lookups.produtoModulos.data, produtoId]);
+
   // Ticket Médio — calculado sobre TODA a base filtrada (não só a página atual),
   // dividido por todos os clientes (incluindo MRR=0), mesma fórmula do Dashboard:
   //   ticket_medio = SUM(mensalidade + deltas_ativos) / COUNT(clientes)
@@ -634,6 +643,13 @@ export default function Clientes() {
     if (segmentoId) badges.push({ key: "seg", label: "Segmento", displayValue: resolveLabel(segmentoId, lookups.segmentos.data), onClear: () => updateFilter("segmentoId", "") });
     if (funcionarioId) badges.push({ key: "func", label: "Funcionário", displayValue: resolveLabel(funcionarioId, lookups.funcionarios.data), onClear: () => updateFilter("funcionarioId", "") });
     if (fornecedorId) badges.push({ key: "forn", label: "Fornecedor", displayValue: resolveLabel(fornecedorId, lookups.fornecedores.data), onClear: () => updateFilter("fornecedorId", "") });
+    if (moduloIds.length > 0) {
+      const nomes = moduloIds.map((mid) => {
+        const mod = (lookups.produtoModulos.data || []).find((m) => m.id === mid);
+        return mod?.nome || mid;
+      }).join(", ");
+      badges.push({ key: "mod", label: "Módulos", displayValue: nomes, onClear: () => updateFilter("moduloIds", []) });
+    }
     if (estadoId) badges.push({ key: "est", label: "Estado", displayValue: resolveLabel(estadoId, lookups.estados.data as any), onClear: () => updateFilter("estadoId", "") });
     if (cidadeId) badges.push({ key: "cid", label: "Cidade", displayValue: resolveLabel(cidadeId, lookups.cidades.data), onClear: () => updateFilter("cidadeId", "") });
     if (motivoCancelamentoId) badges.push({ key: "mot", label: "Motivo Cancel.", displayValue: resolveLabel(motivoCancelamentoId, lookups.motivosCancelamento.data?.map(m => ({ id: m.id, nome: m.descricao }))), onClear: () => updateFilter("motivoCancelamentoId", "") });
@@ -649,7 +665,7 @@ export default function Clientes() {
     if (margemMin || margemMax) badges.push({ key: "marg", label: "Margem", displayValue: `${margemMin || "…"} – ${margemMax || "…"}`, onClear: () => { updateFilter("margemMin", ""); updateFilter("margemMax", ""); } });
 
     return badges;
-  }, [unidadeBaseQuick, somenteMatrizes, recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
+  }, [unidadeBaseQuick, somenteMatrizes, recorrenciaAdv, modeloContratoId, produtoId, moduloIds, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
 
   // Helper for Select value/onChange with __all__ pattern
   const selVal = (v: string) => v || "__all__";
@@ -939,6 +955,49 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={(v) => updateFilter("lucroMin", v)} onMaxChange={(v) => updateFilter("lucroMax", v)} prefix="R$" />
               <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={(v) => updateFilter("margemMin", v)} onMaxChange={(v) => updateFilter("margemMax", v)} prefix="%" />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Módulos</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 w-full justify-between text-xs font-normal">
+                      <span className="truncate">
+                        {moduloIds.length > 0
+                          ? `${moduloIds.length} módulo(s) selecionado(s)`
+                          : "Selecionar módulos..."}
+                      </span>
+                      <ChevronDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[260px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar módulo..." className="h-8" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum módulo encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredModulos.map((mod) => {
+                            const isSelected = moduloIds.includes(mod.id);
+                            return (
+                              <CommandItem
+                                key={mod.id}
+                                value={mod.nome}
+                                onSelect={() => {
+                                  const next = isSelected
+                                    ? moduloIds.filter((id) => id !== mod.id)
+                                    : [...moduloIds, mod.id];
+                                  updateFilter("moduloIds", next);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                {mod.nome}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
               <div className="flex items-center gap-2 pt-5">
                 <Checkbox
                   id="somente-matrizes"
