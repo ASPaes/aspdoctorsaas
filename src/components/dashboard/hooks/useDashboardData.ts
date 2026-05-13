@@ -196,9 +196,9 @@ export function useDashboardData(filters: DashboardFilters) {
       // Build set of ALL clients matching current filters (ativos + cancelados no período)
       // to correctly filter movimentos by fornecedor/unidade
       const allClientesFiltered = new Set([
-        ...(clientesRaw || []).map(c => c.id),
-        ...(cancelamentos || []).map(c => c.id),
-        ...(novosClientes || []).map(c => c.id),
+        ...(clientesAtivos || []).map(c => c.id),
+        ...(cancelamentosFilt || []).map(c => c.id),
+        ...(novosClientesFilt || []).map(c => c.id),
       ]);
 
       const needsClientFilter = !!(filters.fornecedorId || filters.unidadeBaseId);
@@ -582,11 +582,11 @@ export function useDashboardData(filters: DashboardFilters) {
         .sort((a, b) => b.value - a.value)
         .slice(0, 10);
       const porOrigemVenda = buildDistribution(activeClients, 'origem_venda_id', origemMap);
-      const porMotivoCancelamento = buildDistribution(cancelamentos || [], 'motivo_cancelamento_id', motivoMap);
+      const porMotivoCancelamento = buildDistribution(cancelamentosFilt || [], 'motivo_cancelamento_id', motivoMap);
 
       // Vendas: distribuições baseadas nos novos clientes do período
       const porOrigemVendaNovos = buildDistribution(novosClientes || [], 'origem_venda_id', origemMap);
-      const porFornecedorNovos = buildDistribution(novosClientes || [], 'fornecedor_id', fornecedorMap);
+      const porFornecedorNovos = buildDistribution(novosClientesFilt || [], 'fornecedor_id', fornecedorMap);
 
       // Top cidades by estado for map drill-down
       const topCidadesByEstado: Record<string, { nome: string; qtd: number }[]> = {};
@@ -664,7 +664,7 @@ export function useDashboardData(filters: DashboardFilters) {
       allFuncionarios?.forEach(f => { funcMap[f.id] = f.nome; });
 
       // Cancelados list
-      const canceladosListItems: CanceladoListItem[] = (cancelamentos || [])
+      const canceladosListItems: CanceladoListItem[] = (cancelamentosFilt || [])
         .map(c => {
           const dataRef = c.data_ativacao || c.data_venda || c.data_cadastro;
           const diasAtivo = dataRef && c.data_cancelamento
@@ -685,7 +685,7 @@ export function useDashboardData(filters: DashboardFilters) {
       setCanceladosList(canceladosListItems);
 
       // Novos clientes list
-      const novosListItems: NovoClienteListItem[] = (novosClientes || [])
+      const novosListItems: NovoClienteListItem[] = (novosClientesFilt || [])
         .map(c => ({
           id: c.id,
           razaoSocial: c.razao_social || '(sem nome)',
