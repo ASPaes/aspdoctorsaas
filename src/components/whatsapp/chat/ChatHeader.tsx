@@ -692,6 +692,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           setShowScheduleDialog(false);
         }}
       />
+      <GroupParticipantsSheet
+        open={showParticipants}
+        onOpenChange={setShowParticipants}
+        groupJid={(conversation as any)?.group_jid || ""}
+        instanceId={conversation?.instance_id || ""}
+      />
     </div>
   );
 }
