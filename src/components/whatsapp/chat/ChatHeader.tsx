@@ -497,7 +497,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Tooltip>
           )}
 
-          {isScheduled && (
+          {!isGroupConv && isScheduled && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-amber-500/50 text-amber-600 dark:text-amber-400">
