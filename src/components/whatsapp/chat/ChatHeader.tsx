@@ -6,8 +6,9 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users } from "lucide-react";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
+import GroupParticipantsSheet from "./GroupParticipantsSheet";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreateCSTicketFromChat } from "./CreateCSTicketFromChat";
@@ -68,6 +69,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -314,6 +316,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
           {/* Primary actions */}
           <div className="flex items-center gap-0.5 shrink-0">
+            {(conversation as any)?.is_group && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowParticipants(true)}>
+                    <Users className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Participantes do grupo</TooltipContent>
+              </Tooltip>
+            )}
+
             {presenceBlocked ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -678,6 +691,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           unscheduleAttendance(attendance.id);
           setShowScheduleDialog(false);
         }}
+      />
+      <GroupParticipantsSheet
+        open={showParticipants}
+        onOpenChange={setShowParticipants}
+        groupJid={(conversation as any)?.group_jid || ""}
+        instanceId={conversation?.instance_id || ""}
       />
     </div>
   );
