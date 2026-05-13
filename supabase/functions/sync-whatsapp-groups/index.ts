@@ -13,7 +13,7 @@ interface SyncedGroup {
   name: string;
   pictureUrl?: string | null;
   participantCount?: number | null;
-  participants?: { phone: string; name: string | null; admin: boolean }[];
+  participants?: { phone: string; name: string | null; admin: boolean; isLid?: boolean }[];
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -51,11 +51,18 @@ async function fetchEvolutionGroups(
       name: g.subject || g.name || '',
       pictureUrl: g.profilePictureUrl ?? null,
       participantCount: g.size ?? null,
-      participants: (g.participants || []).map((p: any) => ({
-        phone: (p.id || p.jid || '').replace('@s.whatsapp.net', '').replace(/@.*/, ''),
-        name: p.name || p.pushName || null,
-        admin: p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin === true || p.isSuperAdmin === true,
-      })),
+      participants: (g.participants || []).map((p: any) => {
+        // Evolution retorna id como: "5547999@s.whatsapp.net", "5547999:42@s.whatsapp.net", ou "267542@lid"
+        const rawId = p.id || p.jid || '';
+        const isLid = rawId.includes('@lid') || (!rawId.includes('@s.whatsapp.net') && !rawId.includes('@g.us'));
+        let phone = rawId.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '').replace(/:\d+$/, '');
+        return {
+          phone,
+          name: p.name || p.pushName || p.notify || null,
+          admin: p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin === true || p.isSuperAdmin === true,
+          isLid,
+        };
+      }),
     }))
     .filter((g: SyncedGroup) => !!g.jid);
 }
@@ -151,7 +158,7 @@ Deno.serve(async (req) => {
         group_name: g.name,
         group_picture_url: g.pictureUrl ?? null,
         participant_count: g.participantCount ?? null,
-        participants: JSON.stringify(g.participants || []),
+        participants: g.participants || [],
         last_synced_at: nowIso,
         updated_at: nowIso,
       }));
