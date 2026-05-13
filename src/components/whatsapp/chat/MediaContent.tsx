@@ -91,7 +91,7 @@ export function MediaContent({
   const resolvedInlineUrl = useProxyUrl(messageId, mediaUrl, "inline");
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  if (messageType === "document" || (messageType !== "image" && messageType !== "audio" && messageType !== "video")) {
+  if (messageType === "document" || (messageType !== "image" && messageType !== "sticker" && messageType !== "audio" && messageType !== "video")) {
     return (
       <AttachmentCard
         messageId={messageId}
