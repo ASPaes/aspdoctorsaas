@@ -153,10 +153,10 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
           <div key={`${idx}-${i}`} className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">{frag.value}</label>
             <Input
-              ref={i === 0 ? firstInputRef : undefined}
+              ref={(el) => (inputRefs.current[i] = el)}
               value={values[idx] || ""}
               onChange={(e) => setValues((v) => ({ ...v, [idx]: e.target.value }))}
-              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onKeyDown={(e) => handleKeyDown(e, i)}
               placeholder={`Digite: ${frag.value.toLowerCase()}`}
               className={cn(
                 "h-8 text-sm",
