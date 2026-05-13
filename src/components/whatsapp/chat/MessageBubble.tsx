@@ -213,6 +213,12 @@ export function MessageBubble({
         return null;
       })()}
 
+      {!isFromMe && msg.sender_name && (
+        <p className="text-[10px] font-semibold mb-0.5 text-foreground/70">
+          {msg.sender_name}
+        </p>
+      )}
+
       {msg.quoted_message_id && (
         <div className={cn(
           "text-[10px] px-2 py-1 rounded mb-1 border-l-2",

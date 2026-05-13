@@ -865,6 +865,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     media_filename: mediaFilename || null, media_ext: mediaFilename?.split('.').pop()?.toLowerCase() || null,
     media_kind: mediaKind(messageType), is_from_me: fromMe, status: fromMe ? 'sent' : 'received',
     quoted_message_id: quotedMessageId || null, timestamp, tenant_id: tenantId, instance_id: instanceId,
+    sender_name: !fromMe ? (pushName || null) : null,
     metadata: (() => {
       const base: Record<string, any> = { source: providerType };
       if ((messageType === 'contact' || messageType === 'contacts') && msg.rawPayload) {
