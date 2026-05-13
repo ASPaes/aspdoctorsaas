@@ -422,3 +422,187 @@ export const FIELD_DESCRIPTIONS: Record<string, { section: string; why: string }
   cert_a1_ultima_venda_em:    { section: 'Certificado A1', why: 'Data da última venda do certificado digital. Usado para calcular ciclo de renovação e projetar receita futura.' },
   matriz_codigo_sequencial:   { section: 'Cliente', why: 'Código sequencial da empresa matriz. Vincula filiais à sua empresa-mãe para relatórios consolidados. Preencha com o número do Cód. Seq. da matriz (ex: 42).' },
 };
+
+// ═══════════════════════════════════════════════════════════════
+// MODO DETALHADO — 4 templates independentes
+// ═══════════════════════════════════════════════════════════════
+
+// --- 1. DETALHADO: CLIENTES (só cadastral) ---
+export const DETAILED_CLIENTES_FIELDS: Record<string, string> = {
+  'Razão Social': 'razao_social',
+  'Nome Fantasia': 'nome_fantasia',
+  'CNPJ': 'cnpj',
+  'Email': 'email',
+  'WhatsApp': 'telefone_whatsapp',
+  'Unidade Base': 'unidade_base',
+  'Data de Cadastro': 'data_cadastro',
+  'Tipo de Pessoa': 'tipo_pessoa',
+  'Área de Atuação': 'area_atuacao',
+  'Segmento': 'segmento',
+  'Imposto (%)': 'imposto_percentual',
+  'Custo Fixo (%)': 'custo_fixo_percentual',
+  'Dia Vencimento': 'dia_vencimento_mrr',
+  'Forma Pagto Mensalidade': 'forma_pagamento_mensalidade',
+  'CEP': 'cep',
+  'Estado (UF)': 'estado',
+  'Cidade': 'cidade',
+  'Endereço': 'endereco',
+  'Número': 'numero',
+  'Bairro': 'bairro',
+  'Complemento': 'complemento',
+  'Nome do Contato': 'contato_nome',
+  'CPF do Contato': 'contato_cpf',
+  'Telefone do Contato': 'contato_fone',
+  'WhatsApp Contato': 'telefone_whatsapp_contato',
+  'Aniversário do Contato': 'contato_aniversario',
+  'Observação do Cliente': 'observacao_cliente',
+  'Cancelado? (sim/nao)': 'cancelado',
+  'Data Cancelamento': 'data_cancelamento',
+  'Motivo Cancelamento': 'motivo_cancelamento',
+  'Obs. Cancelamento': 'observacao_cancelamento',
+  'Código da Matriz': 'matriz_codigo_sequencial',
+};
+
+export const DETAILED_CLIENTES_REQUIRED = ['razao_social','nome_fantasia','cnpj','email','telefone_whatsapp','unidade_base','data_cadastro'];
+
+export const DETAILED_CLIENTES_FK = FK_FIELDS.filter(f => ['unidade_base','area_atuacao','segmento','forma_pagamento_mensalidade','motivo_cancelamento'].includes(f.csvColumn));
+
+// --- 2. DETALHADO: PRODUTOS (CNPJ como chave) ---
+export const DETAILED_PRODUTOS_FIELDS: Record<string, string> = {
+  'CNPJ': 'cnpj',
+  'Produto': 'produto',
+  'Mensalidade (R$)': 'vlr_mensal',
+  'Custo Operação (R$)': 'vlr_custo',
+  'Valor de Ativação (R$)': 'vlr_ativacao',
+  'Data de Ativação': 'data_ativacao',
+  'Fornecedor': 'fornecedor',
+  'Código no Fornecedor': 'codigo_fornecedor',
+  'Link Portal Fornecedor': 'link_portal_fornecedor',
+  'Data da Venda': 'data_venda',
+  'Recorrência': 'recorrencia',
+  'Data de Reajuste': 'data_reajuste',
+  'Origem da Venda': 'origem_venda',
+  'Funcionário': 'funcionario',
+  'Modelo de Contrato': 'modelo_contrato',
+  'Forma Pagto Ativação': 'forma_pagamento_ativacao',
+  'Obs. Negociação': 'observacao_negociacao',
+};
+
+export const DETAILED_PRODUTOS_REQUIRED = ['cnpj','produto','vlr_mensal','vlr_custo'];
+
+export const DETAILED_PRODUTOS_FK = FK_FIELDS.filter(f => ['produto','fornecedor','origem_venda','funcionario','modelo_contrato','forma_pagamento_ativacao'].includes(f.csvColumn));
+
+// --- 3. DETALHADO: MÓDULOS (CNPJ + Produto como chave) ---
+export const DETAILED_MODULOS_FIELDS: Record<string, string> = {
+  'CNPJ': 'cnpj',
+  'Produto': 'produto',
+  'Módulo': 'modulo',
+  'Valor Mensal (R$)': 'vlr_mensal',
+  'Custo (R$)': 'vlr_custo',
+  'Valor de Ativação (R$)': 'vlr_ativacao',
+  'Data de Ativação': 'data_ativacao',
+};
+
+export const DETAILED_MODULOS_REQUIRED = ['cnpj','produto','modulo','vlr_mensal'];
+
+export const DETAILED_MODULOS_FK: typeof FK_FIELDS = [
+  { csvColumn: 'produto', label: 'Produto', table: 'produtos', searchField: 'nome', dbField: 'produto_id', tenantScoped: true, description: 'Produto vinculado ao módulo.' },
+  { csvColumn: 'modulo', label: 'Módulo', table: 'produto_modulos', searchField: 'nome', dbField: 'modulo_id', tenantScoped: true, description: 'Módulo do catálogo de produtos.' },
+];
+
+// --- 4. DETALHADO: CONTRATOS (CNPJ + Produto como chave) ---
+export const DETAILED_CONTRATOS_FIELDS: Record<string, string> = {
+  'CNPJ': 'cnpj',
+  'Produto': 'produto',
+  'Tipo': 'tipo',
+  'Data da Venda': 'data_venda',
+  'Data Início': 'data_inicio',
+  'Data Fim': 'data_fim',
+  'Prazo (meses)': 'prazo_meses',
+  'Fidelidade (meses)': 'fidelidade_meses',
+  'Recorrência': 'recorrencia',
+  'Índice Reajuste': 'indice_reajuste',
+  'Data Próximo Reajuste': 'data_proximo_reajuste',
+  'Modelo de Contrato': 'modelo_contrato',
+  'Funcionário': 'funcionario',
+  'Origem da Venda': 'origem_venda',
+  'Forma Pagto Ativação': 'forma_pagamento_ativacao',
+  'Vlr Total Mensal': 'vlr_total_mensal',
+  'Vlr Total Ativação': 'vlr_total_ativacao',
+  'Link Assinatura (D4Sign)': 'link_assinatura',
+  'Observações': 'observacoes',
+  'Status': 'status',
+  'Data Cancelamento': 'cancelado_em',
+  'Motivo Cancelamento': 'motivo_cancelamento',
+};
+
+export const DETAILED_CONTRATOS_REQUIRED = ['cnpj','produto','tipo'];
+
+export const DETAILED_CONTRATOS_FK = FK_FIELDS.filter(f => ['produto','modelo_contrato','funcionario','origem_venda','forma_pagamento_ativacao'].includes(f.csvColumn));
+
+// --- Tipo de importação detalhada ---
+export type DetailedImportType = 'clientes' | 'produtos' | 'modulos' | 'contratos';
+
+// --- Helper: retorna config por tipo ---
+export function getDetailedConfig(type: DetailedImportType) {
+  switch (type) {
+    case 'clientes':
+      return { fields: DETAILED_CLIENTES_FIELDS, required: DETAILED_CLIENTES_REQUIRED, fk: DETAILED_CLIENTES_FK, label: 'Clientes', target: 'clientes' };
+    case 'produtos':
+      return { fields: DETAILED_PRODUTOS_FIELDS, required: DETAILED_PRODUTOS_REQUIRED, fk: DETAILED_PRODUTOS_FK, label: 'Produtos', target: 'cliente_produtos' };
+    case 'modulos':
+      return { fields: DETAILED_MODULOS_FIELDS, required: DETAILED_MODULOS_REQUIRED, fk: DETAILED_MODULOS_FK, label: 'Módulos', target: 'cliente_produto_modulos' };
+    case 'contratos':
+      return { fields: DETAILED_CONTRATOS_FIELDS, required: DETAILED_CONTRATOS_REQUIRED, fk: DETAILED_CONTRATOS_FK, label: 'Contratos', target: 'contratos' };
+  }
+}
+
+// --- CSV downloads para modo detalhado ---
+function generateDetailedCsv(fields: Record<string, string>): string {
+  return Object.keys(fields).join(';');
+}
+
+export function downloadDetailedClientesCsv() {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + generateDetailedCsv(DETAILED_CLIENTES_FIELDS)], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `template_detalhado_clientes_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadDetailedProdutosCsv() {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + generateDetailedCsv(DETAILED_PRODUTOS_FIELDS)], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `template_detalhado_produtos_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadDetailedModulosCsv() {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + generateDetailedCsv(DETAILED_MODULOS_FIELDS)], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `template_detalhado_modulos_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadDetailedContratosCsv() {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + generateDetailedCsv(DETAILED_CONTRATOS_FIELDS)], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `template_detalhado_contratos_${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
