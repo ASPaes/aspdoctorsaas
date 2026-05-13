@@ -219,45 +219,36 @@ async function closeAttendance(
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
+  // Constrói contexto de envio ANTES do close (precisa ler conversa ativa)
   const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
-  const nowIso = new Date().toISOString();
 
-  // Atualiza attendance: status closed (guard idempotência via .eq status)
-  const { error: attErr, data: updRows } = await supabase
-    .from("support_attendances")
-    .update({
-      status: "closed",
-      closed_at: nowIso,
-      closed_reason: "inactivity",
-      closure_type: "inactivity_auto",
-      updated_at: nowIso,
-    })
-    .eq("id", att.id)
-    .eq("status", "in_progress")
-    .select("id");
+  // Fecha attendance + conversa ATOMICAMENTE (single transaction via RPC)
+  // Evita janela onde attendance está closed mas conversa ainda active,
+  // causando flicker na UI (conversa aparece em "Atendendo" com badge "Encerrado")
+  const { data: result, error: rpcErr } = await supabase
+    .rpc("fn_close_attendance_atomic", {
+      p_attendance_id: att.id,
+      p_closed_reason: "inactivity",
+      p_closure_type: "inactivity_auto",
+    });
 
-  if (attErr) {
-    log("erro ao fechar attendance", attErr);
+  if (rpcErr) {
+    log("erro na RPC fn_close_attendance_atomic", rpcErr);
     return "skipped";
   }
 
-  // Se update não afetou nenhuma linha (status já mudou em paralelo), não envia
-  if (!updRows || updRows.length === 0) {
-    log("attendance não estava mais in_progress — skip mensagem");
+  if (!result?.success) {
+    log("RPC retornou falha", result);
     return "skipped";
   }
 
-  await supabase
-    .from("whatsapp_conversations")
-    .update({ status: "closed", updated_at: nowIso })
-    .eq("id", att.conversation_id);
-
+  // Envia mensagem de encerramento DEPOIS do commit atômico
   if (built) {
     await sendAndPersistAutoMessage(
       supabase,
       built.ctx,
       att.conversation_id,
-      `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, é só nos enviar uma nova mensagem. \u{1F60A}`,
+      `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, \u00e9 s\u00f3 nos enviar uma nova mensagem. \u{1F60A}`,
       {
         system: true,
         attendance_event: "closed",
