@@ -279,13 +279,22 @@ function validateRow(values: Record<string, string>): string[] {
 /*  Step Indicator                                                     */
 /* ------------------------------------------------------------------ */
 
-function StepIndicator({ current }: { current: number }) {
-  const steps = [
-    { num: 1, label: "Template" },
-    { num: 2, label: "Upload" },
-    { num: 3, label: "Relacionados" },
-    { num: 4, label: "Importar" },
-  ];
+function StepIndicator({ current, mode }: { current: number; mode: 'selecting' | 'simplified' | 'detailed' }) {
+  if (mode === 'selecting') return null;
+
+  const steps = mode === 'detailed'
+    ? [
+        { num: 1, label: "Hub" },
+        { num: 2, label: "Upload" },
+        { num: 3, label: "Relacionados" },
+        { num: 4, label: "Importar" },
+      ]
+    : [
+        { num: 1, label: "Template" },
+        { num: 2, label: "Upload" },
+        { num: 3, label: "Relacionados" },
+        { num: 4, label: "Importar" },
+      ];
 
   return (
     <div className="flex items-center justify-center gap-2 mb-6">
