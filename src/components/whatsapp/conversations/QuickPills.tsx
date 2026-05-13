@@ -43,7 +43,7 @@ export function QuickPills({ active, onChange, inProgressCount, waitingCount, cl
               active === p.key
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-accent",
-              p.key === "groups" && groupsHasUnread && "bg-orange-500/20 text-orange-400 border border-orange-500/50 animate-pulse"
+              p.key === "groups" && groupsHasUnread && "bg-orange-500/20 text-orange-400 border border-orange-500/50"
             )}
           >
             {p.label}
