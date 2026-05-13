@@ -8,6 +8,7 @@ interface Props {
   closedCount: number;
   afterHoursCount: number;
   groupsCount: number;
+  groupsHasUnread?: boolean;
 }
 
 const pills = [
@@ -19,7 +20,7 @@ const pills = [
   { key: "closed", label: "Encerrados" },
 ];
 
-export function QuickPills({ active, onChange, inProgressCount, waitingCount, closedCount, afterHoursCount, groupsCount }: Props) {
+export function QuickPills({ active, onChange, inProgressCount, waitingCount, closedCount, afterHoursCount, groupsCount, groupsHasUnread }: Props) {
   const getCount = (key: string) => {
     if (key === "in_progress") return inProgressCount;
     if (key === "waiting") return waitingCount;
@@ -41,7 +42,8 @@ export function QuickPills({ active, onChange, inProgressCount, waitingCount, cl
               "px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
               active === p.key
                 ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-accent"
+                : "bg-muted text-muted-foreground hover:bg-accent",
+              p.key === "groups" && groupsHasUnread && "bg-orange-500/20 text-orange-400 border border-orange-500/50 animate-pulse"
             )}
           >
             {p.label}
