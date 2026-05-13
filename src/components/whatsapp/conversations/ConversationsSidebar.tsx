@@ -531,6 +531,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           waitingCount={pillCounts.waiting}
           closedCount={pillCounts.closed}
           afterHoursCount={pillCounts.afterHours}
+          groupsCount={pillCounts.groups}
         />
       </div>
       )}
