@@ -23,86 +23,49 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-async function fetchEvolutionContactsMap(
+async function fetchGroupParticipantsEvolution(
   secrets: InstanceSecrets,
   identifier: string,
   providerType: string,
-): Promise<Map<string, { phone: string; name: string | null }>> {
-  const map = new Map<string, { phone: string; name: string | null }>();
-  const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
-  const headers: Record<string, string> = {};
-  if (providerType === 'cloud') {
-    headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
-  } else {
-    headers['apikey'] = secrets.api_key || '';
-  }
-
-  // Tenta múltiplos endpoints da Evolution API pra encontrar mapeamento LID → telefone
-  const endpoints = [
-    { method: 'POST', url: `${baseUrl}/chat/findContacts/${identifier}`, body: JSON.stringify({ where: {} }) },
-    { method: 'GET', url: `${baseUrl}/chat/contacts/${identifier}`, body: null },
-    { method: 'POST', url: `${baseUrl}/chat/findContacts/${identifier}`, body: JSON.stringify({ where: { id: { contains: '@s.whatsapp.net' } } }) },
-  ];
-
-  for (const ep of endpoints) {
-    try {
-      const fetchOpts: RequestInit = { method: ep.method, headers: { ...headers } };
-      if (ep.body) {
-        fetchOpts.body = ep.body;
-        (fetchOpts.headers as Record<string, string>)['Content-Type'] = 'application/json';
-      }
-
-      console.log(`${LOG} Trying contacts endpoint: ${ep.method} ${ep.url}`);
-      const res = await fetch(ep.url, fetchOpts);
-
-      if (!res.ok) {
-        console.log(`${LOG} Endpoint returned ${res.status} — trying next`);
-        continue;
-      }
-
-      const raw = await res.json();
-      const contacts = Array.isArray(raw) ? raw : (raw?.contacts || raw?.data || []);
-
-      console.log(`${LOG} Endpoint returned ${contacts.length} contacts. Sample: ${JSON.stringify(contacts[0] || {}).substring(0, 300)}`);
-
-      if (contacts.length === 0) continue;
-
-      for (const c of contacts) {
-        const rawId = c.id || c.jid || '';
-        const rawLid = c.lid || c.lidJid || '';
-        const pushName = c.pushName || c.name || c.notify || c.verifiedName || c.shortName || null;
-
-        // Extrair telefone do id (5547999999999@s.whatsapp.net ou 5547999999999:42@s.whatsapp.net)
-        const phoneFromId = rawId.replace('@s.whatsapp.net', '').replace(/@.*/, '').replace(/:\d+$/, '');
-        // Extrair LID limpo
-        const lidClean = rawLid.replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '');
-
-        const isValidPhone = phoneFromId && /^\d{10,15}$/.test(phoneFromId) && !phoneFromId.startsWith('0');
-
-        // Mapear LID → telefone
-        if (lidClean && isValidPhone) {
-          map.set(lidClean, { phone: phoneFromId, name: pushName });
-        }
-        // Mapear telefone → telefone (pra participantes sem LID)
-        if (isValidPhone) {
-          map.set(phoneFromId, { phone: phoneFromId, name: pushName });
-        }
-      }
-
-      if (map.size > 0) {
-        console.log(`${LOG} Contact map built: ${map.size} entries from ${ep.url}`);
-        break; // Sucesso, não tenta próximo endpoint
-      }
-    } catch (err) {
-      console.error(`${LOG} Error trying endpoint:`, err);
+  groupJid: string,
+): Promise<{ phone: string; name: string | null; admin: boolean; isLid: boolean }[]> {
+  try {
+    const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+    const headers: Record<string, string> = {};
+    if (providerType === 'cloud') {
+      headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
+    } else {
+      headers['apikey'] = secrets.api_key || '';
     }
-  }
 
-  if (map.size === 0) {
-    console.log(`${LOG} No contacts could be resolved from any endpoint`);
-  }
+    const url = `${baseUrl}/group/findGroupInfos/${identifier}?groupJid=${encodeURIComponent(groupJid)}`;
+    console.log(`${LOG} Fetching participants for group ${groupJid}`);
+    const res = await fetch(url, { headers });
 
-  return map;
+    if (!res.ok) {
+      console.log(`${LOG} findGroupInfos returned ${res.status} for ${groupJid}`);
+      return [];
+    }
+
+    const data = await res.json();
+    const participants = data?.participants || [];
+
+    return participants.map((p: any) => {
+      const rawPhone = p.phoneNumber || p.id || '';
+      const phone = rawPhone.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '');
+      const isRealPhone = rawPhone.includes('@s.whatsapp.net');
+
+      return {
+        phone,
+        name: p.pushName || p.name || p.notify || null,
+        admin: p.admin === 'admin' || p.admin === 'superadmin',
+        isLid: !isRealPhone,
+      };
+    });
+  } catch (err) {
+    console.error(`${LOG} fetchGroupParticipantsEvolution error for ${groupJid}:`, err);
+    return [];
+  }
 }
 
 async function fetchEvolutionGroups(
