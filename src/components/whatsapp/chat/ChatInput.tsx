@@ -438,7 +438,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         )}
 
         <div className="relative flex gap-2 items-end">
-          {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} />}
+          {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} selectedIndex={macroSelectedIndex} onClose={() => setShowMacroSuggestions(false)} />}
 
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked} />
 
