@@ -109,17 +109,19 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cancelamento', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
-      const cancelamentosQtd = cancelamentos?.length || 0;
-      const mrrCancelado = cancelamentos?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
+      const cancelamentosFilt = fornecedorClientIds
+        ? (cancelamentos || []).filter(c => fornecedorClientIds!.has(c.id))
+        : (cancelamentos || []);
+      const cancelamentosQtd = cancelamentosFilt.length;
+      const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
       // Early churn (≤90 dias)
-      const earlyChurn = cancelamentos?.filter(c => {
+      const earlyChurn = cancelamentosFilt.filter(c => {
         if (!c.data_cadastro || !c.data_cancelamento) return false;
         return differenceInDays(new Date(c.data_cancelamento), new Date(c.data_cadastro)) <= 90;
-      }) || [];
+      });
       const cancelamentosEarly = earlyChurn.length;
       const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
