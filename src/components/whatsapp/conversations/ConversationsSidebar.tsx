@@ -181,7 +181,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     for (const conv of conversations) {
       // Grupos são separados — não entram nas pills normais
       if ((conv as any).is_group === true) {
-        groups++;
+        groups += (conv.unread_count || 0);
         continue;
       }
 
