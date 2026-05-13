@@ -44,6 +44,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
+  const [macroSelectedIndex, setMacroSelectedIndex] = useState(0);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
