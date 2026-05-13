@@ -8,6 +8,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, parseISO } from "date-fns";
 import { cn, escapeLike } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,7 @@ export default function Clientes() {
     searchText, status, unidadeBaseQuick, somenteMatrizes,
     periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId,
-    areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, moduloIds,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax,
     sortField: sortFieldRaw, sortDir: sortDirRaw, page, filtersOpen,
@@ -134,17 +135,54 @@ export default function Clientes() {
       }
       return ids;
     },
-    staleTime: 60_000,
+  });
+
+  // Pre-fetch client IDs from cliente_produtos for fornecedor/produto/modulo filters
+  const hasProductStructureFilters = !!(fornecedorId || produtoId || moduloIds.length > 0);
+
+  const { data: productFilterClientIds } = useQuery({
+    queryKey: ["product_filter_client_ids", fornecedorId, produtoId, moduloIds, tid],
+    queryFn: async () => {
+      let moduleFilterCpIds: Set<string> | null = null;
+      if (moduloIds.length > 0) {
+        const cpmRows = await fetchAllRows<any>(() => {
+          return (supabase.from("cliente_produto_modulos" as any) as any)
+            .select("cliente_produto_id")
+            .in("modulo_id", moduloIds)
+            .eq("ativo", true);
+        });
+        moduleFilterCpIds = new Set((cpmRows || []).map((r: any) => r.cliente_produto_id));
+      }
+
+      const cpRows = await fetchAllRows<any>(() => {
+        let q = (supabase.from("cliente_produtos" as any) as any)
+          .select("id, cliente_id");
+        if (tid) q = q.eq("tenant_id", tid);
+        if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
+        if (produtoId) q = q.eq("produto_id", Number(produtoId));
+        return q;
+      });
+
+      let filteredCpRows = cpRows || [];
+      if (moduleFilterCpIds) {
+        filteredCpRows = filteredCpRows.filter((r: any) => moduleFilterCpIds!.has(r.id));
+      }
+      return new Set(filteredCpRows.map((r: any) => r.cliente_id));
+    },
+    enabled: hasProductStructureFilters,
+    staleTime: 30_000,
   });
 
   // Build query key from all filters
   const filterKey = useMemo(() => ({
     debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    moduloIds,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid,
   }), [debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    moduloIds,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid]);
 
@@ -180,8 +218,8 @@ export default function Clientes() {
       || valueFilters.margemMin !== null
       || valueFilters.margemMax !== null;
 
-    return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes);
-  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes]);
+    return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes || hasProductStructureFilters);
+  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes, hasProductStructureFilters]);
 
   const round2 = useCallback((n: number) => Math.round((n + Number.EPSILON) * 100) / 100, []);
 
@@ -238,7 +276,6 @@ export default function Clientes() {
       else if (val) q = q.eq(field, Number(val));
     };
     applyLookupFilter("modelo_contrato_id", modeloContratoId);
-    applyLookupFilter("produto_id", produtoId);
     applyLookupFilter("origem_venda_id", origemVendaId);
     applyLookupFilter("estado_id", estadoId);
     applyLookupFilter("cidade_id", cidadeId);
@@ -246,7 +283,6 @@ export default function Clientes() {
     applyLookupFilter("area_atuacao_id", areaAtuacaoId);
     applyLookupFilter("segmento_id", segmentoId);
     applyLookupFilter("funcionario_id", funcionarioId);
-    applyLookupFilter("fornecedor_id", fornecedorId);
 
     const applyDateRange = (field: string, range: DateRange) => {
       if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
@@ -291,6 +327,8 @@ export default function Clientes() {
     }
 
     const filtered = rows.filter((row) => {
+      // Filtro via cliente_produtos (fornecedor/produto/módulo)
+      if (hasProductStructureFilters && productFilterClientIds && !productFilterClientIds.has(row.id)) return false;
       // Somente Matrizes filter
       if (somenteMatrizes && matrizIdsSet && !matrizIdsSet.has(row.id)) return false;
       const lucroReal = computeLucroReal(row);
@@ -327,7 +365,7 @@ export default function Clientes() {
     });
 
     return sorted;
-  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters, somenteMatrizes, matrizIdsSet]);
+  }, [applyCommonFiltersOnClientes, computeLucroReal, computeMargemBruta, sortDir, sortField, valueFilters, somenteMatrizes, matrizIdsSet, hasProductStructureFilters, productFilterClientIds]);
 
   // Query "Novos no Mês"
   const { data: novosNoMes } = useQuery({
