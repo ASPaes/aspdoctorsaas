@@ -117,6 +117,19 @@ export function ChatMessages({
     });
   }, [onNewMessage]);
 
+  // Mapa de reações: message_id (externo) → array de emojis
+  const reactionsMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const msg of messages) {
+      if (msg.message_type === 'reaction' && msg.quoted_message_id && msg.content) {
+        const existing = map.get(msg.quoted_message_id) || [];
+        existing.push(msg.content);
+        map.set(msg.quoted_message_id, existing);
+      }
+    }
+    return map;
+  }, [messages]);
+
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
     const items: TimelineItem[] = messages
@@ -298,6 +311,7 @@ export function ChatMessages({
                       )}
                       <MessageBubble
                         msg={item.msg}
+                        reactions={reactionsMap.get(item.msg.message_id) || undefined}
                         onReply={onReply}
                         selectionMode={selectionMode}
                         isSelected={selectedMessages?.has(item.msg.id)}

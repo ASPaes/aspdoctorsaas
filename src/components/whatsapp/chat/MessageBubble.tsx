@@ -18,6 +18,7 @@ import {
 
 interface Props {
   msg: Message;
+  reactions?: string[];
   onReply?: (msg: Message) => void;
   selectionMode?: boolean;
   isSelected?: boolean;
@@ -39,6 +40,7 @@ function canDeletePanelOnly(msg: Message): boolean {
 
 export function MessageBubble({
   msg,
+  reactions,
   onReply,
   selectionMode,
   isSelected,
@@ -272,6 +274,21 @@ export function MessageBubble({
     </div>
   );
 
+  const messageContent = (
+    <div className="flex flex-col">
+      {bubbleContent}
+      {reactions && reactions.length > 0 && (
+        <div className={cn("flex gap-0.5 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
+          <div className="flex items-center gap-0.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full px-1.5 py-0.5 shadow-sm -mt-2 relative z-10">
+            {reactions.map((emoji, i) => (
+              <span key={i} className="text-sm leading-none">{emoji}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // Selection mode
   if (selectionMode) {
     return (
@@ -285,13 +302,13 @@ export function MessageBubble({
       >
         {isFromMe ? (
           <>
-            {bubbleContent}
+            {messageContent}
             <Checkbox checked={isSelected} className="shrink-0" />
           </>
         ) : (
           <>
             <Checkbox checked={isSelected} className="shrink-0" />
-            {bubbleContent}
+            {messageContent}
           </>
         )}
       </div>
@@ -346,7 +363,7 @@ export function MessageBubble({
       onDoubleClick={() => onReply?.(msg)}
     >
       {isFromMe && actionsMenu}
-      {bubbleContent}
+      {messageContent}
       {!isFromMe && actionsMenu}
     </div>
   );
