@@ -70,6 +70,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -180,6 +183,30 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       setShowCloseModal(true);
     }
   }, [csatEnabled, closeConversation, conversation.id]);
+
+  const handleDeleteConversation = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const { data, error } = await supabase.rpc("delete_conversation_admin", {
+        p_conversation_id: conversation.id,
+      });
+      if (error) throw error;
+      const { toast } = await import("sonner").then(m => ({ toast: m.toast }));
+      toast.success("Conversa excluída com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+      onClose?.();
+    } catch (err: any) {
+      const { toast } = await import("sonner").then(m => ({ toast: m.toast }));
+      toast.error(err.message || "Erro ao excluir conversa");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setDeleteConfirmText("");
+    }
+  }, [conversation.id, queryClient, onClose]);
+
+  const deleteTargetName = (contact?.name || contact?.phone_number || "").trim();
+  const isGroupConv = (conversation as any)?.is_group === true;
 
   // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
@@ -371,7 +398,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {conversation.status === "active" && (
+            {conversation.status === "active" && !isGroupConv && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -415,7 +442,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {conversation.status === "active" && (
+                {conversation.status === "active" && !isGroupConv && (
                   <DropdownMenuItem onClick={() => archiveConversation(conversation.id)}>
                     <Archive className="h-4 w-4 mr-2" /> Arquivar
                   </DropdownMenuItem>
@@ -434,6 +461,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 {hasMultipleInstances && (
                   <DropdownMenuItem onClick={() => setIsChangeInstanceOpen(true)}>
                     <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => { setDeleteConfirmText(""); setShowDeleteDialog(true); }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Excluir conversa
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -698,6 +733,46 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         groupJid={(conversation as any)?.group_jid || ""}
         instanceId={conversation?.instance_id || ""}
       />
+
+      <Dialog open={showDeleteDialog} onOpenChange={(o) => { if (!o) { setShowDeleteDialog(false); setDeleteConfirmText(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir conversa permanentemente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Esta ação é <strong>irreversível</strong>. Todas as mensagens, atendimentos e dados desta conversa serão excluídos permanentemente.
+            </p>
+            <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
+              <p className="text-sm font-medium">Para confirmar, digite o nome abaixo:</p>
+              <p className="text-sm font-bold mt-1">{deleteTargetName}</p>
+            </div>
+            <input
+              type="text"
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+              placeholder="Digite o nome para confirmar..."
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => { setShowDeleteDialog(false); setDeleteConfirmText(""); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmText !== deleteTargetName || isDeleting}
+              onClick={handleDeleteConversation}
+            >
+              {isDeleting ? "Excluindo..." : "Excluir permanentemente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

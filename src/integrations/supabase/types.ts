@@ -6116,6 +6116,10 @@ export type Database = {
         Args: { p_encrypted: string; p_encryption_key: string }
         Returns: string
       }
+      delete_conversation_admin: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
       delete_messages_by_ids: {
         Args: { p_message_ids: string[] }
         Returns: Json
