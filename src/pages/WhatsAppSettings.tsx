@@ -10,6 +10,7 @@ import TeamTab from "@/components/configuracoes/whatsapp/TeamTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
+import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -30,6 +31,7 @@ export default function WhatsAppSettings() {
       <Tabs defaultValue="instances">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="instances">Instâncias</TabsTrigger>
+          <TabsTrigger value="grupos">Grupos</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           {isAdmin && <TabsTrigger value="pausas">Pausas</TabsTrigger>}
           <TabsTrigger value="macros">Macros</TabsTrigger>
@@ -41,6 +43,10 @@ export default function WhatsAppSettings() {
 
         <TabsContent value="instances" className="mt-4">
           <WhatsAppInstancesTab />
+        </TabsContent>
+
+        <TabsContent value="grupos" className="mt-4">
+          <WhatsAppGroupsTab />
         </TabsContent>
 
         <TabsContent value="atendimento" className="mt-4">
