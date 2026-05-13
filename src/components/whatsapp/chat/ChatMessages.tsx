@@ -29,6 +29,7 @@ interface Props {
   onContactSave?: (phone: string, name: string) => void;
   highlightMessageId?: string | null;
   onHighlightShown?: () => void;
+  isGroup?: boolean;
 }
 
 type TimelineItem =
@@ -54,6 +55,7 @@ export function ChatMessages({
   onContactSave,
   highlightMessageId,
   onHighlightShown,
+  isGroup,
 }: Props) {
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
@@ -135,7 +137,7 @@ export function ChatMessages({
     const items: TimelineItem[] = messages
       .filter(msg => msg.message_type !== 'reaction')
       .map(msg => ({ type: 'message' as const, msg }));
-    if (assignments) {
+    if (assignments && !isGroup) {
       for (const event of assignments) {
         items.push({ type: 'transfer' as const, event });
       }
@@ -146,7 +148,7 @@ export function ChatMessages({
       return new Date(tA).getTime() - new Date(tB).getTime();
     });
     return items;
-  }, [messages, assignments]);
+  }, [messages, assignments, isGroup]);
 
   // Compute the ID of the first unread incoming message
   const firstUnreadId = useMemo(() => {

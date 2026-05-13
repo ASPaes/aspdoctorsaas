@@ -248,13 +248,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [assignedTo, getSenderLabel, fallbackFuncionario, tenantUsers]);
 
   const effectiveStatus = useMemo(() => {
+    if (isGroupConv) return conversation.status;
     if (attendance) {
       if (attendance.status === "waiting") return "waiting";
       if (attendance.status === "in_progress") return "in_progress";
       if (attendance.status === "closed" || attendance.status === "inactive_closed") return "closed";
     }
     return conversation.status;
-  }, [attendance, conversation.status]);
+  }, [attendance, conversation.status, isGroupConv]);
 
   const scheduledUntil = (attendance as any)?.scheduled_until ?? null;
   const isScheduled = !!scheduledUntil && new Date(scheduledUntil) > new Date();
@@ -354,14 +355,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {presenceBlocked ? (
+            {presenceBlocked && !isGroupConv ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-[10px] text-muted-foreground px-2 cursor-default">Fique ATIVO para atender</span>
                 </TooltipTrigger>
                 <TooltipContent>Inicie seu expediente ou volte da pausa.</TooltipContent>
               </Tooltip>
-            ) : (
+            ) : !isGroupConv && (
               <QueueIndicator
                 conversationId={conversation.id}
                 assignedTo={conversation.assigned_to || null}
@@ -379,7 +380,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
             </Tooltip>
 
-            {canSchedule && (
+            {canSchedule && !isGroupConv && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -415,7 +416,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {(conversation.status === "closed" || conversation.status === "archived") && (
+            {(conversation.status === "closed" || conversation.status === "archived") && !isGroupConv && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => reopenConversation(conversation.id)} aria-label="Reabrir conversa">
@@ -496,7 +497,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             </Tooltip>
           )}
 
-          {isScheduled && (
+          {!isGroupConv && isScheduled && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-amber-500/50 text-amber-600 dark:text-amber-400">
@@ -537,13 +538,13 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           )}
 
 
-          {attendance?.created_from === 'billing_automation' && (
+          {!isGroupConv && attendance?.created_from === 'billing_automation' && (
             <Badge variant="outline" className="text-[10px] h-4 shrink-0 whitespace-nowrap border-amber-500 text-amber-600 dark:text-amber-400">
               💰 Cobrança
             </Badge>
           )}
 
-          {isAfterHours && (
+          {!isGroupConv && isAfterHours && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
