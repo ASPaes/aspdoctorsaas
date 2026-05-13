@@ -52,7 +52,7 @@ export default function Clientes() {
     searchText, status, unidadeBaseQuick, somenteMatrizes,
     periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId,
-    areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
+    areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, moduloIds,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax,
     sortField: sortFieldRaw, sortDir: sortDirRaw, page, filtersOpen,
