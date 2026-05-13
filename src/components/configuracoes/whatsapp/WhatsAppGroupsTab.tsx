@@ -41,7 +41,7 @@ interface WhatsAppGroup {
 
 export default function WhatsAppGroupsTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const { formatDate } = useAppTimezone();
+  const { timezone } = useAppTimezone();
   const queryClient = useQueryClient();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
 
@@ -260,7 +260,7 @@ export default function WhatsAppGroupsTab() {
                         {group.last_synced_at && (
                           <span className="inline-flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {formatDate(group.last_synced_at)}
+                            {formatDateLabel(group.last_synced_at, timezone)}
                           </span>
                         )}
                       </div>
