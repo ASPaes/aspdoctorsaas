@@ -22,13 +22,19 @@ export interface WhatsAppMacro {
 
 export const useWhatsAppMacros = (instanceId?: string) => {
   const queryClient = useQueryClient();
+  const { effectiveTenantId } = useTenantFilter();
 
   const { data: macros = [], isLoading } = useQuery({
-    queryKey: ['whatsapp-macros', instanceId],
+    queryKey: ['whatsapp-macros', instanceId, effectiveTenantId],
     queryFn: async () => {
       let query = (supabase.from('whatsapp_macros') as any)
         .select('*')
+        .eq('is_active', true)
         .order('title', { ascending: true });
+
+      if (effectiveTenantId) {
+        query = query.eq('tenant_id', effectiveTenantId);
+      }
 
       if (instanceId) {
         query = query.or(`instance_id.is.null,instance_id.eq.${instanceId}`);
