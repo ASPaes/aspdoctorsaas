@@ -70,6 +70,9 @@ function getMessageContent(message: any, type: string): string {
   }
   const mediaMessage = message[`${type}Message`];
   if (mediaMessage?.caption) return mediaMessage.caption;
+  if (type === 'reaction') {
+    return message.reactionMessage?.text || '';
+  }
   const descriptions: Record<string, string> = {
     image: '📷 Imagem', audio: '🎵 Áudio', video: '🎥 Vídeo',
     document: '📄 Documento', sticker: '🎨 Sticker',
@@ -463,7 +466,9 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
         .filter(Boolean)
         .join(', ');
     }
-    const quotedMessageId = message.extendedTextMessage?.contextInfo?.stanzaId || null;
+    const quotedMessageId = message.reactionMessage?.key?.id
+      || message.extendedTextMessage?.contextInfo?.stanzaId
+      || null;
 
     const instanceInfo: InstanceInfo = {
       id: instanceData.id,

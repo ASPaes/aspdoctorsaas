@@ -928,6 +928,12 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   if (!fromMe) upd.unread_count = (currentConv?.unread_count || 0) + 1;
   if (Object.keys(upd).length > 0) await supabase.from('whatsapp_conversations').update(upd).eq('id', conversationId);
 
+  // Reações: salvas no banco mas sem automação (URA, CSAT, attendance, etc.)
+  if (messageType === 'reaction') {
+    console.log('[processor] Reaction saved, skipping automation for', conversationId);
+    return;
+  }
+
   // Grupos: pular TODA automação (URA, business hours, CSAT, attendance, sentiment)
   if (isGroup) {
     console.log('[processor] Group message saved, skipping automation for', conversationId);
