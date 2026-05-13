@@ -248,13 +248,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [assignedTo, getSenderLabel, fallbackFuncionario, tenantUsers]);
 
   const effectiveStatus = useMemo(() => {
+    if (isGroupConv) return conversation.status;
     if (attendance) {
       if (attendance.status === "waiting") return "waiting";
       if (attendance.status === "in_progress") return "in_progress";
       if (attendance.status === "closed" || attendance.status === "inactive_closed") return "closed";
     }
     return conversation.status;
-  }, [attendance, conversation.status]);
+  }, [attendance, conversation.status, isGroupConv]);
 
   const scheduledUntil = (attendance as any)?.scheduled_until ?? null;
   const isScheduled = !!scheduledUntil && new Date(scheduledUntil) > new Date();
