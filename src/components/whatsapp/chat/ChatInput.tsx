@@ -96,7 +96,13 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     staleTime: 5 * 60_000,
   });
   const contactName = (contactNameData as any)?.whatsapp_contacts?.name ?? null;
-  const agentName = user?.user_metadata?.full_name || null;
+  const { preferences: userPrefs } = useUserPreferences();
+  const agentName =
+    userPrefs?.signature_name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    null;
 
   const macroPrefillValues = useMemo(() => {
     const map: Record<string, string> = {};
