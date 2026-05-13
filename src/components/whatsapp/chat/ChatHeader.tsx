@@ -355,14 +355,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {presenceBlocked ? (
+            {presenceBlocked && !isGroupConv ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-[10px] text-muted-foreground px-2 cursor-default">Fique ATIVO para atender</span>
                 </TooltipTrigger>
                 <TooltipContent>Inicie seu expediente ou volte da pausa.</TooltipContent>
               </Tooltip>
-            ) : (
+            ) : !isGroupConv && (
               <QueueIndicator
                 conversationId={conversation.id}
                 assignedTo={conversation.assigned_to || null}
