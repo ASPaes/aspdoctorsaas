@@ -45,6 +45,10 @@ export default function WhatsAppSettings() {
           <WhatsAppInstancesTab />
         </TabsContent>
 
+        <TabsContent value="grupos" className="mt-4">
+          <WhatsAppGroupsTab />
+        </TabsContent>
+
         <TabsContent value="atendimento" className="mt-4">
           <AtendimentoCsatTab />
         </TabsContent>
