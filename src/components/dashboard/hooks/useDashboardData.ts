@@ -67,12 +67,12 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
 
       // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
         if (c.cancelado !== true) return true;
         if (!c.data_cancelamento) return false;
         return new Date(String(c.data_cancelamento)) > new Date(periodoFimStr);
