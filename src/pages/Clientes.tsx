@@ -327,6 +327,8 @@ export default function Clientes() {
     }
 
     const filtered = rows.filter((row) => {
+      // Filtro via cliente_produtos (fornecedor/produto/módulo)
+      if (hasProductStructureFilters && productFilterClientIds && !productFilterClientIds.has(row.id)) return false;
       // Somente Matrizes filter
       if (somenteMatrizes && matrizIdsSet && !matrizIdsSet.has(row.id)) return false;
       const lucroReal = computeLucroReal(row);
