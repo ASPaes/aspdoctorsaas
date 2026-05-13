@@ -44,6 +44,19 @@ export function useDashboardData(filters: DashboardFilters) {
       const periodoInicioStr = format(periodoInicio, 'yyyy-MM-dd');
       const periodoFimStr = format(periodoFim, 'yyyy-MM-dd');
 
+      // Fornecedor filter via cliente_produtos (deprecated clientes.fornecedor_id)
+      let fornecedorClientIds: Set<string> | null = null;
+      if (filters.fornecedorId) {
+        const cpByForn = await fetchAllRows<any>(() => {
+          let q = (supabase.from('cliente_produtos' as any) as any)
+            .select('cliente_id')
+            .eq('fornecedor_id', filters.fornecedorId);
+          if (tid) q = q.eq('tenant_id', tid);
+          return q;
+        });
+        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
+      }
+
       // 1. Clientes ativos no fim do período — snapshot temporal
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       // Usa paginação para superar o limite de 1000 linhas do PostgREST (db-max-rows).
