@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export interface WhatsAppMacro {
   id: string;
@@ -21,13 +22,19 @@ export interface WhatsAppMacro {
 
 export const useWhatsAppMacros = (instanceId?: string) => {
   const queryClient = useQueryClient();
+  const { effectiveTenantId } = useTenantFilter();
 
   const { data: macros = [], isLoading } = useQuery({
-    queryKey: ['whatsapp-macros', instanceId],
+    queryKey: ['whatsapp-macros', instanceId, effectiveTenantId],
     queryFn: async () => {
       let query = (supabase.from('whatsapp_macros') as any)
         .select('*')
+        .eq('is_active', true)
         .order('title', { ascending: true });
+
+      if (effectiveTenantId) {
+        query = query.eq('tenant_id', effectiveTenantId);
+      }
 
       if (instanceId) {
         query = query.or(`instance_id.is.null,instance_id.eq.${instanceId}`);
@@ -43,7 +50,11 @@ export const useWhatsAppMacros = (instanceId?: string) => {
 
   const createMacro = useMutation({
     mutationFn: async (macro: any) => {
-      const { data, error } = await (supabase.from('whatsapp_macros') as any).insert(macro).select().single();
+      const payload = { ...macro };
+      if (effectiveTenantId && !payload.tenant_id) {
+        payload.tenant_id = effectiveTenantId;
+      }
+      const { data, error } = await (supabase.from('whatsapp_macros') as any).insert(payload).select().single();
       if (error) throw error;
       return data;
     },
