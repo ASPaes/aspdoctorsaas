@@ -55,6 +55,7 @@ export function ChatMessages({
   onContactSave,
   highlightMessageId,
   onHighlightShown,
+  isGroup,
 }: Props) {
   const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
