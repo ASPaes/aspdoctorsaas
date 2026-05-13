@@ -135,7 +135,42 @@ export default function Clientes() {
       }
       return ids;
     },
-    staleTime: 60_000,
+  });
+
+  // Pre-fetch client IDs from cliente_produtos for fornecedor/produto/modulo filters
+  const hasProductStructureFilters = !!(fornecedorId || produtoId || moduloIds.length > 0);
+
+  const { data: productFilterClientIds } = useQuery({
+    queryKey: ["product_filter_client_ids", fornecedorId, produtoId, moduloIds, tid],
+    queryFn: async () => {
+      let moduleFilterCpIds: Set<string> | null = null;
+      if (moduloIds.length > 0) {
+        const cpmRows = await fetchAllRows<any>(() => {
+          return (supabase.from("cliente_produto_modulos" as any) as any)
+            .select("cliente_produto_id")
+            .in("modulo_id", moduloIds)
+            .eq("ativo", true);
+        });
+        moduleFilterCpIds = new Set((cpmRows || []).map((r: any) => r.cliente_produto_id));
+      }
+
+      const cpRows = await fetchAllRows<any>(() => {
+        let q = (supabase.from("cliente_produtos" as any) as any)
+          .select("id, cliente_id");
+        if (tid) q = q.eq("tenant_id", tid);
+        if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
+        if (produtoId) q = q.eq("produto_id", Number(produtoId));
+        return q;
+      });
+
+      let filteredCpRows = cpRows || [];
+      if (moduleFilterCpIds) {
+        filteredCpRows = filteredCpRows.filter((r: any) => moduleFilterCpIds!.has(r.id));
+      }
+      return new Set(filteredCpRows.map((r: any) => r.cliente_id));
+    },
+    enabled: hasProductStructureFilters,
+    staleTime: 30_000,
   });
 
   // Build query key from all filters
