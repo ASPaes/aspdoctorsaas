@@ -242,6 +242,15 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const filtered = useMemo(() => {
     let result = [...conversations];
 
+    // Separar grupos: excluir de todas as pills normais, incluir só na pill "groups"
+    if (activePill === "groups") {
+      result = result.filter(c => (c as any).is_group === true);
+      // Sem filtro adicional de bucket — mostrar todos os grupos
+    } else {
+      // Excluir grupos das pills normais
+      result = result.filter(c => (c as any).is_group !== true);
+    }
+
     // Department filtering (skip for after_hours which is tenant-wide)
     if (selectedDepartmentId && activePill !== "after_hours") {
       result = result.filter(c => {
@@ -251,37 +260,39 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
 
-    // Pill filters com visibilidade por papel
-    if (activePill === "in_progress") {
-      result = result.filter(c => {
-        if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
-        if (!isAdmin && user?.id) {
-          const isMyConv = (c as any).assigned_to === user.id;
-          const att = attendanceMap.get(c.id);
-          const isMyAtt = att?.assigned_to === user.id;
-          if (!isMyConv && !isMyAtt) return false;
-        }
-        return true;
-      });
-    } else if (activePill === "waiting") {
-      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
-    } else if (activePill === "after_hours") {
-      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
-    } else if (activePill === "closed") {
-      result = result.filter(c => {
-        if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
-        if (!isAdmin && user?.id) {
-          const att = attendanceMap.get(c.id);
-          if (att && att.assigned_to !== user.id) return false;
-        }
-        return true;
-      });
-    }
-    if (activePill === "all" && !isAdmin && user?.id) {
-      result = result.filter(c => {
-        if (!(c as any).assigned_to) return true;
-        return (c as any).assigned_to === user.id;
-      });
+    if (activePill !== "groups") {
+      // Pill filters com visibilidade por papel
+      if (activePill === "in_progress") {
+        result = result.filter(c => {
+          if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
+          if (!isAdmin && user?.id) {
+            const isMyConv = (c as any).assigned_to === user.id;
+            const att = attendanceMap.get(c.id);
+            const isMyAtt = att?.assigned_to === user.id;
+            if (!isMyConv && !isMyAtt) return false;
+          }
+          return true;
+        });
+      } else if (activePill === "waiting") {
+        result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
+      } else if (activePill === "after_hours") {
+        result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
+      } else if (activePill === "closed") {
+        result = result.filter(c => {
+          if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
+          if (!isAdmin && user?.id) {
+            const att = attendanceMap.get(c.id);
+            if (att && att.assigned_to !== user.id) return false;
+          }
+          return true;
+        });
+      }
+      if (activePill === "all" && !isAdmin && user?.id) {
+        result = result.filter(c => {
+          if (!(c as any).assigned_to) return true;
+          return (c as any).assigned_to === user.id;
+        });
+      }
     }
 
     if (filters.autoReplyDisabledOnly) {
