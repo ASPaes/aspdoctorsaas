@@ -21,6 +21,7 @@ import { useMacroTags } from "../hooks/useMacroTags";
 import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import type { MediaSendParams } from "./input/types";
 import { toast } from "sonner";
