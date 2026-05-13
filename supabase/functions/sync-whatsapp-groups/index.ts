@@ -189,8 +189,11 @@ Deno.serve(async (req) => {
         ? instance.instance_id_external
         : instance.instance_name;
 
-      for (const g of groups) {
+      for (let i = 0; i < groups.length; i++) {
+        const g = groups[i];
         if (!g.jid) continue;
+        // Delay de 500ms entre chamadas pra evitar rate limit da Evolution
+        if (i > 0) await new Promise((r) => setTimeout(r, 500));
         const realParticipants = await fetchGroupParticipantsEvolution(
           secrets, identifier, instance.provider_type, g.jid
         );
@@ -204,21 +207,45 @@ Deno.serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     if (groups.length > 0) {
-      const rows = groups.map((g) => ({
-        tenant_id: instance.tenant_id,
-        instance_id: instance.id,
-        group_jid: g.jid,
-        group_name: g.name,
-        group_picture_url: g.pictureUrl ?? null,
-        participant_count: g.participantCount ?? null,
-        participants: g.participants || [],
-        last_synced_at: nowIso,
-        updated_at: nowIso,
-      }));
-      const { error: upErr } = await supabase
-        .from('whatsapp_groups')
-        .upsert(rows, { onConflict: 'tenant_id,instance_id,group_jid' });
-      if (upErr) throw new Error(`upsert error: ${upErr.message}`);
+      // Separar: grupos COM participantes resolvidos vs SEM (pra não sobrescrever dados existentes com [])
+      const rowsWithParticipants = groups.filter((g) => g.participants && g.participants.length > 0);
+      const rowsWithout = groups.filter((g) => !g.participants || g.participants.length === 0);
+
+      if (rowsWithParticipants.length > 0) {
+        const fullRows = rowsWithParticipants.map((g) => ({
+          tenant_id: instance.tenant_id,
+          instance_id: instance.id,
+          group_jid: g.jid,
+          group_name: g.name,
+          group_picture_url: g.pictureUrl ?? null,
+          participant_count: g.participantCount ?? null,
+          participants: g.participants,
+          last_synced_at: nowIso,
+          updated_at: nowIso,
+        }));
+        const { error } = await supabase
+          .from('whatsapp_groups')
+          .upsert(fullRows, { onConflict: 'tenant_id,instance_id,group_jid' });
+        if (error) console.error(`${LOG} upsert (with participants) error:`, error.message);
+      }
+
+      if (rowsWithout.length > 0) {
+        // Sem participants — upsert só metadata, preserva participants existentes
+        const metaRows = rowsWithout.map((g) => ({
+          tenant_id: instance.tenant_id,
+          instance_id: instance.id,
+          group_jid: g.jid,
+          group_name: g.name,
+          group_picture_url: g.pictureUrl ?? null,
+          participant_count: g.participantCount ?? null,
+          last_synced_at: nowIso,
+          updated_at: nowIso,
+        }));
+        const { error } = await supabase
+          .from('whatsapp_groups')
+          .upsert(metaRows, { onConflict: 'tenant_id,instance_id,group_jid' });
+        if (error) console.error(`${LOG} upsert (metadata only) error:`, error.message);
+      }
     }
 
     // Disable groups no longer present in provider
