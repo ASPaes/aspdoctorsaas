@@ -4748,6 +4748,7 @@ export type Database = {
           instance_id: string
           last_synced_at: string | null
           participant_count: number | null
+          participants: Json | null
           retention_days: number
           tenant_id: string
           updated_at: string
@@ -4762,6 +4763,7 @@ export type Database = {
           instance_id: string
           last_synced_at?: string | null
           participant_count?: number | null
+          participants?: Json | null
           retention_days?: number
           tenant_id: string
           updated_at?: string
@@ -4776,6 +4778,7 @@ export type Database = {
           instance_id?: string
           last_synced_at?: string | null
           participant_count?: number | null
+          participants?: Json | null
           retention_days?: number
           tenant_id?: string
           updated_at?: string
