@@ -135,7 +135,10 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
               onChange={(e) => setValues((v) => ({ ...v, [idx]: e.target.value }))}
               onKeyDown={(e) => handleKeyDown(e, idx)}
               placeholder={`Digite: ${frag.value.toLowerCase()}`}
-              className="h-8 text-sm"
+              className={cn(
+                "h-8 text-sm",
+                prefilledSet.has(idx) && "border-emerald-500/30 bg-emerald-500/5"
+              )}
             />
           </div>
         ))}
