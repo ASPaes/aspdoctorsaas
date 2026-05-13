@@ -1070,6 +1070,62 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         return cnpjsDuplicadosNoBanco.has(cnpj);
       });
 
+      // Helpers para popular tabelas relacionadas (cliente_produtos, contratos)
+      const buildProdutoPayload = (clienteId: string, p: any) => ({
+        tenant_id: tenantId,
+        cliente_id: clienteId,
+        produto_id: p.produto_id,
+        fornecedor_id: p.fornecedor_id,
+        codigo_fornecedor: p.codigo_fornecedor,
+        link_portal_fornecedor: p.link_portal_fornecedor,
+        vlr_ativacao: p.valor_ativacao,
+        vlr_mensal: p.mensalidade,
+        vlr_custo: p.custo_operacao,
+        data_ativacao: p.data_ativacao,
+        ativo: true,
+      });
+      const buildContratoPayload = (clienteId: string, p: any) => ({
+        tenant_id: tenantId,
+        cliente_id: clienteId,
+        tipo: 'base',
+        data_venda: p.data_venda,
+        data_inicio: p.data_ativacao,
+        data_proximo_reajuste: p.data_reajuste,
+        recorrencia: p.recorrencia,
+        modelo_contrato_id: p.modelo_contrato_id,
+        funcionario_id: p.funcionario_id,
+        origem_venda_id: p.origem_venda_id,
+        forma_pagamento_ativacao_id: p.forma_pagamento_ativacao_id,
+        vlr_total_mensal: p.mensalidade,
+        vlr_total_ativacao: p.valor_ativacao,
+        observacoes: p.observacao_negociacao,
+        status: p.cancelado ? 'cancelado' : 'ativo',
+        cancelado_em: p.cancelado ? p.data_cancelamento : null,
+      });
+      const isContratoRelevante = (p: any) =>
+        !!(p.data_venda || p.recorrencia || p.modelo_contrato_id || p.funcionario_id || p.origem_venda_id);
+
+      const insertRelacionados = async (clienteId: string, p: any) => {
+        if (p.produto_id) {
+          try {
+            const { error } = await (supabase.from("cliente_produtos" as any) as any)
+              .insert([buildProdutoPayload(clienteId, p)]);
+            if (error) console.warn('[import] cliente_produtos insert falhou:', error.message);
+          } catch (e: any) {
+            console.warn('[import] cliente_produtos insert exceção:', e?.message);
+          }
+        }
+        if (isContratoRelevante(p)) {
+          try {
+            const { error } = await (supabase.from("contratos" as any) as any)
+              .insert([buildContratoPayload(clienteId, p)]);
+            if (error) console.warn('[import] contratos insert falhou:', error.message);
+          } catch (e: any) {
+            console.warn('[import] contratos insert exceção:', e?.message);
+          }
+        }
+      };
+
       // INSERT dos registros novos
       if (payloadNovos.length > 0) {
         const { error: batchErr, data: insertedData } = await supabase
@@ -1079,6 +1135,34 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         if (!batchErr) {
           // Lote inteiro sucesso
           imported += (insertedData?.length ?? payloadNovos.length);
+
+          // Inserir cliente_produtos e contratos em batch
+          if (insertedData && insertedData.length === payloadNovos.length) {
+            const produtosPayload = payloadNovos
+              .map((p, idx) => p.produto_id ? buildProdutoPayload(insertedData[idx].id, p) : null)
+              .filter(Boolean);
+            if (produtosPayload.length > 0) {
+              try {
+                const { error } = await (supabase.from("cliente_produtos" as any) as any)
+                  .insert(produtosPayload);
+                if (error) console.warn('[import] cliente_produtos batch falhou:', error.message);
+              } catch (e: any) {
+                console.warn('[import] cliente_produtos batch exceção:', e?.message);
+              }
+            }
+            const contratosPayload = payloadNovos
+              .map((p, idx) => isContratoRelevante(p) ? buildContratoPayload(insertedData[idx].id, p) : null)
+              .filter(Boolean);
+            if (contratosPayload.length > 0) {
+              try {
+                const { error } = await (supabase.from("contratos" as any) as any)
+                  .insert(contratosPayload);
+                if (error) console.warn('[import] contratos batch falhou:', error.message);
+              } catch (e: any) {
+                console.warn('[import] contratos batch exceção:', e?.message);
+              }
+            }
+          }
         } else {
           // Lote falhou — retry linha a linha para identificar quais registros têm problema
           for (let ri = 0; ri < payloadNovos.length; ri++) {
@@ -1087,9 +1171,11 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               const p = payload[idx];
               return p === payloadNovos[ri];
             }) ?? batches[b][ri];
-            const { error: rowErr } = await supabase
+            const { error: rowErr, data: rowInserted } = await supabase
               .from('clientes')
-              .insert(record);
+              .insert(record)
+              .select('id')
+              .single();
             if (rowErr) {
               failed += 1;
               failedRows.push({
@@ -1099,6 +1185,9 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               });
             } else {
               imported += 1;
+              if (rowInserted?.id) {
+                await insertRelacionados(rowInserted.id, record);
+              }
             }
           }
         }
@@ -1121,6 +1210,45 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             });
           } else {
             imported += 1;
+            // Upsert relacionados: buscar id do cliente, deletar existentes e inserir novos
+            try {
+              const { data: existing } = await supabase
+                .from('clientes')
+                .select('id')
+                .eq('cnpj', record.cnpj)
+                .eq('tenant_id', tenantId)
+                .single();
+              if (existing?.id) {
+                if (record.produto_id) {
+                  try {
+                    await (supabase.from("cliente_produtos" as any) as any)
+                      .delete()
+                      .eq('cliente_id', existing.id)
+                      .eq('produto_id', record.produto_id);
+                    const { error } = await (supabase.from("cliente_produtos" as any) as any)
+                      .insert([buildProdutoPayload(existing.id, record)]);
+                    if (error) console.warn('[import] cliente_produtos upsert falhou:', error.message);
+                  } catch (e: any) {
+                    console.warn('[import] cliente_produtos upsert exceção:', e?.message);
+                  }
+                }
+                if (isContratoRelevante(record)) {
+                  try {
+                    await (supabase.from("contratos" as any) as any)
+                      .delete()
+                      .eq('cliente_id', existing.id)
+                      .eq('tipo', 'base');
+                    const { error } = await (supabase.from("contratos" as any) as any)
+                      .insert([buildContratoPayload(existing.id, record)]);
+                    if (error) console.warn('[import] contratos upsert falhou:', error.message);
+                  } catch (e: any) {
+                    console.warn('[import] contratos upsert exceção:', e?.message);
+                  }
+                }
+              }
+            } catch (e: any) {
+              console.warn('[import] busca cliente para relacionados falhou:', e?.message);
+            }
           }
         }
       }
