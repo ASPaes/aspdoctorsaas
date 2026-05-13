@@ -57,6 +57,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const isBlocked = presenceBlocked || !!disabled;
 
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const { profile } = useAuth();
 
   const { data: metaWindow } = useMetaWindow(conversationId);
   const isMeta = metaWindow?.isMeta === true;
@@ -68,7 +69,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     queryFn: async () => {
       const { data, error } = await supabase
         .from("whatsapp_conversations")
-        .select("contact_id, whatsapp_contacts!inner(phone_number)")
+        .select("contact_id, whatsapp_contacts!inner(phone_number, name)")
         .eq("id", conversationId)
         .maybeSingle();
       if (error) throw error;
@@ -78,6 +79,33 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   });
   const contactPhone =
     (contactInfo as any)?.whatsapp_contacts?.phone_number ?? null;
+  const contactName =
+    (contactInfo as any)?.whatsapp_contacts?.name ?? null;
+  const agentName =
+    (profile as any)?.raw_user_meta_data?.full_name ||
+    (profile as any)?.full_name ||
+    null;
+
+  const macroPrefillValues = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (contactName) {
+      map["Nome do cliente"] = contactName;
+      map["nome do cliente"] = contactName;
+      map["Cliente"] = contactName;
+      map["cliente"] = contactName;
+    }
+    if (agentName) {
+      map["Nome do técnico"] = agentName;
+      map["nome do técnico"] = agentName;
+      map["Nome do atendente"] = agentName;
+      map["nome do atendente"] = agentName;
+      map["Técnico"] = agentName;
+      map["técnico"] = agentName;
+      map["Atendente"] = agentName;
+      map["atendente"] = agentName;
+    }
+    return map;
+  }, [contactName, agentName]);
 
   const { macros, incrementUsage } = useWhatsAppMacros();
   const { detectTags } = useMacroTags();
