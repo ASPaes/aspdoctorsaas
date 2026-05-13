@@ -1594,7 +1594,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         )}
 
         {/* ===================== STEP 2 — Upload ===================== */}
-        {step === 2 && fileHeaders.length === 0 && (
+        {importMode === 'simplified' && step === 2 && fileHeaders.length === 0 && (
           <div className="space-y-4">
             <div
               className={cn(
@@ -1636,7 +1636,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         )}
 
         {/* Step 2 — Column mapping (always shown) */}
-        {step === 2 && fileHeaders.length > 0 && (
+        {importMode === 'simplified' && step === 2 && fileHeaders.length > 0 && (
           <div className="space-y-4">
             {headersMatch && (
               <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 p-3 rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
@@ -1757,7 +1757,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         )}
 
         {/* ===================== STEP 3 — FK Config ===================== */}
-        {step === 3 && (
+        {importMode === 'simplified' && step === 3 && (
           <div className="space-y-4">
             {activeFkFields.length === 0 ? (
               <>
@@ -1969,7 +1969,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         )}
 
         {/* ===================== STEP 4 — Preview / Import / Result ===================== */}
-        {step === 4 && !importing && !result && (
+        {importMode === 'simplified' && step === 4 && !importing && !result && (
           <TooltipProvider>
           <div className="space-y-4">
             {/* Banner resumo */}
@@ -2183,7 +2183,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           </TooltipProvider>
         )}
 
-        {step === 4 && importing && (
+        {importMode === 'simplified' && step === 4 && importing && (
           <div className="space-y-4 py-6 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
             <div>
@@ -2214,7 +2214,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {step === 4 && !importing && result && (
+        {importMode === 'simplified' && step === 4 && !importing && result && (
           <div className="space-y-4 py-2">
             {/* Card de resumo */}
             <div className={`rounded-lg border p-4 space-y-3 ${result.imported > 0 ? 'border-green-200 dark:border-green-800 bg-green-500/5' : 'border-destructive/20 bg-destructive/5'}`}>
