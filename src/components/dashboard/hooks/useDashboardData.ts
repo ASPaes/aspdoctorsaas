@@ -339,14 +339,16 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cadastro', prevMonthEnd)
           .eq('cancelado', false);
         if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
         if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
         return prevNovosQuery;
       });
 
-      const prevNovosClientes = prevNovos?.length ?? null;
-      const prevNewMrr = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) : null;
-      const prevTotalImplantacao = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0) : null;
+      const prevNovosFilt = fornecedorClientIds
+        ? (prevNovos || []).filter(c => fornecedorClientIds!.has(c.id))
+        : (prevNovos || []);
+      const prevNovosClientes = prevNovosFilt.length;
+      const prevNewMrr = prevNovosFilt.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0);
+      const prevTotalImplantacao = prevNovosFilt.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0);
 
       // Previous month movimentos for upsell/cross-sell delta
       const prevMovimentos = await fetchAllRows<any>(() => tf(supabase
