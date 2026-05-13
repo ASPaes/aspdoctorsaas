@@ -57,7 +57,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const isBlocked = presenceBlocked || !!disabled;
 
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
 
   const { data: metaWindow } = useMetaWindow(conversationId);
   const isMeta = metaWindow?.isMeta === true;
@@ -79,12 +79,23 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   });
   const contactPhone =
     (contactInfo as any)?.whatsapp_contacts?.phone_number ?? null;
-  const contactName =
-    (contactInfo as any)?.whatsapp_contacts?.name ?? null;
-  const agentName =
-    (profile as any)?.raw_user_meta_data?.full_name ||
-    (profile as any)?.full_name ||
-    null;
+
+  const { data: contactNameData } = useQuery({
+    queryKey: ["conversation-contact-name", conversationId],
+    enabled: !!conversationId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_conversations")
+        .select("whatsapp_contacts!inner(name)")
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const contactName = (contactNameData as any)?.whatsapp_contacts?.name ?? null;
+  const agentName = user?.user_metadata?.full_name || null;
 
   const macroPrefillValues = useMemo(() => {
     const map: Record<string, string> = {};
