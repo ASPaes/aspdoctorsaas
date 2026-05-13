@@ -109,6 +109,66 @@ export default function WhatsAppGroupsTab() {
         .eq("id", groupId)
         .eq("tenant_id", tid);
       if (error) throw error;
+
+      // Ao habilitar: criar contato + conversa pra grupo aparecer imediatamente no chat
+      if (enabled) {
+        const group = groups?.find((g) => g.id === groupId);
+        if (!group || !selectedInstanceId || !tid) return;
+
+        const phoneNumber = group.group_jid.replace("@g.us", "");
+
+        // Upsert contato de grupo
+        const { data: existingContact } = await (supabase as any)
+          .from("whatsapp_contacts")
+          .select("id")
+          .eq("tenant_id", tid)
+          .eq("instance_id", selectedInstanceId)
+          .eq("phone_number", phoneNumber)
+          .maybeSingle();
+
+        let contactId = existingContact?.id;
+        if (!contactId) {
+          const { data: newContact } = await (supabase as any)
+            .from("whatsapp_contacts")
+            .insert({
+              tenant_id: tid,
+              instance_id: selectedInstanceId,
+              phone_number: phoneNumber,
+              name: group.group_name || phoneNumber,
+              is_group: true,
+            })
+            .select("id")
+            .single();
+          contactId = newContact?.id;
+        }
+
+        if (!contactId) return;
+
+        // Verificar se já existe conversa
+        const { data: existingConv } = await (supabase as any)
+          .from("whatsapp_conversations")
+          .select("id")
+          .eq("tenant_id", tid)
+          .eq("instance_id", selectedInstanceId)
+          .eq("is_group", true)
+          .eq("group_jid", group.group_jid)
+          .maybeSingle();
+
+        if (!existingConv) {
+          await (supabase as any)
+            .from("whatsapp_conversations")
+            .insert({
+              tenant_id: tid,
+              instance_id: selectedInstanceId,
+              contact_id: contactId,
+              status: "active",
+              is_group: true,
+              group_jid: group.group_jid,
+              last_message_at: new Date().toISOString(),
+              last_message_preview: "Grupo habilitado",
+            });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", selectedInstanceId, tid] });
