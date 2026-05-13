@@ -199,6 +199,33 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [conversationId, sendMutation]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMacroSuggestions && filteredMacros.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMacroSelectedIndex((prev) => Math.min(prev + 1, filteredMacros.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMacroSelectedIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleMacroSelect(filteredMacros[macroSelectedIndex]);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        handleMacroSelect(filteredMacros[macroSelectedIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMacroSuggestions(false);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
