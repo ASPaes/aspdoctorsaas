@@ -733,6 +733,46 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         groupJid={(conversation as any)?.group_jid || ""}
         instanceId={conversation?.instance_id || ""}
       />
+
+      <Dialog open={showDeleteDialog} onOpenChange={(o) => { if (!o) { setShowDeleteDialog(false); setDeleteConfirmText(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir conversa permanentemente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Esta ação é <strong>irreversível</strong>. Todas as mensagens, atendimentos e dados desta conversa serão excluídos permanentemente.
+            </p>
+            <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
+              <p className="text-sm font-medium">Para confirmar, digite o nome abaixo:</p>
+              <p className="text-sm font-bold mt-1">{deleteTargetName}</p>
+            </div>
+            <input
+              type="text"
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+              placeholder="Digite o nome para confirmar..."
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => { setShowDeleteDialog(false); setDeleteConfirmText(""); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmText !== deleteTargetName || isDeleting}
+              onClick={handleDeleteConversation}
+            >
+              {isDeleting ? "Excluindo..." : "Excluir permanentemente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
