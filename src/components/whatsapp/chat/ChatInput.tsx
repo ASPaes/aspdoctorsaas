@@ -44,6 +44,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [isRecording, setIsRecording] = useState(false);
   const [showMacroSuggestions, setShowMacroSuggestions] = useState(false);
   const [filteredMacros, setFilteredMacros] = useState<any[]>([]);
+  const [macroSelectedIndex, setMacroSelectedIndex] = useState(0);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -112,6 +113,10 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       setFilteredMacros([]);
     }
   }, [message, macros]);
+
+  useEffect(() => {
+    setMacroSelectedIndex(0);
+  }, [filteredMacros]);
 
   // Send attached file as media
   const sendAttachedFile = useCallback(async (file: File, caption?: string) => {
@@ -194,6 +199,33 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   }, [conversationId, sendMutation]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMacroSuggestions && filteredMacros.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMacroSelectedIndex((prev) => Math.min(prev + 1, filteredMacros.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMacroSelectedIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleMacroSelect(filteredMacros[macroSelectedIndex]);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        handleMacroSelect(filteredMacros[macroSelectedIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMacroSuggestions(false);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
@@ -406,7 +438,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         )}
 
         <div className="relative flex gap-2 items-end">
-          {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} />}
+          {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} selectedIndex={macroSelectedIndex} onClose={() => setShowMacroSuggestions(false)} />}
 
           <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked} />
 
