@@ -179,7 +179,20 @@ export function MessageBubble({
     );
   }
 
-  const bubbleContent = (
+  const messageContent = (
+    <div className="flex flex-col">
+      {bubbleContent}
+      {reactions && reactions.length > 0 && (
+        <div className={cn("flex gap-0.5 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
+          <div className="flex items-center gap-0.5 bg-card/80 backdrop-blur-sm border border-border/50 rounded-full px-1.5 py-0.5 shadow-sm -mt-2 relative z-10">
+            {reactions.map((emoji, i) => (
+              <span key={i} className="text-sm leading-none">{emoji}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
     <div
       className={cn(
         "max-w-[75%] min-w-0 rounded-lg px-3 py-1.5 text-sm relative",
