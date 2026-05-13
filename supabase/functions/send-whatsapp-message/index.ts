@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
         .from('whatsapp_conversations')
         .select(`*, whatsapp_contacts!inner (phone_number, name)`)
         .eq('id', body.conversationId)
-        .single(),
+        .single() as Promise<any>,
       // 2) Resolve sender name + role
       (async (): Promise<{ label: string; name: string; role: string | null }> => {
         if (!senderUserId) return { label: '', name: '', role: null };
@@ -292,7 +292,10 @@ Deno.serve(async (req) => {
 
     console.log('[send-whatsapp-message] Sending to:', contact.phone_number, 'via instance:', instanceData.instance_name, 'Provider:', providerType);
 
-    const destinationNumber = getDestinationNumber(contact.phone_number);
+    const isGroupConv = conversation.is_group === true;
+    const destinationNumber = isGroupConv
+      ? (conversation.group_jid || contact.phone_number)
+      : getDestinationNumber(contact.phone_number);
 
     // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
@@ -367,7 +370,7 @@ Deno.serve(async (req) => {
 
     // --- PRE-SEND: If agent is sending and no active attendance exists, create it and send opening notification BEFORE the agent's message ---
     let preCreatedAttendance: { id: string; attendance_code: string } | null = null;
-    if (senderUserId && !body.systemMessage) {
+    if (senderUserId && !body.systemMessage && !isGroupConv) {
       // Mark first_agent_message_at for analytics (only if not already set)
       const faMsgNow = new Date().toISOString();
       await supabase
@@ -633,7 +636,7 @@ Deno.serve(async (req) => {
 
     // Ensure attendance exists + auto-assign + increment agent count
     // Skip attendance logic for system messages (e.g. closure notifications)
-    if (senderUserId && !body.systemMessage) {
+    if (senderUserId && !body.systemMessage && !isGroupConv) {
       try {
         const now = new Date();
         const nowIso = now.toISOString();
