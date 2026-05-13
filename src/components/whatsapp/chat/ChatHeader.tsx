@@ -316,6 +316,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
           {/* Primary actions */}
           <div className="flex items-center gap-0.5 shrink-0">
+            {(conversation as any)?.is_group && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowParticipants(true)}>
+                    <Users className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Participantes do grupo</TooltipContent>
+              </Tooltip>
+            )}
+
             {presenceBlocked ? (
               <Tooltip>
                 <TooltipTrigger asChild>
