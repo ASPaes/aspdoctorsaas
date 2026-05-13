@@ -204,6 +204,7 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
           Cancelar
         </Button>
         <Button
+          ref={sendBtnRef}
           type="button"
           size="sm"
           onClick={handleSend}
