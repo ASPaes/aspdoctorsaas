@@ -16,6 +16,7 @@ export interface ClientesFilters {
   recorrenciaAdv: string;
   modeloContratoId: string;
   produtoId: string;
+  moduloIds: string[];
   origemVendaId: string;
   areaAtuacaoId: string;
   segmentoId: string;
@@ -48,6 +49,7 @@ const defaultFilters: ClientesFilters = {
   recorrenciaAdv: "",
   modeloContratoId: "",
   produtoId: "",
+  moduloIds: [],
   origemVendaId: "",
   areaAtuacaoId: "",
   segmentoId: "",
@@ -135,6 +137,10 @@ export function useClientesFilters() {
       if (key === "estadoId") {
         next.cidadeId = "";
       }
+      // Clear modulos when product changes
+      if (key === "produtoId") {
+        next.moduloIds = [];
+      }
       return next;
     });
   }, []);
@@ -149,6 +155,7 @@ export function useClientesFilters() {
       recorrenciaAdv: "",
       modeloContratoId: "",
       produtoId: "",
+      moduloIds: [],
       origemVendaId: "",
       areaAtuacaoId: "",
       segmentoId: "",

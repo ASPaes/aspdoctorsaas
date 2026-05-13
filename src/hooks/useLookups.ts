@@ -85,6 +85,22 @@ export function useLookups(estadoId?: number | null) {
     },
   });
 
+  const produtoModulos = useQuery({
+    queryKey: ["produto_modulos", tid],
+    staleTime: 30 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (tf(
+        (supabase.from("produto_modulos" as any) as any)
+          .select("id, nome, produto_id, ativo")
+          .eq("ativo", true)
+          .order("nome"),
+        tid
+      ) as any);
+      if (error) throw error;
+      return data as { id: string; nome: string; produto_id: number; ativo: boolean }[];
+    },
+  });
+
   const formasPagamento = useQuery({
     queryKey: ["formas_pagamento", tid],
     staleTime: 30 * 60 * 1000,
@@ -149,7 +165,7 @@ export function useLookups(estadoId?: number | null) {
 
   return {
     estados, cidades, areasAtuacao, segmentos, modelosContrato, funcionarios,
-    produtos, formasPagamento, motivosCancelamento, configuracoes, origensVenda,
+    produtos, produtoModulos, formasPagamento, motivosCancelamento, configuracoes, origensVenda,
     fornecedores, unidadesBase,
   };
 }
