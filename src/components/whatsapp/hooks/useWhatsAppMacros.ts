@@ -50,7 +50,11 @@ export const useWhatsAppMacros = (instanceId?: string) => {
 
   const createMacro = useMutation({
     mutationFn: async (macro: any) => {
-      const { data, error } = await (supabase.from('whatsapp_macros') as any).insert(macro).select().single();
+      const payload = { ...macro };
+      if (effectiveTenantId && !payload.tenant_id) {
+        payload.tenant_id = effectiveTenantId;
+      }
+      const { data, error } = await (supabase.from('whatsapp_macros') as any).insert(payload).select().single();
       if (error) throw error;
       return data;
     },
