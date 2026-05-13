@@ -109,6 +109,7 @@ export function MediaContent({
 
   switch (messageType) {
     case "image":
+    case "sticker":
       return (
         <>
           {lightboxOpen && resolvedInlineUrl && (
@@ -116,8 +117,8 @@ export function MediaContent({
           )}
           <img
             src={resolvedInlineUrl}
-            alt="Imagem"
-            className="rounded max-w-full mb-1 max-h-64 object-contain cursor-zoom-in"
+            alt={messageType === "sticker" ? "Sticker" : "Imagem"}
+            className={`rounded max-w-full mb-1 object-contain cursor-zoom-in ${messageType === "sticker" ? "max-h-40 bg-transparent" : "max-h-64"}`}
             loading="lazy"
             onClick={() => setLightboxOpen(true)}
           />
