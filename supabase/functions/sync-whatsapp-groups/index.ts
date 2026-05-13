@@ -23,86 +23,49 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-async function fetchEvolutionContactsMap(
+async function fetchGroupParticipantsEvolution(
   secrets: InstanceSecrets,
   identifier: string,
   providerType: string,
-): Promise<Map<string, { phone: string; name: string | null }>> {
-  const map = new Map<string, { phone: string; name: string | null }>();
-  const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
-  const headers: Record<string, string> = {};
-  if (providerType === 'cloud') {
-    headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
-  } else {
-    headers['apikey'] = secrets.api_key || '';
-  }
-
-  // Tenta múltiplos endpoints da Evolution API pra encontrar mapeamento LID → telefone
-  const endpoints = [
-    { method: 'POST', url: `${baseUrl}/chat/findContacts/${identifier}`, body: JSON.stringify({ where: {} }) },
-    { method: 'GET', url: `${baseUrl}/chat/contacts/${identifier}`, body: null },
-    { method: 'POST', url: `${baseUrl}/chat/findContacts/${identifier}`, body: JSON.stringify({ where: { id: { contains: '@s.whatsapp.net' } } }) },
-  ];
-
-  for (const ep of endpoints) {
-    try {
-      const fetchOpts: RequestInit = { method: ep.method, headers: { ...headers } };
-      if (ep.body) {
-        fetchOpts.body = ep.body;
-        (fetchOpts.headers as Record<string, string>)['Content-Type'] = 'application/json';
-      }
-
-      console.log(`${LOG} Trying contacts endpoint: ${ep.method} ${ep.url}`);
-      const res = await fetch(ep.url, fetchOpts);
-
-      if (!res.ok) {
-        console.log(`${LOG} Endpoint returned ${res.status} — trying next`);
-        continue;
-      }
-
-      const raw = await res.json();
-      const contacts = Array.isArray(raw) ? raw : (raw?.contacts || raw?.data || []);
-
-      console.log(`${LOG} Endpoint returned ${contacts.length} contacts. Sample: ${JSON.stringify(contacts[0] || {}).substring(0, 300)}`);
-
-      if (contacts.length === 0) continue;
-
-      for (const c of contacts) {
-        const rawId = c.id || c.jid || '';
-        const rawLid = c.lid || c.lidJid || '';
-        const pushName = c.pushName || c.name || c.notify || c.verifiedName || c.shortName || null;
-
-        // Extrair telefone do id (5547999999999@s.whatsapp.net ou 5547999999999:42@s.whatsapp.net)
-        const phoneFromId = rawId.replace('@s.whatsapp.net', '').replace(/@.*/, '').replace(/:\d+$/, '');
-        // Extrair LID limpo
-        const lidClean = rawLid.replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '');
-
-        const isValidPhone = phoneFromId && /^\d{10,15}$/.test(phoneFromId) && !phoneFromId.startsWith('0');
-
-        // Mapear LID → telefone
-        if (lidClean && isValidPhone) {
-          map.set(lidClean, { phone: phoneFromId, name: pushName });
-        }
-        // Mapear telefone → telefone (pra participantes sem LID)
-        if (isValidPhone) {
-          map.set(phoneFromId, { phone: phoneFromId, name: pushName });
-        }
-      }
-
-      if (map.size > 0) {
-        console.log(`${LOG} Contact map built: ${map.size} entries from ${ep.url}`);
-        break; // Sucesso, não tenta próximo endpoint
-      }
-    } catch (err) {
-      console.error(`${LOG} Error trying endpoint:`, err);
+  groupJid: string,
+): Promise<{ phone: string; name: string | null; admin: boolean; isLid: boolean }[]> {
+  try {
+    const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+    const headers: Record<string, string> = {};
+    if (providerType === 'cloud') {
+      headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
+    } else {
+      headers['apikey'] = secrets.api_key || '';
     }
-  }
 
-  if (map.size === 0) {
-    console.log(`${LOG} No contacts could be resolved from any endpoint`);
-  }
+    const url = `${baseUrl}/group/findGroupInfos/${identifier}?groupJid=${encodeURIComponent(groupJid)}`;
+    console.log(`${LOG} Fetching participants for group ${groupJid}`);
+    const res = await fetch(url, { headers });
 
-  return map;
+    if (!res.ok) {
+      console.log(`${LOG} findGroupInfos returned ${res.status} for ${groupJid}`);
+      return [];
+    }
+
+    const data = await res.json();
+    const participants = data?.participants || [];
+
+    return participants.map((p: any) => {
+      const rawPhone = p.phoneNumber || p.id || '';
+      const phone = rawPhone.replace('@s.whatsapp.net', '').replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '');
+      const isRealPhone = rawPhone.includes('@s.whatsapp.net');
+
+      return {
+        phone,
+        name: p.pushName || p.name || p.notify || null,
+        admin: p.admin === 'admin' || p.admin === 'superadmin',
+        isLid: !isRealPhone,
+      };
+    });
+  } catch (err) {
+    console.error(`${LOG} fetchGroupParticipantsEvolution error for ${groupJid}:`, err);
+    return [];
+  }
 }
 
 async function fetchEvolutionGroups(
@@ -118,7 +81,7 @@ async function fetchEvolutionGroups(
     headers['apikey'] = secrets.api_key || '';
   }
 
-  const url = `${baseUrl}/group/fetchAllGroups/${identifier}?getParticipants=true`;
+  const url = `${baseUrl}/group/fetchAllGroups/${identifier}?getParticipants=false`;
   console.log(`${LOG} Evolution GET ${url}`);
   const res = await fetch(url, { headers });
   if (!res.ok) {
@@ -133,18 +96,7 @@ async function fetchEvolutionGroups(
       name: g.subject || g.name || '',
       pictureUrl: g.profilePictureUrl ?? null,
       participantCount: g.size ?? null,
-      participants: (g.participants || []).map((p: any) => {
-        // Evolution retorna id como: "5547999@s.whatsapp.net", "5547999:42@s.whatsapp.net", ou "267542@lid"
-        const rawId = p.id || p.jid || '';
-        const isLid = rawId.includes('@lid') || (!rawId.includes('@s.whatsapp.net') && !rawId.includes('@g.us'));
-        let phone = rawId.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '').replace(/:\d+$/, '');
-        return {
-          phone,
-          name: p.name || p.pushName || p.notify || null,
-          admin: p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin === true || p.isSuperAdmin === true,
-          isLid,
-        };
-      }),
+      participants: [],
     }))
     .filter((g: SyncedGroup) => !!g.jid);
 }
@@ -231,30 +183,23 @@ Deno.serve(async (req) => {
 
     console.log(`${LOG} Fetched ${groups.length} groups from provider`);
 
-    // Resolver LIDs para números reais (apenas Evolution)
+    // Buscar participantes reais por grupo (Evolution only — usa endpoint que retorna phoneNumber)
     if (instance.provider_type !== 'zapi' && instance.provider_type !== 'meta_cloud') {
       const identifier = instance.provider_type === 'cloud' && instance.instance_id_external
         ? instance.instance_id_external
         : instance.instance_name;
-      const contactsMap = await fetchEvolutionContactsMap(secrets, identifier, instance.provider_type);
 
-      if (contactsMap.size > 0) {
-        for (const g of groups) {
-          if (!g.participants) continue;
-          g.participants = g.participants.map((p) => {
-            if (!p.isLid) return p;
-            const resolved = contactsMap.get(p.phone);
-            if (resolved) {
-              return { ...p, phone: resolved.phone, name: p.name || resolved.name, isLid: false };
-            }
-            return p;
-          });
-        }
-        const totalResolved = groups.reduce(
-          (acc, g) => acc + (g.participants?.filter((p) => !p.isLid).length || 0), 0
+      for (const g of groups) {
+        if (!g.jid) continue;
+        const realParticipants = await fetchGroupParticipantsEvolution(
+          secrets, identifier, instance.provider_type, g.jid
         );
-        console.log(`${LOG} Resolved ${totalResolved} participant phones from contacts map`);
+        if (realParticipants.length > 0) {
+          g.participants = realParticipants;
+          g.participantCount = realParticipants.length;
+        }
       }
+      console.log(`${LOG} Fetched real participants for ${groups.length} groups`);
     }
 
     const nowIso = new Date().toISOString();
