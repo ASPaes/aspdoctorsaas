@@ -414,12 +414,19 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const messageType = getMessageType(message);
     const timestamp = new Date(messageTimestamp * 1000).toISOString();
 
-    // Filtro de grupos
+    // Filtro de grupos: verificar whitelist em whatsapp_groups
     if (isGroup) {
-      const { data: instCfg } = await supabase.from('whatsapp_instances')
-        .select('ignore_group_messages').eq('id', instanceData.id).single();
-      if (instCfg?.ignore_group_messages !== false) {
-        console.log(`${LOG} Group message ignored: ${key.remoteJid}`);
+      const groupJid = key.remoteJid.includes('@') ? key.remoteJid : `${phone}@g.us`;
+      const { data: grpCfg } = await supabase
+        .from('whatsapp_groups')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('instance_id', instanceData.id)
+        .eq('group_jid', groupJid)
+        .eq('enabled', true)
+        .maybeSingle();
+      if (!grpCfg) {
+        console.log(`${LOG} Group not whitelisted, ignoring: ${groupJid}`);
         return;
       }
     }
