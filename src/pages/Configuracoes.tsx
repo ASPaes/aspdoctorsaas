@@ -43,6 +43,7 @@ import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstan
 import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
+import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
 import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
@@ -97,6 +98,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
+          <TabsTrigger value="grupos">Grupos</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="pausas">Pausas</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
@@ -108,6 +110,10 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
 
         <TabsContent value="setup" className="mt-4">
           <SetupGuideCollapsible />
+        </TabsContent>
+
+        <TabsContent value="grupos" className="mt-4">
+          <WhatsAppGroupsTab />
         </TabsContent>
 
         <TabsContent value="atendimento" className="mt-4">
