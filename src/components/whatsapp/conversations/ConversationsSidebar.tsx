@@ -177,11 +177,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     let closed = 0;
     let afterHours = 0;
     let groups = 0;
+    let groupsUnread = 0;
 
     for (const conv of conversations) {
       // Grupos são separados — não entram nas pills normais
       if ((conv as any).is_group === true) {
-        groups += (conv.unread_count || 0);
+        groups++;
+        if ((conv.unread_count || 0) > 0) groupsUnread++;
         continue;
       }
 
@@ -220,7 +222,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
-    return { inProgress, waiting, closed, afterHours, groups };
+    return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
   }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
@@ -532,6 +534,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           closedCount={pillCounts.closed}
           afterHoursCount={pillCounts.afterHours}
           groupsCount={pillCounts.groups}
+          groupsHasUnread={pillCounts.groupsUnread > 0}
         />
       </div>
       )}
