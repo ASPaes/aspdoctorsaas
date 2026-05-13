@@ -5702,118 +5702,6 @@ export type Database = {
           valor_ativacao: number | null
           valor_repasse: number | null
         }
-        Insert: {
-          area_atuacao_id?: number | null
-          cancelado?: boolean | null
-          cert_a1_ultima_venda_em?: string | null
-          cert_a1_ultimo_vendedor_id?: number | null
-          cert_a1_vencimento?: string | null
-          cidade_id?: number | null
-          cnpj?: string | null
-          codigo_sequencial?: number | null
-          created_at?: string | null
-          custo_fixo_percentual?: number | null
-          custo_operacao?: number | null
-          data_ativacao?: string | null
-          data_cadastro?: string | null
-          data_cancelamento?: string | null
-          data_reajuste?: string | null
-          data_reativacao?: string | null
-          data_venda?: string | null
-          email?: string | null
-          estado_id?: number | null
-          fator_preco_cogs_x?: never
-          fixos_rs?: never
-          forma_pagamento_ativacao_id?: number | null
-          forma_pagamento_mensalidade_id?: number | null
-          fornecedor_id?: number | null
-          funcionario_id?: number | null
-          id?: string | null
-          imposto_percentual?: number | null
-          impostos_rs?: never
-          lucro_bruto?: never
-          lucro_real?: never
-          margem_bruta_percent?: never
-          margem_contribuicao?: never
-          markup_cogs_percent?: never
-          mensalidade?: number | null
-          modelo_contrato_id?: number | null
-          motivo_cancelamento_id?: number | null
-          nome_fantasia?: string | null
-          observacao_cancelamento?: string | null
-          observacao_cliente?: string | null
-          observacao_negociacao?: string | null
-          observacao_reativacao?: string | null
-          origem_venda_id?: number | null
-          produto_id?: number | null
-          razao_social?: string | null
-          reativado_por_user_id?: string | null
-          recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
-          segmento_id?: number | null
-          telefone_contato?: string | null
-          telefone_whatsapp?: string | null
-          tenant_id?: string | null
-          unidade_base_id?: number | null
-          updated_at?: string | null
-          valor_ativacao?: number | null
-          valor_repasse?: never
-        }
-        Update: {
-          area_atuacao_id?: number | null
-          cancelado?: boolean | null
-          cert_a1_ultima_venda_em?: string | null
-          cert_a1_ultimo_vendedor_id?: number | null
-          cert_a1_vencimento?: string | null
-          cidade_id?: number | null
-          cnpj?: string | null
-          codigo_sequencial?: number | null
-          created_at?: string | null
-          custo_fixo_percentual?: number | null
-          custo_operacao?: number | null
-          data_ativacao?: string | null
-          data_cadastro?: string | null
-          data_cancelamento?: string | null
-          data_reajuste?: string | null
-          data_reativacao?: string | null
-          data_venda?: string | null
-          email?: string | null
-          estado_id?: number | null
-          fator_preco_cogs_x?: never
-          fixos_rs?: never
-          forma_pagamento_ativacao_id?: number | null
-          forma_pagamento_mensalidade_id?: number | null
-          fornecedor_id?: number | null
-          funcionario_id?: number | null
-          id?: string | null
-          imposto_percentual?: number | null
-          impostos_rs?: never
-          lucro_bruto?: never
-          lucro_real?: never
-          margem_bruta_percent?: never
-          margem_contribuicao?: never
-          markup_cogs_percent?: never
-          mensalidade?: number | null
-          modelo_contrato_id?: number | null
-          motivo_cancelamento_id?: number | null
-          nome_fantasia?: string | null
-          observacao_cancelamento?: string | null
-          observacao_cliente?: string | null
-          observacao_negociacao?: string | null
-          observacao_reativacao?: string | null
-          origem_venda_id?: number | null
-          produto_id?: number | null
-          razao_social?: string | null
-          reativado_por_user_id?: string | null
-          recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
-          segmento_id?: number | null
-          telefone_contato?: string | null
-          telefone_whatsapp?: string | null
-          tenant_id?: string | null
-          unidade_base_id?: number | null
-          updated_at?: string | null
-          valor_ativacao?: number | null
-          valor_repasse?: never
-        }
         Relationships: [
           {
             foreignKeyName: "clientes_area_atuacao_id_fkey"
@@ -5858,13 +5746,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "clientes_fornecedor_id_fkey"
-            columns: ["fornecedor_id"]
-            isOneToOne: false
-            referencedRelation: "fornecedores"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "clientes_funcionario_id_fkey"
             columns: ["funcionario_id"]
             isOneToOne: false
@@ -5883,13 +5764,6 @@ export type Database = {
             columns: ["origem_venda_id"]
             isOneToOne: false
             referencedRelation: "origens_venda"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clientes_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
           {

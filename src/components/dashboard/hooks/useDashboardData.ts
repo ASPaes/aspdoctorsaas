@@ -44,6 +44,19 @@ export function useDashboardData(filters: DashboardFilters) {
       const periodoInicioStr = format(periodoInicio, 'yyyy-MM-dd');
       const periodoFimStr = format(periodoFim, 'yyyy-MM-dd');
 
+      // Fornecedor filter via cliente_produtos (deprecated clientes.fornecedor_id)
+      let fornecedorClientIds: Set<string> | null = null;
+      if (filters.fornecedorId) {
+        const cpByForn = await fetchAllRows<any>(() => {
+          let q = (supabase.from('cliente_produtos' as any) as any)
+            .select('cliente_id')
+            .eq('fornecedor_id', filters.fornecedorId);
+          if (tid) q = q.eq('tenant_id', tid);
+          return q;
+        });
+        fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
+      }
+
       // 1. Clientes ativos no fim do período — snapshot temporal
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       // Usa paginação para superar o limite de 1000 linhas do PostgREST (db-max-rows).
@@ -54,12 +67,12 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
 
       // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
         if (c.cancelado !== true) return true;
         if (!c.data_cancelamento) return false;
         return new Date(String(c.data_cancelamento)) > new Date(periodoFimStr);
@@ -76,12 +89,14 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
-      const novosCount = novosClientes?.length || 0;
-      const newMrr = novosClientes?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
-      const totalImplantacao = novosClientes?.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0) || 0;
+      const novosClientesFilt = fornecedorClientIds
+        ? (novosClientes || []).filter(c => fornecedorClientIds!.has(c.id))
+        : (novosClientes || []);
+      const novosCount = novosClientesFilt.length;
+      const newMrr = novosClientesFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+      const totalImplantacao = novosClientesFilt.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
 
       // 3. Cancelamentos no período — requer flag cancelado=true E data_cancelamento na janela
       const cancelamentos = await fetchAllRows<any>(() => {
@@ -94,17 +109,19 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cancelamento', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
-      const cancelamentosQtd = cancelamentos?.length || 0;
-      const mrrCancelado = cancelamentos?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
+      const cancelamentosFilt = fornecedorClientIds
+        ? (cancelamentos || []).filter(c => fornecedorClientIds!.has(c.id))
+        : (cancelamentos || []);
+      const cancelamentosQtd = cancelamentosFilt.length;
+      const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
       // Early churn (≤90 dias)
-      const earlyChurn = cancelamentos?.filter(c => {
+      const earlyChurn = cancelamentosFilt.filter(c => {
         if (!c.data_cadastro || !c.data_cancelamento) return false;
         return differenceInDays(new Date(c.data_cancelamento), new Date(c.data_cadastro)) <= 90;
-      }) || [];
+      });
       const cancelamentosEarly = earlyChurn.length;
       const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
@@ -116,11 +133,11 @@ export function useDashboardData(filters: DashboardFilters) {
           .lt('data_cadastro', periodoInicioStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
       // Ativo no início: não-cancelado, OU cancelado com data >= início (saiu no próprio período ou depois).
       const clientesInicioAtivos = (clientesInicioFull || []).filter(c => {
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
         if (c.cancelado !== true) return true;
         if (!c.data_cancelamento) return false;
         return new Date(String(c.data_cancelamento)) >= new Date(periodoInicioStr);
@@ -322,14 +339,16 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cadastro', prevMonthEnd)
           .eq('cancelado', false);
         if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) prevNovosQuery = prevNovosQuery.eq('fornecedor_id', filters.fornecedorId);
         if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
         return prevNovosQuery;
       });
 
-      const prevNovosClientes = prevNovos?.length ?? null;
-      const prevNewMrr = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) : null;
-      const prevTotalImplantacao = prevNovos ? prevNovos.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0) : null;
+      const prevNovosFilt = fornecedorClientIds
+        ? (prevNovos || []).filter(c => fornecedorClientIds!.has(c.id))
+        : (prevNovos || []);
+      const prevNovosClientes = prevNovosFilt.length;
+      const prevNewMrr = prevNovosFilt.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0);
+      const prevTotalImplantacao = prevNovosFilt.reduce((s, c) => s + (Number(c.valor_ativacao) || 0), 0);
 
       // Previous month movimentos for upsell/cross-sell delta
       const prevMovimentos = await fetchAllRows<any>(() => tf(supabase
@@ -410,7 +429,7 @@ export function useDashboardData(filters: DashboardFilters) {
           if (new Date(c.data_cadastro) >= startDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) < startDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
 
@@ -419,7 +438,7 @@ export function useDashboardData(filters: DashboardFilters) {
           if (new Date(c.data_cadastro) > endDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) <= endDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
         const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
@@ -441,7 +460,7 @@ export function useDashboardData(filters: DashboardFilters) {
           const dc = format(new Date(c.data_cadastro), 'yyyy-MM');
           if (dc !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
         const ativacoesMes = novosNoMes.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
@@ -452,7 +471,7 @@ export function useDashboardData(filters: DashboardFilters) {
           const dc = format(new Date(c.data_cancelamento), 'yyyy-MM');
           if (dc !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
         churnQtdEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.length });
@@ -542,7 +561,26 @@ export function useDashboardData(filters: DashboardFilters) {
       const porCidade = buildDistribution(activeClients, 'cidade_id', cidadeMap);
       const porSegmento = buildDistribution(activeClients, 'segmento_id', segmentoMap);
       const porAreaAtuacao = buildDistribution(activeClients, 'area_atuacao_id', areaMap);
-      const porFornecedor = buildDistribution(activeClients, 'fornecedor_id', fornecedorMap);
+      // Distribuição por fornecedor: fonte = cliente_produtos (multi-produto)
+      const cpForDistForn = await fetchAllRows<any>(() => {
+        let q = (supabase.from('cliente_produtos' as any) as any)
+          .select('cliente_id, fornecedor_id')
+          .eq('ativo', true);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+      const activeIds = new Set((clientesAtivos || []).map((c: any) => c.id));
+      const fornCounts: Record<string, number> = {};
+      (cpForDistForn || []).forEach((cp: any) => {
+        if (!activeIds.has(cp.cliente_id)) return;
+        const fname = fornecedorMap[cp.fornecedor_id];
+        if (fname) fornCounts[fname] = (fornCounts[fname] || 0) + 1;
+      });
+      const totalFornDist = Object.values(fornCounts).reduce((s, v) => s + v, 0) || 1;
+      const porFornecedor: DistributionDataPoint[] = Object.entries(fornCounts)
+        .map(([name, value]) => ({ name, value, percent: value / totalFornDist }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
       const porOrigemVenda = buildDistribution(activeClients, 'origem_venda_id', origemMap);
       const porMotivoCancelamento = buildDistribution(cancelamentos || [], 'motivo_cancelamento_id', motivoMap);
 
