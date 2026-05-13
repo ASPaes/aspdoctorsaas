@@ -276,7 +276,6 @@ export default function Clientes() {
       else if (val) q = q.eq(field, Number(val));
     };
     applyLookupFilter("modelo_contrato_id", modeloContratoId);
-    applyLookupFilter("produto_id", produtoId);
     applyLookupFilter("origem_venda_id", origemVendaId);
     applyLookupFilter("estado_id", estadoId);
     applyLookupFilter("cidade_id", cidadeId);
@@ -284,7 +283,6 @@ export default function Clientes() {
     applyLookupFilter("area_atuacao_id", areaAtuacaoId);
     applyLookupFilter("segmento_id", segmentoId);
     applyLookupFilter("funcionario_id", funcionarioId);
-    applyLookupFilter("fornecedor_id", fornecedorId);
 
     const applyDateRange = (field: string, range: DateRange) => {
       if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
