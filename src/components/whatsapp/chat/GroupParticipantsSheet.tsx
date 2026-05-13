@@ -24,6 +24,7 @@ interface Participant {
   phone: string;
   name: string | null;
   admin: boolean;
+  isLid?: boolean;
 }
 
 export default function GroupParticipantsSheet({
@@ -90,6 +91,11 @@ export default function GroupParticipantsSheet({
           <p className="text-xs text-muted-foreground">
             {count} participante{count !== 1 ? "s" : ""}
           </p>
+          {participants.some((p) => p.isLid) && (
+            <p className="text-[10px] text-amber-500/70 mt-1">
+              Alguns participantes usam ID interno do WhatsApp (multi-device)
+            </p>
+          )}
         </SheetHeader>
 
         <ScrollArea className="flex-1">
@@ -114,10 +120,13 @@ export default function GroupParticipantsSheet({
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">
-                      {p.name || p.phone}
+                      {p.name || (p.isLid ? 'Participante' : p.phone)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatBRPhone(p.phone)}
+                      {p.isLid
+                        ? `ID: ${p.phone.slice(0, 6)}...`
+                        : formatBRPhone(p.phone)
+                      }
                     </p>
                   </div>
                   {p.admin && (
