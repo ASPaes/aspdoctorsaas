@@ -339,6 +339,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
+  const [importMode, setImportMode] = useState<'selecting' | 'simplified' | 'detailed'>('selecting');
+  const [detailedType, setDetailedType] = useState<DetailedImportType | null>(null);
   const [rawLines, setRawLines] = useState<string[][]>([]);
   const [fileHeaders, setFileHeaders] = useState<string[]>([]);
   const [headersMatch, setHeadersMatch] = useState(false);
