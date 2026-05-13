@@ -442,7 +442,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {conversation.status === "active" && (
+                {conversation.status === "active" && !isGroupConv && (
                   <DropdownMenuItem onClick={() => archiveConversation(conversation.id)}>
                     <Archive className="h-4 w-4 mr-2" /> Arquivar
                   </DropdownMenuItem>
