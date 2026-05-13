@@ -6443,6 +6443,14 @@ export type Database = {
         Returns: Json
       }
       require_active_profile: { Args: never; Returns: boolean }
+      resolve_group_contact_name: {
+        Args: {
+          p_group_jid: string
+          p_instance_id: string
+          p_tenant_id: string
+        }
+        Returns: string
+      }
       resolve_user_notification_settings: {
         Args: { p_user_id: string }
         Returns: Json
