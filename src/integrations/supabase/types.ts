@@ -6023,6 +6023,14 @@ export type Database = {
       }
       fn_auto_offline_stale_agents: { Args: never; Returns: Json }
       fn_check_acceptance_timeouts: { Args: never; Returns: Json }
+      fn_close_attendance_atomic: {
+        Args: {
+          p_attendance_id: string
+          p_closed_reason?: string
+          p_closure_type?: string
+        }
+        Returns: Json
+      }
       fn_cohort_logos:
         | {
             Args: {
