@@ -29,6 +29,7 @@ interface Props {
   onContactSave?: (phone: string, name: string) => void;
   highlightMessageId?: string | null;
   onHighlightShown?: () => void;
+  isGroup?: boolean;
 }
 
 type TimelineItem =
