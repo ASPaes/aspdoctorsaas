@@ -184,6 +184,30 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     }
   }, [csatEnabled, closeConversation, conversation.id]);
 
+  const handleDeleteConversation = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const { data, error } = await supabase.rpc("delete_conversation_admin", {
+        p_conversation_id: conversation.id,
+      });
+      if (error) throw error;
+      const { toast } = await import("sonner").then(m => ({ toast: m.toast }));
+      toast.success("Conversa excluída com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+      onClose?.();
+    } catch (err: any) {
+      const { toast } = await import("sonner").then(m => ({ toast: m.toast }));
+      toast.error(err.message || "Erro ao excluir conversa");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setDeleteConfirmText("");
+    }
+  }, [conversation.id, queryClient, onClose]);
+
+  const deleteTargetName = (contact?.name || contact?.phone_number || "").trim();
+  const isGroupConv = (conversation as any)?.is_group === true;
+
   // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
   const { getSenderLabel } = useSenderMap();
