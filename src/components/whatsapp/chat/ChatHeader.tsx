@@ -463,6 +463,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
                   </DropdownMenuItem>
                 )}
+                {isAdmin && (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => { setDeleteConfirmText(""); setShowDeleteDialog(true); }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Excluir conversa
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
