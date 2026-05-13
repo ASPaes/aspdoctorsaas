@@ -183,30 +183,23 @@ Deno.serve(async (req) => {
 
     console.log(`${LOG} Fetched ${groups.length} groups from provider`);
 
-    // Resolver LIDs para números reais (apenas Evolution)
+    // Buscar participantes reais por grupo (Evolution only — usa endpoint que retorna phoneNumber)
     if (instance.provider_type !== 'zapi' && instance.provider_type !== 'meta_cloud') {
       const identifier = instance.provider_type === 'cloud' && instance.instance_id_external
         ? instance.instance_id_external
         : instance.instance_name;
-      const contactsMap = await fetchEvolutionContactsMap(secrets, identifier, instance.provider_type);
 
-      if (contactsMap.size > 0) {
-        for (const g of groups) {
-          if (!g.participants) continue;
-          g.participants = g.participants.map((p) => {
-            if (!p.isLid) return p;
-            const resolved = contactsMap.get(p.phone);
-            if (resolved) {
-              return { ...p, phone: resolved.phone, name: p.name || resolved.name, isLid: false };
-            }
-            return p;
-          });
-        }
-        const totalResolved = groups.reduce(
-          (acc, g) => acc + (g.participants?.filter((p) => !p.isLid).length || 0), 0
+      for (const g of groups) {
+        if (!g.jid) continue;
+        const realParticipants = await fetchGroupParticipantsEvolution(
+          secrets, identifier, instance.provider_type, g.jid
         );
-        console.log(`${LOG} Resolved ${totalResolved} participant phones from contacts map`);
+        if (realParticipants.length > 0) {
+          g.participants = realParticipants;
+          g.participantCount = realParticipants.length;
+        }
       }
+      console.log(`${LOG} Fetched real participants for ${groups.length} groups`);
     }
 
     const nowIso = new Date().toISOString();
