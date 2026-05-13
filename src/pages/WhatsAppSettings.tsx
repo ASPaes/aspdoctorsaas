@@ -31,6 +31,7 @@ export default function WhatsAppSettings() {
       <Tabs defaultValue="instances">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="instances">Instâncias</TabsTrigger>
+          <TabsTrigger value="grupos">Grupos</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           {isAdmin && <TabsTrigger value="pausas">Pausas</TabsTrigger>}
           <TabsTrigger value="macros">Macros</TabsTrigger>
