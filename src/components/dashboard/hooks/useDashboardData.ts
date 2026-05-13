@@ -89,12 +89,14 @@ export function useDashboardData(filters: DashboardFilters) {
           .lte('data_cadastro', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        if (filters.fornecedorId) q = q.eq('fornecedor_id', filters.fornecedorId);
         return q;
       });
-      const novosCount = novosClientes?.length || 0;
-      const newMrr = novosClientes?.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0) || 0;
-      const totalImplantacao = novosClientes?.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0) || 0;
+      const novosClientesFilt = fornecedorClientIds
+        ? (novosClientes || []).filter(c => fornecedorClientIds!.has(c.id))
+        : (novosClientes || []);
+      const novosCount = novosClientesFilt.length;
+      const newMrr = novosClientesFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+      const totalImplantacao = novosClientesFilt.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
 
       // 3. Cancelamentos no período — requer flag cancelado=true E data_cancelamento na janela
       const cancelamentos = await fetchAllRows<any>(() => {
