@@ -13,6 +13,7 @@ interface Fragment {
 interface Props {
   template: string;
   permiteEdicaoLivre: boolean;
+  prefillValues?: Record<string, string>;
   onCancel: () => void;
   onEditFreely: () => void;
   onSend: (finalText: string) => void;
@@ -37,7 +38,31 @@ function parseTemplate(template: string): Fragment[] {
   return fragments;
 }
 
-export function MacroFillCard({ template, permiteEdicaoLivre, onCancel, onEditFreely, onSend, isSending }: Props) {
+function computeInitialValues(template: string, prefillValues?: Record<string, string>): { values: Record<number, string>; prefilled: Set<number> } {
+  const values: Record<number, string> = {};
+  const prefilled = new Set<number>();
+  if (!prefillValues) return { values, prefilled };
+  const frags = parseTemplate(template);
+  frags.forEach((f, idx) => {
+    if (f.type === "tag") {
+      const exact = prefillValues[f.value];
+      if (exact) {
+        values[idx] = exact;
+        prefilled.add(idx);
+        return;
+      }
+      const lower = f.value.toLowerCase();
+      const key = Object.keys(prefillValues).find((k) => k.toLowerCase() === lower);
+      if (key) {
+        values[idx] = prefillValues[key];
+        prefilled.add(idx);
+      }
+    }
+  });
+  return { values, prefilled };
+}
+
+export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
   const fragments = useMemo(() => parseTemplate(template), [template]);
 
   const tagOccurrences = useMemo(() => {
@@ -46,7 +71,9 @@ export function MacroFillCard({ template, permiteEdicaoLivre, onCancel, onEditFr
       .filter((x) => x.frag.type === "tag");
   }, [fragments]);
 
-  const [values, setValues] = useState<Record<number, string>>({});
+  const initial = useMemo(() => computeInitialValues(template, prefillValues), [template, prefillValues]);
+  const [values, setValues] = useState<Record<number, string>>(() => initial.values);
+  const prefilledSet = initial.prefilled;
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -108,7 +135,10 @@ export function MacroFillCard({ template, permiteEdicaoLivre, onCancel, onEditFr
               onChange={(e) => setValues((v) => ({ ...v, [idx]: e.target.value }))}
               onKeyDown={(e) => handleKeyDown(e, idx)}
               placeholder={`Digite: ${frag.value.toLowerCase()}`}
-              className="h-8 text-sm"
+              className={cn(
+                "h-8 text-sm",
+                prefilledSet.has(idx) && "border-emerald-500/30 bg-emerald-500/5"
+              )}
             />
           </div>
         ))}
