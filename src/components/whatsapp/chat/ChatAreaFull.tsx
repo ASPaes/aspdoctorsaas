@@ -231,6 +231,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onEnterSelectionMode={enterSelectionMode}
           onContactChat={handleContactChat}
           onContactSave={handleContactSave}
+          isGroup={(conversation as any)?.is_group === true}
         />
 
         {/* Selection action bar */}
