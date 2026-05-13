@@ -302,13 +302,13 @@ export function MessageBubble({
       >
         {isFromMe ? (
           <>
-            {bubbleContent}
+            {messageContent}
             <Checkbox checked={isSelected} className="shrink-0" />
           </>
         ) : (
           <>
             <Checkbox checked={isSelected} className="shrink-0" />
-            {bubbleContent}
+            {messageContent}
           </>
         )}
       </div>
@@ -363,7 +363,7 @@ export function MessageBubble({
       onDoubleClick={() => onReply?.(msg)}
     >
       {isFromMe && actionsMenu}
-      {bubbleContent}
+      {messageContent}
       {!isFromMe && actionsMenu}
     </div>
   );
