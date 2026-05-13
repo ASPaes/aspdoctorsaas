@@ -74,10 +74,21 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
   const initial = useMemo(() => computeInitialValues(template, prefillValues), [template, prefillValues]);
   const [values, setValues] = useState<Record<number, string>>(() => initial.values);
   const prefilledSet = initial.prefilled;
-  const firstInputRef = useRef<HTMLInputElement>(null);
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const sendBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setTimeout(() => firstInputRef.current?.focus(), 0);
+    setTimeout(() => {
+      // Focus first empty input; if none, focus send button
+      const firstEmptyPos = tagOccurrences.findIndex(({ idx }) => !(values[idx] || "").trim());
+      if (firstEmptyPos >= 0) {
+        inputRefs.current[firstEmptyPos]?.focus();
+        inputRefs.current[firstEmptyPos]?.select();
+      } else {
+        sendBtnRef.current?.focus();
+      }
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const allFilled = tagOccurrences.every(({ idx }) => (values[idx] || "").trim() !== "");
@@ -97,13 +108,25 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
     onSend(finalText);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, currentIdx: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent, currentPos: number) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const idxs = tagOccurrences.map((o) => o.idx);
-      const lastIdx = idxs[idxs.length - 1];
-      if (currentIdx === lastIdx && allFilled) {
-        handleSend();
+      // Find next empty input after current position
+      const nextEmptyPos = tagOccurrences.findIndex(
+        ({ idx }, pos) => pos !== currentPos && !(values[idx] || "").trim()
+      );
+      if (nextEmptyPos >= 0) {
+        inputRefs.current[nextEmptyPos]?.focus();
+        inputRefs.current[nextEmptyPos]?.select();
+        return;
+      }
+      // No empty fields left
+      if (allFilled) {
+        if (currentPos === tagOccurrences.length - 1) {
+          handleSend();
+        } else {
+          sendBtnRef.current?.focus();
+        }
       }
     }
   };
@@ -130,10 +153,10 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
           <div key={`${idx}-${i}`} className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">{frag.value}</label>
             <Input
-              ref={i === 0 ? firstInputRef : undefined}
+              ref={(el) => (inputRefs.current[i] = el)}
               value={values[idx] || ""}
               onChange={(e) => setValues((v) => ({ ...v, [idx]: e.target.value }))}
-              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onKeyDown={(e) => handleKeyDown(e, i)}
               placeholder={`Digite: ${frag.value.toLowerCase()}`}
               className={cn(
                 "h-8 text-sm",
@@ -181,6 +204,7 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
           Cancelar
         </Button>
         <Button
+          ref={sendBtnRef}
           type="button"
           size="sm"
           onClick={handleSend}
