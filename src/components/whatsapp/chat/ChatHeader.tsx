@@ -380,7 +380,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               <TooltipContent side="bottom" className="text-xs">Analisar sentimento</TooltipContent>
             </Tooltip>
 
-            {canSchedule && (
+            {canSchedule && !isGroupConv && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
