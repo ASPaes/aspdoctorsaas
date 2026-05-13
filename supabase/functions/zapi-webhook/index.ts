@@ -145,13 +145,18 @@ async function processZapiWebhook(req: Request): Promise<void> {
     (rawJid.replace(/\D/g, '').length > 15);
 
   if (isGroup) {
-    const { data: instCfg } = await supabase
-      .from('whatsapp_instances')
-      .select('ignore_group_messages')
-      .eq('id', instanceId)
-      .single();
-    if (instCfg?.ignore_group_messages !== false) {
-      console.log(`${LOG} Mensagem de grupo ignorada: ${rawJid}`);
+    const rawGroupId = rawJid.replace(/\D/g, '').split('@')[0] || rawJid;
+    const groupJid = rawJid.includes('@g.us') ? rawJid : `${rawGroupId}@g.us`;
+    const { data: grpCfg } = await supabase
+      .from('whatsapp_groups')
+      .select('id')
+      .eq('tenant_id', instance.tenant_id)
+      .eq('instance_id', instanceId)
+      .eq('group_jid', groupJid)
+      .eq('enabled', true)
+      .maybeSingle();
+    if (!grpCfg) {
+      console.log(`${LOG} Group not whitelisted, ignoring: ${groupJid}`);
       return;
     }
   }
@@ -231,7 +236,7 @@ async function processZapiWebhook(req: Request): Promise<void> {
     instanceInfo,
     secrets: vaultSecrets,
     messageId,
-    remoteJid: `${normalizedPhone}@s.whatsapp.net`,
+    remoteJid: isGroup ? `${rawJid.includes('@g.us') ? rawJid : rawJid.replace(/\D/g, '').split('@')[0] + '@g.us'}` : `${normalizedPhone}@s.whatsapp.net`,
     fromMe: false,
     pushName: payload?.senderName || payload?.name || '',
     content,
