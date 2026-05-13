@@ -43,6 +43,10 @@ import {
   ArrowRight,
   Loader2,
   Info,
+  Package,
+  Users,
+  Layers,
+  FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,6 +66,12 @@ import {
   FIELD_DESCRIPTIONS,
   downloadTemplateMinimoCsv,
   downloadTemplateCompletoCsv,
+  DetailedImportType,
+  getDetailedConfig,
+  downloadDetailedClientesCsv,
+  downloadDetailedProdutosCsv,
+  downloadDetailedModulosCsv,
+  downloadDetailedContratosCsv,
 } from "./clienteImportTemplate";
 
 // All system field names derived from FRIENDLY_TO_SYSTEM
