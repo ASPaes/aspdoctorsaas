@@ -398,7 +398,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {conversation.status === "active" && (
+            {conversation.status === "active" && !isGroupConv && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
