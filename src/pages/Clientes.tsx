@@ -8,6 +8,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { format, parseISO } from "date-fns";
 import { cn, escapeLike } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
+import { fetchAllRows } from "@/lib/supabasePaginate";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
