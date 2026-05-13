@@ -23,6 +23,59 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function fetchEvolutionContactsMap(
+  secrets: InstanceSecrets,
+  identifier: string,
+  providerType: string,
+): Promise<Map<string, { phone: string; name: string | null }>> {
+  const map = new Map<string, { phone: string; name: string | null }>();
+  try {
+    const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (providerType === 'cloud') {
+      headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
+    } else {
+      headers['apikey'] = secrets.api_key || '';
+    }
+
+    const res = await fetch(`${baseUrl}/chat/findContacts/${identifier}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ where: {} }),
+    });
+
+    if (!res.ok) {
+      console.log(`${LOG} findContacts returned ${res.status} — skipping LID resolution`);
+      return map;
+    }
+
+    const contacts = await res.json();
+    for (const c of (Array.isArray(contacts) ? contacts : [])) {
+      const id = c.id || '';
+      const lid = c.lid || '';
+      const pushName = c.pushName || c.name || c.notify || null;
+
+      // Extrair número do id (formato: 5547999999999@s.whatsapp.net ou 5547999999999:42@s.whatsapp.net)
+      const phoneFromId = id.replace('@s.whatsapp.net', '').replace(/@.*/, '').replace(/:\d+$/, '');
+      const lidClean = lid.replace('@lid', '').replace(/@.*/, '');
+
+      // Se tem LID e telefone válido, mapear LID → telefone
+      if (lidClean && phoneFromId && phoneFromId.length >= 10 && phoneFromId.length <= 15) {
+        map.set(lidClean, { phone: phoneFromId, name: pushName });
+      }
+      // Também mapear o próprio phone (pra caso o participante não seja LID)
+      if (phoneFromId && phoneFromId.length >= 10 && phoneFromId.length <= 15) {
+        map.set(phoneFromId, { phone: phoneFromId, name: pushName });
+      }
+    }
+
+    console.log(`${LOG} Contact map built: ${map.size} entries`);
+  } catch (err) {
+    console.error(`${LOG} fetchEvolutionContactsMap error:`, err);
+  }
+  return map;
+}
+
 async function fetchEvolutionGroups(
   secrets: InstanceSecrets,
   identifier: string,
@@ -148,6 +201,32 @@ Deno.serve(async (req) => {
     }
 
     console.log(`${LOG} Fetched ${groups.length} groups from provider`);
+
+    // Resolver LIDs para números reais (apenas Evolution)
+    if (instance.provider_type !== 'zapi' && instance.provider_type !== 'meta_cloud') {
+      const identifier = instance.provider_type === 'cloud' && instance.instance_id_external
+        ? instance.instance_id_external
+        : instance.instance_name;
+      const contactsMap = await fetchEvolutionContactsMap(secrets, identifier, instance.provider_type);
+
+      if (contactsMap.size > 0) {
+        for (const g of groups) {
+          if (!g.participants) continue;
+          g.participants = g.participants.map((p) => {
+            if (!p.isLid) return p;
+            const resolved = contactsMap.get(p.phone);
+            if (resolved) {
+              return { ...p, phone: resolved.phone, name: p.name || resolved.name, isLid: false };
+            }
+            return p;
+          });
+        }
+        const totalResolved = groups.reduce(
+          (acc, g) => acc + (g.participants?.filter((p) => !p.isLid).length || 0), 0
+        );
+        console.log(`${LOG} Resolved ${totalResolved} participant phones from contacts map`);
+      }
+    }
 
     const nowIso = new Date().toISOString();
     if (groups.length > 0) {
