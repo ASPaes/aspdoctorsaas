@@ -29,50 +29,79 @@ async function fetchEvolutionContactsMap(
   providerType: string,
 ): Promise<Map<string, { phone: string; name: string | null }>> {
   const map = new Map<string, { phone: string; name: string | null }>();
-  try {
-    const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (providerType === 'cloud') {
-      headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
-    } else {
-      headers['apikey'] = secrets.api_key || '';
-    }
-
-    const res = await fetch(`${baseUrl}/chat/findContacts/${identifier}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ where: {} }),
-    });
-
-    if (!res.ok) {
-      console.log(`${LOG} findContacts returned ${res.status} — skipping LID resolution`);
-      return map;
-    }
-
-    const contacts = await res.json();
-    for (const c of (Array.isArray(contacts) ? contacts : [])) {
-      const id = c.id || '';
-      const lid = c.lid || '';
-      const pushName = c.pushName || c.name || c.notify || null;
-
-      // Extrair número do id (formato: 5547999999999@s.whatsapp.net ou 5547999999999:42@s.whatsapp.net)
-      const phoneFromId = id.replace('@s.whatsapp.net', '').replace(/@.*/, '').replace(/:\d+$/, '');
-      const lidClean = lid.replace('@lid', '').replace(/@.*/, '');
-
-      // Se tem LID e telefone válido, mapear LID → telefone
-      if (lidClean && phoneFromId && phoneFromId.length >= 10 && phoneFromId.length <= 15) {
-        map.set(lidClean, { phone: phoneFromId, name: pushName });
-      }
-      // Também mapear o próprio phone (pra caso o participante não seja LID)
-      if (phoneFromId && phoneFromId.length >= 10 && phoneFromId.length <= 15) {
-        map.set(phoneFromId, { phone: phoneFromId, name: pushName });
-      }
-    }
-
-    console.log(`${LOG} Contact map built: ${map.size} entries`);
-  } catch (err) {
-    console.error(`${LOG} fetchEvolutionContactsMap error:`, err);
+  const baseUrl = (secrets.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+  const headers: Record<string, string> = {};
+  if (providerType === 'cloud') {
+    headers['Authorization'] = `Bearer ${secrets.api_key || ''}`;
+  } else {
+    headers['apikey'] = secrets.api_key || '';
   }
+
+  // Tenta múltiplos endpoints da Evolution API pra encontrar mapeamento LID → telefone
+  const endpoints = [
+    { method: 'POST', url: `${baseUrl}/chat/findContacts/${identifier}`, body: JSON.stringify({ where: {} }) },
+    { method: 'GET', url: `${baseUrl}/chat/contacts/${identifier}`, body: null },
+    { method: 'POST', url: `${baseUrl}/chat/findContacts/${identifier}`, body: JSON.stringify({ where: { id: { contains: '@s.whatsapp.net' } } }) },
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      const fetchOpts: RequestInit = { method: ep.method, headers: { ...headers } };
+      if (ep.body) {
+        fetchOpts.body = ep.body;
+        (fetchOpts.headers as Record<string, string>)['Content-Type'] = 'application/json';
+      }
+
+      console.log(`${LOG} Trying contacts endpoint: ${ep.method} ${ep.url}`);
+      const res = await fetch(ep.url, fetchOpts);
+
+      if (!res.ok) {
+        console.log(`${LOG} Endpoint returned ${res.status} — trying next`);
+        continue;
+      }
+
+      const raw = await res.json();
+      const contacts = Array.isArray(raw) ? raw : (raw?.contacts || raw?.data || []);
+
+      console.log(`${LOG} Endpoint returned ${contacts.length} contacts. Sample: ${JSON.stringify(contacts[0] || {}).substring(0, 300)}`);
+
+      if (contacts.length === 0) continue;
+
+      for (const c of contacts) {
+        const rawId = c.id || c.jid || '';
+        const rawLid = c.lid || c.lidJid || '';
+        const pushName = c.pushName || c.name || c.notify || c.verifiedName || c.shortName || null;
+
+        // Extrair telefone do id (5547999999999@s.whatsapp.net ou 5547999999999:42@s.whatsapp.net)
+        const phoneFromId = rawId.replace('@s.whatsapp.net', '').replace(/@.*/, '').replace(/:\d+$/, '');
+        // Extrair LID limpo
+        const lidClean = rawLid.replace('@lid', '').replace(/@.*/, '').replace(/:\d+$/, '');
+
+        const isValidPhone = phoneFromId && /^\d{10,15}$/.test(phoneFromId) && !phoneFromId.startsWith('0');
+
+        // Mapear LID → telefone
+        if (lidClean && isValidPhone) {
+          map.set(lidClean, { phone: phoneFromId, name: pushName });
+        }
+        // Mapear telefone → telefone (pra participantes sem LID)
+        if (isValidPhone) {
+          map.set(phoneFromId, { phone: phoneFromId, name: pushName });
+        }
+      }
+
+      if (map.size > 0) {
+        console.log(`${LOG} Contact map built: ${map.size} entries from ${ep.url}`);
+        break; // Sucesso, não tenta próximo endpoint
+      }
+    } catch (err) {
+      console.error(`${LOG} Error trying endpoint:`, err);
+    }
+  }
+
+  if (map.size === 0) {
+    console.log(`${LOG} No contacts could be resolved from any endpoint`);
+  }
+
   return map;
 }
 
