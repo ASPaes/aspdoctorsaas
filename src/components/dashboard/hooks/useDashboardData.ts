@@ -429,7 +429,7 @@ export function useDashboardData(filters: DashboardFilters) {
           if (new Date(c.data_cadastro) >= startDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) < startDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
 
@@ -438,7 +438,7 @@ export function useDashboardData(filters: DashboardFilters) {
           if (new Date(c.data_cadastro) > endDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) <= endDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
         const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
@@ -460,7 +460,7 @@ export function useDashboardData(filters: DashboardFilters) {
           const dc = format(new Date(c.data_cadastro), 'yyyy-MM');
           if (dc !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
         const ativacoesMes = novosNoMes.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
@@ -471,7 +471,7 @@ export function useDashboardData(filters: DashboardFilters) {
           const dc = format(new Date(c.data_cancelamento), 'yyyy-MM');
           if (dc !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
-          if (filters.fornecedorId && c.fornecedor_id !== filters.fornecedorId) return false;
+          if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
         churnQtdEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.length });
