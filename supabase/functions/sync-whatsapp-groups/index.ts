@@ -81,7 +81,7 @@ async function fetchEvolutionGroups(
     headers['apikey'] = secrets.api_key || '';
   }
 
-  const url = `${baseUrl}/group/fetchAllGroups/${identifier}?getParticipants=true`;
+  const url = `${baseUrl}/group/fetchAllGroups/${identifier}?getParticipants=false`;
   console.log(`${LOG} Evolution GET ${url}`);
   const res = await fetch(url, { headers });
   if (!res.ok) {
@@ -96,18 +96,7 @@ async function fetchEvolutionGroups(
       name: g.subject || g.name || '',
       pictureUrl: g.profilePictureUrl ?? null,
       participantCount: g.size ?? null,
-      participants: (g.participants || []).map((p: any) => {
-        // Evolution retorna id como: "5547999@s.whatsapp.net", "5547999:42@s.whatsapp.net", ou "267542@lid"
-        const rawId = p.id || p.jid || '';
-        const isLid = rawId.includes('@lid') || (!rawId.includes('@s.whatsapp.net') && !rawId.includes('@g.us'));
-        let phone = rawId.replace('@s.whatsapp.net', '').replace('@lid', '').replace('@g.us', '').replace(/:\d+$/, '');
-        return {
-          phone,
-          name: p.name || p.pushName || p.notify || null,
-          admin: p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin === true || p.isSuperAdmin === true,
-          isLid,
-        };
-      }),
+      participants: [],
     }))
     .filter((g: SyncedGroup) => !!g.jid);
 }
