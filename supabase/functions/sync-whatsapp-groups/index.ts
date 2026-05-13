@@ -203,6 +203,64 @@ Deno.serve(async (req) => {
         }
       }
       console.log(`${LOG} Fetched real participants for ${groups.length} groups`);
+
+      // Resolver nomes: cruzar telefones com whatsapp_contacts e clientes
+      const allPhones = new Set<string>();
+      for (const g of groups) {
+        for (const p of (g.participants || [])) {
+          if (p.phone && !p.isLid) allPhones.add(p.phone);
+        }
+      }
+
+      if (allPhones.size > 0) {
+        const phonesArr = Array.from(allPhones);
+
+        // Buscar nomes de contatos WhatsApp
+        const { data: contacts } = await supabase
+          .from('whatsapp_contacts')
+          .select('phone_number, name')
+          .eq('tenant_id', instance.tenant_id)
+          .eq('is_group', false)
+          .in('phone_number', phonesArr);
+
+        const nameMap = new Map<string, string>();
+        for (const c of (contacts || [])) {
+          if (c.name && c.name !== c.phone_number) {
+            nameMap.set(c.phone_number, c.name);
+          }
+        }
+
+        // Buscar nomes de clientes pelo telefone
+        if (nameMap.size < phonesArr.length) {
+          const { data: clientes } = await supabase
+            .from('clientes')
+            .select('telefone_whatsapp, telefone_whatsapp_contato, nome_fantasia, razao_social')
+            .eq('tenant_id', instance.tenant_id)
+            .eq('cancelado', false);
+
+          for (const cl of (clientes || [])) {
+            const nome = cl.nome_fantasia || cl.razao_social;
+            if (!nome) continue;
+            for (const tel of [cl.telefone_whatsapp, cl.telefone_whatsapp_contato]) {
+              if (tel && phonesArr.includes(tel) && !nameMap.has(tel)) {
+                nameMap.set(tel, nome);
+              }
+            }
+          }
+        }
+
+        // Aplicar nomes resolvidos
+        if (nameMap.size > 0) {
+          for (const g of groups) {
+            for (const p of (g.participants || [])) {
+              if (!p.name && p.phone && nameMap.has(p.phone)) {
+                p.name = nameMap.get(p.phone)!;
+              }
+            }
+          }
+          console.log(`${LOG} Resolved ${nameMap.size} participant names from contacts/clientes`);
+        }
+      }
     }
 
     const nowIso = new Date().toISOString();
