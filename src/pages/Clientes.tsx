@@ -298,9 +298,9 @@ export default function Clientes() {
 
     return q;
   }, [
-    areaAtuacaoId, cidadeId, debouncedSearch, estadoId, fornecedorId, funcionarioId,
+    areaAtuacaoId, cidadeId, debouncedSearch, estadoId, funcionarioId,
     modeloContratoId, motivoCancelamentoId, origemVendaId, periodoAtivacao, periodoCadastro,
-    periodoCancelamento, periodoVenda, produtoId, recorrenciaAdv, segmentoId, status,
+    periodoCancelamento, periodoVenda, recorrenciaAdv, segmentoId, status,
     unidadeBaseQuick, valueFilters,
   ]);
 
