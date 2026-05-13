@@ -18,6 +18,7 @@ import {
 
 interface Props {
   msg: Message;
+  reactions?: string[];
   onReply?: (msg: Message) => void;
   selectionMode?: boolean;
   isSelected?: boolean;
@@ -39,6 +40,7 @@ function canDeletePanelOnly(msg: Message): boolean {
 
 export function MessageBubble({
   msg,
+  reactions,
   onReply,
   selectionMode,
   isSelected,
