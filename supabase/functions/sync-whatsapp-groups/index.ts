@@ -214,37 +214,59 @@ Deno.serve(async (req) => {
 
       if (allPhones.size > 0) {
         const phonesArr = Array.from(allPhones);
-
-        // Buscar nomes de contatos WhatsApp
-        const { data: contacts } = await supabase
-          .from('whatsapp_contacts')
-          .select('phone_number, name')
-          .eq('tenant_id', instance.tenant_id)
-          .eq('is_group', false)
-          .in('phone_number', phonesArr);
+        // Gerar variantes com/sem nono dígito (55DD + 8 dígitos ↔ 55DD9 + 8 dígitos)
+        const allVariants: string[] = [];
+        const variantToOriginal = new Map<string, string>();
+        for (const ph of phonesArr) {
+          allVariants.push(ph);
+          variantToOriginal.set(ph, ph);
+          if (ph.startsWith('55') && ph.length === 12) {
+            const with9 = ph.slice(0, 4) + '9' + ph.slice(4);
+            allVariants.push(with9);
+            variantToOriginal.set(with9, ph);
+          }
+          if (ph.startsWith('55') && ph.length === 13) {
+            const without9 = ph.slice(0, 4) + ph.slice(5);
+            allVariants.push(without9);
+            variantToOriginal.set(without9, ph);
+          }
+        }
 
         const nameMap = new Map<string, string>();
-        for (const c of (contacts || [])) {
-          if (c.name && c.name !== c.phone_number) {
-            nameMap.set(c.phone_number, c.name);
+
+        // Buscar nomes de contatos WhatsApp (chunks de 100 pra evitar limite PostgREST)
+        for (let i = 0; i < allVariants.length; i += 100) {
+          const chunk = allVariants.slice(i, i + 100);
+          const { data: contacts } = await supabase
+            .from('whatsapp_contacts')
+            .select('phone_number, name')
+            .eq('tenant_id', instance.tenant_id)
+            .eq('is_group', false)
+            .in('phone_number', chunk);
+
+          for (const c of (contacts || [])) {
+            if (c.name && c.name !== c.phone_number) {
+              const original = variantToOriginal.get(c.phone_number) || c.phone_number;
+              if (!nameMap.has(original)) nameMap.set(original, c.name);
+            }
           }
         }
 
         // Buscar nomes de clientes pelo telefone
-        if (nameMap.size < phonesArr.length) {
-          const { data: clientes } = await supabase
-            .from('clientes')
-            .select('telefone_whatsapp, telefone_whatsapp_contato, nome_fantasia, razao_social')
-            .eq('tenant_id', instance.tenant_id)
-            .eq('cancelado', false);
+        const { data: clientes } = await supabase
+          .from('clientes')
+          .select('telefone_whatsapp, telefone_whatsapp_contato, nome_fantasia, razao_social')
+          .eq('tenant_id', instance.tenant_id)
+          .eq('cancelado', false);
 
-          for (const cl of (clientes || [])) {
-            const nome = cl.nome_fantasia || cl.razao_social;
-            if (!nome) continue;
-            for (const tel of [cl.telefone_whatsapp, cl.telefone_whatsapp_contato]) {
-              if (tel && phonesArr.includes(tel) && !nameMap.has(tel)) {
-                nameMap.set(tel, nome);
-              }
+        for (const cl of (clientes || [])) {
+          const nome = cl.nome_fantasia || cl.razao_social;
+          if (!nome) continue;
+          for (const tel of [cl.telefone_whatsapp, cl.telefone_whatsapp_contato]) {
+            if (!tel) continue;
+            const original = variantToOriginal.get(tel);
+            if (original && !nameMap.has(original)) {
+              nameMap.set(original, nome);
             }
           }
         }
