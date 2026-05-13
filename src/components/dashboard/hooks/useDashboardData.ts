@@ -561,7 +561,26 @@ export function useDashboardData(filters: DashboardFilters) {
       const porCidade = buildDistribution(activeClients, 'cidade_id', cidadeMap);
       const porSegmento = buildDistribution(activeClients, 'segmento_id', segmentoMap);
       const porAreaAtuacao = buildDistribution(activeClients, 'area_atuacao_id', areaMap);
-      const porFornecedor = buildDistribution(activeClients, 'fornecedor_id', fornecedorMap);
+      // Distribuição por fornecedor: fonte = cliente_produtos (multi-produto)
+      const cpForDistForn = await fetchAllRows<any>(() => {
+        let q = (supabase.from('cliente_produtos' as any) as any)
+          .select('cliente_id, fornecedor_id')
+          .eq('ativo', true);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+      const activeIds = new Set((clientesAtivos || []).map((c: any) => c.id));
+      const fornCounts: Record<string, number> = {};
+      (cpForDistForn || []).forEach((cp: any) => {
+        if (!activeIds.has(cp.cliente_id)) return;
+        const fname = fornecedorMap[cp.fornecedor_id];
+        if (fname) fornCounts[fname] = (fornCounts[fname] || 0) + 1;
+      });
+      const totalFornDist = Object.values(fornCounts).reduce((s, v) => s + v, 0) || 1;
+      const porFornecedor: DistributionDataPoint[] = Object.entries(fornCounts)
+        .map(([name, value]) => ({ name, value, percent: value / totalFornDist }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
       const porOrigemVenda = buildDistribution(activeClients, 'origem_venda_id', origemMap);
       const porMotivoCancelamento = buildDistribution(cancelamentos || [], 'motivo_cancelamento_id', motivoMap);
 
