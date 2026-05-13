@@ -824,7 +824,18 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     }
   }
 
-  const contactId = await findOrCreateContact(supabase, instanceId, phone, pushName || phone, isGroup, fromMe, tenantId);
+  // Para grupos: resolver nome real do grupo em vez de usar pushName do remetente
+  let contactName = pushName || phone;
+  if (isGroup) {
+    const groupJidResolved = remoteJid.includes('@') ? remoteJid : `${phone}@g.us`;
+    const { data: resolvedName } = await supabase.rpc('resolve_group_contact_name', {
+      p_tenant_id: tenantId,
+      p_instance_id: instanceId,
+      p_group_jid: groupJidResolved,
+    });
+    if (resolvedName) contactName = resolvedName;
+  }
+  const contactId = await findOrCreateContact(supabase, instanceId, phone, contactName, isGroup, fromMe, tenantId);
   if (!contactId) return;
 
   // [PAUSADO 2026-04-28] Sync de foto desabilitado por causar carga excessiva no DB.
