@@ -517,6 +517,13 @@ export default function Clientes() {
     return m;
   }, [lookups.unidadesBase.data]);
 
+  // Módulos filtrados pelo produto selecionado (se houver)
+  const filteredModulos = useMemo(() => {
+    const all = lookups.produtoModulos.data || [];
+    if (!produtoId) return all;
+    return all.filter((m) => String(m.produto_id) === produtoId);
+  }, [lookups.produtoModulos.data, produtoId]);
+
   // Ticket Médio — calculado sobre TODA a base filtrada (não só a página atual),
   // dividido por todos os clientes (incluindo MRR=0), mesma fórmula do Dashboard:
   //   ticket_medio = SUM(mensalidade + deltas_ativos) / COUNT(clientes)
