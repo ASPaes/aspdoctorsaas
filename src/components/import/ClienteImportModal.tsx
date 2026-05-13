@@ -418,6 +418,8 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setDuplicataAcao(null);
     setDuplicataOpcao('pular');
     setImportPhase('');
+    setImportMode('selecting');
+    setDetailedType(null);
     // cnpjsDuplicadosNoBanco is local — no state to reset
   }, []);
 
