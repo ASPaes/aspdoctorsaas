@@ -643,6 +643,13 @@ export default function Clientes() {
     if (segmentoId) badges.push({ key: "seg", label: "Segmento", displayValue: resolveLabel(segmentoId, lookups.segmentos.data), onClear: () => updateFilter("segmentoId", "") });
     if (funcionarioId) badges.push({ key: "func", label: "Funcionário", displayValue: resolveLabel(funcionarioId, lookups.funcionarios.data), onClear: () => updateFilter("funcionarioId", "") });
     if (fornecedorId) badges.push({ key: "forn", label: "Fornecedor", displayValue: resolveLabel(fornecedorId, lookups.fornecedores.data), onClear: () => updateFilter("fornecedorId", "") });
+    if (moduloIds.length > 0) {
+      const nomes = moduloIds.map((mid) => {
+        const mod = (lookups.produtoModulos.data || []).find((m) => m.id === mid);
+        return mod?.nome || mid;
+      }).join(", ");
+      badges.push({ key: "mod", label: "Módulos", displayValue: nomes, onClear: () => updateFilter("moduloIds", []) });
+    }
     if (estadoId) badges.push({ key: "est", label: "Estado", displayValue: resolveLabel(estadoId, lookups.estados.data as any), onClear: () => updateFilter("estadoId", "") });
     if (cidadeId) badges.push({ key: "cid", label: "Cidade", displayValue: resolveLabel(cidadeId, lookups.cidades.data), onClear: () => updateFilter("cidadeId", "") });
     if (motivoCancelamentoId) badges.push({ key: "mot", label: "Motivo Cancel.", displayValue: resolveLabel(motivoCancelamentoId, lookups.motivosCancelamento.data?.map(m => ({ id: m.id, nome: m.descricao }))), onClear: () => updateFilter("motivoCancelamentoId", "") });
