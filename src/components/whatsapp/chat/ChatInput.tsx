@@ -114,6 +114,10 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     }
   }, [message, macros]);
 
+  useEffect(() => {
+    setMacroSelectedIndex(0);
+  }, [filteredMacros]);
+
   // Send attached file as media
   const sendAttachedFile = useCallback(async (file: File, caption?: string) => {
     if (isBlocked) {
