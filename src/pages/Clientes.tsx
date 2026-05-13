@@ -218,8 +218,8 @@ export default function Clientes() {
       || valueFilters.margemMin !== null
       || valueFilters.margemMax !== null;
 
-    return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes);
-  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes]);
+    return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes || hasProductStructureFilters);
+  }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes, hasProductStructureFilters]);
 
   const round2 = useCallback((n: number) => Math.round((n + Number.EPSILON) * 100) / 100, []);
 
