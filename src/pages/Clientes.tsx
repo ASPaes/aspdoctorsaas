@@ -955,6 +955,49 @@ export default function Clientes() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={(v) => updateFilter("lucroMin", v)} onMaxChange={(v) => updateFilter("lucroMax", v)} prefix="R$" />
               <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={(v) => updateFilter("margemMin", v)} onMaxChange={(v) => updateFilter("margemMax", v)} prefix="%" />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Módulos</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 w-full justify-between text-xs font-normal">
+                      <span className="truncate">
+                        {moduloIds.length > 0
+                          ? `${moduloIds.length} módulo(s) selecionado(s)`
+                          : "Selecionar módulos..."}
+                      </span>
+                      <ChevronDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[260px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar módulo..." className="h-8" />
+                      <CommandList>
+                        <CommandEmpty>Nenhum módulo encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredModulos.map((mod) => {
+                            const isSelected = moduloIds.includes(mod.id);
+                            return (
+                              <CommandItem
+                                key={mod.id}
+                                value={mod.nome}
+                                onSelect={() => {
+                                  const next = isSelected
+                                    ? moduloIds.filter((id) => id !== mod.id)
+                                    : [...moduloIds, mod.id];
+                                  updateFilter("moduloIds", next);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                {mod.nome}
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
               <div className="flex items-center gap-2 pt-5">
                 <Checkbox
                   id="somente-matrizes"
