@@ -1346,10 +1346,121 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           <DialogTitle>Importar Clientes</DialogTitle>
         </DialogHeader>
 
-        <StepIndicator current={step} />
+        <StepIndicator current={step} mode={importMode} />
+
+        {/* ===================== STEP 0 — Seletor de Modo ===================== */}
+        {importMode === 'selecting' && (
+          <div className="space-y-4">
+            <div className="text-center space-y-1 mb-2">
+              <h3 className="text-base font-semibold">Como deseja importar?</h3>
+              <p className="text-sm text-muted-foreground">Escolha o modelo que melhor se adapta à sua base de dados</p>
+            </div>
+            {/* Card Simplificado */}
+            <button
+              onClick={() => { setImportMode('simplified'); setStep(1); }}
+              className="w-full text-left rounded-lg border-2 border-border hover:border-primary/50 p-5 transition-all hover:bg-primary/5 group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                  <FileSpreadsheet className="w-5 h-5 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">Simplificado</p>
+                  <p className="text-xs text-muted-foreground">1 arquivo — cada linha é um cliente com seu produto e contrato. Ideal para migração rápida ou bases simples.</p>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {['Cliente', 'Produto', 'Contrato'].map(t => (
+                      <span key={t} className="text-[10px] bg-muted rounded px-1.5 py-0.5 text-muted-foreground">{t}</span>
+                    ))}
+                    <span className="text-[10px] text-muted-foreground">— tudo em 1 arquivo</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+            {/* Card Detalhado */}
+            <button
+              onClick={() => { setImportMode('detailed'); setStep(1); }}
+              className="w-full text-left rounded-lg border-2 border-border hover:border-primary/50 p-5 transition-all hover:bg-primary/5 group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0 group-hover:bg-accent/20 transition-colors">
+                  <Layers className="w-5 h-5 text-accent" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">Detalhado</p>
+                  <p className="text-xs text-muted-foreground">4 templates separados — importe clientes, depois produtos, módulos e contratos individualmente. Ideal para bases completas com múltiplos produtos por cliente.</p>
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {['1. Clientes', '2. Produtos', '3. Módulos', '4. Contratos'].map(t => (
+                      <span key={t} className="text-[10px] bg-muted rounded px-1.5 py-0.5 text-muted-foreground">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* ===================== MODO DETALHADO — Hub (step 1) ===================== */}
+        {importMode === 'detailed' && step === 1 && (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold">Importação Detalhada</h3>
+              <p className="text-sm text-muted-foreground">Importe cada tipo de dados separadamente. A ordem importa: clientes primeiro, depois produtos, módulos e contratos.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                { type: 'clientes' as DetailedImportType, icon: Users, label: 'Clientes', desc: 'Dados cadastrais, endereço, contato', download: downloadDetailedClientesCsv, order: 1, color: 'text-green-500' },
+                { type: 'produtos' as DetailedImportType, icon: Package, label: 'Produtos', desc: 'Produto, fornecedor, valores mensais', download: downloadDetailedProdutosCsv, order: 2, color: 'text-blue-500' },
+                { type: 'modulos' as DetailedImportType, icon: Layers, label: 'Módulos', desc: 'Módulos por produto, valores unitários', download: downloadDetailedModulosCsv, order: 3, color: 'text-purple-500' },
+                { type: 'contratos' as DetailedImportType, icon: FileText, label: 'Contratos', desc: 'Vigência, fidelidade, reajuste', download: downloadDetailedContratosCsv, order: 4, color: 'text-orange-500' },
+              ]).map(item => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.type} className="rounded-lg border p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold bg-muted ${item.color}`}>{item.order}</div>
+                      <Icon className={`w-4 h-4 ${item.color}`} />
+                      <span className="text-sm font-semibold">{item.label}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={item.download} className="gap-1 text-xs h-8">
+                        <Download className="w-3 h-3" /> Template
+                      </Button>
+                      <Button size="sm" onClick={() => { setDetailedType(item.type); setStep(2); }} className="gap-1 text-xs h-8">
+                        <Upload className="w-3 h-3" /> Importar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="rounded-md border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 p-3">
+              <p className="text-xs text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span><strong>Ordem obrigatória:</strong> Importe Clientes primeiro. Produtos exigem CNPJ existente. Módulos exigem CNPJ + Produto. Contratos exigem CNPJ + Produto.</span>
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setImportMode('selecting')} className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> Trocar modo
+            </Button>
+          </div>
+        )}
+
+        {/* ===================== MODO DETALHADO — Steps 2+ (placeholder) ===================== */}
+        {importMode === 'detailed' && step >= 2 && (
+          <div className="space-y-4 py-8 text-center">
+            <Layers className="w-10 h-10 mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Importação detalhada de <strong>{detailedType ? getDetailedConfig(detailedType)?.label : ''}</strong> — em desenvolvimento.
+            </p>
+            <Button variant="outline" onClick={() => { setStep(1); setDetailedType(null); }} className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> Voltar ao Hub
+            </Button>
+          </div>
+        )}
 
         {/* ===================== STEP 1 — Template ===================== */}
-        {step === 1 && (
+        {importMode === 'simplified' && step === 1 && (
           <div className="space-y-4">
             {/* Card 1 — Campos Obrigatórios */}
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-2">
