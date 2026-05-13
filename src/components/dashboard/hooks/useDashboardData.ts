@@ -196,9 +196,9 @@ export function useDashboardData(filters: DashboardFilters) {
       // Build set of ALL clients matching current filters (ativos + cancelados no período)
       // to correctly filter movimentos by fornecedor/unidade
       const allClientesFiltered = new Set([
-        ...(clientesRaw || []).map(c => c.id),
-        ...(cancelamentos || []).map(c => c.id),
-        ...(novosClientes || []).map(c => c.id),
+        ...(clientesAtivos || []).map(c => c.id),
+        ...(cancelamentosFilt || []).map(c => c.id),
+        ...(novosClientesFilt || []).map(c => c.id),
       ]);
 
       const needsClientFilter = !!(filters.fornecedorId || filters.unidadeBaseId);
