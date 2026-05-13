@@ -348,7 +348,7 @@ export async function findOrCreateContact(
 }
 
 export async function findOrCreateConversation(
-  supabase: any, instanceId: string, contactId: string, tenantId: string, isFromMe: boolean = false
+  supabase: any, instanceId: string, contactId: string, tenantId: string, isFromMe: boolean = false, isGroup: boolean = false, groupJid: string | null = null
 ): Promise<string | null> {
   try {
     const { data: existing } = await supabase.from('whatsapp_conversations').select('id, department_id, status').eq('tenant_id', tenantId).eq('instance_id', instanceId).eq('contact_id', contactId).maybeSingle();
@@ -361,7 +361,7 @@ export async function findOrCreateConversation(
     }
 
     const departmentId = await resolveDepartmentForInstance(supabase, instanceId, tenantId);
-    const { data: newConv, error } = await supabase.from('whatsapp_conversations').insert({ instance_id: instanceId, contact_id: contactId, status: isFromMe ? 'closed' : 'active', tenant_id: tenantId, ...(departmentId ? { department_id: departmentId } : {}) }).select('id').single();
+    const { data: newConv, error } = await supabase.from('whatsapp_conversations').insert({ instance_id: instanceId, contact_id: contactId, status: isFromMe ? 'closed' : 'active', tenant_id: tenantId, is_group: isGroup, group_jid: groupJid, ...(departmentId ? { department_id: departmentId } : {}) }).select('id').single();
     if (error) { console.error('[processor] Error creating conversation:', error); return null; }
 
     // Auto-assignment is now handled by database triggers on support_attendances (Phase 1 distribution engine).
@@ -808,7 +808,21 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
 
   const { phone, isGroup } = normalizePhoneNumber(remoteJid.includes('@') ? remoteJid : `${remoteJid}@s.whatsapp.net`);
 
-  if (isGroup) { const { data: cfg } = await supabase.from('whatsapp_instances').select('ignore_group_messages').eq('id', instanceId).single(); if (cfg?.ignore_group_messages !== false) return; }
+  if (isGroup) {
+    const groupJid = remoteJid.includes('@') ? remoteJid : `${phone}@g.us`;
+    const { data: grpCfg } = await supabase
+      .from('whatsapp_groups')
+      .select('id, enabled')
+      .eq('tenant_id', tenantId)
+      .eq('instance_id', instanceId)
+      .eq('group_jid', groupJid)
+      .eq('enabled', true)
+      .maybeSingle();
+    if (!grpCfg) {
+      console.log('[processor] Group not whitelisted, ignoring:', groupJid);
+      return;
+    }
+  }
 
   const contactId = await findOrCreateContact(supabase, instanceId, phone, pushName || phone, isGroup, fromMe, tenantId);
   if (!contactId) return;
@@ -828,7 +842,8 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   //   }).catch(() => {});
   // }
 
-  const conversationId = await findOrCreateConversation(supabase, instanceId, contactId, tenantId, fromMe);
+  const groupJidForConv = isGroup ? (remoteJid.includes('@') ? remoteJid : `${phone}@g.us`) : null;
+  const conversationId = await findOrCreateConversation(supabase, instanceId, contactId, tenantId, fromMe, isGroup, groupJidForConv);
   if (!conversationId) return;
 
   const { data: savedMsg, error: msgError } = await supabase.from('whatsapp_messages').upsert({
@@ -899,6 +914,12 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   if (isNewer) { upd.last_message_at = timestamp; upd.last_message_preview = content.substring(0, 200); upd.is_last_message_from_me = fromMe; }
   if (!fromMe) upd.unread_count = (currentConv?.unread_count || 0) + 1;
   if (Object.keys(upd).length > 0) await supabase.from('whatsapp_conversations').update(upd).eq('id', conversationId);
+
+  // Grupos: pular TODA automação (URA, business hours, CSAT, attendance, sentiment)
+  if (isGroup) {
+    console.log('[processor] Group message saved, skipping automation for', conversationId);
+    return;
+  }
 
   const ctx: SendContext = { instanceId, tenantId, providerType, instanceInfo, secrets, remoteJid: remoteJid.includes('@') ? remoteJid : `${remoteJid}@s.whatsapp.net`, contactName: pushName || phone };
 
