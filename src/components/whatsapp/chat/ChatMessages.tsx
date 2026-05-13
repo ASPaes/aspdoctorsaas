@@ -119,7 +119,9 @@ export function ChatMessages({
 
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
-    const items: TimelineItem[] = messages.map(msg => ({ type: 'message' as const, msg }));
+    const items: TimelineItem[] = messages
+      .filter(msg => msg.message_type !== 'reaction')
+      .map(msg => ({ type: 'message' as const, msg }));
     if (assignments) {
       for (const event of assignments) {
         items.push({ type: 'transfer' as const, event });
