@@ -176,8 +176,15 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     let waiting = 0;
     let closed = 0;
     let afterHours = 0;
+    let groups = 0;
 
     for (const conv of conversations) {
+      // Grupos são separados — não entram nas pills normais
+      if ((conv as any).is_group === true) {
+        groups++;
+        continue;
+      }
+
       const state = getStateForConv(conv);
 
       // Department filter for counts (skip for after_hours which is tenant-wide)
@@ -213,7 +220,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
-    return { inProgress, waiting, closed, afterHours };
+    return { inProgress, waiting, closed, afterHours, groups };
   }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
