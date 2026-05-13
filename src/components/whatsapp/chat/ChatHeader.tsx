@@ -416,7 +416,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               </Tooltip>
             )}
 
-            {(conversation.status === "closed" || conversation.status === "archived") && (
+            {(conversation.status === "closed" || conversation.status === "archived") && !isGroupConv && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => reopenConversation(conversation.id)} aria-label="Reabrir conversa">
