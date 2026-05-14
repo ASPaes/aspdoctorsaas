@@ -343,8 +343,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const resolveValueLabel = (field: string, value: string | null): string => {
     if (!value) return "—";
     switch (field) {
-      case "status":
-        return STATUS_LABELS[value] ?? value;
+      case "status_id": {
+        const si = ticketStatuses.find(s => s.id === value);
+        return si ? si.name : value.slice(0, 8) + "...";
+      }
       case "responsavel_user_id":
         return eventAgents.find(a => a.user_id === value)?.nome ?? value.slice(0, 8) + "...";
       case "department_id":
