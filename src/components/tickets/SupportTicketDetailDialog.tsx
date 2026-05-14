@@ -991,7 +991,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <Sparkles className="h-3.5 w-3.5" />
               Resumo parcial
             </Button>
-            {ticket?.status === "concluido" && (
+            {getStatusInfo(ticket?.status_id).isTerminal && (
               <Button
                 size="sm"
                 variant="outline"
