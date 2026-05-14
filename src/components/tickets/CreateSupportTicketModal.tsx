@@ -458,7 +458,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Setor</Label>
+              <Label className="text-sm font-medium">Setor <Req /></Label>
               <Select value={departamentoId} onValueChange={setDepartamentoId}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o setor..." />
