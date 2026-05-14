@@ -1095,9 +1095,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Plus className="h-4 w-4 mr-1.5" />
           Ticket filho
         </Button>
+        {isAdminOrHead && (
+          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Excluir
+          </Button>
+        )}
       </div>
-
-      {/* Conversas vinculadas */}
       {linkedAttendances.length > 0 && (
         <div className="space-y-2 pt-2">
           <Separator />
