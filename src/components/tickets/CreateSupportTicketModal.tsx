@@ -50,7 +50,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setServiceTypeId("");
     setCanalOrigem("telefone");
     setTipoHorario("comercial");
-    setStatus("concluido");
+    setStatusId("");
     setAgendadoPara("");
     setObservacaoAgente("");
     setDepartamentoId("");
