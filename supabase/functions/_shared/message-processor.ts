@@ -610,11 +610,31 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
 
     // Holiday/exception lookup (mesmo dia + próximos 14 dias)
     const exceptions = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 14);
-    const isHolidayToday = !!(exceptions.today && exceptions.today.is_closed);
 
     const dayKey = tzDayKey(msgDate, tz);
     const tParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(msgDate);
     const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+    // Feriado com horário reduzido (use_template) — usa janela do template
+    if (exceptions.today?.use_template && exceptions.template) {
+      const t = exceptions.template;
+      const open = t.open_at.slice(0, 5);
+      const close = t.close_at.slice(0, 5);
+      const inTurn = currentTime >= open && currentTime < close;
+      const inBreak = !!(t.has_break && t.break_start && t.break_end &&
+        currentTime >= t.break_start.slice(0, 5) && currentTime < t.break_end.slice(0, 5));
+      if (inTurn && !inBreak) return { inside: true };
+      // fora da janela do template → trata como feriado fechado abaixo
+    }
+
+    // Feriado fechado o dia inteiro: is_closed=true sem use_template, OU use_template fora da janela.
+    const isHolidayToday = !!(
+      exceptions.today &&
+      (
+        (exceptions.today.is_closed && !exceptions.today.use_template) ||
+        (exceptions.today.use_template && !!exceptions.template) // já filtrado acima quando dentro
+      )
+    );
 
     const dayConfig = businessHours[dayKey];
     const slots: { start: string; end: string }[] = (dayConfig?.slots || []).slice();
