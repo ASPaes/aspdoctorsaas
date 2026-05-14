@@ -1606,6 +1606,26 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
         }}
       />
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir ticket?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            O ticket <span className="font-mono font-semibold text-foreground">{ticket?.ticket_code}</span> será excluído permanentemente. Esta ação não pode ser desfeita.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleSoftDelete} disabled={deleting}>
+              {deleting && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+              Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
