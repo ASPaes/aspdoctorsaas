@@ -405,10 +405,8 @@ export default function Configuracoes() {
             <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
           </>
         );
-      case "status-tickets":
-        return <TicketStatusesConfig />;
-      case "tags-tickets":
-        return <TicketTagsConfig />;
+      case "tickets-config":
+        return <TicketSettingsTab />;
       default:
         return null;
     }
