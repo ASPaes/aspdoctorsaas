@@ -434,6 +434,37 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     },
   });
 
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["ticket_statuses_detail", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, slug, color, position, is_initial, is_terminal, is_active, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; name: string; slug: string; color: string;
+        position: number; is_initial: boolean; is_terminal: boolean;
+        is_active: boolean; department_id: string | null;
+      }>;
+    },
+  });
+
+  const getStatusInfo = (statusId: string | null) => {
+    if (!statusId) return { name: "Sem status", color: "#6b7280", isTerminal: false };
+    const found = ticketStatuses.find(s => s.id === statusId);
+    return found
+      ? { name: found.name, color: found.color, isTerminal: found.is_terminal }
+      : { name: "—", color: "#6b7280", isTerminal: false };
+  };
+
+  const statusesForDepartment = useMemo(() => {
+    if (!ticket?.department_id) return ticketStatuses;
+    return ticketStatuses.filter(s => s.department_id === ticket.department_id);
+  }, [ticketStatuses, ticket?.department_id]);
+
   const handleFieldUpdate = async (fields: Record<string, any>) => {
     if (!ticketId) return;
     setUpdating(true);
