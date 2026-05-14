@@ -684,6 +684,25 @@ export default function SupportTickets() {
                             {(() => { const si = getStatusInfo(t.status_id); return (
                               <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
                             ); })()}
+                            {(() => {
+                              const tags = (t.ticket_tag_assignments ?? [])
+                                .map(a => a.tag)
+                                .filter(Boolean);
+                              if (tags.length === 0) return null;
+                              return (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {tags.map(tag => (
+                                    <span
+                                      key={tag!.id}
+                                      className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                      style={{ background: tag!.color + "22", color: tag!.color }}
+                                    >
+                                      {tag!.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                           {breadcrumb && (
                             <p className="text-xs text-muted-foreground truncate">
