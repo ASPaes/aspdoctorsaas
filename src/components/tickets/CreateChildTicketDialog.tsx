@@ -35,7 +35,7 @@ export function CreateChildTicketDialog({
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  const [status, setStatus] = useState<string>("aberto");
+  
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [responsavel, setResponsavel] = useState<string>("");
   const [canal, setCanal] = useState<string>("");
@@ -43,7 +43,6 @@ export function CreateChildTicketDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
-    setStatus("aberto");
     setAgendadoPara("");
     setResponsavel("");
     setCanal("");
@@ -82,18 +81,14 @@ export function CreateChildTicketDialog({
       toast.error("Informe a observação do agente");
       return;
     }
-    if (status === "agendado" && !agendadoPara) {
-      toast.error("Informe a data de agendamento");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const { error } = await (supabase.rpc as any)("create_child_ticket", {
         p_parent_ticket_id: parentTicketId,
         p_observacao_agente: observacao,
-        p_status: status,
-        p_agendado_para: status === "agendado" && agendadoPara ? new Date(agendadoPara).toISOString() : null,
+        p_status_id: null,
+        p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
         p_responsavel_uid: responsavel || null,
         p_canal_origem: canal || null,
       });
@@ -140,35 +135,21 @@ export function CreateChildTicketDialog({
               </div>
             )}
             <p className="text-[11px] text-muted-foreground italic pt-1">
-              A classificação será herdada do ticket pai.
+              A classificação será herdada do ticket pai. O ticket filho será criado no status inicial do setor.
             </p>
           </div>
 
           {/* Status + Agendado */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Status <Req /></Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aberto">Aberto</SelectItem>
-                  <SelectItem value="agendado">Agendado</SelectItem>
-                  <SelectItem value="aguardando_terceiro">Aguardando terceiro</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-sm font-medium">Agendado para</Label>
+              <Input
+                type="datetime-local"
+                className="h-10"
+                value={agendadoPara}
+                onChange={(e) => setAgendadoPara(e.target.value)}
+              />
             </div>
-
-            {status === "agendado" && (
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Agendado para <Req /></Label>
-                <Input
-                  type="datetime-local"
-                  className="h-10"
-                  value={agendadoPara}
-                  onChange={(e) => setAgendadoPara(e.target.value)}
-                />
-              </div>
-            )}
           </div>
 
           {/* Responsável + Canal */}
