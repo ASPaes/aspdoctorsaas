@@ -381,9 +381,6 @@ export default function Configuracoes() {
   const meta = SECTION_META[activeSection] ?? { breadcrumb: [activeSection], title: activeSection, description: "" };
 
   const renderContent = () => {
-    if (activeSection === "setores") {
-      return <SetoresTab />;
-    }
     if (CADASTRO_SECTIONS.includes(activeSection)) {
       return <CadastrosTab section={activeSection} />;
     }
