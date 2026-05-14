@@ -195,6 +195,24 @@ export default function BusinessHoursExceptionsSection() {
     },
   });
 
+  const toggleTemplateMutation = useMutation({
+    mutationFn: async ({ id, useTemplate }: { id: string; useTemplate: boolean }) => {
+      if (useTemplate && !templateValido) {
+        throw new Error("Configure o horário em feriados primeiro (acima de Domingo).");
+      }
+      const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
+        .update({ use_template: useTemplate, is_closed: !useTemplate })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Não foi possível alternar", description: err.message, variant: "destructive" });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: async (ano: number) => {
       if (!tid) throw new Error("tenant_id ausente");
