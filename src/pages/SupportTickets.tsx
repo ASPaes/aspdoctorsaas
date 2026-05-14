@@ -352,7 +352,7 @@ export default function SupportTickets() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <TicketCheck className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">Tickets Suporte</h1>
+          <h1 className="text-2xl font-bold">Tickets</h1>
         </div>
         {activeTab === "tickets" && isAdminOrHead && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
