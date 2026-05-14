@@ -32,7 +32,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
   const [tipoHorario, setTipoHorario] = useState<string>("comercial");
-  const [status, setStatus] = useState<string>("concluido");
+  const [statusId, setStatusId] = useState<string>("");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
   const [departamentoId, setDepartamentoId] = useState("");
@@ -50,7 +50,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setServiceTypeId("");
     setCanalOrigem("telefone");
     setTipoHorario("comercial");
-    setStatus("concluido");
+    setStatusId("");
     setAgendadoPara("");
     setObservacaoAgente("");
     setDepartamentoId("");
@@ -140,6 +140,21 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["create_ticket_statuses", tid, departamentoId],
+    enabled: !!tid && !!departamentoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, color, position, is_initial, is_terminal")
+        .eq("tenant_id", tid)
+        .eq("department_id", departamentoId)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string; position: number; is_initial: boolean; is_terminal: boolean }>;
+    },
+  });
+
   const { data: agentes = [] } = useQuery({
     queryKey: ["create_ticket_agentes", tid],
     enabled: !!tid,
@@ -215,6 +230,16 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setSubcategoryId("");
   }, [produtoId]);
 
+  useEffect(() => {
+    if (ticketStatuses.length > 0) {
+      const terminal = ticketStatuses.find((s) => s.is_terminal);
+      if (terminal) setStatusId(terminal.id);
+      else setStatusId(ticketStatuses[0].id);
+    } else {
+      setStatusId("");
+    }
+  }, [ticketStatuses]);
+
   const handleSubmit = async () => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
@@ -224,8 +249,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-    if (status === "agendado" && !agendadoPara) {
-      toast.error("Informe a data de agendamento");
+    if (!departamentoId) {
+      toast.error("Selecione o setor");
       return;
     }
 
@@ -240,10 +265,10 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_canal_origem: canalOrigem,
         p_tipo_horario: tipoHorario,
         p_observacao_agente: observacaoAgente || null,
-        p_status: status,
-        p_agendado_para: status === "agendado" ? new Date(agendadoPara).toISOString() : null,
+        p_status_id: statusId || null,
+        p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
         p_contact_id: null,
-        p_department_id: departamentoId || null,
+        p_department_id: departamentoId,
         p_responsavel_user_id: responsavelId || null,
         p_cliente_contato_id: clienteContatoId && clienteContatoId !== "principal" ? clienteContatoId : null,
         p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
@@ -433,7 +458,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Setor</Label>
+              <Label className="text-sm font-medium">Setor <Req /></Label>
               <Select value={departamentoId} onValueChange={setDepartamentoId}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o setor..." />
@@ -489,27 +514,32 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+              <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder={departamentoId ? "Selecione..." : "Selecione o setor primeiro"} />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="concluido">Concluído</SelectItem>
-                  <SelectItem value="aberto">Aberto</SelectItem>
-                  <SelectItem value="agendado">Agendado</SelectItem>
+                  {ticketStatuses.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                        {s.name}
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {status === "agendado" && (
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Agendado para <Req /></Label>
-                <Input
-                  type="datetime-local"
-                  className="h-10"
-                  value={agendadoPara}
-                  onChange={(e) => setAgendadoPara(e.target.value)}
-                />
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Agendado para</Label>
+              <Input
+                type="datetime-local"
+                className="h-10"
+                value={agendadoPara}
+                onChange={(e) => setAgendadoPara(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Observação */}
