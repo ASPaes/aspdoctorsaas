@@ -968,7 +968,48 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       )}
 
-      {/* Resumo IA do atendimento */}
+      {/* Checklist */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Checklist</span>
+          {((ticket?.checklist as any[]) ?? []).length > 0 && (
+            <Badge variant="outline" className="text-[10px]">
+              {((ticket.checklist as any[]) ?? []).filter((c: any) => c.done).length}/{((ticket.checklist as any[]) ?? []).length}
+            </Badge>
+          )}
+        </div>
+        <div className="space-y-1">
+          {((ticket?.checklist as any[]) ?? []).map((item: any, i: number) => (
+            <div key={i} className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50">
+              <Checkbox checked={!!item.done} onCheckedChange={() => handleToggleCheck(i)} />
+              <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>
+                {item.text}
+              </span>
+              <button
+                onClick={() => handleRemoveCheckItem(i)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            value={newCheckItem}
+            onChange={(e) => setNewCheckItem(e.target.value)}
+            placeholder="Novo item..."
+            className="h-8 text-sm flex-1"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCheckItem(); } }}
+          />
+          <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleAddCheckItem}>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+
       {attendance?.ai_summary && (
         <div className="bg-muted/30 rounded-lg p-3 space-y-2">
           <div className="flex items-center gap-1.5">
