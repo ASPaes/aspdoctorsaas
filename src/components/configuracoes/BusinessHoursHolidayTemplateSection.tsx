@@ -101,8 +101,8 @@ export default function BusinessHoursHolidayTemplateSection() {
           onClick={handleRadioClick}
           className="flex items-center gap-2 flex-wrap hover:opacity-80 transition-opacity"
         >
-          <div className={`w-4 h-4 rounded-full ${hasHorario && expanded ? "bg-primary" : "border-2 border-primary"} flex items-center justify-center shrink-0`}>
-            {hasHorario && expanded && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+          <div className={`w-4 h-4 rounded-full ${expanded ? "bg-primary" : "border-2 border-primary"} flex items-center justify-center shrink-0`}>
+            {expanded && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
           </div>
           <span className="font-medium text-sm">Horário em feriados</span>
           {expanded && (
