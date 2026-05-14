@@ -83,6 +83,7 @@ export default function SupportTickets() {
   const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [ticketsView, setTicketsView] = useState("lista");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const [kanbanAgendadoOpen, setKanbanAgendadoOpen] = useState(false);
