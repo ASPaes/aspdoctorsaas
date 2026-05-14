@@ -223,6 +223,7 @@ export default function SetoresTab() {
       setFormActive(dept.is_active);
       setFormFallback(dept.is_default_fallback);
       setRequiresTicket(dept.requires_ticket_on_close ?? false);
+      setUsaTickets(dept.usa_tickets ?? true);
     },
     []
   );
