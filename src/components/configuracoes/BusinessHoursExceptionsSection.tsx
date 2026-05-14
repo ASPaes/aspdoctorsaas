@@ -150,6 +150,7 @@ export default function BusinessHoursExceptionsSection() {
         type: formType,
         name: formName.trim() || null,
         is_closed: true,
+        use_template: false,
       };
 
       if (editingId) {
