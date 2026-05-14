@@ -108,13 +108,32 @@ export default function BusinessHoursExceptionsSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("business_hours_exceptions" as any)
-        .select("id, date, type, name, is_closed")
+        .select("id, date, type, name, is_closed, use_template")
         .eq("tenant_id", tid!)
         .order("date", { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as Exception[];
     },
   });
+
+  const { data: template } = useQuery<any>({
+    queryKey: ["tenant-holiday-template", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("tenant_holiday_template" as any) as any)
+        .select("*")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const templateValido = !!(template?.open_at && template?.close_at);
+  const formatTemplateRange = () => {
+    if (!templateValido) return "—";
+    return `${template.open_at.slice(0, 5)}–${template.close_at.slice(0, 5)}`;
+  };
 
   const datasJaCadastradas = useMemo(
     () => new Set(exceptions.map((e) => e.date)),
