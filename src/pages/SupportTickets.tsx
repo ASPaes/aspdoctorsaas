@@ -679,9 +679,9 @@ export default function SupportTickets() {
                             <p className="text-sm font-medium truncate">
                               {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
                             </p>
-                            <Badge className={`text-[10px] border ${STATUS_CLASSES[t.status] ?? ""}`}>
-                              {STATUS_LABELS[t.status] ?? t.status}
-                            </Badge>
+                            {(() => { const si = getStatusInfo(t.status_id); return (
+                              <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
+                            ); })()}
                           </div>
                           {breadcrumb && (
                             <p className="text-xs text-muted-foreground truncate">
