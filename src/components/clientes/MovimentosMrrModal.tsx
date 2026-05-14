@@ -181,6 +181,24 @@ export function MovimentosMrrModal({
   const { user, profile } = useAuth();
   const draftKey = `draft:mov_mrr:${profile?.tenant_id ?? "t"}:${user?.id ?? "u"}:new:${clienteId}`;
 
+  const { data: origensCatalogo = [], isLoading: loadingOrigens } = useQuery<OrigemOption[]>({
+    queryKey: ['origens_venda_catalog', profile?.tenant_id],
+    enabled: !!profile?.tenant_id && open,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      let q = supabase.from('origens_venda').select('id, nome');
+      if (profile?.tenant_id) q = q.eq('tenant_id', profile.tenant_id);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []) as OrigemOption[];
+    },
+  });
+
+  const setOrigemVendaDirty = useCallback((v: string) => {
+    setOrigemVenda(v);
+    formIsDirty.current = true;
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [movimentos, setMovimentos] = useState<MovimentoMrr[]>([]);
