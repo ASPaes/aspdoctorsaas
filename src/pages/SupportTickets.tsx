@@ -603,6 +603,25 @@ export default function SupportTickets() {
             </div>
           )}
 
+          {/* Abas de setor */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <button
+              onClick={() => setDepartmentFilter("all")}
+              className={departmentFilter === "all" ? "shrink-0 px-3 py-1.5 text-xs rounded-md bg-primary/10 text-primary font-medium" : "shrink-0 px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground transition-colors"}
+            >
+              Todos
+            </button>
+            {supportDepartments.map((dept) => (
+              <button
+                key={dept.id}
+                onClick={() => setDepartmentFilter(dept.id)}
+                className={departmentFilter === dept.id ? "shrink-0 px-3 py-1.5 text-xs rounded-md bg-primary/10 text-primary font-medium" : "shrink-0 px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground transition-colors"}
+              >
+                {dept.name}
+              </button>
+            ))}
+          </div>
+
           {/* Sub-abas de visualização */}
           <div className="flex items-center gap-1 border-b border-border">
             <button
