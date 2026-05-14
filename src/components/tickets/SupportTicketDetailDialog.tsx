@@ -90,6 +90,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [quickTagName, setQuickTagName] = useState("");
+  const [quickTagColor, setQuickTagColor] = useState("#3b82f6");
+  const [creatingTag, setCreatingTag] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
