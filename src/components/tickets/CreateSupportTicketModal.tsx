@@ -249,8 +249,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-    if (status === "agendado" && !agendadoPara) {
-      toast.error("Informe a data de agendamento");
+    if (!departamentoId) {
+      toast.error("Selecione o setor");
       return;
     }
 
@@ -265,10 +265,10 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_canal_origem: canalOrigem,
         p_tipo_horario: tipoHorario,
         p_observacao_agente: observacaoAgente || null,
-        p_status: status,
-        p_agendado_para: status === "agendado" ? new Date(agendadoPara).toISOString() : null,
+        p_status_id: statusId || null,
+        p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
         p_contact_id: null,
-        p_department_id: departamentoId || null,
+        p_department_id: departamentoId,
         p_responsavel_user_id: responsavelId || null,
         p_cliente_contato_id: clienteContatoId && clienteContatoId !== "principal" ? clienteContatoId : null,
         p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
