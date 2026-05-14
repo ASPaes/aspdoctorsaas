@@ -147,7 +147,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
         </TabsContent>
 
         <TabsContent value="setores" className="mt-4">
-          <SetoresTab />
+          <SetoresInstanciasTab />
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
