@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
 import { normalizeBRPhone, formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
 import BusinessHoursExceptionsSection from "./BusinessHoursExceptionsSection";
+import BusinessHoursHolidayTemplateSection from "./BusinessHoursHolidayTemplateSection";
 
 // ─── Types ───────────────────────────────────────────────────────
 interface TimeSlot {
