@@ -87,8 +87,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           items: [
             { value: "setores", label: "Setores" },
             { value: "funcionarios", label: "Funcionários" },
-            { value: "status-tickets", label: "Status de tickets" },
-            { value: "tags-tickets", label: "Tags de tickets" },
+            { value: "tickets-config", label: "Tickets" },
           ],
         },
         {
