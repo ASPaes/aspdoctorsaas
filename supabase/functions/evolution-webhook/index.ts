@@ -76,6 +76,11 @@ function getMessageContent(message: any, type: string): string {
     const count = message.contactsArrayMessage.contacts?.length || 0;
     return `📇 ${count} contato${count !== 1 ? 's' : ''}`;
   }
+  // PATCH: handle documentWithCaptionMessage caption
+  if (type === 'document') {
+    const docMsg = resolveDocumentMessage(message);
+    if (docMsg?.caption) return docMsg.caption;
+  }
   const mediaMessage = message[`${type}Message`];
   if (mediaMessage?.caption) return mediaMessage.caption;
   if (type === 'reaction') {
