@@ -81,18 +81,14 @@ export function CreateChildTicketDialog({
       toast.error("Informe a observação do agente");
       return;
     }
-    if (status === "agendado" && !agendadoPara) {
-      toast.error("Informe a data de agendamento");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const { error } = await (supabase.rpc as any)("create_child_ticket", {
         p_parent_ticket_id: parentTicketId,
         p_observacao_agente: observacao,
-        p_status: status,
-        p_agendado_para: status === "agendado" && agendadoPara ? new Date(agendadoPara).toISOString() : null,
+        p_status_id: null,
+        p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
         p_responsavel_uid: responsavel || null,
         p_canal_origem: canal || null,
       });
