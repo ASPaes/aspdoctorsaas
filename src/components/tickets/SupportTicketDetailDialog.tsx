@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -21,6 +23,7 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
+  Tag as TagIcon, X, ListChecks, Trash2,
 } from "lucide-react";
 
 
