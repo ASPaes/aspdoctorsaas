@@ -34,6 +34,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
+import TicketStatusesConfig from "@/components/configuracoes/TicketStatusesConfig";
+import TicketTagsConfig from "@/components/configuracoes/TicketTagsConfig";
 import SettingsSidebar, { CADASTRO_SECTIONS } from "@/components/configuracoes/SettingsSidebar";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
@@ -72,6 +74,8 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   "formas-pagamento": { breadcrumb: ["Cadastros", "Comercial", "Formas de pagamento"], title: "Formas de pagamento", description: "Métodos de pagamento aceitos." },
   setores: { breadcrumb: ["Cadastros", "Operacional", "Setores"], title: "Setores", description: "Setores de atendimento da sua operação." },
   funcionarios: { breadcrumb: ["Cadastros", "Operacional", "Funcionários"], title: "Funcionários", description: "Equipe e colaboradores." },
+  "status-tickets": { breadcrumb: ["Cadastros", "Operacional", "Status de tickets"], title: "Status de tickets", description: "Configure os status personalizados por setor para os tickets de suporte." },
+  "tags-tickets": { breadcrumb: ["Cadastros", "Operacional", "Tags de tickets"], title: "Tags de tickets", description: "Configure as tags coloridas para classificação de tickets." },
   "categorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Categorias"], title: "Categorias de serviço", description: "Categorias usadas para classificar serviços." },
   "subcategorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Subcategorias"], title: "Subcategorias de serviço", description: "Subcategorias de detalhamento dos serviços." },
   "tipos-servico": { breadcrumb: ["Cadastros", "Serviços", "Tipos de serviço"], title: "Tipos de serviço", description: "Tipos de serviço prestados." },
@@ -403,6 +407,10 @@ export default function Configuracoes() {
             <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
           </>
         );
+      case "status-tickets":
+        return <TicketStatusesConfig />;
+      case "tags-tickets":
+        return <TicketTagsConfig />;
       default:
         return null;
     }
