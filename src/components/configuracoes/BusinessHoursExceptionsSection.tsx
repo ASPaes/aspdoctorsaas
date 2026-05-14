@@ -209,6 +209,7 @@ export default function BusinessHoursExceptionsSection() {
         type: "holiday",
         name: f.name,
         is_closed: true,
+        use_template: false,
       }));
       const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
         .insert(payload);
