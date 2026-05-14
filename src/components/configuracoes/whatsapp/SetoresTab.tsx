@@ -44,6 +44,7 @@ interface Department {
   default_instance_id: string | null;
   tenant_id: string;
   requires_ticket_on_close: boolean;
+  usa_tickets: boolean;
 }
 
 interface DeptInstance {
@@ -82,6 +83,7 @@ export default function SetoresTab() {
   const [formActive, setFormActive] = useState(true);
   const [formFallback, setFormFallback] = useState(false);
   const [requiresTicket, setRequiresTicket] = useState(false);
+  const [usaTickets, setUsaTickets] = useState(true);
 
   // ========== Queries ==========
 
@@ -133,6 +135,7 @@ export default function SetoresTab() {
         is_default_fallback: formFallback,
         tenant_id: tid,
         requires_ticket_on_close: requiresTicket,
+        usa_tickets: usaTickets,
       };
 
       if (isCreating) {
@@ -141,10 +144,10 @@ export default function SetoresTab() {
           .insert(payload);
         if (error) throw error;
       } else if (selectedId) {
-        const { name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close } = payload;
+        const { name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close, usa_tickets } = payload;
         const { error } = await supabase
           .from("support_departments")
-          .update({ name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close })
+          .update({ name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close, usa_tickets })
           .eq("id", selectedId);
         if (error) throw error;
       }
@@ -220,6 +223,7 @@ export default function SetoresTab() {
       setFormActive(dept.is_active);
       setFormFallback(dept.is_default_fallback);
       setRequiresTicket(dept.requires_ticket_on_close ?? false);
+      setUsaTickets(dept.usa_tickets ?? true);
     },
     []
   );
@@ -232,6 +236,7 @@ export default function SetoresTab() {
     setFormActive(true);
     setFormFallback(false);
     setRequiresTicket(false);
+    setUsaTickets(true);
   }, []);
 
   const handleSave = () => {
@@ -319,6 +324,9 @@ export default function SetoresTab() {
                 {d.requires_ticket_on_close && (
                   <Badge variant="outline" className="text-[10px]">Ticket obrigatório</Badge>
                 )}
+                {!d.usa_tickets && (
+                  <Badge variant="secondary" className="text-[10px]">Sem tickets</Badge>
+                )}
               </div>
             </button>
           ))}
@@ -386,16 +394,28 @@ export default function SetoresTab() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={requiresTicket}
-                        onCheckedChange={setRequiresTicket}
-                        id="dept-requires-ticket"
+                        checked={usaTickets}
+                        onCheckedChange={setUsaTickets}
+                        id="dept-usa-tickets"
                       />
-                      <Label htmlFor="dept-requires-ticket">Exigir ticket ao encerrar chat</Label>
+                      <Label htmlFor="dept-usa-tickets">Usa módulo de tickets</Label>
                     </div>
+                    {usaTickets && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={requiresTicket}
+                          onCheckedChange={setRequiresTicket}
+                          id="dept-requires-ticket"
+                        />
+                        <Label htmlFor="dept-requires-ticket">Exigir ticket ao encerrar chat</Label>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground -mt-2">
-                    Quando ativo, o agente será obrigado a classificar o atendimento (criar ticket) antes de encerrar conversas deste setor.
-                  </p>
+                  {usaTickets && (
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Quando ativo, o agente será obrigado a classificar o atendimento (criar ticket) antes de encerrar conversas deste setor.
+                    </p>
+                  )}
 
                   <Button
                     onClick={handleSave}
