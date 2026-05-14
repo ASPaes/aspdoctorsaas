@@ -391,16 +391,28 @@ export default function SetoresTab() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={requiresTicket}
-                        onCheckedChange={setRequiresTicket}
-                        id="dept-requires-ticket"
+                        checked={usaTickets}
+                        onCheckedChange={setUsaTickets}
+                        id="dept-usa-tickets"
                       />
-                      <Label htmlFor="dept-requires-ticket">Exigir ticket ao encerrar chat</Label>
+                      <Label htmlFor="dept-usa-tickets">Usa módulo de tickets</Label>
                     </div>
+                    {usaTickets && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={requiresTicket}
+                          onCheckedChange={setRequiresTicket}
+                          id="dept-requires-ticket"
+                        />
+                        <Label htmlFor="dept-requires-ticket">Exigir ticket ao encerrar chat</Label>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground -mt-2">
-                    Quando ativo, o agente será obrigado a classificar o atendimento (criar ticket) antes de encerrar conversas deste setor.
-                  </p>
+                  {usaTickets && (
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Quando ativo, o agente será obrigado a classificar o atendimento (criar ticket) antes de encerrar conversas deste setor.
+                    </p>
+                  )}
 
                   <Button
                     onClick={handleSave}
