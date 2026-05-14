@@ -77,6 +77,91 @@ interface MovimentosMrrModalProps {
   funcionarios: { id: number; nome: string }[];
 }
 
+interface OrigemOption { id: number; nome: string }
+
+function OrigemCombobox({
+  value,
+  onChange,
+  origens,
+  loading,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  origens: OrigemOption[];
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const sorted = useMemo(
+    () => [...origens].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+    [origens]
+  );
+  const matchInCatalog = useMemo(
+    () => sorted.find((o) => o.nome.localeCompare(value, 'pt-BR', { sensitivity: 'base' }) === 0),
+    [sorted, value]
+  );
+  const isLegacy = !!value && !matchInCatalog;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className={cn("truncate", !value && "text-muted-foreground", isLegacy && "italic")}>
+            {value
+              ? (isLegacy ? `${value} (valor antigo)` : matchInCatalog!.nome)
+              : (loading ? 'Carregando…' : 'Selecione a origem')}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command
+          filter={(val, search) =>
+            val.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
+              search.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            ) ? 1 : 0
+          }
+        >
+          <CommandInput placeholder="Buscar origem..." />
+          <CommandList className="max-h-[260px]">
+            <CommandEmpty>Nenhuma origem encontrada.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__sem_origem__"
+                onSelect={() => { onChange(''); setOpen(false); }}
+              >
+                <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                <span className="text-muted-foreground">— Sem origem —</span>
+              </CommandItem>
+              {sorted.map((o) => (
+                <CommandItem
+                  key={o.id}
+                  value={o.nome}
+                  onSelect={() => { onChange(o.nome); setOpen(false); }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", matchInCatalog?.id === o.id ? "opacity-100" : "opacity-0")} />
+                  {o.nome}
+                </CommandItem>
+              ))}
+              {isLegacy && (
+                <CommandItem value={value} onSelect={() => setOpen(false)}>
+                  <Check className="mr-2 h-4 w-4 opacity-100" />
+                  <span className="italic">{value} (valor antigo)</span>
+                </CommandItem>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const TIPO_LABELS: Record<string, { label: string; color: string }> = {
   upsell: { label: 'Upsell', color: 'bg-green-500' },
   cross_sell: { label: 'Cross-sell', color: 'bg-blue-500' },
