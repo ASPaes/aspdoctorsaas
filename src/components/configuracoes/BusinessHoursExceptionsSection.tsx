@@ -321,6 +321,7 @@ export default function BusinessHoursExceptionsSection() {
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Horário reduzido</TableHead>
                   <TableHead className="w-24 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -332,6 +333,18 @@ export default function BusinessHoursExceptionsSection() {
                     </TableCell>
                     <TableCell>{TYPE_LABELS[ex.type] || ex.type}</TableCell>
                     <TableCell className="text-muted-foreground">{ex.name || "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!!ex.use_template}
+                          onCheckedChange={(v) => toggleTemplateMutation.mutate({ id: ex.id, useTemplate: v })}
+                          disabled={toggleTemplateMutation.isPending}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {ex.use_template ? `Abre ${formatTemplateRange()}` : "Fechado o dia"}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button
