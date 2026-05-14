@@ -374,13 +374,10 @@ export default function SupportTickets() {
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
-    const abertos = filteredTickets.filter((t: any) => t.status === "aberto").length;
-    const concluidos = filteredTickets.filter((t: any) => t.status === "concluido").length;
-    const agendados = filteredTickets.filter((t: any) => t.status === "agendado").length;
-    const aguardando = filteredTickets.filter((t: any) => t.status === "aguardando_terceiro").length;
-    const cancelados = filteredTickets.filter((t: any) => t.status === "cancelado").length;
-    return { total, abertos, concluidos, agendados, aguardando, cancelados };
-  }, [filteredTickets]);
+    const terminais = filteredTickets.filter((t: any) => getStatusInfo(t.status_id).isTerminal).length;
+    const ativos = total - terminais;
+    return { total, terminais, ativos };
+  }, [filteredTickets, ticketStatuses]);
 
   return (
     <div className="space-y-4 p-4 md:p-6">
