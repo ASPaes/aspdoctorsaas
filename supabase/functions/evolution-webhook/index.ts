@@ -366,11 +366,11 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 // ── processMessageUpsert — delega ao message-processor ───────────────────────
 
 async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
-  try {
-    const { instance, data } = payload;
-    const { key, pushName, message, messageTimestamp } = data;
+  const { instance, data } = payload;
+  const { key, pushName, message, messageTimestamp } = data;
+  console.log(`${LOG} Processing message: ${key?.id} type=${getMessageType(message)}`);
 
-    console.log(`${LOG} Processing message: ${key.id}`);
+  try {
 
     // ── Guard: Comandos administrativos ──────────────────────────────────────
     // Verificar ANTES de qualquer processamento
