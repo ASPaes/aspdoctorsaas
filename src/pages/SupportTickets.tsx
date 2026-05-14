@@ -51,7 +51,7 @@ interface TicketRow {
   id: string;
   ticket_code: string | null;
   assunto: string | null;
-  status: string;
+  status_id: string | null;
   prioridade: string | null;
   canal_origem: string | null;
   tipo_horario: string | null;
