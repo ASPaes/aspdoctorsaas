@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
@@ -86,8 +87,34 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [viewChatMeta, setViewChatMeta] = useState<{ code: string; contact: string; openedAt: string | null; closedAt: string | null; conversationId: string | null }>({ code: "", contact: "", openedAt: null, closedAt: null, conversationId: null });
   const [newCheckItem, setNewCheckItem] = useState("");
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data?.user?.id ?? null));
+  }, []);
+  const { data: currentProfile } = useProfile(currentUserId ?? undefined);
+  const isAdminOrHead = currentProfile?.role === "admin" || currentProfile?.role === "head" || currentProfile?.is_super_admin === true;
+
+  const handleSoftDelete = async () => {
+    if (!ticketId) return;
+    setDeleting(true);
+    try {
+      const { error } = await (supabase.rpc as any)("soft_delete_ticket", { p_ticket_id: ticketId });
+      if (error) throw error;
+      toast.success("Ticket excluído");
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
   useEffect(() => {
@@ -1068,9 +1095,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Plus className="h-4 w-4 mr-1.5" />
           Ticket filho
         </Button>
+        {isAdminOrHead && (
+          <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Excluir
+          </Button>
+        )}
       </div>
-
-      {/* Conversas vinculadas */}
       {linkedAttendances.length > 0 && (
         <div className="space-y-2 pt-2">
           <Separator />
@@ -1575,6 +1606,26 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
         }}
       />
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir ticket?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            O ticket <span className="font-mono font-semibold text-foreground">{ticket?.ticket_code}</span> será excluído permanentemente. Esta ação não pode ser desfeita.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleSoftDelete} disabled={deleting}>
+              {deleting && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
+              Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
