@@ -125,9 +125,18 @@ function tzDayKey(date: Date, tz: string): string {
   return WEEKDAY_KEYS[wd] || '';
 }
 
+export interface HolidayTemplate {
+  open_at: string;
+  close_at: string;
+  has_break: boolean;
+  break_start: string | null;
+  break_end: string | null;
+}
+
 export interface BusinessHoursExceptionsLookup {
-  today: { name: string | null; is_closed: boolean } | null;
+  today: { name: string | null; is_closed: boolean; use_template: boolean } | null;
   closedDates: Set<string>;
+  template: HolidayTemplate | null;
 }
 
 export async function getBusinessHoursExceptions(
@@ -142,24 +151,47 @@ export async function getBusinessHoursExceptions(
     const endStr = tzDateStr(new Date(msgDate.getTime() + daysAhead * 86400000), tz);
     const { data, error } = await supabase
       .from('business_hours_exceptions')
-      .select('date, name, is_closed')
+      .select('date, name, is_closed, use_template')
       .eq('tenant_id', tenantId)
       .gte('date', startStr)
       .lte('date', endStr);
     if (error) {
       console.error('[processor] getBusinessHoursExceptions error:', error.message);
-      return { today: null, closedDates: new Set() };
+      return { today: null, closedDates: new Set(), template: null };
     }
     const closedDates = new Set<string>();
-    let today: { name: string | null; is_closed: boolean } | null = null;
+    let today: { name: string | null; is_closed: boolean; use_template: boolean } | null = null;
     for (const row of (data || [])) {
-      if (row.is_closed) closedDates.add(row.date);
-      if (row.date === startStr) today = { name: row.name ?? null, is_closed: !!row.is_closed };
+      // Dias com horário reduzido (use_template) NÃO entram em closedDates,
+      // pois não estão totalmente fechados.
+      if (row.is_closed && !row.use_template) closedDates.add(row.date);
+      if (row.date === startStr) {
+        today = {
+          name: row.name ?? null,
+          is_closed: !!row.is_closed,
+          use_template: !!row.use_template,
+        };
+      }
     }
-    return { today, closedDates };
+
+    let template: HolidayTemplate | null = null;
+    if (today?.use_template) {
+      const { data: tpl, error: tplErr } = await supabase
+        .from('tenant_holiday_template')
+        .select('open_at, close_at, has_break, break_start, break_end')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (tplErr) {
+        console.error('[processor] tenant_holiday_template error:', tplErr.message);
+      } else if (tpl?.open_at && tpl?.close_at) {
+        template = tpl as HolidayTemplate;
+      }
+    }
+
+    return { today, closedDates, template };
   } catch (err) {
     console.error('[processor] getBusinessHoursExceptions unexpected:', err);
-    return { today: null, closedDates: new Set() };
+    return { today: null, closedDates: new Set(), template: null };
   }
 }
 
