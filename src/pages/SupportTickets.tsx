@@ -64,6 +64,7 @@ interface TicketRow {
   service_categories: { nome: string } | null;
   service_subcategories: { nome: string } | null;
   service_types: { nome: string } | null;
+  ticket_tag_assignments?: Array<{ tag: { id: string; name: string; color: string } | null }>;
 }
 
 export default function SupportTickets() {
