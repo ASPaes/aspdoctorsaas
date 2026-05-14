@@ -135,6 +135,7 @@ export default function SetoresTab() {
         is_default_fallback: formFallback,
         tenant_id: tid,
         requires_ticket_on_close: requiresTicket,
+        usa_tickets: usaTickets,
       };
 
       if (isCreating) {
@@ -143,10 +144,10 @@ export default function SetoresTab() {
           .insert(payload);
         if (error) throw error;
       } else if (selectedId) {
-        const { name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close } = payload;
+        const { name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close, usa_tickets } = payload;
         const { error } = await supabase
           .from("support_departments")
-          .update({ name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close })
+          .update({ name, slug: s, description, is_active, is_default_fallback, requires_ticket_on_close, usa_tickets })
           .eq("id", selectedId);
         if (error) throw error;
       }
