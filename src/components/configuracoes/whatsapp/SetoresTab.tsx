@@ -324,6 +324,9 @@ export default function SetoresTab() {
                 {d.requires_ticket_on_close && (
                   <Badge variant="outline" className="text-[10px]">Ticket obrigatório</Badge>
                 )}
+                {!d.usa_tickets && (
+                  <Badge variant="secondary" className="text-[10px]">Sem tickets</Badge>
+                )}
               </div>
             </button>
           ))}
