@@ -236,6 +236,7 @@ export default function SetoresTab() {
     setFormActive(true);
     setFormFallback(false);
     setRequiresTicket(false);
+    setUsaTickets(true);
   }, []);
 
   const handleSave = () => {
