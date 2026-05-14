@@ -3955,12 +3955,14 @@ export type Database = {
           atualizado_em: string
           canal_origem: string
           category_id: string | null
+          checklist: Json
           cliente_contato_id: string | null
           cliente_id: string
           closed_by: string | null
           concluido_em: string | null
           contact_id: string | null
           criado_por: string | null
+          deleted_at: string | null
           department_id: string | null
           descricao: string | null
           fornecedor_id: number | null
@@ -3976,7 +3978,7 @@ export type Database = {
           resumo_conclusivo: string | null
           resumo_parcial: string | null
           service_type_id: string | null
-          status: Database["public"]["Enums"]["support_ticket_status"]
+          status_id: string | null
           subcategory_id: string | null
           tempo_agente_minutos: number | null
           tempo_calculado_minutos: number | null
@@ -3993,12 +3995,14 @@ export type Database = {
           atualizado_em?: string
           canal_origem?: string
           category_id?: string | null
+          checklist?: Json
           cliente_contato_id?: string | null
           cliente_id: string
           closed_by?: string | null
           concluido_em?: string | null
           contact_id?: string | null
           criado_por?: string | null
+          deleted_at?: string | null
           department_id?: string | null
           descricao?: string | null
           fornecedor_id?: number | null
@@ -4014,7 +4018,7 @@ export type Database = {
           resumo_conclusivo?: string | null
           resumo_parcial?: string | null
           service_type_id?: string | null
-          status?: Database["public"]["Enums"]["support_ticket_status"]
+          status_id?: string | null
           subcategory_id?: string | null
           tempo_agente_minutos?: number | null
           tempo_calculado_minutos?: number | null
@@ -4031,12 +4035,14 @@ export type Database = {
           atualizado_em?: string
           canal_origem?: string
           category_id?: string | null
+          checklist?: Json
           cliente_contato_id?: string | null
           cliente_id?: string
           closed_by?: string | null
           concluido_em?: string | null
           contact_id?: string | null
           criado_por?: string | null
+          deleted_at?: string | null
           department_id?: string | null
           descricao?: string | null
           fornecedor_id?: number | null
@@ -4052,7 +4058,7 @@ export type Database = {
           resumo_conclusivo?: string | null
           resumo_parcial?: string | null
           service_type_id?: string | null
-          status?: Database["public"]["Enums"]["support_ticket_status"]
+          status_id?: string | null
           subcategory_id?: string | null
           tempo_agente_minutos?: number | null
           tempo_calculado_minutos?: number | null
@@ -4144,6 +4150,13 @@ export type Database = {
             columns: ["service_type_id"]
             isOneToOne: false
             referencedRelation: "service_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_status_id_fkey"
+            columns: ["status_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_statuses"
             referencedColumns: ["id"]
           },
           {
@@ -4343,6 +4356,150 @@ export type Database = {
           trial_ends_at?: string | null
         }
         Relationships: []
+      }
+      ticket_statuses: {
+        Row: {
+          color: string
+          created_at: string
+          department_id: string
+          id: string
+          is_active: boolean
+          is_initial: boolean
+          is_terminal: boolean
+          name: string
+          position: number
+          slug: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          department_id: string
+          id?: string
+          is_active?: boolean
+          is_initial?: boolean
+          is_terminal?: boolean
+          name: string
+          position?: number
+          slug: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          department_id?: string
+          id?: string
+          is_active?: boolean
+          is_initial?: boolean
+          is_terminal?: boolean
+          name?: string
+          position?: number
+          slug?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_statuses_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_statuses_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_tag_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          tag_id: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          tag_id: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          tag_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_tag_assignments_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_tag_assignments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_tags: {
+        Row: {
+          color: string
+          created_at: string
+          department_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_tags_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_tags_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       unidades_base: {
         Row: {
@@ -5935,66 +6092,30 @@ export type Database = {
           p_observacao_agente: string
           p_parent_ticket_id: string
           p_responsavel_uid?: string
-          p_status?: string
+          p_status_id?: string
         }
         Returns: string
       }
-      create_manual_ticket:
-        | {
-            Args: {
-              p_agendado_para?: string
-              p_canal_origem: string
-              p_category_id: string
-              p_cliente_id: string
-              p_contact_id?: string
-              p_department_id?: string
-              p_observacao_agente?: string
-              p_produto_id: number
-              p_service_type_id: string
-              p_status?: string
-              p_subcategory_id: string
-              p_tipo_horario?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_agendado_para?: string
-              p_canal_origem: string
-              p_category_id: string
-              p_cliente_id: string
-              p_contact_id?: string
-              p_department_id?: string
-              p_observacao_agente?: string
-              p_produto_id: number
-              p_responsavel_user_id?: string
-              p_service_type_id: string
-              p_status?: string
-              p_subcategory_id: string
-              p_tipo_horario?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_agendado_para?: string
-              p_canal_origem: string
-              p_category_id: string
-              p_cliente_contato_id?: string
-              p_cliente_id: string
-              p_contact_id?: string
-              p_department_id?: string
-              p_observacao_agente?: string
-              p_previsao_encerramento?: string
-              p_produto_id: number
-              p_responsavel_user_id?: string
-              p_service_type_id: string
-              p_status?: string
-              p_subcategory_id: string
-              p_tipo_horario?: string
-            }
-            Returns: string
-          }
+      create_manual_ticket: {
+        Args: {
+          p_agendado_para?: string
+          p_canal_origem: string
+          p_category_id: string
+          p_cliente_contato_id?: string
+          p_cliente_id: string
+          p_contact_id?: string
+          p_department_id: string
+          p_observacao_agente?: string
+          p_previsao_encerramento?: string
+          p_produto_id: number
+          p_responsavel_user_id?: string
+          p_service_type_id: string
+          p_status_id?: string
+          p_subcategory_id: string
+          p_tipo_horario?: string
+        }
+        Returns: string
+      }
       create_tenant_for_new_user:
         | { Args: { p_nome: string }; Returns: string }
         | {
@@ -6012,9 +6133,9 @@ export type Database = {
           p_category_id: string
           p_observacao_agente?: string
           p_observacao_ia?: string
-          p_produto_id: number
-          p_service_type_id: string
-          p_subcategory_id: string
+          p_produto_id?: number
+          p_service_type_id?: string
+          p_subcategory_id?: string
           p_tipo_horario?: string
         }
         Returns: string
@@ -6508,6 +6629,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_user_id: string }
         Returns: boolean
       }
+      soft_delete_ticket: { Args: { p_ticket_id: string }; Returns: undefined }
       start_conversation_from_ticket: {
         Args: {
           p_contact_name?: string
@@ -6548,7 +6670,7 @@ export type Database = {
       update_ticket_status: {
         Args: {
           p_agendado_para?: string
-          p_new_status: string
+          p_new_status_id: string
           p_previsao_encerramento?: string
           p_ticket_id: string
         }
@@ -6637,13 +6759,6 @@ export type Database = {
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
       sentiment_type: "positive" | "neutral" | "negative"
       support_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
-      support_ticket_status:
-        | "aberto"
-        | "agendado"
-        | "em_andamento"
-        | "aguardando_terceiro"
-        | "concluido"
-        | "cancelado"
       support_ticket_tipo: "cliente" | "fornecedor"
     }
     CompositeTypes: {
@@ -6822,14 +6937,6 @@ export const Constants = {
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
       sentiment_type: ["positive", "neutral", "negative"],
       support_ticket_prioridade: ["baixa", "media", "alta", "urgente"],
-      support_ticket_status: [
-        "aberto",
-        "agendado",
-        "em_andamento",
-        "aguardando_terceiro",
-        "concluido",
-        "cancelado",
-      ],
       support_ticket_tipo: ["cliente", "fornecedor"],
     },
   },

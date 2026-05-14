@@ -23,23 +23,7 @@ import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-const STATUS_LABELS: Record<string, string> = {
-  aberto: "Aberto",
-  agendado: "Agendado",
-  em_andamento: "Em andamento",
-  aguardando_terceiro: "Aguardando terceiro",
-  concluido: "Concluído",
-  cancelado: "Cancelado",
-};
 
-const STATUS_CLASSES: Record<string, string> = {
-  aberto: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  agendado: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  em_andamento: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  aguardando_terceiro: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  concluido: "bg-green-500/10 text-green-400 border-green-500/20",
-  cancelado: "bg-red-500/10 text-red-400 border-red-500/20 opacity-70",
-};
 
 
 function ChannelIcon({ canal }: { canal: string | null }) {
@@ -67,7 +51,7 @@ interface TicketRow {
   id: string;
   ticket_code: string | null;
   assunto: string | null;
-  status: string;
+  status_id: string | null;
   prioridade: string | null;
   canal_origem: string | null;
   tipo_horario: string | null;
@@ -99,6 +83,7 @@ export default function SupportTickets() {
   const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [ticketsView, setTicketsView] = useState("lista");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const [kanbanAgendadoOpen, setKanbanAgendadoOpen] = useState(false);
@@ -245,6 +230,47 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["ticket_statuses", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, slug, color, position, is_initial, is_terminal, is_active, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; slug: string; color: string; position: number; is_initial: boolean; is_terminal: boolean; is_active: boolean; department_id: string | null }>;
+    },
+  });
+
+  const { data: supportDepartments = [] } = useQuery({
+    queryKey: ["support_departments_list", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name, slug")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; slug: string }>;
+    },
+  });
+
+  const filteredStatuses = useMemo(
+    () => departmentFilter === "all"
+      ? ticketStatuses
+      : ticketStatuses.filter((s) => s.department_id === departmentFilter),
+    [ticketStatuses, departmentFilter]
+  );
+
+  const getStatusInfo = (statusId: string | null) => {
+    const s = ticketStatuses.find((x) => x.id === statusId);
+    if (!s) return { name: "Sem status", color: "#6b7280", isTerminal: false };
+    return { name: s.name, color: s.color, isTerminal: s.is_terminal };
+  };
+
   const filteredSubcategories = useMemo(
     () => categoriaFilter === "all"
       ? subcategories
@@ -291,7 +317,7 @@ export default function SupportTickets() {
   };
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), isAdminOrHead, userId],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), departmentFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -301,7 +327,7 @@ export default function SupportTickets() {
 
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, assunto, status, prioridade, canal_origem, tipo_horario,
+          id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           clientes:cliente_id(nome_fantasia),
           produtos:produto_id(nome),
@@ -310,6 +336,7 @@ export default function SupportTickets() {
           service_types:service_type_id(nome)
         `)
         .eq("tenant_id", tid)
+        .is("deleted_at", null)
         .gte("aberto_em", fromISO)
         .lte("aberto_em", toISO)
         .order("aberto_em", { ascending: false })
@@ -321,12 +348,13 @@ export default function SupportTickets() {
       }
 
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
-      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (statusFilter !== "all") q = q.eq("status_id", statusFilter);
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
       if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
+      if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
 
       const { data, error } = await q;
       if (error) throw error;
@@ -346,13 +374,10 @@ export default function SupportTickets() {
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
-    const abertos = filteredTickets.filter((t: any) => t.status === "aberto").length;
-    const concluidos = filteredTickets.filter((t: any) => t.status === "concluido").length;
-    const agendados = filteredTickets.filter((t: any) => t.status === "agendado").length;
-    const aguardando = filteredTickets.filter((t: any) => t.status === "aguardando_terceiro").length;
-    const cancelados = filteredTickets.filter((t: any) => t.status === "cancelado").length;
-    return { total, abertos, concluidos, agendados, aguardando, cancelados };
-  }, [filteredTickets]);
+    const terminais = filteredTickets.filter((t: any) => getStatusInfo(t.status_id).isTerminal).length;
+    const ativos = total - terminais;
+    return { total, terminais, ativos };
+  }, [filteredTickets, ticketStatuses]);
 
   return (
     <div className="space-y-4 p-4 md:p-6">
