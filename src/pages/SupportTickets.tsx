@@ -300,7 +300,8 @@ export default function SupportTickets() {
           produtos:produto_id(nome),
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
-          service_types:service_type_id(nome)
+          service_types:service_type_id(nome),
+          ticket_tag_assignments(tag:tag_id(id, name, color))
         `)
         .eq("tenant_id", tid)
         .is("deleted_at", null)
