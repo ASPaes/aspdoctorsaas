@@ -54,6 +54,7 @@ import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySet
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
+import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -75,8 +76,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   setores: { breadcrumb: ["Cadastros", "Operacional", "Setores"], title: "Setores", description: "Setores de atendimento da sua operação." },
   funcionarios: { breadcrumb: ["Cadastros", "Operacional", "Funcionários"], title: "Funcionários", description: "Equipe e colaboradores." },
   "tickets-config": { breadcrumb: ["Cadastros", "Operacional", "Tickets"], title: "Tickets", description: "Status personalizados por setor e tags de classificação." },
-  "categorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Categorias"], title: "Categorias de serviço", description: "Categorias usadas para classificar serviços." },
-  "subcategorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Subcategorias"], title: "Subcategorias de serviço", description: "Subcategorias de detalhamento dos serviços." },
+  "categorias-servico": { breadcrumb: ["Cadastros", "Serviços", "Categorias"], title: "Categorias de serviço", description: "Categorias e subcategorias para classificação de serviços." },
   "tipos-servico": { breadcrumb: ["Cadastros", "Serviços", "Tipos de serviço"], title: "Tipos de serviço", description: "Tipos de serviço prestados." },
   segmentos: { breadcrumb: ["Cadastros", "Classificação", "Segmentos"], title: "Segmentos", description: "Segmentos de mercado dos clientes." },
   "areas-atuacao": { breadcrumb: ["Cadastros", "Classificação", "Áreas de atuação"], title: "Áreas de atuação", description: "Áreas de atuação dos clientes." },
@@ -381,6 +381,9 @@ export default function Configuracoes() {
   const meta = SECTION_META[activeSection] ?? { breadcrumb: [activeSection], title: activeSection, description: "" };
 
   const renderContent = () => {
+    if (activeSection === "categorias-servico") {
+      return <CategoriasServicosTab />;
+    }
     if (CADASTRO_SECTIONS.includes(activeSection)) {
       return <CadastrosTab section={activeSection} />;
     }
