@@ -83,6 +83,7 @@ export default function SetoresTab() {
   const [formActive, setFormActive] = useState(true);
   const [formFallback, setFormFallback] = useState(false);
   const [requiresTicket, setRequiresTicket] = useState(false);
+  const [usaTickets, setUsaTickets] = useState(true);
 
   // ========== Queries ==========
 
