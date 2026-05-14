@@ -43,7 +43,6 @@ export function CreateChildTicketDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
-    setStatus("aberto");
     setAgendadoPara("");
     setResponsavel("");
     setCanal("");
