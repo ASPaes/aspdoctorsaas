@@ -528,22 +528,29 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-mono text-sm font-semibold text-primary">{ticket.ticket_code ?? "—"}</span>
         <Select
-          value={ticket.status ?? ""}
-          onValueChange={(v) => {
-            handleFieldUpdate({ status: v });
-          }}
+          value={ticket.status_id ?? ""}
+          onValueChange={(v) => handleFieldUpdate({ status_id: v })}
           disabled={updating}
         >
           <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs">
-            <SelectValue />
+            <SelectValue>
+              {(() => { const si = getStatusInfo(ticket.status_id); return (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: si.color }} />
+                  {si.name}
+                </span>
+              );})()}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="aberto">Aberto</SelectItem>
-            <SelectItem value="em_andamento">Em andamento</SelectItem>
-            <SelectItem value="agendado">Agendado</SelectItem>
-            <SelectItem value="aguardando_terceiro">Aguardando terceiro</SelectItem>
-            <SelectItem value="concluido">Concluído</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
+            {statusesForDepartment.map(s => (
+              <SelectItem key={s.id} value={s.id}>
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                  {s.name}
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select
