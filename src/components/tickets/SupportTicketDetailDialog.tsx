@@ -211,6 +211,38 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     } catch { toast.error("Erro ao remover tag"); }
   };
 
+  const handleCreateAndAddTag = async () => {
+    if (!quickTagName.trim() || !tid || !ticketId) return;
+    setCreatingTag(true);
+    try {
+      const { data: newTag, error: insertError } = await (supabase.from("ticket_tags" as any) as any)
+        .insert({
+          tenant_id: tid,
+          name: quickTagName.trim(),
+          color: quickTagColor,
+          department_id: ticket?.department_id || null,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
+      if (newTag?.id) {
+        await (supabase.from("ticket_tag_assignments" as any) as any)
+          .insert({ ticket_id: ticketId, tag_id: newTag.id });
+      }
+      setQuickTagName("");
+      setQuickTagColor("#3b82f6");
+      refetchTags();
+      queryClient.invalidateQueries({ queryKey: ["ticket_tags_available"] });
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      toast.success("Tag criada e adicionada");
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setCreatingTag(false);
+    }
+  };
+
   const handleToggleCheck = async (index: number) => {
     const items = [...((ticket?.checklist as any[]) ?? [])];
     items[index] = { ...items[index], done: !items[index].done };
