@@ -44,6 +44,7 @@ interface Department {
   default_instance_id: string | null;
   tenant_id: string;
   requires_ticket_on_close: boolean;
+  usa_tickets: boolean;
 }
 
 interface DeptInstance {
