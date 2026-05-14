@@ -133,6 +133,23 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: 
                         </span>
                         {t.canal_origem && <ChannelIcon canal={t.canal_origem} />}
                       </div>
+                      {(() => {
+                        const tags = (t.ticket_tag_assignments ?? []).map(a => a.tag).filter(Boolean);
+                        if (tags.length === 0) return null;
+                        return (
+                          <div className="flex items-center gap-1 flex-wrap mb-1">
+                            {tags.slice(0, 3).map(tag => (
+                              <span key={tag!.id} className="text-[9px] px-1.5 py-0.5 rounded font-medium"
+                                style={{ background: tag!.color + "22", color: tag!.color }}>
+                                {tag!.name}
+                              </span>
+                            ))}
+                            {tags.length > 3 && (
+                              <span className="text-[9px] text-muted-foreground">+{tags.length - 3}</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <p className="text-xs text-foreground line-clamp-2">
                         {t.assunto ?? "—"}
                       </p>
