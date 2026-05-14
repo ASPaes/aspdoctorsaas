@@ -428,7 +428,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     const fromMe = getPayloadIsFromMe(data);
     const messageType = getMessageType(message);
-    const timestamp = new Date(messageTimestamp * 1000).toISOString();
+    // PATCH: safe timestamp — protect against undefined messageTimestamp
+    const safeTimestamp = messageTimestamp && !isNaN(messageTimestamp)
+      ? messageTimestamp
+      : Math.floor(Date.now() / 1000);
+    const timestamp = new Date(safeTimestamp * 1000).toISOString();
 
     // Filtro de grupos: verificar whitelist em whatsapp_groups
     if (isGroup) {
