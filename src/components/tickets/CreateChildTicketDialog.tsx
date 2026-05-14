@@ -35,7 +35,7 @@ export function CreateChildTicketDialog({
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
-  const [status, setStatus] = useState<string>("aberto");
+  
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [responsavel, setResponsavel] = useState<string>("");
   const [canal, setCanal] = useState<string>("");
