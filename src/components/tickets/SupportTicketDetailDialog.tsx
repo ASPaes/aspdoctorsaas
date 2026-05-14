@@ -778,6 +778,28 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
               )}
             </div>
+            <div className="border-t mt-2 pt-2">
+              <p className="text-[10px] text-muted-foreground mb-1.5 px-1">Criar nova</p>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="color"
+                  value={quickTagColor}
+                  onChange={(e) => setQuickTagColor(e.target.value)}
+                  className="h-8 w-8 p-0.5 shrink-0"
+                />
+                <Input
+                  value={quickTagName}
+                  onChange={(e) => setQuickTagName(e.target.value)}
+                  placeholder="Nome..."
+                  className="h-8 text-xs flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateAndAddTag(); } }}
+                />
+                <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleCreateAndAddTag}
+                  disabled={!quickTagName.trim() || creatingTag}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
           </PopoverContent>
         </Popover>
       </div>
