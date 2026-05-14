@@ -45,7 +45,7 @@ import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager
 import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
-import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
+
 import SetoresInstanciasTab from "@/components/configuracoes/whatsapp/SetoresInstanciasTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
@@ -381,9 +381,6 @@ export default function Configuracoes() {
   const meta = SECTION_META[activeSection] ?? { breadcrumb: [activeSection], title: activeSection, description: "" };
 
   const renderContent = () => {
-    if (activeSection === "setores") {
-      return <SetoresTab />;
-    }
     if (CADASTRO_SECTIONS.includes(activeSection)) {
       return <CadastrosTab section={activeSection} />;
     }
