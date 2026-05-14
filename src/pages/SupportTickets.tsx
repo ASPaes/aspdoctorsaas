@@ -86,49 +86,15 @@ export default function SupportTickets() {
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  const [kanbanAgendadoOpen, setKanbanAgendadoOpen] = useState(false);
-  const [kanbanPendingMove, setKanbanPendingMove] = useState<{ ticketId: string; newStatus: string } | null>(null);
-  const [kanbanAgendadoPara, setKanbanAgendadoPara] = useState("");
-  const [kanbanPrevisao, setKanbanPrevisao] = useState("");
-
-  const handleKanbanStatusChange = async (ticketId: string, newStatus: string) => {
-    if (newStatus === "agendado") {
-      setKanbanPendingMove({ ticketId, newStatus });
-      setKanbanAgendadoPara("");
-      setKanbanPrevisao("");
-      setKanbanAgendadoOpen(true);
-      return;
-    }
-
+  const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
     try {
       const { error } = await (supabase.rpc as any)("update_ticket_status", {
         p_ticket_id: ticketId,
-        p_new_status: newStatus,
+        p_new_status_id: newStatusId,
       });
       if (error) throw error;
       toast.success("Status atualizado");
       queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
-      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
-    } catch (err: any) {
-      toast.error("Erro ao atualizar: " + (err.message ?? ""));
-    }
-  };
-
-  const handleConfirmAgendado = async () => {
-    if (!kanbanPendingMove) return;
-    try {
-      const { error } = await (supabase.rpc as any)("update_ticket_status", {
-        p_ticket_id: kanbanPendingMove.ticketId,
-        p_new_status: "agendado",
-        p_agendado_para: kanbanAgendadoPara ? new Date(kanbanAgendadoPara).toISOString() : null,
-        p_previsao_encerramento: kanbanPrevisao ? new Date(kanbanPrevisao).toISOString() : null,
-      });
-      if (error) throw error;
-      toast.success("Ticket agendado");
-      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
-      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
-      setKanbanAgendadoOpen(false);
-      setKanbanPendingMove(null);
     } catch (err: any) {
       toast.error("Erro: " + (err.message ?? ""));
     }
