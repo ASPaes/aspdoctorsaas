@@ -54,6 +54,7 @@ import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySet
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
+import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
