@@ -695,7 +695,7 @@ export function MovimentosMrrModal({
                     </div>
                     <div className="space-y-2">
                       <Label>Origem</Label>
-                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => { setOrigemVenda(e.target.value); formIsDirty.current = true; }} />
+                      <OrigemCombobox value={origemVenda} onChange={setOrigemVendaDirty} origens={origensCatalogo} loading={loadingOrigens} />
                     </div>
                   </div>
                 )}
