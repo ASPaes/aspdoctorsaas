@@ -529,8 +529,83 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     console.log(`${LOG} Delegando para processInboundMessage: ${phone} fromMe=${fromMe}`);
     await processInboundMessage(supabase, normalized);
 
-  } catch (err) {
-    console.error(`${LOG} Error in processMessageUpsert:`, err);
+  } catch (processingError) {
+    // PATCH: Fallback — salva mensagem placeholder pro agente ver que algo chegou
+    console.error(`${LOG} CRITICAL processing error for msg ${key?.id}:`, processingError);
+    try {
+      const { phone: fbPhone } = normalizePhoneNumber(key?.remoteJid || '');
+
+      let { data: fbInstance } = await supabase.from('whatsapp_instances')
+        .select('id, tenant_id').eq('instance_name', instance).maybeSingle();
+      if (!fbInstance) {
+        const { data: fbCloud } = await supabase.from('whatsapp_instances')
+          .select('id, tenant_id').eq('instance_id_external', instance).maybeSingle();
+        fbInstance = fbCloud;
+      }
+      if (!fbInstance) { console.error(`${LOG} FALLBACK: instance not found`); return; }
+
+      const fbVariants = [fbPhone];
+      if (fbPhone.startsWith('55') && fbPhone.length === 13) fbVariants.push(fbPhone.slice(0, 4) + fbPhone.slice(5));
+      if (fbPhone.startsWith('55') && fbPhone.length === 12) fbVariants.push(fbPhone.slice(0, 4) + '9' + fbPhone.slice(4));
+
+      let { data: fbContact } = await supabase.from('whatsapp_contacts')
+        .select('id').eq('tenant_id', fbInstance.tenant_id)
+        .eq('instance_id', fbInstance.id)
+        .in('phone_number', fbVariants).maybeSingle();
+
+      if (!fbContact) {
+        const { data: newC } = await supabase.from('whatsapp_contacts').insert({
+          instance_id: fbInstance.id, phone_number: fbPhone,
+          name: pushName || fbPhone, is_group: false, tenant_id: fbInstance.tenant_id,
+        }).select('id').single();
+        fbContact = newC;
+      }
+      if (!fbContact) { console.error(`${LOG} FALLBACK: contact creation failed`); return; }
+
+      let { data: fbConv } = await supabase.from('whatsapp_conversations')
+        .select('id').eq('tenant_id', fbInstance.tenant_id)
+        .eq('instance_id', fbInstance.id)
+        .eq('contact_id', fbContact.id).maybeSingle();
+
+      if (!fbConv) {
+        const { data: newConv } = await supabase.from('whatsapp_conversations').insert({
+          instance_id: fbInstance.id, contact_id: fbContact.id,
+          status: 'active', tenant_id: fbInstance.tenant_id,
+        }).select('id').single();
+        fbConv = newConv;
+      }
+      if (!fbConv) { console.error(`${LOG} FALLBACK: conversation creation failed`); return; }
+
+      const fbTimestamp = new Date(
+        (messageTimestamp && !isNaN(messageTimestamp) ? messageTimestamp : Math.floor(Date.now() / 1000)) * 1000
+      ).toISOString();
+
+      await supabase.from('whatsapp_messages').upsert({
+        conversation_id: fbConv.id,
+        remote_jid: key?.remoteJid || '',
+        message_id: key?.id || `fallback_${Date.now()}`,
+        content: '⚠️ Arquivo/mídia recebido mas não foi possível processar. Peça para o cliente reenviar.',
+        message_type: 'text',
+        is_from_me: false,
+        status: 'received',
+        timestamp: fbTimestamp,
+        tenant_id: fbInstance.tenant_id,
+        instance_id: fbInstance.id,
+        metadata: { processing_error: true, original_error: String(processingError).substring(0, 500) },
+      }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+
+      await supabase.from('whatsapp_conversations').update({
+        last_message_at: fbTimestamp,
+        last_message_preview: '⚠️ Arquivo não processado',
+        is_last_message_from_me: false,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      }).eq('id', fbConv.id);
+
+      console.log(`${LOG} FALLBACK: placeholder saved for msg ${key?.id} in conv ${fbConv.id}`);
+    } catch (fallbackError) {
+      console.error(`${LOG} FALLBACK ALSO FAILED for msg ${key?.id}:`, fallbackError);
+    }
   }
 }
 
