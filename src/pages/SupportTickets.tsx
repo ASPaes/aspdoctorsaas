@@ -271,6 +271,7 @@ export default function SupportTickets() {
     return { name: s.name, color: s.color, isTerminal: s.is_terminal };
   };
 
+  const filteredSubcategories = useMemo(
     () => categoriaFilter === "all"
       ? subcategories
       : subcategories.filter((s) => s.category_id === categoriaFilter),
