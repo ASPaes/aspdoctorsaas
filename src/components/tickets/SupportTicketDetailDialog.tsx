@@ -87,8 +87,34 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [viewChatMeta, setViewChatMeta] = useState<{ code: string; contact: string; openedAt: string | null; closedAt: string | null; conversationId: string | null }>({ code: "", contact: "", openedAt: null, closedAt: null, conversationId: null });
   const [newCheckItem, setNewCheckItem] = useState("");
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data?.user?.id ?? null));
+  }, []);
+  const { data: currentProfile } = useProfile(currentUserId ?? undefined);
+  const isAdminOrHead = currentProfile?.role === "admin" || currentProfile?.role === "head" || currentProfile?.is_super_admin === true;
+
+  const handleSoftDelete = async () => {
+    if (!ticketId) return;
+    setDeleting(true);
+    try {
+      const { error } = await (supabase.rpc as any)("soft_delete_ticket", { p_ticket_id: ticketId });
+      if (error) throw error;
+      toast.success("Ticket excluído");
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
 
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
   useEffect(() => {
