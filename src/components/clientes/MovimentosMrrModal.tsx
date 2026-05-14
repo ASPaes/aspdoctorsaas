@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -73,6 +77,91 @@ interface MovimentosMrrModalProps {
   funcionarios: { id: number; nome: string }[];
 }
 
+interface OrigemOption { id: number; nome: string }
+
+function OrigemCombobox({
+  value,
+  onChange,
+  origens,
+  loading,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  origens: OrigemOption[];
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const sorted = useMemo(
+    () => [...origens].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+    [origens]
+  );
+  const matchInCatalog = useMemo(
+    () => sorted.find((o) => o.nome.localeCompare(value, 'pt-BR', { sensitivity: 'base' }) === 0),
+    [sorted, value]
+  );
+  const isLegacy = !!value && !matchInCatalog;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className={cn("truncate", !value && "text-muted-foreground", isLegacy && "italic")}>
+            {value
+              ? (isLegacy ? `${value} (valor antigo)` : matchInCatalog!.nome)
+              : (loading ? 'Carregando…' : 'Selecione a origem')}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command
+          filter={(val, search) =>
+            val.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
+              search.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            ) ? 1 : 0
+          }
+        >
+          <CommandInput placeholder="Buscar origem..." />
+          <CommandList className="max-h-[260px]">
+            <CommandEmpty>Nenhuma origem encontrada.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__sem_origem__"
+                onSelect={() => { onChange(''); setOpen(false); }}
+              >
+                <Check className={cn("mr-2 h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
+                <span className="text-muted-foreground">— Sem origem —</span>
+              </CommandItem>
+              {sorted.map((o) => (
+                <CommandItem
+                  key={o.id}
+                  value={o.nome}
+                  onSelect={() => { onChange(o.nome); setOpen(false); }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", matchInCatalog?.id === o.id ? "opacity-100" : "opacity-0")} />
+                  {o.nome}
+                </CommandItem>
+              ))}
+              {isLegacy && (
+                <CommandItem value={value} onSelect={() => setOpen(false)}>
+                  <Check className="mr-2 h-4 w-4 opacity-100" />
+                  <span className="italic">{value} (valor antigo)</span>
+                </CommandItem>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const TIPO_LABELS: Record<string, { label: string; color: string }> = {
   upsell: { label: 'Upsell', color: 'bg-green-500' },
   cross_sell: { label: 'Cross-sell', color: 'bg-blue-500' },
@@ -91,6 +180,24 @@ export function MovimentosMrrModal({
 }: MovimentosMrrModalProps) {
   const { user, profile } = useAuth();
   const draftKey = `draft:mov_mrr:${profile?.tenant_id ?? "t"}:${user?.id ?? "u"}:new:${clienteId}`;
+
+  const { data: origensCatalogo = [], isLoading: loadingOrigens } = useQuery<OrigemOption[]>({
+    queryKey: ['origens_venda_catalog', profile?.tenant_id],
+    enabled: !!profile?.tenant_id && open,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      let q = supabase.from('origens_venda').select('id, nome');
+      if (profile?.tenant_id) q = q.eq('tenant_id', profile.tenant_id);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []) as OrigemOption[];
+    },
+  });
+
+  const setOrigemVendaDirty = useCallback((v: string) => {
+    setOrigemVenda(v);
+    formIsDirty.current = true;
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -567,7 +674,7 @@ export function MovimentosMrrModal({
                     </div>
                     <div className="space-y-2">
                       <Label>Origem</Label>
-                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => { setOrigemVenda(e.target.value); formIsDirty.current = true; }} />
+                      <OrigemCombobox value={origemVenda} onChange={setOrigemVendaDirty} origens={origensCatalogo} loading={loadingOrigens} />
                     </div>
                   </div>
                 ) : (
@@ -588,7 +695,7 @@ export function MovimentosMrrModal({
                     </div>
                     <div className="space-y-2">
                       <Label>Origem</Label>
-                      <Input placeholder="Ex: Indicação, Campanha, etc." value={origemVenda} onChange={(e) => { setOrigemVenda(e.target.value); formIsDirty.current = true; }} />
+                      <OrigemCombobox value={origemVenda} onChange={setOrigemVendaDirty} origens={origensCatalogo} loading={loadingOrigens} />
                     </div>
                   </div>
                 )}
