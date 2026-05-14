@@ -86,49 +86,15 @@ export default function SupportTickets() {
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
-  const [kanbanAgendadoOpen, setKanbanAgendadoOpen] = useState(false);
-  const [kanbanPendingMove, setKanbanPendingMove] = useState<{ ticketId: string; newStatus: string } | null>(null);
-  const [kanbanAgendadoPara, setKanbanAgendadoPara] = useState("");
-  const [kanbanPrevisao, setKanbanPrevisao] = useState("");
-
-  const handleKanbanStatusChange = async (ticketId: string, newStatus: string) => {
-    if (newStatus === "agendado") {
-      setKanbanPendingMove({ ticketId, newStatus });
-      setKanbanAgendadoPara("");
-      setKanbanPrevisao("");
-      setKanbanAgendadoOpen(true);
-      return;
-    }
-
+  const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
     try {
       const { error } = await (supabase.rpc as any)("update_ticket_status", {
         p_ticket_id: ticketId,
-        p_new_status: newStatus,
+        p_new_status_id: newStatusId,
       });
       if (error) throw error;
       toast.success("Status atualizado");
       queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
-      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
-    } catch (err: any) {
-      toast.error("Erro ao atualizar: " + (err.message ?? ""));
-    }
-  };
-
-  const handleConfirmAgendado = async () => {
-    if (!kanbanPendingMove) return;
-    try {
-      const { error } = await (supabase.rpc as any)("update_ticket_status", {
-        p_ticket_id: kanbanPendingMove.ticketId,
-        p_new_status: "agendado",
-        p_agendado_para: kanbanAgendadoPara ? new Date(kanbanAgendadoPara).toISOString() : null,
-        p_previsao_encerramento: kanbanPrevisao ? new Date(kanbanPrevisao).toISOString() : null,
-      });
-      if (error) throw error;
-      toast.success("Ticket agendado");
-      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
-      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
-      setKanbanAgendadoOpen(false);
-      setKanbanPendingMove(null);
     } catch (err: any) {
       toast.error("Erro: " + (err.message ?? ""));
     }
@@ -415,30 +381,18 @@ export default function SupportTickets() {
 
         <TabsContent value="tickets" className="space-y-4">
           {/* Metric cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-card border border-border rounded-lg p-3">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
               <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Abertos</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.abertos}</p>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Ativos</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.ativos}</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Concluídos</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.concluidos}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Agendados</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-yellow-400">{ticketMetrics.agendados}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Aguardando</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-orange-400">{ticketMetrics.aguardando}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Cancelados</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-red-400">{ticketMetrics.cancelados}</p>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -447,8 +401,13 @@ export default function SupportTickets() {
               <SelectTrigger className="h-9 w-[150px] text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
-                {Object.entries(STATUS_LABELS).map(([v, l]) => (
-                  <SelectItem key={v} value={v}>{l}</SelectItem>
+                {filteredStatuses.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                      {s.name}
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -644,6 +603,25 @@ export default function SupportTickets() {
             </div>
           )}
 
+          {/* Abas de setor */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <button
+              onClick={() => setDepartmentFilter("all")}
+              className={departmentFilter === "all" ? "shrink-0 px-3 py-1.5 text-xs rounded-md bg-primary/10 text-primary font-medium" : "shrink-0 px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground transition-colors"}
+            >
+              Todos
+            </button>
+            {supportDepartments.map((dept) => (
+              <button
+                key={dept.id}
+                onClick={() => setDepartmentFilter(dept.id)}
+                className={departmentFilter === dept.id ? "shrink-0 px-3 py-1.5 text-xs rounded-md bg-primary/10 text-primary font-medium" : "shrink-0 px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground transition-colors"}
+              >
+                {dept.name}
+              </button>
+            ))}
+          </div>
+
           {/* Sub-abas de visualização */}
           <div className="flex items-center gap-1 border-b border-border">
             <button
@@ -701,9 +679,9 @@ export default function SupportTickets() {
                             <p className="text-sm font-medium truncate">
                               {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
                             </p>
-                            <Badge className={`text-[10px] border ${STATUS_CLASSES[t.status] ?? ""}`}>
-                              {STATUS_LABELS[t.status] ?? t.status}
-                            </Badge>
+                            {(() => { const si = getStatusInfo(t.status_id); return (
+                              <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
+                            ); })()}
                           </div>
                           {breadcrumb && (
                             <p className="text-xs text-muted-foreground truncate">
@@ -743,7 +721,7 @@ export default function SupportTickets() {
               </div>
             ) : (
               <TicketsKanbanView
-                tickets={filteredTickets.filter((t: any) => t.status !== "cancelado")}
+                tickets={filteredTickets.filter((t: any) => !getStatusInfo(t.status_id).isTerminal) as any}
                 onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
                 onStatusChange={handleKanbanStatusChange}
               />
@@ -778,42 +756,6 @@ export default function SupportTickets() {
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
       />
-
-      <Dialog open={kanbanAgendadoOpen} onOpenChange={(o) => { if (!o) { setKanbanAgendadoOpen(false); setKanbanPendingMove(null); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Agendar ticket</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Agendado para *</Label>
-              <Input
-                type="datetime-local"
-                value={kanbanAgendadoPara}
-                onChange={(e) => setKanbanAgendadoPara(e.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Previsão de encerramento</Label>
-              <Input
-                type="datetime-local"
-                value={kanbanPrevisao}
-                onChange={(e) => setKanbanPrevisao(e.target.value)}
-                className="h-10"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setKanbanAgendadoOpen(false); setKanbanPendingMove(null); }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmAgendado} disabled={!kanbanAgendadoPara}>
-              Confirmar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
