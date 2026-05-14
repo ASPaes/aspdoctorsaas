@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -21,6 +23,7 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
+  Tag as TagIcon, X, ListChecks, Trash2,
 } from "lucide-react";
 
 
@@ -81,6 +84,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [savingContact, setSavingContact] = useState(false);
   const [viewChatOpen, setViewChatOpen] = useState(false);
   const [viewChatMeta, setViewChatMeta] = useState<{ code: string; contact: string; openedAt: string | null; closedAt: string | null; conversationId: string | null }>({ code: "", contact: "", openedAt: null, closedAt: null, conversationId: null });
+  const [newCheckItem, setNewCheckItem] = useState("");
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -125,6 +130,80 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       return (data ?? []) as any[];
     },
   });
+
+  const { data: ticketTags = [], refetch: refetchTags } = useQuery({
+    queryKey: ["ticket_tags_assigned", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tag_assignments" as any) as any)
+        .select("id, tag:tag_id(id, name, color)")
+        .eq("ticket_id", ticketId);
+      if (error) throw error;
+      return ((data ?? []) as any[]).filter(a => a.tag).map(a => ({
+        assignmentId: a.id as string,
+        id: a.tag.id as string,
+        name: a.tag.name as string,
+        color: a.tag.color as string,
+      }));
+    },
+  });
+
+  const { data: availableTags = [] } = useQuery({
+    queryKey: ["ticket_tags_available", tid],
+    enabled: !!tid && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tags" as any) as any)
+        .select("id, name, color, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string; department_id: string | null }>;
+    },
+  });
+
+  const handleAddTag = async (tagId: string) => {
+    try {
+      await (supabase.from("ticket_tag_assignments" as any) as any)
+        .insert({ ticket_id: ticketId, tag_id: tagId });
+      refetchTags();
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      toast.success("Tag adicionada");
+    } catch { toast.error("Erro ao adicionar tag"); }
+  };
+
+  const handleRemoveTag = async (assignmentId: string) => {
+    try {
+      await (supabase.from("ticket_tag_assignments" as any) as any)
+        .delete().eq("id", assignmentId);
+      refetchTags();
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+    } catch { toast.error("Erro ao remover tag"); }
+  };
+
+  const handleToggleCheck = async (index: number) => {
+    const items = [...((ticket?.checklist as any[]) ?? [])];
+    items[index] = { ...items[index], done: !items[index].done };
+    await (supabase.from("support_tickets" as any) as any)
+      .update({ checklist: items }).eq("id", ticketId);
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+  };
+
+  const handleAddCheckItem = async () => {
+    if (!newCheckItem.trim()) return;
+    const items = [...((ticket?.checklist as any[]) ?? []), { text: newCheckItem.trim(), done: false }];
+    await (supabase.from("support_tickets" as any) as any)
+      .update({ checklist: items }).eq("id", ticketId);
+    setNewCheckItem("");
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+  };
+
+  const handleRemoveCheckItem = async (index: number) => {
+    const items = ((ticket?.checklist as any[]) ?? []).filter((_: any, i: number) => i !== index);
+    await (supabase.from("support_tickets" as any) as any)
+      .update({ checklist: items }).eq("id", ticketId);
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+  };
 
   const attendanceId = ticket?.attendance_id ?? null;
 
@@ -595,7 +674,53 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </Button>
       </div>
 
-      {/* Classificação editável */}
+      {/* Tags */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {ticketTags.map(tag => (
+          <span
+            key={tag.assignmentId}
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium"
+            style={{ background: tag.color + "22", color: tag.color }}
+          >
+            {tag.name}
+            <button
+              onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.assignmentId); }}
+              className="hover:opacity-70"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
+              <TagIcon className="h-3 w-3" />
+              Tag
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-1.5">
+            <div className="space-y-0.5 max-h-60 overflow-y-auto">
+              {availableTags
+                .filter(t => !ticketTags.find(tt => tt.id === t.id))
+                .map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => { handleAddTag(t.id); setTagPopoverOpen(false); }}
+                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                  >
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
+                    {t.name}
+                  </button>
+                ))}
+              {availableTags.filter(t => !ticketTags.find(tt => tt.id === t.id)).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[10px] uppercase text-muted-foreground">Classificação</p>
@@ -843,7 +968,48 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       )}
 
-      {/* Resumo IA do atendimento */}
+      {/* Checklist */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Checklist</span>
+          {((ticket?.checklist as any[]) ?? []).length > 0 && (
+            <Badge variant="outline" className="text-[10px]">
+              {((ticket.checklist as any[]) ?? []).filter((c: any) => c.done).length}/{((ticket.checklist as any[]) ?? []).length}
+            </Badge>
+          )}
+        </div>
+        <div className="space-y-1">
+          {((ticket?.checklist as any[]) ?? []).map((item: any, i: number) => (
+            <div key={i} className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50">
+              <Checkbox checked={!!item.done} onCheckedChange={() => handleToggleCheck(i)} />
+              <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>
+                {item.text}
+              </span>
+              <button
+                onClick={() => handleRemoveCheckItem(i)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            value={newCheckItem}
+            onChange={(e) => setNewCheckItem(e.target.value)}
+            placeholder="Novo item..."
+            className="h-8 text-sm flex-1"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCheckItem(); } }}
+          />
+          <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleAddCheckItem}>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+
       {attendance?.ai_summary && (
         <div className="bg-muted/30 rounded-lg p-3 space-y-2">
           <div className="flex items-center gap-1.5">
