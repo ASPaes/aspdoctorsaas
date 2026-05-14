@@ -135,7 +135,7 @@ export function CreateChildTicketDialog({
               </div>
             )}
             <p className="text-[11px] text-muted-foreground italic pt-1">
-              A classificação será herdada do ticket pai.
+              A classificação será herdada do ticket pai. O ticket filho será criado no status inicial do setor.
             </p>
           </div>
 
