@@ -103,7 +103,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
           service_types:service_type_id(nome),
-          parent:parent_ticket_id(id, ticket_code, status),
+          parent:parent_ticket_id(id, ticket_code, status_id),
           whatsapp_contacts:contact_id(name, phone_number)
         `)
         .eq("id", ticketId)
@@ -118,7 +118,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     enabled: !!ticketId && open,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_tickets" as any) as any)
-        .select("id, ticket_code, status, assunto, aberto_em, agendado_para")
+        .select("id, ticket_code, status_id, assunto, aberto_em, agendado_para")
         .eq("parent_ticket_id", ticketId)
         .order("aberto_em");
       if (error) throw error;
@@ -323,7 +323,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   }, [ticket, clienteContatos]);
 
   const FIELD_LABELS: Record<string, string> = {
-    status: "Status",
+    status_id: "Status",
     responsavel_user_id: "Responsável",
     department_id: "Setor",
     category_id: "Categoria",
@@ -343,8 +343,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const resolveValueLabel = (field: string, value: string | null): string => {
     if (!value) return "—";
     switch (field) {
-      case "status":
-        return STATUS_LABELS[value] ?? value;
+      case "status_id": {
+        const si = ticketStatuses.find(s => s.id === value);
+        return si ? si.name : value.slice(0, 8) + "...";
+      }
       case "responsavel_user_id":
         return eventAgents.find(a => a.user_id === value)?.nome ?? value.slice(0, 8) + "...";
       case "department_id":
@@ -432,6 +434,37 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     },
   });
 
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["ticket_statuses_detail", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, slug, color, position, is_initial, is_terminal, is_active, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; name: string; slug: string; color: string;
+        position: number; is_initial: boolean; is_terminal: boolean;
+        is_active: boolean; department_id: string | null;
+      }>;
+    },
+  });
+
+  const getStatusInfo = (statusId: string | null) => {
+    if (!statusId) return { name: "Sem status", color: "#6b7280", isTerminal: false };
+    const found = ticketStatuses.find(s => s.id === statusId);
+    return found
+      ? { name: found.name, color: found.color, isTerminal: found.is_terminal }
+      : { name: "—", color: "#6b7280", isTerminal: false };
+  };
+
+  const statusesForDepartment = useMemo(() => {
+    if (!ticket?.department_id) return ticketStatuses;
+    return ticketStatuses.filter(s => s.department_id === ticket.department_id);
+  }, [ticketStatuses, ticket?.department_id]);
+
   const handleFieldUpdate = async (fields: Record<string, any>) => {
     if (!ticketId) return;
     setUpdating(true);
@@ -495,22 +528,29 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-mono text-sm font-semibold text-primary">{ticket.ticket_code ?? "—"}</span>
         <Select
-          value={ticket.status ?? ""}
-          onValueChange={(v) => {
-            handleFieldUpdate({ status: v });
-          }}
+          value={ticket.status_id ?? ""}
+          onValueChange={(v) => handleFieldUpdate({ status_id: v })}
           disabled={updating}
         >
           <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs">
-            <SelectValue />
+            <SelectValue>
+              {(() => { const si = getStatusInfo(ticket.status_id); return (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: si.color }} />
+                  {si.name}
+                </span>
+              );})()}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="aberto">Aberto</SelectItem>
-            <SelectItem value="em_andamento">Em andamento</SelectItem>
-            <SelectItem value="agendado">Agendado</SelectItem>
-            <SelectItem value="aguardando_terceiro">Aguardando terceiro</SelectItem>
-            <SelectItem value="concluido">Concluído</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
+            {statusesForDepartment.map(s => (
+              <SelectItem key={s.id} value={s.id}>
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                  {s.name}
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select
@@ -840,9 +880,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-[10px] uppercase text-muted-foreground">Ticket pai:</span>
           <span className="font-mono text-xs font-semibold text-primary">{ticket.parent.ticket_code}</span>
-          <Badge className={`text-[10px] border ${STATUS_CLASSES[ticket.parent.status] ?? ""}`}>
-            {STATUS_LABELS[ticket.parent.status] ?? ticket.parent.status}
-          </Badge>
+          {(() => { const si = getStatusInfo(ticket.parent.status_id); return (
+            <Badge variant="outline" className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
+              {si.name}
+            </Badge>
+          );})()}
         </button>
       )}
 
@@ -949,7 +991,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <Sparkles className="h-3.5 w-3.5" />
               Resumo parcial
             </Button>
-            {ticket?.status === "concluido" && (
+            {getStatusInfo(ticket?.status_id).isTerminal && (
               <Button
                 size="sm"
                 variant="outline"
@@ -1068,9 +1110,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <div className="flex items-center gap-2 mb-1">
             <TicketCheck className="h-3.5 w-3.5 text-blue-400" />
             <span className="font-mono text-xs font-semibold text-blue-400">{c.ticket_code}</span>
-            <Badge className={`text-[10px] border ${STATUS_CLASSES[c.status] ?? ""}`}>
-              {STATUS_LABELS[c.status] ?? c.status}
-            </Badge>
+            {(() => { const si = getStatusInfo(c.status_id); return (
+              <Badge variant="outline" className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
+                {si.name}
+              </Badge>
+            );})()}
           </div>
           {c.assunto && <p className="text-xs text-muted-foreground line-clamp-2">{c.assunto}</p>}
         </button>
@@ -1160,9 +1204,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
                     <span className="text-xs">alterou status:</span>
-                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.old_value ?? ""] ?? evt.old_value}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{getStatusInfo(evt.old_value).name}</Badge>
                     <span className="text-[10px]">→</span>
-                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.new_value ?? ""] ?? evt.new_value}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{getStatusInfo(evt.new_value).name}</Badge>
                     <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : evt.event_type === "ai_summary" ? (
