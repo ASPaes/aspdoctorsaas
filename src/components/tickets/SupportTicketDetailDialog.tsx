@@ -1204,9 +1204,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground">{getAgentName(evt.user_id)}</span>
                     <span className="text-xs">alterou status:</span>
-                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.old_value ?? ""] ?? evt.old_value}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{getStatusInfo(evt.old_value).name}</Badge>
                     <span className="text-[10px]">→</span>
-                    <Badge variant="outline" className="text-[10px]">{STATUS_LABELS[evt.new_value ?? ""] ?? evt.new_value}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{getStatusInfo(evt.new_value).name}</Badge>
                     <span className="text-[10px] text-muted-foreground">{formatEvtDate(evt.created_at)}</span>
                   </div>
                 ) : evt.event_type === "ai_summary" ? (
