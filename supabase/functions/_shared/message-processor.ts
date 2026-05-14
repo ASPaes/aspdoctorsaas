@@ -125,9 +125,18 @@ function tzDayKey(date: Date, tz: string): string {
   return WEEKDAY_KEYS[wd] || '';
 }
 
+export interface HolidayTemplate {
+  open_at: string;
+  close_at: string;
+  has_break: boolean;
+  break_start: string | null;
+  break_end: string | null;
+}
+
 export interface BusinessHoursExceptionsLookup {
-  today: { name: string | null; is_closed: boolean } | null;
+  today: { name: string | null; is_closed: boolean; use_template: boolean } | null;
   closedDates: Set<string>;
+  template: HolidayTemplate | null;
 }
 
 export async function getBusinessHoursExceptions(
@@ -142,24 +151,47 @@ export async function getBusinessHoursExceptions(
     const endStr = tzDateStr(new Date(msgDate.getTime() + daysAhead * 86400000), tz);
     const { data, error } = await supabase
       .from('business_hours_exceptions')
-      .select('date, name, is_closed')
+      .select('date, name, is_closed, use_template')
       .eq('tenant_id', tenantId)
       .gte('date', startStr)
       .lte('date', endStr);
     if (error) {
       console.error('[processor] getBusinessHoursExceptions error:', error.message);
-      return { today: null, closedDates: new Set() };
+      return { today: null, closedDates: new Set(), template: null };
     }
     const closedDates = new Set<string>();
-    let today: { name: string | null; is_closed: boolean } | null = null;
+    let today: { name: string | null; is_closed: boolean; use_template: boolean } | null = null;
     for (const row of (data || [])) {
-      if (row.is_closed) closedDates.add(row.date);
-      if (row.date === startStr) today = { name: row.name ?? null, is_closed: !!row.is_closed };
+      // Dias com horário reduzido (use_template) NÃO entram em closedDates,
+      // pois não estão totalmente fechados.
+      if (row.is_closed && !row.use_template) closedDates.add(row.date);
+      if (row.date === startStr) {
+        today = {
+          name: row.name ?? null,
+          is_closed: !!row.is_closed,
+          use_template: !!row.use_template,
+        };
+      }
     }
-    return { today, closedDates };
+
+    let template: HolidayTemplate | null = null;
+    if (today?.use_template) {
+      const { data: tpl, error: tplErr } = await supabase
+        .from('tenant_holiday_template')
+        .select('open_at, close_at, has_break, break_start, break_end')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (tplErr) {
+        console.error('[processor] tenant_holiday_template error:', tplErr.message);
+      } else if (tpl?.open_at && tpl?.close_at) {
+        template = tpl as HolidayTemplate;
+      }
+    }
+
+    return { today, closedDates, template };
   } catch (err) {
     console.error('[processor] getBusinessHoursExceptions unexpected:', err);
-    return { today: null, closedDates: new Set() };
+    return { today: null, closedDates: new Set(), template: null };
   }
 }
 
@@ -578,11 +610,31 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
 
     // Holiday/exception lookup (mesmo dia + próximos 14 dias)
     const exceptions = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 14);
-    const isHolidayToday = !!(exceptions.today && exceptions.today.is_closed);
 
     const dayKey = tzDayKey(msgDate, tz);
     const tParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(msgDate);
     const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+    // Feriado com horário reduzido (use_template) — usa janela do template
+    if (exceptions.today?.use_template && exceptions.template) {
+      const t = exceptions.template;
+      const open = t.open_at.slice(0, 5);
+      const close = t.close_at.slice(0, 5);
+      const inTurn = currentTime >= open && currentTime < close;
+      const inBreak = !!(t.has_break && t.break_start && t.break_end &&
+        currentTime >= t.break_start.slice(0, 5) && currentTime < t.break_end.slice(0, 5));
+      if (inTurn && !inBreak) return { inside: true };
+      // fora da janela do template → trata como feriado fechado abaixo
+    }
+
+    // Feriado fechado o dia inteiro: is_closed=true sem use_template, OU use_template fora da janela.
+    const isHolidayToday = !!(
+      exceptions.today &&
+      (
+        (exceptions.today.is_closed && !exceptions.today.use_template) ||
+        (exceptions.today.use_template && !!exceptions.template) // já filtrado acima quando dentro
+      )
+    );
 
     const dayConfig = businessHours[dayKey];
     const slots: { start: string; end: string }[] = (dayConfig?.slots || []).slice();

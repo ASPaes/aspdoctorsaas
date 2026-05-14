@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff, Download } from "lucide-react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -23,6 +24,7 @@ interface Exception {
   type: string;
   name: string | null;
   is_closed: boolean;
+  use_template: boolean;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -106,13 +108,32 @@ export default function BusinessHoursExceptionsSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("business_hours_exceptions" as any)
-        .select("id, date, type, name, is_closed")
+        .select("id, date, type, name, is_closed, use_template")
         .eq("tenant_id", tid!)
         .order("date", { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as Exception[];
     },
   });
+
+  const { data: template } = useQuery<any>({
+    queryKey: ["tenant-holiday-template", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("tenant_holiday_template" as any) as any)
+        .select("*")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const templateValido = !!(template?.open_at && template?.close_at);
+  const formatTemplateRange = () => {
+    if (!templateValido) return "—";
+    return `${template.open_at.slice(0, 5)}–${template.close_at.slice(0, 5)}`;
+  };
 
   const datasJaCadastradas = useMemo(
     () => new Set(exceptions.map((e) => e.date)),
@@ -129,6 +150,7 @@ export default function BusinessHoursExceptionsSection() {
         type: formType,
         name: formName.trim() || null,
         is_closed: true,
+        use_template: false,
       };
 
       if (editingId) {
@@ -173,6 +195,24 @@ export default function BusinessHoursExceptionsSection() {
     },
   });
 
+  const toggleTemplateMutation = useMutation({
+    mutationFn: async ({ id, useTemplate }: { id: string; useTemplate: boolean }) => {
+      if (useTemplate && !templateValido) {
+        throw new Error("Configure o horário em feriados primeiro (acima de Domingo).");
+      }
+      const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
+        .update({ use_template: useTemplate, is_closed: !useTemplate })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Não foi possível alternar", description: err.message, variant: "destructive" });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: async (ano: number) => {
       if (!tid) throw new Error("tenant_id ausente");
@@ -187,6 +227,7 @@ export default function BusinessHoursExceptionsSection() {
         type: "holiday",
         name: f.name,
         is_closed: true,
+        use_template: false,
       }));
       const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
         .insert(payload);
@@ -280,6 +321,7 @@ export default function BusinessHoursExceptionsSection() {
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Horário reduzido</TableHead>
                   <TableHead className="w-24 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -291,6 +333,18 @@ export default function BusinessHoursExceptionsSection() {
                     </TableCell>
                     <TableCell>{TYPE_LABELS[ex.type] || ex.type}</TableCell>
                     <TableCell className="text-muted-foreground">{ex.name || "—"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!!ex.use_template}
+                          onCheckedChange={(v) => toggleTemplateMutation.mutate({ id: ex.id, useTemplate: v })}
+                          disabled={toggleTemplateMutation.isPending}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {ex.use_template ? `Abre ${formatTemplateRange()}` : "Fechado o dia"}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         <Button

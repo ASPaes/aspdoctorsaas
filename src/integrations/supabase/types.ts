@@ -401,6 +401,7 @@ export type Database = {
           tenant_id: string
           type: string
           updated_at: string
+          use_template: boolean
         }
         Insert: {
           created_at?: string
@@ -411,6 +412,7 @@ export type Database = {
           tenant_id: string
           type: string
           updated_at?: string
+          use_template?: boolean
         }
         Update: {
           created_at?: string
@@ -421,6 +423,7 @@ export type Database = {
           tenant_id?: string
           type?: string
           updated_at?: string
+          use_template?: boolean
         }
         Relationships: []
       }
@@ -4274,6 +4277,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tenant_holiday_template: {
+        Row: {
+          break_end: string | null
+          break_start: string | null
+          close_at: string | null
+          has_break: boolean
+          open_at: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          break_end?: string | null
+          break_start?: string | null
+          close_at?: string | null
+          has_break?: boolean
+          open_at?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          break_end?: string | null
+          break_start?: string | null
+          close_at?: string | null
+          has_break?: boolean
+          open_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       tenants: {
         Row: {
