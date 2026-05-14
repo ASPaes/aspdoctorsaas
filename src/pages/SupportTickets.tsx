@@ -230,7 +230,47 @@ export default function SupportTickets() {
     },
   });
 
-  const filteredSubcategories = useMemo(
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["ticket_statuses", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, slug, color, position, is_initial, is_terminal, is_active, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; slug: string; color: string; position: number; is_initial: boolean; is_terminal: boolean; is_active: boolean; department_id: string | null }>;
+    },
+  });
+
+  const { data: supportDepartments = [] } = useQuery({
+    queryKey: ["support_departments_list", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name, slug")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; slug: string }>;
+    },
+  });
+
+  const filteredStatuses = useMemo(
+    () => departmentFilter === "all"
+      ? ticketStatuses
+      : ticketStatuses.filter((s) => s.department_id === departmentFilter),
+    [ticketStatuses, departmentFilter]
+  );
+
+  const getStatusInfo = (statusId: string | null) => {
+    const s = ticketStatuses.find((x) => x.id === statusId);
+    if (!s) return { name: "Sem status", color: "#6b7280", isTerminal: false };
+    return { name: s.name, color: s.color, isTerminal: s.is_terminal };
+  };
+
     () => categoriaFilter === "all"
       ? subcategories
       : subcategories.filter((s) => s.category_id === categoriaFilter),
