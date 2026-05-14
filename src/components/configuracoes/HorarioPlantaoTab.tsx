@@ -414,6 +414,7 @@ export default function HorarioPlantaoTab() {
                       );
                     })}
                   </div>
+                  <BusinessHoursHolidayTemplateSection />
                 </div>
 
                 {/* Message */}
