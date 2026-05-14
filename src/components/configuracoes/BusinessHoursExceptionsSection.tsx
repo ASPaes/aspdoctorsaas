@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, Plus, Pencil, Trash2, Loader2, CalendarOff, Download } from "lucide-react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -23,6 +24,7 @@ interface Exception {
   type: string;
   name: string | null;
   is_closed: boolean;
+  use_template: boolean;
 }
 
 const TYPE_LABELS: Record<string, string> = {
