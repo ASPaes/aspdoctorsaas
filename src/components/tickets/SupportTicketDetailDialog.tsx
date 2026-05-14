@@ -84,6 +84,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [savingContact, setSavingContact] = useState(false);
   const [viewChatOpen, setViewChatOpen] = useState(false);
   const [viewChatMeta, setViewChatMeta] = useState<{ code: string; contact: string; openedAt: string | null; closedAt: string | null; conversationId: string | null }>({ code: "", contact: "", openedAt: null, closedAt: null, conversationId: null });
+  const [newCheckItem, setNewCheckItem] = useState("");
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
