@@ -30,7 +30,7 @@ const ALL_NAV_ITEMS = [
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
   { title: "Chat", url: "/whatsapp", icon: MessageCircle },
-  { title: "Tickets Suporte", url: "/tickets", icon: TicketCheck, requiredRoles: ["admin", "head"] },
+  { title: "Tickets", url: "/tickets", icon: TicketCheck, requiredRoles: ["admin", "head"] },
   { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, requiredRoles: ["admin"] },
   { title: "Configurações", url: "/configuracoes", icon: Settings, requiredRoles: ["admin"] },
 ];
