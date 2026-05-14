@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
