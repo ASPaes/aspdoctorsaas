@@ -32,7 +32,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
   const [tipoHorario, setTipoHorario] = useState<string>("comercial");
-  const [status, setStatus] = useState<string>("concluido");
+  const [statusId, setStatusId] = useState<string>("");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
   const [departamentoId, setDepartamentoId] = useState("");
