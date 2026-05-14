@@ -131,6 +131,80 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     },
   });
 
+  const { data: ticketTags = [], refetch: refetchTags } = useQuery({
+    queryKey: ["ticket_tags_assigned", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tag_assignments" as any) as any)
+        .select("id, tag:tag_id(id, name, color)")
+        .eq("ticket_id", ticketId);
+      if (error) throw error;
+      return ((data ?? []) as any[]).filter(a => a.tag).map(a => ({
+        assignmentId: a.id as string,
+        id: a.tag.id as string,
+        name: a.tag.name as string,
+        color: a.tag.color as string,
+      }));
+    },
+  });
+
+  const { data: availableTags = [] } = useQuery({
+    queryKey: ["ticket_tags_available", tid],
+    enabled: !!tid && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tags" as any) as any)
+        .select("id, name, color, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string; department_id: string | null }>;
+    },
+  });
+
+  const handleAddTag = async (tagId: string) => {
+    try {
+      await (supabase.from("ticket_tag_assignments" as any) as any)
+        .insert({ ticket_id: ticketId, tag_id: tagId });
+      refetchTags();
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      toast.success("Tag adicionada");
+    } catch { toast.error("Erro ao adicionar tag"); }
+  };
+
+  const handleRemoveTag = async (assignmentId: string) => {
+    try {
+      await (supabase.from("ticket_tag_assignments" as any) as any)
+        .delete().eq("id", assignmentId);
+      refetchTags();
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+    } catch { toast.error("Erro ao remover tag"); }
+  };
+
+  const handleToggleCheck = async (index: number) => {
+    const items = [...((ticket?.checklist as any[]) ?? [])];
+    items[index] = { ...items[index], done: !items[index].done };
+    await (supabase.from("support_tickets" as any) as any)
+      .update({ checklist: items }).eq("id", ticketId);
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+  };
+
+  const handleAddCheckItem = async () => {
+    if (!newCheckItem.trim()) return;
+    const items = [...((ticket?.checklist as any[]) ?? []), { text: newCheckItem.trim(), done: false }];
+    await (supabase.from("support_tickets" as any) as any)
+      .update({ checklist: items }).eq("id", ticketId);
+    setNewCheckItem("");
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+  };
+
+  const handleRemoveCheckItem = async (index: number) => {
+    const items = ((ticket?.checklist as any[]) ?? []).filter((_: any, i: number) => i !== index);
+    await (supabase.from("support_tickets" as any) as any)
+      .update({ checklist: items }).eq("id", ticketId);
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+  };
+
   const attendanceId = ticket?.attendance_id ?? null;
 
   const { data: csat } = useQuery({
