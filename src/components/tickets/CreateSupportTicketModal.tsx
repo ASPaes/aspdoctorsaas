@@ -230,6 +230,16 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setSubcategoryId("");
   }, [produtoId]);
 
+  useEffect(() => {
+    if (ticketStatuses.length > 0) {
+      const terminal = ticketStatuses.find((s) => s.is_terminal);
+      if (terminal) setStatusId(terminal.id);
+      else setStatusId(ticketStatuses[0].id);
+    } else {
+      setStatusId("");
+    }
+  }, [ticketStatuses]);
+
   const handleSubmit = async () => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
