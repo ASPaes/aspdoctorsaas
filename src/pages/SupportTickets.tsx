@@ -721,7 +721,7 @@ export default function SupportTickets() {
               </div>
             ) : (
               <TicketsKanbanView
-                tickets={filteredTickets.filter((t: any) => t.status !== "cancelado")}
+                tickets={filteredTickets.filter((t: any) => !getStatusInfo(t.status_id).isTerminal) as any}
                 onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
                 onStatusChange={handleKanbanStatusChange}
               />
