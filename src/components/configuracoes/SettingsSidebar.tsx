@@ -10,6 +10,7 @@ export const CADASTRO_SECTIONS = [
   "modelos-contrato",
   "origens-venda",
   "formas-pagamento",
+  "setores",
   "funcionarios",
   "categorias-servico",
   "subcategorias-servico",
