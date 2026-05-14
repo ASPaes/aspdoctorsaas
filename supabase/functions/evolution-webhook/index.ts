@@ -26,11 +26,19 @@ function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
   if (message.imageMessage) return 'image';
   if (message.audioMessage) return 'audio';
   if (message.videoMessage) return 'video';
+  // PATCH: handle documentWithCaptionMessage wrapper (Evolution API v2)
+  if (message.documentWithCaptionMessage?.message?.documentMessage) return 'document';
   if (message.documentMessage) return 'document';
   if (message.stickerMessage) return 'sticker';
   if (message.contactMessage) return 'contact';
   if (message.contactsArrayMessage) return 'contacts';
   return 'text';
+}
+
+function resolveDocumentMessage(message: any): any {
+  return message.documentMessage
+    || message.documentWithCaptionMessage?.message?.documentMessage
+    || null;
 }
 
 function isRevokeMessage(message: any): boolean {
