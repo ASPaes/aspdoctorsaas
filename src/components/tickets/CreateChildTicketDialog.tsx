@@ -142,28 +142,14 @@ export function CreateChildTicketDialog({
           {/* Status + Agendado */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Status <Req /></Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="aberto">Aberto</SelectItem>
-                  <SelectItem value="agendado">Agendado</SelectItem>
-                  <SelectItem value="aguardando_terceiro">Aguardando terceiro</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-sm font-medium">Agendado para</Label>
+              <Input
+                type="datetime-local"
+                className="h-10"
+                value={agendadoPara}
+                onChange={(e) => setAgendadoPara(e.target.value)}
+              />
             </div>
-
-            {status === "agendado" && (
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Agendado para <Req /></Label>
-                <Input
-                  type="datetime-local"
-                  className="h-10"
-                  value={agendadoPara}
-                  onChange={(e) => setAgendadoPara(e.target.value)}
-                />
-              </div>
-            )}
           </div>
 
           {/* Responsável + Canal */}
