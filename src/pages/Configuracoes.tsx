@@ -34,6 +34,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
+import TicketStatusesConfig from "@/components/configuracoes/TicketStatusesConfig";
+import TicketTagsConfig from "@/components/configuracoes/TicketTagsConfig";
 import SettingsSidebar, { CADASTRO_SECTIONS } from "@/components/configuracoes/SettingsSidebar";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
