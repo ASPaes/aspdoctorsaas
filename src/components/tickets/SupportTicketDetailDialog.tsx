@@ -1110,9 +1110,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <div className="flex items-center gap-2 mb-1">
             <TicketCheck className="h-3.5 w-3.5 text-blue-400" />
             <span className="font-mono text-xs font-semibold text-blue-400">{c.ticket_code}</span>
-            <Badge className={`text-[10px] border ${STATUS_CLASSES[c.status] ?? ""}`}>
-              {STATUS_LABELS[c.status] ?? c.status}
-            </Badge>
+            {(() => { const si = getStatusInfo(c.status_id); return (
+              <Badge variant="outline" className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
+                {si.name}
+              </Badge>
+            );})()}
           </div>
           {c.assunto && <p className="text-xs text-muted-foreground line-clamp-2">{c.assunto}</p>}
         </button>
