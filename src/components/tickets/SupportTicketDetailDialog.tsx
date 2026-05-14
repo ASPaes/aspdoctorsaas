@@ -90,6 +90,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [quickTagName, setQuickTagName] = useState("");
+  const [quickTagColor, setQuickTagColor] = useState("#3b82f6");
+  const [creatingTag, setCreatingTag] = useState(false);
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -206,6 +209,38 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       refetchTags();
       queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
     } catch { toast.error("Erro ao remover tag"); }
+  };
+
+  const handleCreateAndAddTag = async () => {
+    if (!quickTagName.trim() || !tid || !ticketId) return;
+    setCreatingTag(true);
+    try {
+      const { data: newTag, error: insertError } = await (supabase.from("ticket_tags" as any) as any)
+        .insert({
+          tenant_id: tid,
+          name: quickTagName.trim(),
+          color: quickTagColor,
+          department_id: ticket?.department_id || null,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
+      if (newTag?.id) {
+        await (supabase.from("ticket_tag_assignments" as any) as any)
+          .insert({ ticket_id: ticketId, tag_id: newTag.id });
+      }
+      setQuickTagName("");
+      setQuickTagColor("#3b82f6");
+      refetchTags();
+      queryClient.invalidateQueries({ queryKey: ["ticket_tags_available"] });
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      toast.success("Tag criada e adicionada");
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    } finally {
+      setCreatingTag(false);
+    }
   };
 
   const handleToggleCheck = async (index: number) => {
@@ -742,6 +777,28 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               {availableTags.filter(t => !ticketTags.find(tt => tt.id === t.id)).length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
               )}
+            </div>
+            <div className="border-t mt-2 pt-2">
+              <p className="text-[10px] text-muted-foreground mb-1.5 px-1">Criar nova</p>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="color"
+                  value={quickTagColor}
+                  onChange={(e) => setQuickTagColor(e.target.value)}
+                  className="h-8 w-8 p-0.5 shrink-0"
+                />
+                <Input
+                  value={quickTagName}
+                  onChange={(e) => setQuickTagName(e.target.value)}
+                  placeholder="Nome..."
+                  className="h-8 text-xs flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateAndAddTag(); } }}
+                />
+                <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleCreateAndAddTag}
+                  disabled={!quickTagName.trim() || creatingTag}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </PopoverContent>
         </Popover>
