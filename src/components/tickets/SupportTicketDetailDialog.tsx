@@ -880,9 +880,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-[10px] uppercase text-muted-foreground">Ticket pai:</span>
           <span className="font-mono text-xs font-semibold text-primary">{ticket.parent.ticket_code}</span>
-          <Badge className={`text-[10px] border ${STATUS_CLASSES[ticket.parent.status] ?? ""}`}>
-            {STATUS_LABELS[ticket.parent.status] ?? ticket.parent.status}
-          </Badge>
+          {(() => { const si = getStatusInfo(ticket.parent.status_id); return (
+            <Badge variant="outline" className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
+              {si.name}
+            </Badge>
+          );})()}
         </button>
       )}
 
