@@ -23,23 +23,6 @@ import {
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
 } from "lucide-react";
 
-const STATUS_LABELS: Record<string, string> = {
-  aberto: "Aberto",
-  agendado: "Agendado",
-  em_andamento: "Em andamento",
-  aguardando_terceiro: "Aguardando terceiro",
-  concluido: "Concluído",
-  cancelado: "Cancelado",
-};
-
-const STATUS_CLASSES: Record<string, string> = {
-  aberto: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  agendado: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  em_andamento: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  aguardando_terceiro: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  concluido: "bg-green-500/10 text-green-400 border-green-500/20",
-  cancelado: "bg-red-500/10 text-red-400 border-red-500/20 opacity-70",
-};
 
 const PRIORITY_CLASSES: Record<string, string> = {
   baixa: "bg-muted text-muted-foreground border-border",
