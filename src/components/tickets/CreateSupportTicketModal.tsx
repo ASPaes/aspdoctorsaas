@@ -140,6 +140,21 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["create_ticket_statuses", tid, departamentoId],
+    enabled: !!tid && !!departamentoId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, color, position, is_initial, is_terminal")
+        .eq("tenant_id", tid)
+        .eq("department_id", departamentoId)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string; position: number; is_initial: boolean; is_terminal: boolean }>;
+    },
+  });
+
   const { data: agentes = [] } = useQuery({
     queryKey: ["create_ticket_agentes", tid],
     enabled: !!tid,
