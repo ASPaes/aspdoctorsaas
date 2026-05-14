@@ -674,7 +674,53 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </Button>
       </div>
 
-      {/* Classificação editável */}
+      {/* Tags */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {ticketTags.map(tag => (
+          <span
+            key={tag.assignmentId}
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium"
+            style={{ background: tag.color + "22", color: tag.color }}
+          >
+            {tag.name}
+            <button
+              onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.assignmentId); }}
+              className="hover:opacity-70"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
+              <TagIcon className="h-3 w-3" />
+              Tag
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-1.5">
+            <div className="space-y-0.5 max-h-60 overflow-y-auto">
+              {availableTags
+                .filter(t => !ticketTags.find(tt => tt.id === t.id))
+                .map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => { handleAddTag(t.id); setTagPopoverOpen(false); }}
+                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                  >
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
+                    {t.name}
+                  </button>
+                ))}
+              {availableTags.filter(t => !ticketTags.find(tt => tt.id === t.id)).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[10px] uppercase text-muted-foreground">Classificação</p>
