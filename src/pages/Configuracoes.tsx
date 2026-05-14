@@ -46,6 +46,7 @@ import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/Assi
 import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
 import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
 import SetoresTab from "@/components/configuracoes/whatsapp/SetoresTab";
+import SetoresInstanciasTab from "@/components/configuracoes/whatsapp/SetoresInstanciasTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import KBTab from "@/components/configuracoes/KBTab";
@@ -146,7 +147,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
         </TabsContent>
 
         <TabsContent value="setores" className="mt-4">
-          <SetoresTab />
+          <SetoresInstanciasTab />
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
