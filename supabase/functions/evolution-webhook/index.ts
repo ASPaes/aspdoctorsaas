@@ -457,7 +457,10 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     let mediaFilename: string | null = null;
 
     if (messageType !== 'text' && messageType !== 'reaction' && messageType !== 'revoke') {
-      const mediaMessage = message[`${messageType}Message`];
+      // PATCH: use resolveDocumentMessage for documents, fallback to standard path
+      const mediaMessage = messageType === 'document'
+        ? resolveDocumentMessage(message)
+        : message[`${messageType}Message`];
       if (mediaMessage?.mimetype) {
         mediaMimetype = mediaMessage.mimetype;
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
