@@ -525,7 +525,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name").eq("tenant_id", tid).eq("is_active", true).order("name");
+        .select("id, name").eq("tenant_id", tid).eq("is_active", true).eq("usa_tickets", true).order("name");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
     },
