@@ -323,7 +323,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   }, [ticket, clienteContatos]);
 
   const FIELD_LABELS: Record<string, string> = {
-    status: "Status",
+    status_id: "Status",
     responsavel_user_id: "Responsável",
     department_id: "Setor",
     category_id: "Categoria",
