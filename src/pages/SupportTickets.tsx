@@ -64,6 +64,7 @@ interface TicketRow {
   service_categories: { nome: string } | null;
   service_subcategories: { nome: string } | null;
   service_types: { nome: string } | null;
+  ticket_tag_assignments?: Array<{ tag: { id: string; name: string; color: string } | null }>;
 }
 
 export default function SupportTickets() {
@@ -299,7 +300,8 @@ export default function SupportTickets() {
           produtos:produto_id(nome),
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
-          service_types:service_type_id(nome)
+          service_types:service_type_id(nome),
+          ticket_tag_assignments(tag:tag_id(id, name, color))
         `)
         .eq("tenant_id", tid)
         .is("deleted_at", null)
@@ -682,6 +684,25 @@ export default function SupportTickets() {
                             {(() => { const si = getStatusInfo(t.status_id); return (
                               <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
                             ); })()}
+                            {(() => {
+                              const tags = (t.ticket_tag_assignments ?? [])
+                                .map(a => a.tag)
+                                .filter(Boolean);
+                              if (tags.length === 0) return null;
+                              return (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {tags.map(tag => (
+                                    <span
+                                      key={tag!.id}
+                                      className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                      style={{ background: tag!.color + "22", color: tag!.color }}
+                                    >
+                                      {tag!.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                           {breadcrumb && (
                             <p className="text-xs text-muted-foreground truncate">
