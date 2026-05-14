@@ -118,7 +118,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     enabled: !!ticketId && open,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_tickets" as any) as any)
-        .select("id, ticket_code, status, assunto, aberto_em, agendado_para")
+        .select("id, ticket_code, status_id, assunto, aberto_em, agendado_para")
         .eq("parent_ticket_id", ticketId)
         .order("aberto_em");
       if (error) throw error;
