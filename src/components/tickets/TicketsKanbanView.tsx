@@ -22,6 +22,7 @@ interface TicketRow {
   clientes: { nome_fantasia: string } | null;
   produtos: { nome: string } | null;
   service_categories: { nome: string } | null;
+  ticket_tag_assignments?: Array<{ tag: { id: string; name: string; color: string } | null }>;
 }
 
 interface Props {
