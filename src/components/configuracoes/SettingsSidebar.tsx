@@ -92,7 +92,6 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           label: "Serviços",
           items: [
             { value: "categorias-servico", label: "Categorias" },
-            { value: "subcategorias-servico", label: "Subcategorias" },
             { value: "tipos-servico", label: "Tipos de serviço" },
           ],
         },
