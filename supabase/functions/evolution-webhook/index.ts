@@ -26,11 +26,19 @@ function getMessageType(message: any): NormalizedInboundMessage['messageType'] {
   if (message.imageMessage) return 'image';
   if (message.audioMessage) return 'audio';
   if (message.videoMessage) return 'video';
+  // PATCH: handle documentWithCaptionMessage wrapper (Evolution API v2)
+  if (message.documentWithCaptionMessage?.message?.documentMessage) return 'document';
   if (message.documentMessage) return 'document';
   if (message.stickerMessage) return 'sticker';
   if (message.contactMessage) return 'contact';
   if (message.contactsArrayMessage) return 'contacts';
   return 'text';
+}
+
+function resolveDocumentMessage(message: any): any {
+  return message.documentMessage
+    || message.documentWithCaptionMessage?.message?.documentMessage
+    || null;
 }
 
 function isRevokeMessage(message: any): boolean {
@@ -67,6 +75,11 @@ function getMessageContent(message: any, type: string): string {
   if (message.contactsArrayMessage) {
     const count = message.contactsArrayMessage.contacts?.length || 0;
     return `📇 ${count} contato${count !== 1 ? 's' : ''}`;
+  }
+  // PATCH: handle documentWithCaptionMessage caption
+  if (type === 'document') {
+    const docMsg = resolveDocumentMessage(message);
+    if (docMsg?.caption) return docMsg.caption;
   }
   const mediaMessage = message[`${type}Message`];
   if (mediaMessage?.caption) return mediaMessage.caption;
@@ -415,7 +428,11 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     const { phone, isGroup } = normalizePhoneNumber(key.remoteJid);
     const fromMe = getPayloadIsFromMe(data);
     const messageType = getMessageType(message);
-    const timestamp = new Date(messageTimestamp * 1000).toISOString();
+    // PATCH: safe timestamp — protect against undefined messageTimestamp
+    const safeTimestamp = messageTimestamp && !isNaN(messageTimestamp)
+      ? messageTimestamp
+      : Math.floor(Date.now() / 1000);
+    const timestamp = new Date(safeTimestamp * 1000).toISOString();
 
     // Filtro de grupos: verificar whitelist em whatsapp_groups
     if (isGroup) {
@@ -440,7 +457,10 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
     let mediaFilename: string | null = null;
 
     if (messageType !== 'text' && messageType !== 'reaction' && messageType !== 'revoke') {
-      const mediaMessage = message[`${messageType}Message`];
+      // PATCH: use resolveDocumentMessage for documents, fallback to standard path
+      const mediaMessage = messageType === 'document'
+        ? resolveDocumentMessage(message)
+        : message[`${messageType}Message`];
       if (mediaMessage?.mimetype) {
         mediaMimetype = mediaMessage.mimetype;
         mediaFilename = mediaMessage.fileName || mediaMessage.filename || null;
