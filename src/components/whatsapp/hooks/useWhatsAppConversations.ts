@@ -73,7 +73,7 @@ export interface ConversationsResult {
 function applyBaseFilter(q: any, tid: string | null, filters?: ConversationsFilters) {
   if (tid) q = q.eq('tenant_id', tid);
   if (filters?.departmentId) {
-    q = q.eq('department_id', filters.departmentId);
+    q = q.or(`department_id.eq.${filters.departmentId},department_id.is.null`);
   } else if (filters?.instanceIds && filters.instanceIds.length > 0) {
     q = q.in('instance_id', filters.instanceIds);
   } else if (filters?.instanceId) {
