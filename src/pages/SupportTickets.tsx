@@ -756,42 +756,6 @@ export default function SupportTickets() {
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
       />
-
-      <Dialog open={kanbanAgendadoOpen} onOpenChange={(o) => { if (!o) { setKanbanAgendadoOpen(false); setKanbanPendingMove(null); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Agendar ticket</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Agendado para *</Label>
-              <Input
-                type="datetime-local"
-                value={kanbanAgendadoPara}
-                onChange={(e) => setKanbanAgendadoPara(e.target.value)}
-                className="h-10"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Previsão de encerramento</Label>
-              <Input
-                type="datetime-local"
-                value={kanbanPrevisao}
-                onChange={(e) => setKanbanPrevisao(e.target.value)}
-                className="h-10"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setKanbanAgendadoOpen(false); setKanbanPendingMove(null); }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleConfirmAgendado} disabled={!kanbanAgendadoPara}>
-              Confirmar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
