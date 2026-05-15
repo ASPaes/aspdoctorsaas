@@ -771,10 +771,156 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
             </div>
           </div>
 
-          {/* Right panel (placeholder — Prompt 12B) */}
+          {/* Right panel */}
           <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Atividade</div>
-            <p className="text-xs text-muted-foreground">Em breve.</p>
+            {/* Tags */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Tags</div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {selectedTagIds.map((tagId) => {
+                  const tag = availableTags.find((t) => t.id === tagId);
+                  if (!tag) return null;
+                  return (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium"
+                      style={{ background: tag.color + "22", color: tag.color }}
+                    >
+                      {tag.name}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTagIds((prev) => prev.filter((id) => id !== tag.id))}
+                        className="hover:opacity-70"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+                <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
+                      <TagIcon className="h-3 w-3" />
+                      Tag
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-56 p-1.5">
+                    <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                      {availableTags
+                        .filter((t) => !selectedTagIds.includes(t.id))
+                        .map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTagIds((prev) => [...prev, t.id]);
+                              setTagPopoverOpen(false);
+                            }}
+                            className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                          >
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
+                            {t.name}
+                          </button>
+                        ))}
+                      {availableTags.filter((t) => !selectedTagIds.includes(t.id)).length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
+                      )}
+                    </div>
+                    <div className="border-t mt-2 pt-2">
+                      <p className="text-[10px] text-muted-foreground mb-1.5 px-1">Criar nova</p>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="color"
+                          value={quickTagColor}
+                          onChange={(e) => setQuickTagColor(e.target.value)}
+                          className="h-8 w-8 p-0.5 shrink-0"
+                        />
+                        <Input
+                          value={quickTagName}
+                          onChange={(e) => setQuickTagName(e.target.value)}
+                          placeholder="Nome..."
+                          className="h-8 text-xs flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCreateAndAddTag();
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2"
+                          onClick={handleCreateAndAddTag}
+                          disabled={!quickTagName.trim() || creatingTag}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <Separator className="my-3" />
+
+            {/* Timeline */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Timeline</div>
+              <div className="flex gap-1.5">
+                <Input
+                  value={firstNote}
+                  onChange={(e) => setFirstNote(e.target.value)}
+                  placeholder="Primeira ocorrência..."
+                  className="h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled
+                  title="Será registrada ao criar o ticket"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Será registrada como primeira ocorrência ao criar o ticket.
+              </p>
+            </div>
+
+            <Separator className="my-3" />
+
+            {/* Metadata */}
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide">Aberto em</span>
+              </div>
+              <p className="text-xs pl-5">
+                {new Date().toLocaleString("pt-BR", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+
+              <div className="flex items-center gap-2 text-muted-foreground pt-1">
+                <UserIcon className="h-3 w-3 shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide">Criado por</span>
+              </div>
+              <p className="text-xs pl-5 truncate">{currentUserName ?? "—"}</p>
+
+              <div className="flex items-center gap-2 text-muted-foreground pt-1">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide">Tempo agente</span>
+              </div>
+              <p className="text-xs pl-5">0 min</p>
+            </div>
           </div>
         </div>
 
