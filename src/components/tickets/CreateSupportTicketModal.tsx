@@ -553,7 +553,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           {/* Tipo horário */}
           <div className="flex gap-1">
-            {["comercial", "fora", "plantao"].map((t) => (
+            {["comercial", "plantao"].map((t) => (
               <button
                 key={t}
                 type="button"
@@ -564,7 +564,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
                     : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {t === "comercial" ? "Comercial" : t === "fora" ? "Fora" : "Plantão"}
+                {t === "comercial" ? "Comercial" : "Plantão"}
               </button>
             ))}
           </div>

@@ -1472,7 +1472,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
           <DialogTitle className="sr-only">Detalhes do ticket {ticket?.ticket_code ?? ""}</DialogTitle>
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b shrink-0">
@@ -1512,10 +1512,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   Excluir
                 </Button>
               )}
-              <DialogClose className="ml-1 rounded-sm opacity-70 hover:opacity-100 transition-opacity">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Fechar</span>
-              </DialogClose>
             </div>
           </div>
 
@@ -1593,7 +1589,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
             {/* Tipo horário */}
             <div className="flex gap-1">
-              {["comercial", "fora", "plantao"].map((t) => (
+              {["comercial", "plantao"].map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -1605,7 +1601,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                       : "border-border text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {t === "comercial" ? "Comercial" : t === "fora" ? "Fora" : "Plantão"}
+                  {t === "comercial" ? "Comercial" : "Plantão"}
                 </button>
               ))}
             </div>
