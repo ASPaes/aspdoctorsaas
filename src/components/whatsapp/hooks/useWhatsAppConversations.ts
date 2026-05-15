@@ -150,7 +150,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const page = filters?.page || 1;
-  const pageSize = filters?.pageSize || 20;
+  const pageSize = filters?.pageSize || (filters?.isGroup ? 100 : 20);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
