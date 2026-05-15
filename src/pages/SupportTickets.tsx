@@ -298,6 +298,22 @@ export default function SupportTickets() {
     },
   });
 
+  const selectedDeptSlug = supportDepartments.find(d => d.id === departmentFilter)?.slug;
+  const { data: implantacaoMetrics } = useQuery({
+    queryKey: ["implantacao_metrics", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentFilter],
+    enabled: !!tid && selectedDeptSlug === "implantacao",
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_avg_implantacao_days", {
+        p_tenant_id: tid,
+        p_date_from: dateRange?.from ? dateRange.from.toISOString().slice(0, 10) : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
+        p_date_to: dateRange?.to ? dateRange.to.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        p_department_id: departmentFilter !== "all" ? departmentFilter : null,
+      });
+      if (error) throw error;
+      return data as { avg_days: number; total_concluidas: number; min_days: number; max_days: number } | null;
+    },
+  });
+
   const { data: availableTags = [] } = useQuery({
     queryKey: ["ticket_tags_filter", tid],
     enabled: !!tid,
