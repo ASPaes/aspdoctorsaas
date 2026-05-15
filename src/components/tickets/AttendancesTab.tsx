@@ -448,6 +448,26 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                     TME: {formatDur(att.wait_seconds)}
                   </span>
                   <span className="shrink-0 font-mono">TMA: {formatDur(att.handle_seconds)}</span>
+                  {att.status === "closed" && !att.ticket_id && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.dispatchEvent(new CustomEvent("create-ticket-from-attendance", {
+                          detail: { attendanceId: att.id, clienteId: att.cliente_id, contactId: att.contact_id, departmentId: att.department_id }
+                        }));
+                      }}>
+                      <Plus className="h-3 w-3" /> Ticket
+                    </Button>
+                  )}
+                  {att.ticket_id && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.dispatchEvent(new CustomEvent("open-ticket", { detail: { ticketId: att.ticket_id } }));
+                      }}>
+                      <TicketCheck className="h-3 w-3" /> Ver ticket
+                    </Button>
+                  )}
                 </div>
 
                 {/* Row 3 — Resumo IA */}
