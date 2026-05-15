@@ -206,10 +206,14 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
   });
 
   useEffect(() => {
-    if (userDepartmentId && !departamentoId && open) {
+    if (!open) return;
+    if (departamentoId) return;
+    if (defaultDepartmentId && defaultDepartmentId !== "all") {
+      setDepartamentoId(defaultDepartmentId);
+    } else if (userDepartmentId) {
       setDepartamentoId(userDepartmentId);
     }
-  }, [userDepartmentId, open]);
+  }, [open, defaultDepartmentId, userDepartmentId]);
 
   const { data: ticketStatuses = [] } = useQuery({
     queryKey: ["create_ticket_statuses", tid, departamentoId],
