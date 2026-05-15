@@ -863,7 +863,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           defaultValue={ticket?.observacao_agente ?? ""}
           key={`obs-${ticket?.observacao_agente ?? ""}`}
           placeholder="Descreva o problema ou observação..."
-          className="min-h-[80px] text-sm resize-y"
+          className="text-sm min-h-[80px] overflow-hidden"
+          style={{ resize: "none" }}
+          onInput={(e) => {
+            const t = e.target as HTMLTextAreaElement;
+            t.style.height = "auto";
+            t.style.height = t.scrollHeight + "px";
+          }}
           onBlur={(e) => {
             const val = e.target.value;
             if (val !== (ticket?.observacao_agente ?? "")) {
