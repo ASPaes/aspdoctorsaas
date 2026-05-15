@@ -950,7 +950,7 @@ export default function SupportTickets() {
         ) : (
           <TicketsKanbanView
             tickets={filteredTickets}
-            columns={filteredStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, position: s.position }))}
+            columns={filteredStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, position: s.position, is_terminal: s.is_terminal }))}
             onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
             onStatusChange={handleKanbanStatusChange}
           />

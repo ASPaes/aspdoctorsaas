@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MessageCircle, Phone, User, Mail } from "lucide-react";
+import { Calendar, MessageCircle, Phone, User, Mail, Lock } from "lucide-react";
 
 interface KanbanColumn {
   id: string;
   name: string;
   color: string;
   position: number;
+  is_terminal?: boolean;
 }
 
 interface TicketRow {
@@ -132,6 +133,20 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: 
                           {t.ticket_code}
                         </span>
                         {t.canal_origem && <ChannelIcon canal={t.canal_origem} />}
+                        {(() => {
+                          const col = columns.find(c => c.id === t.status_id);
+                          const terminal = col?.is_terminal ?? false;
+                          return terminal ? (
+                            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                              <Lock className="h-2.5 w-2.5" /> Encerrado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25">
+                              <span className="h-1 w-1 rounded-full bg-green-400 animate-pulse" />
+                              Aberto
+                            </span>
+                          );
+                        })()}
                       </div>
                       {(() => {
                         const tags = (t.ticket_tag_assignments ?? []).map(a => a.tag).filter(Boolean);
