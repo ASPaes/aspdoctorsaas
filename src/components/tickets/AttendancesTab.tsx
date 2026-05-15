@@ -100,6 +100,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       const { data, error } = await (supabase.from("support_departments" as any) as any)
         .select("id, name")
         .eq("tenant_id", tid)
+        .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
