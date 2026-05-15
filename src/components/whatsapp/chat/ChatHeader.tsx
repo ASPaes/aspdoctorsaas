@@ -431,6 +431,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setShowInChatSearch(true)} aria-label="Buscar nesta conversa">
+                  <FileSearch className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Buscar nesta conversa</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onToggleDetails} aria-label="Detalhes">
                   <PanelRightOpen className="h-4 w-4" />
                 </Button>
