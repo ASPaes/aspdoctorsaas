@@ -3968,6 +3968,8 @@ export type Database = {
           concluido_em: string | null
           contact_id: string | null
           criado_por: string | null
+          data_fim_implantacao: string | null
+          data_inicio_implantacao: string | null
           deleted_at: string | null
           department_id: string | null
           descricao: string | null
@@ -4008,6 +4010,8 @@ export type Database = {
           concluido_em?: string | null
           contact_id?: string | null
           criado_por?: string | null
+          data_fim_implantacao?: string | null
+          data_inicio_implantacao?: string | null
           deleted_at?: string | null
           department_id?: string | null
           descricao?: string | null
@@ -4048,6 +4052,8 @@ export type Database = {
           concluido_em?: string | null
           contact_id?: string | null
           criado_por?: string | null
+          data_fim_implantacao?: string | null
+          data_inicio_implantacao?: string | null
           deleted_at?: string | null
           department_id?: string | null
           descricao?: string | null
@@ -6342,6 +6348,15 @@ export type Database = {
           p_department_id?: string
           p_status?: string
           p_tenant_id?: string
+        }
+        Returns: Json
+      }
+      get_avg_implantacao_days: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_tenant_id: string
         }
         Returns: Json
       }
