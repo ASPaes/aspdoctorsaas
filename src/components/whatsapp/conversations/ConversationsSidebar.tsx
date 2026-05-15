@@ -132,6 +132,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
+  const { effectiveTenantId: tid } = useTenantFilter();
+
   const { conversations, isLoading } = useWhatsAppConversations({
     instanceId: filters.instanceId,
     departmentId: selectedDepartmentId || undefined,
@@ -139,6 +141,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     status: filters.status,
     assignedTo: resolvedAssignedTo,
     unassigned: resolvedUnassigned || undefined,
+    isGroup: activePill === "groups" ? true : activePill === "all" ? undefined : false,
     pageSize: 100,
     includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
