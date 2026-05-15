@@ -144,7 +144,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, effectiveDeptFilter, closureTypeFilter, page, isAdminOrHead, userId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, page, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -165,7 +165,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
-      if (atendenteFilter !== "all") q = q.eq("assigned_to", atendenteFilter);
+      if (effectiveAgente !== "all") q = q.eq("assigned_to", effectiveAgente);
       if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
       if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
