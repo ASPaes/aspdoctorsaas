@@ -127,6 +127,75 @@ export default function SupportTickets() {
     return () => window.removeEventListener("open-ticket-detail", handler);
   }, []);
 
+  const { data: unseenMentions = [], refetch: refetchMentions } = useQuery({
+    queryKey: ["unseen_mentions", userId],
+    enabled: !!userId,
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_mentions" as any) as any)
+        .select("id, ticket_id, mentioned_by, created_at, support_tickets:ticket_id(ticket_code, assunto)")
+        .eq("mentioned_user_id", userId)
+        .is("seen_at", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; ticket_id: string; mentioned_by: string; created_at: string;
+        support_tickets: { ticket_code: string | null; assunto: string | null } | null;
+      }>;
+    },
+  });
+
+  const mentionedByIds = [...new Set(unseenMentions.map(m => m.mentioned_by).filter(Boolean))];
+  const { data: mentionerNames = [] } = useQuery({
+    queryKey: ["mentioner_names", mentionedByIds.join(",")],
+    enabled: mentionedByIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .in("user_id", mentionedByIds);
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((p: any) => ({
+        user_id: p.user_id as string,
+        nome: (p.funcionarios?.nome ?? "Agente") as string,
+      }));
+    },
+  });
+  const getMentionerName = (uid: string) => mentionerNames.find(m => m.user_id === uid)?.nome ?? "Agente";
+
+  const handleMentionClick = async (mention: any) => {
+    try {
+      await (supabase.rpc as any)("mark_mention_seen", { p_mention_id: mention.id });
+      refetchMentions();
+      setSelectedTicketId(mention.ticket_id);
+      setDetailOpen(true);
+    } catch {}
+  };
+
+  const handleMarkAllSeen = async () => {
+    try {
+      await (supabase.rpc as any)("mark_all_mentions_seen");
+      refetchMentions();
+      toast.success("Todas as notificações marcadas como vistas");
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel("ticket_mentions_realtime")
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "ticket_mentions",
+        filter: `mentioned_user_id=eq.${userId}`,
+      }, () => {
+        refetchMentions();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
 
 
   const { data: produtos = [] } = useQuery({
