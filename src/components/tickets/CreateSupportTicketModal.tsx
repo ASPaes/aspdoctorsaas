@@ -483,8 +483,8 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         <div className="grid grid-cols-[1fr_260px] flex-1 overflow-hidden">
           {/* Left panel */}
           <div className="p-4 pr-4 border-r space-y-4 overflow-y-auto">
-            {/* Setor + Responsável */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Setor + Status + Responsável */}
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Setor <Req /></Label>
                 <Select value={departamentoId} onValueChange={setDepartamentoId}>
@@ -492,6 +492,31 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
                   <SelectContent>
                     {departamentos.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Status</Label>
+                <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue>
+                      {currentStatus ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: currentStatus.color }} />
+                          {currentStatus.name}
+                        </span>
+                      ) : "Status"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ticketStatuses.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                          {s.name}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
