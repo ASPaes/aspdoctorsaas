@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File } from "lucide-react";
+import { Paperclip, Upload, Trash2, Download, Loader2, FileText, Image, Film, Music, File, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   ticketId: string;
@@ -30,7 +31,45 @@ function formatSize(bytes: number | null): string {
 
 function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string>("");
   const queryClient = useQueryClient();
+
+  const handlePreview = async (att: any) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(
+        `${supabaseUrl}/storage/v1/object/authenticated/ticket-attachments/${att.file_path}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+      if (!res.ok) throw new Error("Erro ao carregar");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setPreviewType(att.file_type);
+      setPreviewName(att.file_name);
+    } catch (err: any) {
+      toast.error("Erro: " + (err.message ?? ""));
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPreviewType(null);
+    setPreviewName("");
+  };
+
+  const isPreviewable = (type: string | null) =>
+    !!type && (type.startsWith("image") || type.startsWith("video") || type.startsWith("audio") || type.includes("pdf"));
 
   const { data: attachments = [], refetch } = useQuery({
     queryKey: ["ticket_attachments", ticketId],
@@ -169,9 +208,19 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
                 {fileIcon(att.file_type)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" title={att.file_name}>
+                <button
+                  className="text-sm font-medium truncate text-left hover:text-primary transition-colors w-full"
+                  title={att.file_name}
+                  onClick={() => {
+                    if (isPreviewable(att.file_type)) {
+                      handlePreview(att);
+                    } else {
+                      handleDownload(att);
+                    }
+                  }}
+                >
                   {att.file_name}
-                </p>
+                </button>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-[11px] text-muted-foreground">
                     {formatSize(att.file_size)}
@@ -179,7 +228,18 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                {isPreviewable(att.file_type) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handlePreview(att)}
+                    title="Visualizar"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -205,6 +265,28 @@ function TicketAttachments({ ticketId, tenantId, canDelete }: Props) {
           ))}
         </div>
       )}
+
+      <Dialog open={!!previewUrl} onOpenChange={(o) => { if (!o) closePreview(); }}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="truncate pr-8">{previewName}</DialogTitle>
+          </DialogHeader>
+          <div className="w-full max-h-[75vh] overflow-auto flex items-center justify-center">
+            {previewType?.startsWith("image") && previewUrl && (
+              <img src={previewUrl} alt={previewName} className="max-w-full max-h-[75vh] object-contain" />
+            )}
+            {previewType?.startsWith("video") && previewUrl && (
+              <video src={previewUrl} controls className="max-w-full max-h-[75vh]" />
+            )}
+            {previewType?.startsWith("audio") && previewUrl && (
+              <audio src={previewUrl} controls className="w-full" />
+            )}
+            {previewType?.includes("pdf") && previewUrl && (
+              <iframe src={previewUrl} title={previewName} className="w-full h-[75vh]" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
