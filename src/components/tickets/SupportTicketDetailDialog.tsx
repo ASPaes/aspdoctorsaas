@@ -680,35 +680,72 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   const detailsContent = !ticket ? null : (
     <div className="space-y-4 pr-2 pt-1">
-      {/* Header badges */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-mono text-sm font-semibold text-primary">{ticket.ticket_code ?? "—"}</span>
-        <Select
-          value={ticket.status_id ?? ""}
-          onValueChange={(v) => handleFieldUpdate({ status_id: v })}
-          disabled={updating}
-        >
-          <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs">
-            <SelectValue>
-              {(() => { const si = getStatusInfo(ticket.status_id); return (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: si.color }} />
-                  {si.name}
-                </span>
-              );})()}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {statusesForDepartment.map(s => (
-              <SelectItem key={s.id} value={s.id}>
-                <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
-                  {s.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Setor + Status + Responsável */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Setor</Label>
+          <Select
+            value={ticket?.department_id ?? "none"}
+            onValueChange={(v) => handleFieldUpdate({ department_id: v === "none" ? null : v })}
+            disabled={updating}
+          >
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="—" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">—</SelectItem>
+              {departamentos.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Status</Label>
+          <Select
+            value={ticket?.status_id ?? ""}
+            onValueChange={(v) => handleFieldUpdate({ status_id: v })}
+            disabled={updating}
+          >
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue>
+                {(() => { const si = getStatusInfo(ticket?.status_id); return (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: si.color }} />
+                    {si.name}
+                  </span>
+                );})()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {statusesForDepartment.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                    {s.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Responsável</Label>
+          <Select
+            value={ticket?.responsavel_user_id ?? ""}
+            onValueChange={(v) => handleFieldUpdate({ responsavel_user_id: v })}
+            disabled={updating}
+          >
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Não atribuído" />
+            </SelectTrigger>
+            <SelectContent>
+              {eventAgents.map((a) => (
+                <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Tags */}
