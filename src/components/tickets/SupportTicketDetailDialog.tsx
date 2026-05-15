@@ -923,41 +923,34 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       )}
 
-      {/* Descrição */}
-      {ticket.descricao && (
-        <div>
-          <p className="text-[10px] uppercase text-muted-foreground mb-1">Descrição</p>
-          <p className="text-sm whitespace-pre-wrap">{ticket.descricao}</p>
-        </div>
-      )}
+      {/* Descrição (Observação do agente, editável) */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Descrição</Label>
+        <Textarea
+          defaultValue={ticket?.observacao_agente ?? ""}
+          key={`obs-${ticket?.observacao_agente ?? ""}`}
+          placeholder="Descreva o problema ou observação..."
+          className="min-h-[80px] text-sm resize-y"
+          onBlur={(e) => {
+            const val = e.target.value;
+            if (val !== (ticket?.observacao_agente ?? "")) {
+              handleFieldUpdate({ observacao_agente: val });
+            }
+          }}
+          disabled={updating}
+        />
+      </div>
 
-      <Separator />
-
-      {/* Metadados grid editáveis */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Aberto em</span>
-          <p className="text-sm h-8 flex items-center">{ticket?.aberto_em ? new Date(ticket.aberto_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
-        </div>
-        <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Agendado para</span>
+      {/* Previsão de encerramento + Agendado para */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs font-medium">Previsão de encerramento</Label>
+            <Badge variant="outline" className="text-[9px] h-4 px-1">auto</Badge>
+          </div>
           <Input
             type="datetime-local"
-            className="h-8 text-sm"
-            defaultValue={ticket?.agendado_para ? new Date(ticket.agendado_para).toISOString().slice(0, 16) : ""}
-            key={`agendado-${ticket?.agendado_para}`}
-            onBlur={(e) => {
-              const val = e.target.value;
-              if (val) handleFieldUpdate({ agendado_para: new Date(val).toISOString() });
-            }}
-            disabled={updating}
-          />
-        </div>
-        <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Previsão encerramento</span>
-          <Input
-            type="datetime-local"
-            className="h-8 text-sm"
+            className="h-9 text-xs"
             defaultValue={ticket?.previsao_encerramento ? new Date(ticket.previsao_encerramento).toISOString().slice(0, 16) : ""}
             key={`previsao-${ticket?.previsao_encerramento}`}
             onBlur={(e) => {
@@ -967,16 +960,33 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             disabled={updating}
           />
         </div>
-        {/* Tempo do agente */}
-        <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Agendado para</Label>
+          <Input
+            type="datetime-local"
+            className="h-9 text-xs"
+            defaultValue={ticket?.agendado_para ? new Date(ticket.agendado_para).toISOString().slice(0, 16) : ""}
+            key={`agendado-${ticket?.agendado_para}`}
+            onBlur={(e) => {
+              const val = e.target.value;
+              if (val) handleFieldUpdate({ agendado_para: new Date(val).toISOString() });
+            }}
+            disabled={updating}
+          />
+        </div>
+      </div>
+
+      {/* Tempo agente + Tempo calculado */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
             <Timer className="h-3 w-3" />
             Tempo agente (min)
-          </span>
+          </Label>
           <Input
             type="number"
             min={0}
-            className="h-8 text-sm"
+            className="h-9 text-xs"
             defaultValue={ticket?.tempo_agente_minutos ?? ""}
             key={`tempo-agente-${ticket?.tempo_agente_minutos}`}
             placeholder="0"
@@ -989,28 +999,19 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             disabled={updating}
           />
         </div>
-        {/* Tempo calculado (read-only) */}
-        <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo calculado</span>
-          <p className="text-sm h-8 flex items-center text-muted-foreground">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Tempo calculado</Label>
+          <p className="text-sm h-9 flex items-center text-muted-foreground">
             {ticket?.tempo_calculado_minutos ? `${ticket.tempo_calculado_minutos} min` : "—"}
           </p>
         </div>
       </div>
 
-      {/* Observação do agente */}
-      {ticket?.observacao_agente && (
-        <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Observação do agente</span>
-          <p className="text-sm bg-muted/30 rounded-md px-2.5 py-1.5 whitespace-pre-wrap">{ticket.observacao_agente}</p>
-        </div>
-      )}
-
       {/* Checklist */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Checklist</span>
+          <Label className="text-xs font-medium">Checklist</Label>
           {((ticket?.checklist as any[]) ?? []).length > 0 && (
             <Badge variant="outline" className="text-[10px]">
               {((ticket.checklist as any[]) ?? []).filter((c: any) => c.done).length}/{((ticket.checklist as any[]) ?? []).length}
@@ -1047,12 +1048,91 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       </div>
 
+      {/* Anexos */}
+      {ticketId && tid && (
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Anexos</Label>
+          <TicketAttachments ticketId={ticketId} tenantId={tid} canDelete />
+        </div>
+      )}
+
+      {/* Resumo IA do ticket */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Resumo IA</span>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1"
+              onClick={async () => {
+                try {
+                  toast.info("Gerando resumo parcial...");
+                  const { error } = await supabase.functions.invoke("summarize-ticket", {
+                    body: { ticketId, type: "partial" },
+                  });
+                  if (error) throw error;
+                  toast.success("Resumo parcial gerado");
+                  queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+                } catch (err: any) {
+                  toast.error("Erro: " + (err.message ?? "Função não disponível ainda"));
+                }
+              }}
+              disabled={updating}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Resumo parcial
+            </Button>
+            {getStatusInfo(ticket?.status_id).isTerminal && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={async () => {
+                  try {
+                    toast.info("Gerando resumo conclusivo...");
+                    const { error } = await supabase.functions.invoke("summarize-ticket", {
+                      body: { ticketId, type: "conclusive" },
+                    });
+                    if (error) throw error;
+                    toast.success("Resumo conclusivo gerado");
+                    queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+                  } catch (err: any) {
+                    toast.error("Erro: " + (err.message ?? "Função não disponível ainda"));
+                  }
+                }}
+                disabled={updating}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Resumo final
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {ticket?.resumo_parcial && (
+          <div className="bg-muted/30 rounded-lg p-3 space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground">Resumo parcial</p>
+            <p className="text-sm whitespace-pre-wrap">{ticket.resumo_parcial}</p>
+          </div>
+        )}
+
+        {ticket?.resumo_conclusivo && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+            <p className="text-[10px] uppercase text-primary">Resumo conclusivo</p>
+            <p className="text-sm whitespace-pre-wrap">{ticket.resumo_conclusivo}</p>
+          </div>
+        )}
+      </div>
 
       {attendance?.ai_summary && (
         <div className="bg-muted/30 rounded-lg p-3 space-y-2">
           <div className="flex items-center gap-1.5">
             <Bot className="h-3.5 w-3.5 text-primary" />
-            <p className="text-[10px] uppercase text-muted-foreground">Resumo IA</p>
+            <p className="text-[10px] uppercase text-muted-foreground">Resumo IA da conversa</p>
           </div>
           <p className="text-sm whitespace-pre-wrap line-clamp-6">{attendance.ai_summary}</p>
           {attendance.ai_problem && (
