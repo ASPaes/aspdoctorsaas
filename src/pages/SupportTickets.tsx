@@ -110,6 +110,12 @@ export default function SupportTickets() {
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
 
   useEffect(() => {
+    if (departmentFilter === "all" && ticketsView === "kanban") {
+      setTicketsView("lista");
+    }
+  }, [departmentFilter]);
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.ticketId) {
