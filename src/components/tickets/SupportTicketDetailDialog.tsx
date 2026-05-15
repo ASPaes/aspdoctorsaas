@@ -713,6 +713,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
       queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
       queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["implantacao_metrics"] });
       refetchEvents();
     } catch (err: any) {
       toast.error("Erro: " + (err.message ?? ""));
