@@ -1781,6 +1781,46 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   </div>
                 </div>
 
+                {/* Marcados */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-2">Marcados</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {ticketMentions.map(m => {
+                      const agent = agentesDisponiveis.find(a => a.user_id === m.mentioned_user_id);
+                      return (
+                        <span key={m.id} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          {agent?.nome ?? "Agente"}
+                          <button onClick={() => handleRemoveMention(m.id)} className="hover:opacity-70">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
+                          <UserPlus className="h-3 w-3" /> Marcar
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2" align="start">
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {agentesDisponiveis
+                            .filter(a => !ticketMentions.find(m => m.mentioned_user_id === a.user_id))
+                            .map(a => (
+                              <button key={a.user_id} onClick={() => handleAddMention(a.user_id)}
+                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm">
+                                {a.nome}
+                              </button>
+                            ))}
+                          {agentesDisponiveis.filter(a => !ticketMentions.find(m => m.mentioned_user_id === a.user_id)).length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-2">Todos já marcados</p>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
                 <Separator />
 
                 {/* Timeline */}
