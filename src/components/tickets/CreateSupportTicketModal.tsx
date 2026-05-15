@@ -189,6 +189,27 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: userDepartmentId } = useQuery({
+    queryKey: ["user_department", responsavelId],
+    enabled: !!responsavelId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_department_members" as any) as any)
+        .select("department_id")
+        .eq("user_id", responsavelId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.department_id as string | null;
+    },
+  });
+
+  useEffect(() => {
+    if (userDepartmentId && !departamentoId && open) {
+      setDepartamentoId(userDepartmentId);
+    }
+  }, [userDepartmentId, open]);
+
   const { data: ticketStatuses = [] } = useQuery({
     queryKey: ["create_ticket_statuses", tid, departamentoId],
     enabled: !!tid && !!departamentoId,
