@@ -49,6 +49,7 @@ export interface ConversationsFilters {
   instanceId?: string;
   instanceIds?: string[];
   departmentId?: string;
+  isGroup?: boolean;
   
   status?: string;
   assignedTo?: string;
@@ -92,6 +93,8 @@ function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilt
     q = q.eq('assigned_to', filters.assignedTo);
   }
   if (filters?.unassigned) q = q.is('assigned_to', null);
+  if (filters?.isGroup === true) q = q.eq('is_group', true);
+  if (filters?.isGroup === false) q = q.eq('is_group', false);
   return q;
 }
 
@@ -147,7 +150,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const page = filters?.page || 1;
-  const pageSize = filters?.pageSize || 20;
+  const pageSize = filters?.pageSize || (filters?.isGroup ? 100 : 20);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 

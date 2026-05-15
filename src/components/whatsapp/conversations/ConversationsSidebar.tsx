@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useConversationSearch } from "../hooks/useConversationSearch";
 import { Input } from "@/components/ui/input";
@@ -130,6 +132,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
   const resolvedUnassigned = filters.assignedToAgent === "__unassigned__";
 
+  const { effectiveTenantId: tid } = useTenantFilter();
+
   const { conversations, isLoading } = useWhatsAppConversations({
     instanceId: filters.instanceId,
     departmentId: selectedDepartmentId || undefined,
@@ -137,6 +141,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     status: filters.status,
     assignedTo: resolvedAssignedTo,
     unassigned: resolvedUnassigned || undefined,
+    isGroup: activePill === "groups" ? true : activePill === "all" ? undefined : false,
     pageSize: 100,
     includeIds: forcedConvId ? [forcedConvId] : undefined,
   });
@@ -172,22 +177,36 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     };
   }, [stateMap, isStatesLoading, attendanceMap]);
 
+  const { data: groupCountData } = useQuery({
+    queryKey: ["whatsapp", "group-counts", tid],
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const { count: totalGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tid)
+        .eq("is_group", true)
+        .not("last_message_at", "is", null);
+      const { count: unreadGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tid)
+        .eq("is_group", true)
+        .gt("unread_count", 0);
+      return { totalGroups: totalGroups || 0, unreadGroups: unreadGroups || 0 };
+    },
+    enabled: !!tid,
+  });
+
   // Compute pill counts using centralized bucket logic
   const pillCounts = useMemo(() => {
     let inProgress = 0;
     let waiting = 0;
     let closed = 0;
     let afterHours = 0;
-    let groups = 0;
-    let groupsUnread = 0;
 
     for (const conv of conversations) {
-      // Grupos são separados — não entram nas pills normais
-      if ((conv as any).is_group === true) {
-        groups++;
-        if ((conv.unread_count || 0) > 0) groupsUnread++;
-        continue;
-      }
+      // Grupos não entram nas pills normais
+      if ((conv as any).is_group === true) continue;
 
       const state = getStateForConv(conv);
 
@@ -224,8 +243,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
+    const groups = groupCountData?.totalGroups ?? 0;
+    const groupsUnread = groupCountData?.unreadGroups ?? 0;
     return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
-  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
+  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
@@ -246,15 +267,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const filtered = useMemo(() => {
     let result = [...conversations];
 
-    // Separar grupos: excluir de todas as pills normais, incluir só na pill "groups"
-    if (activePill === "groups") {
-      result = result.filter(c => (c as any).is_group === true);
-      // Sem filtro adicional de bucket — mostrar todos os grupos
-    } else {
-      // Excluir grupos das pills normais
-      result = result.filter(c => (c as any).is_group !== true);
-    }
-
     // Department filtering (skip for after_hours which is tenant-wide)
     if (selectedDepartmentId && activePill !== "after_hours") {
       result = result.filter(c => {
@@ -264,39 +276,37 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       });
     }
 
-    if (activePill !== "groups") {
-      // Pill filters com visibilidade por papel
-      if (activePill === "in_progress") {
-        result = result.filter(c => {
-          if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
-          if (!isAdmin && user?.id) {
-            const isMyConv = (c as any).assigned_to === user.id;
-            const att = attendanceMap.get(c.id);
-            const isMyAtt = att?.assigned_to === user.id;
-            if (!isMyConv && !isMyAtt) return false;
-          }
-          return true;
-        });
-      } else if (activePill === "waiting") {
-        result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
-      } else if (activePill === "after_hours") {
-        result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
-      } else if (activePill === "closed") {
-        result = result.filter(c => {
-          if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
-          if (!isAdmin && user?.id) {
-            const att = attendanceMap.get(c.id);
-            if (att && att.assigned_to !== user.id) return false;
-          }
-          return true;
-        });
-      }
-      if (activePill === "all" && !isAdmin && user?.id) {
-        result = result.filter(c => {
-          if (!(c as any).assigned_to) return true;
-          return (c as any).assigned_to === user.id;
-        });
-      }
+    // Pill filters com visibilidade por papel
+    if (activePill === "in_progress") {
+      result = result.filter(c => {
+        if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
+        if (!isAdmin && user?.id) {
+          const isMyConv = (c as any).assigned_to === user.id;
+          const att = attendanceMap.get(c.id);
+          const isMyAtt = att?.assigned_to === user.id;
+          if (!isMyConv && !isMyAtt) return false;
+        }
+        return true;
+      });
+    } else if (activePill === "waiting") {
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
+    } else if (activePill === "after_hours") {
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_out_of_hours");
+    } else if (activePill === "closed") {
+      result = result.filter(c => {
+        if (getConversationBucket(getStateForConv(c)) !== "closed") return false;
+        if (!isAdmin && user?.id) {
+          const att = attendanceMap.get(c.id);
+          if (att && att.assigned_to !== user.id) return false;
+        }
+        return true;
+      });
+    }
+    if (activePill === "all" && !isAdmin && user?.id) {
+      result = result.filter(c => {
+        if (!(c as any).assigned_to) return true;
+        return (c as any).assigned_to === user.id;
+      });
     }
 
     if (filters.autoReplyDisabledOnly) {
