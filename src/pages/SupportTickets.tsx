@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X, Headphones, LayoutList, Columns3, BarChart3, LayoutGrid } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
@@ -19,8 +18,6 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 
 
 
@@ -80,10 +77,10 @@ export default function SupportTickets() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [ticketsView, setTicketsView] = useState("lista");
+  const [ticketsView, setTicketsView] = useState<string>("lista");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
@@ -225,6 +222,17 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: availableTags = [] } = useQuery({
+    queryKey: ["ticket_tags_filter", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tags" as any) as any)
+        .select("id, name, color").eq("tenant_id", tid).eq("is_active", true).order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string }>;
+    },
+  });
+
   const filteredStatuses = useMemo(
     () => departmentFilter === "all"
       ? ticketStatuses
@@ -257,8 +265,9 @@ export default function SupportTickets() {
     if (subcategoriaFilter !== "all") count++;
     if (canalFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
+    if (tagFilters.length > 0) count++;
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -267,6 +276,7 @@ export default function SupportTickets() {
     setSubcategoriaFilter("all");
     setCanalFilter("all");
     setServiceTypeFilters([]);
+    setTagFilters([]);
   };
 
   const getFilterLabel = (type: string, value: string): string => {
@@ -284,7 +294,7 @@ export default function SupportTickets() {
   };
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), departmentFilter, isAdminOrHead, userId],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -324,6 +334,16 @@ export default function SupportTickets() {
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
 
+      if (tagFilters.length > 0) {
+        const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
+          .select("ticket_id").in("tag_id", tagFilters);
+        if (taggedIds && taggedIds.length > 0) {
+          q = q.in("id", taggedIds.map((t: any) => t.ticket_id));
+        } else {
+          return [];
+        }
+      }
+
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as TicketRow[];
@@ -349,414 +369,320 @@ export default function SupportTickets() {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets</h1>
         </div>
         {isAdminOrHead && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            Novo ticket
+            <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
           </Button>
         )}
       </div>
 
-      <div className="space-y-4">
+      {/* Setores como pill buttons */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <button
+          onClick={() => setDepartmentFilter("all")}
+          className={`shrink-0 px-3.5 py-1.5 text-xs rounded-full border transition-colors ${
+            departmentFilter === "all"
+              ? "bg-primary/10 text-primary border-primary/30 font-medium"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Todos
+        </button>
+        {supportDepartments.map((dept) => (
+          <button
+            key={dept.id}
+            onClick={() => setDepartmentFilter(dept.id)}
+            className={`shrink-0 px-3.5 py-1.5 text-xs rounded-full border transition-colors ${
+              departmentFilter === dept.id
+                ? "bg-primary/10 text-primary border-primary/30 font-medium"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {dept.name}
+          </button>
+        ))}
+      </div>
 
-        <div className="space-y-4">
-          {/* Metric cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Ativos</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.ativos}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
-              <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 w-[150px] text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                {filteredStatuses.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
-                      {s.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-              <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Responsável" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os agentes</SelectItem>
-                {agentes.map((a) => (
-                  <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por código ou assunto..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 pl-9 text-sm"
-              />
-            </div>
-            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`h-9 gap-1.5 text-sm ${activeFilterCount > 0 ? "border-primary text-primary" : ""}`}
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Filtros
-                  {activeFilterCount > 0 && (
-                    <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px] rounded-full">{activeFilterCount}</Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-[460px] p-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Produto</label>
-                    <Select value={produtoFilter} onValueChange={setProdutoFilter}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os produtos</SelectItem>
-                        {produtos.map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Atendente</label>
-                    <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {agentes.map((a) => (
-                          <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
-                    <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todas" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        {categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Subcategoria</label>
-                    <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter} disabled={categoriaFilter === "all"}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder={categoriaFilter === "all" ? "Selecione categoria..." : "Todas"} /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        {filteredSubcategories.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Canal de origem</label>
-                    <Select value={canalFilter} onValueChange={setCanalFilter}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                        <SelectItem value="telefone">Telefone</SelectItem>
-                        <SelectItem value="presencial">Presencial</SelectItem>
-                        <SelectItem value="email">E-mail</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Tipo de serviço</label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 w-full justify-between text-sm font-normal">
-                          {serviceTypeFilters.length === 0 ? "Todos" : `${serviceTypeFilters.length} selecionado${serviceTypeFilters.length > 1 ? "s" : ""}`}
-                          <Filter className="h-3 w-3 ml-1 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" className="w-52 p-2">
-                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                          {serviceTypes.map((t) => (
-                            <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm">
-                              <Checkbox
-                                checked={serviceTypeFilters.includes(t.id)}
-                                onCheckedChange={(v) => setServiceTypeFilters(prev => v ? [...prev, t.id] : prev.filter(id => id !== t.id))}
-                              />
-                              {t.nome}
-                            </label>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                {activeFilterCount > 0 && (
-                  <div className="flex justify-end pt-3 mt-3 border-t">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>
-                      Limpar filtros
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {activeFilterCount > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] text-muted-foreground mr-1">Filtros:</span>
-              {produtoFilter !== "all" && (
-                <button
-                  onClick={() => setProdutoFilter("all")}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                >
-                  {getFilterLabel("produto", produtoFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {atendenteFilter !== "all" && (
-                <button
-                  onClick={() => setAtendenteFilter("all")}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                >
-                  {getFilterLabel("atendente", atendenteFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {categoriaFilter !== "all" && (
-                <button
-                  onClick={() => { setCategoriaFilter("all"); setSubcategoriaFilter("all"); }}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                >
-                  {getFilterLabel("categoria", categoriaFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {subcategoriaFilter !== "all" && (
-                <button
-                  onClick={() => setSubcategoriaFilter("all")}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                >
-                  {getFilterLabel("subcategoria", subcategoriaFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {canalFilter !== "all" && (
-                <button
-                  onClick={() => setCanalFilter("all")}
-                  className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                >
-                  {getFilterLabel("canal", canalFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {serviceTypeFilters.length > 0 && serviceTypeFilters.map((stId) => {
-                const st = serviceTypes.find((t) => t.id === stId);
-                return (
-                  <button
-                    key={stId}
-                    onClick={() => setServiceTypeFilters((prev) => prev.filter((id) => id !== stId))}
-                    className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    {st?.nome ?? stId}
-                    <X className="h-3 w-3" />
-                  </button>
-                );
-              })}
-              <button
-                onClick={clearAdvancedFilters}
-                className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
-              >
-                Limpar todos
-              </button>
-            </div>
-          )}
-
-          {/* Abas de setor */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1">
-            <button
-              onClick={() => setDepartmentFilter("all")}
-              className={departmentFilter === "all" ? "shrink-0 px-3 py-1.5 text-xs rounded-md bg-primary/10 text-primary font-medium" : "shrink-0 px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground transition-colors"}
+      {/* Toolbar: filtros globais + views */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+        <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+          <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Agente" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os agentes</SelectItem>
+            {agentes.map((a) => (
+              <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="relative flex-1 min-w-[160px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 pl-9 text-sm"
+          />
+        </div>
+        <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-9 gap-1.5 ${activeFilterCount > 0 ? "border-primary text-primary" : ""}`}
             >
-              Todos
+              <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros
+              {activeFilterCount > 0 && (
+                <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px] rounded-full">{activeFilterCount}</Badge>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[460px] p-4">
+            <p className="text-sm text-muted-foreground">Filtros avançados</p>
+          </PopoverContent>
+        </Popover>
+        <div className="flex-1" />
+        {/* View switcher */}
+        <div className="flex items-center border rounded-md overflow-hidden">
+          {([
+            { id: "lista", label: "Lista", Icon: LayoutList },
+            { id: "kanban", label: "Kanban", Icon: LayoutGrid },
+            { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
+            ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
+          ] as const).map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setTicketsView(v.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                ticketsView === v.id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <v.Icon className="h-3.5 w-3.5" /> {v.label}
             </button>
-            {supportDepartments.map((dept) => (
-              <button
-                key={dept.id}
-                onClick={() => setDepartmentFilter(dept.id)}
-                className={departmentFilter === dept.id ? "shrink-0 px-3 py-1.5 text-xs rounded-md bg-primary/10 text-primary font-medium" : "shrink-0 px-3 py-1.5 text-xs rounded-md text-muted-foreground hover:text-foreground transition-colors"}
-              >
-                {dept.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Sub-abas: Lista | Kanban | Atendimentos | Pendentes */}
-          <div className="flex items-center gap-0 border rounded-md overflow-hidden w-fit">
-            {([
-              { id: "lista", label: "Lista", Icon: LayoutList },
-              { id: "kanban", label: "Kanban", Icon: LayoutGrid },
-              { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
-              ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
-            ] as const).map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setTicketsView(v.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
-                  ticketsView === v.id
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <v.Icon className="h-3.5 w-3.5" />
-                {v.label}
-              </button>
-            ))}
-          </div>
-
-          {ticketsView === "lista" && (
-            isLoading ? (
-              <div className="space-y-2">
-                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-              </div>
-            ) : filteredTickets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <Inbox className="h-12 w-12 mb-3 opacity-40" />
-                <p className="text-sm">Nenhum ticket encontrado</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredTickets.map((t) => {
-                  const breadcrumb = [
-                    t.produtos?.nome,
-                    t.service_categories?.nome,
-                    t.service_subcategories?.nome,
-                  ].filter(Boolean).join(" › ");
-                  const tipoServico = t.service_types?.nome;
-
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
-                      className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="shrink-0 min-w-[110px]">
-                          <p className="font-mono text-sm font-semibold text-primary">{t.ticket_code ?? "—"}</p>
-                          {t.parent_ticket_id && (
-                            <Badge variant="outline" className="mt-1 text-[10px]">↳ vinculado</Badge>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-medium truncate">
-                              {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
-                            </p>
-                            {(() => { const si = getStatusInfo(t.status_id); return (
-                              <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
-                            ); })()}
-                            {(() => {
-                              const tags = (t.ticket_tag_assignments ?? [])
-                                .map(a => a.tag)
-                                .filter(Boolean);
-                              if (tags.length === 0) return null;
-                              return (
-                                <div className="flex items-center gap-1 flex-wrap">
-                                  {tags.map(tag => (
-                                    <span
-                                      key={tag!.id}
-                                      className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                                      style={{ background: tag!.color + "22", color: tag!.color }}
-                                    >
-                                      {tag!.name}
-                                    </span>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                          {breadcrumb && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {breadcrumb}
-                              {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
-                            </p>
-                          )}
-                          {t.assunto && (
-                            <p className="text-xs text-muted-foreground truncate">{t.assunto}</p>
-                          )}
-                          {t.agendado_para && (
-                            <p className="text-[11px] text-yellow-400 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              Agendado: {formatDate(t.agendado_para)}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="shrink-0 flex flex-col items-end gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <ChannelIcon canal={t.canal_origem} />
-                            <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )
-          )}
-
-          {ticketsView === "kanban" && (
-            isLoading ? (
-              <div className="flex gap-3 overflow-x-auto">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[60vh] min-w-[260px] w-[260px]" />)}
-              </div>
-            ) : (
-              <TicketsKanbanView
-                tickets={filteredTickets}
-                columns={filteredStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, position: s.position }))}
-                onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
-                onStatusChange={handleKanbanStatusChange}
-              />
-            )
-          )}
-
-          {ticketsView === "atendimentos" && (() => {
-            const Comp = AttendancesTab as any;
-            return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} />;
-          })()}
-
-          {ticketsView === "pendentes" && isAdminOrHead && (
-            <PendingClosuresTab embedded departmentFilter={departmentFilter} />
-          )}
+          ))}
         </div>
       </div>
+
+      {/* Metric cards contextuais */}
+      {(ticketsView === "lista" || ticketsView === "kanban") && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Ativos</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.ativos}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Chips de filtros ativos */}
+      {activeFilterCount > 0 && (ticketsView === "lista" || ticketsView === "kanban") && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-muted-foreground mr-1">Filtros:</span>
+          {produtoFilter !== "all" && (
+            <button
+              onClick={() => setProdutoFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("produto", produtoFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {atendenteFilter !== "all" && (
+            <button
+              onClick={() => setAtendenteFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("atendente", atendenteFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {categoriaFilter !== "all" && (
+            <button
+              onClick={() => { setCategoriaFilter("all"); setSubcategoriaFilter("all"); }}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("categoria", categoriaFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {subcategoriaFilter !== "all" && (
+            <button
+              onClick={() => setSubcategoriaFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("subcategoria", subcategoriaFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {canalFilter !== "all" && (
+            <button
+              onClick={() => setCanalFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("canal", canalFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {serviceTypeFilters.map((stId) => {
+            const st = serviceTypes.find((t) => t.id === stId);
+            return (
+              <button
+                key={stId}
+                onClick={() => setServiceTypeFilters((prev) => prev.filter((id) => id !== stId))}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              >
+                {st?.nome ?? stId} <X className="h-3 w-3" />
+              </button>
+            );
+          })}
+          {tagFilters.map((tagId) => {
+            const tag = availableTags.find((t) => t.id === tagId);
+            return tag ? (
+              <button
+                key={tagId}
+                onClick={() => setTagFilters((prev) => prev.filter((id) => id !== tagId))}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-medium"
+                style={{ background: tag.color + "22", color: tag.color }}
+              >
+                {tag.name} <X className="h-3 w-3" />
+              </button>
+            ) : null;
+          })}
+          <button
+            onClick={clearAdvancedFilters}
+            className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
+          >
+            Limpar todos
+          </button>
+        </div>
+      )}
+
+      {/* Conteúdo por view */}
+      {ticketsView === "lista" && (
+        isLoading ? (
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <Inbox className="h-12 w-12 mb-3 opacity-40" />
+            <p className="text-sm">Nenhum ticket encontrado</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredTickets.map((t) => {
+              const breadcrumb = [
+                t.produtos?.nome,
+                t.service_categories?.nome,
+                t.service_subcategories?.nome,
+              ].filter(Boolean).join(" › ");
+              const tipoServico = t.service_types?.nome;
+
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => { setSelectedTicketId(t.id); setDetailOpen(true); }}
+                  className="w-full text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="shrink-0 min-w-[110px]">
+                      <p className="font-mono text-sm font-semibold text-primary">{t.ticket_code ?? "—"}</p>
+                      {t.parent_ticket_id && (
+                        <Badge variant="outline" className="mt-1 text-[10px]">↳ vinculado</Badge>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium truncate">
+                          {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
+                        </p>
+                        {(() => { const si = getStatusInfo(t.status_id); return (
+                          <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
+                        ); })()}
+                        {(() => {
+                          const tags = (t.ticket_tag_assignments ?? [])
+                            .map(a => a.tag)
+                            .filter(Boolean);
+                          if (tags.length === 0) return null;
+                          return (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {tags.map(tag => (
+                                <span
+                                  key={tag!.id}
+                                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                  style={{ background: tag!.color + "22", color: tag!.color }}
+                                >
+                                  {tag!.name}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      {breadcrumb && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {breadcrumb}
+                          {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
+                        </p>
+                      )}
+                      {t.assunto && (
+                        <p className="text-xs text-muted-foreground truncate">{t.assunto}</p>
+                      )}
+                      {t.agendado_para && (
+                        <p className="text-[11px] text-yellow-400 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Agendado: {formatDate(t.agendado_para)}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="shrink-0 flex flex-col items-end gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <ChannelIcon canal={t.canal_origem} />
+                        <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {ticketsView === "kanban" && (
+        isLoading ? (
+          <div className="flex gap-3 overflow-x-auto">
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[60vh] min-w-[260px] w-[260px]" />)}
+          </div>
+        ) : (
+          <TicketsKanbanView
+            tickets={filteredTickets}
+            columns={filteredStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, position: s.position }))}
+            onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
+            onStatusChange={handleKanbanStatusChange}
+          />
+        )
+      )}
+
+      {ticketsView === "atendimentos" && (() => {
+        const Comp = AttendancesTab as any;
+        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} />;
+      })()}
+
+      {ticketsView === "pendentes" && isAdminOrHead && (() => {
+        const Comp = PendingClosuresTab as any;
+        return <Comp embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} />;
+      })()}
 
       <CreateSupportTicketModal
         open={createOpen}
