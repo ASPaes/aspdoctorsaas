@@ -120,14 +120,16 @@ export function PendingClosuresTab({ departmentFilter = "all", agenteFilter: par
     },
   });
 
+  const effectiveAgente = embedded && parentAgenteFilter !== "all" ? parentAgenteFilter : (agenteFilter || null);
+
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ["pending_closures", tid, agenteFilter, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: ["pending_closures", tid, effectiveAgente, dateRange.from.toISOString(), dateRange.to.toISOString()],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_pending_closures", {
         p_limit: 50,
         p_offset: 0,
-        p_agent_id: agenteFilter || null,
+        p_agent_id: effectiveAgente,
         p_date_from: dateRange.from.toISOString(),
         p_date_to: new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), dateRange.to.getDate(), 23, 59, 59).toISOString(),
       });
