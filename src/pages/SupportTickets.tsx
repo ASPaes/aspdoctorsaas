@@ -110,6 +110,12 @@ export default function SupportTickets() {
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
 
   useEffect(() => {
+    if (departmentFilter === "all" && ticketsView === "kanban") {
+      setTicketsView("lista");
+    }
+  }, [departmentFilter]);
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.ticketId) {
@@ -573,12 +579,12 @@ export default function SupportTickets() {
         <div className="flex-1" />
         {/* View switcher */}
         <div className="flex items-center border rounded-md overflow-hidden">
-          {([
+          {[
             { id: "lista", label: "Lista", Icon: LayoutList },
-            { id: "kanban", label: "Kanban", Icon: LayoutGrid },
+            ...(departmentFilter !== "all" ? [{ id: "kanban", label: "Kanban", Icon: LayoutGrid }] : []),
             { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
             ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
-          ] as const).map((v) => (
+          ].map((v) => (
             <button
               key={v.id}
               onClick={() => setTicketsView(v.id)}
