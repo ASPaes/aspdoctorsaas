@@ -217,7 +217,7 @@ export default function SupportTickets() {
         .eq("tenant_id", tid)
         .eq("is_active", true)
         .eq("usa_tickets", true)
-        .order("name");
+        .order("sort_order");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string; slug: string }>;
     },
