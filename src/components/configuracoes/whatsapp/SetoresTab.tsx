@@ -322,7 +322,7 @@ export default function SetoresTab() {
                   <Badge variant="outline" className="text-xs">Fallback</Badge>
                 )}
                 {d.requires_ticket_on_close && (
-                  <Badge variant="outline" className="text-[10px]">Ticket obrigatório no encerramento do chat</Badge>
+                  <Badge variant="outline" className="text-[10px]">Ticket obrigatório chat</Badge>
                 )}
                 {!d.usa_tickets && (
                   <Badge variant="secondary" className="text-[10px]">Sem tickets</Badge>

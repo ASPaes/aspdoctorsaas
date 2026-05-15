@@ -155,7 +155,7 @@ export default function SetoresInstanciasTab() {
                     <Badge variant="outline" className="text-[10px]">Tickets</Badge>
                   )}
                   {selectedDept?.requires_ticket_on_close && (
-                    <Badge variant="outline" className="text-[10px]">Ticket obrigatório no encerramento do chat</Badge>
+                    <Badge variant="outline" className="text-[10px]">Ticket obrigatório chat</Badge>
                   )}
                 </CardTitle>
               </CardHeader>
