@@ -107,6 +107,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
+  const effectiveAgente = embedded && parentAgenteFilter !== "all" ? parentAgenteFilter : atendenteFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
