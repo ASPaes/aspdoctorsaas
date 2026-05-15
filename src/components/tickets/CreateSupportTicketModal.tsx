@@ -60,6 +60,15 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [departamentoId, setDepartamentoId] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
   const [contatoSolicitante, setContatoSolicitante] = useState("");
+  const [contatoSelectedId, setContatoSelectedId] = useState<string | null>(null);
+  const [contatoResults, setContatoResults] = useState<Array<{ id: string; name: string; phone_number: string | null; email: string | null; role: string | null }>>([]);
+  const [contatoDropdownOpen, setContatoDropdownOpen] = useState(false);
+  const [newContactDialogOpen, setNewContactDialogOpen] = useState(false);
+  const [newContactName, setNewContactName] = useState("");
+  const [newContactPhone, setNewContactPhone] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newContactRole, setNewContactRole] = useState("");
+  const [savingNewContact, setSavingNewContact] = useState(false);
   const [previsaoEncerramento, setPrevisaoEncerramento] = useState(defaultPrevisao);
   const [checklistItems, setChecklistItems] = useState<{ text: string; done: boolean }[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
