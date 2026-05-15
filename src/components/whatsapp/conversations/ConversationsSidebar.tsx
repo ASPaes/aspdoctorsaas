@@ -73,6 +73,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     assignedToMe: saved?.assignedToMe ?? false,
     assignedToAgent: saved?.assignedToAgent ?? undefined,
     autoReplyDisabledOnly: saved?.autoReplyDisabledOnly ?? false,
+    rulesDisabledOnly: saved?.rulesDisabledOnly ?? false,
   });
 
   const persist = (patch: Record<string, any>) => {
