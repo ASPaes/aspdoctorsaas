@@ -5,7 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -61,6 +63,12 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [previsaoEncerramento, setPrevisaoEncerramento] = useState(defaultPrevisao);
   const [checklistItems, setChecklistItems] = useState<{ text: string; done: boolean }[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [quickTagName, setQuickTagName] = useState("");
+  const [quickTagColor, setQuickTagColor] = useState("#3b82f6");
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [firstNote, setFirstNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
@@ -81,6 +89,10 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setPrevisaoEncerramento(defaultPrevisao());
     setChecklistItems([]);
     setNewChecklistItem("");
+    setSelectedTagIds([]);
+    setFirstNote("");
+    setQuickTagName("");
+    setQuickTagColor("#3b82f6");
   };
 
   useEffect(() => {
@@ -196,6 +208,32 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: availableTags = [], refetch: refetchAvailableTags } = useQuery({
+    queryKey: ["create_ticket_tags", tid],
+    enabled: !!tid && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tags" as any) as any)
+        .select("id, name, color, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string; department_id: string | null }>;
+    },
+  });
+
+  const { data: currentUserName } = useQuery({
+    queryKey: ["create_ticket_current_user", responsavelId],
+    enabled: !!responsavelId,
+    queryFn: async () => {
+      const { data } = await (supabase.from("profiles" as any) as any)
+        .select("funcionarios:funcionario_id(nome)")
+        .eq("user_id", responsavelId)
+        .maybeSingle();
+      return ((data as any)?.funcionarios?.nome as string) || null;
+    },
+  });
+
   const { data: clienteContatoPrincipal } = useQuery({
     queryKey: ["cliente_contato_principal_ticket", selectedCliente?.id],
     enabled: !!selectedCliente?.id,
@@ -252,6 +290,35 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setNewChecklistItem("");
   };
 
+  const handleCreateAndAddTag = async () => {
+    if (!quickTagName.trim() || !tid) return;
+    setCreatingTag(true);
+    try {
+      const { data: newTag, error } = await (supabase.from("ticket_tags" as any) as any)
+        .insert({
+          tenant_id: tid,
+          name: quickTagName.trim(),
+          color: quickTagColor,
+          department_id: departamentoId || null,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if ((newTag as any)?.id) {
+        setSelectedTagIds((prev) => [...prev, (newTag as any).id]);
+      }
+      setQuickTagName("");
+      setQuickTagColor("#3b82f6");
+      refetchAvailableTags();
+      toast.success("Tag criada");
+    } catch (err: any) {
+      toast.error("Erro ao criar tag: " + (err?.message ?? ""));
+    } finally {
+      setCreatingTag(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
@@ -268,7 +335,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
     setIsSubmitting(true);
     try {
-      const { error } = await (supabase.rpc as any)("create_manual_ticket", {
+      const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
         p_cliente_id: selectedCliente.id,
         p_produto_id: Number(produtoId),
         p_category_id: categoryId,
@@ -287,6 +354,33 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
       });
 
       if (error) throw error;
+
+      const ticketId =
+        typeof rpcData === "string"
+          ? rpcData
+          : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+
+      if (ticketId) {
+        if (selectedTagIds.length > 0) {
+          await (supabase.from("ticket_tag_assignments" as any) as any).insert(
+            selectedTagIds.map((tagId) => ({ ticket_id: ticketId, tag_id: tagId }))
+          );
+        }
+        if (firstNote.trim() && responsavelId) {
+          await (supabase.from("support_ticket_events" as any) as any).insert({
+            tenant_id: tid,
+            ticket_id: ticketId,
+            user_id: responsavelId,
+            event_type: "note",
+            content: firstNote.trim(),
+          });
+        }
+        if (checklistItems.length > 0) {
+          await (supabase.from("support_tickets" as any) as any)
+            .update({ checklist: checklistItems })
+            .eq("id", ticketId);
+        }
+      }
 
       toast.success("Ticket criado com sucesso");
       onCreated?.();
@@ -677,10 +771,156 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
             </div>
           </div>
 
-          {/* Right panel (placeholder — Prompt 12B) */}
+          {/* Right panel */}
           <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Atividade</div>
-            <p className="text-xs text-muted-foreground">Em breve.</p>
+            {/* Tags */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Tags</div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {selectedTagIds.map((tagId) => {
+                  const tag = availableTags.find((t) => t.id === tagId);
+                  if (!tag) return null;
+                  return (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium"
+                      style={{ background: tag.color + "22", color: tag.color }}
+                    >
+                      {tag.name}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTagIds((prev) => prev.filter((id) => id !== tag.id))}
+                        className="hover:opacity-70"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+                <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
+                      <TagIcon className="h-3 w-3" />
+                      Tag
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-56 p-1.5">
+                    <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                      {availableTags
+                        .filter((t) => !selectedTagIds.includes(t.id))
+                        .map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTagIds((prev) => [...prev, t.id]);
+                              setTagPopoverOpen(false);
+                            }}
+                            className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                          >
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
+                            {t.name}
+                          </button>
+                        ))}
+                      {availableTags.filter((t) => !selectedTagIds.includes(t.id)).length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
+                      )}
+                    </div>
+                    <div className="border-t mt-2 pt-2">
+                      <p className="text-[10px] text-muted-foreground mb-1.5 px-1">Criar nova</p>
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="color"
+                          value={quickTagColor}
+                          onChange={(e) => setQuickTagColor(e.target.value)}
+                          className="h-8 w-8 p-0.5 shrink-0"
+                        />
+                        <Input
+                          value={quickTagName}
+                          onChange={(e) => setQuickTagName(e.target.value)}
+                          placeholder="Nome..."
+                          className="h-8 text-xs flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCreateAndAddTag();
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2"
+                          onClick={handleCreateAndAddTag}
+                          disabled={!quickTagName.trim() || creatingTag}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <Separator className="my-3" />
+
+            {/* Timeline */}
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Timeline</div>
+              <div className="flex gap-1.5">
+                <Input
+                  value={firstNote}
+                  onChange={(e) => setFirstNote(e.target.value)}
+                  placeholder="Primeira ocorrência..."
+                  className="h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled
+                  title="Será registrada ao criar o ticket"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Será registrada como primeira ocorrência ao criar o ticket.
+              </p>
+            </div>
+
+            <Separator className="my-3" />
+
+            {/* Metadata */}
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide">Aberto em</span>
+              </div>
+              <p className="text-xs pl-5">
+                {new Date().toLocaleString("pt-BR", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+
+              <div className="flex items-center gap-2 text-muted-foreground pt-1">
+                <UserIcon className="h-3 w-3 shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide">Criado por</span>
+              </div>
+              <p className="text-xs pl-5 truncate">{currentUserName ?? "—"}</p>
+
+              <div className="flex items-center gap-2 text-muted-foreground pt-1">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span className="text-[10px] uppercase tracking-wide">Tempo agente</span>
+              </div>
+              <p className="text-xs pl-5">0 min</p>
+            </div>
           </div>
         </div>
 
