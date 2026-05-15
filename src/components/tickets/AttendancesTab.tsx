@@ -154,7 +154,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           opened_at, assumed_at, closed_at,
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
-          ai_summary, ai_category,
+          ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
