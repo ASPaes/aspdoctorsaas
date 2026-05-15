@@ -63,6 +63,12 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [previsaoEncerramento, setPrevisaoEncerramento] = useState(defaultPrevisao);
   const [checklistItems, setChecklistItems] = useState<{ text: string; done: boolean }[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [quickTagName, setQuickTagName] = useState("");
+  const [quickTagColor, setQuickTagColor] = useState("#3b82f6");
+  const [creatingTag, setCreatingTag] = useState(false);
+  const [firstNote, setFirstNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
@@ -83,6 +89,10 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setPrevisaoEncerramento(defaultPrevisao());
     setChecklistItems([]);
     setNewChecklistItem("");
+    setSelectedTagIds([]);
+    setFirstNote("");
+    setQuickTagName("");
+    setQuickTagColor("#3b82f6");
   };
 
   useEffect(() => {
