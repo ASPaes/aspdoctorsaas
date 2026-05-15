@@ -183,7 +183,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         .eq("tenant_id", tid)
         .eq("is_active", true)
         .eq("usa_tickets", true)
-        .order("name");
+        .order("sort_order");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
     },
