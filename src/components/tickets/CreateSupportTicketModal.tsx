@@ -60,6 +60,15 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [departamentoId, setDepartamentoId] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
   const [contatoSolicitante, setContatoSolicitante] = useState("");
+  const [contatoSelectedId, setContatoSelectedId] = useState<string | null>(null);
+  const [contatoResults, setContatoResults] = useState<Array<{ id: string; name: string; phone_number: string | null; email: string | null; role: string | null }>>([]);
+  const [contatoDropdownOpen, setContatoDropdownOpen] = useState(false);
+  const [newContactDialogOpen, setNewContactDialogOpen] = useState(false);
+  const [newContactName, setNewContactName] = useState("");
+  const [newContactPhone, setNewContactPhone] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newContactRole, setNewContactRole] = useState("");
+  const [savingNewContact, setSavingNewContact] = useState(false);
   const [previsaoEncerramento, setPrevisaoEncerramento] = useState(defaultPrevisao);
   const [checklistItems, setChecklistItems] = useState<{ text: string; done: boolean }[]>([]);
   const [newChecklistItem, setNewChecklistItem] = useState("");
@@ -86,6 +95,9 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setObservacaoAgente("");
     setDepartamentoId("");
     setContatoSolicitante("");
+    setContatoSelectedId(null);
+    setContatoResults([]);
+    setContatoDropdownOpen(false);
     setPrevisaoEncerramento(defaultPrevisao());
     setChecklistItems([]);
     setNewChecklistItem("");
@@ -251,6 +263,29 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
       });
   }, [selectedCliente?.id]);
 
+  // Search whatsapp_contacts as user types
+  useEffect(() => {
+    const clienteId = selectedCliente?.id;
+    const term = contatoSolicitante.trim();
+    if (!clienteId || term.length < 1 || contatoSelectedId) {
+      setContatoResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const { data } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("id, name, phone_number, email, role")
+        .eq("client_id", clienteId)
+        .ilike("name", `%${term}%`)
+        .limit(8);
+      if (!cancelled) {
+        setContatoResults((data as any) ?? []);
+        setContatoDropdownOpen(true);
+      }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [contatoSolicitante, selectedCliente?.id, contatoSelectedId]);
+
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(
@@ -396,7 +431,42 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const currentCanal = CANAIS.find((c) => c.id === canalOrigem);
   const CanalIcon = currentCanal?.icon ?? Phone;
 
+  const handleSaveNewContact = async () => {
+    if (!selectedCliente || !tid) return;
+    if (!newContactName.trim()) {
+      toast.error("Informe o nome");
+      return;
+    }
+    setSavingNewContact(true);
+    try {
+      const { data, error } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .insert({
+          tenant_id: tid,
+          client_id: selectedCliente.id,
+          name: newContactName.trim(),
+          phone_number: newContactPhone.trim() || null,
+          email: newContactEmail.trim() || null,
+          role: newContactRole.trim() || null,
+          is_primary: false,
+        })
+        .select("id, name")
+        .single();
+      if (error) throw error;
+      toast.success("Contato cadastrado");
+      setContatoSolicitante((data as any).name);
+      setContatoSelectedId((data as any).id);
+      setContatoResults([]);
+      setContatoDropdownOpen(false);
+      setNewContactDialogOpen(false);
+    } catch (err: any) {
+      toast.error("Erro ao salvar contato: " + (err?.message ?? ""));
+    } finally {
+      setSavingNewContact(false);
+    }
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
@@ -605,26 +675,64 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Contato solicitante</Label>
                 <div className="flex gap-1.5">
-                  <Input
-                    value={contatoSolicitante}
-                    onChange={(e) => setContatoSolicitante(e.target.value)}
-                    placeholder="Nome do solicitante"
-                    className="h-9 text-xs"
-                    disabled={!selectedCliente}
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      value={contatoSolicitante}
+                      onChange={(e) => {
+                        setContatoSolicitante(e.target.value);
+                        setContatoSelectedId(null);
+                      }}
+                      onFocus={() => { if (contatoResults.length > 0) setContatoDropdownOpen(true); }}
+                      onBlur={() => setTimeout(() => setContatoDropdownOpen(false), 150)}
+                      placeholder="Nome do solicitante"
+                      className="h-9 text-xs"
+                      disabled={!selectedCliente}
+                    />
+                    {contatoDropdownOpen && contatoResults.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-input bg-popover shadow-md">
+                        {contatoResults.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setContatoSolicitante(c.name);
+                              setContatoSelectedId(c.id);
+                              setContatoDropdownOpen(false);
+                              setContatoResults([]);
+                            }}
+                          >
+                            <div className="font-medium">{c.name}</div>
+                            {(c.phone_number || c.role) && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {[c.role, c.phone_number].filter(Boolean).join(" • ")}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className="h-9 w-9 shrink-0"
-                    disabled={!selectedCliente || !contatoSolicitante.trim()}
-                    onClick={() => toast.info("Em breve: salvar nos contatos")}
-                    title="Salvar nos contatos"
+                    disabled={!selectedCliente}
+                    onClick={() => {
+                      setNewContactName(contatoSolicitante);
+                      setNewContactPhone("");
+                      setNewContactEmail("");
+                      setNewContactRole("");
+                      setNewContactDialogOpen(true);
+                    }}
+                    title="Cadastrar novo contato"
                   >
                     <UserPlus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Preenche automaticamente com o contato principal</p>
+                <p className="text-[10px] text-muted-foreground">Busca nos contatos do cliente. Use + para cadastrar.</p>
               </div>
             </div>
 
@@ -940,5 +1048,46 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={newContactDialogOpen} onOpenChange={setNewContactDialogOpen}>
+      <DialogContent className="max-w-md">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-base font-semibold">Novo contato</h3>
+            <p className="text-xs text-muted-foreground">
+              {selectedCliente ? (selectedCliente.nome_fantasia || selectedCliente.razao_social) : ""}
+            </p>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Nome <Req /></Label>
+              <Input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Telefone</Label>
+              <Input value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} className="h-9 text-xs" placeholder="(11) 99999-9999" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">E-mail</Label>
+              <Input type="email" value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Cargo</Label>
+              <Input value={newContactRole} onChange={(e) => setNewContactRole(e.target.value)} className="h-9 text-xs" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setNewContactDialogOpen(false)} disabled={savingNewContact}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleSaveNewContact} disabled={savingNewContact}>
+              {savingNewContact && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
