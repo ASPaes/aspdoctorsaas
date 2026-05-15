@@ -26,7 +26,7 @@ import {
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare,
 } from "lucide-react";
-import { DialogClose } from "@/components/ui/dialog";
+
 
 const PRIORIDADES_STRIP = [
   { id: "baixa", name: "Baixa", color: "#10b981" },
