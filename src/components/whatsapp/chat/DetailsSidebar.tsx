@@ -58,6 +58,14 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const [contactNotes, setContactNotes] = useState(contact?.notes || "");
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  // Optimistic local override for rules_disabled (parent state may not refresh immediately)
+  const [rulesDisabledLocal, setRulesDisabledLocal] = useState<boolean | null>(null);
+  const rulesDisabledFromProp = !!(contact as any)?.rules_disabled;
+  useEffect(() => {
+    setRulesDisabledLocal(null);
+  }, [contact?.id, rulesDisabledFromProp]);
+  const rulesDisabledEffective = rulesDisabledLocal ?? rulesDisabledFromProp;
+
   // Collapsible section states
   const [topicsOpen, setTopicsOpen] = useState(true);
   const [sentimentOpen, setSentimentOpen] = useState(true);
