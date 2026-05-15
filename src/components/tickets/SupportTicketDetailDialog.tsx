@@ -997,6 +997,37 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       </div>
 
+      {/* Tempo agente + Tempo calculado */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium flex items-center gap-1">
+            <Timer className="h-3 w-3" />
+            Tempo agente (min)
+          </Label>
+          <Input
+            type="number"
+            min={0}
+            className="h-9 text-xs"
+            defaultValue={ticket?.tempo_agente_minutos ?? ""}
+            key={`tempo-agente-${ticket?.tempo_agente_minutos}`}
+            placeholder="0"
+            onBlur={(e) => {
+              const val = e.target.value.trim();
+              if (val && Number(val) !== (ticket?.tempo_agente_minutos ?? 0)) {
+                handleFieldUpdate({ tempo_agente_minutos: val });
+              }
+            }}
+            disabled={updating}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium">Tempo calculado</Label>
+          <p className="text-sm h-9 flex items-center text-muted-foreground">
+            {ticket?.tempo_calculado_minutos ? `${ticket.tempo_calculado_minutos} min` : "—"}
+          </p>
+        </div>
+      </div>
+
       {(() => {
         const dept = departamentos?.find((d: any) => d.id === ticket?.department_id);
         if (dept?.slug !== "implantacao") return null;
@@ -1051,37 +1082,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         );
       })()}
-
-      {/* Tempo agente + Tempo calculado */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium flex items-center gap-1">
-            <Timer className="h-3 w-3" />
-            Tempo agente (min)
-          </Label>
-          <Input
-            type="number"
-            min={0}
-            className="h-9 text-xs"
-            defaultValue={ticket?.tempo_agente_minutos ?? ""}
-            key={`tempo-agente-${ticket?.tempo_agente_minutos}`}
-            placeholder="0"
-            onBlur={(e) => {
-              const val = e.target.value.trim();
-              if (val && Number(val) !== (ticket?.tempo_agente_minutos ?? 0)) {
-                handleFieldUpdate({ tempo_agente_minutos: val });
-              }
-            }}
-            disabled={updating}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Tempo calculado</Label>
-          <p className="text-sm h-9 flex items-center text-muted-foreground">
-            {ticket?.tempo_calculado_minutos ? `${ticket.tempo_calculado_minutos} min` : "—"}
-          </p>
-        </div>
-      </div>
 
       {/* Checklist */}
       <div className="space-y-2">
