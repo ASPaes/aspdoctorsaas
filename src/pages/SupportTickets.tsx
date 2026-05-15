@@ -354,7 +354,7 @@ export default function SupportTickets() {
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets</h1>
         </div>
-        {activeTab === "tickets" && isAdminOrHead && (
+        {isAdminOrHead && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             Novo ticket
@@ -362,24 +362,7 @@ export default function SupportTickets() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="tickets" className="gap-2">
-            <TicketCheck className="h-4 w-4" />
-            Tickets
-            <Badge variant="secondary" className="text-xs ml-1">{filteredTickets.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="atendimentos" className="gap-1.5">
-            <Headphones className="h-4 w-4" />
-            Atendimentos
-          </TabsTrigger>
-          {isAdminOrHead && (
-            <TabsTrigger value="pending" className="gap-2">
-              <Clock className="h-4 w-4" />
-              Pendentes
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <div className="space-y-4">
 
         <TabsContent value="tickets" className="space-y-4">
           {/* Metric cards */}
