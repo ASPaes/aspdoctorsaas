@@ -941,22 +941,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         </div>
         <div className="space-y-1">
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Tipo horário</span>
-          <Select
-            value={ticket?.tipo_horario ?? "comercial"}
-            onValueChange={(v) => handleFieldUpdate({ tipo_horario: v })}
-            disabled={updating}
-          >
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="comercial">Comercial</SelectItem>
-              <SelectItem value="plantao">Plantão</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
           <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Aberto em</span>
           <p className="text-sm h-8 flex items-center">{ticket?.aberto_em ? new Date(ticket.aberto_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
         </div>
