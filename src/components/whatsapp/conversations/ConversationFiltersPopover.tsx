@@ -7,7 +7,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Filter, X, Sparkles, Check, ChevronsUpDown } from "lucide-react";
+import { Filter, X, Sparkles, Check, ChevronsUpDown, HelpCircle, ShieldOff } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAuth } from "@/contexts/AuthContext";
