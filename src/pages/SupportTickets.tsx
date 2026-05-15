@@ -576,7 +576,7 @@ export default function SupportTickets() {
           {([
             { id: "lista", label: "Lista", Icon: LayoutList },
             { id: "kanban", label: "Kanban", Icon: LayoutGrid },
-            { id: "atendimentos", label: "Atendimentos-Chats", Icon: Headphones },
+            { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
             ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
           ] as const).map((v) => (
             <button
