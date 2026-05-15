@@ -447,6 +447,36 @@ export const useWhatsAppActions = () => {
     },
   });
 
+  const toggleRulesDisabledMutation = useMutation({
+    mutationFn: async ({ contactId, rulesDisabled, reason }: { contactId: string; rulesDisabled: boolean; reason?: string }) => {
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from('whatsapp_contacts')
+        .update({
+          rules_disabled: rulesDisabled,
+          rules_disabled_at: rulesDisabled ? nowIso : null,
+          rules_disabled_by: rulesDisabled ? (user?.id ?? null) : null,
+          rules_disabled_reason: rulesDisabled ? (reason ?? null) : null,
+          updated_at: nowIso,
+        } as any)
+        .eq('id', contactId);
+      if (error) throw error;
+      return { contactId, rulesDisabled };
+    },
+    onSuccess: ({ rulesDisabled }) => {
+      toast.success(
+        rulesDisabled
+          ? 'Regras do sistema desativadas para este contato'
+          : 'Regras do sistema reativadas para este contato'
+      );
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'contacts'] });
+    },
+    onError: () => {
+      toast.error('Erro ao atualizar regras do contato');
+    },
+  });
+
   const scheduleAttendanceMutation = useMutation({
     mutationFn: async ({ attendanceId, scheduledUntilIso }: { attendanceId: string; scheduledUntilIso: string }) => {
       const { data, error } = await supabase.rpc('schedule_attendance' as any, {
