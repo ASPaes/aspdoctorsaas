@@ -1048,5 +1048,46 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={newContactDialogOpen} onOpenChange={setNewContactDialogOpen}>
+      <DialogContent className="max-w-md">
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-base font-semibold">Novo contato</h3>
+            <p className="text-xs text-muted-foreground">
+              {selectedCliente ? (selectedCliente.nome_fantasia || selectedCliente.razao_social) : ""}
+            </p>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Nome <Req /></Label>
+              <Input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Telefone</Label>
+              <Input value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} className="h-9 text-xs" placeholder="(11) 99999-9999" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">E-mail</Label>
+              <Input type="email" value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} className="h-9 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Cargo</Label>
+              <Input value={newContactRole} onChange={(e) => setNewContactRole(e.target.value)} className="h-9 text-xs" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setNewContactDialogOpen(false)} disabled={savingNewContact}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleSaveNewContact} disabled={savingNewContact}>
+              {savingNewContact && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
