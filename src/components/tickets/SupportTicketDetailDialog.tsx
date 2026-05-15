@@ -881,12 +881,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       </div>
 
       {/* Previsão de encerramento + Agendado para */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 items-end">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Label className="text-xs font-medium">Previsão de encerramento</Label>
-            <Badge variant="outline" className="text-[9px] h-4 px-1">auto</Badge>
-          </div>
+          <Label className="text-xs font-medium">Previsão <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 align-middle">auto</Badge></Label>
           <Input
             type="datetime-local"
             className="h-9 text-xs"
@@ -990,7 +987,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {/* Anexos */}
       {ticketId && tid && (
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Anexos</Label>
           <TicketAttachments ticketId={ticketId} tenantId={tid} canDelete />
         </div>
       )}
