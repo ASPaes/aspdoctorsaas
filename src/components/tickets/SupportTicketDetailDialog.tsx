@@ -923,7 +923,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       )}
 
-      {/* Descrição */}
+      {/* Descricao */}
       {ticket.descricao && (
         <div>
           <p className="text-[10px] uppercase text-muted-foreground mb-1">Descrição</p>
