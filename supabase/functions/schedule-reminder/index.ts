@@ -56,6 +56,18 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Guard "Sem regras do sistema": pular envio do lembrete agendado.
+        if (contact.rules_disabled === true) {
+          console.log(`[schedule-reminder] rules_disabled=true — skipping reminder for att=${att.id}`);
+          // Marca como notificado para não reprocessar em loop a cada minuto.
+          await supabase
+            .from('support_attendances')
+            .update({ schedule_notified_at: new Date().toISOString() })
+            .eq('id', att.id);
+          results.push({ attendanceId: att.id, ok: true, error: 'rules_disabled' });
+          continue;
+        }
+
         const [instResult, secrets] = await Promise.all([
           supabase
             .from('whatsapp_instances')
