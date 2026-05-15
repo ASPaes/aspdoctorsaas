@@ -234,23 +234,22 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
-  const { data: clienteContatoPrincipal } = useQuery({
-    queryKey: ["cliente_contato_principal_ticket", selectedCliente?.id],
-    enabled: !!selectedCliente?.id,
-    queryFn: async () => {
-      const { data } = await (supabase.from("clientes" as any) as any)
-        .select("contato_nome, contato_fone")
-        .eq("id", selectedCliente!.id)
-        .maybeSingle();
-      return data as { contato_nome: string | null; contato_fone: string | null } | null;
-    },
-  });
-
   useEffect(() => {
-    if (clienteContatoPrincipal?.contato_nome) {
-      setContatoSolicitante(clienteContatoPrincipal.contato_nome);
+    const clienteId = selectedCliente?.id;
+    if (!clienteId) {
+      setContatoSolicitante("");
+      return;
     }
-  }, [clienteContatoPrincipal]);
+    (supabase.from("whatsapp_contacts" as any) as any)
+      .select("name, phone_number")
+      .eq("client_id", clienteId)
+      .eq("is_primary", true)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data?.name) setContatoSolicitante(data.name);
+        else setContatoSolicitante("");
+      });
+  }, [selectedCliente?.id]);
 
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
