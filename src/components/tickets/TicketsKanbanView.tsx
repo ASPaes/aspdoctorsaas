@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MessageCircle, Phone, User, Mail } from "lucide-react";
+import { Calendar, MessageCircle, Phone, User, Mail, Lock } from "lucide-react";
 
 interface KanbanColumn {
   id: string;
