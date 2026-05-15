@@ -225,6 +225,17 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: availableTags = [] } = useQuery({
+    queryKey: ["ticket_tags_filter", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tags" as any) as any)
+        .select("id, name, color").eq("tenant_id", tid).eq("is_active", true).order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string }>;
+    },
+  });
+
   const filteredStatuses = useMemo(
     () => departmentFilter === "all"
       ? ticketStatuses
