@@ -45,7 +45,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const sentiment = sentimentRaw as any;
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
-  const { updateContact, isUpdatingContact } = useWhatsAppActions();
+  const { updateContact, isUpdatingContact, toggleRulesDisabled, isTogglingRulesDisabled } = useWhatsAppActions();
   const { profile } = useAuth();
 
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
