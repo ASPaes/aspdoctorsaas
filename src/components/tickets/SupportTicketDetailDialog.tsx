@@ -1631,9 +1631,16 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           {isLoading ? (
             <div className="flex-1 overflow-hidden px-6 py-4">{loadingNode}</div>
           ) : (
-            <div className="grid grid-cols-[1fr_260px] flex-1 overflow-hidden">
-              <div className="p-4 border-r space-y-4 overflow-y-auto">
+            <div ref={containerRef} className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: `1fr auto ${rightPanelWidth}px` }}>
+              <div className="p-4 space-y-4 overflow-y-auto">
                 {detailsContent}
+              </div>
+              <div
+                onMouseDown={handleMouseDown}
+                className={`w-1.5 cursor-col-resize flex items-center justify-center hover:bg-primary/20 transition-colors shrink-0 ${isDragging ? "bg-primary/20" : ""}`}
+                title="Arraste para redimensionar"
+              >
+                <div className="w-0.5 h-8 rounded-full bg-border" />
               </div>
               <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
                 {/* Tags */}
