@@ -497,7 +497,48 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
       <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
-          <h3 className="text-base font-semibold">Novo ticket</h3>
+          <h3 className="text-base font-medium">Novo ticket</h3>
+          <div className="flex items-center gap-1.5">
+            {(() => {
+              const currentStatus = ticketStatuses.find(s => s.id === statusId);
+              const isTerminal = currentStatus?.is_terminal ?? false;
+              const initialStatus = ticketStatuses.find(s => s.is_initial);
+              const terminalStatus = ticketStatuses.find(s => s.is_terminal);
+              if (!departamentoId || ticketStatuses.length === 0) return null;
+              return (
+                <>
+                  {!isTerminal ? (
+                    <>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/25">
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                        Aberto
+                      </div>
+                      {terminalStatus && (
+                        <button type="button"
+                          onClick={() => setStatusId(terminalStatus.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors">
+                          <Check className="h-3.5 w-3.5" /> Encerrar
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
+                        <Lock className="h-3 w-3" /> Encerrado
+                      </div>
+                      {initialStatus && (
+                        <button type="button"
+                          onClick={() => setStatusId(initialStatus.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
+                          <RefreshCw className="h-3.5 w-3.5" /> Reabrir
+                        </button>
+                      )}
+                    </>
+                  )}
+                </>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Top strip */}
