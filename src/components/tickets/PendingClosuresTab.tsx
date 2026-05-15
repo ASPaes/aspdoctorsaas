@@ -73,16 +73,35 @@ function ClosureTypeBadge({ type }: { type: string }) {
   return <Badge variant="secondary">{type}</Badge>;
 }
 
-export function PendingClosuresTab() {
+interface Props {
+  departmentFilter?: string;
+  embedded?: boolean;
+}
+
+export function PendingClosuresTab({ departmentFilter = "all", embedded = false }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
 
   const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 7), to: new Date() });
   const [agenteFilter, setAgenteFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [classifyTarget, setClassifyTarget] = useState<PendingClosure | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
+
+  const { data: deptName } = useQuery({
+    queryKey: ["pending_closures_dept_name", tid, departmentFilter],
+    enabled: !!tid && embedded && departmentFilter !== "all",
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("name")
+        .eq("id", departmentFilter)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.name as string | undefined;
+    },
+  });
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["pending_closures_agents", tid],
