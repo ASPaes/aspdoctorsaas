@@ -412,7 +412,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         <div className="flex items-center gap-2 px-5 py-2.5 border-b flex-wrap">
           {/* Prioridade */}
           <Select value={prioridade} onValueChange={setPrioridade}>
-            <SelectTrigger className="h-auto w-auto border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!truncate-none [&>span]:!line-clamp-none [&>span]:!overflow-visible">
+            <SelectTrigger className="h-auto w-auto border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <span
                   className="h-1.5 w-1.5 rounded-full shrink-0"
@@ -436,7 +436,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           {/* Canal */}
           <Select value={canalOrigem} onValueChange={setCanalOrigem}>
-            <SelectTrigger className="h-auto w-auto border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!truncate-none [&>span]:!line-clamp-none [&>span]:!overflow-visible">
+            <SelectTrigger className="h-auto w-auto border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <CanalIcon className="h-3 w-3 shrink-0" />
                 {currentCanal?.name ?? "Canal"}
