@@ -4363,6 +4363,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_mentions: {
+        Row: {
+          created_at: string
+          id: string
+          mentioned_by: string
+          mentioned_user_id: string
+          seen_at: string | null
+          tenant_id: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mentioned_by: string
+          mentioned_user_id: string
+          seen_at?: string | null
+          tenant_id: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mentioned_by?: string
+          mentioned_user_id?: string
+          seen_at?: string | null
+          tenant_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_mentions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_mentions_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_statuses: {
         Row: {
           color: string
@@ -6474,11 +6519,13 @@ export type Database = {
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_admin_or_head: { Args: never; Returns: boolean }
+      mark_all_mentions_seen: { Args: never; Returns: undefined }
       mark_all_notifications_read: { Args: never; Returns: undefined }
       mark_conversation_notifications_read: {
         Args: { p_conversation_id: string }
         Returns: number
       }
+      mark_mention_seen: { Args: { p_mention_id: string }; Returns: undefined }
       mark_notification_read: {
         Args: { p_recipient_id: string }
         Returns: undefined
