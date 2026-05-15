@@ -451,11 +451,57 @@ export default function SupportTickets() {
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets</h1>
         </div>
-        {isAdminOrHead && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative h-9 w-9">
+                <Bell className="h-4 w-4" />
+                {unseenMentions.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center font-medium animate-pulse">
+                    {unseenMentions.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="flex items-center justify-between px-3 py-2 border-b">
+                <span className="text-sm font-medium">Notificações</span>
+                {unseenMentions.length > 0 && (
+                  <button onClick={handleMarkAllSeen} className="text-[10px] text-muted-foreground hover:text-foreground">
+                    Marcar todas como vistas
+                  </button>
+                )}
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {unseenMentions.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">Nenhuma notificação</div>
+                ) : (
+                  unseenMentions.map(m => (
+                    <button key={m.id} onClick={() => handleMentionClick(m)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b last:border-0">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">
+                            {m.support_tickets?.ticket_code ?? "Ticket"} — {m.support_tickets?.assunto ?? "Sem assunto"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {getMentionerName(m.mentioned_by)} te marcou · {new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {isAdminOrHead && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Setores como pill buttons */}
