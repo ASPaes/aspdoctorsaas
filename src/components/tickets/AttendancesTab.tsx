@@ -124,7 +124,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         p_date_from: dateRange.from.toISOString(),
         p_date_to: toEnd.toISOString(),
         p_status: statusFilter !== "all" ? statusFilter : null,
-        p_agent_id: !isAdminOrHead && userId ? userId : (atendenteFilter !== "all" ? atendenteFilter : null),
+        p_agent_id: !isAdminOrHead && userId ? userId : (effectiveAgente !== "all" ? effectiveAgente : null),
         p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
         p_tenant_id: tid,
