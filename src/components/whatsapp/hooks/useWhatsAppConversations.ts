@@ -49,6 +49,7 @@ export interface ConversationsFilters {
   instanceId?: string;
   instanceIds?: string[];
   departmentId?: string;
+  isGroup?: boolean;
   
   status?: string;
   assignedTo?: string;
