@@ -3645,6 +3645,7 @@ export type Database = {
           requires_ticket_on_close: boolean
           show_in_ura: boolean
           slug: string
+          sort_order: number
           tenant_id: string
           updated_at: string
           ura_label: string | null
@@ -3662,6 +3663,7 @@ export type Database = {
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
           slug: string
+          sort_order?: number
           tenant_id: string
           updated_at?: string
           ura_label?: string | null
@@ -3679,6 +3681,7 @@ export type Database = {
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
           slug?: string
+          sort_order?: number
           tenant_id?: string
           updated_at?: string
           ura_label?: string | null
