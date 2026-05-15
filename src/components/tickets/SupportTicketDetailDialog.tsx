@@ -709,46 +709,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             ))}
           </SelectContent>
         </Select>
-        <Select
-          value={ticket.prioridade ?? ""}
-          onValueChange={(v) => handleFieldUpdate({ prioridade: v })}
-          disabled={updating}
-        >
-          <SelectTrigger className="h-7 w-auto min-w-[110px] text-xs">
-            <SelectValue placeholder="Prioridade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="baixa">Baixa</SelectItem>
-            <SelectItem value="media">Média</SelectItem>
-            <SelectItem value="alta">Alta</SelectItem>
-            <SelectItem value="urgente">Urgente</SelectItem>
-          </SelectContent>
-        </Select>
-        {ticket.canal_origem && (
-          <Badge variant="outline" className="text-[10px] gap-1">
-            <ChannelIcon canal={ticket.canal_origem} />
-            {ticket.canal_origem}
-          </Badge>
-        )}
-        <div className="flex-1" />
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs gap-1"
-          onClick={() => setStartConvOpen(true)}
-        >
-          <MessageCircle className="h-3.5 w-3.5" />
-          Conversa
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs gap-1"
-          onClick={() => setChildOpen(true)}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Filho
-        </Button>
       </div>
 
       {/* Tags */}
