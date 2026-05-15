@@ -564,7 +564,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
                     : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {t === "comercial" ? "Comercial" : t === "fora" ? "Fora" : "Plantão"}
+                {t === "comercial" ? "Comercial" : "Plantão"}
               </button>
             ))}
           </div>
