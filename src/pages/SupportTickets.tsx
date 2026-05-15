@@ -268,8 +268,9 @@ export default function SupportTickets() {
     if (subcategoriaFilter !== "all") count++;
     if (canalFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
+    if (tagFilters.length > 0) count++;
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -278,6 +279,7 @@ export default function SupportTickets() {
     setSubcategoriaFilter("all");
     setCanalFilter("all");
     setServiceTypeFilters([]);
+    setTagFilters([]);
   };
 
   const getFilterLabel = (type: string, value: string): string => {
