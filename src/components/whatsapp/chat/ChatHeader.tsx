@@ -492,6 +492,21 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 pl-10">
           <SignatureControl conversationId={conversation.id} />
 
+          {(conversation.contact as any)?.rules_disabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-red-500/50 text-red-600 dark:text-red-400">
+                  <ShieldOff className="h-2.5 w-2.5" />
+                  Sem regras
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-xs">
+                Todas as automações do sistema estão desativadas para este contato
+                (encerramento automático, URA, lembretes, off-hours, atribuição automática).
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {conversation.auto_reply_disabled && (
             <Tooltip>
               <TooltipTrigger asChild>
