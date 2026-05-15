@@ -306,7 +306,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
     setIsSubmitting(true);
     try {
-      const { error } = await (supabase.rpc as any)("create_manual_ticket", {
+      const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
         p_cliente_id: selectedCliente.id,
         p_produto_id: Number(produtoId),
         p_category_id: categoryId,
@@ -325,6 +325,33 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
       });
 
       if (error) throw error;
+
+      const ticketId =
+        typeof rpcData === "string"
+          ? rpcData
+          : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+
+      if (ticketId) {
+        if (selectedTagIds.length > 0) {
+          await (supabase.from("ticket_tag_assignments" as any) as any).insert(
+            selectedTagIds.map((tagId) => ({ ticket_id: ticketId, tag_id: tagId }))
+          );
+        }
+        if (firstNote.trim() && responsavelId) {
+          await (supabase.from("support_ticket_events" as any) as any).insert({
+            tenant_id: tid,
+            ticket_id: ticketId,
+            user_id: responsavelId,
+            event_type: "note",
+            content: firstNote.trim(),
+          });
+        }
+        if (checklistItems.length > 0) {
+          await (supabase.from("support_tickets" as any) as any)
+            .update({ checklist: checklistItems })
+            .eq("id", ticketId);
+        }
+      }
 
       toast.success("Ticket criado com sucesso");
       onCreated?.();
