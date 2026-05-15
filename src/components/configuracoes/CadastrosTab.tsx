@@ -107,7 +107,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         { key: "description", label: "Descrição" },
         { key: "usa_tickets", label: "Usa tickets", type: "boolean" },
         { key: "requires_ticket_on_close", label: "Ticket obrigatório chat", type: "boolean" },
-        { key: "sort_order", label: "Ordem", type: "number" },
+        { key: "sort_order", label: "Ordem" },
         { key: "is_active", label: "Ativo", type: "boolean" },
       ],
     },
