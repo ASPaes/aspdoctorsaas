@@ -640,26 +640,64 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Contato solicitante</Label>
                 <div className="flex gap-1.5">
-                  <Input
-                    value={contatoSolicitante}
-                    onChange={(e) => setContatoSolicitante(e.target.value)}
-                    placeholder="Nome do solicitante"
-                    className="h-9 text-xs"
-                    disabled={!selectedCliente}
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      value={contatoSolicitante}
+                      onChange={(e) => {
+                        setContatoSolicitante(e.target.value);
+                        setContatoSelectedId(null);
+                      }}
+                      onFocus={() => { if (contatoResults.length > 0) setContatoDropdownOpen(true); }}
+                      onBlur={() => setTimeout(() => setContatoDropdownOpen(false), 150)}
+                      placeholder="Nome do solicitante"
+                      className="h-9 text-xs"
+                      disabled={!selectedCliente}
+                    />
+                    {contatoDropdownOpen && contatoResults.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-input bg-popover shadow-md">
+                        {contatoResults.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setContatoSolicitante(c.name);
+                              setContatoSelectedId(c.id);
+                              setContatoDropdownOpen(false);
+                              setContatoResults([]);
+                            }}
+                          >
+                            <div className="font-medium">{c.name}</div>
+                            {(c.phone_number || c.role) && (
+                              <div className="text-[10px] text-muted-foreground">
+                                {[c.role, c.phone_number].filter(Boolean).join(" • ")}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className="h-9 w-9 shrink-0"
-                    disabled={!selectedCliente || !contatoSolicitante.trim()}
-                    onClick={() => toast.info("Em breve: salvar nos contatos")}
-                    title="Salvar nos contatos"
+                    disabled={!selectedCliente}
+                    onClick={() => {
+                      setNewContactName(contatoSolicitante);
+                      setNewContactPhone("");
+                      setNewContactEmail("");
+                      setNewContactRole("");
+                      setNewContactDialogOpen(true);
+                    }}
+                    title="Cadastrar novo contato"
                   >
                     <UserPlus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Preenche automaticamente com o contato principal</p>
+                <p className="text-[10px] text-muted-foreground">Busca nos contatos do cliente. Use + para cadastrar.</p>
               </div>
             </div>
 
