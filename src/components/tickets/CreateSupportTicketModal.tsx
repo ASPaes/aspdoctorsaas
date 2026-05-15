@@ -290,6 +290,35 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setNewChecklistItem("");
   };
 
+  const handleCreateAndAddTag = async () => {
+    if (!quickTagName.trim() || !tid) return;
+    setCreatingTag(true);
+    try {
+      const { data: newTag, error } = await (supabase.from("ticket_tags" as any) as any)
+        .insert({
+          tenant_id: tid,
+          name: quickTagName.trim(),
+          color: quickTagColor,
+          department_id: departamentoId || null,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if ((newTag as any)?.id) {
+        setSelectedTagIds((prev) => [...prev, (newTag as any).id]);
+      }
+      setQuickTagName("");
+      setQuickTagColor("#3b82f6");
+      refetchAvailableTags();
+      toast.success("Tag criada");
+    } catch (err: any) {
+      toast.error("Erro ao criar tag: " + (err?.message ?? ""));
+    } finally {
+      setCreatingTag(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
