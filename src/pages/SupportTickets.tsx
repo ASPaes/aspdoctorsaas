@@ -337,6 +337,16 @@ export default function SupportTickets() {
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
 
+      if (tagFilters.length > 0) {
+        const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
+          .select("ticket_id").in("tag_id", tagFilters);
+        if (taggedIds && taggedIds.length > 0) {
+          q = q.in("id", taggedIds.map((t: any) => t.ticket_id));
+        } else {
+          return [];
+        }
+      }
+
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as TicketRow[];
