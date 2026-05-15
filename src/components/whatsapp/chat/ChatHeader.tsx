@@ -72,6 +72,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const { data: supportConfig } = useSupportConfig();
