@@ -1044,7 +1044,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <div className="space-y-1">
                 <Label className="text-xs">Dias</Label>
                 <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-xs font-medium font-mono">
-                  {dias !== null ? (dias >= 0 ? `${dias} dia${dias !== 1 ? "s" : ""}` : "Data inválida") : "—"}
+                  {dias !== null ? (dias >= 0 ? `${dias} dia${dias !== 1 ? "s" : ""}` : "Inválido") : "—"}
                 </div>
               </div>
             </div>
