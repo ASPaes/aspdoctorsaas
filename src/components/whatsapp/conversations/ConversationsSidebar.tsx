@@ -177,22 +177,36 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     };
   }, [stateMap, isStatesLoading, attendanceMap]);
 
+  const { data: groupCountData } = useQuery({
+    queryKey: ["whatsapp", "group-counts", tid],
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const { count: totalGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tid)
+        .eq("is_group", true)
+        .not("last_message_at", "is", null);
+      const { count: unreadGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tid)
+        .eq("is_group", true)
+        .gt("unread_count", 0);
+      return { totalGroups: totalGroups || 0, unreadGroups: unreadGroups || 0 };
+    },
+    enabled: !!tid,
+  });
+
   // Compute pill counts using centralized bucket logic
   const pillCounts = useMemo(() => {
     let inProgress = 0;
     let waiting = 0;
     let closed = 0;
     let afterHours = 0;
-    let groups = 0;
-    let groupsUnread = 0;
 
     for (const conv of conversations) {
-      // Grupos são separados — não entram nas pills normais
-      if ((conv as any).is_group === true) {
-        groups++;
-        if ((conv.unread_count || 0) > 0) groupsUnread++;
-        continue;
-      }
+      // Grupos não entram nas pills normais
+      if ((conv as any).is_group === true) continue;
 
       const state = getStateForConv(conv);
 
@@ -229,8 +243,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       }
     }
 
+    const groups = groupCountData?.totalGroups ?? 0;
+    const groupsUnread = groupCountData?.unreadGroups ?? 0;
     return { inProgress, waiting, closed, afterHours, groups, groupsUnread };
-  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId]);
+  }, [conversations, getStateForConv, attendanceMap, isAdmin, user?.id, selectedDepartmentId, groupCountData]);
 
   // Auto-seleciona pill na primeira abertura: "in_progress" se houver conversas em andamento, senão "waiting"
   useEffect(() => {
