@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -275,14 +276,14 @@ export default function ProdutosModulosTab() {
                   ) : (
                     modulosQ.data!.map(m => (
                       <TableRow key={m.id}>
-                        <TableCell className="font-medium">{m.nome}</TableCell>
-                        <TableCell className="text-muted-foreground">{m.descricao ?? "—"}</TableCell>
-                        <TableCell>
+                        <TableCell className="font-medium align-top">{m.nome}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-pre-wrap break-words max-w-[600px]">{m.descricao ?? "—"}</TableCell>
+                        <TableCell className="align-top">
                           {m.ativo
                             ? <Badge className="bg-green-500/15 text-green-500 hover:bg-green-500/20">Ativo</Badge>
                             : <Badge variant="secondary">Inativo</Badge>}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right align-top">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" onClick={() => openEditModulo(m)}><Pencil /></Button>
                             <Button variant="ghost" size="icon" onClick={() => setDeleteModulo(m)}><Trash2 /></Button>
@@ -330,7 +331,14 @@ export default function ProdutosModulosTab() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="modulo-desc">Descrição</Label>
-              <Input id="modulo-desc" value={moduloDesc} onChange={(e) => setModuloDesc(e.target.value)} />
+              <Textarea
+                id="modulo-desc"
+                value={moduloDesc}
+                onChange={(e) => setModuloDesc(e.target.value)}
+                rows={3}
+                className="resize-y min-h-[80px] max-h-[300px]"
+                placeholder="Descreva o módulo. Arraste o canto inferior direito para aumentar o campo."
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Ativo</Label>
