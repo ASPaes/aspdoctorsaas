@@ -25,6 +25,7 @@ import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus, Rocket,
+  Check, Lock, RefreshCw,
 } from "lucide-react";
 
 
