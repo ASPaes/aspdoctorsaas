@@ -25,6 +25,7 @@ export interface FiltersState {
   assignedToMe: boolean;
   assignedToAgent: string | undefined;
   autoReplyDisabledOnly?: boolean;
+  rulesDisabledOnly?: boolean;
 }
 
 interface Props {
