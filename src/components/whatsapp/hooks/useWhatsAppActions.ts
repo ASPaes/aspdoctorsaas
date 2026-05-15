@@ -463,6 +463,34 @@ export const useWhatsAppActions = () => {
       if (error) throw error;
       return { contactId, rulesDisabled };
     },
+    onMutate: async ({ contactId, rulesDisabled }) => {
+      const nowIso = new Date().toISOString();
+      // Snapshot para rollback
+      const prevConversations = queryClient.getQueriesData({ queryKey: ['whatsapp', 'conversations'] });
+
+      // Patch otimista: atualiza o contato em todas as conversas em cache
+      queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
+        if (!old?.conversations) return old;
+        return {
+          ...old,
+          conversations: old.conversations.map((c: any) =>
+            c?.contact?.id === contactId
+              ? {
+                  ...c,
+                  contact: {
+                    ...c.contact,
+                    rules_disabled: rulesDisabled,
+                    rules_disabled_at: rulesDisabled ? nowIso : null,
+                    rules_disabled_by: rulesDisabled ? (user?.id ?? null) : null,
+                  },
+                }
+              : c
+          ),
+        };
+      });
+
+      return { prevConversations };
+    },
     onSuccess: ({ rulesDisabled }) => {
       toast.success(
         rulesDisabled
@@ -472,7 +500,13 @@ export const useWhatsAppActions = () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'contacts'] });
     },
-    onError: () => {
+    onError: (_err, _vars, ctx) => {
+      // Rollback
+      if (ctx?.prevConversations) {
+        for (const [key, data] of ctx.prevConversations as any) {
+          queryClient.setQueryData(key, data);
+        }
+      }
       toast.error('Erro ao atualizar regras do contato');
     },
   });
