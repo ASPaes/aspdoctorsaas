@@ -116,7 +116,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const delta = startX - moveEvent.clientX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 220), 500);
+      const newWidth = Math.min(Math.max(startWidth + delta, 220), 700);
       setRightPanelWidth(newWidth);
     };
 
@@ -1643,10 +1643,17 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               </div>
               <div
                 onMouseDown={handleMouseDown}
-                className={`w-1.5 cursor-col-resize flex items-center justify-center hover:bg-primary/20 transition-colors shrink-0 ${isDragging ? "bg-primary/20" : ""}`}
-                title="Arraste para redimensionar"
+                className={`group relative w-2 cursor-col-resize flex items-center justify-center shrink-0 border-x border-border hover:bg-primary/10 transition-colors ${isDragging ? "bg-primary/20" : "bg-muted/30"}`}
+                title="Clique e arraste para redimensionar"
               >
-                <div className="w-0.5 h-8 rounded-full bg-border" />
+                <div className="flex flex-col gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                  <div className="w-0.5 h-0.5 rounded-full bg-foreground" />
+                  <div className="w-0.5 h-0.5 rounded-full bg-foreground" />
+                  <div className="w-0.5 h-0.5 rounded-full bg-foreground" />
+                  <div className="w-0.5 h-0.5 rounded-full bg-foreground" />
+                  <div className="w-0.5 h-0.5 rounded-full bg-foreground" />
+                  <div className="w-0.5 h-0.5 rounded-full bg-foreground" />
+                </div>
               </div>
               <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
                 {/* Tags */}
