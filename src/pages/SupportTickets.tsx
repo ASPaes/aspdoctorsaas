@@ -444,7 +444,129 @@ export default function SupportTickets() {
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[460px] p-4">
-            <p className="text-sm text-muted-foreground">Filtros avançados</p>
+            {(ticketsView === "lista" || ticketsView === "kanban") ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Status</label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {filteredStatuses.map(s => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <span className="flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />{s.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Produto</label>
+                    <Select value={produtoFilter} onValueChange={setProdutoFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {produtos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+                    <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Subcategoria</label>
+                    <Select value={subcategoriaFilter} onValueChange={setSubcategoriaFilter} disabled={categoriaFilter === "all"}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder={categoriaFilter === "all" ? "Selecione categoria" : "Todas"} /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {filteredSubcategories.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Canal</label>
+                    <Select value={canalFilter} onValueChange={setCanalFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="telefone">Telefone</SelectItem>
+                        <SelectItem value="presencial">Presencial</SelectItem>
+                        <SelectItem value="email">E-mail</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tipo serviço</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 w-full justify-between text-sm font-normal">
+                          {serviceTypeFilters.length === 0 ? "Todos" : `${serviceTypeFilters.length} selecionado(s)`}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-52 p-2">
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {serviceTypes.map(t => (
+                            <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent cursor-pointer text-sm">
+                              <Checkbox
+                                checked={serviceTypeFilters.includes(t.id)}
+                                onCheckedChange={v => setServiceTypeFilters(prev => v ? [...prev, t.id] : prev.filter(id => id !== t.id))}
+                              />
+                              {t.nome}
+                            </label>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-2 border-t">
+                  <label className="text-xs font-medium text-muted-foreground">Tags</label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {availableTags.map(tag => {
+                      const isActive = tagFilters.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => setTagFilters(prev => isActive ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                          className={`text-[11px] px-2 py-1 rounded-md font-medium transition-all ${isActive ? "ring-1 ring-offset-1 ring-offset-background" : "opacity-60 hover:opacity-100"}`}
+                          style={{ background: tag.color + (isActive ? "33" : "15"), color: tag.color }}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                    {availableTags.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma tag cadastrada</p>}
+                  </div>
+                </div>
+
+                {activeFilterCount > 0 && (
+                  <div className="flex justify-end pt-2 border-t">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>Limpar filtros</Button>
+                  </div>
+                )}
+              </div>
+            ) : ticketsView === "atendimentos" ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Filtros aplicados diretamente nos atendimentos</p>
+                <p className="text-xs text-muted-foreground italic">Os filtros de status e tipo de encerramento estão disponíveis dentro da view de atendimentos.</p>
+              </div>
+            ) : (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                Nenhum filtro avançado disponível para esta view.
+              </div>
+            )}
           </PopoverContent>
         </Popover>
         <div className="flex-1" />
