@@ -75,10 +75,11 @@ function ClosureTypeBadge({ type }: { type: string }) {
 
 interface Props {
   departmentFilter?: string;
+  agenteFilter?: string;
   embedded?: boolean;
 }
 
-export function PendingClosuresTab({ departmentFilter = "all", embedded = false }: Props = {}) {
+export function PendingClosuresTab({ departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
 
