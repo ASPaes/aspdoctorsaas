@@ -55,9 +55,11 @@ function formatDur(secs: number | null): string {
 interface Props {
   isAdminOrHead?: boolean;
   userId?: string | null;
+  departmentFilter?: string;
+  embedded?: boolean;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", embedded = false }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const [statusFilter, setStatusFilter] = useState<string>("all");
