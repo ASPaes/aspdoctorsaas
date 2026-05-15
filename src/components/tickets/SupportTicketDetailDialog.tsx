@@ -997,6 +997,61 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       </div>
 
+      {(() => {
+        const dept = departamentos?.find((d: any) => d.id === ticket?.department_id);
+        if (dept?.slug !== "implantacao") return null;
+        const inicio = ticket?.data_inicio_implantacao ? new Date(ticket.data_inicio_implantacao) : null;
+        const fim = ticket?.data_fim_implantacao ? new Date(ticket.data_fim_implantacao) : null;
+        const dias = inicio && fim ? Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        return (
+          <div className="space-y-1.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1.5">
+              <Rocket className="h-3.5 w-3.5" /> Implantação
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Início</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-xs"
+                  defaultValue={ticket?.data_inicio_implantacao ?? ""}
+                  key={`impl-ini-${ticket?.data_inicio_implantacao ?? ""}`}
+                  onBlur={(e) => {
+                    const val = e.target.value || null;
+                    if (val !== (ticket?.data_inicio_implantacao ?? null)) {
+                      handleFieldUpdate({ data_inicio_implantacao: val });
+                    }
+                  }}
+                  disabled={updating}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Fim</Label>
+                <Input
+                  type="date"
+                  className="h-9 text-xs"
+                  defaultValue={ticket?.data_fim_implantacao ?? ""}
+                  key={`impl-fim-${ticket?.data_fim_implantacao ?? ""}`}
+                  onBlur={(e) => {
+                    const val = e.target.value || null;
+                    if (val !== (ticket?.data_fim_implantacao ?? null)) {
+                      handleFieldUpdate({ data_fim_implantacao: val });
+                    }
+                  }}
+                  disabled={updating}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Dias</Label>
+                <div className="h-9 flex items-center px-3 rounded-md border bg-muted/30 text-xs font-medium">
+                  {dias !== null ? `${dias} dia${dias !== 1 ? "s" : ""}` : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tempo agente + Tempo calculado */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
