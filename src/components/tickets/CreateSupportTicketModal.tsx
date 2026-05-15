@@ -431,7 +431,42 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const currentCanal = CANAIS.find((c) => c.id === canalOrigem);
   const CanalIcon = currentCanal?.icon ?? Phone;
 
+  const handleSaveNewContact = async () => {
+    if (!selectedCliente || !tid) return;
+    if (!newContactName.trim()) {
+      toast.error("Informe o nome");
+      return;
+    }
+    setSavingNewContact(true);
+    try {
+      const { data, error } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .insert({
+          tenant_id: tid,
+          client_id: selectedCliente.id,
+          name: newContactName.trim(),
+          phone_number: newContactPhone.trim() || null,
+          email: newContactEmail.trim() || null,
+          role: newContactRole.trim() || null,
+          is_primary: false,
+        })
+        .select("id, name")
+        .single();
+      if (error) throw error;
+      toast.success("Contato cadastrado");
+      setContatoSolicitante((data as any).name);
+      setContatoSelectedId((data as any).id);
+      setContatoResults([]);
+      setContatoDropdownOpen(false);
+      setNewContactDialogOpen(false);
+    } catch (err: any) {
+      toast.error("Erro ao salvar contato: " + (err?.message ?? ""));
+    } finally {
+      setSavingNewContact(false);
+    }
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
