@@ -800,11 +800,15 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Descrição</Label>
               <Textarea
-                rows={4}
                 value={observacaoAgente}
-                onChange={(e) => setObservacaoAgente(e.target.value)}
+                onChange={(e) => {
+                  setObservacaoAgente(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
                 placeholder="Descreva o atendimento..."
-                className="resize-none text-xs"
+                className="text-xs min-h-[80px] overflow-hidden"
+                style={{ resize: "none" }}
               />
             </div>
 
