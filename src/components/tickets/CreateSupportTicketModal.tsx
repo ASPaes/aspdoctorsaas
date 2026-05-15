@@ -183,11 +183,32 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         .eq("tenant_id", tid)
         .eq("is_active", true)
         .eq("usa_tickets", true)
-        .order("name");
+        .order("sort_order");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
     },
   });
+
+  const { data: userDepartmentId } = useQuery({
+    queryKey: ["user_department", responsavelId],
+    enabled: !!responsavelId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_department_members" as any) as any)
+        .select("department_id")
+        .eq("user_id", responsavelId)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as any)?.department_id as string | null;
+    },
+  });
+
+  useEffect(() => {
+    if (userDepartmentId && !departamentoId && open) {
+      setDepartamentoId(userDepartmentId);
+    }
+  }, [userDepartmentId, open]);
 
   const { data: ticketStatuses = [] } = useQuery({
     queryKey: ["create_ticket_statuses", tid, departamentoId],
@@ -779,11 +800,15 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Descrição</Label>
               <Textarea
-                rows={4}
                 value={observacaoAgente}
-                onChange={(e) => setObservacaoAgente(e.target.value)}
+                onChange={(e) => {
+                  setObservacaoAgente(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
                 placeholder="Descreva o atendimento..."
-                className="resize-none text-xs"
+                className="text-xs min-h-[80px] overflow-hidden"
+                style={{ resize: "none" }}
               />
             </div>
 
