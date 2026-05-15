@@ -1560,6 +1560,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+          <DialogTitle className="sr-only">Detalhes do ticket {ticket?.ticket_code ?? ""}</DialogTitle>
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b shrink-0">
             <div className="flex items-center gap-3 min-w-0">
