@@ -1512,10 +1512,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   Excluir
                 </Button>
               )}
-              <DialogClose className="ml-1 rounded-sm opacity-70 hover:opacity-100 transition-opacity">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Fechar</span>
-              </DialogClose>
             </div>
           </div>
 
