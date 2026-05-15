@@ -410,34 +410,10 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
         {/* Top strip */}
         <div className="flex items-center gap-2 px-5 py-2.5 border-b flex-wrap">
-          {/* Status */}
-          <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
-            <SelectTrigger className="h-auto w-auto border rounded-md px-2.5 py-1 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="h-1.5 w-1.5 rounded-full shrink-0"
-                  style={{ background: currentStatus?.color ?? "#6b7280" }}
-                />
-                {currentStatus?.name ?? "Status"}
-                <ChevronDown className="h-3 w-3 opacity-60" />
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {ticketStatuses.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                    {s.name}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           {/* Prioridade */}
           <Select value={prioridade} onValueChange={setPrioridade}>
-            <SelectTrigger className="h-auto w-auto border rounded-md px-2.5 py-1 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
-              <span className="flex items-center gap-1.5">
+            <SelectTrigger className="h-auto w-auto min-w-[120px] border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <span
                   className="h-1.5 w-1.5 rounded-full shrink-0"
                   style={{ background: currentPrioridade?.color ?? "#6b7280" }}
@@ -460,9 +436,9 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
           {/* Canal */}
           <Select value={canalOrigem} onValueChange={setCanalOrigem}>
-            <SelectTrigger className="h-auto w-auto border rounded-md px-2.5 py-1 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
-              <span className="flex items-center gap-1.5">
-                <CanalIcon className="h-3 w-3" />
+            <SelectTrigger className="h-auto w-auto min-w-[120px] border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <CanalIcon className="h-3 w-3 shrink-0" />
                 {currentCanal?.name ?? "Canal"}
                 <ChevronDown className="h-3 w-3 opacity-60" />
               </span>
