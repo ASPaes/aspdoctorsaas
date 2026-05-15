@@ -1000,15 +1000,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {(() => {
         const dept = departamentos?.find((d: any) => d.id === ticket?.department_id);
         if (dept?.slug !== "implantacao") return null;
-        const inicio = ticket?.data_inicio_implantacao ? new Date(ticket.data_inicio_implantacao) : null;
-        const fim = ticket?.data_fim_implantacao ? new Date(ticket.data_fim_implantacao) : null;
+        const inicio = ticket?.data_inicio_implantacao ? new Date(ticket.data_inicio_implantacao + "T00:00:00") : null;
+        const fim = ticket?.data_fim_implantacao ? new Date(ticket.data_fim_implantacao + "T00:00:00") : null;
         const dias = inicio && fim ? Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) : null;
         return (
           <div className="space-y-1.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1.5">
               <Rocket className="h-3.5 w-3.5" /> Implantação
             </p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">Início</Label>
                 <Input
