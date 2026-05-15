@@ -208,6 +208,32 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
+  const { data: availableTags = [], refetch: refetchAvailableTags } = useQuery({
+    queryKey: ["create_ticket_tags", tid],
+    enabled: !!tid && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_tags" as any) as any)
+        .select("id, name, color, department_id")
+        .eq("tenant_id", tid)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; color: string; department_id: string | null }>;
+    },
+  });
+
+  const { data: currentUserName } = useQuery({
+    queryKey: ["create_ticket_current_user", responsavelId],
+    enabled: !!responsavelId,
+    queryFn: async () => {
+      const { data } = await (supabase.from("profiles" as any) as any)
+        .select("funcionarios:funcionario_id(nome)")
+        .eq("user_id", responsavelId)
+        .maybeSingle();
+      return ((data as any)?.funcionarios?.nome as string) || null;
+    },
+  });
+
   const { data: clienteContatoPrincipal } = useQuery({
     queryKey: ["cliente_contato_principal_ticket", selectedCliente?.id],
     enabled: !!selectedCliente?.id,
