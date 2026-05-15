@@ -25,6 +25,7 @@ import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus, Rocket,
+  Check, Lock, RefreshCw,
 } from "lucide-react";
 
 
@@ -1649,6 +1650,48 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   Excluir
                 </Button>
               )}
+              {ticket && (() => {
+                const si = getStatusInfo(ticket.status_id);
+                const isTerminal = si.isTerminal;
+                const initialStatus = statusesForDepartment.find(s => s.is_initial);
+                const terminalStatus = statusesForDepartment.find(s => s.is_terminal);
+                return (
+                  <div className="flex items-center gap-1.5 ml-3 pl-3 border-l border-border">
+                    {!isTerminal ? (
+                      <>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-green-500/15 text-green-400 border border-green-500/25">
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+                          Aberto
+                        </div>
+                        {terminalStatus && (
+                          <button
+                            onClick={() => handleFieldUpdate({ status_id: terminalStatus.id })}
+                            disabled={updating}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Encerrar
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
+                          <Lock className="h-3 w-3" /> Encerrado
+                        </div>
+                        {initialStatus && (
+                          <button
+                            onClick={() => handleFieldUpdate({ status_id: initialStatus.id })}
+                            disabled={updating}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" /> Reabrir
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
