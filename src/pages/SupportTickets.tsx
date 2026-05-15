@@ -749,11 +749,11 @@ export default function SupportTickets() {
 
           {ticketsView === "atendimentos" && (() => {
             const Comp = AttendancesTab as any;
-            return <Comp isAdminOrHead={isAdminOrHead} userId={userId} />;
+            return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} />;
           })()}
 
           {ticketsView === "pendentes" && isAdminOrHead && (
-            <PendingClosuresTab />
+            <PendingClosuresTab embedded departmentFilter={departmentFilter} />
           )}
         </div>
       </div>
