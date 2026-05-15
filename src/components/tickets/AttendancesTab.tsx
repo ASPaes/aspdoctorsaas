@@ -55,9 +55,11 @@ function formatDur(secs: number | null): string {
 interface Props {
   isAdminOrHead?: boolean;
   userId?: string | null;
+  departmentFilter?: string;
+  embedded?: boolean;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", embedded = false }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -91,18 +93,19 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   });
 
   const { data: departamentos = [] } = useQuery({
-    queryKey: ["attendances_departamentos", tid],
+    queryKey: ["attendances_departamentos_all", tid],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name, requires_ticket_on_close")
+        .select("id, name")
         .eq("tenant_id", tid)
-        .eq("requires_ticket_on_close", true)
         .order("name");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
     },
   });
+
+  const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
@@ -110,8 +113,8 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, isAdminOrHead, userId, departamentos.map((d: any) => d.id).join(",")],
-    enabled: !!tid && departamentos.length > 0,
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, atendenteFilter, effectiveDeptFilter, closureTypeFilter, isAdminOrHead, userId],
+    enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
       toEnd.setHours(23, 59, 59, 999);
@@ -120,7 +123,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         p_date_to: toEnd.toISOString(),
         p_status: statusFilter !== "all" ? statusFilter : null,
         p_agent_id: !isAdminOrHead && userId ? userId : (atendenteFilter !== "all" ? atendenteFilter : null),
-        p_department_id: departamentoFilter !== "all" ? departamentoFilter : null,
+        p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
         p_tenant_id: tid,
       });
@@ -139,8 +142,8 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, page, isAdminOrHead, userId, departamentos.map((d: any) => d.id).join(",")],
-    enabled: !!tid && departamentos.length > 0,
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, atendenteFilter, effectiveDeptFilter, closureTypeFilter, page, isAdminOrHead, userId],
+    enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
         .select(`
@@ -159,15 +162,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         .order("opened_at", { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-      // Filtrar apenas setores com ticket obrigatório
-      const deptIds = departamentos.map((d: any) => d.id);
-      if (deptIds.length > 0) {
-        q = q.in("department_id", deptIds);
-      }
-
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (atendenteFilter !== "all") q = q.eq("assigned_to", atendenteFilter);
-      if (departamentoFilter !== "all") q = q.eq("department_id", departamentoFilter);
+      if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
       if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
@@ -214,7 +211,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
 
   return (
     <div className="space-y-3">
-      {metrics && departamentos.length > 0 && (
+      {!embedded && metrics && departamentos.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
@@ -246,143 +243,158 @@ function AttendancesTab({ isAdminOrHead = true, userId = null }: Props = {}) {
         </div>
       )}
 
-      {/* Filtros primários */}
-      <div className="flex flex-wrap items-center gap-2">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px] h-9">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos status</SelectItem>
-            <SelectItem value="waiting">Aguardando</SelectItem>
-            <SelectItem value="in_progress">Em andamento</SelectItem>
-            <SelectItem value="closed">Encerrado</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="relative flex-1 min-w-[200px]">
+      {embedded && (
+        <div className="relative mb-3">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por código, contato, telefone..."
+            placeholder="Buscar atendimento..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 h-9"
           />
         </div>
-
-        <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-2">
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtros
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFilterCount}</Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-[420px] p-3">
-            <div className="grid grid-cols-2 gap-3">
-              {isAdminOrHead && (
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Atendente</label>
-                  <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {agentes.map((a: any) => (
-                        <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">Departamento</label>
-                <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {departamentos.map((d: any) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5 col-span-2">
-                <label className="text-xs text-muted-foreground">Tipo de encerramento</label>
-                <Select value={closureTypeFilter} onValueChange={setClosureTypeFilter}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="inactivity_auto">Inatividade</SelectItem>
-                    <SelectItem value="silent">Silencioso</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {activeFilterCount > 0 && (
-              <div className="flex justify-end mt-3 pt-3 border-t">
-                <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>
-                  Limpar filtros
-                </Button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* Chips de filtros ativos */}
-      {activeFilterCount > 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] text-muted-foreground">Filtros:</span>
-          {atendenteFilter !== "all" && (
-            <button
-              onClick={() => setAtendenteFilter("all")}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              {getFilterLabel("atendente", atendenteFilter)}
-              <X className="h-3 w-3" />
-            </button>
-          )}
-          {departamentoFilter !== "all" && (
-            <button
-              onClick={() => setDepartamentoFilter("all")}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              {getFilterLabel("departamento", departamentoFilter)}
-              <X className="h-3 w-3" />
-            </button>
-          )}
-          {closureTypeFilter !== "all" && (
-            <button
-              onClick={() => setClosureTypeFilter("all")}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              {getFilterLabel("closure", closureTypeFilter)}
-              <X className="h-3 w-3" />
-            </button>
-          )}
-          <button
-            onClick={clearAdvancedFilters}
-            className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
-          >
-            Limpar todos
-          </button>
-        </div>
       )}
 
-      {!isLoading && departamentos.length === 0 && (
+      {!embedded && (
+        <>
+          {/* Filtros primários */}
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos status</SelectItem>
+                <SelectItem value="waiting">Aguardando</SelectItem>
+                <SelectItem value="in_progress">Em andamento</SelectItem>
+                <SelectItem value="closed">Encerrado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por código, contato, telefone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
+
+            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFilterCount}</Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-[420px] p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {isAdminOrHead && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-muted-foreground">Atendente</label>
+                      <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {agentes.map((a: any) => (
+                            <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Departamento</label>
+                    <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {departamentos.map((d: any) => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5 col-span-2">
+                    <label className="text-xs text-muted-foreground">Tipo de encerramento</label>
+                    <Select value={closureTypeFilter} onValueChange={setClosureTypeFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="inactivity_auto">Inatividade</SelectItem>
+                        <SelectItem value="silent">Silencioso</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {activeFilterCount > 0 && (
+                  <div className="flex justify-end mt-3 pt-3 border-t">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>
+                      Limpar filtros
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Chips de filtros ativos */}
+          {activeFilterCount > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] text-muted-foreground">Filtros:</span>
+              {atendenteFilter !== "all" && (
+                <button
+                  onClick={() => setAtendenteFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("atendente", atendenteFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {departamentoFilter !== "all" && (
+                <button
+                  onClick={() => setDepartamentoFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("departamento", departamentoFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {closureTypeFilter !== "all" && (
+                <button
+                  onClick={() => setClosureTypeFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("closure", closureTypeFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              <button
+                onClick={clearAdvancedFilters}
+                className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
+              >
+                Limpar todos
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {!embedded && !isLoading && departamentos.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Inbox className="h-10 w-10 mb-2 opacity-50" />
-          <p className="text-sm">Nenhum setor com ticket obrigatório configurado</p>
-          <p className="text-xs mt-1">Ative "Ticket obrigatório" em Configurações → WhatsApp → Setores</p>
+          <p className="text-sm">Nenhum setor configurado</p>
         </div>
       )}
 
-      {departamentos.length > 0 && (
+      {(embedded || departamentos.length > 0) && (
         <>
           {/* Lista */}
           {isLoading ? (
