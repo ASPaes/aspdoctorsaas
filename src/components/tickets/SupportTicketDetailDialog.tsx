@@ -885,6 +885,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">Descrição</Label>
         <Textarea
+          ref={(el) => {
+            if (el) {
+              el.style.height = "auto";
+              el.style.height = el.scrollHeight + "px";
+            }
+          }}
           defaultValue={ticket?.observacao_agente ?? ""}
           key={`obs-${ticket?.observacao_agente ?? ""}`}
           placeholder="Descreva o problema ou observação..."
