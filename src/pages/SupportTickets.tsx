@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X, Headphones, LayoutList, Columns3, BarChart3 } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, Filter, SlidersHorizontal, X, Headphones, LayoutList, Columns3, BarChart3, LayoutGrid } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
 import { AttendancesTab } from "@/components/tickets/AttendancesTab";
 import { Button } from "@/components/ui/button";
@@ -355,7 +354,7 @@ export default function SupportTickets() {
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets</h1>
         </div>
-        {activeTab === "tickets" && isAdminOrHead && (
+        {isAdminOrHead && (
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             Novo ticket
@@ -363,26 +362,9 @@ export default function SupportTickets() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="tickets" className="gap-2">
-            <TicketCheck className="h-4 w-4" />
-            Tickets
-            <Badge variant="secondary" className="text-xs ml-1">{filteredTickets.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="atendimentos" className="gap-1.5">
-            <Headphones className="h-4 w-4" />
-            Atendimentos
-          </TabsTrigger>
-          {isAdminOrHead && (
-            <TabsTrigger value="pending" className="gap-2">
-              <Clock className="h-4 w-4" />
-              Pendentes
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <div className="space-y-4">
 
-        <TabsContent value="tickets" className="space-y-4">
+        <div className="space-y-4">
           {/* Metric cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-card border border-border rounded-lg p-3">
@@ -411,6 +393,15 @@ export default function SupportTickets() {
                       {s.name}
                     </span>
                   </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+              <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Responsável" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os agentes</SelectItem>
+                {agentes.map((a) => (
+                  <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -625,22 +616,27 @@ export default function SupportTickets() {
             ))}
           </div>
 
-          {/* Sub-abas de visualização */}
-          <div className="flex items-center gap-1 border-b border-border">
-            <button
-              onClick={() => setTicketsView("lista")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t-md transition-colors ${ticketsView === "lista" ? "bg-card border border-b-0 border-border font-medium text-foreground -mb-px" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <LayoutList className="h-4 w-4" />
-              Lista
-            </button>
-            <button
-              onClick={() => setTicketsView("kanban")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t-md transition-colors ${ticketsView === "kanban" ? "bg-card border border-b-0 border-border font-medium text-foreground -mb-px" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Columns3 className="h-4 w-4" />
-              Kanban
-            </button>
+          {/* Sub-abas: Lista | Kanban | Atendimentos | Pendentes */}
+          <div className="flex items-center gap-0 border rounded-md overflow-hidden w-fit">
+            {([
+              { id: "lista", label: "Lista", Icon: LayoutList },
+              { id: "kanban", label: "Kanban", Icon: LayoutGrid },
+              { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
+              ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
+            ] as const).map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setTicketsView(v.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                  ticketsView === v.id
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <v.Icon className="h-3.5 w-3.5" />
+                {v.label}
+              </button>
+            ))}
           </div>
 
           {ticketsView === "lista" && (
@@ -750,21 +746,17 @@ export default function SupportTickets() {
               />
             )
           )}
-        </TabsContent>
 
-        <TabsContent value="atendimentos" className="mt-4">
-          {(() => {
+          {ticketsView === "atendimentos" && (() => {
             const Comp = AttendancesTab as any;
             return <Comp isAdminOrHead={isAdminOrHead} userId={userId} />;
           })()}
-        </TabsContent>
 
-        {isAdminOrHead && (
-          <TabsContent value="pending">
+          {ticketsView === "pendentes" && isAdminOrHead && (
             <PendingClosuresTab />
-          </TabsContent>
-        )}
-      </Tabs>
+          )}
+        </div>
+      </div>
 
       <CreateSupportTicketModal
         open={createOpen}
