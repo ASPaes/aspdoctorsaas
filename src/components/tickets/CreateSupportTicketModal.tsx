@@ -42,7 +42,7 @@ const defaultPrevisao = () => {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 };
 
-export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Props) {
+export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaultDepartmentId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
