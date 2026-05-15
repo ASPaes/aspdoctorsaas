@@ -100,13 +100,14 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
 
   const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode }[] = [
     {
-      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", orderBy: "name",
+      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", orderBy: "sort_order",
       columns: [
         { key: "name", label: "Nome" },
         { key: "slug", label: "Slug" },
         { key: "description", label: "Descrição" },
         { key: "usa_tickets", label: "Usa tickets", type: "boolean" },
         { key: "requires_ticket_on_close", label: "Ticket obrigatório chat", type: "boolean" },
+        { key: "sort_order", label: "Ordem", type: "number" },
         { key: "is_active", label: "Ativo", type: "boolean" },
       ],
     },
