@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Ticket } from "lucide-react";
+import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -20,6 +20,25 @@ interface Props {
 
 const Req = () => <span className="text-destructive">*</span>;
 
+const PRIORIDADES = [
+  { id: "baixa", name: "Baixa", color: "#10b981" },
+  { id: "media", name: "Média", color: "#f59e0b" },
+  { id: "alta", name: "Alta", color: "#ef4444" },
+];
+
+const CANAIS = [
+  { id: "telefone", name: "Telefone", icon: Phone },
+  { id: "presencial", name: "Presencial", icon: Building2 },
+  { id: "email", name: "E-mail", icon: Mail },
+  { id: "whatsapp", name: "WhatsApp", icon: MessageSquare },
+];
+
+const defaultPrevisao = () => {
+  const d = new Date(Date.now() + 20 * 60 * 1000);
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+};
+
 export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
@@ -32,13 +51,16 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
   const [tipoHorario, setTipoHorario] = useState<string>("comercial");
+  const [prioridade, setPrioridade] = useState<string>("media");
   const [statusId, setStatusId] = useState<string>("");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
   const [observacaoAgente, setObservacaoAgente] = useState<string>("");
   const [departamentoId, setDepartamentoId] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
-  const [clienteContatoId, setClienteContatoId] = useState("");
-  const [previsaoEncerramento, setPrevisaoEncerramento] = useState("");
+  const [contatoSolicitante, setContatoSolicitante] = useState("");
+  const [previsaoEncerramento, setPrevisaoEncerramento] = useState(defaultPrevisao);
+  const [checklistItems, setChecklistItems] = useState<{ text: string; done: boolean }[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
@@ -50,13 +72,15 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setServiceTypeId("");
     setCanalOrigem("telefone");
     setTipoHorario("comercial");
+    setPrioridade("media");
     setStatusId("");
     setAgendadoPara("");
     setObservacaoAgente("");
     setDepartamentoId("");
-    setResponsavelId("");
-    setClienteContatoId("");
-    setPrevisaoEncerramento("");
+    setContatoSolicitante("");
+    setPrevisaoEncerramento(defaultPrevisao());
+    setChecklistItems([]);
+    setNewChecklistItem("");
   };
 
   useEffect(() => {
@@ -64,7 +88,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   }, [open]);
 
   useEffect(() => {
-    if (open && !responsavelId) {
+    if (open) {
       supabase.auth.getUser().then(({ data }) => {
         if (data?.user?.id) setResponsavelId(data.user.id);
       });
@@ -172,43 +196,23 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     },
   });
 
-  const { data: clienteContatos = [] } = useQuery({
-    queryKey: ["cliente_contatos_ticket", selectedCliente?.id],
+  const { data: clienteContatoPrincipal } = useQuery({
+    queryKey: ["cliente_contato_principal_ticket", selectedCliente?.id],
     enabled: !!selectedCliente?.id,
     queryFn: async () => {
-      const { data: cli } = await (supabase.from("clientes" as any) as any)
+      const { data } = await (supabase.from("clientes" as any) as any)
         .select("contato_nome, contato_fone")
         .eq("id", selectedCliente!.id)
         .maybeSingle();
-      const { data: contatos, error } = await (supabase.from("cliente_contatos" as any) as any)
-        .select("id, nome, fone, email, cargo")
-        .eq("cliente_id", selectedCliente!.id)
-        .order("nome");
-      if (error) throw error;
-      const result: Array<{ id: string; nome: string; fone: string | null; email: string | null; cargo: string | null; isPrincipal: boolean }> = [];
-      if (cli?.contato_nome) {
-        result.push({
-          id: "principal",
-          nome: cli.contato_nome,
-          fone: cli.contato_fone ?? null,
-          email: null,
-          cargo: "Contato principal",
-          isPrincipal: true,
-        });
-      }
-      (contatos ?? []).forEach((c: any) => {
-        result.push({
-          id: c.id,
-          nome: c.nome,
-          fone: c.fone ?? null,
-          email: c.email ?? null,
-          cargo: c.cargo ?? null,
-          isPrincipal: false,
-        });
-      });
-      return result;
+      return data as { contato_nome: string | null; contato_fone: string | null } | null;
     },
   });
+
+  useEffect(() => {
+    if (clienteContatoPrincipal?.contato_nome) {
+      setContatoSolicitante(clienteContatoPrincipal.contato_nome);
+    }
+  }, [clienteContatoPrincipal]);
 
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
@@ -233,13 +237,20 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
 
   useEffect(() => {
     if (ticketStatuses.length > 0) {
-      const terminal = ticketStatuses.find((s) => s.is_terminal);
-      if (terminal) setStatusId(terminal.id);
+      const initial = ticketStatuses.find((s) => s.is_initial);
+      if (initial) setStatusId(initial.id);
       else setStatusId(ticketStatuses[0].id);
     } else {
       setStatusId("");
     }
   }, [ticketStatuses]);
+
+  const addChecklistItem = () => {
+    const t = newChecklistItem.trim();
+    if (!t) return;
+    setChecklistItems((prev) => [...prev, { text: t, done: false }]);
+    setNewChecklistItem("");
+  };
 
   const handleSubmit = async () => {
     if (!selectedCliente) {
@@ -271,7 +282,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
         p_contact_id: null,
         p_department_id: departamentoId,
         p_responsavel_user_id: responsavelId || null,
-        p_cliente_contato_id: clienteContatoId && clienteContatoId !== "principal" ? clienteContatoId : null,
+        p_cliente_contato_id: null,
         p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
       });
 
@@ -287,283 +298,405 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     }
   };
 
+  const currentStatus = ticketStatuses.find((s) => s.id === statusId);
+  const currentPrioridade = PRIORIDADES.find((p) => p.id === prioridade);
+  const currentCanal = CANAIS.find((c) => c.id === canalOrigem);
+  const CanalIcon = currentCanal?.icon ?? Phone;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <Ticket className="h-5 w-5 text-primary" />
-            Novo ticket manual
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b">
+          <h3 className="text-base font-semibold">Novo ticket</h3>
+          <DialogClose className="rounded-sm opacity-70 hover:opacity-100 transition-opacity">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Fechar</span>
+          </DialogClose>
+        </div>
 
-        <div className="space-y-4 pt-2">
-          {/* Cliente */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Cliente <Req /></Label>
-            {selectedCliente ? (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-input bg-muted/30 px-3 py-2">
-                <span className="text-sm truncate">
-                  <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
-                  {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
-                </span>
+        {/* Top strip */}
+        <div className="flex items-center gap-2 px-5 py-2.5 border-b flex-wrap">
+          {/* Status */}
+          <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
+            <SelectTrigger className="h-auto w-auto border rounded-md px-2.5 py-1 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{ background: currentStatus?.color ?? "#6b7280" }}
+                />
+                {currentStatus?.name ?? "Status"}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {ticketStatuses.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                    {s.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Prioridade */}
+          <Select value={prioridade} onValueChange={setPrioridade}>
+            <SelectTrigger className="h-auto w-auto border rounded-md px-2.5 py-1 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{ background: currentPrioridade?.color ?? "#6b7280" }}
+                />
+                {currentPrioridade?.name ?? "Prioridade"}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {PRIORIDADES.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <span className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+                    {p.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Canal */}
+          <Select value={canalOrigem} onValueChange={setCanalOrigem}>
+            <SelectTrigger className="h-auto w-auto border rounded-md px-2.5 py-1 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden">
+              <span className="flex items-center gap-1.5">
+                <CanalIcon className="h-3 w-3" />
+                {currentCanal?.name ?? "Canal"}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {CANAIS.map((c) => {
+                const Ic = c.icon;
+                return (
+                  <SelectItem key={c.id} value={c.id}>
+                    <span className="flex items-center gap-2">
+                      <Ic className="h-3.5 w-3.5" />
+                      {c.name}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <div className="flex-1" />
+
+          {/* Tipo horário */}
+          <div className="flex gap-1">
+            {["comercial", "fora", "plantao"].map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTipoHorario(t)}
+                className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
+                  tipoHorario === t
+                    ? "bg-primary/10 text-primary border-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t === "comercial" ? "Comercial" : t === "fora" ? "Fora" : "Plantão"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="grid grid-cols-[1fr_260px] flex-1 overflow-hidden">
+          {/* Left panel */}
+          <div className="p-4 pr-4 border-r space-y-4 overflow-y-auto">
+            {/* Setor + Responsável */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Setor <Req /></Label>
+                <Select value={departamentoId} onValueChange={setDepartamentoId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {departamentos.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Responsável <Req /></Label>
+                <Select value={responsavelId} onValueChange={setResponsavelId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {agentes.map((a) => (
+                      <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Cliente */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Cliente <Req /></Label>
+              {selectedCliente ? (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-input bg-muted/30 px-3 py-2">
+                  <span className="text-sm truncate">
+                    <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
+                    {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 shrink-0"
+                    onClick={() => {
+                      setSelectedCliente(null);
+                      setProdutoId("");
+                      setClienteSearchTerm("");
+                      setContatoSolicitante("");
+                    }}
+                  >
+                    Trocar
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative space-y-1">
+                  <Input
+                    value={clienteSearchTerm}
+                    onChange={(e) => setClienteSearchTerm(e.target.value)}
+                    placeholder="Buscar por nome, CNPJ ou código..."
+                    className="h-9 text-xs"
+                  />
+                  {isSearchingClientes && (
+                    <div className="absolute right-3 top-2.5">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  {clienteResults.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto rounded-md border border-input bg-popover">
+                      {clienteResults.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors"
+                          onClick={() => {
+                            setSelectedCliente(c);
+                            setClienteSearchTerm("");
+                            (supabase.from("clientes" as any) as any)
+                              .select("produto_id")
+                              .eq("id", c.id)
+                              .maybeSingle()
+                              .then(({ data }: any) => {
+                                if (data?.produto_id) setProdutoId(String(data.produto_id));
+                              });
+                          }}
+                        >
+                          <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                          {c.nome_fantasia || c.razao_social}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {clienteResults.length === 0 && clienteSearchTerm.length >= 2 && !isSearchingClientes && (
+                    <p className="text-xs text-muted-foreground px-1">Nenhum cliente encontrado</p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Contato solicitante</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    value={contatoSolicitante}
+                    onChange={(e) => setContatoSolicitante(e.target.value)}
+                    placeholder="Nome do solicitante"
+                    className="h-9 text-xs"
+                    disabled={!selectedCliente}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    disabled={!selectedCliente || !contatoSolicitante.trim()}
+                    onClick={() => toast.info("Em breve: salvar nos contatos")}
+                    title="Salvar nos contatos"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Preenche automaticamente com o contato principal</p>
+              </div>
+            </div>
+
+            {/* Classificação */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Classificação</Label>
+              <div className="grid grid-cols-4 gap-2">
+                <Select value={produtoId} onValueChange={setProdutoId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Produto *" /></SelectTrigger>
+                  <SelectContent>
+                    {produtos.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={categoryId} onValueChange={setCategoryId} disabled={!produtoId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Categoria *" /></SelectTrigger>
+                  <SelectContent>
+                    {filteredCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={subcategoryId} onValueChange={setSubcategoryId} disabled={!categoryId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Subcategoria *" /></SelectTrigger>
+                  <SelectContent>
+                    {filteredSubcategories.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={serviceTypeId} onValueChange={setServiceTypeId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Tipo *" /></SelectTrigger>
+                  <SelectContent>
+                    {serviceTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Descrição */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Descrição</Label>
+              <Textarea
+                rows={4}
+                value={observacaoAgente}
+                onChange={(e) => setObservacaoAgente(e.target.value)}
+                placeholder="Descreva o atendimento..."
+                className="resize-none text-xs"
+              />
+            </div>
+
+            {/* Previsão + Agendado */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs font-medium">Previsão de encerramento</Label>
+                  <span className="text-[9px] uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded">auto</span>
+                </div>
+                <Input
+                  type="datetime-local"
+                  value={previsaoEncerramento}
+                  onChange={(e) => setPrevisaoEncerramento(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Agendado para</Label>
+                <Input
+                  type="datetime-local"
+                  className="h-9 text-xs"
+                  value={agendadoPara}
+                  onChange={(e) => setAgendadoPara(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Checklist */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Checklist</Label>
+              {checklistItems.length > 0 && (
+                <div className="space-y-1">
+                  {checklistItems.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-md border border-input bg-muted/20 px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() =>
+                          setChecklistItems((prev) =>
+                            prev.map((it, idx) => (idx === i ? { ...it, done: !it.done } : it))
+                          )
+                        }
+                        className="h-3.5 w-3.5 shrink-0"
+                      />
+                      <span className={`flex-1 text-xs ${item.done ? "line-through text-muted-foreground" : ""}`}>
+                        {item.text}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setChecklistItems((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-1.5">
+                <Input
+                  value={newChecklistItem}
+                  onChange={(e) => setNewChecklistItem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addChecklistItem();
+                    }
+                  }}
+                  placeholder="Adicionar item..."
+                  className="h-9 text-xs"
+                />
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 shrink-0"
-                  onClick={() => {
-                    setSelectedCliente(null);
-                    setProdutoId("");
-                    setClienteSearchTerm("");
-                  }}
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={addChecklistItem}
+                  disabled={!newChecklistItem.trim()}
                 >
-                  Trocar
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            ) : (
-              <div className="relative space-y-1">
-                <Input
-                  value={clienteSearchTerm}
-                  onChange={(e) => setClienteSearchTerm(e.target.value)}
-                  placeholder="Buscar por nome, CNPJ ou código..."
-                  className="h-10"
-                  autoFocus
-                />
-                {isSearchingClientes && (
-                  <div className="absolute right-3 top-3">
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  </div>
-                )}
-                {clienteResults.length > 0 && (
-                  <div className="max-h-48 overflow-y-auto rounded-md border border-input bg-popover">
-                    {clienteResults.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
-                        onClick={() => {
-                          setSelectedCliente(c);
-                          setClienteSearchTerm("");
-                          setClienteContatoId("");
-                          (supabase.from("clientes" as any) as any)
-                            .select("produto_id")
-                            .eq("id", c.id)
-                            .maybeSingle()
-                            .then(({ data }: any) => {
-                              if (data?.produto_id) setProdutoId(String(data.produto_id));
-                            });
-                        }}
-                      >
-                        <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
-                        {c.nome_fantasia || c.razao_social}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {clienteResults.length === 0 && clienteSearchTerm.length >= 2 && !isSearchingClientes && (
-                  <p className="text-xs text-muted-foreground px-1">Nenhum cliente encontrado</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Produto */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Produto <Req /></Label>
-            <Select value={produtoId} onValueChange={setProdutoId}>
-              <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {produtos.map((p) => (
-                  <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Categoria + Subcategoria */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Categoria <Req /></Label>
-              <Select value={categoryId} onValueChange={setCategoryId} disabled={!produtoId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {filteredCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Subcategoria <Req /></Label>
-              <Select value={subcategoryId} onValueChange={setSubcategoryId} disabled={!categoryId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {filteredSubcategories.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Anexos */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">Anexos</Label>
+              <Button type="button" variant="outline" size="sm" className="h-9 text-xs gap-1.5" disabled>
+                <Paperclip className="h-3.5 w-3.5" />
+                Anexar arquivo
+              </Button>
             </div>
           </div>
 
-          {/* Tipo de serviço */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Tipo de serviço <Req /></Label>
-            <Select value={serviceTypeId} onValueChange={setServiceTypeId}>
-              <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {serviceTypes.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Right panel (placeholder — Prompt 12B) */}
+          <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Atividade</div>
+            <p className="text-xs text-muted-foreground">Em breve.</p>
           </div>
+        </div>
 
-          {/* Contato + Previsão */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Contato do cliente</Label>
-              <Select value={clienteContatoId} onValueChange={setClienteContatoId} disabled={!selectedCliente}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder={selectedCliente ? "Selecione o contato..." : "Selecione um cliente primeiro"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {clienteContatos.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{c.nome}</span>
-                        {c.isPrincipal && <span className="text-[10px] text-primary font-medium">Principal</span>}
-                        {c.cargo && !c.isPrincipal && <span className="text-[10px] text-muted-foreground">({c.cargo})</span>}
-                      </div>
-                    </SelectItem>
-                  ))}
-                  {clienteContatos.length === 0 && selectedCliente && (
-                    <div className="p-2 text-xs text-muted-foreground text-center">Nenhum contato cadastrado</div>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Previsão de encerramento</Label>
-              <Input
-                type="datetime-local"
-                value={previsaoEncerramento}
-                onChange={(e) => setPrevisaoEncerramento(e.target.value)}
-                className="h-10"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Setor <Req /></Label>
-              <Select value={departamentoId} onValueChange={setDepartamentoId}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione o setor..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {departamentos.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Responsável <Req /></Label>
-              <Select value={responsavelId} onValueChange={setResponsavelId}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {agentes.map((a) => (
-                    <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Canal de origem <Req /></Label>
-              <Select value={canalOrigem} onValueChange={setCanalOrigem}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="telefone">Telefone</SelectItem>
-                  <SelectItem value="presencial">Presencial</SelectItem>
-                  <SelectItem value="email">E-mail</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Tipo de horário</Label>
-              <Select value={tipoHorario} onValueChange={setTipoHorario}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="comercial">Comercial</SelectItem>
-                  <SelectItem value="plantao">Plantão</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Status + Agendamento */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Status</Label>
-              <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder={departamentoId ? "Selecione..." : "Selecione o setor primeiro"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {ticketStatuses.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
-                        {s.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Agendado para</Label>
-              <Input
-                type="datetime-local"
-                className="h-10"
-                value={agendadoPara}
-                onChange={(e) => setAgendadoPara(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Observação */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">Observação do agente</Label>
-            <Textarea
-              rows={4}
-              value={observacaoAgente}
-              onChange={(e) => setObservacaoAgente(e.target.value)}
-              placeholder="Descreva o atendimento..."
-              className="resize-none"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
-              Criar ticket
-            </Button>
-          </div>
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-5 py-3 border-t">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+            Criar ticket
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
