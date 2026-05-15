@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Bot, Inbox, Loader2 } from "lucide-react";
+import { Bot, Inbox, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ClassifyClosureModal } from "@/components/tickets/ClassifyClosureModal";
 
