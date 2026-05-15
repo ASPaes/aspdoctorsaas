@@ -298,6 +298,22 @@ export default function SupportTickets() {
     },
   });
 
+  const selectedDeptSlug = supportDepartments.find(d => d.id === departmentFilter)?.slug;
+  const { data: implantacaoMetrics } = useQuery({
+    queryKey: ["implantacao_metrics", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentFilter],
+    enabled: !!tid && selectedDeptSlug === "implantacao",
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_avg_implantacao_days", {
+        p_tenant_id: tid,
+        p_date_from: dateRange?.from ? dateRange.from.toISOString().slice(0, 10) : new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
+        p_date_to: dateRange?.to ? dateRange.to.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        p_department_id: departmentFilter !== "all" ? departmentFilter : null,
+      });
+      if (error) throw error;
+      return data as { avg_days: number; total_concluidas: number; min_days: number; max_days: number } | null;
+    },
+  });
+
   const { data: availableTags = [] } = useQuery({
     queryKey: ["ticket_tags_filter", tid],
     enabled: !!tid,
@@ -715,7 +731,7 @@ export default function SupportTickets() {
 
       {/* Metric cards contextuais */}
       {(ticketsView === "lista" || ticketsView === "kanban") && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
             <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
@@ -728,6 +744,13 @@ export default function SupportTickets() {
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
             <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
           </div>
+          {selectedDeptSlug === "implantacao" && implantacaoMetrics && (
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo médio implantação</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-purple-400">{implantacaoMetrics.avg_days} dias</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{implantacaoMetrics.total_concluidas} concluídas · Min {implantacaoMetrics.min_days}d · Max {implantacaoMetrics.max_days}d</p>
+            </div>
+          )}
         </div>
       )}
 
