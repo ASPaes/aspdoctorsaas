@@ -279,30 +279,46 @@ export function PendingClosuresTab({ departmentFilter = "all", embedded = false 
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold">Pendentes de Classificação</h2>
-        <Badge variant="secondary">{items.length}</Badge>
-      </div>
+      {!embedded && (
+        <>
+          {/* Header */}
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Pendentes de Classificação</h2>
+            <Badge variant="secondary">{items.length}</Badge>
+          </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-2">
+            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
 
-        <Select value={agenteFilter || "_all"} onValueChange={(v) => setAgenteFilter(v === "_all" ? "" : v)}>
-          <SelectTrigger className="h-9 w-[220px]">
-            <SelectValue placeholder="Todos os agentes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Todos os agentes</SelectItem>
-            {agentes.map((a) => (
-              <SelectItem key={a.user_id} value={a.user_id}>
-                {a.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+            <Select value={agenteFilter || "_all"} onValueChange={(v) => setAgenteFilter(v === "_all" ? "" : v)}>
+              <SelectTrigger className="h-9 w-[220px]">
+                <SelectValue placeholder="Todos os agentes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">Todos os agentes</SelectItem>
+                {agentes.map((a) => (
+                  <SelectItem key={a.user_id} value={a.user_id}>
+                    {a.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
+
+      {embedded && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar atendimento..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+      )}
 
       {/* Bulk actions bar */}
       {selectedCount > 0 && (
@@ -334,14 +350,14 @@ export function PendingClosuresTab({ departmentFilter = "all", embedded = false 
             <Skeleton key={i} className="h-32 w-full" />
           ))}
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-16 text-muted-foreground">
           <Inbox className="h-10 w-10" />
           <p className="text-sm">Nenhum atendimento pendente de classificação</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((item) => {
+          {filteredItems.map((item) => {
             const isSel = selected.has(item.attendance_id);
             return (
               <div
