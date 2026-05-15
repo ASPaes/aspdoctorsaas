@@ -135,6 +135,23 @@ export function PendingClosuresTab({ departmentFilter = "all", embedded = false 
     },
   });
 
+  const filteredItems = useMemo(() => {
+    let arr = items;
+    if (embedded && departmentFilter !== "all" && deptName) {
+      arr = arr.filter((i) => (i.department_name ?? "") === deptName);
+    }
+    const s = search.trim().toLowerCase();
+    if (embedded && s) {
+      arr = arr.filter((i) =>
+        (i.attendance_code ?? "").toLowerCase().includes(s) ||
+        (i.contact_name ?? "").toLowerCase().includes(s) ||
+        (i.contact_phone ?? "").includes(s) ||
+        (i.cliente_nome ?? "").toLowerCase().includes(s)
+      );
+    }
+    return arr;
+  }, [items, embedded, departmentFilter, deptName, search]);
+
   const toggleOne = (id: string) => {
     setSelected((s) => {
       const n = new Set(s);
