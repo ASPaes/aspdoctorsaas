@@ -1559,13 +1559,147 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-6 py-4 border-b shrink-0">
-            <DialogTitle>Detalhes do Ticket</DialogTitle>
-          </DialogHeader>
-          <div className="px-6 py-4">
+        <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="font-mono text-sm font-medium text-primary">{ticket?.ticket_code ?? "—"}</span>
+              <span className="text-sm text-muted-foreground truncate">
+                {ticket?.assunto || "Detalhes do ticket"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => setStartConvOpen(true)}
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                Conversa
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => setChildOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Filho
+              </Button>
+              {isAdminOrHead && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Excluir
+                </Button>
+              )}
+              <DialogClose className="ml-1 rounded-sm opacity-70 hover:opacity-100 transition-opacity">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Fechar</span>
+              </DialogClose>
+            </div>
+          </div>
+
+          {/* Top strip */}
+          <div className="flex items-center gap-2 px-5 py-2.5 border-b flex-wrap shrink-0">
+            {/* Prioridade */}
+            <Select
+              value={ticket?.prioridade ?? ""}
+              onValueChange={(v) => handleFieldUpdate({ prioridade: v })}
+              disabled={updating}
+            >
+              <SelectTrigger className="h-auto w-auto min-w-[120px] border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  {(() => {
+                    const cur = PRIORIDADES_STRIP.find((p) => p.id === ticket?.prioridade);
+                    return (
+                      <>
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: cur?.color ?? "#6b7280" }} />
+                        {cur?.name ?? "Prioridade"}
+                        <ChevronDown className="h-3 w-3 opacity-60" />
+                      </>
+                    );
+                  })()}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORIDADES_STRIP.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+                      {p.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Canal */}
+            <Select
+              value={ticket?.canal_origem ?? ""}
+              onValueChange={(v) => handleFieldUpdate({ canal_origem: v })}
+              disabled={updating}
+            >
+              <SelectTrigger className="h-auto w-auto min-w-[120px] border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  {(() => {
+                    const cur = CANAIS_STRIP.find((c) => c.id === ticket?.canal_origem);
+                    const Ic = cur?.icon ?? Phone;
+                    return (
+                      <>
+                        <Ic className="h-3 w-3 shrink-0" />
+                        {cur?.name ?? "Canal"}
+                        <ChevronDown className="h-3 w-3 opacity-60" />
+                      </>
+                    );
+                  })()}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {CANAIS_STRIP.map((c) => {
+                  const Ic = c.icon;
+                  return (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="flex items-center gap-2">
+                        <Ic className="h-3.5 w-3.5" />
+                        {c.name}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
+            <div className="flex-1" />
+
+            {/* Tipo horário */}
+            <div className="flex gap-1">
+              {["comercial", "fora", "plantao"].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => handleFieldUpdate({ tipo_horario: t })}
+                  disabled={updating}
+                  className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
+                    (ticket?.tipo_horario ?? "comercial") === t
+                      ? "bg-primary/10 text-primary border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t === "comercial" ? "Comercial" : t === "fora" ? "Fora" : "Plantão"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-hidden px-6 py-4">
             {isLoading ? loadingNode : (
-              <div className="flex h-[calc(90vh-80px)] gap-4">
+              <div className="flex h-full gap-4">
                 <ScrollArea className="flex-1 min-w-0">
                   <div className="pr-4 pb-4">{detailsContent}</div>
                 </ScrollArea>
