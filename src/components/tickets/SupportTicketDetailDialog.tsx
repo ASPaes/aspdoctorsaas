@@ -24,7 +24,7 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
-  Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare,
+  Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus,
 } from "lucide-react";
 
 
@@ -281,6 +281,60 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     } finally {
       setCreatingTag(false);
     }
+  };
+
+  const { data: ticketMentions = [], refetch: refetchMentions } = useQuery({
+    queryKey: ["ticket_mentions", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_mentions" as any) as any)
+        .select("id, mentioned_user_id, mentioned_by, seen_at, created_at")
+        .eq("ticket_id", ticketId);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; mentioned_user_id: string; mentioned_by: string;
+        seen_at: string | null; created_at: string;
+      }>;
+    },
+  });
+
+  const { data: agentesDisponiveis = [] } = useQuery({
+    queryKey: ["agentes_mention", tid],
+    enabled: !!tid && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, role, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+    },
+  });
+
+  const handleAddMention = async (userId: string) => {
+    if (!ticketId || !tid) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await (supabase.from("ticket_mentions" as any) as any)
+        .insert({ tenant_id: tid, ticket_id: ticketId, mentioned_user_id: userId, mentioned_by: user?.id });
+      if (error) throw error;
+      refetchMentions();
+      toast.success("Agente marcado");
+    } catch (err: any) {
+      if (err?.message?.includes("duplicate")) toast.info("Agente já marcado");
+      else toast.error("Erro: " + (err?.message ?? ""));
+    }
+  };
+
+  const handleRemoveMention = async (mentionId: string) => {
+    try {
+      const { error } = await (supabase.from("ticket_mentions" as any) as any).delete().eq("id", mentionId);
+      if (error) throw error;
+      refetchMentions();
+    } catch { toast.error("Erro ao remover"); }
   };
 
   const handleToggleCheck = async (index: number) => {
@@ -1721,6 +1775,46 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                               <Plus className="h-3.5 w-3.5" />
                             </Button>
                           </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                {/* Marcados */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-2">Marcados</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {ticketMentions.map(m => {
+                      const agent = agentesDisponiveis.find(a => a.user_id === m.mentioned_user_id);
+                      return (
+                        <span key={m.id} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          {agent?.nome ?? "Agente"}
+                          <button onClick={() => handleRemoveMention(m.id)} className="hover:opacity-70">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
+                          <UserPlus className="h-3 w-3" /> Marcar
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2" align="start">
+                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                          {agentesDisponiveis
+                            .filter(a => !ticketMentions.find(m => m.mentioned_user_id === a.user_id))
+                            .map(a => (
+                              <button key={a.user_id} onClick={() => handleAddMention(a.user_id)}
+                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm">
+                                {a.nome}
+                              </button>
+                            ))}
+                          {agentesDisponiveis.filter(a => !ticketMentions.find(m => m.mentioned_user_id === a.user_id)).length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-2">Todos já marcados</p>
+                          )}
                         </div>
                       </PopoverContent>
                     </Popover>
