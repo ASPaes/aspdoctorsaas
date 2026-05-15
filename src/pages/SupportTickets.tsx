@@ -396,6 +396,15 @@ export default function SupportTickets() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+              <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Responsável" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os agentes</SelectItem>
+                {agentes.map((a) => (
+                  <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
