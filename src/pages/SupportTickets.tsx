@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell } from "lucide-react";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
@@ -126,6 +126,75 @@ export default function SupportTickets() {
     window.addEventListener("open-ticket-detail", handler);
     return () => window.removeEventListener("open-ticket-detail", handler);
   }, []);
+
+  const { data: unseenMentions = [], refetch: refetchMentions } = useQuery({
+    queryKey: ["unseen_mentions", userId],
+    enabled: !!userId,
+    refetchInterval: 30000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_mentions" as any) as any)
+        .select("id, ticket_id, mentioned_by, created_at, support_tickets:ticket_id(ticket_code, assunto)")
+        .eq("mentioned_user_id", userId)
+        .is("seen_at", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; ticket_id: string; mentioned_by: string; created_at: string;
+        support_tickets: { ticket_code: string | null; assunto: string | null } | null;
+      }>;
+    },
+  });
+
+  const mentionedByIds = [...new Set(unseenMentions.map(m => m.mentioned_by).filter(Boolean))];
+  const { data: mentionerNames = [] } = useQuery({
+    queryKey: ["mentioner_names", mentionedByIds.join(",")],
+    enabled: mentionedByIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, funcionarios:funcionario_id(nome)")
+        .in("user_id", mentionedByIds);
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((p: any) => ({
+        user_id: p.user_id as string,
+        nome: (p.funcionarios?.nome ?? "Agente") as string,
+      }));
+    },
+  });
+  const getMentionerName = (uid: string) => mentionerNames.find(m => m.user_id === uid)?.nome ?? "Agente";
+
+  const handleMentionClick = async (mention: any) => {
+    try {
+      await (supabase.rpc as any)("mark_mention_seen", { p_mention_id: mention.id });
+      refetchMentions();
+      setSelectedTicketId(mention.ticket_id);
+      setDetailOpen(true);
+    } catch {}
+  };
+
+  const handleMarkAllSeen = async () => {
+    try {
+      await (supabase.rpc as any)("mark_all_mentions_seen");
+      refetchMentions();
+      toast.success("Todas as notificações marcadas como vistas");
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel("ticket_mentions_realtime")
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "ticket_mentions",
+        filter: `mentioned_user_id=eq.${userId}`,
+      }, () => {
+        refetchMentions();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
 
 
 
@@ -382,11 +451,57 @@ export default function SupportTickets() {
           <TicketCheck className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-bold">Tickets</h1>
         </div>
-        {isAdminOrHead && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative h-9 w-9">
+                <Bell className="h-4 w-4" />
+                {unseenMentions.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 text-[9px] text-white flex items-center justify-center font-medium animate-pulse">
+                    {unseenMentions.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="flex items-center justify-between px-3 py-2 border-b">
+                <span className="text-sm font-medium">Notificações</span>
+                {unseenMentions.length > 0 && (
+                  <button onClick={handleMarkAllSeen} className="text-[10px] text-muted-foreground hover:text-foreground">
+                    Marcar todas como vistas
+                  </button>
+                )}
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {unseenMentions.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">Nenhuma notificação</div>
+                ) : (
+                  unseenMentions.map(m => (
+                    <button key={m.id} onClick={() => handleMentionClick(m)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b last:border-0">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">
+                            {m.support_tickets?.ticket_code ?? "Ticket"} — {m.support_tickets?.assunto ?? "Sem assunto"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {getMentionerName(m.mentioned_by)} te marcou · {new Date(m.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {isAdminOrHead && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Setores como pill buttons */}
