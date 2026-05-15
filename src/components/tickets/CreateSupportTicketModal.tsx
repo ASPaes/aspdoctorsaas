@@ -95,6 +95,9 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
     setObservacaoAgente("");
     setDepartamentoId("");
     setContatoSolicitante("");
+    setContatoSelectedId(null);
+    setContatoResults([]);
+    setContatoDropdownOpen(false);
     setPrevisaoEncerramento(defaultPrevisao());
     setChecklistItems([]);
     setNewChecklistItem("");
