@@ -6,7 +6,8 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch } from "lucide-react";
+import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
 import { format } from "date-fns";
@@ -71,6 +72,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const { data: supportConfig } = useSupportConfig();
@@ -429,6 +431,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setShowInChatSearch(true)} aria-label="Buscar nesta conversa">
+                  <FileSearch className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Buscar nesta conversa</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={onToggleDetails} aria-label="Detalhes">
                   <PanelRightOpen className="h-4 w-4" />
                 </Button>
@@ -588,6 +599,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       <CSTicketAlert sentiment={sentimentData} conversation={conversation} variant="banner" />
 
       {/* Modals */}
+      <InChatMessageSearchModal
+        open={showInChatSearch}
+        onOpenChange={setShowInChatSearch}
+        conversationId={conversation.id}
+        contactName={name}
+      />
       <EditContactModal
         open={isEditContactOpen}
         onOpenChange={setIsEditContactOpen}
