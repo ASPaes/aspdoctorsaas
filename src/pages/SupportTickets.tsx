@@ -364,7 +364,7 @@ export default function SupportTickets() {
 
       <div className="space-y-4">
 
-        <TabsContent value="tickets" className="space-y-4">
+        <div className="space-y-4">
           {/* Metric cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className="bg-card border border-border rounded-lg p-3">
