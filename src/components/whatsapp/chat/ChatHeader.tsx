@@ -599,6 +599,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       <CSTicketAlert sentiment={sentimentData} conversation={conversation} variant="banner" />
 
       {/* Modals */}
+      <InChatMessageSearchModal
+        open={showInChatSearch}
+        onOpenChange={setShowInChatSearch}
+        conversationId={conversation.id}
+        contactName={name}
+      />
       <EditContactModal
         open={isEditContactOpen}
         onOpenChange={setIsEditContactOpen}
