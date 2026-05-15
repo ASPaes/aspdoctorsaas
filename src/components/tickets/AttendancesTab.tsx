@@ -13,7 +13,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
-  ChevronLeft, ChevronRight, Headphones,
+  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck,
 } from "lucide-react";
 
 const PAGE_SIZE = 100;
