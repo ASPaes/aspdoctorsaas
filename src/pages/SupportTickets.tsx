@@ -731,7 +731,7 @@ export default function SupportTickets() {
 
       {/* Metric cards contextuais */}
       {(ticketsView === "lista" || ticketsView === "kanban") && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
             <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
@@ -744,6 +744,13 @@ export default function SupportTickets() {
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
             <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
           </div>
+          {selectedDeptSlug === "implantacao" && implantacaoMetrics && (
+            <div className="bg-card border border-border rounded-lg p-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo médio implantação</p>
+              <p className="text-2xl font-semibold font-mono mt-0.5 text-purple-400">{implantacaoMetrics.avg_days} dias</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{implantacaoMetrics.total_concluidas} concluídas · Min {implantacaoMetrics.min_days}d · Max {implantacaoMetrics.max_days}d</p>
+            </div>
+          )}
         </div>
       )}
 
