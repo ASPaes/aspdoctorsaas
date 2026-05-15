@@ -13,7 +13,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
-  ChevronLeft, ChevronRight, Headphones,
+  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck,
 } from "lucide-react";
 
 const PAGE_SIZE = 100;
@@ -154,7 +154,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           opened_at, assumed_at, closed_at,
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
-          ai_summary, ai_category,
+          ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -448,6 +448,26 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                     TME: {formatDur(att.wait_seconds)}
                   </span>
                   <span className="shrink-0 font-mono">TMA: {formatDur(att.handle_seconds)}</span>
+                  {att.status === "closed" && !att.ticket_id && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.dispatchEvent(new CustomEvent("create-ticket-from-attendance", {
+                          detail: { attendanceId: att.id, clienteId: att.cliente_id, contactId: att.contact_id, departmentId: att.department_id }
+                        }));
+                      }}>
+                      <Plus className="h-3 w-3" /> Ticket
+                    </Button>
+                  )}
+                  {att.ticket_id && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.dispatchEvent(new CustomEvent("open-ticket", { detail: { ticketId: att.ticket_id } }));
+                      }}>
+                      <TicketCheck className="h-3 w-3" /> Ver ticket
+                    </Button>
+                  )}
                 </div>
 
                 {/* Row 3 — Resumo IA */}

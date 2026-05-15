@@ -127,6 +127,22 @@ export default function SupportTickets() {
     return () => window.removeEventListener("open-ticket-detail", handler);
   }, []);
 
+  useEffect(() => {
+    const handleOpenTicket = (e: any) => {
+      setSelectedTicketId(e.detail.ticketId);
+      setDetailOpen(true);
+    };
+    const handleCreateFromAttendance = (_e: any) => {
+      setCreateOpen(true);
+    };
+    window.addEventListener("open-ticket", handleOpenTicket);
+    window.addEventListener("create-ticket-from-attendance", handleCreateFromAttendance);
+    return () => {
+      window.removeEventListener("open-ticket", handleOpenTicket);
+      window.removeEventListener("create-ticket-from-attendance", handleCreateFromAttendance);
+    };
+  }, []);
+
   const { data: unseenMentions = [], refetch: refetchMentions } = useQuery({
     queryKey: ["unseen_mentions", userId],
     enabled: !!userId,
@@ -713,7 +729,7 @@ export default function SupportTickets() {
           {[
             { id: "lista", label: "Lista", Icon: LayoutList },
             ...(departmentFilter !== "all" ? [{ id: "kanban", label: "Kanban", Icon: LayoutGrid }] : []),
-            { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
+            { id: "atendimentos", label: "Atendimentos - Chats", Icon: Headphones },
             ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
           ].map((v) => (
             <button
