@@ -1698,18 +1698,18 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             </div>
           </div>
 
-          <div className="flex-1 overflow-hidden px-6 py-4">
-            {isLoading ? loadingNode : (
-              <div className="flex h-full gap-4">
-                <ScrollArea className="flex-1 min-w-0">
-                  <div className="pr-4 pb-4">{detailsContent}</div>
-                </ScrollArea>
-                <div className="w-[380px] shrink-0 border-l flex flex-col min-h-0">
-                  <ScrollArea className="flex-1">{timelineContent}</ScrollArea>
-                </div>
+          {isLoading ? (
+            <div className="flex-1 overflow-hidden px-6 py-4">{loadingNode}</div>
+          ) : (
+            <div className="grid grid-cols-[1fr_260px] flex-1 overflow-hidden">
+              <div className="p-4 border-r space-y-4 overflow-y-auto">
+                {detailsContent}
               </div>
-            )}
-          </div>
+              <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
+                {/* Right panel - será preenchido no prompt 13D */}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       {childDialog}
