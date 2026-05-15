@@ -607,22 +607,27 @@ export default function SupportTickets() {
             ))}
           </div>
 
-          {/* Sub-abas de visualização */}
-          <div className="flex items-center gap-1 border-b border-border">
-            <button
-              onClick={() => setTicketsView("lista")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t-md transition-colors ${ticketsView === "lista" ? "bg-card border border-b-0 border-border font-medium text-foreground -mb-px" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <LayoutList className="h-4 w-4" />
-              Lista
-            </button>
-            <button
-              onClick={() => setTicketsView("kanban")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-t-md transition-colors ${ticketsView === "kanban" ? "bg-card border border-b-0 border-border font-medium text-foreground -mb-px" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Columns3 className="h-4 w-4" />
-              Kanban
-            </button>
+          {/* Sub-abas: Lista | Kanban | Atendimentos | Pendentes */}
+          <div className="flex items-center gap-0 border rounded-md overflow-hidden w-fit">
+            {([
+              { id: "lista", label: "Lista", Icon: LayoutList },
+              { id: "kanban", label: "Kanban", Icon: LayoutGrid },
+              { id: "atendimentos", label: "Atendimentos", Icon: Headphones },
+              ...(isAdminOrHead ? [{ id: "pendentes", label: "Pendentes", Icon: Clock }] : []),
+            ] as const).map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setTicketsView(v.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                  ticketsView === v.id
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <v.Icon className="h-3.5 w-3.5" />
+                {v.label}
+              </button>
+            ))}
           </div>
 
           {ticketsView === "lista" && (
