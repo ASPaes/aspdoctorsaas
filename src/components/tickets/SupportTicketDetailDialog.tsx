@@ -987,7 +987,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {/* Anexos */}
       {ticketId && tid && (
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Anexos</Label>
           <TicketAttachments ticketId={ticketId} tenantId={tid} canDelete />
         </div>
       )}
