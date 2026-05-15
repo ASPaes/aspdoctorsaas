@@ -18,6 +18,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  defaultDepartmentId?: string;
 }
 
 const Req = () => <span className="text-destructive">*</span>;
