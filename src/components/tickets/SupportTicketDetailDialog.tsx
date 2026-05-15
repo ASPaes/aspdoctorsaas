@@ -24,8 +24,23 @@ import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
-  Tag as TagIcon, X, ListChecks, Trash2,
+  Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare,
 } from "lucide-react";
+import { DialogClose } from "@/components/ui/dialog";
+
+const PRIORIDADES_STRIP = [
+  { id: "baixa", name: "Baixa", color: "#10b981" },
+  { id: "media", name: "Média", color: "#f59e0b" },
+  { id: "alta", name: "Alta", color: "#ef4444" },
+  { id: "urgente", name: "Urgente", color: "#dc2626" },
+];
+
+const CANAIS_STRIP = [
+  { id: "telefone", name: "Telefone", icon: Phone },
+  { id: "presencial", name: "Presencial", icon: Building2 },
+  { id: "email", name: "E-mail", icon: Mail },
+  { id: "whatsapp", name: "WhatsApp", icon: MessageSquare },
+];
 
 
 const PRIORITY_CLASSES: Record<string, string> = {
