@@ -263,6 +263,29 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
       });
   }, [selectedCliente?.id]);
 
+  // Search whatsapp_contacts as user types
+  useEffect(() => {
+    const clienteId = selectedCliente?.id;
+    const term = contatoSolicitante.trim();
+    if (!clienteId || term.length < 1 || contatoSelectedId) {
+      setContatoResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const { data } = await (supabase.from("whatsapp_contacts" as any) as any)
+        .select("id, name, phone_number, email, role")
+        .eq("client_id", clienteId)
+        .ilike("name", `%${term}%`)
+        .limit(8);
+      if (!cancelled) {
+        setContatoResults((data as any) ?? []);
+        setContatoDropdownOpen(true);
+      }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [contatoSolicitante, selectedCliente?.id, contatoSelectedId]);
+
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
   const filteredCategories = useMemo(
