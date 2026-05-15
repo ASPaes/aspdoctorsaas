@@ -93,6 +93,8 @@ function applyFullFilter(q: any, tid: string | null, filters?: ConversationsFilt
     q = q.eq('assigned_to', filters.assignedTo);
   }
   if (filters?.unassigned) q = q.is('assigned_to', null);
+  if (filters?.isGroup === true) q = q.eq('is_group', true);
+  if (filters?.isGroup === false) q = q.eq('is_group', false);
   return q;
 }
 
