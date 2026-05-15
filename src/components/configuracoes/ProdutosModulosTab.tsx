@@ -331,7 +331,14 @@ export default function ProdutosModulosTab() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="modulo-desc">Descrição</Label>
-              <Input id="modulo-desc" value={moduloDesc} onChange={(e) => setModuloDesc(e.target.value)} />
+              <Textarea
+                id="modulo-desc"
+                value={moduloDesc}
+                onChange={(e) => setModuloDesc(e.target.value)}
+                rows={3}
+                className="resize-y min-h-[80px] max-h-[300px]"
+                placeholder="Descreva o módulo. Arraste o canto inferior direito para aumentar o campo."
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Ativo</Label>
