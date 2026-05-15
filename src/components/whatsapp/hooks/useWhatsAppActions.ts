@@ -551,5 +551,7 @@ export const useWhatsAppActions = () => {
     isSchedulingAttendance: scheduleAttendanceMutation.isPending,
     unscheduleAttendance: unscheduleAttendanceMutation.mutate,
     isUnschedulingAttendance: unscheduleAttendanceMutation.isPending,
+    toggleRulesDisabled: toggleRulesDisabledMutation.mutate,
+    isTogglingRulesDisabled: toggleRulesDisabledMutation.isPending,
   };
 };
