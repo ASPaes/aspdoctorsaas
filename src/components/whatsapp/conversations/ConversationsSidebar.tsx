@@ -97,6 +97,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         assignedToMe: next.assignedToMe,
         assignedToAgent: next.assignedToAgent,
         autoReplyDisabledOnly: next.autoReplyDisabledOnly,
+        rulesDisabledOnly: next.rulesDisabledOnly,
       });
       return next;
     });
