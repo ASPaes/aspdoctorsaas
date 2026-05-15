@@ -455,6 +455,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       onRemove: () => setFilters(f => ({ ...f, autoReplyDisabledOnly: false })),
     });
   }
+  if (filters.rulesDisabledOnly) {
+    activeFilterBadges.push({
+      key: "rulesDisabledOnly",
+      label: "Sem regras",
+      onRemove: () => setFilters(f => ({ ...f, rulesDisabledOnly: false })),
+    });
+  }
 
   return (
     <div className="flex flex-col h-full border-r border-border">
