@@ -283,6 +283,60 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     }
   };
 
+  const { data: ticketMentions = [], refetch: refetchMentions } = useQuery({
+    queryKey: ["ticket_mentions", ticketId],
+    enabled: !!ticketId && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_mentions" as any) as any)
+        .select("id, mentioned_user_id, mentioned_by, seen_at, created_at")
+        .eq("ticket_id", ticketId);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; mentioned_user_id: string; mentioned_by: string;
+        seen_at: string | null; created_at: string;
+      }>;
+    },
+  });
+
+  const { data: agentesDisponiveis = [] } = useQuery({
+    queryKey: ["agentes_mention", tid],
+    enabled: !!tid && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("profiles" as any) as any)
+        .select("user_id, role, funcionarios:funcionario_id(nome)")
+        .eq("tenant_id", tid)
+        .not("funcionario_id", "is", null);
+      if (error) throw error;
+      return ((data ?? []) as any[])
+        .filter((p: any) => p.funcionarios?.nome)
+        .map((p: any) => ({ user_id: p.user_id as string, nome: p.funcionarios.nome as string }))
+        .sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+    },
+  });
+
+  const handleAddMention = async (userId: string) => {
+    if (!ticketId || !tid) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await (supabase.from("ticket_mentions" as any) as any)
+        .insert({ tenant_id: tid, ticket_id: ticketId, mentioned_user_id: userId, mentioned_by: user?.id });
+      if (error) throw error;
+      refetchMentions();
+      toast.success("Agente marcado");
+    } catch (err: any) {
+      if (err?.message?.includes("duplicate")) toast.info("Agente já marcado");
+      else toast.error("Erro: " + (err?.message ?? ""));
+    }
+  };
+
+  const handleRemoveMention = async (mentionId: string) => {
+    try {
+      const { error } = await (supabase.from("ticket_mentions" as any) as any).delete().eq("id", mentionId);
+      if (error) throw error;
+      refetchMentions();
+    } catch { toast.error("Erro ao remover"); }
+  };
+
   const handleToggleCheck = async (index: number) => {
     const items = [...((ticket?.checklist as any[]) ?? [])];
     items[index] = { ...items[index], done: !items[index].done };
