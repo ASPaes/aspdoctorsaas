@@ -780,70 +780,103 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       </div>
 
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] uppercase text-muted-foreground">Classificação</p>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setEditClassification(!editClassification)}>
-            {editClassification ? "Fechar" : "Editar"}
-          </Button>
-        </div>
-        {!editClassification ? (
-          <p className="text-xs text-muted-foreground">
-            {breadcrumb || "Sem classificação"}
-            {tipoServico && <span className="text-foreground/70"> · {tipoServico}</span>}
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-[10px]">Produto</Label>
-              <Select value={ticket.produto_id ? String(ticket.produto_id) : ""} onValueChange={(v) => handleFieldUpdate({ produto_id: Number(v) })} disabled={updating}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {produtos.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-[10px]">Categoria</Label>
-              <Select value={ticket.category_id ?? ""} onValueChange={(v) => handleFieldUpdate({ category_id: v })} disabled={updating}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {categories.filter(c => !ticket?.produto_id || c.produto_id === ticket.produto_id || c.produto_id === null).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-[10px]">Subcategoria</Label>
-              <Select value={ticket.subcategory_id ?? ""} onValueChange={(v) => handleFieldUpdate({ subcategory_id: v })} disabled={updating}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {subcategories.filter(s => s.category_id === ticket?.category_id).map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-[10px]">Tipo serviço</Label>
-              <Select value={ticket.service_type_id ?? ""} onValueChange={(v) => handleFieldUpdate({ service_type_id: v })} disabled={updating}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  {serviceTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+      {/* Cliente */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Cliente</Label>
+        {ticket.clientes ? (
+          <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+            <p className="text-sm font-semibold">{ticket.clientes.nome_fantasia ?? "—"}</p>
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              {ticket.clientes.cnpj && <p>CNPJ: {ticket.clientes.cnpj}</p>}
+              {ticket.clientes.telefone_whatsapp && <p>Tel: {ticket.clientes.telefone_whatsapp}</p>}
             </div>
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Sem cliente vinculado</p>
         )}
+        <div className="space-y-1 pt-1">
+          <Label className="text-[11px] text-muted-foreground">Contato solicitante</Label>
+          <div className="flex items-center gap-2">
+            {ticket?.contact_id && !ticket?.cliente_contato_id ? (
+              <p className="text-sm h-9 flex items-center gap-2 flex-1">
+                {ticket?.whatsapp_contacts?.name ?? "—"}
+                <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
+              </p>
+            ) : (
+              <Select
+                value={ticket?.cliente_contato_id ?? "none"}
+                onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
+                disabled={updating}
+              >
+                <SelectTrigger className="h-9 text-xs flex-1">
+                  <SelectValue placeholder="Selecione o contato..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem contato</SelectItem>
+                  {clienteContatos.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome} {c.detalhe ? `(${c.detalhe})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              onClick={() => setNewContactOpen(true)}
+              disabled={!ticketClienteId}
+              title="Adicionar contato"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Cliente */}
-      {ticket.clientes && (
-        <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-          <p className="text-sm font-semibold">{ticket.clientes.nome_fantasia ?? "—"}</p>
-          <div className="text-xs text-muted-foreground space-y-0.5">
-            {ticket.clientes.cnpj && <p>CNPJ: {ticket.clientes.cnpj}</p>}
-            {ticket.clientes.telefone_whatsapp && <p>Tel: {ticket.clientes.telefone_whatsapp}</p>}
+      {/* Classificação */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Classificação</Label>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Produto</Label>
+            <Select value={ticket.produto_id ? String(ticket.produto_id) : ""} onValueChange={(v) => handleFieldUpdate({ produto_id: Number(v) })} disabled={updating}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                {produtos.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+            <Select value={ticket.category_id ?? ""} onValueChange={(v) => handleFieldUpdate({ category_id: v })} disabled={updating}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                {categories.filter(c => !ticket?.produto_id || c.produto_id === ticket.produto_id || c.produto_id === null).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Subcategoria</Label>
+            <Select value={ticket.subcategory_id ?? ""} onValueChange={(v) => handleFieldUpdate({ subcategory_id: v })} disabled={updating}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                {subcategories.filter(s => s.category_id === ticket?.category_id).map((s) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Tipo de serviço</Label>
+            <Select value={ticket.service_type_id ?? ""} onValueChange={(v) => handleFieldUpdate({ service_type_id: v })} disabled={updating}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                {serviceTypes.map((t) => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Assunto */}
       {ticket.assunto && (
