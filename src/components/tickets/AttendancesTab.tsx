@@ -93,18 +93,19 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: departamentos = [] } = useQuery({
-    queryKey: ["attendances_departamentos", tid],
+    queryKey: ["attendances_departamentos_all", tid],
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name, requires_ticket_on_close")
+        .select("id, name")
         .eq("tenant_id", tid)
-        .eq("requires_ticket_on_close", true)
         .order("name");
       if (error) throw error;
       return (data ?? []) as Array<{ id: string; name: string }>;
     },
   });
+
+  const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
