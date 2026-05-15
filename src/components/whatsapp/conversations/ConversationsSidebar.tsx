@@ -303,6 +303,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       result = result.filter((c) => c.auto_reply_disabled === true);
     }
 
+    if (filters.rulesDisabledOnly) {
+      result = result.filter((c) => (c.contact as any)?.rules_disabled === true);
+    }
+
     // Sort
     switch (filters.sortBy) {
       case "oldest":
