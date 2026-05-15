@@ -1471,7 +1471,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
           <DialogTitle className="sr-only">Detalhes do ticket {ticket?.ticket_code ?? ""}</DialogTitle>
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b shrink-0">
+          <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <span className="font-mono text-sm font-medium text-primary">{ticket?.ticket_code ?? "—"}</span>
               <span className="text-sm text-muted-foreground truncate">
