@@ -1589,7 +1589,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
             {/* Tipo horário */}
             <div className="flex gap-1">
-              {["comercial", "fora", "plantao"].map((t) => (
+              {["comercial", "plantao"].map((t) => (
                 <button
                   key={t}
                   type="button"
