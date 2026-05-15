@@ -7,6 +7,7 @@ interface KanbanColumn {
   name: string;
   color: string;
   position: number;
+  is_terminal?: boolean;
 }
 
 interface TicketRow {
