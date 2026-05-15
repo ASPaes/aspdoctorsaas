@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MessageCircle, Phone, User, Mail, Lock } from "lucide-react";
 
@@ -53,6 +53,10 @@ function formatDate(iso: string | null): string {
 function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isPanningRef = useRef(false);
+  const panStartXRef = useRef(0);
+  const panStartScrollLeftRef = useRef(0);
 
   const sortedColumns = useMemo(
     () => [...columns].sort((a, b) => a.position - b.position),
@@ -68,8 +72,28 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: 
     return map;
   }, [tickets, sortedColumns]);
 
+  const stopPanning = () => {
+    isPanningRef.current = false;
+  };
+
   return (
-    <div className="overflow-x-auto">
+    <div
+      ref={scrollContainerRef}
+      className="overflow-x-auto cursor-grab active:cursor-grabbing select-none"
+      onMouseDown={(e) => {
+        if ((e.target as HTMLElement).closest("[data-ticket-card='true']")) return;
+        isPanningRef.current = true;
+        panStartXRef.current = e.pageX;
+        panStartScrollLeftRef.current = scrollContainerRef.current?.scrollLeft ?? 0;
+      }}
+      onMouseMove={(e) => {
+        if (!isPanningRef.current || !scrollContainerRef.current) return;
+        e.preventDefault();
+        scrollContainerRef.current.scrollLeft = panStartScrollLeftRef.current - (e.pageX - panStartXRef.current);
+      }}
+      onMouseUp={stopPanning}
+      onMouseLeave={stopPanning}
+    >
       <div className="flex flex-row gap-3 min-h-[60vh] pb-2">
         {sortedColumns.map((col) => {
           const columnTickets = ticketsByStatus[col.id] ?? [];
@@ -118,6 +142,7 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: 
                   columnTickets.map((t) => (
                     <div
                       key={t.id}
+                      data-ticket-card="true"
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData("ticketId", t.id);
