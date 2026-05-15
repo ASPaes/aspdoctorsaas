@@ -4633,6 +4633,10 @@ export type Database = {
           phone_number: string
           picture_synced_at: string | null
           profile_picture_url: string | null
+          rules_disabled: boolean
+          rules_disabled_at: string | null
+          rules_disabled_by: string | null
+          rules_disabled_reason: string | null
           tags: string[] | null
           tenant_id: string
           updated_at: string
@@ -4647,6 +4651,10 @@ export type Database = {
           phone_number: string
           picture_synced_at?: string | null
           profile_picture_url?: string | null
+          rules_disabled?: boolean
+          rules_disabled_at?: string | null
+          rules_disabled_by?: string | null
+          rules_disabled_reason?: string | null
           tags?: string[] | null
           tenant_id: string
           updated_at?: string
@@ -4661,6 +4669,10 @@ export type Database = {
           phone_number?: string
           picture_synced_at?: string | null
           profile_picture_url?: string | null
+          rules_disabled?: boolean
+          rules_disabled_at?: string | null
+          rules_disabled_by?: string | null
+          rules_disabled_reason?: string | null
           tags?: string[] | null
           tenant_id?: string
           updated_at?: string

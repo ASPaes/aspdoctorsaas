@@ -10,7 +10,8 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
 import { formatBRPhone } from "@/lib/phoneBR";
@@ -44,7 +45,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const sentiment = sentimentRaw as any;
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
-  const { updateContact, isUpdatingContact } = useWhatsAppActions();
+  const { updateContact, isUpdatingContact, toggleRulesDisabled, isTogglingRulesDisabled } = useWhatsAppActions();
   const { profile } = useAuth();
 
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
@@ -222,6 +223,32 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               </div>
             </div>
           )}
+
+          {/* ─── Regras do sistema ─── */}
+          <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <ShieldOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs font-medium">Tirar regras do chat</span>
+              </div>
+              <Switch
+                checked={!!(contact as any)?.rules_disabled}
+                disabled={isTogglingRulesDisabled || !contact?.id}
+                onCheckedChange={(v) => contact?.id && toggleRulesDisabled({ contactId: contact.id, rulesDisabled: v })}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              Desativa todas as automações do DoctorSaaS para este número:
+              encerramento automático, avisos/lembretes, URA, auto-resposta fora do
+              horário, atribuição automática e categorização IA.
+              {" "}A configuração vale para todas as conversas deste número, em qualquer instância.
+            </p>
+            {(contact as any)?.rules_disabled && (contact as any)?.rules_disabled_at && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                Ativado em {new Date((contact as any).rules_disabled_at).toLocaleString('pt-BR')}
+              </p>
+            )}
+          </div>
 
           <Separator />
 

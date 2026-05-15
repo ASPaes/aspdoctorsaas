@@ -1,57 +1,87 @@
+## Objetivo
 
+Permitir marcar contatos (por número, independente da instância) como "Sem regras DoctorSaaS", desativando todas as automações do sistema para aquele número. Adicionar filtros relacionados na lista de conversas.
 
-## Diagnosis
+## Escopo
 
-Camila Marques (role: `user`, department: `Financeiro`) cannot transfer conversations to other departments because of an RLS policy conflict on the `support_attendances` table.
+### 1. Banco de dados
+Adicionar coluna em `whatsapp_contacts`:
+- `rules_disabled boolean default false`
+- `rules_disabled_at timestamptz`
+- `rules_disabled_by uuid`
+- `rules_disabled_reason text`
 
-The UPDATE policy `support_attendances_update_by_department` has a `WITH CHECK` clause that requires the **new** `department_id` to match the user's own department. When Camila transfers to "Implantação", the update sets `department_id = 'implantacao_id'` which doesn't match her `current_user_department_id()` (Financeiro), so PostgreSQL rejects the write.
+Como o "amarrar por número" deve valer independente da instância, criar função/trigger que ao marcar um contato propaga para todos os `whatsapp_contacts` com mesmo `phone_number` e `tenant_id`.
 
-The same issue may also affect the `whatsapp_conversations` SELECT policy — after updating the conversation's `department_id` to a different department, Camila can no longer read that conversation (which is expected), but the subsequent queries in the mutation chain may also fail.
+Index: `idx_whatsapp_contacts_rules_disabled` em `(tenant_id, phone_number, rules_disabled)`.
 
-## Root Cause
+### 2. Backend — pontos a respeitar a flag
 
-The `support_attendances_update_by_department` policy's `WITH CHECK` is too restrictive:
-```sql
-WITH CHECK (
-  is_admin_or_head() OR 
-  (department_id = current_user_department_id() AND tenant_id = current_tenant_id())
-)
+Edge Functions que devem checar `rules_disabled` e fazer **early return** (não acionar regra):
+- `check-inactivity-timeout` — não encerrar por inatividade
+- `check-csat-timeout` — não enviar/cobrar CSAT
+- `finalize-attendance` — bloquear encerramento automático/silencioso (manual continua permitido)
+- Webhooks (`evolution-webhook`, `meta-webhook`, `zapi-webhook`) na parte de:
+  - Disparo de URA / boas-vindas
+  - Auto-reply / off-hours
+  - Atribuição automática
+  - Categorização IA / smart replies
+  - Criação de novo atendimento por timeout
+- `schedule-reminder` — não disparar lembretes
+- `compose-whatsapp-message` (auto) — pular sugestões automáticas
+
+Padrão: helper `isRulesDisabled(supabase, tenant_id, phone_number)` retornando boolean, chamado no início.
+
+### 3. UI — Chat Details (painel direito da conversa)
+
+Em `src/components/whatsapp/chat/...` (painel de detalhes do contato), nova seção:
+
+```
+┌─ Regras do sistema ──────────────────┐
+│ ☐ Tirar regras do chat               │
+│   Desativa todas automações:          │
+│   • Encerramento automático           │
+│   • Avisos / lembretes                │
+│   • URA                               │
+│   • Auto-resposta off-hours           │
+│   • Atribuição automática             │
+│   Aplica-se a todas as conversas      │
+│   deste número.                       │
+└───────────────────────────────────────┘
 ```
 
-This blocks any non-admin from updating an attendance to a different department — which is exactly what a department transfer does.
+Quando marcado, mostra badge "Sem regras" no header do chat e na lista da sidebar.
 
-## Fix
+### 4. Filtros na lista de conversas
 
-Create a migration that relaxes the `WITH CHECK` on the `support_attendances` UPDATE policy to allow users to transfer attendances **from** their own department **to** any department within their tenant:
+Em `src/components/whatsapp/...` (filtros da sidebar), adicionar na seção de filtros:
+- Toggle "Sem regras" — clique aplica imediatamente
+- Toggle "Apenas auto-respostas pausadas" (existente) — adicionar `(?)` tooltip com explicação:
+  > "Mostra conversas onde o agente pausou as respostas automáticas do sistema, mas as demais regras (URA, encerramento, etc.) continuam ativas."
 
-```sql
--- Drop and recreate the update policy
-DROP POLICY IF EXISTS "support_attendances_update_by_department" ON support_attendances;
+Filtros mutuamente compatíveis (podem combinar).
 
-CREATE POLICY "support_attendances_update_by_department"
-  ON support_attendances
-  FOR UPDATE
-  USING (
-    is_admin_or_head() 
-    OR (department_id = current_user_department_id() AND tenant_id = current_tenant_id())
-  )
-  WITH CHECK (
-    is_admin_or_head() 
-    OR (tenant_id = current_tenant_id() AND current_user_department_id() IS NOT NULL)
-  );
-```
+### 5. Indicadores visuais
+- Badge "Sem regras" (variant warning) no `ChatHeader` e item da `ChatList`.
+- Ícone ShieldOff ao lado do nome quando ativo.
 
-The `USING` clause still ensures users can only update attendances from their own department. The `WITH CHECK` clause is relaxed to allow the new row to have any `department_id` within the tenant — the key security constraint remains that the user must belong to the original department (enforced by `USING`).
+## Arquivos afetados (resumo)
 
-## Impact
-- **Security**: Users can only transfer attendances that belong to their own department (USING unchanged). They cannot arbitrarily modify attendances from other departments.
-- **No code changes**: Only a database migration is needed.
-- **Files**: One new migration file.
+**DB**: migration nova
+**Edge Functions**: ~7 funções com early-return
+**Frontend**:
+- `src/components/whatsapp/chat/ChatDetailsPanel.tsx` (ou equivalente) — toggle
+- `src/components/whatsapp/chat/ChatHeader.tsx` — badge
+- `src/components/whatsapp/ChatList*.tsx` — badge + filtro
+- Filtros sidebar — novo toggle + tooltip
 
-## Manual Test
-1. Log in as Camila Marques (Financeiro, role: user)
-2. Open a conversation assigned to her
-3. Click "Transferir Conversa" > Setor > select "Implantação"
-4. Click "Transferir Setor"
-5. Expected: Success toast, conversation moves to Implantação queue
+## Fora do escopo
+- Histórico/auditoria detalhada (apenas timestamp + user que ativou)
+- Permissão por role (qualquer agente do tenant pode marcar) — pode virar restrição depois
 
+## Pergunta antes de implementar
+
+Esse é um feature grande (DB + 7 edge functions + UI em 3-4 lugares). Prefere:
+- **(A)** Implementar tudo agora numa entrega só
+- **(B)** Faseado: 1º DB + UI da flag + badge; 2º filtros; 3º edge functions uma a uma
+- **(C)** Só DB + UI + 2-3 edge functions mais críticas (encerramento, URA, auto-reply) e o resto depois

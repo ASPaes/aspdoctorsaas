@@ -6,7 +6,7 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff } from "lucide-react";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
@@ -491,6 +491,21 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         {/* Row 2: Context chips — single line, overflow hidden */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 pl-10">
           <SignatureControl conversationId={conversation.id} />
+
+          {(conversation.contact as any)?.rules_disabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-[10px] h-4 gap-1 shrink-0 whitespace-nowrap border-red-500/50 text-red-600 dark:text-red-400">
+                  <ShieldOff className="h-2.5 w-2.5" />
+                  Sem regras
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs max-w-xs">
+                Todas as automações do sistema estão desativadas para este contato
+                (encerramento automático, URA, lembretes, off-hours, atribuição automática).
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {conversation.auto_reply_disabled && (
             <Tooltip>

@@ -73,6 +73,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
     assignedToMe: saved?.assignedToMe ?? false,
     assignedToAgent: saved?.assignedToAgent ?? undefined,
     autoReplyDisabledOnly: saved?.autoReplyDisabledOnly ?? false,
+    rulesDisabledOnly: saved?.rulesDisabledOnly ?? false,
   });
 
   const persist = (patch: Record<string, any>) => {
@@ -96,6 +97,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         assignedToMe: next.assignedToMe,
         assignedToAgent: next.assignedToAgent,
         autoReplyDisabledOnly: next.autoReplyDisabledOnly,
+        rulesDisabledOnly: next.rulesDisabledOnly,
       });
       return next;
     });
@@ -301,6 +303,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       result = result.filter((c) => c.auto_reply_disabled === true);
     }
 
+    if (filters.rulesDisabledOnly) {
+      result = result.filter((c) => (c.contact as any)?.rules_disabled === true);
+    }
+
     // Sort
     switch (filters.sortBy) {
       case "oldest":
@@ -447,6 +453,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       key: "autoReplyDisabledOnly",
       label: "Auto-respostas pausadas",
       onRemove: () => setFilters(f => ({ ...f, autoReplyDisabledOnly: false })),
+    });
+  }
+  if (filters.rulesDisabledOnly) {
+    activeFilterBadges.push({
+      key: "rulesDisabledOnly",
+      label: "Sem regras",
+      onRemove: () => setFilters(f => ({ ...f, rulesDisabledOnly: false })),
     });
   }
 
