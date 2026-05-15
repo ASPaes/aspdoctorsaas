@@ -80,10 +80,10 @@ export default function SupportTickets() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("tickets");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [ticketsView, setTicketsView] = useState("lista");
+  const [ticketsView, setTicketsView] = useState<string>("lista");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
