@@ -1030,6 +1030,22 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     return;
   }
 
+  // "Sem regras do sistema": flag por contato (propagada cross-instance pelo trigger).
+  // Quando ativa, mensagem é persistida normalmente mas TODA a automação é pulada
+  // (URA, CSAT, business hours, inatividade, lembretes, auto-respostas, criação de
+  // atendimento, sentiment, categorização). Permite chats 100% manuais.
+  {
+    const { data: contactRules } = await supabase
+      .from('whatsapp_contacts')
+      .select('rules_disabled')
+      .eq('id', contactId)
+      .maybeSingle();
+    if (contactRules?.rules_disabled === true) {
+      console.log(`[processor] rules_disabled=true on contact ${contactId} — skipping ALL automation for conversation ${conversationId}`);
+      return;
+    }
+  }
+
   triggerAutoSentiment(supabase, conversationId, supabaseUrl);
   triggerAutoCategorization(supabase, conversationId, supabaseUrl);
 
