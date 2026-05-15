@@ -748,73 +748,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       </div>
 
-      {/* Tags */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {ticketTags.map(tag => (
-          <span
-            key={tag.assignmentId}
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium"
-            style={{ background: tag.color + "22", color: tag.color }}
-          >
-            {tag.name}
-            <button
-              onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.assignmentId); }}
-              className="hover:opacity-70"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-        <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
-              <TagIcon className="h-3 w-3" />
-              Tag
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-1.5">
-            <div className="space-y-0.5 max-h-60 overflow-y-auto">
-              {availableTags
-                .filter(t => !ticketTags.find(tt => tt.id === t.id))
-                .map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => { handleAddTag(t.id); setTagPopoverOpen(false); }}
-                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
-                  >
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
-                    {t.name}
-                  </button>
-                ))}
-              {availableTags.filter(t => !ticketTags.find(tt => tt.id === t.id)).length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
-              )}
-            </div>
-            <div className="border-t mt-2 pt-2">
-              <p className="text-[10px] text-muted-foreground mb-1.5 px-1">Criar nova</p>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="color"
-                  value={quickTagColor}
-                  onChange={(e) => setQuickTagColor(e.target.value)}
-                  className="h-8 w-8 p-0.5 shrink-0"
-                />
-                <Input
-                  value={quickTagName}
-                  onChange={(e) => setQuickTagName(e.target.value)}
-                  placeholder="Nome..."
-                  className="h-8 text-xs flex-1"
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateAndAddTag(); } }}
-                />
-                <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleCreateAndAddTag}
-                  disabled={!quickTagName.trim() || creatingTag}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
 
 
       {/* Cliente */}
@@ -1150,27 +1083,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       )}
 
-      {/* Ticket pai */}
-      {ticket.parent && (
-        <button
-          onClick={() => {
-            onOpenChange(false);
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: ticket.parent.id } }));
-            }, 300);
-          }}
-          className="w-full border border-border rounded-lg p-2.5 flex items-center gap-2 hover:border-primary/40 transition-colors"
-        >
-          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-[10px] uppercase text-muted-foreground">Ticket pai:</span>
-          <span className="font-mono text-xs font-semibold text-primary">{ticket.parent.ticket_code}</span>
-          {(() => { const si = getStatusInfo(ticket.parent.status_id); return (
-            <Badge variant="outline" className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
-              {si.name}
-            </Badge>
-          );})()}
-        </button>
-      )}
 
       {linkedAttendances.length > 0 && (
         <div className="space-y-2 pt-2">
@@ -1701,7 +1613,164 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 {detailsContent}
               </div>
               <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
-                {/* Right panel - será preenchido no prompt 13D */}
+                {/* Tags */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Tags</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {ticketTags.map(tag => (
+                      <span
+                        key={tag.assignmentId}
+                        className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium"
+                        style={{ background: tag.color + "22", color: tag.color }}
+                      >
+                        {tag.name}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.assignmentId); }}
+                          className="hover:opacity-70"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                    <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
+                          <TagIcon className="h-3 w-3" />
+                          Tag
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-56 p-1.5">
+                        <div className="space-y-0.5 max-h-60 overflow-y-auto">
+                          {availableTags
+                            .filter(t => !ticketTags.find(tt => tt.id === t.id))
+                            .map(t => (
+                              <button
+                                key={t.id}
+                                onClick={() => { handleAddTag(t.id); setTagPopoverOpen(false); }}
+                                className="w-full text-left px-2 py-1.5 rounded-md hover:bg-accent text-sm flex items-center gap-2"
+                              >
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: t.color }} />
+                                {t.name}
+                              </button>
+                            ))}
+                          {availableTags.filter(t => !ticketTags.find(tt => tt.id === t.id)).length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tag disponível</p>
+                          )}
+                        </div>
+                        <div className="border-t mt-2 pt-2">
+                          <p className="text-[10px] text-muted-foreground mb-1.5 px-1">Criar nova</p>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="color"
+                              value={quickTagColor}
+                              onChange={(e) => setQuickTagColor(e.target.value)}
+                              className="h-8 w-8 p-0.5 shrink-0"
+                            />
+                            <Input
+                              value={quickTagName}
+                              onChange={(e) => setQuickTagName(e.target.value)}
+                              placeholder="Nome..."
+                              className="h-8 text-xs flex-1"
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateAndAddTag(); } }}
+                            />
+                            <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleCreateAndAddTag}
+                              disabled={!quickTagName.trim() || creatingTag}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Timeline */}
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Timeline</p>
+                  {timelineContent}
+                </div>
+
+                <Separator />
+
+                {/* Metadata */}
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Metadata</p>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Aberto em</span>
+                      <span className="font-medium text-right">{ticket?.aberto_em ? formatDateTime(ticket.aberto_em) : "—"}</span>
+                    </div>
+                    {ticket?.created_by_user_id && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">Criado por</span>
+                        <span className="font-medium text-right truncate">{getAgentName(ticket.created_by_user_id)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Tempo agente</span>
+                      <span className="font-medium text-right">{ticket?.tempo_agente_minutos ? `${ticket.tempo_agente_minutos} min` : "—"}</span>
+                    </div>
+                    {ticket?.tempo_calculado_minutos != null && (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">Tempo calculado</span>
+                        <span className="font-medium text-right">{ticket.tempo_calculado_minutos} min</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {ticket?.parent && (
+                    <div className="space-y-1 pt-2">
+                      <p className="text-[10px] uppercase text-muted-foreground">Ticket pai</p>
+                      <button
+                        onClick={() => {
+                          onOpenChange(false);
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: ticket.parent.id } }));
+                          }, 300);
+                        }}
+                        className="w-full border border-border rounded-md p-2 flex items-center gap-2 hover:border-primary/40 transition-colors"
+                      >
+                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-mono text-xs font-semibold text-primary truncate">{ticket.parent.ticket_code}</span>
+                        {(() => { const si = getStatusInfo(ticket.parent.status_id); return (
+                          <Badge variant="outline" className="text-[10px] border ml-auto shrink-0" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
+                            {si.name}
+                          </Badge>
+                        );})()}
+                      </button>
+                    </div>
+                  )}
+
+                  {children.length > 0 && (
+                    <div className="space-y-1 pt-2">
+                      <p className="text-[10px] uppercase text-muted-foreground">Tickets filhos ({children.length})</p>
+                      <div className="space-y-1">
+                        {children.map((c: any) => (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              onOpenChange(false);
+                              setTimeout(() => {
+                                window.dispatchEvent(new CustomEvent("open-ticket-detail", { detail: { ticketId: c.id } }));
+                              }, 300);
+                            }}
+                            className="w-full border border-border rounded-md p-2 flex items-center gap-2 hover:border-primary/40 transition-colors"
+                          >
+                            <TicketCheck className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                            <span className="font-mono text-xs font-semibold text-blue-400 truncate">{c.ticket_code}</span>
+                            {(() => { const si = getStatusInfo(c.status_id); return (
+                              <Badge variant="outline" className="text-[10px] border ml-auto shrink-0" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>
+                                {si.name}
+                              </Badge>
+                            );})()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
