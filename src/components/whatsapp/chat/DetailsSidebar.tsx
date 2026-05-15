@@ -240,9 +240,13 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
                 <span className="text-xs font-medium">Tirar regras do chat</span>
               </div>
               <Switch
-                checked={!!(contact as any)?.rules_disabled}
+                checked={rulesDisabledEffective}
                 disabled={isTogglingRulesDisabled || !contact?.id}
-                onCheckedChange={(v) => contact?.id && toggleRulesDisabled({ contactId: contact.id, rulesDisabled: v })}
+                onCheckedChange={(v) => {
+                  if (!contact?.id) return;
+                  setRulesDisabledLocal(v);
+                  toggleRulesDisabled({ contactId: contact.id, rulesDisabled: v });
+                }}
               />
             </div>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
@@ -251,7 +255,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               horário, atribuição automática e categorização IA.
               {" "}A configuração vale para todas as conversas deste número, em qualquer instância.
             </p>
-            {(contact as any)?.rules_disabled && (contact as any)?.rules_disabled_at && (
+            {rulesDisabledEffective && (contact as any)?.rules_disabled_at && (
               <p className="text-[10px] text-amber-600 dark:text-amber-400">
                 Ativado em {new Date((contact as any).rules_disabled_at).toLocaleString('pt-BR')}
               </p>
