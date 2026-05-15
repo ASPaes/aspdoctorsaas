@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
         id, tenant_id, conversation_id, assigned_to, scheduled_until,
         whatsapp_conversations!inner (
           id, instance_id,
-          whatsapp_contacts!inner ( phone_number, name )
+          whatsapp_contacts!inner ( phone_number, name, rules_disabled )
         )
       `)
       .eq('status', 'in_progress')
