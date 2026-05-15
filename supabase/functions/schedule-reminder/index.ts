@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
         id, tenant_id, conversation_id, assigned_to, scheduled_until,
         whatsapp_conversations!inner (
           id, instance_id,
-          whatsapp_contacts!inner ( phone_number, name )
+          whatsapp_contacts!inner ( phone_number, name, rules_disabled )
         )
       `)
       .eq('status', 'in_progress')
@@ -53,6 +53,18 @@ Deno.serve(async (req) => {
         if (!contact?.phone_number || !instanceId) {
           console.warn(`[schedule-reminder] Skipping att=${att.id}: missing contact or instance`);
           results.push({ attendanceId: att.id, ok: false, error: 'missing_contact_or_instance' });
+          continue;
+        }
+
+        // Guard "Sem regras do sistema": pular envio do lembrete agendado.
+        if (contact.rules_disabled === true) {
+          console.log(`[schedule-reminder] rules_disabled=true — skipping reminder for att=${att.id}`);
+          // Marca como notificado para não reprocessar em loop a cada minuto.
+          await supabase
+            .from('support_attendances')
+            .update({ schedule_notified_at: new Date().toISOString() })
+            .eq('id', att.id);
+          results.push({ attendanceId: att.id, ok: true, error: 'rules_disabled' });
           continue;
         }
 

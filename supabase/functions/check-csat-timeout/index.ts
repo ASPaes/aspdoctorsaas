@@ -198,6 +198,21 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Guard "Sem regras do sistema": pular envio de mensagem automática de timeout
+        // e fechamento diferido. O CSAT já foi marcado como expired acima.
+        {
+          const { data: contactRules } = await supabase
+            .from('whatsapp_contacts')
+            .select('rules_disabled')
+            .eq('id', conv.contact_id)
+            .maybeSingle();
+          if (contactRules?.rules_disabled === true) {
+            console.log(`[${FUNCTION_NAME}][${requestId}] rules_disabled=true on contact — skipping CSAT timeout messages for att=${att.attendance_code}`);
+            processed++;
+            continue;
+          }
+        }
+
         const evolutionInstanceId = instance.instance_id_external || instance.instance_name;
         const remoteJid = `${contact.phone_number}@s.whatsapp.net`;
 

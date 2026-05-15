@@ -110,6 +110,20 @@ async function processAttendance(
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
   try {
+    // Guard "Sem regras do sistema": se o contato do atendimento estiver com
+    // rules_disabled=true, pular qualquer automação de inatividade (aviso/fechamento).
+    {
+      const { data: contactRules } = await supabase
+        .from("whatsapp_contacts")
+        .select("rules_disabled")
+        .eq("id", att.contact_id)
+        .maybeSingle();
+      if (contactRules?.rules_disabled === true) {
+        log("rules_disabled=true no contato — skip");
+        return "skipped";
+      }
+    }
+
     const config = await getSupportConfig(supabase, att.tenant_id);
 
     const closeThresholdMin = config.support_auto_close_inactivity_minutes;
