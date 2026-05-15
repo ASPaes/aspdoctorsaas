@@ -954,6 +954,7 @@ export default function SupportTickets() {
       <CreateSupportTicketModal
         open={createOpen}
         onOpenChange={setCreateOpen}
+        defaultDepartmentId={departmentFilter}
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
         }}

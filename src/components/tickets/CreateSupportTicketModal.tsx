@@ -18,6 +18,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
+  defaultDepartmentId?: string;
 }
 
 const Req = () => <span className="text-destructive">*</span>;
@@ -41,7 +42,7 @@ const defaultPrevisao = () => {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 };
 
-export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Props) {
+export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaultDepartmentId }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
@@ -205,10 +206,14 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   });
 
   useEffect(() => {
-    if (userDepartmentId && !departamentoId && open) {
+    if (!open) return;
+    if (departamentoId) return;
+    if (defaultDepartmentId && defaultDepartmentId !== "all") {
+      setDepartamentoId(defaultDepartmentId);
+    } else if (userDepartmentId) {
       setDepartamentoId(userDepartmentId);
     }
-  }, [userDepartmentId, open]);
+  }, [open, defaultDepartmentId, userDepartmentId]);
 
   const { data: ticketStatuses = [] } = useQuery({
     queryKey: ["create_ticket_statuses", tid, departamentoId],
@@ -489,14 +494,10 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated }: Prop
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b">
+        <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
           <h3 className="text-base font-semibold">Novo ticket</h3>
-          <DialogClose className="rounded-sm opacity-70 hover:opacity-100 transition-opacity">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Fechar</span>
-          </DialogClose>
         </div>
 
         {/* Top strip */}
