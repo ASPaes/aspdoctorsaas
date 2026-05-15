@@ -293,13 +293,54 @@ export function ConversationFiltersPopover({ filters, onChange }: Props) {
 
         {isAdmin && (
           <div className="flex items-center justify-between">
-            <Label htmlFor="auto-reply-disabled-only" className="text-xs font-medium text-muted-foreground">
-              Somente com auto-respostas pausadas
-            </Label>
+            <div className="flex items-center gap-1">
+              <Label htmlFor="auto-reply-disabled-only" className="text-xs font-medium text-muted-foreground">
+                Somente com auto-respostas pausadas
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground">
+                    <HelpCircle className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs max-w-[260px]">
+                  Mostra conversas em que um atendente pausou apenas as respostas
+                  automáticas (URA, smart replies, off-hours). As demais regras do
+                  sistema continuam ativas (encerramento, atribuição, lembretes).
+                </TooltipContent>
+              </Tooltip>
+            </div>
             <Switch
               id="auto-reply-disabled-only"
               checked={!!filters.autoReplyDisabledOnly}
               onCheckedChange={(v) => onChange({ ...filters, autoReplyDisabledOnly: v })}
+            />
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              <Label htmlFor="rules-disabled-only" className="text-xs font-medium text-muted-foreground inline-flex items-center gap-1">
+                <ShieldOff className="h-3 w-3" />
+                Somente sem regras do sistema
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground">
+                    <HelpCircle className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs max-w-[260px]">
+                  Mostra contatos marcados como "Tirar regras do chat" — todas as
+                  automações do DoctorSaaS estão desativadas para o número.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Switch
+              id="rules-disabled-only"
+              checked={!!filters.rulesDisabledOnly}
+              onCheckedChange={(v) => onChange({ ...filters, rulesDisabledOnly: v })}
             />
           </div>
         )}
