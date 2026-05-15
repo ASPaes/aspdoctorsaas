@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -104,6 +104,31 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(300);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    const startX = e.clientX;
+    const startWidth = rightPanelWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 220), 500);
+      setRightPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [quickTagName, setQuickTagName] = useState("");
   const [quickTagColor, setQuickTagColor] = useState("#3b82f6");
@@ -1606,9 +1631,16 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           {isLoading ? (
             <div className="flex-1 overflow-hidden px-6 py-4">{loadingNode}</div>
           ) : (
-            <div className="grid grid-cols-[1fr_260px] flex-1 overflow-hidden">
-              <div className="p-4 border-r space-y-4 overflow-y-auto">
+            <div ref={containerRef} className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: `1fr auto ${rightPanelWidth}px` }}>
+              <div className="p-4 space-y-4 overflow-y-auto">
                 {detailsContent}
+              </div>
+              <div
+                onMouseDown={handleMouseDown}
+                className={`w-1.5 cursor-col-resize flex items-center justify-center hover:bg-primary/20 transition-colors shrink-0 ${isDragging ? "bg-primary/20" : ""}`}
+                title="Arraste para redimensionar"
+              >
+                <div className="w-0.5 h-8 rounded-full bg-border" />
               </div>
               <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
                 {/* Tags */}
