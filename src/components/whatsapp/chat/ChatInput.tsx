@@ -190,6 +190,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         mediaBase64: base64Data,
         mediaMimetype: file.type || 'application/octet-stream',
         fileName: file.name,
+        quotedMessageId: replyTo?.message_id || undefined,
       },
       {
         onSuccess: () => {
@@ -202,7 +203,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mídia"); },
       }
     );
-  }, [isBlocked, sendMutation, conversationId, onCancelReply]);
+  }, [isBlocked, sendMutation, conversationId, replyTo, onCancelReply]);
 
   const handleSend = useCallback(() => {
     if (attachedFile) {
@@ -237,13 +238,13 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
       return;
     }
     sendMutation.mutate(
-      { conversationId, content: params.content, messageType: params.messageType, mediaUrl: params.mediaUrl, mediaBase64: params.mediaBase64, mediaMimetype: params.mediaMimetype, fileName: params.fileName },
+      { conversationId, content: params.content, messageType: params.messageType, mediaUrl: params.mediaUrl, mediaBase64: params.mediaBase64, mediaMimetype: params.mediaMimetype, fileName: params.fileName, quotedMessageId: replyTo?.message_id || undefined },
       {
-        onSuccess: () => { setIsRecording(false); },
+        onSuccess: () => { setIsRecording(false); onCancelReply?.(); },
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mídia"); },
       }
     );
-  }, [conversationId, sendMutation]);
+  }, [conversationId, sendMutation, replyTo, onCancelReply]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (showMacroSuggestions && filteredMacros.length > 0) {
