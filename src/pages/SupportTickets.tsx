@@ -778,7 +778,7 @@ export default function SupportTickets() {
 
       {/* Metric cards contextuais */}
       {(ticketsView === "lista" || ticketsView === "kanban") && (
-        <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
+        <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
             <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
@@ -791,6 +791,19 @@ export default function SupportTickets() {
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
             <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
           </div>
+          <button
+            onClick={() => setCsatModalOpen(true)}
+            className="bg-card border border-primary/40 rounded-lg p-3 text-left hover:border-primary/70 transition-colors"
+          >
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">CSAT médio</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-yellow-400">
+              {csatSummary?.media != null ? csatSummary.media.toLocaleString("pt-BR") : "—"}
+              <span className="text-sm font-normal text-muted-foreground"> / {csatScale ?? 5}</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {csatSummary?.respostas ?? 0} resposta(s) · clique p/ ver
+            </p>
+          </button>
           {selectedDeptSlug === "implantacao" && implantacaoMetrics && (
             <div className="bg-card border border-border rounded-lg p-3">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo médio implantação</p>
