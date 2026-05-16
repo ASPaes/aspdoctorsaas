@@ -386,6 +386,11 @@ export function MessageBubble({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={isFromMe ? "end" : "start"} className="min-w-[180px]">
+        <DropdownMenuItem onClick={() => onReply?.(msg)}>
+          <Reply className="h-4 w-4 mr-2" />
+          Responder
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {isFromMe && canDeletePanelOnly(msg) && (
           <DropdownMenuItem onClick={handleDeleteEveryone} className="text-destructive focus:text-destructive">
             <Trash2 className="h-4 w-4 mr-2" />
