@@ -509,7 +509,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
       if (needsReason) {
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
       } else {
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
         await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       }
       return true;
