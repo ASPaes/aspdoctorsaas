@@ -19,6 +19,7 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
+import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 
 
 
@@ -82,6 +83,7 @@ export default function SupportTickets() {
   const [ticketsView, setTicketsView] = useState<string>("lista");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [csatModalOpen, setCsatModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
@@ -327,6 +329,35 @@ export default function SupportTickets() {
       });
       if (error) throw error;
       return data as { avg_days: number; total_concluidas: number; min_days: number; max_days: number } | null;
+    },
+  });
+
+  // CSAT: escala do tenant + resumo do período (para o card)
+  const { data: csatScale } = useQuery({
+    queryKey: ["csat-scale", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("support_csat_score_max")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.support_csat_score_max ?? 5) as number;
+    },
+  });
+
+  const { data: csatSummary } = useQuery({
+    queryKey: ["csat-card-summary", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentFilter],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_csat_report_summary", {
+        p_tenant_id: tid,
+        p_date_from: dateRange.from.toISOString().slice(0, 10),
+        p_date_to: dateRange.to.toISOString().slice(0, 10),
+        p_department_id: departmentFilter !== "all" ? departmentFilter : null,
+      });
+      if (error) throw error;
+      return data as { media: number | null; respostas: number; enviadas: number };
     },
   });
 
@@ -747,7 +778,7 @@ export default function SupportTickets() {
 
       {/* Metric cards contextuais */}
       {(ticketsView === "lista" || ticketsView === "kanban") && (
-        <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
+        <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
             <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
@@ -760,6 +791,19 @@ export default function SupportTickets() {
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
             <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
           </div>
+          <button
+            onClick={() => setCsatModalOpen(true)}
+            className="bg-card border border-primary/40 rounded-lg p-3 text-left hover:border-primary/70 transition-colors"
+          >
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">CSAT médio</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-yellow-400">
+              {csatSummary?.media != null ? csatSummary.media.toLocaleString("pt-BR") : "—"}
+              <span className="text-sm font-normal text-muted-foreground"> / {csatScale ?? 5}</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {csatSummary?.respostas ?? 0} resposta(s) · clique p/ ver
+            </p>
+          </button>
           {selectedDeptSlug === "implantacao" && implantacaoMetrics && (
             <div className="bg-card border border-border rounded-lg p-3">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tempo médio implantação</p>
@@ -980,6 +1024,16 @@ export default function SupportTickets() {
         ticketId={selectedTicketId}
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
+      />
+
+      <CsatReportModal
+        open={csatModalOpen}
+        onOpenChange={setCsatModalOpen}
+        tenantId={tid}
+        dateFrom={dateRange.from}
+        dateTo={dateRange.to}
+        departmentId={departmentFilter}
+        scoreMax={csatScale ?? 5}
       />
     </div>
   );
