@@ -6427,6 +6427,33 @@ export type Database = {
           telefone_whatsapp: string
         }[]
       }
+      get_csat_report_list: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_limit?: number
+          p_tenant_id: string
+        }
+        Returns: {
+          cliente_nome: string
+          department_id: string
+          id: string
+          reason: string
+          responded_at: string
+          score: number
+          setor: string
+        }[]
+      }
+      get_csat_report_summary: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       get_database_projection: { Args: never; Returns: Json }
       get_duplicate_contacts: {
         Args: { p_tenant_id: string }
