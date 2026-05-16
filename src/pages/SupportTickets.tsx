@@ -1025,6 +1025,16 @@ export default function SupportTickets() {
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedTicketId(null); }}
       />
+
+      <CsatReportModal
+        open={csatModalOpen}
+        onOpenChange={setCsatModalOpen}
+        tenantId={tid}
+        dateFrom={dateRange.from}
+        dateTo={dateRange.to}
+        departmentId={departmentFilter}
+        scoreMax={csatScale ?? 5}
+      />
     </div>
   );
 }
