@@ -19,6 +19,7 @@ import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTick
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
+import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 
 
 
@@ -82,6 +83,7 @@ export default function SupportTickets() {
   const [ticketsView, setTicketsView] = useState<string>("lista");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [csatModalOpen, setCsatModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
