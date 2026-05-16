@@ -115,6 +115,7 @@ class EvolutionAdapter implements ProviderAdapter {
           ? msg.mediaBase64.split(',')[1]
           : msg.mediaBase64);
         body = { number: msg.to, audio };
+        if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
         break;
       }
       default: {
@@ -126,6 +127,7 @@ class EvolutionAdapter implements ProviderAdapter {
           caption: msg.content,
           ...(msg.messageType === 'document' && msg.fileName ? { fileName: msg.fileName } : {}),
         };
+        if (msg.quotedMessageId) body.quoted = { key: { id: msg.quotedMessageId } };
       }
     }
 
@@ -214,6 +216,7 @@ class ZApiAdapter implements ProviderAdapter {
       case 'image': {
         endpoint = `${base}/send-image`;
         body = { phone, image: msg.mediaUrl, caption: msg.content };
+        if (msg.quotedMessageId) body.messageId = msg.quotedMessageId;
         break;
       }
       case 'audio': {
@@ -229,11 +232,13 @@ class ZApiAdapter implements ProviderAdapter {
           endpoint = `${base}/send-audio`;
           body = { phone, audio: msg.mediaUrl };
         }
+        if (msg.quotedMessageId) body.messageId = msg.quotedMessageId;
         break;
       }
       case 'video': {
         endpoint = `${base}/send-video`;
         body = { phone, video: msg.mediaUrl, caption: msg.content };
+        if (msg.quotedMessageId) body.messageId = msg.quotedMessageId;
         break;
       }
       case 'document': {
@@ -247,6 +252,7 @@ class ZApiAdapter implements ProviderAdapter {
         }
         endpoint = `${base}/send-document/${docExt}`;
         body = { phone, document: msg.mediaUrl, fileName: msg.fileName };
+        if (msg.quotedMessageId) body.messageId = msg.quotedMessageId;
         break;
       }
       default:
@@ -311,6 +317,11 @@ class MetaCloudAdapter implements ProviderAdapter {
       if (msg.content && mediaType !== 'audio') mediaObj.caption = msg.content;
       if (mediaType === 'document' && msg.fileName) mediaObj.filename = msg.fileName;
       graphBody = { messaging_product: 'whatsapp', to, type: mediaType, [mediaType]: mediaObj };
+    }
+
+    // Reply: Meta Cloud usa context.message_id (vale para texto e midia)
+    if (msg.quotedMessageId) {
+      graphBody.context = { message_id: msg.quotedMessageId };
     }
 
     const res = await fetch(`${this.graphBase}/${phoneId}/messages`, {
