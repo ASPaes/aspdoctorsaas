@@ -1,5 +1,5 @@
 // message-processor.ts — Parte 1/4: Imports, constantes e utilitários
-import { getSupportConfig, SupportConfig } from './support-config.ts';
+import { getSupportConfig, SupportConfig, resolveCsatTemplates } from './support-config.ts';
 import { getAIConfig, callAI } from './ai-client.ts';
 import { getAdapter } from './providers/index.ts';
 import { NormalizedInboundMessage, SendContext, PhoneParseResult } from './message-types.ts';
