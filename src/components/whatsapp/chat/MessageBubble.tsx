@@ -54,6 +54,8 @@ export function MessageBubble({
   onEnterSelectionMode,
   onContactChat,
   onContactSave,
+  onReplyClick,
+  quotedMessage,
 }: Props) {
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
