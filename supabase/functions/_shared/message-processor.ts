@@ -472,6 +472,21 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     if (!csat) return false;
 
     const supportConfig = await getSupportConfig(supabase, tenantId);
+
+    // Resolve templates CSAT por setor do atendimento (fallback campo a campo para o padrão)
+    const { data: csatConv } = await supabase
+      .from('whatsapp_conversations')
+      .select('department_id')
+      .eq('id', conversationId)
+      .maybeSingle();
+
+    const csatTemplates = await resolveCsatTemplates(
+      supabase,
+      tenantId,
+      csatConv?.department_id ?? null,
+      supportConfig,
+    );
+
     const elapsedMinutes = (Date.now() - new Date(csat.asked_at).getTime()) / (1000 * 60);
 
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
