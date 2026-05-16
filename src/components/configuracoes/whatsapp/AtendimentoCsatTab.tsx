@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Plus, Trash2 } from "lucide-react";
 import UraOptionsManager from "./UraOptionsManager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -316,7 +316,7 @@ export default function AtendimentoCsatTab() {
 
                 <FormField control={form.control} name="support_csat_prompt_template" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mensagem de pesquisa</FormLabel>
+                    <FormLabel>Mensagem de pesquisa (padrão)</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={3} placeholder="Mensagem enviada ao cliente pedindo a nota" />
                     </FormControl>
@@ -327,7 +327,7 @@ export default function AtendimentoCsatTab() {
 
                 <FormField control={form.control} name="support_csat_reason_prompt_template" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mensagem pedindo motivo</FormLabel>
+                    <FormLabel>Mensagem pedindo motivo (padrão)</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={2} placeholder="Mensagem enviada para pedir o motivo da nota baixa" />
                     </FormControl>
@@ -337,13 +337,15 @@ export default function AtendimentoCsatTab() {
 
                 <FormField control={form.control} name="support_csat_thanks_template" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mensagem de agradecimento</FormLabel>
+                    <FormLabel>Mensagem de agradecimento (padrão)</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={2} placeholder="Mensagem enviada após receber a nota" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <CsatPorSetor />
               </>
             )}
           </CardContent>
@@ -455,5 +457,211 @@ export default function AtendimentoCsatTab() {
         </div>
       </form>
     </Form>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Bloco: Mensagens CSAT por setor (exceções ao padrão do tenant)
+// ─────────────────────────────────────────────────────────────
+interface DeptCsatRow {
+  id?: string;
+  department_id: string;
+  prompt_template: string;
+  reason_prompt_template: string;
+  thanks_template: string;
+}
+
+function CsatPorSetor() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["csat-setores-ativos", tid],
+    queryFn: async () => {
+      let q = supabase
+        .from("support_departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!tid,
+  });
+
+  const { data: overrides = [], isLoading } = useQuery({
+    queryKey: ["csat-department-templates", tid],
+    queryFn: async () => {
+      let q = supabase
+        .from("csat_department_templates")
+        .select("id, department_id, prompt_template, reason_prompt_template, thanks_template");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!tid,
+  });
+
+  const [rows, setRows] = useState<DeptCsatRow[]>([]);
+  useEffect(() => {
+    setRows(
+      (overrides as any[]).map((o) => ({
+        id: o.id,
+        department_id: o.department_id,
+        prompt_template: o.prompt_template ?? "",
+        reason_prompt_template: o.reason_prompt_template ?? "",
+        thanks_template: o.thanks_template ?? "",
+      }))
+    );
+  }, [overrides]);
+
+  const usedDeptIds = new Set(rows.map((r) => r.department_id));
+  const availableDepts = (departments as any[]).filter((d) => !usedDeptIds.has(d.id));
+  const deptName = (id: string) =>
+    (departments as any[]).find((d) => d.id === id)?.name ?? "Setor";
+
+  const addRow = (departmentId: string) => {
+    setRows((prev) => [
+      ...prev,
+      { department_id: departmentId, prompt_template: "", reason_prompt_template: "", thanks_template: "" },
+    ]);
+  };
+
+  const updateRow = (index: number, field: keyof DeptCsatRow, value: string) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  };
+
+  const removeRow = (index: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!tid) throw new Error("Tenant não identificado");
+      const currentIds = new Set(rows.filter((r) => r.id).map((r) => r.id));
+      const toDelete = (overrides as any[]).filter((o) => !currentIds.has(o.id)).map((o) => o.id);
+      if (toDelete.length > 0) {
+        const { error: delErr } = await supabase
+          .from("csat_department_templates")
+          .delete()
+          .in("id", toDelete);
+        if (delErr) throw delErr;
+      }
+      const payload = rows.map((r) => ({
+        ...(r.id ? { id: r.id } : {}),
+        tenant_id: tid,
+        department_id: r.department_id,
+        prompt_template: r.prompt_template.trim() || null,
+        reason_prompt_template: r.reason_prompt_template.trim() || null,
+        thanks_template: r.thanks_template.trim() || null,
+      }));
+      if (payload.length > 0) {
+        const { error: upErr } = await supabase
+          .from("csat_department_templates")
+          .upsert(payload, { onConflict: "tenant_id,department_id" });
+        if (upErr) throw upErr;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["csat-department-templates"] });
+      toast({ title: "Salvo!", description: "Mensagens por setor atualizadas." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-4 border-t pt-4">
+      <div>
+        <p className="text-sm font-medium">Mensagens por setor (opcional)</p>
+        <p className="text-xs text-muted-foreground">
+          Adicione um setor só se quiser mensagens diferentes das padrão acima. Campo em branco usa a mensagem padrão.
+        </p>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : (
+        <>
+          {rows.map((row, index) => (
+            <Card key={row.department_id} className="border-muted">
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium px-2 py-0.5 rounded bg-muted">
+                    {deptName(row.department_id)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeRow(index)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Mensagem da nota</label>
+                  <Textarea
+                    rows={2}
+                    value={row.prompt_template}
+                    onChange={(e) => updateRow(index, "prompt_template", e.target.value)}
+                    placeholder="Em branco — usa a mensagem padrão"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Mensagem pedindo motivo</label>
+                  <Textarea
+                    rows={2}
+                    value={row.reason_prompt_template}
+                    onChange={(e) => updateRow(index, "reason_prompt_template", e.target.value)}
+                    placeholder="Em branco — usa a mensagem padrão"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Mensagem de agradecimento</label>
+                  <Textarea
+                    rows={2}
+                    value={row.thanks_template}
+                    onChange={(e) => updateRow(index, "thanks_template", e.target.value)}
+                    placeholder="Em branco — usa a mensagem padrão"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          <div className="flex items-center gap-2">
+            <Select
+              value=""
+              onValueChange={(v) => { if (v) addRow(v); }}
+              disabled={availableDepts.length === 0}
+            >
+              <SelectTrigger className="w-[260px]">
+                <SelectValue placeholder={availableDepts.length === 0 ? "Todos os setores já adicionados" : "Adicionar setor..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDepts.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+            >
+              {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Salvar mensagens por setor
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
