@@ -332,6 +332,35 @@ export default function SupportTickets() {
     },
   });
 
+  // CSAT: escala do tenant + resumo do período (para o card)
+  const { data: csatScale } = useQuery({
+    queryKey: ["csat-scale", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("support_csat_score_max")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.support_csat_score_max ?? 5) as number;
+    },
+  });
+
+  const { data: csatSummary } = useQuery({
+    queryKey: ["csat-card-summary", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentFilter],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_csat_report_summary", {
+        p_tenant_id: tid,
+        p_date_from: dateRange.from.toISOString().slice(0, 10),
+        p_date_to: dateRange.to.toISOString().slice(0, 10),
+        p_department_id: departmentFilter !== "all" ? departmentFilter : null,
+      });
+      if (error) throw error;
+      return data as { media: number | null; respostas: number; enviadas: number };
+    },
+  });
+
   const { data: availableTags = [] } = useQuery({
     queryKey: ["ticket_tags_filter", tid],
     enabled: !!tid,
