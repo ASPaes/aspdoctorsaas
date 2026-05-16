@@ -327,7 +327,7 @@ export default function AtendimentoCsatTab() {
 
                 <FormField control={form.control} name="support_csat_reason_prompt_template" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mensagem pedindo motivo</FormLabel>
+                    <FormLabel>Mensagem pedindo motivo (padrão)</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={2} placeholder="Mensagem enviada para pedir o motivo da nota baixa" />
                     </FormControl>
@@ -337,13 +337,15 @@ export default function AtendimentoCsatTab() {
 
                 <FormField control={form.control} name="support_csat_thanks_template" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mensagem de agradecimento</FormLabel>
+                    <FormLabel>Mensagem de agradecimento (padrão)</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={2} placeholder="Mensagem enviada após receber a nota" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <CsatPorSetor />
               </>
             )}
           </CardContent>
