@@ -252,6 +252,31 @@ export function ChatMessages({
     return () => clearTimeout(timer);
   }, [highlightMessageId, isLoading, messages]);
 
+  // Scroll to highlighted message (from clicking quoted bubble)
+  useEffect(() => {
+    if (!internalHighlight || isLoading) return;
+    let attempts = 0;
+    const maxAttempts = 10;
+    const tryScroll = () => {
+      attempts++;
+      const el = document.querySelector(`[data-msg-id="${internalHighlight}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("message-highlight-flash");
+        setTimeout(() => {
+          el.classList.remove("message-highlight-flash");
+          setInternalHighlight(null);
+        }, 2500);
+      } else if (attempts < maxAttempts) {
+        setTimeout(tryScroll, 300);
+      } else {
+        setInternalHighlight(null);
+      }
+    };
+    const timer = setTimeout(tryScroll, 200);
+    return () => clearTimeout(timer);
+  }, [internalHighlight, isLoading]);
+
   // Inject highlight flash CSS
   useEffect(() => {
     const style = document.createElement("style");
