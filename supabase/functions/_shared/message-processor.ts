@@ -517,7 +517,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
       await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       return true;
     }
