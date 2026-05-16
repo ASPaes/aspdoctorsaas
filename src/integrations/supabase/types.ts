@@ -1991,6 +1991,50 @@ export type Database = {
           },
         ]
       }
+      csat_department_templates: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          prompt_template: string | null
+          reason_prompt_template: string | null
+          tenant_id: string
+          thanks_template: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          prompt_template?: string | null
+          reason_prompt_template?: string | null
+          tenant_id: string
+          thanks_template?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          prompt_template?: string | null
+          reason_prompt_template?: string | null
+          tenant_id?: string
+          thanks_template?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csat_department_templates_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_integrity_issues: {
         Row: {
           attendance_id: string | null
@@ -3486,6 +3530,7 @@ export type Database = {
           asked_at: string
           attendance_id: string
           created_at: string
+          department_id: string | null
           id: string
           reason: string | null
           responded_at: string | null
@@ -3497,6 +3542,7 @@ export type Database = {
           asked_at?: string
           attendance_id: string
           created_at?: string
+          department_id?: string | null
           id?: string
           reason?: string | null
           responded_at?: string | null
@@ -3508,6 +3554,7 @@ export type Database = {
           asked_at?: string
           attendance_id?: string
           created_at?: string
+          department_id?: string | null
           id?: string
           reason?: string | null
           responded_at?: string | null
@@ -3529,6 +3576,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_whatsapp_conversations_state"
             referencedColumns: ["attendance_id"]
+          },
+          {
+            foreignKeyName: "support_csat_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
           },
         ]
       }

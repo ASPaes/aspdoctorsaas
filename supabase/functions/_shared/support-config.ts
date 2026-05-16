@@ -207,3 +207,63 @@ export async function getSupportConfig(
     return { ...DEFAULTS };
   }
 }
+
+// ─── CSAT templates por setor ──────────────────────────────────────────────────
+
+/** As 3 mensagens CSAT já resolvidas (override do setor OU padrão do tenant). */
+export interface ResolvedCsatTemplates {
+  prompt_template: string;
+  reason_prompt_template: string;
+  thanks_template: string;
+}
+
+/**
+ * Resolve as 3 mensagens CSAT considerando override por setor.
+ * Modelo "padrão + exceções": configuracoes = padrão do tenant;
+ * csat_department_templates = exceções por setor. Resolução campo a campo.
+ * departmentId null/sem override/erro → retorna o padrão (idêntico ao legado).
+ */
+export async function resolveCsatTemplates(
+  supabase: any,
+  tenantId: string,
+  departmentId: string | null | undefined,
+  baseConfig: SupportConfig,
+): Promise<ResolvedCsatTemplates> {
+  const fallback: ResolvedCsatTemplates = {
+    prompt_template: baseConfig.support_csat_prompt_template,
+    reason_prompt_template: baseConfig.support_csat_reason_prompt_template,
+    thanks_template: baseConfig.support_csat_thanks_template,
+  };
+
+  if (!departmentId) return fallback;
+
+  try {
+    const { data, error } = await supabase
+      .from('csat_department_templates')
+      .select('prompt_template, reason_prompt_template, thanks_template')
+      .eq('tenant_id', tenantId)
+      .eq('department_id', departmentId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[resolveCsatTemplates] Error fetching override:', error.message);
+      return fallback;
+    }
+
+    if (!data) return fallback;
+
+    const pick = (override: string | null | undefined, base: string): string => {
+      const trimmed = (override ?? '').trim();
+      return trimmed.length > 0 ? override! : base;
+    };
+
+    return {
+      prompt_template: pick(data.prompt_template, fallback.prompt_template),
+      reason_prompt_template: pick(data.reason_prompt_template, fallback.reason_prompt_template),
+      thanks_template: pick(data.thanks_template, fallback.thanks_template),
+    };
+  } catch (err) {
+    console.error('[resolveCsatTemplates] Unexpected error:', err);
+    return fallback;
+  }
+}
