@@ -245,17 +245,33 @@ export const useWhatsAppActions = () => {
                     .single();
                   const contactName = (convData as any)?.contact?.name || '';
 
-                  const promptTemplate = config.support_csat_prompt_template ||
+                  // Override de prompt CSAT por setor (campo vazio herda o padrão)
+                  let promptTemplate = config.support_csat_prompt_template ||
                     'Oi {{customer_name}}, para encerrar este atendimento é muito importante entender como foi sua experiência. De 0 a 5, como você avalia este atendimento? (Responda apenas a nota)';
+                  if (activeAtt.department_id) {
+                    try {
+                      const { data: deptTpl } = await supabase
+                        .from('csat_department_templates')
+                        .select('prompt_template')
+                        .eq('tenant_id', resolvedTenantId)
+                        .eq('department_id', activeAtt.department_id)
+                        .maybeSingle();
+                      const override = (deptTpl?.prompt_template ?? '').trim();
+                      if (override.length > 0) promptTemplate = deptTpl!.prompt_template;
+                    } catch (deptErr) {
+                      console.error('[closeConversation] Erro ao buscar override CSAT por setor:', deptErr);
+                    }
+                  }
                   const csatPrompt = promptTemplate
                     .replace(/\{\{customer_name\}\}/g, contactName)
                     .replace(/\{\{score_min\}\}/g, String(config.support_csat_score_min ?? 0))
                     .replace(/\{\{score_max\}\}/g, String(config.support_csat_score_max ?? 5));
 
-                  // Create support_csat record
+                  // Create support_csat record — carimba o setor (congelado para relatório)
                   await supabase.from('support_csat').insert({
                     tenant_id: resolvedTenantId,
                     attendance_id: activeAtt.id,
+                    department_id: activeAtt.department_id ?? null,
                     status: 'pending',
                     asked_at: now.toISOString(),
                   });
