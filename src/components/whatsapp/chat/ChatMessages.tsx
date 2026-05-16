@@ -133,6 +133,20 @@ export function ChatMessages({
     return map;
   }, [messages]);
 
+  const messagesByExternalId = useMemo(() => {
+    const map = new Map<string, Message>();
+    for (const msg of messages) {
+      if (msg.message_id) map.set(msg.message_id, msg);
+    }
+    return map;
+  }, [messages]);
+
+  const handleReplyClick = useCallback((quotedMessageExternalId: string) => {
+    const target = messagesByExternalId.get(quotedMessageExternalId);
+    if (!target) return;
+    setInternalHighlight(target.id);
+  }, [messagesByExternalId]);
+
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
     const items: TimelineItem[] = messages
