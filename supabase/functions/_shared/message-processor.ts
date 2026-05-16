@@ -1,5 +1,5 @@
 // message-processor.ts — Parte 1/4: Imports, constantes e utilitários
-import { getSupportConfig, SupportConfig } from './support-config.ts';
+import { getSupportConfig, SupportConfig, resolveCsatTemplates } from './support-config.ts';
 import { getAIConfig, callAI } from './ai-client.ts';
 import { getAdapter } from './providers/index.ts';
 import { NormalizedInboundMessage, SendContext, PhoneParseResult } from './message-types.ts';
@@ -472,6 +472,21 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
     if (!csat) return false;
 
     const supportConfig = await getSupportConfig(supabase, tenantId);
+
+    // Resolve templates CSAT por setor do atendimento (fallback campo a campo para o padrão)
+    const { data: csatConv } = await supabase
+      .from('whatsapp_conversations')
+      .select('department_id')
+      .eq('id', conversationId)
+      .maybeSingle();
+
+    const csatTemplates = await resolveCsatTemplates(
+      supabase,
+      tenantId,
+      csatConv?.department_id ?? null,
+      supportConfig,
+    );
+
     const elapsedMinutes = (Date.now() - new Date(csat.asked_at).getTime()) / (1000 * 60);
 
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
@@ -492,9 +507,9 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
       const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
       await supabase.from('support_csat').update({ score: scoreNum, responded_at: new Date().toISOString(), status: needsReason ? 'awaiting_reason' : 'completed' }).eq('id', csat.id);
       if (needsReason) {
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
       } else {
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
         await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       }
       return true;
@@ -502,7 +517,7 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
-      await sendAndPersistAutoMessage(supabase, ctx, conversationId, supportConfig.support_csat_thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
       await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
       return true;
     }
