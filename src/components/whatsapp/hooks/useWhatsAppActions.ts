@@ -146,7 +146,7 @@ export const useWhatsAppActions = () => {
         .from('support_attendances')
         .select(`
           id, opened_at, assumed_at, attendance_code,
-          tenant_id, cliente_id, contact_id,
+          tenant_id, cliente_id, contact_id, department_id,
           contact:whatsapp_contacts(phone_number)
         `)
         .eq('conversation_id', conversationId)
