@@ -72,6 +72,7 @@ export function ChatMessages({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
+  const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
   const pendingNewCountRef = useRef(0);
 
   // Track scroll position
