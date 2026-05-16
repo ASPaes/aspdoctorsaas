@@ -72,6 +72,7 @@ export function ChatMessages({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
+  const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
   const pendingNewCountRef = useRef(0);
 
   // Track scroll position
@@ -131,6 +132,20 @@ export function ChatMessages({
     }
     return map;
   }, [messages]);
+
+  const messagesByExternalId = useMemo(() => {
+    const map = new Map<string, Message>();
+    for (const msg of messages) {
+      if (msg.message_id) map.set(msg.message_id, msg);
+    }
+    return map;
+  }, [messages]);
+
+  const handleReplyClick = useCallback((quotedMessageExternalId: string) => {
+    const target = messagesByExternalId.get(quotedMessageExternalId);
+    if (!target) return;
+    setInternalHighlight(target.id);
+  }, [messagesByExternalId]);
 
   // Merge messages and assignment events into a single timeline
   const timelineItems = useMemo(() => {
@@ -237,6 +252,31 @@ export function ChatMessages({
     return () => clearTimeout(timer);
   }, [highlightMessageId, isLoading, messages]);
 
+  // Scroll to highlighted message (from clicking quoted bubble)
+  useEffect(() => {
+    if (!internalHighlight || isLoading) return;
+    let attempts = 0;
+    const maxAttempts = 10;
+    const tryScroll = () => {
+      attempts++;
+      const el = document.querySelector(`[data-msg-id="${internalHighlight}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("message-highlight-flash");
+        setTimeout(() => {
+          el.classList.remove("message-highlight-flash");
+          setInternalHighlight(null);
+        }, 2500);
+      } else if (attempts < maxAttempts) {
+        setTimeout(tryScroll, 300);
+      } else {
+        setInternalHighlight(null);
+      }
+    };
+    const timer = setTimeout(tryScroll, 200);
+    return () => clearTimeout(timer);
+  }, [internalHighlight, isLoading]);
+
   // Inject highlight flash CSS
   useEffect(() => {
     const style = document.createElement("style");
@@ -315,6 +355,8 @@ export function ChatMessages({
                         msg={item.msg}
                         reactions={reactionsMap.get(item.msg.message_id) || undefined}
                         onReply={onReply}
+                        onReplyClick={handleReplyClick}
+                        quotedMessage={item.msg.quoted_message_id ? messagesByExternalId.get(item.msg.quoted_message_id) || null : null}
                         selectionMode={selectionMode}
                         isSelected={selectedMessages?.has(item.msg.id)}
                         onToggleSelect={onToggleSelect}

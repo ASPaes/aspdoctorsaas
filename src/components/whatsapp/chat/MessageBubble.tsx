@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Trash2, Forward, CheckSquare, EyeOff, Loader2, AlertCircle, RotateCcw, MoreVertical, Reply } from "lucide-react";
 import { useState } from "react";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { MediaContent } from "./MediaContent";
@@ -30,6 +30,8 @@ interface Props {
   onEnterSelectionMode?: (msgId: string) => void;
   onContactChat?: (phone: string, name: string) => void;
   onContactSave?: (phone: string, name: string) => void;
+  onReplyClick?: (quotedMessageId: string) => void;
+  quotedMessage?: Message | null;
 }
 
 function canDeletePanelOnly(msg: Message): boolean {
@@ -52,6 +54,8 @@ export function MessageBubble({
   onEnterSelectionMode,
   onContactChat,
   onContactSave,
+  onReplyClick,
+  quotedMessage,
 }: Props) {
   const isFromMe = Boolean(msg.isFromMe ?? msg.is_from_me ?? (msg as any).fromMe ?? (msg as any).key?.fromMe ?? false);
   const rawKind = (msg.message_type ?? (msg as any).messageType ?? (msg as any).type ?? 'text') as string;
@@ -219,14 +223,58 @@ export function MessageBubble({
         </p>
       )}
 
-      {msg.quoted_message_id && (
-        <div className={cn(
-          "text-[10px] px-2 py-1 rounded mb-1 border-l-2",
-          isFromMe ? "bg-primary-foreground/10 border-primary-foreground/30" : "bg-background/50 border-primary/30"
-        )}>
-          <span className="opacity-70">Mensagem citada</span>
-        </div>
+  {msg.quoted_message_id && (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!quotedMessage) {
+          toast.error("Mensagem original não encontrada");
+          return;
+        }
+        onReplyClick?.(msg.quoted_message_id!);
+      }}
+      className={cn(
+        "block w-full text-left text-xs px-2 py-1.5 rounded mb-1 border-l-2 hover:opacity-100 transition-opacity cursor-pointer",
+        isFromMe
+          ? "bg-primary-foreground/10 border-primary-foreground/40 opacity-90"
+          : "bg-background/60 border-primary/40 opacity-90"
       )}
+    >
+      <p className={cn(
+        "font-semibold text-[10px] mb-0.5",
+        isFromMe ? "text-primary-foreground/90" : "text-primary/90"
+      )}>
+        {!quotedMessage
+          ? "Mensagem"
+          : quotedMessage.is_from_me
+          ? "Você"
+          : (quotedMessage.sender_name || "Contato")}
+      </p>
+      <p className={cn(
+        "text-[11px] truncate",
+        isFromMe ? "text-primary-foreground/70" : "text-foreground/70"
+      )}>
+        {!quotedMessage
+          ? "Mensagem citada"
+          : quotedMessage.message_type === "image"
+          ? "📷 Imagem"
+          : quotedMessage.message_type === "audio"
+          ? "🎤 Áudio"
+          : quotedMessage.message_type === "video"
+          ? "🎥 Vídeo"
+          : quotedMessage.message_type === "document"
+          ? "📄 Documento"
+          : quotedMessage.message_type === "sticker"
+          ? "🎨 Sticker"
+          : quotedMessage.message_type === "contact" || quotedMessage.message_type === "contacts"
+          ? "👤 Contato"
+          : (quotedMessage.content && quotedMessage.content.length > 80
+              ? quotedMessage.content.substring(0, 80) + "..."
+              : (quotedMessage.content || "Mensagem"))}
+      </p>
+    </button>
+  )}
 
       {(msg.message_type === 'contact' || msg.message_type === 'contacts') && msg.metadata && (
         <ContactCard
@@ -338,6 +386,11 @@ export function MessageBubble({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align={isFromMe ? "end" : "start"} className="min-w-[180px]">
+        <DropdownMenuItem onClick={() => onReply?.(msg)}>
+          <Reply className="h-4 w-4 mr-2" />
+          Responder
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {isFromMe && canDeletePanelOnly(msg) && (
           <DropdownMenuItem onClick={handleDeleteEveryone} className="text-destructive focus:text-destructive">
             <Trash2 className="h-4 w-4 mr-2" />
