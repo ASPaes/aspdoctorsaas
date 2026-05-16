@@ -355,6 +355,8 @@ export function ChatMessages({
                         msg={item.msg}
                         reactions={reactionsMap.get(item.msg.message_id) || undefined}
                         onReply={onReply}
+                        onReplyClick={handleReplyClick}
+                        quotedMessage={item.msg.quoted_message_id ? messagesByExternalId.get(item.msg.quoted_message_id) || null : null}
                         selectionMode={selectionMode}
                         isSelected={selectedMessages?.has(item.msg.id)}
                         onToggleSelect={onToggleSelect}
