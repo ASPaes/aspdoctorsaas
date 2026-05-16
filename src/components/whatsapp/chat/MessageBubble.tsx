@@ -223,14 +223,58 @@ export function MessageBubble({
         </p>
       )}
 
-      {msg.quoted_message_id && (
-        <div className={cn(
-          "text-[10px] px-2 py-1 rounded mb-1 border-l-2",
-          isFromMe ? "bg-primary-foreground/10 border-primary-foreground/30" : "bg-background/50 border-primary/30"
-        )}>
-          <span className="opacity-70">Mensagem citada</span>
-        </div>
+  {msg.quoted_message_id && (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!quotedMessage) {
+          toast.error("Mensagem original não encontrada");
+          return;
+        }
+        onReplyClick?.(msg.quoted_message_id!);
+      }}
+      className={cn(
+        "block w-full text-left text-xs px-2 py-1.5 rounded mb-1 border-l-2 hover:opacity-100 transition-opacity cursor-pointer",
+        isFromMe
+          ? "bg-primary-foreground/10 border-primary-foreground/40 opacity-90"
+          : "bg-background/60 border-primary/40 opacity-90"
       )}
+    >
+      <p className={cn(
+        "font-semibold text-[10px] mb-0.5",
+        isFromMe ? "text-primary-foreground/90" : "text-primary/90"
+      )}>
+        {!quotedMessage
+          ? "Mensagem"
+          : quotedMessage.is_from_me
+          ? "Você"
+          : (quotedMessage.sender_name || "Contato")}
+      </p>
+      <p className={cn(
+        "text-[11px] truncate",
+        isFromMe ? "text-primary-foreground/70" : "text-foreground/70"
+      )}>
+        {!quotedMessage
+          ? "Mensagem citada"
+          : quotedMessage.message_type === "image"
+          ? "📷 Imagem"
+          : quotedMessage.message_type === "audio"
+          ? "🎤 Áudio"
+          : quotedMessage.message_type === "video"
+          ? "🎥 Vídeo"
+          : quotedMessage.message_type === "document"
+          ? "📄 Documento"
+          : quotedMessage.message_type === "sticker"
+          ? "🎨 Sticker"
+          : quotedMessage.message_type === "contact" || quotedMessage.message_type === "contacts"
+          ? "👤 Contato"
+          : (quotedMessage.content && quotedMessage.content.length > 80
+              ? quotedMessage.content.substring(0, 80) + "..."
+              : (quotedMessage.content || "Mensagem"))}
+      </p>
+    </button>
+  )}
 
       {(msg.message_type === 'contact' || msg.message_type === 'contacts') && msg.metadata && (
         <ContactCard
