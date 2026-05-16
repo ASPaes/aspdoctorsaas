@@ -316,7 +316,7 @@ export default function AtendimentoCsatTab() {
 
                 <FormField control={form.control} name="support_csat_prompt_template" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mensagem de pesquisa</FormLabel>
+                    <FormLabel>Mensagem de pesquisa (padrão)</FormLabel>
                     <FormControl>
                       <Textarea {...field} rows={3} placeholder="Mensagem enviada ao cliente pedindo a nota" />
                     </FormControl>
