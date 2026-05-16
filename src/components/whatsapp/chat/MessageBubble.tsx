@@ -30,6 +30,8 @@ interface Props {
   onEnterSelectionMode?: (msgId: string) => void;
   onContactChat?: (phone: string, name: string) => void;
   onContactSave?: (phone: string, name: string) => void;
+  onReplyClick?: (quotedMessageId: string) => void;
+  quotedMessage?: Message | null;
 }
 
 function canDeletePanelOnly(msg: Message): boolean {
