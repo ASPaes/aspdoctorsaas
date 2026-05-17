@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff } from "lucide-react";
+import { X, Plus, Loader2, Phone, Tag, StickyNote, FileText, MessageSquare, RefreshCw, Sparkles, Pencil, Ticket, ChevronDown, BookOpen, Send, History, ShieldOff, ShieldAlert } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContactHistoryUnifiedModal } from "./ContactHistoryUnifiedModal";
@@ -25,6 +25,7 @@ import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { useKBDraft } from "../hooks/useKBDraft";
 import { TopicBadges } from "./TopicBadges";
 import { ClienteLinkCard } from "./ClienteLinkCard";
+import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useRelevantAttendance } from "../hooks/useRelevantAttendance";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { Input } from "@/components/ui/input";
@@ -261,6 +262,17 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               </p>
             )}
           </div>
+
+          {/* ─── Avisos e bloqueios do contato ─── */}
+          {isAdminOrHead && contact?.id && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs font-medium">Avisos e bloqueios</span>
+              </div>
+              <ClientAlertsManager contactId={contact.id} canManage={isAdminOrHead} />
+            </div>
+          )}
 
           <Separator />
 
