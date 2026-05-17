@@ -4,6 +4,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export interface ClientAlert {
   id: string;
+  tenant_id: string;
   kind: "aviso" | "bloqueio";
   block_behavior: "confirm" | "hard" | null;
   titulo: string;
@@ -21,7 +22,7 @@ export function useClientAlerts() {
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await (supabase.from("client_alerts" as any) as any)
-        .select("id, kind, block_behavior, titulo, mensagem, cliente_id, contact_id, expires_at")
+        .select("id, tenant_id, kind, block_behavior, titulo, mensagem, cliente_id, contact_id, expires_at")
         .eq("ativo", true);
       if (error) throw error;
       return (data ?? []) as ClientAlert[];
