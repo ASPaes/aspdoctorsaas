@@ -215,6 +215,10 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           pendingAction={pendingAction}
           onPendingActionConsumed={onPendingActionConsumed}
         />
+        <ClientAlertBanner
+          contactId={conversation.contact?.id}
+          clienteId={(conversation.contact as any)?.cliente_id}
+        />
         <ChatMessages
           conversationId={conversation.id}
           highlightMessageId={highlightMessageId}
