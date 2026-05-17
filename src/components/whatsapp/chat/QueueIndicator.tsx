@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock } from "lucide-react";
+import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
