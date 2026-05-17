@@ -74,6 +74,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
+  const { data: allClientAlerts = [] } = useClientAlerts();
   const { getSenderLabel } = useSenderMap();
   const { timezone } = useAppTimezone();
 
