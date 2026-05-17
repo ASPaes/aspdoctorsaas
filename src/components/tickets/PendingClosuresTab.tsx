@@ -77,13 +77,16 @@ interface Props {
   departmentFilter?: string;
   agenteFilter?: string;
   embedded?: boolean;
+  dateRangeOverride?: { from: Date; to: Date };
 }
 
-export function PendingClosuresTab({ departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false }: Props = {}) {
+export function PendingClosuresTab({ departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
 
-  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 7), to: new Date() });
+  const [internalDateRange, setInternalDateRange] = useState({ from: subDays(new Date(), 7), to: new Date() });
+  const dateRange = dateRangeOverride || internalDateRange;
+  const setDateRange = dateRangeOverride ? () => {} : setInternalDateRange;
   const [agenteFilter, setAgenteFilter] = useState<string>("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
