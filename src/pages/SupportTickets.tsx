@@ -661,8 +661,8 @@ export default function SupportTickets() {
           Todos
         </button>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDeptDragEnd}>
-          <SortableContext items={orderedDepartments.map(d => d.id)} strategy={horizontalListSortingStrategy}>
-            {orderedDepartments.map((dept) => (
+          <SortableContext items={orderedDepartmentsFromState.map(d => d.id)} strategy={horizontalListSortingStrategy}>
+            {orderedDepartmentsFromState.map((dept) => (
               <SortableDeptPill
                 key={dept.id}
                 dept={dept}
