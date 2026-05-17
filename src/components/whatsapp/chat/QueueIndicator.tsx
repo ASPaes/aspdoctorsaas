@@ -26,9 +26,11 @@ interface QueueIndicatorProps {
   assignedTo: string | null;
   onTransferClick: () => void;
   assignedOperatorName?: string | null;
+  contactId?: string | null;
+  clienteId?: string | null;
 }
 
-export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName }: QueueIndicatorProps) {
+export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName, contactId, clienteId }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
