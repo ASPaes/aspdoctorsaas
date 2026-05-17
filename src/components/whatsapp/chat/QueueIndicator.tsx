@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,6 +65,32 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
   const doClaim = () => {
     if (!user?.id) return;
     assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
+  };
+
+  // Registra auditoria ao furar bloqueios "confirmação" e assume o atendimento.
+  // Falha de log não impede o atendimento.
+  const handleConfirmOverride = async () => {
+    setBlockDialogOpen(false);
+    if (user?.id && clientBlocks.length > 0) {
+      const rows = clientBlocks.map((b) => ({
+        tenant_id: b.tenant_id,
+        alert_id: b.id,
+        cliente_id: b.cliente_id,
+        contact_id: b.contact_id,
+        conversation_id: conversationId,
+        action: "bloqueio_confirmado",
+        alert_titulo: b.titulo,
+        alert_kind: b.kind,
+        alert_block_behavior: b.block_behavior,
+        performed_by: user.id,
+      }));
+      try {
+        await (supabase.from("client_alert_audit" as any) as any).insert(rows);
+      } catch (e) {
+        console.error("Falha ao registrar auditoria de bloqueio", e);
+      }
+    }
+    doClaim();
   };
 
   const handleClaim = () => {
@@ -168,12 +195,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
             ) : (
               <>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    setBlockDialogOpen(false);
-                    doClaim();
-                  }}
-                >
+                <AlertDialogAction onClick={handleConfirmOverride}>
                   Assumir mesmo assim
                 </AlertDialogAction>
               </>
