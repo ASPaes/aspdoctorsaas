@@ -2875,30 +2875,39 @@ export type Database = {
           created_at: string
           descricao: string | null
           id: string
+          margem_percentual: number | null
           nome: string
           produto_id: number
           tenant_id: string
           updated_at: string
+          vlr_custo: number | null
+          vlr_venda: number | null
         }
         Insert: {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
           id?: string
+          margem_percentual?: number | null
           nome: string
           produto_id: number
           tenant_id: string
           updated_at?: string
+          vlr_custo?: number | null
+          vlr_venda?: number | null
         }
         Update: {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
           id?: string
+          margem_percentual?: number | null
           nome?: string
           produto_id?: number
           tenant_id?: string
           updated_at?: string
+          vlr_custo?: number | null
+          vlr_venda?: number | null
         }
         Relationships: [
           {

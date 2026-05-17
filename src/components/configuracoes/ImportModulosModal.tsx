@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileSpreadsheet, X, Loader2, Check, AlertCircle, CheckCircle2, Download, ArrowLeft, ArrowRight, Package } from "lucide-react";
+import { FileSpreadsheet, X, Loader2, Check, AlertCircle, CheckCircle2, Download, ArrowLeft, ArrowRight, Package, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +22,23 @@ interface Props {
 interface ParsedRow {
   nome: string;
   descricao: string;
+  vlr_custo: number;
+  margem_percentual: number;
+  vlr_venda: number;
+}
+
+function parseBRNumber(val: string): number {
+  if (!val || val.trim() === "" || val.trim() === "-") return 0;
+  let s = val.trim().replace(/R\$\s*/gi, "").replace(/%/g, "").replace(/\s/g, "");
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtBR(n: number): string {
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 interface ProdutoOption {
@@ -73,7 +90,7 @@ function sanitizeFilename(s: string) {
 
 function downloadTemplateCsv(produtoNome: string) {
   const BOM = "\uFEFF";
-  const content = BOM + "nome;descricao\nMódulo Exemplo 1;Descrição do módulo 1\nMódulo Exemplo 2;\n";
+  const content = BOM + "nome;descricao;vlr_custo;margem_percentual;vlr_venda\nMódulo Exemplo 1;Descrição do módulo 1;100;50;150\nMódulo Exemplo 2;;0;0;0\n";
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -139,7 +156,13 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
       const parsed: ParsedRow[] = lines.map(line => {
         const cols = line.split(";");
-        return { nome: (cols[0] ?? "").trim(), descricao: (cols[1] ?? "").trim() };
+        return {
+          nome: (cols[0] ?? "").trim(),
+          descricao: (cols[1] ?? "").trim(),
+          vlr_custo: parseBRNumber(cols[2] ?? ""),
+          margem_percentual: parseBRNumber(cols[3] ?? ""),
+          vlr_venda: parseBRNumber(cols[4] ?? ""),
+        };
       });
       setRows(parsed);
       setFileName(file.name);
@@ -172,6 +195,9 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
         produto_id: selectedProdutoId,
         nome: r.nome,
         descricao: r.descricao || null,
+        vlr_custo: r.vlr_custo,
+        margem_percentual: r.margem_percentual,
+        vlr_venda: r.vlr_venda,
         ativo: true,
       }));
       const batchSize = 100;
@@ -301,6 +327,9 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
                         <TableHead className="w-12">#</TableHead>
                         <TableHead>Nome</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead className="text-right">Vlr Custo</TableHead>
+                        <TableHead className="text-right">Margem %</TableHead>
+                        <TableHead className="text-right">Vlr Venda</TableHead>
                         <TableHead className="w-20">Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -309,7 +338,10 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
                         <TableRow key={i}>
                           <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                           <TableCell>{r.nome || <span className="text-muted-foreground italic">vazio</span>}</TableCell>
-                          <TableCell>{r.descricao}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{r.descricao}</TableCell>
+                          <TableCell className="text-right">{fmtBR(r.vlr_custo)}</TableCell>
+                          <TableCell className="text-right">{fmtBR(r.margem_percentual)}%</TableCell>
+                          <TableCell className="text-right">{fmtBR(r.vlr_venda)}</TableCell>
                           <TableCell>
                             {r.nome ? (
                               <Check className="h-4 w-4 text-green-500" />
@@ -366,6 +398,11 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
                 <CheckCircle2 className="h-4 w-4 text-primary" />
                 <span className="text-sm text-muted-foreground">Módulos a importar:</span>
                 <span className="text-sm font-medium">{validRows.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Valor total de venda:</span>
+                <span className="text-sm font-medium">R$ {fmtBR(validRows.reduce((s, r) => s + (r.vlr_venda || 0), 0))}</span>
               </div>
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
