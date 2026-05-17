@@ -9,6 +9,17 @@ import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface QueueIndicatorProps {
   conversationId: string;
