@@ -18,10 +18,23 @@ import { Plus, Pencil, Trash2, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 
 interface Produto { id: number; nome: string; tenant_id: string; }
-interface Modulo { id: string; nome: string; descricao: string | null; ativo: boolean; produto_id: number; }
+interface Modulo {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+  produto_id: number;
+  vlr_custo: number;
+  margem_percentual: number;
+  vlr_venda: number;
+}
+
+const fmtBRL = (n: number) => `R$ ${(n ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtPct = (n: number) => `${(n ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 
 export default function ProdutosModulosTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -44,6 +57,9 @@ export default function ProdutosModulosTab() {
   const [moduloNome, setModuloNome] = useState("");
   const [moduloDesc, setModuloDesc] = useState("");
   const [moduloAtivo, setModuloAtivo] = useState(true);
+  const [moduloVlrCusto, setModuloVlrCusto] = useState(0);
+  const [moduloMargem, setModuloMargem] = useState(0);
+  const [moduloVlrVenda, setModuloVlrVenda] = useState(0);
   const [savingModulo, setSavingModulo] = useState(false);
 
   // Módulo delete
@@ -130,10 +146,16 @@ export default function ProdutosModulosTab() {
 
   // Módulo handlers
   const openNewModulo = () => {
-    setEditingModulo(null); setModuloNome(""); setModuloDesc(""); setModuloAtivo(true); setModuloDialogOpen(true);
+    setEditingModulo(null); setModuloNome(""); setModuloDesc(""); setModuloAtivo(true);
+    setModuloVlrCusto(0); setModuloMargem(0); setModuloVlrVenda(0);
+    setModuloDialogOpen(true);
   };
   const openEditModulo = (m: Modulo) => {
-    setEditingModulo(m); setModuloNome(m.nome); setModuloDesc(m.descricao ?? ""); setModuloAtivo(m.ativo); setModuloDialogOpen(true);
+    setEditingModulo(m); setModuloNome(m.nome); setModuloDesc(m.descricao ?? ""); setModuloAtivo(m.ativo);
+    setModuloVlrCusto(m.vlr_custo ?? 0);
+    setModuloMargem(m.margem_percentual ?? 0);
+    setModuloVlrVenda(m.vlr_venda ?? 0);
+    setModuloDialogOpen(true);
   };
 
   const saveModulo = async () => {
@@ -143,7 +165,14 @@ export default function ProdutosModulosTab() {
     try {
       if (editingModulo) {
         const { error } = await (supabase.from("produto_modulos" as any) as any)
-          .update({ nome: moduloNome.trim(), descricao: moduloDesc.trim() || null, ativo: moduloAtivo })
+          .update({
+            nome: moduloNome.trim(),
+            descricao: moduloDesc.trim() || null,
+            ativo: moduloAtivo,
+            vlr_custo: moduloVlrCusto,
+            margem_percentual: moduloMargem,
+            vlr_venda: moduloVlrVenda,
+          })
           .eq("id", editingModulo.id);
         if (error) throw error;
         toast({ title: "Módulo atualizado" });
@@ -154,6 +183,9 @@ export default function ProdutosModulosTab() {
           nome: moduloNome.trim(),
           descricao: moduloDesc.trim() || null,
           ativo: moduloAtivo,
+          vlr_custo: moduloVlrCusto,
+          margem_percentual: moduloMargem,
+          vlr_venda: moduloVlrVenda,
         });
         if (error) throw error;
         toast({ title: "Módulo criado" });
@@ -257,6 +289,9 @@ export default function ProdutosModulosTab() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead className="w-[120px] text-right">Vlr Custo</TableHead>
+                    <TableHead className="w-[100px] text-right">Margem %</TableHead>
+                    <TableHead className="w-[120px] text-right">Vlr Venda</TableHead>
                     <TableHead className="w-[100px]">Ativo</TableHead>
                     <TableHead className="w-[120px] text-right">Ações</TableHead>
                   </TableRow>
@@ -264,11 +299,11 @@ export default function ProdutosModulosTab() {
                 <TableBody>
                   {modulosQ.isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                      <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                     ))
                   ) : (modulosQ.data ?? []).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
                         Nenhum módulo cadastrado. Use 'Novo Módulo' ou 'Importar CSV'.
                       </TableCell>
                     </TableRow>
@@ -277,6 +312,9 @@ export default function ProdutosModulosTab() {
                       <TableRow key={m.id}>
                         <TableCell className="font-medium align-top">{m.nome}</TableCell>
                         <TableCell className="text-muted-foreground whitespace-pre-wrap break-words max-w-[600px]">{m.descricao ?? "—"}</TableCell>
+                        <TableCell className="text-right align-top tabular-nums">{fmtBRL(m.vlr_custo)}</TableCell>
+                        <TableCell className="text-right align-top tabular-nums">{fmtPct(m.margem_percentual)}</TableCell>
+                        <TableCell className="text-right align-top tabular-nums">{fmtBRL(m.vlr_venda)}</TableCell>
                         <TableCell className="align-top">
                           {m.ativo
                             ? <Badge className="bg-green-500/15 text-green-500 hover:bg-green-500/20">Ativo</Badge>
@@ -338,6 +376,36 @@ export default function ProdutosModulosTab() {
                 className="resize-y min-h-[80px] max-h-[300px]"
                 placeholder="Descreva o módulo. Arraste o canto inferior direito para aumentar o campo."
               />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="modulo-vlr-custo">Valor de Custo (R$)</Label>
+                <NumericInput
+                  id="modulo-vlr-custo"
+                  value={moduloVlrCusto}
+                  onChange={(v) => setModuloVlrCusto(v ?? 0)}
+                  placeholder="0,00"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="modulo-margem">Margem</Label>
+                <NumericInput
+                  id="modulo-margem"
+                  value={moduloMargem}
+                  onChange={(v) => setModuloMargem(v ?? 0)}
+                  placeholder="0"
+                  suffix="%"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="modulo-vlr-venda">Valor de Venda (R$)</Label>
+                <NumericInput
+                  id="modulo-vlr-venda"
+                  value={moduloVlrVenda}
+                  onChange={(v) => setModuloVlrVenda(v ?? 0)}
+                  placeholder="0,00"
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Ativo</Label>
