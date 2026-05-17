@@ -1,4 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell } from "lucide-react";
 import { subDays } from "date-fns";
@@ -63,6 +67,40 @@ interface TicketRow {
   service_subcategories: { nome: string } | null;
   service_types: { nome: string } | null;
   ticket_tag_assignments?: Array<{ tag: { id: string; name: string; color: string } | null }>;
+}
+
+function SortableDeptPill({ dept, isActive, onClick }: { dept: { id: string; name: string }; isActive: boolean; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dept.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`shrink-0 inline-flex items-center gap-1 pl-1 pr-3 py-1.5 text-xs rounded-full border transition-colors ${
+        isActive
+          ? "bg-primary/10 text-primary border-primary/30 font-medium"
+          : "border-border text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none p-0.5 opacity-50 hover:opacity-100"
+        aria-label="Reordenar"
+        type="button"
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+      <button type="button" onClick={onClick} className="outline-none">
+        {dept.name}
+      </button>
+    </div>
+  );
 }
 
 export default function SupportTickets() {
@@ -316,6 +354,42 @@ export default function SupportTickets() {
     },
   });
 
+  const DEPT_ORDER_KEY = `dept-order-${tid}-${userId}`;
+
+  const orderedDepartments = useMemo(() => {
+    if (!supportDepartments.length) return [];
+    try {
+      const saved = localStorage.getItem(DEPT_ORDER_KEY);
+      if (saved) {
+        const savedOrder: string[] = JSON.parse(saved);
+        const deptMap = new Map(supportDepartments.map(d => [d.id, d]));
+        const ordered = savedOrder
+          .filter(id => deptMap.has(id))
+          .map(id => deptMap.get(id)!);
+        for (const d of supportDepartments) {
+          if (!savedOrder.includes(d.id)) ordered.push(d);
+        }
+        return ordered;
+      }
+    } catch {}
+    return supportDepartments;
+  }, [supportDepartments, DEPT_ORDER_KEY]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDeptDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = orderedDepartments.findIndex(d => d.id === active.id);
+    const newIndex = orderedDepartments.findIndex(d => d.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(orderedDepartments, oldIndex, newIndex);
+    localStorage.setItem(DEPT_ORDER_KEY, JSON.stringify(reordered.map(d => d.id)));
+    queryClient.invalidateQueries({ queryKey: ["support_departments_list"] });
+  }, [orderedDepartments, DEPT_ORDER_KEY, queryClient]);
+
   const selectedDeptSlug = supportDepartments.find(d => d.id === departmentFilter)?.slug;
   const { data: implantacaoMetrics } = useQuery({
     queryKey: ["implantacao_metrics", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), departmentFilter],
@@ -567,7 +641,7 @@ export default function SupportTickets() {
         </div>
       </div>
 
-      {/* Setores como pill buttons */}
+      {/* Setores como pill buttons — drag-and-drop para reordenar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         <button
           onClick={() => setDepartmentFilter("all")}
@@ -579,19 +653,18 @@ export default function SupportTickets() {
         >
           Todos
         </button>
-        {supportDepartments.map((dept) => (
-          <button
-            key={dept.id}
-            onClick={() => setDepartmentFilter(dept.id)}
-            className={`shrink-0 px-3.5 py-1.5 text-xs rounded-full border transition-colors ${
-              departmentFilter === dept.id
-                ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {dept.name}
-          </button>
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDeptDragEnd}>
+          <SortableContext items={orderedDepartments.map(d => d.id)} strategy={horizontalListSortingStrategy}>
+            {orderedDepartments.map((dept) => (
+              <SortableDeptPill
+                key={dept.id}
+                dept={dept}
+                isActive={departmentFilter === dept.id}
+                onClick={() => setDepartmentFilter(dept.id)}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
 
       {/* Toolbar: filtros globais + views */}
