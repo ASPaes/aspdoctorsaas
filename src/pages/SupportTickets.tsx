@@ -641,7 +641,7 @@ export default function SupportTickets() {
         </div>
       </div>
 
-      {/* Setores como pill buttons */}
+      {/* Setores como pill buttons — drag-and-drop para reordenar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         <button
           onClick={() => setDepartmentFilter("all")}
@@ -653,19 +653,18 @@ export default function SupportTickets() {
         >
           Todos
         </button>
-        {supportDepartments.map((dept) => (
-          <button
-            key={dept.id}
-            onClick={() => setDepartmentFilter(dept.id)}
-            className={`shrink-0 px-3.5 py-1.5 text-xs rounded-full border transition-colors ${
-              departmentFilter === dept.id
-                ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {dept.name}
-          </button>
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDeptDragEnd}>
+          <SortableContext items={orderedDepartments.map(d => d.id)} strategy={horizontalListSortingStrategy}>
+            {orderedDepartments.map((dept) => (
+              <SortableDeptPill
+                key={dept.id}
+                dept={dept}
+                isActive={departmentFilter === dept.id}
+                onClick={() => setDepartmentFilter(dept.id)}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
 
       {/* Toolbar: filtros globais + views */}
