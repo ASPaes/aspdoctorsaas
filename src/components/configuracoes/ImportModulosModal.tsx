@@ -327,6 +327,9 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
                         <TableHead className="w-12">#</TableHead>
                         <TableHead>Nome</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead className="text-right">Vlr Custo</TableHead>
+                        <TableHead className="text-right">Margem %</TableHead>
+                        <TableHead className="text-right">Vlr Venda</TableHead>
                         <TableHead className="w-20">Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -335,7 +338,10 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
                         <TableRow key={i}>
                           <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                           <TableCell>{r.nome || <span className="text-muted-foreground italic">vazio</span>}</TableCell>
-                          <TableCell>{r.descricao}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{r.descricao}</TableCell>
+                          <TableCell className="text-right">{fmtBR(r.vlr_custo)}</TableCell>
+                          <TableCell className="text-right">{fmtBR(r.margem_percentual)}%</TableCell>
+                          <TableCell className="text-right">{fmtBR(r.vlr_venda)}</TableCell>
                           <TableCell>
                             {r.nome ? (
                               <Check className="h-4 w-4 text-green-500" />
