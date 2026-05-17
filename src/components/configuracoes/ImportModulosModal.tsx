@@ -400,6 +400,11 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
                 <span className="text-sm font-medium">{validRows.length}</span>
               </div>
               <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Valor total de venda:</span>
+                <span className="text-sm font-medium">R$ {fmtBR(validRows.reduce((s, r) => s + (r.vlr_venda || 0), 0))}</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Arquivo:</span>
                 <span className="text-sm">{fileName}</span>
