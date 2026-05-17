@@ -579,6 +579,89 @@ export type Database = {
           },
         ]
       }
+      client_alerts: {
+        Row: {
+          ativo: boolean
+          block_behavior: string | null
+          cliente_id: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          kind: string
+          mensagem: string
+          resolved_at: string | null
+          resolved_by: string | null
+          tenant_id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          block_behavior?: string | null
+          cliente_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          kind: string
+          mensagem: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          tenant_id: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          block_behavior?: string | null
+          cliente_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          kind?: string
+          mensagem?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          tenant_id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_alerts_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_alerts_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_alerts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_alerts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_avaliacoes_atendimento: {
         Row: {
           avaliado_por: string | null
@@ -4732,6 +4815,7 @@ export type Database = {
       }
       whatsapp_contacts: {
         Row: {
+          cliente_id: string | null
           created_at: string
           id: string
           instance_id: string | null
@@ -4750,6 +4834,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cliente_id?: string | null
           created_at?: string
           id?: string
           instance_id?: string | null
@@ -4768,6 +4853,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cliente_id?: string | null
           created_at?: string
           id?: string
           instance_id?: string | null
@@ -4786,6 +4872,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_contacts_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_contacts_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_contacts_instance_id_fkey"
             columns: ["instance_id"]
