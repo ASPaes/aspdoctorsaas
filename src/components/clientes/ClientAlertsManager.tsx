@@ -83,6 +83,7 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["client-alerts-active"] });
       toast({ title: "Salvo!", description: "Aviso/bloqueio criado." });
       resetForm();
     },
@@ -101,6 +102,7 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["client-alerts-active"] });
       toast({ title: "Removido", description: "Aviso/bloqueio desativado." });
     },
     onError: (err: any) => {
