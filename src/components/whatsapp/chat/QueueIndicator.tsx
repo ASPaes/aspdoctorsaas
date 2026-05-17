@@ -54,13 +54,29 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   const { isBlocked } = useAgentPresence();
 
+  // Bloqueios ativos do contato/cliente desta conversa
+  const { data: allClientAlerts = [] } = useClientAlerts();
+  const clientBlocks = resolveAlertsFor(allClientAlerts, { contactId, clienteId })
+    .filter((a) => a.kind === "bloqueio");
+  const hasHardBlock = clientBlocks.some((b) => b.block_behavior === "hard");
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+
+  const doClaim = () => {
+    if (!user?.id) return;
+    assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
+  };
+
   const handleClaim = () => {
     if (!user?.id) return;
     if (isBlocked) {
       toast.warning("Você precisa estar Ativo para assumir atendimentos.");
       return;
     }
-    assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
+    if (clientBlocks.length > 0) {
+      setBlockDialogOpen(true);
+      return;
+    }
+    doClaim();
   };
 
   // Chip display
