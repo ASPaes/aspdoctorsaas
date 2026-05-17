@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock } from "lucide-react";
+import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
@@ -8,15 +9,28 @@ import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface QueueIndicatorProps {
   conversationId: string;
   assignedTo: string | null;
   onTransferClick: () => void;
   assignedOperatorName?: string | null;
+  contactId?: string | null;
+  clienteId?: string | null;
 }
 
-export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName }: QueueIndicatorProps) {
+export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName, contactId, clienteId }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
   const { assignConversation, unassignConversation, isAssigning } = useConversationAssignment();
 
@@ -40,13 +54,29 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   const { isBlocked } = useAgentPresence();
 
+  // Bloqueios ativos do contato/cliente desta conversa
+  const { data: allClientAlerts = [] } = useClientAlerts();
+  const clientBlocks = resolveAlertsFor(allClientAlerts, { contactId, clienteId })
+    .filter((a) => a.kind === "bloqueio");
+  const hasHardBlock = clientBlocks.some((b) => b.block_behavior === "hard");
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+
+  const doClaim = () => {
+    if (!user?.id) return;
+    assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
+  };
+
   const handleClaim = () => {
     if (!user?.id) return;
     if (isBlocked) {
       toast.warning("Você precisa estar Ativo para assumir atendimentos.");
       return;
     }
-    assignConversation({ conversationId, assignedTo: user.id, reason: "Assumido manualmente" });
+    if (clientBlocks.length > 0) {
+      setBlockDialogOpen(true);
+      return;
+    }
+    doClaim();
   };
 
   // Chip display
@@ -105,6 +135,52 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           <ArrowRightLeft className="h-3 w-3" />
         </Button>
       )}
+
+
+      <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-destructive" />
+              {hasHardBlock ? "Atendimento bloqueado" : "Cliente com bloqueio"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  {hasHardBlock
+                    ? "Este cliente tem um bloqueio que impede assumir o atendimento:"
+                    : "Este cliente tem um bloqueio. Confirme que está ciente antes de prosseguir:"}
+                </p>
+                <div className="space-y-2">
+                  {clientBlocks.map((b) => (
+                    <div key={b.id} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="font-medium text-sm text-foreground">{b.titulo}</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{b.mensagem}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {hasHardBlock ? (
+              <AlertDialogAction onClick={() => setBlockDialogOpen(false)}>Entendi</AlertDialogAction>
+            ) : (
+              <>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setBlockDialogOpen(false);
+                    doClaim();
+                  }}
+                >
+                  Assumir mesmo assim
+                </AlertDialogAction>
+              </>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
