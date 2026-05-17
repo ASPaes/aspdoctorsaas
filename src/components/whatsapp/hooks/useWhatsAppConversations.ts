@@ -187,9 +187,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
       query = applyFullFilter(query, tid, filters);
 
-      // Hide conversations without messages, unless they are in includeIds
+      // Hide conversations without messages, unless they are groups or in includeIds
       const includeIds = filters?.includeIds;
-      if (includeIds && includeIds.length > 0) {
+      if (filters?.isGroup) {
+        // Grupos: mostrar todos, mesmo sem mensagens
+      } else if (includeIds && includeIds.length > 0) {
         query = query.or(`last_message_at.not.is.null,id.in.(${includeIds.join(',')})`);
       } else {
         query = query.not('last_message_at', 'is', null);
