@@ -14,7 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, Pencil, Trash2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
