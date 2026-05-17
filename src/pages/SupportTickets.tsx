@@ -69,6 +69,40 @@ interface TicketRow {
   ticket_tag_assignments?: Array<{ tag: { id: string; name: string; color: string } | null }>;
 }
 
+function SortableDeptPill({ dept, isActive, onClick }: { dept: { id: string; name: string }; isActive: boolean; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: dept.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`shrink-0 inline-flex items-center gap-1 pl-1 pr-3 py-1.5 text-xs rounded-full border transition-colors ${
+        isActive
+          ? "bg-primary/10 text-primary border-primary/30 font-medium"
+          : "border-border text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none p-0.5 opacity-50 hover:opacity-100"
+        aria-label="Reordenar"
+        type="button"
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+      <button type="button" onClick={onClick} className="outline-none">
+        {dept.name}
+      </button>
+    </div>
+  );
+}
+
 export default function SupportTickets() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
