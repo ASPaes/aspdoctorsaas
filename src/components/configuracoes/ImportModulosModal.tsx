@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileSpreadsheet, X, Loader2, Check, AlertCircle, CheckCircle2, Download, ArrowLeft, ArrowRight, Package } from "lucide-react";
+import { FileSpreadsheet, X, Loader2, Check, AlertCircle, CheckCircle2, Download, ArrowLeft, ArrowRight, Package, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +22,23 @@ interface Props {
 interface ParsedRow {
   nome: string;
   descricao: string;
+  vlr_custo: number;
+  margem_percentual: number;
+  vlr_venda: number;
+}
+
+function parseBRNumber(val: string): number {
+  if (!val || val.trim() === "" || val.trim() === "-") return 0;
+  let s = val.trim().replace(/R\$\s*/gi, "").replace(/%/g, "").replace(/\s/g, "");
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtBR(n: number): string {
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 interface ProdutoOption {
@@ -73,7 +90,7 @@ function sanitizeFilename(s: string) {
 
 function downloadTemplateCsv(produtoNome: string) {
   const BOM = "\uFEFF";
-  const content = BOM + "nome;descricao\nMódulo Exemplo 1;Descrição do módulo 1\nMódulo Exemplo 2;\n";
+  const content = BOM + "nome;descricao;vlr_custo;margem_percentual;vlr_venda\nMódulo Exemplo 1;Descrição do módulo 1;100;50;150\nMódulo Exemplo 2;;0;0;0\n";
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
