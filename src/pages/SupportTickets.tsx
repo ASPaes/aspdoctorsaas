@@ -122,6 +122,7 @@ export default function SupportTickets() {
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [ticketStateFilter, setTicketStateFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
@@ -571,14 +572,22 @@ export default function SupportTickets() {
   });
 
   const filteredTickets = useMemo(() => {
+    let result = tickets;
+    if (ticketStateFilter === "open") {
+      result = result.filter((t) => !getStatusInfo(t.status_id).isTerminal);
+    } else if (ticketStateFilter === "closed") {
+      result = result.filter((t) => getStatusInfo(t.status_id).isTerminal);
+    }
     const s = search.trim().toLowerCase();
-    if (!s) return tickets;
-    return tickets.filter(
-      (t) =>
-        (t.ticket_code ?? "").toLowerCase().includes(s) ||
-        (t.assunto ?? "").toLowerCase().includes(s)
-    );
-  }, [tickets, search]);
+    if (s) {
+      result = result.filter(
+        (t) =>
+          (t.ticket_code ?? "").toLowerCase().includes(s) ||
+          (t.assunto ?? "").toLowerCase().includes(s)
+      );
+    }
+    return result;
+  }, [tickets, search, ticketStateFilter, ticketStatuses]);
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
@@ -677,6 +686,14 @@ export default function SupportTickets() {
       {/* Toolbar: filtros globais + views */}
       <div className="flex items-center gap-2 flex-wrap">
         <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+        <Select value={ticketStateFilter} onValueChange={setTicketStateFilter}>
+          <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="open">Abertos</SelectItem>
+            <SelectItem value="closed">Encerrados</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
           <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Agente" /></SelectTrigger>
           <SelectContent>
@@ -1083,7 +1100,7 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} statusFilterOverride={statusFilter} />;
+        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
