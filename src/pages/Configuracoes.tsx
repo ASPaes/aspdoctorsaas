@@ -454,9 +454,11 @@ export default function Configuracoes() {
             <ImportacaoContent
               onOpen={() => setImportModalOpen(true)}
               onOpenModulos={() => setImportModulosOpen(true)}
+              onOpenCategorias={() => setImportCategoriasOpen(true)}
             />
             <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
             <ImportModulosModal open={importModulosOpen} onOpenChange={setImportModulosOpen} />
+            <ImportCategoriasModal open={importCategoriasOpen} onOpenChange={setImportCategoriasOpen} />
           </>
         );
       case "tickets-config":
