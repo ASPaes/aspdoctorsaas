@@ -25,6 +25,14 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const { timezone } = useAppTimezone();
   const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
+
+  const { data: allClientAlerts = [] } = useClientAlerts();
+  const clientAlerts = resolveAlertsFor(allClientAlerts, {
+    contactId: contact?.id,
+    clienteId: (contact as any)?.cliente_id,
+  });
+  const hasBlock = clientAlerts.some((a) => a.kind === "bloqueio");
+  const hasClientAlert = clientAlerts.length > 0;
   const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
   const hasUnread = unreadCount > 0;
 
