@@ -377,6 +377,36 @@ export default function ProdutosModulosTab() {
                 placeholder="Descreva o módulo. Arraste o canto inferior direito para aumentar o campo."
               />
             </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="modulo-vlr-custo">Valor de Custo (R$)</Label>
+                <NumericInput
+                  id="modulo-vlr-custo"
+                  value={moduloVlrCusto}
+                  onChange={(v) => setModuloVlrCusto(v ?? 0)}
+                  placeholder="0,00"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="modulo-margem">Margem</Label>
+                <NumericInput
+                  id="modulo-margem"
+                  value={moduloMargem}
+                  onChange={(v) => setModuloMargem(v ?? 0)}
+                  placeholder="0"
+                  suffix="%"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="modulo-vlr-venda">Valor de Venda (R$)</Label>
+                <NumericInput
+                  id="modulo-vlr-venda"
+                  value={moduloVlrVenda}
+                  onChange={(v) => setModuloVlrVenda(v ?? 0)}
+                  placeholder="0,00"
+                />
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Label>Ativo</Label>
               <Select value={moduloAtivo ? "sim" : "nao"} onValueChange={(v) => setModuloAtivo(v === "sim")}>
