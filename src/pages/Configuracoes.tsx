@@ -248,7 +248,7 @@ function PercentuaisCard({
   );
 }
 
-function ImportacaoContent({ onOpen, onOpenModulos }: { onOpen: () => void; onOpenModulos: () => void }) {
+function ImportacaoContent({ onOpen, onOpenModulos, onOpenCategorias }: { onOpen: () => void; onOpenModulos: () => void; onOpenCategorias: () => void }) {
   return (
     <div className="space-y-4 max-w-xl">
       <Card>
@@ -283,6 +283,26 @@ function ImportacaoContent({ onOpen, onOpenModulos }: { onOpen: () => void; onOp
                 Importe módulos em massa via CSV. Selecione o produto e faça upload do arquivo com nome e descrição dos módulos.
               </p>
               <Button onClick={onOpenModulos} className="gap-2 mt-3" size="sm">
+                <Upload className="w-4 h-4" />
+                Iniciar Importação
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-4">
+            <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted shrink-0">
+              <FolderOpen className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-medium">Importar Categorias de Serviço</p>
+              <p className="text-xs text-muted-foreground">
+                Importe categorias e subcategorias de serviço via CSV. Vincule a um produto ou crie como universal.
+              </p>
+              <Button onClick={onOpenCategorias} className="gap-2 mt-3" size="sm">
                 <Upload className="w-4 h-4" />
                 Iniciar Importação
               </Button>
