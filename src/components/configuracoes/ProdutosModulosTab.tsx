@@ -14,11 +14,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, Pencil, Trash2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
-import ImportModulosModal from "./ImportModulosModal";
+
 
 interface Produto { id: number; nome: string; tenant_id: string; }
 interface Modulo { id: string; nome: string; descricao: string | null; ativo: boolean; produto_id: number; }
@@ -50,7 +50,7 @@ export default function ProdutosModulosTab() {
   const [deleteModulo, setDeleteModulo] = useState<Modulo | null>(null);
 
   // Import CSV
-  const [importOpen, setImportOpen] = useState(false);
+  
 
   // Queries
   const produtosQ = useQuery({
@@ -248,7 +248,6 @@ export default function ProdutosModulosTab() {
               </div>
               <div className="flex items-center gap-2">
                 <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
-                <Button onClick={() => setImportOpen(true)} size="sm" variant="outline"><Upload />Importar CSV</Button>
               </div>
             </div>
 
@@ -389,15 +388,6 @@ export default function ProdutosModulosTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Import CSV */}
-      <ImportModulosModal
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        produtoId={selectedProdutoId}
-        tenantId={tid}
-        onSuccess={() => qc.invalidateQueries({ queryKey: ["produto_modulos", tid, selectedProdutoId] })}
-      />
     </div>
   );
 }
