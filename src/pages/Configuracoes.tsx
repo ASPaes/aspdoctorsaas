@@ -324,6 +324,7 @@ export default function Configuracoes() {
   const { profile } = useAuth();
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importModulosOpen, setImportModulosOpen] = useState(false);
+  const [importCategoriasOpen, setImportCategoriasOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
