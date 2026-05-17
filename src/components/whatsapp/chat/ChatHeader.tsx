@@ -370,6 +370,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 assignedTo={conversation.assigned_to || null}
                 onTransferClick={() => setIsTransferOpen(true)}
                 assignedOperatorName={assignedOperatorName}
+                contactId={(conversation as any).contact_id ?? conversation.contact?.id}
+                clienteId={(conversation.contact as any)?.cliente_id ?? null}
               />
             )}
 
