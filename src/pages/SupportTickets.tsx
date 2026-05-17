@@ -356,24 +356,30 @@ export default function SupportTickets() {
 
   const DEPT_ORDER_KEY = `dept-order-${tid}-${userId}`;
 
-  const orderedDepartments = useMemo(() => {
-    if (!supportDepartments.length) return [];
+  const [deptOrder, setDeptOrder] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!supportDepartments.length) return;
     try {
       const saved = localStorage.getItem(DEPT_ORDER_KEY);
       if (saved) {
-        const savedOrder: string[] = JSON.parse(saved);
-        const deptMap = new Map(supportDepartments.map(d => [d.id, d]));
-        const ordered = savedOrder
-          .filter(id => deptMap.has(id))
-          .map(id => deptMap.get(id)!);
-        for (const d of supportDepartments) {
-          if (!savedOrder.includes(d.id)) ordered.push(d);
-        }
-        return ordered;
+        setDeptOrder(JSON.parse(saved));
       }
     } catch {}
-    return supportDepartments;
   }, [supportDepartments, DEPT_ORDER_KEY]);
+
+  const orderedDepartmentsFromState = useMemo(() => {
+    if (!supportDepartments.length) return [];
+    if (!deptOrder) return supportDepartments;
+    const deptMap = new Map(supportDepartments.map(d => [d.id, d]));
+    const ordered = deptOrder
+      .filter(id => deptMap.has(id))
+      .map(id => deptMap.get(id)!);
+    for (const d of supportDepartments) {
+      if (!deptOrder.includes(d.id)) ordered.push(d);
+    }
+    return ordered;
+  }, [supportDepartments, deptOrder]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -382,13 +388,14 @@ export default function SupportTickets() {
   const handleDeptDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = orderedDepartments.findIndex(d => d.id === active.id);
-    const newIndex = orderedDepartments.findIndex(d => d.id === over.id);
+    const oldIndex = orderedDepartmentsFromState.findIndex(d => d.id === active.id);
+    const newIndex = orderedDepartmentsFromState.findIndex(d => d.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
-    const reordered = arrayMove(orderedDepartments, oldIndex, newIndex);
-    localStorage.setItem(DEPT_ORDER_KEY, JSON.stringify(reordered.map(d => d.id)));
-    queryClient.invalidateQueries({ queryKey: ["support_departments_list"] });
-  }, [orderedDepartments, DEPT_ORDER_KEY, queryClient]);
+    const reordered = arrayMove(orderedDepartmentsFromState, oldIndex, newIndex);
+    const newOrder = reordered.map(d => d.id);
+    setDeptOrder(newOrder);
+    localStorage.setItem(DEPT_ORDER_KEY, JSON.stringify(newOrder));
+  }, [orderedDepartmentsFromState, DEPT_ORDER_KEY]);
 
   const selectedDeptSlug = supportDepartments.find(d => d.id === departmentFilter)?.slug;
   const { data: implantacaoMetrics } = useQuery({
