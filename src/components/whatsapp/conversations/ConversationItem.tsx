@@ -1,12 +1,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Archive, CheckCheck, AlertTriangle, CalendarClock } from "lucide-react";
+import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 
 interface Props {
   conversation: ConversationWithContact;
