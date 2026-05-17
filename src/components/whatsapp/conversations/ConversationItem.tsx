@@ -1,12 +1,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Archive, CheckCheck, AlertTriangle, CalendarClock } from "lucide-react";
+import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban } from "lucide-react";
 import { formatBRPhone } from "@/lib/phoneBR";
 import { useWhatsAppSentiment } from "../hooks/useWhatsAppSentiment";
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -23,6 +25,14 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   const { timezone } = useAppTimezone();
   const sentimentData = sentiment as any;
   const needsCSTicket = sentimentData?.needs_cs_ticket && !sentimentData?.cs_ticket_created_id;
+
+  const { data: allClientAlerts = [] } = useClientAlerts();
+  const clientAlerts = resolveAlertsFor(allClientAlerts, {
+    contactId: contact?.id,
+    clienteId: (contact as any)?.cliente_id,
+  });
+  const hasBlock = clientAlerts.some((a) => a.kind === "bloqueio");
+  const hasClientAlert = clientAlerts.length > 0;
   const unreadCount = parseInt(String(conv.unread_count ?? 0), 10) || 0;
   const hasUnread = unreadCount > 0;
 
@@ -137,7 +147,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       className={cn(
         "w-full grid gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
         isSelected && "bg-accent",
-        needsCSTicket && "ring-1 ring-destructive/40"
+        needsCSTicket && "ring-1 ring-destructive/40",
+        hasBlock && "ring-1 ring-destructive/60 bg-destructive/5",
+        !hasBlock && hasClientAlert && "ring-1 ring-amber-500/50 bg-amber-500/5"
       )}
       style={{ gridTemplateColumns: "40px minmax(0, 1fr) max-content" }}
     >
@@ -160,7 +172,42 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
       {/* Col 2 — Name + Preview (truncatable) */}
       <div className="min-w-0 overflow-hidden self-center">
-        <p className="text-sm font-medium truncate">{name}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-medium truncate">{name}</p>
+          {hasClientAlert && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="shrink-0 inline-flex" onClick={(e) => e.stopPropagation()}>
+                    {hasBlock ? (
+                      <Ban className="h-3.5 w-3.5 text-destructive" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <div className="space-y-1.5">
+                    {clientAlerts.map((a) => (
+                      <div key={a.id}>
+                        <p className="text-xs font-semibold">
+                          {a.kind === "bloqueio"
+                            ? a.block_behavior === "hard"
+                              ? "Bloqueio · trava"
+                              : "Bloqueio · confirmação"
+                            : "Aviso"}
+                          {" — "}
+                          {a.titulo}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">{a.mensagem}</p>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <div className="flex items-center gap-1 mt-0.5">
           {conv.isLastMessageFromMe && (
             <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
