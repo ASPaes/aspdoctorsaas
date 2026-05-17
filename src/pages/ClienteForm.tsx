@@ -28,7 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save, Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
@@ -40,6 +40,7 @@ import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection";
 import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
+import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { ReativarClienteDialog } from "@/components/clientes/ReativarClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { RefreshCw } from "lucide-react";
@@ -572,6 +573,24 @@ export default function ClienteForm() {
               clienteId={id}
               clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
             />
+          )}
+
+          {/* Avisos e Bloqueios (apenas em edição) */}
+          {isEditing && id && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ShieldAlert className="h-5 w-5 text-primary" />
+                  Avisos e Bloqueios
+                </CardTitle>
+                <CardDescription>
+                  Exibidos ao time ao abrir o atendimento. Valem para todos os contatos de WhatsApp vinculados a este cliente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ClientAlertsManager clienteId={id} canManage={isAdmin} />
+              </CardContent>
+            </Card>
           )}
 
           {/* Filiais vinculadas (apenas em edição) */}
