@@ -195,12 +195,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
             ) : (
               <>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    setBlockDialogOpen(false);
-                    doClaim();
-                  }}
-                >
+                <AlertDialogAction onClick={handleConfirmOverride}>
                   Assumir mesmo assim
                 </AlertDialogAction>
               </>
