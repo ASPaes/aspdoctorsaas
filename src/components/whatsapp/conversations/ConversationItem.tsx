@@ -147,7 +147,9 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
       className={cn(
         "w-full grid gap-3 p-3 rounded-md text-left transition-colors hover:bg-accent/50",
         isSelected && "bg-accent",
-        needsCSTicket && "ring-1 ring-destructive/40"
+        needsCSTicket && "ring-1 ring-destructive/40",
+        hasBlock && "ring-1 ring-destructive/60 bg-destructive/5",
+        !hasBlock && hasClientAlert && "ring-1 ring-amber-500/50 bg-amber-500/5"
       )}
       style={{ gridTemplateColumns: "40px minmax(0, 1fr) max-content" }}
     >
