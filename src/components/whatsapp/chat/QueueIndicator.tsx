@@ -135,6 +135,52 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           <ArrowRightLeft className="h-3 w-3" />
         </Button>
       )}
+
+
+      <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Ban className="h-4 w-4 text-destructive" />
+              {hasHardBlock ? "Atendimento bloqueado" : "Cliente com bloqueio"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  {hasHardBlock
+                    ? "Este cliente tem um bloqueio que impede assumir o atendimento:"
+                    : "Este cliente tem um bloqueio. Confirme que está ciente antes de prosseguir:"}
+                </p>
+                <div className="space-y-2">
+                  {clientBlocks.map((b) => (
+                    <div key={b.id} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="font-medium text-sm text-foreground">{b.titulo}</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{b.mensagem}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {hasHardBlock ? (
+              <AlertDialogAction onClick={() => setBlockDialogOpen(false)}>Entendi</AlertDialogAction>
+            ) : (
+              <>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setBlockDialogOpen(false);
+                    doClaim();
+                  }}
+                >
+                  Assumir mesmo assim
+                </AlertDialogAction>
+              </>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
