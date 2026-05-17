@@ -172,7 +172,42 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
 
       {/* Col 2 — Name + Preview (truncatable) */}
       <div className="min-w-0 overflow-hidden self-center">
-        <p className="text-sm font-medium truncate">{name}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-medium truncate">{name}</p>
+          {hasClientAlert && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="shrink-0 inline-flex" onClick={(e) => e.stopPropagation()}>
+                    {hasBlock ? (
+                      <Ban className="h-3.5 w-3.5 text-destructive" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <div className="space-y-1.5">
+                    {clientAlerts.map((a) => (
+                      <div key={a.id}>
+                        <p className="text-xs font-semibold">
+                          {a.kind === "bloqueio"
+                            ? a.block_behavior === "hard"
+                              ? "Bloqueio · trava"
+                              : "Bloqueio · confirmação"
+                            : "Aviso"}
+                          {" — "}
+                          {a.titulo}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">{a.mensagem}</p>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <div className="flex items-center gap-1 mt-0.5">
           {conv.isLastMessageFromMe && (
             <CheckCheck className="h-3 w-3 text-muted-foreground shrink-0" />
