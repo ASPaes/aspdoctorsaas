@@ -5,6 +5,7 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
+import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
@@ -73,6 +74,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
+  const { data: allClientAlerts = [] } = useClientAlerts();
   const { getSenderLabel } = useSenderMap();
   const { timezone } = useAppTimezone();
 
@@ -196,6 +198,12 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     );
   }
 
+  const hardBlocks = resolveAlertsFor(allClientAlerts, {
+    contactId: conversation.contact_id ?? conversation.contact?.id,
+    clienteId: (conversation.contact as any)?.cliente_id,
+  }).filter((a) => a.kind === "bloqueio" && a.block_behavior === "hard");
+  const hasHardBlock = hardBlocks.length > 0;
+
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
       <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}>
@@ -284,6 +292,13 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           <div className="border-t bg-destructive/10 px-4 py-3 flex items-center gap-2 text-sm text-destructive">
             <ShieldAlert className="h-4 w-4 shrink-0" />
             <span>Acesso não ativo — você não pode enviar mensagens. Fale com o administrador.</span>
+          </div>
+        ) : hasHardBlock ? (
+          <div className="border-t bg-destructive/10 px-4 py-3 flex items-center gap-2 text-sm text-destructive">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>
+              {hardBlocks.map((b) => b.titulo).join(" · ")} — não é possível enviar mensagens neste atendimento. Desative o bloqueio no painel de avisos para liberar.
+            </span>
           </div>
         ) : (
           <ChatInput
