@@ -11,8 +11,9 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus, Upload, Users, RefreshCw, ChevronRight, Layers } from "lucide-react";
+import { Save, Loader2, Plus, Upload, Users, RefreshCw, ChevronRight, Layers, FolderOpen } from "lucide-react";
 import ImportModulosModal from "@/components/configuracoes/ImportModulosModal";
+import ImportCategoriasModal from "@/components/configuracoes/ImportCategoriasModal";
 import {
   AlertDialog,
   AlertDialogAction,
