@@ -100,7 +100,7 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
 
   const { data: produtos = [] } = useQuery<ProdutoOption[]>({
     queryKey: ["produtos-import-modulos", resolvedTenantId],
-    enabled: open && !produtoId,
+    enabled: !!open,
     queryFn: async () => {
       let q = (supabase.from("produtos" as any) as any).select("id, nome").order("nome");
       if (resolvedTenantId) q = q.eq("tenant_id", resolvedTenantId);
