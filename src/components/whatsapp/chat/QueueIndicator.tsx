@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
