@@ -198,6 +198,12 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     );
   }
 
+  const hardBlocks = resolveAlertsFor(allClientAlerts, {
+    contactId: conversation.contact_id ?? conversation.contact?.id,
+    clienteId: (conversation.contact as any)?.cliente_id,
+  }).filter((a) => a.kind === "bloqueio" && a.block_behavior === "hard");
+  const hasHardBlock = hardBlocks.length > 0;
+
   return (
     <div className="h-full flex min-h-0 overflow-hidden">
       <div className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}>
