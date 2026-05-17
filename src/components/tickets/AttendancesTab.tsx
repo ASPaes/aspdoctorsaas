@@ -58,9 +58,11 @@ interface Props {
   departmentFilter?: string;
   agenteFilter?: string;
   embedded?: boolean;
+  dateRangeOverride?: { from: Date; to: Date };
+  statusFilterOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const [statusFilter, setStatusFilter] = useState<string>("all");
