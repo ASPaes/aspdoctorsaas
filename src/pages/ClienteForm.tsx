@@ -575,6 +575,24 @@ export default function ClienteForm() {
             />
           )}
 
+          {/* Avisos e Bloqueios (apenas em edição) */}
+          {isEditing && id && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ShieldAlert className="h-5 w-5 text-primary" />
+                  Avisos e Bloqueios
+                </CardTitle>
+                <CardDescription>
+                  Exibidos ao time ao abrir o atendimento. Valem para todos os contatos de WhatsApp vinculados a este cliente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ClientAlertsManager clienteId={id} canManage={isAdmin} />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Filiais vinculadas (apenas em edição) */}
           {isEditing && id && <FiliaisSection clienteId={id} />}
 
