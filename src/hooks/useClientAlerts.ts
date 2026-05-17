@@ -4,6 +4,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export interface ClientAlert {
   id: string;
+  tenant_id: string;
   kind: "aviso" | "bloqueio";
   block_behavior: "confirm" | "hard" | null;
   titulo: string;
