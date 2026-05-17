@@ -1083,12 +1083,12 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} />;
+        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} statusFilterOverride={statusFilter} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
         const Comp = PendingClosuresTab as any;
-        return <Comp embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} />;
+        return <Comp embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} />;
       })()}
 
       <CreateSupportTicketModal
