@@ -5,6 +5,7 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import type { Message } from "../hooks/useWhatsAppMessages";
 import { ChatHeader } from "./ChatHeader";
 import { ClientAlertBanner } from "./ClientAlertBanner";
+import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
