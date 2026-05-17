@@ -156,7 +156,13 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
       const parsed: ParsedRow[] = lines.map(line => {
         const cols = line.split(";");
-        return { nome: (cols[0] ?? "").trim(), descricao: (cols[1] ?? "").trim() };
+        return {
+          nome: (cols[0] ?? "").trim(),
+          descricao: (cols[1] ?? "").trim(),
+          vlr_custo: parseBRNumber(cols[2] ?? ""),
+          margem_percentual: parseBRNumber(cols[3] ?? ""),
+          vlr_venda: parseBRNumber(cols[4] ?? ""),
+        };
       });
       setRows(parsed);
       setFileName(file.name);
@@ -189,6 +195,9 @@ export default function ImportModulosModal({ open, onOpenChange, produtoId, tena
         produto_id: selectedProdutoId,
         nome: r.nome,
         descricao: r.descricao || null,
+        vlr_custo: r.vlr_custo,
+        margem_percentual: r.margem_percentual,
+        vlr_venda: r.vlr_venda,
         ativo: true,
       }));
       const batchSize = 100;
