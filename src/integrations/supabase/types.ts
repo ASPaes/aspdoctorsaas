@@ -579,6 +579,66 @@ export type Database = {
           },
         ]
       }
+      client_alert_audit: {
+        Row: {
+          action: string
+          alert_block_behavior: string | null
+          alert_id: string | null
+          alert_kind: string
+          alert_titulo: string
+          cliente_id: string | null
+          contact_id: string | null
+          conversation_id: string | null
+          id: string
+          performed_at: string
+          performed_by: string
+          tenant_id: string
+        }
+        Insert: {
+          action?: string
+          alert_block_behavior?: string | null
+          alert_id?: string | null
+          alert_kind: string
+          alert_titulo: string
+          cliente_id?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          id?: string
+          performed_at?: string
+          performed_by: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          alert_block_behavior?: string | null
+          alert_id?: string | null
+          alert_kind?: string
+          alert_titulo?: string
+          cliente_id?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          id?: string
+          performed_at?: string
+          performed_by?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_alert_audit_alert_id_fkey"
+            columns: ["alert_id"]
+            isOneToOne: false
+            referencedRelation: "client_alerts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_alert_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_alerts: {
         Row: {
           ativo: boolean
@@ -6513,6 +6573,18 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      get_client_alert_audit: {
+        Args: { p_cliente_id?: string; p_contact_id?: string }
+        Returns: {
+          action: string
+          alert_block_behavior: string
+          alert_kind: string
+          alert_titulo: string
+          id: string
+          performed_at: string
+          performed_by_name: string
+        }[]
       }
       get_clientes_candidatos_by_phone: {
         Args: { p_phone: string; p_tenant_id: string }
