@@ -185,8 +185,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       const { count: totalGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
         .select("*", { count: "exact", head: true })
         .eq("tenant_id", tid)
-        .eq("is_group", true)
-        .not("last_message_at", "is", null);
+        .eq("is_group", true);
       const { count: unreadGroups } = await (supabase.from("whatsapp_conversations" as any) as any)
         .select("*", { count: "exact", head: true })
         .eq("tenant_id", tid)
