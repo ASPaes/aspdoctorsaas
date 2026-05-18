@@ -307,9 +307,17 @@ export default function CategoriasServicosTab() {
                   />
                 </button>
                 <span className="font-medium truncate min-w-0 flex-1">{c.nome}</span>
-                <Badge variant={c.produto_id ? "default" : "secondary"} className="shrink-0">
-                  {c.produtos?.nome ?? "Universal"}
-                </Badge>
+                {c.linkedProductNames.length === 0 ? (
+                  <Badge variant="secondary" className="shrink-0">Universal</Badge>
+                ) : c.linkedProductNames.length <= 2 ? (
+                  c.linkedProductNames.map((n) => (
+                    <Badge key={n} variant="default" className="shrink-0">{n}</Badge>
+                  ))
+                ) : (
+                  <Badge variant="default" className="shrink-0">
+                    {c.linkedProductNames.length} produtos
+                  </Badge>
+                )}
                 <Badge variant={c.ativo ? "default" : "secondary"} className="shrink-0">
                   {c.ativo ? "Ativo" : "Inativo"}
                 </Badge>
