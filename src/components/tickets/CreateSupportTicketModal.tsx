@@ -326,9 +326,14 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
 
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
-  const filteredCategories = useMemo(
-    () => categories.filter((c) => c.produto_id === produtoIdNum || c.produto_id === null),
-    [categories, produtoIdNum]
+  const filteredCategories = useMemo(() => {
+    if (!produtoIdNum) return categories;
+    const linkedCatIds = new Set(
+      categoryProductLinks.filter((l) => l.produto_id === produtoIdNum).map((l) => l.category_id)
+    );
+    const catsWithAnyLink = new Set(categoryProductLinks.map((l) => l.category_id));
+    return categories.filter((c) => linkedCatIds.has(c.id) || !catsWithAnyLink.has(c.id));
+  }, [categories, produtoIdNum, categoryProductLinks]);
   );
 
   const filteredSubcategories = useMemo(
