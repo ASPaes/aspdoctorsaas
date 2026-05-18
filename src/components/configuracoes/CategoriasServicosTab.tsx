@@ -72,16 +72,43 @@ export default function CategoriasServicosTab() {
     },
   });
 
+  const { data: categoryLinks = [] } = useQuery({
+    queryKey: ["cats_category_products", tid],
+    queryFn: async () => {
+      let q = (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as { category_id: string; produto_id: number }[];
+    },
+  });
+
   const { data: categorias = [] } = useQuery({
-    queryKey: ["cats_categorias", tid],
+    queryKey: ["cats_categorias", tid, produtos, categoryLinks],
     queryFn: async () => {
       let q = (supabase.from("service_categories" as any) as any)
-        .select("*, produtos:produto_id(nome)")
+        .select("id, tenant_id, nome, ativo, created_at, updated_at")
         .order("nome");
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Category[];
+      const rows = (data ?? []) as any[];
+      const prodMap = new Map(produtos.map((p) => [p.id, p.nome]));
+      const linksByCat = new Map<string, number[]>();
+      for (const l of categoryLinks) {
+        const arr = linksByCat.get(l.category_id) ?? [];
+        arr.push(l.produto_id);
+        linksByCat.set(l.category_id, arr);
+      }
+      return rows.map((r) => {
+        const ids = linksByCat.get(r.id) ?? [];
+        return {
+          ...r,
+          linkedProductIds: ids,
+          linkedProductNames: ids.map((id) => prodMap.get(id)).filter(Boolean) as string[],
+        } as Category;
+      });
     },
   });
 
