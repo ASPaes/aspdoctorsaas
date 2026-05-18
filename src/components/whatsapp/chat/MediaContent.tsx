@@ -59,23 +59,30 @@ interface MediaContentProps {
 }
 
 function useProxyUrl(messageId: string, mediaUrl: string | null | undefined, mode: "inline" | "attachment" = "inline"): string | null {
-  const [proxyUrl, setProxyUrl] = useState<string | null>(null);
   const isTemp = messageId?.startsWith('temp-');
 
-  useEffect(() => {
-    if (isTemp) return;
-    let cancelled = false;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled) return;
-      const token = session?.access_token;
-      if (!token) return;
+  const { data: blobUrl } = useQuery<string | null>({
+    queryKey: ['whatsapp', 'media-blob', messageId, mode],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return null;
       const base = import.meta.env.VITE_SUPABASE_URL;
-      setProxyUrl(`${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=${mode}&token=${token}`);
-    });
-    return () => { cancelled = true; };
-  }, [messageId, mode, isTemp]);
+      const url = `${base}/functions/v1/whatsapp-media-proxy?message_row_id=${messageId}&mode=${mode}&token=${session.access_token}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+    enabled: !!messageId && !isTemp,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
-  return isTemp ? (mediaUrl || null) : proxyUrl;
+  if (isTemp) return mediaUrl || null;
+  return blobUrl ?? null;
 }
 
 export function MediaContent({
