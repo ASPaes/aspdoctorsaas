@@ -68,7 +68,6 @@ const App = () => (
       <Toaster />
       <Sonner position="bottom-right" />
       <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
@@ -110,9 +109,8 @@ const App = () => (
             </Route>
 
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
           </Routes>
-        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
     </ThemeProvider>
