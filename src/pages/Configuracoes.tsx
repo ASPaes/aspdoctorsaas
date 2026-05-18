@@ -477,10 +477,17 @@ export default function Configuracoes() {
               onOpen={() => setImportModalOpen(true)}
               onOpenModulos={() => setImportModulosOpen(true)}
               onOpenCategorias={() => setImportCategoriasOpen(true)}
+              onOpenTipos={() => setImportTiposOpen(true)}
             />
             <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
             <ImportModulosModal open={importModulosOpen} onOpenChange={setImportModulosOpen} />
             <ImportCategoriasModal open={importCategoriasOpen} onOpenChange={setImportCategoriasOpen} />
+            <ImportTiposServicoModal
+              open={importTiposOpen}
+              onOpenChange={setImportTiposOpen}
+              tenantId={tid}
+              onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
+            />
           </>
         );
       case "tickets-config":
