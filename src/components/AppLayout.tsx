@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
