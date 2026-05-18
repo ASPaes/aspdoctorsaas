@@ -72,18 +72,36 @@ export function ClassifyClosureModal({
     enabled: open && !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("service_categories" as any) as any)
-        .select("id, nome, produto_id")
+        .select("id, nome")
         .eq("tenant_id", tid)
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
     },
   });
 
-  const filteredCategories = produtoId
-    ? categories.filter((c) => c.produto_id === Number(produtoId) || c.produto_id === null)
-    : categories;
+  const { data: categoryProductLinks = [] } = useQuery({
+    queryKey: ["classify_closure_cat_links", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id")
+        .eq("tenant_id", tid);
+      if (error) throw error;
+      return (data ?? []) as Array<{ category_id: string; produto_id: number }>;
+    },
+  });
+
+  const filteredCategories = (() => {
+    if (!produtoId) return categories;
+    const produtoIdNum = Number(produtoId);
+    const linkedCatIds = new Set(
+      categoryProductLinks.filter((l) => l.produto_id === produtoIdNum).map((l) => l.category_id)
+    );
+    const catsWithAnyLink = new Set(categoryProductLinks.map((l) => l.category_id));
+    return categories.filter((c) => linkedCatIds.has(c.id) || !catsWithAnyLink.has(c.id));
+  })();
 
   const { data: subcategories = [] } = useQuery({
     queryKey: ["classify_closure_subcategories", tid, categoryId],
