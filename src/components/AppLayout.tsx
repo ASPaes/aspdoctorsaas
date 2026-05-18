@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -61,7 +62,13 @@ export default function AppLayout() {
             </div>
           </header>
           <main className="flex-1 p-4 sm:p-6 overflow-auto min-w-0">
-            <Outlet />
+            <Suspense fallback={
+              <div className="flex min-h-[50vh] items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            }>
+              <Outlet />
+            </Suspense>
           </main>
         </div>
       </div>
