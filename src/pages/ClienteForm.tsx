@@ -632,31 +632,6 @@ export default function ClienteForm() {
             </Card>
           )}
 
-          <AlertDialog open={confirmReactivateOpen} onOpenChange={setConfirmReactivateOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reativar cliente?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Os dados de cancelamento (data, motivo e observação) serão removidos e o cliente voltará ao status Ativo. Esta ação só é persistida ao clicar em Salvar Cliente.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    form.setValue("cancelado", false, { shouldDirty: true });
-                    form.setValue("data_cancelamento", null, { shouldDirty: true });
-                    form.setValue("motivo_cancelamento_id", null, { shouldDirty: true });
-                    form.setValue("observacao_cancelamento", null, { shouldDirty: true });
-                    setConfirmReactivateOpen(false);
-                  }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Reativar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
 
 
           {/* Botões de ação */}
