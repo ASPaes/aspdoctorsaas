@@ -585,61 +585,52 @@ export default function ClienteForm() {
           {/* Filiais vinculadas (apenas em edição) */}
           {isEditing && id && <FiliaisSection clienteId={id} />}
 
-          {/* Card: Cancelamento */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div className="space-y-1">
+          {/* Card: Cancelamento (read-only — derivado dos contratos) */}
+          {isEditing && (
+            <Card>
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <XCircle className="h-5 w-5 text-destructive" />
                   Cancelamento
                 </CardTitle>
-                <CardDescription>Ative para registrar o cancelamento do cliente</CardDescription>
-              </div>
-              <div className="flex items-center gap-3">
-                {isEditing && id && cancelado && isAdmin && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10"
-                    onClick={() => setShowReativarDialog(true)}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reativar
-                  </Button>
-                )}
-                <FormField control={form.control} name="cancelado" render={({ field }) => (
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={(next) => {
-                        if (field.value && !next) {
-                          const hasData =
-                            !!form.getValues("data_cancelamento") ||
-                            form.getValues("motivo_cancelamento_id") != null ||
-                            !!form.getValues("observacao_cancelamento");
-                          if (hasData) {
-                            setConfirmReactivateOpen(true);
-                            return;
-                          }
-                        }
-                        field.onChange(next);
-                      }}
-                      aria-label="Ativar ou desativar cancelamento do cliente"
-                    />
-                  </FormControl>
-                )} />
-              </div>
-            </CardHeader>
-            {cancelado && (
+              </CardHeader>
               <CardContent>
-                <CancelamentoTab
-                  form={form}
-                  motivosCancelamento={lookups.motivosCancelamento.data ?? []}
-                />
+                {cancelado ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="destructive">Cancelado</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {form.watch("data_cancelamento") && (
+                          <span>
+                            desde {(() => {
+                              const d = form.watch("data_cancelamento");
+                              if (!d) return "—";
+                              const [y, m, day] = d.split("-");
+                              return `${day}/${m}/${y}`;
+                            })()}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {form.watch("observacao_cancelamento") && (
+                      <p className="text-sm text-muted-foreground">
+                        {form.watch("observacao_cancelamento")}
+                      </p>
+                    )}
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        Para reativar o cliente, reative pelo menos um contrato na seção de Contratos acima.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Cliente ativo. O cancelamento é gerenciado individualmente por contrato na seção de Contratos acima.
+                  </p>
+                )}
               </CardContent>
-            )}
-          </Card>
+            </Card>
+          )}
 
           <AlertDialog open={confirmReactivateOpen} onOpenChange={setConfirmReactivateOpen}>
             <AlertDialogContent>
