@@ -228,13 +228,13 @@ export function useDashboardData(filters: DashboardFilters) {
       });
 
 
-      // === REATIVAÇÕES NO PERÍODO ===
+      // === REATIVAÇÕES NO PERÍODO (fonte: contrato_eventos) ===
       const reativacoesPeriodo = await fetchAllRows<any>(() => {
-        let q = supabase
-          .from('clientes_reativacoes_historico' as any)
-          .select('cliente_id, mensalidade_reativada, data_reativacao')
-          .gte('data_reativacao', periodoInicioStr)
-          .lte('data_reativacao', periodoFimStr);
+        let q = (supabase.from('contrato_eventos' as any) as any)
+          .select('cliente_id, mensalidade_contrato_snapshot, data_acao')
+          .eq('acao', 'reativacao')
+          .gte('data_acao', periodoInicioStr)
+          .lte('data_acao', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         return q;
       });
@@ -243,7 +243,7 @@ export function useDashboardData(filters: DashboardFilters) {
       let reativacoesQtd = 0;
       reativacoesPeriodo?.forEach((r: any) => {
         if (needsClientFilter && !allClientesFiltered.has(r.cliente_id)) return;
-        reativacaoMrr += Number(r.mensalidade_reativada) || 0;
+        reativacaoMrr += Number(r.mensalidade_contrato_snapshot) || 0;
         reativacoesQtd += 1;
       });
 
