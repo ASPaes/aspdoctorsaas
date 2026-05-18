@@ -334,7 +334,6 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
     const catsWithAnyLink = new Set(categoryProductLinks.map((l) => l.category_id));
     return categories.filter((c) => linkedCatIds.has(c.id) || !catsWithAnyLink.has(c.id));
   }, [categories, produtoIdNum, categoryProductLinks]);
-  );
 
   const filteredSubcategories = useMemo(
     () => subcategories.filter((s) => s.category_id === categoryId),
