@@ -714,6 +714,8 @@ export function useDashboardData(filters: DashboardFilters) {
             dataCancelamento: c.data_cancelamento!,
             motivo: c.motivo_cancelamento_id ? (motivoMap[c.motivo_cancelamento_id] || '—') : '—',
             mensalidade: Number(c.mensalidade) || 0,
+            contratoNumero: cancelEnrichMap[c.id]?.contratoNumero || '—',
+            produto: cancelEnrichMap[c.id]?.produto || '—',
             earlyChurn: diasAtivo !== null && diasAtivo <= 90,
           };
         })
