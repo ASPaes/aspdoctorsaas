@@ -125,6 +125,42 @@ export function useDashboardData(filters: DashboardFilters) {
       const cancelamentosEarly = earlyChurn.length;
       const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
 
+      // Enriquecer cancelados com dados de contrato/produto via contrato_eventos
+      const eventosCancel = await fetchAllRows<any>(() => {
+        let q = (supabase.from('contrato_eventos' as any) as any)
+          .select('cliente_id, contrato_id')
+          .eq('acao', 'cancelamento')
+          .gte('data_acao', periodoInicioStr)
+          .lte('data_acao', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+      const contratoIdsCancel = [...new Set((eventosCancel || []).map((e: any) => e.contrato_id).filter(Boolean))];
+      const cancelEnrichMap: Record<string, { contratoNumero: string; produto: string }> = {};
+      if (contratoIdsCancel.length > 0) {
+        const { data: contratosNum } = await (supabase.from('contratos' as any) as any)
+          .select('id, numero')
+          .in('id', contratoIdsCancel);
+        const contratoNumMap: Record<string, string> = {};
+        (contratosNum || []).forEach((ct: any) => { contratoNumMap[ct.id] = ct.numero; });
+        const { data: itensCancel } = await (supabase.from('contrato_itens' as any) as any)
+          .select('contrato_id, descricao')
+          .in('contrato_id', contratoIdsCancel);
+        const itensPorContrato: Record<string, string[]> = {};
+        (itensCancel || []).forEach((it: any) => {
+          if (!itensPorContrato[it.contrato_id]) itensPorContrato[it.contrato_id] = [];
+          if (it.descricao && !itensPorContrato[it.contrato_id].includes(it.descricao)) {
+            itensPorContrato[it.contrato_id].push(it.descricao);
+          }
+        });
+        (eventosCancel || []).forEach((e: any) => {
+          cancelEnrichMap[e.cliente_id] = {
+            contratoNumero: contratoNumMap[e.contrato_id] || '—',
+            produto: (itensPorContrato[e.contrato_id] || []).join(', ') || '—',
+          };
+        });
+      }
+
       // 4. Clientes início do período (snapshot temporal)
       const clientesInicioFull = await fetchAllRows<any>(() => {
         let q = supabase
