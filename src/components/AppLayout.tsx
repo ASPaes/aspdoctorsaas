@@ -63,13 +63,15 @@ export default function AppLayout() {
             </div>
           </header>
           <main className="flex-1 p-4 sm:p-6 overflow-auto min-w-0">
-            <Suspense fallback={
-              <div className="flex min-h-[50vh] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            }>
-              <Outlet />
-            </Suspense>
+            <ErrorBoundary>
+              <Suspense fallback={
+                <div className="flex min-h-[50vh] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              }>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </main>
         </div>
       </div>
