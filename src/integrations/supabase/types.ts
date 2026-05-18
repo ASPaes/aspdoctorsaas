@@ -1556,6 +1556,93 @@ export type Database = {
           },
         ]
       }
+      contrato_eventos: {
+        Row: {
+          acao: string
+          cliente_id: string
+          contrato_id: string
+          created_at: string
+          data_acao: string
+          id: string
+          mensalidade_cliente_snapshot: number | null
+          mensalidade_contrato_snapshot: number | null
+          motivo_cancelamento_id: number | null
+          movimento_mrr_id: string | null
+          observacao: string | null
+          produtos_afetados: Json | null
+          tenant_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          cliente_id: string
+          contrato_id: string
+          created_at?: string
+          data_acao?: string
+          id?: string
+          mensalidade_cliente_snapshot?: number | null
+          mensalidade_contrato_snapshot?: number | null
+          motivo_cancelamento_id?: number | null
+          movimento_mrr_id?: string | null
+          observacao?: string | null
+          produtos_afetados?: Json | null
+          tenant_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          cliente_id?: string
+          contrato_id?: string
+          created_at?: string
+          data_acao?: string
+          id?: string
+          mensalidade_cliente_snapshot?: number | null
+          mensalidade_contrato_snapshot?: number | null
+          motivo_cancelamento_id?: number | null
+          movimento_mrr_id?: string | null
+          observacao?: string | null
+          produtos_afetados?: Json | null
+          tenant_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_eventos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_eventos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_financeiro"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_eventos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_eventos_motivo_cancelamento_id_fkey"
+            columns: ["motivo_cancelamento_id"]
+            isOneToOne: false
+            referencedRelation: "motivos_cancelamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_eventos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contrato_itens: {
         Row: {
           cliente_produto_id: string | null
@@ -6397,6 +6484,14 @@ export type Database = {
       can_access_monitor: { Args: never; Returns: boolean }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
+      cancelar_contrato: {
+        Args: {
+          p_contrato_id: string
+          p_motivo_id?: number
+          p_observacao?: string
+        }
+        Returns: Json
+      }
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
       cleanup_group_messages: { Args: never; Returns: undefined }
       cleanup_notification_dispatch_queue: { Args: never; Returns: number }
@@ -6866,6 +6961,10 @@ export type Database = {
         Args: { p_cliente_id: string; p_motivo?: string; p_observacao?: string }
         Returns: Json
       }
+      reativar_contrato: {
+        Args: { p_contrato_id: string; p_observacao?: string }
+        Returns: Json
+      }
       require_active_profile: { Args: never; Returns: boolean }
       resolve_group_contact_name: {
         Args: {
@@ -7133,7 +7232,13 @@ export type Database = {
         | "mudanca_owner"
         | "nota_ia"
         | "registro_acao"
-      movimento_mrr_tipo: "upsell" | "cross_sell" | "downsell" | "venda_avulsa"
+      movimento_mrr_tipo:
+        | "upsell"
+        | "cross_sell"
+        | "downsell"
+        | "venda_avulsa"
+        | "churn"
+        | "reactivation"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
       sentiment_type: "positive" | "neutral" | "negative"
       support_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
@@ -7311,7 +7416,14 @@ export const Constants = {
         "nota_ia",
         "registro_acao",
       ],
-      movimento_mrr_tipo: ["upsell", "cross_sell", "downsell", "venda_avulsa"],
+      movimento_mrr_tipo: [
+        "upsell",
+        "cross_sell",
+        "downsell",
+        "venda_avulsa",
+        "churn",
+        "reactivation",
+      ],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
       sentiment_type: ["positive", "neutral", "negative"],
       support_ticket_prioridade: ["baixa", "media", "alta", "urgente"],
