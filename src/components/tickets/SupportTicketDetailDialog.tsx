@@ -915,7 +915,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             <Select value={ticket.category_id ?? ""} onValueChange={(v) => handleFieldUpdate({ category_id: v })} disabled={updating}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
-                {categories.filter(c => !ticket?.produto_id || c.produto_id === ticket.produto_id || c.produto_id === null).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                {categories.filter(c => {
+                  if (!ticket?.produto_id) return true;
+                  const linkedCatIds = new Set(categoryProductLinks.filter(l => l.produto_id === ticket.produto_id).map(l => l.category_id));
+                  const catsWithAnyLink = new Set(categoryProductLinks.map(l => l.category_id));
+                  return linkedCatIds.has(c.id) || !catsWithAnyLink.has(c.id);
+                }).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
