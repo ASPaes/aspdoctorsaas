@@ -95,8 +95,27 @@ export default function ClienteContratosSection({ clienteId }: Props) {
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [dialog, setDialog] = useState<{ open: boolean; edit?: Contrato | null }>({ open: false });
+  const [cancelDialog, setCancelDialog] = useState<{ open: boolean; contrato: Contrato | null }>({ open: false, contrato: null });
+  const [reativarDialog, setReativarDialog] = useState<{ open: boolean; contrato: Contrato | null }>({ open: false, contrato: null });
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setCurrentUserId(data?.user?.id ?? null)); }, []);
+  const { data: currentProfile } = useProfile(currentUserId ?? undefined);
+  const isAdminOrHead = currentProfile?.role === "admin" || currentProfile?.role === "head" || currentProfile?.is_super_admin === true;
 
   const tf = (q: any) => (tid ? q.eq("tenant_id", tid) : q);
+
+  const motivosCancelamentoQuery = useQuery({
+    queryKey: ["motivos_cancelamento", tid],
+    queryFn: async () => {
+      const { data, error } = await tf(
+        (supabase.from("motivos_cancelamento" as any) as any).select("id, nome").order("nome")
+      );
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
 
   const contratosQuery = useQuery({
     queryKey: ["contratos_cliente", tid, clienteId],
