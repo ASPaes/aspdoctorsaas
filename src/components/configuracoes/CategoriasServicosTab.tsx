@@ -390,20 +390,37 @@ export default function CategoriasServicosTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Produto (opcional)</Label>
-              <Select value={catProdutoId} onValueChange={setCatProdutoId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Universal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Universal (sem produto)</SelectItem>
-                  {produtos.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Produtos vinculados (opcional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Sem vínculo = visível para todos os produtos
+              </p>
+              <div className="border rounded-md max-h-48 overflow-y-auto divide-y">
+                {produtos.length === 0 && (
+                  <div className="text-xs text-muted-foreground p-2">
+                    Nenhum produto cadastrado.
+                  </div>
+                )}
+                {produtos.map((p) => {
+                  const pid = String(p.id);
+                  const checked = catLinkedProducts.includes(pid);
+                  return (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setCatLinkedProducts((prev) =>
+                            v ? [...prev, pid] : prev.filter((x) => x !== pid)
+                          );
+                        }}
+                      />
+                      <span className="text-sm">{p.nome}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <Label>Ativo</Label>
