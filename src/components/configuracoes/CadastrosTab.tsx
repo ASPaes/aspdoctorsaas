@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, Upload } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import CrudTable, { type ColumnDef } from "@/components/CrudTable";
 import ProdutosModulosTab from "./ProdutosModulosTab";
-import ImportTiposServicoModal from "./ImportTiposServicoModal";
 
 function useDepartmentOptions() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -74,8 +73,6 @@ interface CadastrosTabProps {
 
 export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
   const [syncing, setSyncing] = useState(false);
-  const [importTiposOpen, setImportTiposOpen] = useState(false);
-  const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const departmentOptions = useDepartmentOptions();
   const productOptions = useProductOptions();
