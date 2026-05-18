@@ -51,7 +51,7 @@ export default function CategoriasServicosTab() {
   const [catOpen, setCatOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [catNome, setCatNome] = useState("");
-  const [catProdutoId, setCatProdutoId] = useState<string>("none");
+  const [catLinkedProducts, setCatLinkedProducts] = useState<string[]>([]);
   const [catAtivo, setCatAtivo] = useState(true);
 
   // Subcategory dialog
