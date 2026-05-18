@@ -45,7 +45,7 @@ const ConfiguracoesNotificacoes = lazy(() => import("@/pages/ConfiguracoesNotifi
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 
 const PageLoader = () => (
-  <div className="flex min-h-[50vh] items-center justify-center">
+  <div className="flex min-h-[50vh] items-center justify-center bg-background">
     <Loader2 className="h-8 w-8 animate-spin text-primary" />
   </div>
 );
@@ -71,9 +71,9 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/signup" element={<Suspense fallback={<PageLoader />}><Signup /></Suspense>} />
+            <Route path="/forgot-password" element={<Suspense fallback={<PageLoader />}><ForgotPassword /></Suspense>} />
+            <Route path="/reset-password" element={<Suspense fallback={<PageLoader />}><ResetPassword /></Suspense>} />
 
             {/* Onboarding & access status (protected but outside AppLayout) */}
             <Route path="/onboarding" element={<AuthGuard><Onboarding /></AuthGuard>} />
