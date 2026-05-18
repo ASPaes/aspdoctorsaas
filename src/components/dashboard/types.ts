@@ -130,6 +130,8 @@ export interface CanceladoListItem {
   dataCancelamento: string;
   motivo: string;
   mensalidade: number;
+  contratoNumero?: string;
+  produto?: string;
   earlyChurn: boolean;
 }
 

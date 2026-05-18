@@ -17,7 +17,7 @@ export function CanceladosTable({ items, tvMode }: Props) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className={tvMode ? 'text-xl' : 'text-base'}>
-          Clientes Cancelados no Período ({items.length})
+          Cancelamentos no Período ({items.length})
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -28,6 +28,8 @@ export function CanceladosTable({ items, tvMode }: Props) {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>Contrato</TableHead>
+                <TableHead>Produto</TableHead>
                 <TableHead className="text-center">Dias Ativo</TableHead>
                 <TableHead>Data Cancel.</TableHead>
                 <TableHead>Motivo</TableHead>
@@ -45,6 +47,8 @@ export function CanceladosTable({ items, tvMode }: Props) {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{c.contratoNumero || '—'}</TableCell>
+                  <TableCell className="max-w-[180px] truncate text-sm" title={c.produto || ''}>{c.produto || '—'}</TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       <span>{c.diasAtivo !== null ? c.diasAtivo : '—'}</span>
