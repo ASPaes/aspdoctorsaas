@@ -11,9 +11,10 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus, Upload, Users, RefreshCw, ChevronRight, Layers, FolderOpen } from "lucide-react";
+import { Save, Loader2, Plus, Upload, Users, RefreshCw, ChevronRight, Layers, FolderOpen, Wrench } from "lucide-react";
 import ImportModulosModal from "@/components/configuracoes/ImportModulosModal";
 import ImportCategoriasModal from "@/components/configuracoes/ImportCategoriasModal";
+import ImportTiposServicoModal from "@/components/configuracoes/ImportTiposServicoModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -248,7 +249,7 @@ function PercentuaisCard({
   );
 }
 
-function ImportacaoContent({ onOpen, onOpenModulos, onOpenCategorias }: { onOpen: () => void; onOpenModulos: () => void; onOpenCategorias: () => void }) {
+function ImportacaoContent({ onOpen, onOpenModulos, onOpenCategorias, onOpenTipos }: { onOpen: () => void; onOpenModulos: () => void; onOpenCategorias: () => void; onOpenTipos: () => void }) {
   return (
     <div className="space-y-4 max-w-xl">
       <Card>
@@ -310,6 +311,26 @@ function ImportacaoContent({ onOpen, onOpenModulos, onOpenCategorias }: { onOpen
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-4">
+            <div className="flex items-center justify-center w-9 h-9 rounded-md bg-muted shrink-0">
+              <Wrench className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-medium">Importar Tipos de Serviço</p>
+              <p className="text-xs text-muted-foreground">
+                Importe tipos de serviço via CSV com código, nome e descrição. Duplicatas são ignoradas automaticamente.
+              </p>
+              <Button onClick={onOpenTipos} className="gap-2 mt-3" size="sm">
+                <Upload className="w-4 h-4" />
+                Iniciar Importação
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -325,6 +346,7 @@ export default function Configuracoes() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importModulosOpen, setImportModulosOpen] = useState(false);
   const [importCategoriasOpen, setImportCategoriasOpen] = useState(false);
+  const [importTiposOpen, setImportTiposOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -455,10 +477,17 @@ export default function Configuracoes() {
               onOpen={() => setImportModalOpen(true)}
               onOpenModulos={() => setImportModulosOpen(true)}
               onOpenCategorias={() => setImportCategoriasOpen(true)}
+              onOpenTipos={() => setImportTiposOpen(true)}
             />
             <ClienteImportModal open={importModalOpen} onOpenChange={setImportModalOpen} />
             <ImportModulosModal open={importModulosOpen} onOpenChange={setImportModulosOpen} />
             <ImportCategoriasModal open={importCategoriasOpen} onOpenChange={setImportCategoriasOpen} />
+            <ImportTiposServicoModal
+              open={importTiposOpen}
+              onOpenChange={setImportTiposOpen}
+              tenantId={tid}
+              onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
+            />
           </>
         );
       case "tickets-config":
