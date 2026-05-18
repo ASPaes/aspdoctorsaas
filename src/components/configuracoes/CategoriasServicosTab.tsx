@@ -15,23 +15,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronRight, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Category {
   id: string;
   tenant_id: string;
-  produto_id: number | null;
   nome: string;
   ativo: boolean;
-  produtos?: { nome: string } | null;
+  linkedProductIds: number[];
+  linkedProductNames: string[];
 }
 
 interface Subcategory {
