@@ -449,6 +449,33 @@ export default function ClienteContratosSection({ clienteId }: Props) {
           }}
         />
       )}
+
+      <CancelarContratoDialog
+        open={cancelDialog.open}
+        onOpenChange={(v) => setCancelDialog({ open: v, contrato: v ? cancelDialog.contrato : null })}
+        contrato={cancelDialog.contrato}
+        clienteNome=""
+        motivosCancelamento={motivosCancelamentoQuery.data ?? []}
+        ativosCount={ativosCount}
+        tid={tid}
+        onSuccess={() => {
+          invalidate();
+          qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
+          setCancelDialog({ open: false, contrato: null });
+        }}
+      />
+      <ReativarContratoDialog
+        open={reativarDialog.open}
+        onOpenChange={(v) => setReativarDialog({ open: v, contrato: v ? reativarDialog.contrato : null })}
+        contrato={reativarDialog.contrato}
+        clienteNome=""
+        ativosCount={ativosCount}
+        onSuccess={() => {
+          invalidate();
+          qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
+          setReativarDialog({ open: false, contrato: null });
+        }}
+      />
     </Card>
   );
 }
