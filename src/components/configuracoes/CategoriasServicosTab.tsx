@@ -147,7 +147,7 @@ export default function CategoriasServicosTab() {
   const openNewCategory = () => {
     setEditingCat(null);
     setCatNome("");
-    setCatProdutoId("none");
+    setCatLinkedProducts([]);
     setCatAtivo(true);
     setCatOpen(true);
   };
@@ -155,7 +155,7 @@ export default function CategoriasServicosTab() {
   const openEditCategory = (c: Category) => {
     setEditingCat(c);
     setCatNome(c.nome);
-    setCatProdutoId(c.produto_id ? String(c.produto_id) : "none");
+    setCatLinkedProducts(c.linkedProductIds.map(String));
     setCatAtivo(c.ativo);
     setCatOpen(true);
   };
@@ -167,23 +167,46 @@ export default function CategoriasServicosTab() {
     }
     const payload: any = {
       nome: catNome.trim(),
-      produto_id: catProdutoId === "none" ? null : Number(catProdutoId),
       ativo: catAtivo,
     };
     if (!editingCat && tid) payload.tenant_id = tid;
 
     const table = supabase.from("service_categories" as any) as any;
-    const { error } = editingCat
-      ? await table.update(payload).eq("id", editingCat.id)
-      : await table.insert(payload);
+    let categoryId: string | null = editingCat?.id ?? null;
 
-    if (error) {
-      toast({ title: "Erro ao salvar categoria", description: error.message, variant: "destructive" });
-      return;
+    if (editingCat) {
+      const { error } = await table.update(payload).eq("id", editingCat.id);
+      if (error) {
+        toast({ title: "Erro ao salvar categoria", description: error.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      const { data, error } = await table.insert(payload).select("id").single();
+      if (error) {
+        toast({ title: "Erro ao salvar categoria", description: error.message, variant: "destructive" });
+        return;
+      }
+      categoryId = data?.id ?? null;
     }
+
+    if (categoryId) {
+      const linkTable = supabase.from("service_category_products" as any) as any;
+      await linkTable.delete().eq("category_id", categoryId);
+      if (catLinkedProducts.length > 0) {
+        await linkTable.insert(
+          catLinkedProducts.map((pid) => ({
+            tenant_id: tid,
+            category_id: categoryId,
+            produto_id: Number(pid),
+          }))
+        );
+      }
+    }
+
     toast({ title: editingCat ? "Categoria atualizada" : "Categoria criada" });
     setCatOpen(false);
     qc.invalidateQueries({ queryKey: ["cats_categorias"] });
+    qc.invalidateQueries({ queryKey: ["cats_category_products"] });
   };
 
   const toggleCategoryActive = async (c: Category) => {
