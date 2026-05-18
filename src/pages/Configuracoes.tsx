@@ -249,7 +249,7 @@ function PercentuaisCard({
   );
 }
 
-function ImportacaoContent({ onOpen, onOpenModulos, onOpenCategorias }: { onOpen: () => void; onOpenModulos: () => void; onOpenCategorias: () => void }) {
+function ImportacaoContent({ onOpen, onOpenModulos, onOpenCategorias, onOpenTipos }: { onOpen: () => void; onOpenModulos: () => void; onOpenCategorias: () => void; onOpenTipos: () => void }) {
   return (
     <div className="space-y-4 max-w-xl">
       <Card>
