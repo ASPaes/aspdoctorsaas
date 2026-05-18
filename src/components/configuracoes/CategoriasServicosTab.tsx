@@ -15,23 +15,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronRight, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Category {
   id: string;
   tenant_id: string;
-  produto_id: number | null;
   nome: string;
   ativo: boolean;
-  produtos?: { nome: string } | null;
+  linkedProductIds: number[];
+  linkedProductNames: string[];
 }
 
 interface Subcategory {
@@ -57,7 +51,7 @@ export default function CategoriasServicosTab() {
   const [catOpen, setCatOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [catNome, setCatNome] = useState("");
-  const [catProdutoId, setCatProdutoId] = useState<string>("none");
+  const [catLinkedProducts, setCatLinkedProducts] = useState<string[]>([]);
   const [catAtivo, setCatAtivo] = useState(true);
 
   // Subcategory dialog
@@ -78,16 +72,43 @@ export default function CategoriasServicosTab() {
     },
   });
 
+  const { data: categoryLinks = [] } = useQuery({
+    queryKey: ["cats_category_products", tid],
+    queryFn: async () => {
+      let q = (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as { category_id: string; produto_id: number }[];
+    },
+  });
+
   const { data: categorias = [] } = useQuery({
-    queryKey: ["cats_categorias", tid],
+    queryKey: ["cats_categorias", tid, produtos, categoryLinks],
     queryFn: async () => {
       let q = (supabase.from("service_categories" as any) as any)
-        .select("*, produtos:produto_id(nome)")
+        .select("id, tenant_id, nome, ativo, created_at, updated_at")
         .order("nome");
       if (tid) q = q.eq("tenant_id", tid);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Category[];
+      const rows = (data ?? []) as any[];
+      const prodMap = new Map(produtos.map((p) => [p.id, p.nome]));
+      const linksByCat = new Map<string, number[]>();
+      for (const l of categoryLinks) {
+        const arr = linksByCat.get(l.category_id) ?? [];
+        arr.push(l.produto_id);
+        linksByCat.set(l.category_id, arr);
+      }
+      return rows.map((r) => {
+        const ids = linksByCat.get(r.id) ?? [];
+        return {
+          ...r,
+          linkedProductIds: ids,
+          linkedProductNames: ids.map((id) => prodMap.get(id)).filter(Boolean) as string[],
+        } as Category;
+      });
     },
   });
 
@@ -126,7 +147,7 @@ export default function CategoriasServicosTab() {
   const openNewCategory = () => {
     setEditingCat(null);
     setCatNome("");
-    setCatProdutoId("none");
+    setCatLinkedProducts([]);
     setCatAtivo(true);
     setCatOpen(true);
   };
@@ -134,7 +155,7 @@ export default function CategoriasServicosTab() {
   const openEditCategory = (c: Category) => {
     setEditingCat(c);
     setCatNome(c.nome);
-    setCatProdutoId(c.produto_id ? String(c.produto_id) : "none");
+    setCatLinkedProducts(c.linkedProductIds.map(String));
     setCatAtivo(c.ativo);
     setCatOpen(true);
   };
@@ -146,23 +167,46 @@ export default function CategoriasServicosTab() {
     }
     const payload: any = {
       nome: catNome.trim(),
-      produto_id: catProdutoId === "none" ? null : Number(catProdutoId),
       ativo: catAtivo,
     };
     if (!editingCat && tid) payload.tenant_id = tid;
 
     const table = supabase.from("service_categories" as any) as any;
-    const { error } = editingCat
-      ? await table.update(payload).eq("id", editingCat.id)
-      : await table.insert(payload);
+    let categoryId: string | null = editingCat?.id ?? null;
 
-    if (error) {
-      toast({ title: "Erro ao salvar categoria", description: error.message, variant: "destructive" });
-      return;
+    if (editingCat) {
+      const { error } = await table.update(payload).eq("id", editingCat.id);
+      if (error) {
+        toast({ title: "Erro ao salvar categoria", description: error.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      const { data, error } = await table.insert(payload).select("id").single();
+      if (error) {
+        toast({ title: "Erro ao salvar categoria", description: error.message, variant: "destructive" });
+        return;
+      }
+      categoryId = data?.id ?? null;
     }
+
+    if (categoryId) {
+      const linkTable = supabase.from("service_category_products" as any) as any;
+      await linkTable.delete().eq("category_id", categoryId);
+      if (catLinkedProducts.length > 0) {
+        await linkTable.insert(
+          catLinkedProducts.map((pid) => ({
+            tenant_id: tid,
+            category_id: categoryId,
+            produto_id: Number(pid),
+          }))
+        );
+      }
+    }
+
     toast({ title: editingCat ? "Categoria atualizada" : "Categoria criada" });
     setCatOpen(false);
     qc.invalidateQueries({ queryKey: ["cats_categorias"] });
+    qc.invalidateQueries({ queryKey: ["cats_category_products"] });
   };
 
   const toggleCategoryActive = async (c: Category) => {
@@ -263,9 +307,17 @@ export default function CategoriasServicosTab() {
                   />
                 </button>
                 <span className="font-medium truncate min-w-0 flex-1">{c.nome}</span>
-                <Badge variant={c.produto_id ? "default" : "secondary"} className="shrink-0">
-                  {c.produtos?.nome ?? "Universal"}
-                </Badge>
+                {c.linkedProductNames.length === 0 ? (
+                  <Badge variant="secondary" className="shrink-0">Universal</Badge>
+                ) : c.linkedProductNames.length <= 2 ? (
+                  c.linkedProductNames.map((n) => (
+                    <Badge key={n} variant="default" className="shrink-0">{n}</Badge>
+                  ))
+                ) : (
+                  <Badge variant="default" className="shrink-0">
+                    {c.linkedProductNames.length} produtos
+                  </Badge>
+                )}
                 <Badge variant={c.ativo ? "default" : "secondary"} className="shrink-0">
                   {c.ativo ? "Ativo" : "Inativo"}
                 </Badge>
@@ -338,20 +390,37 @@ export default function CategoriasServicosTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Produto (opcional)</Label>
-              <Select value={catProdutoId} onValueChange={setCatProdutoId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Universal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Universal (sem produto)</SelectItem>
-                  {produtos.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Produtos vinculados (opcional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Sem vínculo = visível para todos os produtos
+              </p>
+              <div className="border rounded-md max-h-48 overflow-y-auto divide-y">
+                {produtos.length === 0 && (
+                  <div className="text-xs text-muted-foreground p-2">
+                    Nenhum produto cadastrado.
+                  </div>
+                )}
+                {produtos.map((p) => {
+                  const pid = String(p.id);
+                  const checked = catLinkedProducts.includes(pid);
+                  return (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setCatLinkedProducts((prev) =>
+                            v ? [...prev, pid] : prev.filter((x) => x !== pid)
+                          );
+                        }}
+                      />
+                      <span className="text-sm">{p.nome}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <Label>Ativo</Label>
