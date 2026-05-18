@@ -34,16 +34,13 @@ import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import FinanceiroCard from "@/components/clientes/FinanceiroCard";
-import CancelamentoTab from "@/components/clientes/CancelamentoTab";
 import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection";
 import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
-import { ReativarClienteDialog } from "@/components/clientes/ReativarClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { RefreshCw } from "lucide-react";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
@@ -182,8 +179,6 @@ export default function ClienteForm() {
 
   const estadoId = form.watch("estado_id");
   const cancelado = form.watch("cancelado");
-  const [confirmReactivateOpen, setConfirmReactivateOpen] = useState(false);
-  const [showReativarDialog, setShowReativarDialog] = useState(false);
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const lookups = useLookups(estadoId);
@@ -343,12 +338,6 @@ export default function ClienteForm() {
         contato_fone: values.contato_fone ? normalizeBRPhone(values.contato_fone) : null,
         imposto_percentual: values.imposto_percentual != null ? values.imposto_percentual / 100 : null,
         custo_fixo_percentual: values.custo_fixo_percentual != null ? values.custo_fixo_percentual / 100 : null,
-        // Sanitização de integridade: cliente não-cancelado nunca persiste dados de cancelamento.
-        ...(values.cancelado !== true ? {
-          data_cancelamento: null,
-          motivo_cancelamento_id: null,
-          observacao_cancelamento: null,
-        } : {}),
       };
 
       if (isEditing) {
@@ -596,87 +585,53 @@ export default function ClienteForm() {
           {/* Filiais vinculadas (apenas em edição) */}
           {isEditing && id && <FiliaisSection clienteId={id} />}
 
-          {/* Card: Cancelamento */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div className="space-y-1">
+          {/* Card: Cancelamento (read-only — derivado dos contratos) */}
+          {isEditing && (
+            <Card>
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <XCircle className="h-5 w-5 text-destructive" />
                   Cancelamento
                 </CardTitle>
-                <CardDescription>Ative para registrar o cancelamento do cliente</CardDescription>
-              </div>
-              <div className="flex items-center gap-3">
-                {isEditing && id && cancelado && isAdmin && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10"
-                    onClick={() => setShowReativarDialog(true)}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Reativar
-                  </Button>
-                )}
-                <FormField control={form.control} name="cancelado" render={({ field }) => (
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={(next) => {
-                        if (field.value && !next) {
-                          const hasData =
-                            !!form.getValues("data_cancelamento") ||
-                            form.getValues("motivo_cancelamento_id") != null ||
-                            !!form.getValues("observacao_cancelamento");
-                          if (hasData) {
-                            setConfirmReactivateOpen(true);
-                            return;
-                          }
-                        }
-                        field.onChange(next);
-                      }}
-                      aria-label="Ativar ou desativar cancelamento do cliente"
-                    />
-                  </FormControl>
-                )} />
-              </div>
-            </CardHeader>
-            {cancelado && (
+              </CardHeader>
               <CardContent>
-                <CancelamentoTab
-                  form={form}
-                  motivosCancelamento={lookups.motivosCancelamento.data ?? []}
-                />
+                {cancelado ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="destructive">Cancelado</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {form.watch("data_cancelamento") && (
+                          <span>
+                            desde {(() => {
+                              const d = form.watch("data_cancelamento");
+                              if (!d) return "—";
+                              const [y, m, day] = d.split("-");
+                              return `${day}/${m}/${y}`;
+                            })()}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {form.watch("observacao_cancelamento") && (
+                      <p className="text-sm text-muted-foreground">
+                        {form.watch("observacao_cancelamento")}
+                      </p>
+                    )}
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        Para reativar o cliente, reative pelo menos um contrato na seção de Contratos acima.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Cliente ativo. O cancelamento é gerenciado individualmente por contrato na seção de Contratos acima.
+                  </p>
+                )}
               </CardContent>
-            )}
-          </Card>
+            </Card>
+          )}
 
-          <AlertDialog open={confirmReactivateOpen} onOpenChange={setConfirmReactivateOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Reativar cliente?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Os dados de cancelamento (data, motivo e observação) serão removidos e o cliente voltará ao status Ativo. Esta ação só é persistida ao clicar em Salvar Cliente.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    form.setValue("cancelado", false, { shouldDirty: true });
-                    form.setValue("data_cancelamento", null, { shouldDirty: true });
-                    form.setValue("motivo_cancelamento_id", null, { shouldDirty: true });
-                    form.setValue("observacao_cancelamento", null, { shouldDirty: true });
-                    setConfirmReactivateOpen(false);
-                  }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Reativar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
 
 
           {/* Botões de ação */}
@@ -704,20 +659,6 @@ export default function ClienteForm() {
         />
       )}
 
-      {isEditing && id && (
-        <ReativarClienteDialog
-          open={showReativarDialog}
-          onOpenChange={setShowReativarDialog}
-          clienteId={id}
-          clienteNome={form.watch("nome_fantasia") || form.watch("razao_social") || ""}
-          mensalidade={form.watch("mensalidade") ?? null}
-          dataCancelamento={form.watch("data_cancelamento") ?? null}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ['cliente', id] });
-            queryClient.invalidateQueries({ queryKey: ['clientes'] });
-          }}
-        />
-      )}
     </div>
   );
 }
