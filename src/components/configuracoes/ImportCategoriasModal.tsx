@@ -75,7 +75,7 @@ function StepIndicator({ current }: { current: Step }) {
 
 function downloadTemplateCsv() {
   const BOM = "\uFEFF";
-  const content = BOM + "categoria;subcategoria\nVendas;Frente De Caixa\nVendas;Pré-Venda\n";
+  const content = BOM + "produto;categoria;subcategoria\nProduto Exemplo;Vendas;Frente De Caixa\nProduto Exemplo;Vendas;Pré-Venda\n";
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -140,11 +140,13 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
     reader.onload = (e) => {
       const text = String(e.target?.result ?? "").replace(/^\uFEFF/, "");
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      const colCount = (lines[0] ?? "").split(";").length;
+      const offset = colCount >= 3 ? 1 : 0;
       const parsed: ParsedRow[] = lines.map(line => {
         const cols = line.split(";");
         return {
-          categoria: toTitleCase((cols[0] ?? "").trim()),
-          subcategoria: toTitleCase((cols[1] ?? "").trim()),
+          categoria: toTitleCase((cols[offset] ?? "").trim()),
+          subcategoria: toTitleCase((cols[offset + 1] ?? "").trim()),
         };
       });
       setRows(parsed);
