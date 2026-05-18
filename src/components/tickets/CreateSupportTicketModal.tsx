@@ -138,12 +138,24 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
     enabled: open && !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("service_categories" as any) as any)
-        .select("id, nome, produto_id")
+        .select("id, nome")
         .eq("tenant_id", tid)
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const { data: categoryProductLinks = [] } = useQuery({
+    queryKey: ["create_manual_ticket_cat_links", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id")
+        .eq("tenant_id", tid);
+      if (error) throw error;
+      return (data ?? []) as Array<{ category_id: string; produto_id: number }>;
     },
   });
 
