@@ -43,6 +43,11 @@ export function getConversationBucket(row: ConversationStateRow): ConversationBu
     return "in_progress";
   }
 
+  // 2.5 No active attendance — should not be in queue
+  if (!row.attendance_status) {
+    return "closed";
+  }
+
   // 3. Waiting + opened out of hours (not yet attended)
   if (row.opened_out_of_hours) {
     return "waiting_out_of_hours";
