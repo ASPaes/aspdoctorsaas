@@ -219,15 +219,37 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
         }
       }
 
-      // Vincular categorias recém-criadas ao produto via junção N:N (se houver produto)
-      if (prodId && newCatIds.length > 0) {
-        const { error: linkError } = await (supabase.from("service_category_products" as any) as any)
-          .insert(newCatIds.map((category_id) => ({
-            tenant_id: resolvedTenantId,
-            category_id,
-            produto_id: prodId,
-          })));
-        if (linkError) throw linkError;
+      // Vincular TODAS as categorias do arquivo ao produto via junção N:N
+      if (prodId) {
+        // Coletar IDs de todas as categorias envolvidas (novas + existentes)
+        const allCategoryIds = uniqueCategories
+          .map(name => catMap[name.toLowerCase()])
+          .filter(Boolean);
+
+        if (allCategoryIds.length > 0) {
+          // Buscar vínculos já existentes para não duplicar
+          const { data: existingLinks } = await (supabase.from("service_category_products" as any) as any)
+            .select("category_id")
+            .eq("tenant_id", resolvedTenantId)
+            .eq("produto_id", prodId)
+            .in("category_id", allCategoryIds);
+
+          const alreadyLinked = new Set(
+            ((existingLinks ?? []) as Array<{ category_id: string }>).map(l => l.category_id)
+          );
+
+          const toLink = allCategoryIds.filter(id => !alreadyLinked.has(id));
+
+          if (toLink.length > 0) {
+            const { error: linkError } = await (supabase.from("service_category_products" as any) as any)
+              .insert(toLink.map((category_id) => ({
+                tenant_id: resolvedTenantId,
+                category_id,
+                produto_id: prodId,
+              })));
+            if (linkError) throw linkError;
+          }
+        }
       }
 
       const subPayload = validRows
@@ -256,6 +278,7 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
       onSuccess?.();
       queryClient.invalidateQueries({ queryKey: ["cats_categorias"] });
       queryClient.invalidateQueries({ queryKey: ["cats_subcategorias"] });
+      queryClient.invalidateQueries({ queryKey: ["cats_category_products"] });
       reset();
       onOpenChange(false);
     } catch (err: any) {
