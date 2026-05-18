@@ -845,3 +845,298 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
+// ============================================================
+// CancelarContratoDialog
+// ============================================================
+interface CancelarContratoDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  contrato: Contrato | null;
+  clienteNome: string;
+  motivosCancelamento: Array<{ id: number; nome: string }>;
+  ativosCount: number;
+  tid: string | null | undefined;
+  onSuccess: () => void;
+}
+
+function CancelarContratoDialog({
+  open, onOpenChange, contrato, motivosCancelamento, ativosCount, onSuccess,
+}: CancelarContratoDialogProps) {
+  const [motivoId, setMotivoId] = useState<string>("");
+  const [observacao, setObservacao] = useState("");
+  const [confirmacao, setConfirmacao] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMotivoId("");
+      setObservacao("");
+      setConfirmacao("");
+    }
+  }, [open, contrato?.id]);
+
+  const itensQuery = useQuery({
+    queryKey: ["contrato_itens_cancel", contrato?.id],
+    enabled: !!contrato?.id && open,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("contrato_itens" as any) as any)
+        .select("id, descricao, vlr_mensal")
+        .eq("contrato_id", contrato!.id);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; descricao: string | null; vlr_mensal: number | null }>;
+    },
+  });
+
+  const isUltimoAtivo = ativosCount <= 1 && contrato?.status === "ativo";
+  const matches = contrato ? confirmacao.trim() === contrato.numero.trim() : false;
+  const canSubmit = !!motivoId && matches && !loading && !!contrato;
+
+  const handleConfirm = async () => {
+    if (!canSubmit || !contrato) return;
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("cancelar_contrato", {
+        p_contrato_id: contrato.id,
+        p_motivo_id: Number(motivoId),
+        p_observacao: observacao.trim() || null,
+      });
+      if (error) throw error;
+      const result = data as any;
+      toast({
+        title: "Contrato cancelado",
+        description: `MRR Churn: R$ ${fmtBRL(Number(result?.mrr_churn ?? 0))}`,
+      });
+      if (result?.cliente_cancelado) {
+        toast({ title: "Cliente marcado como cancelado" });
+      }
+      onSuccess();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao cancelar contrato",
+        description: err?.message || "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!contrato) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <XCircle className="h-5 w-5 text-destructive" />
+            Cancelar contrato {contrato.numero}
+          </DialogTitle>
+          <DialogDescription>
+            Esta ação cancela o contrato e inativa os produtos vinculados.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isUltimoAtivo && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              <strong>Este é o último contrato ativo.</strong> O cliente será marcado como cancelado.
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Motivo do cancelamento *</Label>
+            <Select value={motivoId} onValueChange={setMotivoId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o motivo" />
+              </SelectTrigger>
+              <SelectContent>
+                {motivosCancelamento.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Observação (opcional)</Label>
+            <Textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="Detalhes adicionais..."
+            />
+          </div>
+
+          {itensQuery.data && itensQuery.data.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Produtos que serão inativados</Label>
+              <div className="rounded-md border divide-y max-h-40 overflow-y-auto">
+                {itensQuery.data.map((it) => (
+                  <div key={it.id} className="flex items-center justify-between p-2 text-xs">
+                    <span className="truncate">{it.descricao || "—"}</span>
+                    <span className="font-mono text-muted-foreground shrink-0 ml-2">
+                      R$ {fmtBRL(Number(it.vlr_mensal))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <Label className="text-xs">
+              Para confirmar, digite o número do contrato:{" "}
+              <span className="font-mono text-foreground">{contrato.numero}</span>
+            </Label>
+            <Input
+              value={confirmacao}
+              onChange={(e) => setConfirmacao(e.target.value)}
+              placeholder={contrato.numero}
+              autoComplete="off"
+            />
+            {confirmacao && !matches && (
+              <p className="text-[10px] text-destructive">Número não confere.</p>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Voltar
+          </Button>
+          <Button variant="destructive" onClick={handleConfirm} disabled={!canSubmit}>
+            <XCircle className="h-4 w-4 mr-2" />
+            {loading ? "Cancelando..." : "Cancelar contrato"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// ReativarContratoDialog
+// ============================================================
+interface ReativarContratoDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  contrato: Contrato | null;
+  clienteNome: string;
+  ativosCount: number;
+  onSuccess: () => void;
+}
+
+function ReativarContratoDialog({
+  open, onOpenChange, contrato, ativosCount, onSuccess,
+}: ReativarContratoDialogProps) {
+  const [observacao, setObservacao] = useState("");
+  const [confirmacao, setConfirmacao] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setObservacao("");
+      setConfirmacao("");
+    }
+  }, [open, contrato?.id]);
+
+  const clienteEstaCancelado = ativosCount === 0;
+  const matches = contrato ? confirmacao.trim() === contrato.numero.trim() : false;
+  const canSubmit = matches && !loading && !!contrato;
+
+  const handleConfirm = async () => {
+    if (!canSubmit || !contrato) return;
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("reativar_contrato", {
+        p_contrato_id: contrato.id,
+        p_observacao: observacao.trim() || null,
+      });
+      if (error) throw error;
+      const result = data as any;
+      toast({
+        title: "Contrato reativado",
+        description: `MRR: +R$ ${fmtBRL(Number(result?.mrr_reactivation ?? 0))}`,
+      });
+      if (result?.cliente_reativado) {
+        toast({ title: "Cliente reativado" });
+      }
+      onSuccess();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao reativar contrato",
+        description: err?.message || "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!contrato) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5 text-emerald-500" />
+            Reativar contrato {contrato.numero}
+          </DialogTitle>
+          <DialogDescription>
+            O contrato <span className="font-mono">{contrato.numero}</span> e seus produtos vinculados serão reativados.
+            {clienteEstaCancelado && " O cliente voltará ao status ativo."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Observação (opcional)</Label>
+            <Textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="Detalhes adicionais sobre a reativação..."
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">
+              Para confirmar, digite o número do contrato:{" "}
+              <span className="font-mono text-foreground">{contrato.numero}</span>
+            </Label>
+            <Input
+              value={confirmacao}
+              onChange={(e) => setConfirmacao(e.target.value)}
+              placeholder={contrato.numero}
+              autoComplete="off"
+            />
+            {confirmacao && !matches && (
+              <p className="text-[10px] text-destructive">Número não confere.</p>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Voltar
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={!canSubmit}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            {loading ? "Reativando..." : "Reativar contrato"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
