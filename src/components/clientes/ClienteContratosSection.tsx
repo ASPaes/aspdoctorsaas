@@ -25,9 +25,10 @@ import {
 } from "@/components/ui/collapsible";
 import {
   ScrollText, Plus, Pencil, ChevronDown, ChevronRight,
-  ExternalLink, Loader2,
+  ExternalLink, Loader2, XCircle, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
+import { useProfile } from "@/hooks/useProfile";
 
 interface Props {
   clienteId: string;
