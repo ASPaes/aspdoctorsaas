@@ -133,7 +133,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     staleTime: 10_000,
     refetchOnWindowFocus: false,
     refetchOnMount: 'always',
-    refetchInterval: 15_000,
+    refetchInterval: 120_000,
     refetchIntervalInBackground: false,
   });
 
