@@ -642,9 +642,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("service_categories" as any) as any)
-        .select("id, nome, produto_id").eq("tenant_id", tid).eq("ativo", true).order("nome");
+        .select("id, nome").eq("tenant_id", tid).eq("ativo", true).order("nome");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const { data: categoryProductLinks = [] } = useQuery({
+    queryKey: ["ticket_detail_cat_links", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id").eq("tenant_id", tid);
+      if (error) throw error;
+      return (data ?? []) as Array<{ category_id: string; produto_id: number }>;
     },
   });
 
