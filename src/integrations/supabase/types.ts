@@ -3091,7 +3091,6 @@ export type Database = {
           created_at: string
           id: string
           nome: string
-          produto_id: number | null
           tenant_id: string
           updated_at: string
         }
@@ -3100,7 +3099,6 @@ export type Database = {
           created_at?: string
           id?: string
           nome: string
-          produto_id?: number | null
           tenant_id: string
           updated_at?: string
         }
@@ -3109,20 +3107,58 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
-          produto_id?: number | null
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "service_categories_produto_id_fkey"
+            foreignKeyName: "service_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_category_products: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          produto_id: number
+          tenant_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          produto_id: number
+          tenant_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          produto_id?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_category_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_category_products_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "service_categories_tenant_id_fkey"
+            foreignKeyName: "service_category_products_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
