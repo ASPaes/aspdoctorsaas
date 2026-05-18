@@ -14,6 +14,7 @@ import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function AppLayout() {
   const location = useLocation();
