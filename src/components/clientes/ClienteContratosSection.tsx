@@ -315,6 +315,30 @@ export default function ClienteContratosSection({ clienteId }: Props) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+                    {isAdminOrHead && c.status === "ativo" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                        title="Cancelar contrato"
+                        onClick={(e) => { e.stopPropagation(); setCancelDialog({ open: true, contrato: c }); }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isAdminOrHead && c.status === "cancelado" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-emerald-500 hover:text-emerald-600"
+                        title="Reativar contrato"
+                        onClick={(e) => { e.stopPropagation(); setReativarDialog({ open: true, contrato: c }); }}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
 
                   <CollapsibleContent>
