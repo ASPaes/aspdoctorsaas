@@ -278,6 +278,7 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
       onSuccess?.();
       queryClient.invalidateQueries({ queryKey: ["cats_categorias"] });
       queryClient.invalidateQueries({ queryKey: ["cats_subcategorias"] });
+      queryClient.invalidateQueries({ queryKey: ["cats_category_products"] });
       reset();
       onOpenChange(false);
     } catch (err: any) {
