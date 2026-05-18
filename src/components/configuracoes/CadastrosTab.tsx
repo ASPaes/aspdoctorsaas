@@ -276,12 +276,6 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         ))}
       </Tabs>
 
-      <ImportTiposServicoModal
-        open={importTiposOpen}
-        onOpenChange={setImportTiposOpen}
-        tenantId={tid}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crud_service_types"] })}
-      />
     </div>
   );
 }
