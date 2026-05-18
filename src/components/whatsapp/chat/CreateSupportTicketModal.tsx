@@ -110,12 +110,25 @@ export function CreateSupportTicketModal({
     enabled: open && !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("service_categories" as any) as any)
-        .select("id, nome, produto_id")
+        .select("id, nome")
         .eq("tenant_id", tid)
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  // Vínculos categoria <-> produto (N:N)
+  const { data: categoryProductLinks = [] } = useQuery({
+    queryKey: ["support_ticket_modal_cat_links", tid],
+    enabled: open && !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id")
+        .eq("tenant_id", tid);
+      if (error) throw error;
+      return (data ?? []) as Array<{ category_id: string; produto_id: number }>;
     },
   });
 
@@ -151,10 +164,14 @@ export function CreateSupportTicketModal({
 
   const produtoIdNum = produtoId ? Number(produtoId) : null;
 
-  const filteredCategories = useMemo(
-    () => categories.filter((c) => c.produto_id === produtoIdNum || c.produto_id === null),
-    [categories, produtoIdNum]
-  );
+  const filteredCategories = useMemo(() => {
+    if (produtoIdNum == null) return categories;
+    const linkedCatIds = new Set(
+      categoryProductLinks.filter((l) => l.produto_id === produtoIdNum).map((l) => l.category_id)
+    );
+    const catsWithAnyLink = new Set(categoryProductLinks.map((l) => l.category_id));
+    return categories.filter((c) => linkedCatIds.has(c.id) || !catsWithAnyLink.has(c.id));
+  }, [categories, categoryProductLinks, produtoIdNum]);
 
   const filteredSubcategories = useMemo(
     () =>

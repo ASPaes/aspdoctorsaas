@@ -642,9 +642,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("service_categories" as any) as any)
-        .select("id, nome, produto_id").eq("tenant_id", tid).eq("ativo", true).order("nome");
+        .select("id, nome").eq("tenant_id", tid).eq("ativo", true).order("nome");
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; nome: string; produto_id: number | null }>;
+      return (data ?? []) as Array<{ id: string; nome: string }>;
+    },
+  });
+
+  const { data: categoryProductLinks = [] } = useQuery({
+    queryKey: ["ticket_detail_cat_links", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("service_category_products" as any) as any)
+        .select("category_id, produto_id").eq("tenant_id", tid);
+      if (error) throw error;
+      return (data ?? []) as Array<{ category_id: string; produto_id: number }>;
     },
   });
 
@@ -904,7 +915,12 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             <Select value={ticket.category_id ?? ""} onValueChange={(v) => handleFieldUpdate({ category_id: v })} disabled={updating}>
               <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
-                {categories.filter(c => !ticket?.produto_id || c.produto_id === ticket.produto_id || c.produto_id === null).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                {categories.filter(c => {
+                  if (!ticket?.produto_id) return true;
+                  const linkedCatIds = new Set(categoryProductLinks.filter(l => l.produto_id === ticket.produto_id).map(l => l.category_id));
+                  const catsWithAnyLink = new Set(categoryProductLinks.map(l => l.category_id));
+                  return linkedCatIds.has(c.id) || !catsWithAnyLink.has(c.id);
+                }).map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

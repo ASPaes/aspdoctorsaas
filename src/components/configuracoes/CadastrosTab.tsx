@@ -170,10 +170,8 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       table: "service_categories",
       queryKey: "crud_service_categories",
       orderBy: "nome",
-      selectQuery: "*, produtos:produto_id(nome)",
       columns: [
         { key: "nome", label: "Nome" },
-        { key: "produto_id", label: "Produto (opcional)", type: "select", options: productOptions, render: (_val: any, row: any) => row.produtos?.nome ?? "Universal" },
         { key: "ativo", label: "Ativo", type: "boolean" },
       ],
     },

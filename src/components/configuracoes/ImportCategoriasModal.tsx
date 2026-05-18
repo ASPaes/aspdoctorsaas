@@ -191,15 +191,9 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
     try {
       const prodId = noProductLink ? null : selectedProdutoId;
 
-      let existingQuery = (supabase.from("service_categories" as any) as any)
+      const { data: existingCats } = await (supabase.from("service_categories" as any) as any)
         .select("id, nome")
         .eq("tenant_id", resolvedTenantId);
-      if (prodId) {
-        existingQuery = existingQuery.eq("produto_id", prodId);
-      } else {
-        existingQuery = existingQuery.is("produto_id", null);
-      }
-      const { data: existingCats } = await existingQuery;
 
       const catMap: Record<string, string> = {};
       for (const c of (existingCats ?? []) as Array<{ id: string; nome: string }>) {
@@ -209,11 +203,11 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
       const uniqueCategories = [...new Set(validRows.map(r => r.categoria))].filter(Boolean);
 
       const newCats = uniqueCategories.filter(name => !catMap[name.toLowerCase()]);
+      const newCatIds: string[] = [];
       if (newCats.length > 0) {
         const { data: inserted, error } = await (supabase.from("service_categories" as any) as any)
           .insert(newCats.map(nome => ({
             tenant_id: resolvedTenantId,
-            produto_id: prodId,
             nome,
             ativo: true,
           })))
@@ -221,7 +215,19 @@ export default function ImportCategoriasModal({ open, onOpenChange, onSuccess }:
         if (error) throw error;
         for (const c of (inserted ?? []) as Array<{ id: string; nome: string }>) {
           catMap[c.nome.trim().toLowerCase()] = c.id;
+          newCatIds.push(c.id);
         }
+      }
+
+      // Vincular categorias recém-criadas ao produto via junção N:N (se houver produto)
+      if (prodId && newCatIds.length > 0) {
+        const { error: linkError } = await (supabase.from("service_category_products" as any) as any)
+          .insert(newCatIds.map((category_id) => ({
+            tenant_id: resolvedTenantId,
+            category_id,
+            produto_id: prodId,
+          })));
+        if (linkError) throw linkError;
       }
 
       const subPayload = validRows
