@@ -45,6 +45,8 @@ interface AvalRow {
   department_id: string | null;
   setor: string;
   cliente_nome: string;
+  attendance_id: string;
+  attendance_code: string;
 }
 
 function toISODate(d: Date): string {
