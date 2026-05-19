@@ -508,7 +508,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
             <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.median_handle_seconds)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Tempo atendimento</p>
           </div>
-          <div className="bg-card border border-border rounded-lg p-3">
+          <button type="button" onClick={() => setCsatModalOpen(true)} className="bg-card border border-primary/40 rounded-lg p-3 text-left hover:border-primary/70 transition-colors">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">CSAT médio</p>
             <p className={`text-2xl font-semibold font-mono mt-0.5 ${metrics.avg_csat >= 4 ? "text-green-400" : metrics.avg_csat >= 3 ? "text-yellow-400" : "text-red-400"}`}>
               {metrics.avg_csat > 0 ? metrics.avg_csat : "—"}
@@ -521,7 +521,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                 </span>
               )}
             </p>
-          </div>
+          </button>
         </div>
       )}
 
