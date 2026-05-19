@@ -21,6 +21,8 @@ interface Props {
   dateTo: Date;
   initialDepartmentId?: string | null;
   scoreMax: number;
+  isAdmin?: boolean;
+  onNavigateToAttendance?: (attendanceCode: string) => void;
 }
 
 interface SetorRow {
