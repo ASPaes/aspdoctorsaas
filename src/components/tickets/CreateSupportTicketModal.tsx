@@ -59,7 +59,28 @@ const defaultPrevisao = () => {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 };
 
-export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaultDepartmentId }: Props) {
+export function CreateSupportTicketModal({
+  open,
+  onOpenChange,
+  onCreated,
+  defaultDepartmentId,
+  fromClosure = false,
+  attendanceId = null,
+  closureClienteId = null,
+  closureClienteNome = null,
+  closureClienteCodigo = null,
+  closureProdutoId = null,
+  closureDepartmentId = null,
+  closureResponsavelId = null,
+  closureAiSummary = null,
+  closureAiTopics = null,
+  closureAiKeywords = null,
+  closureAiProblem = null,
+  closureAiSolution = null,
+  closureSentimentLabel = null,
+  closureSentimentConfidence = null,
+  closureSentimentSummary = null,
+}: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
