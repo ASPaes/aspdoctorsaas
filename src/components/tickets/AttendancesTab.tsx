@@ -125,6 +125,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
   const effectiveAgente = embedded && parentAgenteFilter !== "all" ? parentAgenteFilter : atendenteFilter;
+  const effectiveClosureType = embedded && closureTypeOverride && closureTypeOverride !== "all" ? closureTypeOverride : closureTypeFilter;
+  const effectiveCsatFilter = embedded && csatFilterOverride && csatFilterOverride !== "all" ? csatFilterOverride : csatFilter;
+  const effectiveCsatScoreFilter = embedded && csatScoreFilterOverride && csatScoreFilterOverride !== "all" ? csatScoreFilterOverride : csatScoreFilter;
+  const effectiveTicketFilter = embedded && ticketFilterOverride && ticketFilterOverride !== "all" ? ticketFilterOverride : ticketFilter;
+  const effectiveSentimentFilter = embedded && sentimentFilterOverride && sentimentFilterOverride !== "all" ? sentimentFilterOverride : sentimentFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
