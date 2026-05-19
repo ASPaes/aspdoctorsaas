@@ -267,6 +267,197 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     return value;
   };
 
+  const filtersPopover = (
+    <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-9 gap-2">
+          <SlidersHorizontal className="h-4 w-4" />
+          Filtros
+          {activeFilterCount > 0 && (
+            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFilterCount}</Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[420px] p-3">
+        <div className="grid grid-cols-2 gap-3">
+          {!embedded && isAdminOrHead && (
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Atendente</label>
+              <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {agentes.map((a: any) => (
+                    <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {!embedded && (
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Departamento</label>
+              <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {departamentos.map((d: any) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5 col-span-2">
+            <label className="text-xs text-muted-foreground">Tipo de encerramento</label>
+            <Select value={closureTypeFilter} onValueChange={setClosureTypeFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="inactivity_auto">Inatividade</SelectItem>
+                <SelectItem value="silent">Silencioso</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">CSAT</label>
+            <Select value={csatFilter} onValueChange={setCsatFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="sent">CSAT enviado</SelectItem>
+                <SelectItem value="not_sent">Sem envio de CSAT</SelectItem>
+                <SelectItem value="answered">CSAT respondido</SelectItem>
+                <SelectItem value="unanswered">CSAT não respondido</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Nota CSAT</label>
+            <Select value={csatScoreFilter} onValueChange={setCsatScoreFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas notas</SelectItem>
+                <SelectItem value="1">⭐ 1</SelectItem>
+                <SelectItem value="2">⭐ 2</SelectItem>
+                <SelectItem value="3">⭐ 3</SelectItem>
+                <SelectItem value="4">⭐ 4</SelectItem>
+                <SelectItem value="5">⭐ 5</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Ticket</label>
+            <Select value={ticketFilter} onValueChange={setTicketFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="with">Com ticket</SelectItem>
+                <SelectItem value="without">Sem ticket</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Sentimento IA</label>
+            <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="positive">😊 Positivo</SelectItem>
+                <SelectItem value="neutral">😐 Neutro</SelectItem>
+                <SelectItem value="negative">😠 Negativo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {activeFilterCount > 0 && (
+          <div className="flex justify-end mt-3 pt-3 border-t">
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>
+              Limpar filtros
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+
+  const chipsBlock = activeFilterCount > 0 && (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-[11px] text-muted-foreground">Filtros:</span>
+      {!embedded && atendenteFilter !== "all" && (
+        <button
+          onClick={() => setAtendenteFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("atendente", atendenteFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {!embedded && departamentoFilter !== "all" && (
+        <button
+          onClick={() => setDepartamentoFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("departamento", departamentoFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {closureTypeFilter !== "all" && (
+        <button
+          onClick={() => setClosureTypeFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("closure", closureTypeFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {csatFilter !== "all" && (
+        <button
+          onClick={() => setCsatFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("csat", csatFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {csatScoreFilter !== "all" && (
+        <button
+          onClick={() => setCsatScoreFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("csatScore", csatScoreFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {ticketFilter !== "all" && (
+        <button
+          onClick={() => setTicketFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("ticket", ticketFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {sentimentFilter !== "all" && (
+        <button
+          onClick={() => setSentimentFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("sentiment", sentimentFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      <button
+        onClick={clearAdvancedFilters}
+        className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
+      >
+        Limpar todos
+      </button>
+    </div>
+  );
+
+
   return (
     <div className="space-y-3">
       {metrics && (
@@ -309,15 +500,21 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       )}
 
       {embedded && (
-        <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar atendimento..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9"
-          />
-        </div>
+        <>
+          <div className="relative mb-3">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar atendimento..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {filtersPopover}
+            {chipsBlock}
+          </div>
+        </>
       )}
 
       {!embedded && (
@@ -348,195 +545,14 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
               />
             </div>
 
-            <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Filtros
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{activeFilterCount}</Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-[420px] p-3">
-                <div className="grid grid-cols-2 gap-3">
-                  {isAdminOrHead && (
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-muted-foreground">Atendente</label>
-                      <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
-                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos</SelectItem>
-                          {agentes.map((a: any) => (
-                            <SelectItem key={a.user_id} value={a.user_id}>{a.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">Departamento</label>
-                    <Select value={departamentoFilter} onValueChange={setDepartamentoFilter}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {departamentos.map((d: any) => (
-                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5 col-span-2">
-                    <label className="text-xs text-muted-foreground">Tipo de encerramento</label>
-                    <Select value={closureTypeFilter} onValueChange={setClosureTypeFilter}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="inactivity_auto">Inatividade</SelectItem>
-                        <SelectItem value="silent">Silencioso</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">CSAT</label>
-                    <Select value={csatFilter} onValueChange={setCsatFilter}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="sent">CSAT enviado</SelectItem>
-                        <SelectItem value="not_sent">Sem envio de CSAT</SelectItem>
-                        <SelectItem value="answered">CSAT respondido</SelectItem>
-                        <SelectItem value="unanswered">CSAT não respondido</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">Nota CSAT</label>
-                    <Select value={csatScoreFilter} onValueChange={setCsatScoreFilter}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas notas</SelectItem>
-                        <SelectItem value="1">⭐ 1</SelectItem>
-                        <SelectItem value="2">⭐ 2</SelectItem>
-                        <SelectItem value="3">⭐ 3</SelectItem>
-                        <SelectItem value="4">⭐ 4</SelectItem>
-                        <SelectItem value="5">⭐ 5</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">Ticket</label>
-                    <Select value={ticketFilter} onValueChange={setTicketFilter}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="with">Com ticket</SelectItem>
-                        <SelectItem value="without">Sem ticket</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">Sentimento IA</label>
-                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
-                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        <SelectItem value="positive">😊 Positivo</SelectItem>
-                        <SelectItem value="neutral">😐 Neutro</SelectItem>
-                        <SelectItem value="negative">😠 Negativo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {activeFilterCount > 0 && (
-                  <div className="flex justify-end mt-3 pt-3 border-t">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearAdvancedFilters}>
-                      Limpar filtros
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
+            {filtersPopover}
           </div>
 
           {/* Chips de filtros ativos */}
-          {activeFilterCount > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] text-muted-foreground">Filtros:</span>
-              {atendenteFilter !== "all" && (
-                <button
-                  onClick={() => setAtendenteFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("atendente", atendenteFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {departamentoFilter !== "all" && (
-                <button
-                  onClick={() => setDepartamentoFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("departamento", departamentoFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {closureTypeFilter !== "all" && (
-                <button
-                  onClick={() => setClosureTypeFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("closure", closureTypeFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {csatFilter !== "all" && (
-                <button
-                  onClick={() => setCsatFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("csat", csatFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {csatScoreFilter !== "all" && (
-                <button
-                  onClick={() => setCsatScoreFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("csatScore", csatScoreFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {ticketFilter !== "all" && (
-                <button
-                  onClick={() => setTicketFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("ticket", ticketFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              {sentimentFilter !== "all" && (
-                <button
-                  onClick={() => setSentimentFilter("all")}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-                >
-                  {getFilterLabel("sentiment", sentimentFilter)}
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-              <button
-                onClick={clearAdvancedFilters}
-                className="text-[11px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
-              >
-                Limpar todos
-              </button>
-            </div>
-          )}
+          {chipsBlock}
         </>
       )}
+
 
       {/* Lista */}
       {isLoading ? (
