@@ -10,10 +10,11 @@ import { NotificationPermissionBanner } from "@/components/notifications/Notific
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";
 import TeamPresencePopover from "@/components/whatsapp/presence/TeamPresencePopover";
 import { useAuth } from "@/contexts/AuthContext";
-import { Copy } from "lucide-react";
+import { Copy, TicketPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function AppLayout() {
@@ -22,6 +23,7 @@ export default function AppLayout() {
   const { profile } = useAuth();
   const canSeeDuplicates = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const [dupOpen, setDupOpen] = useState(false);
+  const [newTicketOpen, setNewTicketOpen] = useState(false);
 
   return (
     <SidebarProvider>
@@ -52,6 +54,20 @@ export default function AppLayout() {
                       <DuplicateContactsTab />
                     </DialogContent>
                   </Dialog>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setNewTicketOpen(true)}
+                  >
+                    <TicketPlus className="h-3.5 w-3.5" />
+                    Novo Ticket
+                  </Button>
+                  <CreateSupportTicketModal
+                    open={newTicketOpen}
+                    onOpenChange={setNewTicketOpen}
+                    onCreated={() => setNewTicketOpen(false)}
+                  />
                 </>
               )}
             </div>
