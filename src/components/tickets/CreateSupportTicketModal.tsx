@@ -28,6 +28,8 @@ interface Props {
   closureProdutoId?: number | null;
   closureDepartmentId?: string | null;
   closureResponsavelId?: string | null;
+  closureContactName?: string | null;
+  closureHandleSeconds?: number | null;
   closureAiSummary?: string | null;
   closureAiTopics?: string[] | null;
   closureAiKeywords?: string[] | null;
@@ -72,6 +74,8 @@ export function CreateSupportTicketModal({
   closureProdutoId = null,
   closureDepartmentId = null,
   closureResponsavelId = null,
+  closureContactName = null,
+  closureHandleSeconds = null,
   closureAiSummary = null,
   closureAiTopics = null,
   closureAiKeywords = null,
@@ -147,24 +151,55 @@ export function CreateSupportTicketModal({
   };
 
   useEffect(() => {
-    if (open) {
-      reset();
-      if (fromClosure) {
-        if (closureClienteId) {
-          setSelectedCliente({
-            id: closureClienteId,
-            nome_fantasia: closureClienteNome || null,
-            razao_social: null,
-            codigo_sequencial: closureClienteCodigo || null,
-            cnpj: null,
-          } as any);
-        }
-        if (closureProdutoId) setProdutoId(String(closureProdutoId));
-        setCanalOrigem("whatsapp");
-        if (closureDepartmentId) setDepartamentoId(closureDepartmentId);
-        if (closureResponsavelId) setResponsavelId(closureResponsavelId);
-        if (closureAiSummary) setObservacaoAgente(closureAiSummary);
+    if (!open) return;
+    if (fromClosure) {
+      // Reset targeted — mantém dados closure
+      setClienteSearchTerm("");
+      setCanalOrigem("whatsapp");
+      setTipoHorario("comercial");
+      setPrioridade("media");
+      setAgendadoPara("");
+      setContatoSolicitante("");
+      setContatoSelectedId(null);
+      setContatoResults([]);
+      setContatoDropdownOpen(false);
+      setPrevisaoEncerramento(defaultPrevisao());
+      setChecklistItems([]);
+      setNewChecklistItem("");
+      setSelectedTagIds([]);
+      setFirstNote("");
+      setQuickTagName("");
+      setQuickTagColor("#3b82f6");
+      // Pré-preencher closure
+      if (closureClienteId) {
+        setSelectedCliente({
+          id: closureClienteId,
+          nome_fantasia: closureClienteNome || null,
+          razao_social: null,
+          codigo_sequencial: closureClienteCodigo || null,
+          cnpj: null,
+        } as any);
+      } else {
+        setSelectedCliente(null);
       }
+      setProdutoId(closureProdutoId ? String(closureProdutoId) : "");
+      setCategoryId("");
+      setSubcategoryId("");
+      setServiceTypeId("");
+      setDepartamentoId(closureDepartmentId || "");
+      setResponsavelId(closureResponsavelId || "");
+      setContatoSolicitante(closureContactName || "");
+      const descParts: string[] = [];
+      if (closureAiSummary) descParts.push("Resumo: " + closureAiSummary);
+      if (closureAiProblem) descParts.push("Problema: " + closureAiProblem);
+      if (closureAiSolution) descParts.push("Solução: " + closureAiSolution);
+      setObservacaoAgente(descParts.join("\n\n"));
+      if (closureAiProblem) {
+        setChecklistItems([{ text: closureAiProblem, done: false }]);
+      }
+      setStatusId("");
+    } else {
+      reset();
     }
   }, [open]);
 
@@ -407,13 +442,19 @@ export function CreateSupportTicketModal({
 
   useEffect(() => {
     if (ticketStatuses.length > 0) {
-      const initial = ticketStatuses.find((s) => s.is_initial);
-      if (initial) setStatusId(initial.id);
-      else setStatusId(ticketStatuses[0].id);
+      if (fromClosure) {
+        const terminal = ticketStatuses.find((s) => s.is_terminal);
+        if (terminal) setStatusId(terminal.id);
+        else setStatusId(ticketStatuses[ticketStatuses.length - 1].id);
+      } else {
+        const initial = ticketStatuses.find((s) => s.is_initial);
+        if (initial) setStatusId(initial.id);
+        else setStatusId(ticketStatuses[0].id);
+      }
     } else {
       setStatusId("");
     }
-  }, [ticketStatuses]);
+  }, [ticketStatuses, fromClosure]);
 
   const addChecklistItem = () => {
     const t = newChecklistItem.trim();
@@ -705,17 +746,6 @@ export function CreateSupportTicketModal({
             {/* Setor + Status + Responsável */}
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Setor <Req /></Label>
-                <Select value={departamentoId} onValueChange={setDepartamentoId}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    {departamentos.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Status</Label>
                 <Select value={statusId} onValueChange={setStatusId} disabled={!departamentoId}>
                   <SelectTrigger className="h-9 text-xs">
@@ -741,6 +771,17 @@ export function CreateSupportTicketModal({
                 </Select>
               </div>
               <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Setor <Req /></Label>
+                <Select value={departamentoId} onValueChange={setDepartamentoId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {departamentos.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Responsável <Req /></Label>
                 <Select value={responsavelId} onValueChange={setResponsavelId}>
                   <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
@@ -752,6 +793,7 @@ export function CreateSupportTicketModal({
                 </Select>
               </div>
             </div>
+
 
             {/* Cliente */}
             <div className="space-y-2">
@@ -1225,7 +1267,15 @@ export function CreateSupportTicketModal({
                 <Clock className="h-3 w-3 shrink-0" />
                 <span className="text-[10px] uppercase tracking-wide">Tempo agente</span>
               </div>
-              <p className="text-xs pl-5">0 min</p>
+              <p className="text-xs pl-5">
+                {fromClosure && closureHandleSeconds
+                  ? closureHandleSeconds >= 3600
+                    ? `${Math.floor(closureHandleSeconds / 3600)}h ${Math.floor((closureHandleSeconds % 3600) / 60)}min`
+                    : closureHandleSeconds >= 60
+                      ? `${Math.floor(closureHandleSeconds / 60)} min`
+                      : `${closureHandleSeconds}s`
+                  : "0 min"}
+              </p>
             </div>
           </div>
         </div>

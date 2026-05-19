@@ -673,6 +673,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
+        closureContactName={contact?.name ?? null}
+        closureHandleSeconds={(attendance as any)?.handle_seconds ?? null}
         closureAiSummary={(attendance as any)?.ai_summary ?? null}
         closureAiTopics={(attendance as any)?.ai_topics ?? null}
         closureAiKeywords={(attendance as any)?.ai_keywords ?? null}
