@@ -48,7 +48,46 @@ function isLidAnomalous(rawJid: string): boolean {
   return digits.length >= 14;
 }
 
+async function downloadAndUploadZapiMedia(
+  mediaUrl: string,
+  supabase: any,
+  instanceName: string,
+  messageId: string,
+  mimetype: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(mediaUrl);
+    if (!response.ok) {
+      console.error(`${LOG} Failed to download Z-API media: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8 = new Uint8Array(arrayBuffer);
+    if (uint8.length === 0) {
+      console.error(`${LOG} Downloaded media is empty`);
+      return null;
+    }
+    const extension = (mimetype.split('/')[1] || 'bin').split(';')[0].trim();
+    const safeId = messageId.replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 40);
+    const filename = `${Date.now()}-${safeId}.${extension}`;
+    const filePath = `${instanceName}/${filename}`;
+    const { error: uploadError } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(filePath, uint8, { contentType: mimetype, upsert: false });
+    if (uploadError) {
+      console.error(`${LOG} Storage upload error:`, uploadError);
+      return null;
+    }
+    console.log(`${LOG} Media uploaded to storage: ${filePath} (${uint8.length} bytes)`);
+    return filePath;
+  } catch (err) {
+    console.error(`${LOG} Error in downloadAndUploadZapiMedia:`, err);
+    return null;
+  }
+}
+
 async function processZapiWebhook(req: Request): Promise<void> {
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, serviceKey);
@@ -213,6 +252,19 @@ async function processZapiWebhook(req: Request): Promise<void> {
     content = payload.contacts.map((c: any) => c.displayName || c.name || '').filter(Boolean).join(', ');
   }
 
+  let mediaStoragePath: string | null = null;
+  if (mediaUrl && ['image', 'audio', 'video', 'document'].includes(messageType)) {
+    mediaStoragePath = await downloadAndUploadZapiMedia(
+      mediaUrl,
+      supabase,
+      instance.instance_name || `zapi_${zapiInstanceId}`,
+      messageId,
+      mediaMimetype || 'application/octet-stream',
+    );
+  }
+
+
+
   const instanceInfo: InstanceInfo = {
     id: instance.id,
     instance_name: instance.instance_name,
@@ -245,6 +297,7 @@ async function processZapiWebhook(req: Request): Promise<void> {
     mediaUrl,
     mediaMimetype,
     mediaFilename,
+    mediaStoragePath,
     rawPayload: payload,
   };
 
