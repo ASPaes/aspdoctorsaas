@@ -48,7 +48,16 @@ export default function Clientes() {
   const navigate = useNavigate();
   const { filters, updateFilter, clearAdvancedFilters } = useClientesFilters();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+
+  useEffect(() => {
+    if (selectedUnidadeId && !filters.unidadeBaseQuick) {
+      updateFilter("unidadeBaseQuick", String(selectedUnidadeId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUnidadeId]);
+
 
   // Destructure for readability
   const {
