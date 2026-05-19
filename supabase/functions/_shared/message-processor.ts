@@ -786,11 +786,18 @@ async function sendBusinessHoursMessage(
 export async function checkBusinessHours(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, content: string, timestamp: string, supportConfig: any): Promise<{ inside: boolean }> {
   try {
     const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
-    const businessHours = supportConfig.business_hours || {};
     const msgDate = new Date(timestamp);
 
-    // Holiday/exception lookup (mesmo dia + próximos 14 dias)
-    const exceptions = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 14);
+    // Resolve horário efetivo: setor (se configurado) → global (fallback)
+    const deptBH = await resolveDepartmentBusinessHours(
+      supabase, conversationId, ctx.instanceId, tenantId,
+      supportConfig.business_hours || {},
+      supportConfig.business_hours_message || null,
+    );
+    const businessHours = deptBH.businessHours;
+
+    // Holiday/exception lookup com departmentId (setor-específico vence tenant-wide)
+    const exceptions = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 14, deptBH.departmentId);
 
     const dayKey = tzDayKey(msgDate, tz);
     const tParts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(msgDate);
@@ -835,7 +842,11 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
       if (claimErr) {
         console.error('[checkBusinessHours] try_claim_off_hours_notice error:', claimErr.message);
       } else if (claimed === true) {
-        await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, supportConfig, msgDate, tz, businessHours, exceptions.closedDates, exceptions.today);
+        // Usa mensagem do setor se disponível, senão a global via supportConfig
+        const effectiveConfig = deptBH.businessHoursMessage
+          ? { ...supportConfig, business_hours_message: deptBH.businessHoursMessage }
+          : supportConfig;
+        await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, effectiveConfig, msgDate, tz, businessHours, exceptions.closedDates, exceptions.today);
       }
     }
     return { inside: false };
