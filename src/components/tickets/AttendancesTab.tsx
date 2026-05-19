@@ -238,15 +238,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
 
 
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return attendances;
-    return attendances.filter((a: any) =>
-      (a.attendance_code ?? "").toLowerCase().includes(s) ||
-      (a.whatsapp_contacts?.name ?? "").toLowerCase().includes(s) ||
-      (a.whatsapp_contacts?.phone_number ?? "").includes(s)
-    );
-  }, [attendances, search]);
+  const filtered = attendances;
 
   const activeFilterCount = useMemo(() => {
     let c = 0;
