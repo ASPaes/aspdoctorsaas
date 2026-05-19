@@ -208,7 +208,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, page, isAdminOrHead, userId, search],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, page, isAdminOrHead, userId, debouncedSearch],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -219,6 +219,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
           csat_sent, csat_score, last_sentiment,
+          contact_name, contact_phone, instance_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -241,9 +242,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveTicketFilter === "with") q = q.not("ticket_id", "is", null);
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
-      if (search.trim().length >= 2) {
-        const s = search.trim().replace(/[%,()]/g, "");
-        q = q.ilike("attendance_code", `%${s}%`);
+      if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
+      if (debouncedSearch.trim().length >= 2) {
+        const s = debouncedSearch.trim().replace(/[%,()]/g, "");
+        q = q.or(`attendance_code.ilike.%${s}%,contact_name.ilike.%${s}%,contact_phone.ilike.%${s}%`);
       }
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
