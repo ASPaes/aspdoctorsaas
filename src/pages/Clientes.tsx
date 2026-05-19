@@ -52,8 +52,9 @@ export default function Clientes() {
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
 
   useEffect(() => {
-    if (selectedUnidadeId && !filters.unidadeBaseQuick) {
-      updateFilter("unidadeBaseQuick", String(selectedUnidadeId));
+    const globalValue = selectedUnidadeId ? String(selectedUnidadeId) : "";
+    if (filters.unidadeBaseQuick !== globalValue) {
+      updateFilter("unidadeBaseQuick", globalValue);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUnidadeId]);

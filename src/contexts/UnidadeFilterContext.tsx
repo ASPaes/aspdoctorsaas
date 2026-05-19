@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
+const UNIDADE_STORAGE_KEY = "unidade_filter_selected";
+
 interface Unidade {
   id: number;
   nome: string;
@@ -26,8 +28,21 @@ const UnidadeFilterContext = createContext<UnidadeFilterContextType>({
 
 export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  const [selectedUnidadeId, setSelectedUnidadeId] = useState<number | null>(null);
+  const [selectedUnidadeId, setSelectedUnidadeIdRaw] = useState<number | null>(() => {
+    try {
+      const stored = sessionStorage.getItem(UNIDADE_STORAGE_KEY);
+      if (stored && stored !== "null") return Number(stored);
+    } catch {}
+    return null;
+  });
   const [initialized, setInitialized] = useState(false);
+
+  const setSelectedUnidadeId = (id: number | null) => {
+    setSelectedUnidadeIdRaw(id);
+    try {
+      sessionStorage.setItem(UNIDADE_STORAGE_KEY, id !== null ? String(id) : "null");
+    } catch {}
+  };
 
   const { data: unidades = [], isLoading } = useQuery({
     queryKey: ["unidades_base_filter", tid],
@@ -44,21 +59,23 @@ export function UnidadeFilterProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Inicializar com a unidade default_filter
   useEffect(() => {
     if (!initialized && unidades.length > 0) {
-      const defaultUnit = unidades.find((u) => u.is_default_filter);
-      if (defaultUnit) {
-        setSelectedUnidadeId(defaultUnit.id);
+      const stored = sessionStorage.getItem(UNIDADE_STORAGE_KEY);
+      if (!stored || stored === "null") {
+        const defaultUnit = unidades.find((u) => u.is_default_filter);
+        if (defaultUnit) {
+          setSelectedUnidadeId(defaultUnit.id);
+        }
       }
       setInitialized(true);
     }
   }, [unidades, initialized]);
 
-  // Reset quando tenant muda
   useEffect(() => {
     setInitialized(false);
-    setSelectedUnidadeId(null);
+    setSelectedUnidadeIdRaw(null);
+    try { sessionStorage.removeItem(UNIDADE_STORAGE_KEY); } catch {}
   }, [tid]);
 
   const value = useMemo(
