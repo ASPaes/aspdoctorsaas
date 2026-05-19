@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
@@ -105,6 +106,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [ticketModalAtt, setTicketModalAtt] = useState<any>(null);
   const [linkingAttId, setLinkingAttId] = useState<string | null>(null);
   const [linkClienteSearch, setLinkClienteSearch] = useState("");
   const [isLinking, setIsLinking] = useState(false);
@@ -779,9 +782,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.dispatchEvent(new CustomEvent("create-ticket-from-attendance", {
-                          detail: { attendanceId: att.id, clienteId: att.cliente_id, contactId: att.contact_id, departmentId: att.department_id }
-                        }));
+                        setTicketModalAtt(att);
+                        setTicketModalOpen(true);
                       }}>
                       <Plus className="h-3 w-3" /> Ticket
                     </Button>
@@ -857,6 +859,35 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           setCsatModalOpen(false);
         }}
       />
+      {ticketModalAtt && (
+        <CreateSupportTicketModal
+          open={ticketModalOpen}
+          onOpenChange={(o) => { setTicketModalOpen(o); if (!o) setTicketModalAtt(null); }}
+          onCreated={() => {
+            setTicketModalOpen(false);
+            setTicketModalAtt(null);
+            queryClient.invalidateQueries({ queryKey: ["attendances_list"] });
+          }}
+          fromClosure
+          attendanceId={ticketModalAtt.id}
+          closureClienteId={ticketModalAtt.cliente_id ?? null}
+          closureClienteNome={ticketModalAtt.clientes?.nome_fantasia ?? null}
+          closureClienteCodigo={null}
+          closureProdutoId={null}
+          closureDepartmentId={ticketModalAtt.department_id ?? null}
+          closureResponsavelId={ticketModalAtt.assigned_to ?? null}
+          closureContactName={ticketModalAtt.whatsapp_contacts?.name ?? ticketModalAtt.contact_name ?? null}
+          closureHandleSeconds={ticketModalAtt.handle_seconds ?? null}
+          closureAiSummary={ticketModalAtt.ai_summary ?? null}
+          closureAiTopics={null}
+          closureAiKeywords={null}
+          closureAiProblem={null}
+          closureAiSolution={null}
+          closureSentimentLabel={ticketModalAtt.last_sentiment ?? null}
+          closureSentimentConfidence={null}
+          closureSentimentSummary={null}
+        />
+      )}
     </div>
   );
 }
