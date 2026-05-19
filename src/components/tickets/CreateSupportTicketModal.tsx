@@ -19,6 +19,23 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
   defaultDepartmentId?: string;
+  // Closure mode props
+  fromClosure?: boolean;
+  attendanceId?: string | null;
+  closureClienteId?: string | null;
+  closureClienteNome?: string | null;
+  closureClienteCodigo?: number | null;
+  closureProdutoId?: number | null;
+  closureDepartmentId?: string | null;
+  closureResponsavelId?: string | null;
+  closureAiSummary?: string | null;
+  closureAiTopics?: string[] | null;
+  closureAiKeywords?: string[] | null;
+  closureAiProblem?: string | null;
+  closureAiSolution?: string | null;
+  closureSentimentLabel?: string | null;
+  closureSentimentConfidence?: number | null;
+  closureSentimentSummary?: string | null;
 }
 
 const Req = () => <span className="text-destructive">*</span>;
