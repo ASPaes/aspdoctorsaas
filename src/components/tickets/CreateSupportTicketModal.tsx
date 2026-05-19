@@ -28,6 +28,8 @@ interface Props {
   closureProdutoId?: number | null;
   closureDepartmentId?: string | null;
   closureResponsavelId?: string | null;
+  closureContactName?: string | null;
+  closureHandleSeconds?: number | null;
   closureAiSummary?: string | null;
   closureAiTopics?: string[] | null;
   closureAiKeywords?: string[] | null;
