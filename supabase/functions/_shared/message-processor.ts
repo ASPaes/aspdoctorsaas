@@ -1409,6 +1409,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
       }
       return;
     }
+    } // fecha else (sem URA)
   }
 
   const lastBilling = await getLastBillingMessageAt(supabase, conversationId, tenantId);
