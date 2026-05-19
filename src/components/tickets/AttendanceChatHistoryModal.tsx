@@ -28,6 +28,7 @@ interface Props {
   contactName?: string;
   openedAt: string | null;
   closedAt: string | null;
+  csatRespondedAt?: string | null;
 }
 
 function formatDateLabel(iso: string): string {
