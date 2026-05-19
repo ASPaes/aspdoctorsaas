@@ -3589,6 +3589,7 @@ export type Database = {
           status: string
           tenant_id: string
           ticket_id: string | null
+          unidade_base_id: number | null
           updated_at: string
           ura_asked_at: string | null
           ura_completed_at: string | null
@@ -3658,6 +3659,7 @@ export type Database = {
           status?: string
           tenant_id: string
           ticket_id?: string | null
+          unidade_base_id?: number | null
           updated_at?: string
           ura_asked_at?: string | null
           ura_completed_at?: string | null
@@ -3727,6 +3729,7 @@ export type Database = {
           status?: string
           tenant_id?: string
           ticket_id?: string | null
+          unidade_base_id?: number | null
           updated_at?: string
           ura_asked_at?: string | null
           ura_completed_at?: string | null
@@ -3814,6 +3817,13 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attendances_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
             referencedColumns: ["id"]
           },
         ]
@@ -4344,6 +4354,7 @@ export type Database = {
           ticket_code: string | null
           tipo: Database["public"]["Enums"]["support_ticket_tipo"]
           tipo_horario: string | null
+          unidade_base_id: number | null
         }
         Insert: {
           aberto_em?: string
@@ -4386,6 +4397,7 @@ export type Database = {
           ticket_code?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
           tipo_horario?: string | null
+          unidade_base_id?: number | null
         }
         Update: {
           aberto_em?: string
@@ -4428,6 +4440,7 @@ export type Database = {
           ticket_code?: string | null
           tipo?: Database["public"]["Enums"]["support_ticket_tipo"]
           tipo_horario?: string | null
+          unidade_base_id?: number | null
         }
         Relationships: [
           {
@@ -4533,6 +4546,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_unidade_base_id_fkey"
+            columns: ["unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
             referencedColumns: ["id"]
           },
         ]
@@ -4911,16 +4931,25 @@ export type Database = {
       unidades_base: {
         Row: {
           id: number
+          is_active: boolean | null
+          is_default_filter: boolean | null
+          is_principal: boolean | null
           nome: string
           tenant_id: string | null
         }
         Insert: {
           id?: number
+          is_active?: boolean | null
+          is_default_filter?: boolean | null
+          is_principal?: boolean | null
           nome: string
           tenant_id?: string | null
         }
         Update: {
           id?: number
+          is_active?: boolean | null
+          is_default_filter?: boolean | null
+          is_principal?: boolean | null
           nome?: string
           tenant_id?: string | null
         }
@@ -6519,6 +6548,10 @@ export type Database = {
       cleanup_ai_usage_log: { Args: never; Returns: undefined }
       cleanup_group_messages: { Args: never; Returns: undefined }
       cleanup_notification_dispatch_queue: { Args: never; Returns: number }
+      clear_unidade_default_filter: {
+        Args: { p_tenant_id: string }
+        Returns: undefined
+      }
       collect_db_metrics_snapshot: { Args: never; Returns: undefined }
       collect_tenant_daily_metrics:
         | { Args: never; Returns: undefined }
@@ -6733,6 +6766,7 @@ export type Database = {
           p_status?: string
           p_tenant_id?: string
           p_ticket_filter?: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
@@ -7145,6 +7179,14 @@ export type Database = {
           }
       set_attendance_cliente: {
         Args: { p_attendance_id: string; p_cliente_id: string }
+        Returns: undefined
+      }
+      set_unidade_default_filter: {
+        Args: { p_unidade_id: number }
+        Returns: undefined
+      }
+      set_unidade_principal: {
+        Args: { p_unidade_id: number }
         Returns: undefined
       }
       should_create_recipient: {
