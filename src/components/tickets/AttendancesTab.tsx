@@ -55,6 +55,7 @@ function formatDur(secs: number | null): string {
 
 interface Props {
   isAdminOrHead?: boolean;
+  isAdmin?: boolean;
   userId?: string | null;
   departmentFilter?: string;
   agenteFilter?: string;
