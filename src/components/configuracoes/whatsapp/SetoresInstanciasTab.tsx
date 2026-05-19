@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, Building2 } from "lucide-react";
+import { ExternalLink, Building2, MessageSquareText } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 
 export default function SetoresInstanciasTab() {
@@ -24,6 +25,7 @@ export default function SetoresInstanciasTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [welcomeMsg, setWelcomeMsg] = useState("");
   const { instances } = useWhatsAppInstances();
 
   const { data: departments = [] } = useQuery({
@@ -32,7 +34,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -42,6 +44,10 @@ export default function SetoresInstanciasTab() {
   });
 
   const selectedDept = departments.find((d: any) => d.id === selectedId) ?? null;
+
+  useEffect(() => {
+    setWelcomeMsg(selectedDept?.welcome_message ?? "");
+  }, [selectedId, selectedDept?.welcome_message]);
 
   const { data: deptInstances = [] } = useQuery({
     queryKey: ["support_department_instances_wa", selectedId],
@@ -98,6 +104,22 @@ export default function SetoresInstanciasTab() {
       queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
       toast.success("Instância padrão atualizada");
     },
+  });
+
+  const saveWelcome = useMutation({
+    mutationFn: async (msg: string) => {
+      if (!selectedId) return;
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ welcome_message: msg.trim() || null } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Mensagem de boas-vindas salva");
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   return (
@@ -211,6 +233,33 @@ export default function SetoresInstanciasTab() {
                     </Select>
                   </div>
                 )}
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                    <Label>Mensagem de boas-vindas (sem URA)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enviada automaticamente quando a URA está desligada e uma nova conversa entra neste setor.
+                    Use <code className="bg-muted px-1 rounded text-[10px]">{"{nome}"}</code> para o nome do contato e <code className="bg-muted px-1 rounded text-[10px]">{"{atendimento}"}</code> para o código.
+                  </p>
+                  <Textarea
+                    value={welcomeMsg}
+                    onChange={(e) => setWelcomeMsg(e.target.value)}
+                    placeholder="Ex: Olá {nome}! 👋 Bem-vindo ao setor de Suporte. Seu atendimento {atendimento} foi aberto. Em breve um técnico irá te atender."
+                    rows={4}
+                    className="resize-y text-sm"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      disabled={saveWelcome.isPending || welcomeMsg === (selectedDept?.welcome_message ?? "")}
+                      onClick={() => saveWelcome.mutate(welcomeMsg)}
+                    >
+                      {saveWelcome.isPending ? "Salvando..." : "Salvar mensagem"}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
