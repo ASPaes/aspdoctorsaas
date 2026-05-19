@@ -1331,6 +1331,11 @@ export default function SupportTickets() {
         dateTo={dateRange.to}
         initialDepartmentId={departmentFilter}
         scoreMax={csatScale ?? 5}
+        isAdmin={isAdmin}
+        onNavigateToAttendance={(code) => {
+          setTicketsView("atendimentos");
+          setAttSearchOverride(code);
+        }}
       />
     </div>
   );
