@@ -83,6 +83,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   useEffect(() => {
+    if (searchOverride !== undefined) setSearch(searchOverride);
+  }, [searchOverride]);
+  useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
