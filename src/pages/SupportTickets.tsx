@@ -128,6 +128,7 @@ export default function SupportTickets() {
   const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
   const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
   const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
+  const [attInstanceFilter, setAttInstanceFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
