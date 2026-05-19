@@ -53,6 +53,7 @@ const DEFAULTS: Settings = {
   alert_in_conversation: "tick",
   alert_other_conversation: "full",
   alert_other_module: "full",
+  notification_scope: "all",
 };
 
 const DAYS = [
