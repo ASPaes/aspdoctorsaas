@@ -421,6 +421,18 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5 col-span-2">
+            <label className="text-xs text-muted-foreground">Instância</label>
+            <Select value={instanceFilter} onValueChange={setInstanceFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {instances.map((inst: any) => (
+                  <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         {activeFilterCount > 0 && (
           <div className="flex justify-end mt-3 pt-3 border-t">
