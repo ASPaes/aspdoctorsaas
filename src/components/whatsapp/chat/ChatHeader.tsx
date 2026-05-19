@@ -30,7 +30,7 @@ import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
-import { ClassifyClosureModal } from "@/components/tickets/ClassifyClosureModal";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
