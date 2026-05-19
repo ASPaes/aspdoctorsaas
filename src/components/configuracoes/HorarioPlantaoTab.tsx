@@ -155,6 +155,30 @@ export default function HorarioPlantaoTab() {
   // ── Contexto: Global vs Setor ──
   const [selectedContext, setSelectedContext] = useState<string>("global");
 
+  // ── Departments query (for context selector) ──
+  const { effectiveTenantId: deptTid } = useTenantFilter();
+  const qcDept = useQueryClient();
+  const { data: deptRows = [] } = useQuery({
+    queryKey: ["dept-business-hours", deptTid],
+    enabled: !!deptTid,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sort_order")
+        .eq("tenant_id", deptTid!)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; name: string;
+        business_hours_enabled: boolean | null;
+        business_hours: unknown;
+        business_hours_message: string | null;
+        sort_order: number | null;
+      }>;
+    },
+  });
+
   // ── Section B: AI off-hours ──
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
