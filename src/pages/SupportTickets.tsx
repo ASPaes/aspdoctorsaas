@@ -492,8 +492,15 @@ export default function SupportTickets() {
     if (canalFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
     if (tagFilters.length > 0) count++;
+    if (ticketsView === "atendimentos") {
+      if (attClosureTypeFilter !== "all") count++;
+      if (attCsatFilter !== "all") count++;
+      if (attCsatScoreFilter !== "all") count++;
+      if (attTicketFilter !== "all") count++;
+      if (attSentimentFilter !== "all") count++;
+    }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
