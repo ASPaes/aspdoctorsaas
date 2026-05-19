@@ -146,6 +146,19 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     },
   });
 
+  const { data: instances = [] } = useQuery({
+    queryKey: ["attendances_instances", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("whatsapp_instances" as any) as any)
+        .select("id, display_name, instance_name")
+        .eq("tenant_id", tid)
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; display_name: string | null; instance_name: string }>;
+    },
+  });
+
   const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
   const effectiveAgente = embedded && parentAgenteFilter !== "all" ? parentAgenteFilter : atendenteFilter;
   const effectiveClosureType = embedded && closureTypeOverride && closureTypeOverride !== "all" ? closureTypeOverride : closureTypeFilter;
@@ -153,6 +166,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const effectiveCsatScoreFilter = embedded && csatScoreFilterOverride && csatScoreFilterOverride !== "all" ? csatScoreFilterOverride : csatScoreFilter;
   const effectiveTicketFilter = embedded && ticketFilterOverride && ticketFilterOverride !== "all" ? ticketFilterOverride : ticketFilter;
   const effectiveSentimentFilter = embedded && sentimentFilterOverride && sentimentFilterOverride !== "all" ? sentimentFilterOverride : sentimentFilter;
+  const effectiveInstanceFilter = embedded && instanceFilterOverride && instanceFilterOverride !== "all" ? instanceFilterOverride : instanceFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
