@@ -467,30 +467,44 @@ export function CreateSupportTicketModal({
 
     setIsSubmitting(true);
     try {
-      const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
-        p_cliente_id: selectedCliente.id,
-        p_produto_id: Number(produtoId),
-        p_category_id: categoryId,
-        p_subcategory_id: subcategoryId,
-        p_service_type_id: serviceTypeId,
-        p_canal_origem: canalOrigem,
-        p_tipo_horario: tipoHorario,
-        p_observacao_agente: observacaoAgente || null,
-        p_status_id: statusId || null,
-        p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
-        p_contact_id: null,
-        p_department_id: departamentoId,
-        p_responsavel_user_id: responsavelId || null,
-        p_cliente_contato_id: null,
-        p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
-      });
+      let ticketId: string | null = null;
 
-      if (error) throw error;
-
-      const ticketId =
-        typeof rpcData === "string"
-          ? rpcData
-          : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+      if (fromClosure && attendanceId) {
+        const { data: rpcData, error } = await (supabase.rpc as any)("create_ticket_from_closure", {
+          p_attendance_id: attendanceId,
+          p_produto_id: Number(produtoId),
+          p_category_id: categoryId,
+          p_subcategory_id: subcategoryId,
+          p_service_type_id: serviceTypeId,
+          p_observacao_agente: observacaoAgente || null,
+          p_observacao_ia: closureAiSummary || null,
+          p_tipo_horario: tipoHorario,
+          p_department_id: departamentoId || null,
+          p_responsavel_user_id: responsavelId || null,
+        });
+        if (error) throw error;
+        ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+      } else {
+        const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
+          p_cliente_id: selectedCliente.id,
+          p_produto_id: Number(produtoId),
+          p_category_id: categoryId,
+          p_subcategory_id: subcategoryId,
+          p_service_type_id: serviceTypeId,
+          p_canal_origem: canalOrigem,
+          p_tipo_horario: tipoHorario,
+          p_observacao_agente: observacaoAgente || null,
+          p_status_id: statusId || null,
+          p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
+          p_contact_id: null,
+          p_department_id: departamentoId,
+          p_responsavel_user_id: responsavelId || null,
+          p_cliente_contato_id: null,
+          p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
+        });
+        if (error) throw error;
+        ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+      }
 
       if (ticketId) {
         if (selectedTagIds.length > 0) {
