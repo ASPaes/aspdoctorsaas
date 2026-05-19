@@ -202,6 +202,12 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     },
   });
 
+  const attendances = result?.items ?? [];
+  const totalCount = result?.total ?? 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+
+
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (!s) return attendances;
