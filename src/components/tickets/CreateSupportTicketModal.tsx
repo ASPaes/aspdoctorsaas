@@ -151,24 +151,55 @@ export function CreateSupportTicketModal({
   };
 
   useEffect(() => {
-    if (open) {
-      reset();
-      if (fromClosure) {
-        if (closureClienteId) {
-          setSelectedCliente({
-            id: closureClienteId,
-            nome_fantasia: closureClienteNome || null,
-            razao_social: null,
-            codigo_sequencial: closureClienteCodigo || null,
-            cnpj: null,
-          } as any);
-        }
-        if (closureProdutoId) setProdutoId(String(closureProdutoId));
-        setCanalOrigem("whatsapp");
-        if (closureDepartmentId) setDepartamentoId(closureDepartmentId);
-        if (closureResponsavelId) setResponsavelId(closureResponsavelId);
-        if (closureAiSummary) setObservacaoAgente(closureAiSummary);
+    if (!open) return;
+    if (fromClosure) {
+      // Reset targeted — mantém dados closure
+      setClienteSearchTerm("");
+      setCanalOrigem("whatsapp");
+      setTipoHorario("comercial");
+      setPrioridade("media");
+      setAgendadoPara("");
+      setContatoSolicitante("");
+      setContatoSelectedId(null);
+      setContatoResults([]);
+      setContatoDropdownOpen(false);
+      setPrevisaoEncerramento(defaultPrevisao());
+      setChecklistItems([]);
+      setNewChecklistItem("");
+      setSelectedTagIds([]);
+      setFirstNote("");
+      setQuickTagName("");
+      setQuickTagColor("#3b82f6");
+      // Pré-preencher closure
+      if (closureClienteId) {
+        setSelectedCliente({
+          id: closureClienteId,
+          nome_fantasia: closureClienteNome || null,
+          razao_social: null,
+          codigo_sequencial: closureClienteCodigo || null,
+          cnpj: null,
+        } as any);
+      } else {
+        setSelectedCliente(null);
       }
+      setProdutoId(closureProdutoId ? String(closureProdutoId) : "");
+      setCategoryId("");
+      setSubcategoryId("");
+      setServiceTypeId("");
+      setDepartamentoId(closureDepartmentId || "");
+      setResponsavelId(closureResponsavelId || "");
+      setContatoSolicitante(closureContactName || "");
+      const descParts: string[] = [];
+      if (closureAiSummary) descParts.push("Resumo: " + closureAiSummary);
+      if (closureAiProblem) descParts.push("Problema: " + closureAiProblem);
+      if (closureAiSolution) descParts.push("Solução: " + closureAiSolution);
+      setObservacaoAgente(descParts.join("\n\n"));
+      if (closureAiProblem) {
+        setChecklistItems([{ text: closureAiProblem, done: false }]);
+      }
+      setStatusId("");
+    } else {
+      reset();
     }
   }, [open]);
 
