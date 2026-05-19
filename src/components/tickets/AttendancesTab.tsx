@@ -272,8 +272,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     if (csatScoreFilter !== "all") c++;
     if (ticketFilter !== "all") c++;
     if (sentimentFilter !== "all") c++;
+    if (instanceFilter !== "all") c++;
     return c;
-  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
+  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter]);
 
   const clearAdvancedFilters = () => {
     setAtendenteFilter("all");
@@ -283,6 +284,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     setCsatScoreFilter("all");
     setTicketFilter("all");
     setSentimentFilter("all");
+    setInstanceFilter("all");
   };
 
   const CSAT_FILTER_LABELS: Record<string, string> = {
@@ -309,6 +311,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     if (type === "csatScore") return `Nota CSAT: ⭐${value}`;
     if (type === "ticket") return TICKET_FILTER_LABELS[value] ?? value;
     if (type === "sentiment") return SENTIMENT_FILTER_LABELS[value] ?? value;
+    if (type === "instance") {
+      const i = instances.find((x: any) => x.id === value);
+      return i ? (i.display_name || i.instance_name) : value;
+    }
     return value;
   };
 
