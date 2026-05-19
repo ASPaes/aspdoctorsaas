@@ -66,9 +66,10 @@ interface Props {
   csatScoreFilterOverride?: string;
   ticketFilterOverride?: string;
   sentimentFilterOverride?: string;
+  instanceFilterOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const dateRange = dateRangeOverride || internalDateRange;
@@ -78,6 +79,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const statusFilter = statusFilterOverride || internalStatusFilter;
   const setStatusFilter = statusFilterOverride ? () => {} : setInternalStatusFilter;
   const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [departamentoFilter, setDepartamentoFilter] = useState<string>("all");
   const [closureTypeFilter, setClosureTypeFilter] = useState<string>("all");
@@ -85,6 +91,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [csatScoreFilter, setCsatScoreFilter] = useState<string>("all");
   const [ticketFilter, setTicketFilter] = useState<string>("all");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
+  const [instanceFilter, setInstanceFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -107,7 +114,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, search]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, debouncedSearch]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
@@ -139,6 +146,19 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     },
   });
 
+  const { data: instances = [] } = useQuery({
+    queryKey: ["attendances_instances", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("whatsapp_instances" as any) as any)
+        .select("id, display_name, instance_name")
+        .eq("tenant_id", tid)
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; display_name: string | null; instance_name: string }>;
+    },
+  });
+
   const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
   const effectiveAgente = embedded && parentAgenteFilter !== "all" ? parentAgenteFilter : atendenteFilter;
   const effectiveClosureType = embedded && closureTypeOverride && closureTypeOverride !== "all" ? closureTypeOverride : closureTypeFilter;
@@ -146,6 +166,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const effectiveCsatScoreFilter = embedded && csatScoreFilterOverride && csatScoreFilterOverride !== "all" ? csatScoreFilterOverride : csatScoreFilter;
   const effectiveTicketFilter = embedded && ticketFilterOverride && ticketFilterOverride !== "all" ? ticketFilterOverride : ticketFilter;
   const effectiveSentimentFilter = embedded && sentimentFilterOverride && sentimentFilterOverride !== "all" ? sentimentFilterOverride : sentimentFilter;
+  const effectiveInstanceFilter = embedded && instanceFilterOverride && instanceFilterOverride !== "all" ? instanceFilterOverride : instanceFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
@@ -187,7 +208,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, page, isAdminOrHead, userId, search],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, page, isAdminOrHead, userId, debouncedSearch],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -198,6 +219,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
           csat_sent, csat_score, last_sentiment,
+          contact_name, contact_phone, instance_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -220,9 +242,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveTicketFilter === "with") q = q.not("ticket_id", "is", null);
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
-      if (search.trim().length >= 2) {
-        const s = search.trim().replace(/[%,()]/g, "");
-        q = q.ilike("attendance_code", `%${s}%`);
+      if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
+      if (debouncedSearch.trim().length >= 2) {
+        const s = debouncedSearch.trim().replace(/[%,()]/g, "");
+        q = q.or(`attendance_code.ilike.%${s}%,contact_name.ilike.%${s}%,contact_phone.ilike.%${s}%`);
       }
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
@@ -249,8 +272,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     if (csatScoreFilter !== "all") c++;
     if (ticketFilter !== "all") c++;
     if (sentimentFilter !== "all") c++;
+    if (instanceFilter !== "all") c++;
     return c;
-  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
+  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter]);
 
   const clearAdvancedFilters = () => {
     setAtendenteFilter("all");
@@ -260,6 +284,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     setCsatScoreFilter("all");
     setTicketFilter("all");
     setSentimentFilter("all");
+    setInstanceFilter("all");
   };
 
   const CSAT_FILTER_LABELS: Record<string, string> = {
@@ -286,6 +311,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     if (type === "csatScore") return `Nota CSAT: ⭐${value}`;
     if (type === "ticket") return TICKET_FILTER_LABELS[value] ?? value;
     if (type === "sentiment") return SENTIMENT_FILTER_LABELS[value] ?? value;
+    if (type === "instance") {
+      const i = instances.find((x: any) => x.id === value);
+      return i ? (i.display_name || i.instance_name) : value;
+    }
     return value;
   };
 
@@ -392,6 +421,18 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5 col-span-2">
+            <label className="text-xs text-muted-foreground">Instância</label>
+            <Select value={instanceFilter} onValueChange={setInstanceFilter}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {instances.map((inst: any) => (
+                  <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         {activeFilterCount > 0 && (
           <div className="flex justify-end mt-3 pt-3 border-t">
@@ -467,6 +508,15 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
         >
           {getFilterLabel("sentiment", sentimentFilter)}
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {instanceFilter !== "all" && (
+        <button
+          onClick={() => setInstanceFilter("all")}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {getFilterLabel("instance", instanceFilter)}
           <X className="h-3 w-3" />
         </button>
       )}

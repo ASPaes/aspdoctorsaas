@@ -128,6 +128,7 @@ export default function SupportTickets() {
   const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
   const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
   const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
+  const [attInstanceFilter, setAttInstanceFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
@@ -360,6 +361,19 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: whatsappInstances = [] } = useQuery({
+    queryKey: ["whatsapp_instances_filter", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("whatsapp_instances" as any) as any)
+        .select("id, display_name, instance_name")
+        .eq("tenant_id", tid)
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; display_name: string | null; instance_name: string }>;
+    },
+  });
+
   const DEPT_ORDER_KEY = `dept-order-${tid}-${userId}`;
 
   const [deptOrder, setDeptOrder] = useState<string[] | null>(null);
@@ -498,9 +512,10 @@ export default function SupportTickets() {
       if (attCsatScoreFilter !== "all") count++;
       if (attTicketFilter !== "all") count++;
       if (attSentimentFilter !== "all") count++;
+      if (attInstanceFilter !== "all") count++;
     }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -904,6 +919,18 @@ export default function SupportTickets() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Instância</label>
+                    <Select value={attInstanceFilter} onValueChange={setAttInstanceFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {whatsappInstances.map((inst: any) => (
+                          <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1 col-span-2">
                     <label className="text-xs font-medium text-muted-foreground">Sentimento IA</label>
                     <Select value={attSentimentFilter} onValueChange={setAttSentimentFilter}>
@@ -917,7 +944,7 @@ export default function SupportTickets() {
                     </Select>
                   </div>
                 </div>
-                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all") && (
+                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all" || attInstanceFilter !== "all") && (
                   <div className="flex justify-end pt-2 border-t">
                     <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => {
                       setAttClosureTypeFilter("all");
@@ -925,6 +952,7 @@ export default function SupportTickets() {
                       setAttCsatScoreFilter("all");
                       setAttTicketFilter("all");
                       setAttSentimentFilter("all");
+                      setAttInstanceFilter("all");
                     }}>Limpar filtros</Button>
                   </div>
                 )}
@@ -1185,7 +1213,7 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} />;
+        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
