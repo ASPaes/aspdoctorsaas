@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TenantSelector } from "@/components/TenantSelector";
+import { UnidadeSelector } from "@/components/UnidadeSelector";
 import { NotificationBell } from "@/components/NotificationBell";
 import { NotificationPermissionBanner } from "@/components/notifications/NotificationPermissionBanner";
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";

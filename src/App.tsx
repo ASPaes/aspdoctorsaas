@@ -82,7 +82,7 @@ const App = () => (
             <Route path="/access-blocked" element={<AuthGuard><AccessBlocked /></AuthGuard>} />
 
             {/* Protected routes */}
-            <Route element={<AuthGuard><TenantFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></TenantFilterProvider></AuthGuard>}>
+            <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/clientes/novo" element={<ClienteForm />} />
