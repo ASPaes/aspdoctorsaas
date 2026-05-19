@@ -60,9 +60,14 @@ interface Props {
   embedded?: boolean;
   dateRangeOverride?: { from: Date; to: Date };
   statusFilterOverride?: string;
+  closureTypeOverride?: string;
+  csatFilterOverride?: string;
+  csatScoreFilterOverride?: string;
+  ticketFilterOverride?: string;
+  sentimentFilterOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const dateRange = dateRangeOverride || internalDateRange;
@@ -120,6 +125,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   const effectiveDeptFilter = embedded && departmentFilter !== "all" ? departmentFilter : departamentoFilter;
   const effectiveAgente = embedded && parentAgenteFilter !== "all" ? parentAgenteFilter : atendenteFilter;
+  const effectiveClosureType = embedded && closureTypeOverride && closureTypeOverride !== "all" ? closureTypeOverride : closureTypeFilter;
+  const effectiveCsatFilter = embedded && csatFilterOverride && csatFilterOverride !== "all" ? csatFilterOverride : csatFilter;
+  const effectiveCsatScoreFilter = embedded && csatScoreFilterOverride && csatScoreFilterOverride !== "all" ? csatScoreFilterOverride : csatScoreFilter;
+  const effectiveTicketFilter = embedded && ticketFilterOverride && ticketFilterOverride !== "all" ? ticketFilterOverride : ticketFilter;
+  const effectiveSentimentFilter = embedded && sentimentFilterOverride && sentimentFilterOverride !== "all" ? sentimentFilterOverride : sentimentFilter;
 
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
@@ -127,7 +137,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, isAdminOrHead, userId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -138,12 +148,12 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         p_status: statusFilter !== "all" ? statusFilter : null,
         p_agent_id: !isAdminOrHead && userId ? userId : (effectiveAgente !== "all" ? effectiveAgente : null),
         p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
-        p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
+        p_closure_type: effectiveClosureType !== "all" ? effectiveClosureType : null,
         p_tenant_id: tid,
-        p_csat_filter: csatFilter !== "all" ? csatFilter : null,
-        p_csat_score: csatScoreFilter !== "all" ? parseInt(csatScoreFilter) : null,
-        p_ticket_filter: ticketFilter !== "all" ? ticketFilter : null,
-        p_sentiment_filter: sentimentFilter !== "all" ? sentimentFilter : null,
+        p_csat_filter: effectiveCsatFilter !== "all" ? effectiveCsatFilter : null,
+        p_csat_score: effectiveCsatScoreFilter !== "all" ? parseInt(effectiveCsatScoreFilter) : null,
+        p_ticket_filter: effectiveTicketFilter !== "all" ? effectiveTicketFilter : null,
+        p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
       });
       if (error) throw error;
       return data as {
@@ -161,7 +171,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, page, isAdminOrHead, userId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, page, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -185,15 +195,15 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (effectiveAgente !== "all") q = q.eq("assigned_to", effectiveAgente);
       if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
-      if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
-      if (csatFilter === "sent") q = q.eq("csat_sent", true);
-      if (csatFilter === "not_sent") q = q.eq("csat_sent", false);
-      if (csatFilter === "answered") q = q.not("csat_score", "is", null);
-      if (csatFilter === "unanswered") { q = q.eq("csat_sent", true).is("csat_score", null); }
-      if (csatScoreFilter !== "all") q = q.eq("csat_score", parseInt(csatScoreFilter));
-      if (ticketFilter === "with") q = q.not("ticket_id", "is", null);
-      if (ticketFilter === "without") q = q.is("ticket_id", null);
-      if (sentimentFilter !== "all") q = q.eq("last_sentiment", sentimentFilter);
+      if (effectiveClosureType !== "all") q = q.eq("closure_type", effectiveClosureType);
+      if (effectiveCsatFilter === "sent") q = q.eq("csat_sent", true);
+      if (effectiveCsatFilter === "not_sent") q = q.eq("csat_sent", false);
+      if (effectiveCsatFilter === "answered") q = q.not("csat_score", "is", null);
+      if (effectiveCsatFilter === "unanswered") { q = q.eq("csat_sent", true).is("csat_score", null); }
+      if (effectiveCsatScoreFilter !== "all") q = q.eq("csat_score", parseInt(effectiveCsatScoreFilter));
+      if (effectiveTicketFilter === "with") q = q.not("ticket_id", "is", null);
+      if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
+      if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
@@ -500,21 +510,15 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       )}
 
       {embedded && (
-        <>
-          <div className="relative mb-3">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar atendimento..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-9"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {filtersPopover}
-            {chipsBlock}
-          </div>
-        </>
+        <div className="relative mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar atendimento..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
       )}
 
       {!embedded && (

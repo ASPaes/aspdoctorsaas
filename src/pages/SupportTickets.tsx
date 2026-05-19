@@ -123,6 +123,11 @@ export default function SupportTickets() {
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
   const [ticketStateFilter, setTicketStateFilter] = useState<string>("all");
+  const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>("all");
+  const [attCsatFilter, setAttCsatFilter] = useState<string>("all");
+  const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
+  const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
+  const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
@@ -487,8 +492,15 @@ export default function SupportTickets() {
     if (canalFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
     if (tagFilters.length > 0) count++;
+    if (ticketsView === "atendimentos") {
+      if (attClosureTypeFilter !== "all") count++;
+      if (attCsatFilter !== "all") count++;
+      if (attCsatScoreFilter !== "all") count++;
+      if (attTicketFilter !== "all") count++;
+      if (attSentimentFilter !== "all") count++;
+    }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -841,8 +853,81 @@ export default function SupportTickets() {
               </div>
             ) : ticketsView === "atendimentos" ? (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Filtros aplicados diretamente nos atendimentos</p>
-                <p className="text-xs text-muted-foreground italic">Os filtros de status e tipo de encerramento estão disponíveis dentro da view de atendimentos.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tipo encerramento</label>
+                    <Select value={attClosureTypeFilter} onValueChange={setAttClosureTypeFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="inactivity_auto">Inatividade</SelectItem>
+                        <SelectItem value="silent">Silencioso</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">CSAT</label>
+                    <Select value={attCsatFilter} onValueChange={setAttCsatFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="sent">CSAT enviado</SelectItem>
+                        <SelectItem value="not_sent">Sem envio de CSAT</SelectItem>
+                        <SelectItem value="answered">CSAT respondido</SelectItem>
+                        <SelectItem value="unanswered">CSAT não respondido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Nota CSAT</label>
+                    <Select value={attCsatScoreFilter} onValueChange={setAttCsatScoreFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas notas</SelectItem>
+                        <SelectItem value="1">⭐ 1</SelectItem>
+                        <SelectItem value="2">⭐ 2</SelectItem>
+                        <SelectItem value="3">⭐ 3</SelectItem>
+                        <SelectItem value="4">⭐ 4</SelectItem>
+                        <SelectItem value="5">⭐ 5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Ticket</label>
+                    <Select value={attTicketFilter} onValueChange={setAttTicketFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="with">Com ticket</SelectItem>
+                        <SelectItem value="without">Sem ticket</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Sentimento IA</label>
+                    <Select value={attSentimentFilter} onValueChange={setAttSentimentFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="positive">😊 Positivo</SelectItem>
+                        <SelectItem value="neutral">😐 Neutro</SelectItem>
+                        <SelectItem value="negative">😠 Negativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all") && (
+                  <div className="flex justify-end pt-2 border-t">
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => {
+                      setAttClosureTypeFilter("all");
+                      setAttCsatFilter("all");
+                      setAttCsatScoreFilter("all");
+                      setAttTicketFilter("all");
+                      setAttSentimentFilter("all");
+                    }}>Limpar filtros</Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-4 text-center text-sm text-muted-foreground">
@@ -1100,7 +1185,7 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} />;
+        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
