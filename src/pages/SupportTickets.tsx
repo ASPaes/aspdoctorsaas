@@ -919,6 +919,18 @@ export default function SupportTickets() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Instância</label>
+                    <Select value={attInstanceFilter} onValueChange={setAttInstanceFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {whatsappInstances.map((inst: any) => (
+                          <SelectItem key={inst.id} value={inst.id}>{inst.display_name || inst.instance_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1 col-span-2">
                     <label className="text-xs font-medium text-muted-foreground">Sentimento IA</label>
                     <Select value={attSentimentFilter} onValueChange={setAttSentimentFilter}>
@@ -932,7 +944,7 @@ export default function SupportTickets() {
                     </Select>
                   </div>
                 </div>
-                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all") && (
+                {(attClosureTypeFilter !== "all" || attCsatFilter !== "all" || attCsatScoreFilter !== "all" || attTicketFilter !== "all" || attSentimentFilter !== "all" || attInstanceFilter !== "all") && (
                   <div className="flex justify-end pt-2 border-t">
                     <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => {
                       setAttClosureTypeFilter("all");
@@ -940,6 +952,7 @@ export default function SupportTickets() {
                       setAttCsatScoreFilter("all");
                       setAttTicketFilter("all");
                       setAttSentimentFilter("all");
+                      setAttInstanceFilter("all");
                     }}>Limpar filtros</Button>
                   </div>
                 )}
