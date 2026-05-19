@@ -768,16 +768,6 @@ export default function Clientes() {
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={selVal(unidadeBaseQuick)} onValueChange={selChange("unidadeBaseQuick")}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Unidade Base" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Todas Unidades</SelectItem>
-            <SelectItem value="__null__">Nulo</SelectItem>
-            {lookups.unidadesBase.data?.map((u) => (
-              <SelectItem key={u.id} value={String(u.id)}>{u.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Advanced filters */}
