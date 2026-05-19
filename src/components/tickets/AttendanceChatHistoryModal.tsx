@@ -63,8 +63,23 @@ export function AttendanceChatHistoryModal({
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const { data: nextAttendanceStart } = useQuery({
+    queryKey: ["next_attendance_start", conversationId, closedAt],
+    enabled: !!conversationId && !!closedAt && open,
+    queryFn: async () => {
+      const { data } = await (supabase.from("support_attendances" as any) as any)
+        .select("opened_at")
+        .eq("conversation_id", conversationId)
+        .gt("opened_at", closedAt)
+        .order("opened_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      return (data?.opened_at as string) ?? null;
+    },
+  });
+
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["attendance_chat_history", conversationId, openedAt, closedAt, csatRespondedAt],
+    queryKey: ["attendance_chat_history", conversationId, openedAt, closedAt, csatRespondedAt, nextAttendanceStart],
     enabled: !!conversationId && open,
     queryFn: async () => {
       let q = (supabase.from("whatsapp_messages" as any) as any)
@@ -78,11 +93,14 @@ export function AttendanceChatHistoryModal({
       if (closedAt) {
         let upperBound: string;
         if (csatRespondedAt) {
-          upperBound = new Date(new Date(csatRespondedAt).getTime() + 30000).toISOString();
+          upperBound = new Date(new Date(csatRespondedAt).getTime() + 5000).toISOString();
         } else {
           upperBound = new Date(new Date(closedAt).getTime() + 60000).toISOString();
         }
-        q = q.lte("timestamp", upperBound);
+        if (nextAttendanceStart && nextAttendanceStart < upperBound) {
+          upperBound = nextAttendanceStart;
+        }
+        q = q.lt("timestamp", upperBound);
       }
       q = q.limit(500);
       const { data, error } = await q;
