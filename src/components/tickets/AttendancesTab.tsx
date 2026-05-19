@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +12,11 @@ import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModa
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
-  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck,
+  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck, Building2,
 } from "lucide-react";
 
 const PAGE_SIZE = 100;
@@ -103,6 +105,30 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [linkingAttId, setLinkingAttId] = useState<string | null>(null);
+  const [linkClienteSearch, setLinkClienteSearch] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
+  const { results: linkClienteResults, isLoading: linkClienteLoading } = useClienteSearch(linkClienteSearch);
+  const queryClient = useQueryClient();
+
+  const handleLinkCliente = async (attendanceId: string, clienteId: string) => {
+    setIsLinking(true);
+    try {
+      const { error } = await (supabase.rpc as any)("link_cliente_to_attendance", {
+        p_attendance_id: attendanceId,
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+      toast.success("Cliente vinculado com sucesso! Próximos chats deste contato serão vinculados automaticamente.");
+      queryClient.invalidateQueries({ queryKey: ["attendances_list"] });
+      setLinkingAttId(null);
+      setLinkClienteSearch("");
+    } catch (err: any) {
+      toast.error("Erro ao vincular: " + (err?.message ?? ""));
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   const { data: csatScale } = useQuery({
     queryKey: ["csat-scale-att", tid],
@@ -656,9 +682,72 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                   <span className="text-sm font-medium truncate min-w-0">
                     {att.whatsapp_contacts?.name ?? "—"}
                   </span>
-                  <span className="text-xs text-muted-foreground truncate min-w-0">
-                    · {att.clientes?.nome_fantasia ?? "Sem cliente"}
-                  </span>
+                  {att.clientes?.nome_fantasia ? (
+                    <span className="text-xs text-muted-foreground truncate min-w-0">
+                      · {att.clientes.nome_fantasia}
+                    </span>
+                  ) : (
+                    <Popover
+                      open={linkingAttId === att.id}
+                      onOpenChange={(o) => { if (!o) { setLinkingAttId(null); setLinkClienteSearch(""); } }}
+                    >
+                      <PopoverTrigger asChild>
+                        <span
+                          role="button"
+                          onClick={(e) => { e.stopPropagation(); setLinkingAttId(att.id); setLinkClienteSearch(""); }}
+                          className="inline-flex items-center gap-1 text-xs text-yellow-500 hover:text-yellow-400 cursor-pointer shrink-0"
+                        >
+                          · Sem cliente
+                          <Building2 className="h-3 w-3" />
+                        </span>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        className="w-[300px] p-3 space-y-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="text-xs font-medium">Vincular cliente</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          O contato será vinculado ao cliente para próximos chats.
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            value={linkClienteSearch}
+                            onChange={(e) => setLinkClienteSearch(e.target.value)}
+                            placeholder="Nome, CNPJ, código..."
+                            className="h-8 pl-7 text-xs"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="max-h-[240px] overflow-y-auto space-y-1">
+                          {linkClienteLoading && (
+                            <div className="text-[11px] text-muted-foreground px-2 py-1">Buscando...</div>
+                          )}
+                          {!linkClienteLoading && linkClienteSearch.length >= 2 && linkClienteResults.length === 0 && (
+                            <div className="text-[11px] text-muted-foreground px-2 py-1">Nenhum encontrado</div>
+                          )}
+                          {linkClienteResults.map((c: any) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              disabled={isLinking}
+                              onClick={(e) => { e.stopPropagation(); handleLinkCliente(att.id, c.id); }}
+                              className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-accent transition-colors disabled:opacity-50"
+                            >
+                              <div className="font-medium truncate">
+                                {c.codigo_sequencial ? `#${c.codigo_sequencial} ` : ""}{c.nome_fantasia || c.razao_social || "Sem nome"}
+                              </div>
+                              {c.cnpj && (
+                                <div className="text-[10px] text-muted-foreground font-mono">{c.cnpj}</div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   <div className="flex-1" />
                   <Badge variant="outline" className={`text-[10px] shrink-0 ${STATUS_CLASSES[att.status] ?? ""}`}>
                     {STATUS_LABELS[att.status] ?? att.status}
