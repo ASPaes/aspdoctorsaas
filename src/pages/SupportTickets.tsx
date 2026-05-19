@@ -361,6 +361,19 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: whatsappInstances = [] } = useQuery({
+    queryKey: ["whatsapp_instances_filter", tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("whatsapp_instances" as any) as any)
+        .select("id, display_name, instance_name")
+        .eq("tenant_id", tid)
+        .order("display_name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; display_name: string | null; instance_name: string }>;
+    },
+  });
+
   const DEPT_ORDER_KEY = `dept-order-${tid}-${userId}`;
 
   const [deptOrder, setDeptOrder] = useState<string[] | null>(null);
