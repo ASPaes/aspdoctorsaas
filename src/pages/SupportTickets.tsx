@@ -123,6 +123,11 @@ export default function SupportTickets() {
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
   const [ticketStateFilter, setTicketStateFilter] = useState<string>("all");
+  const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>("all");
+  const [attCsatFilter, setAttCsatFilter] = useState<string>("all");
+  const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
+  const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
+  const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
