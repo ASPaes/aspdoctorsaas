@@ -290,26 +290,45 @@ export default function HorarioPlantaoTab() {
   }, [bhSchedule]);
 
   // ── Save handlers ──
-  const handleSaveBH = () => {
+  const handleSaveBH = async () => {
     const err = validateSlots();
     if (err) {
       toast({ title: "Erro de validação", description: err, variant: "destructive" });
       return;
     }
-    // Clean schedule: remove empty 2nd slots before saving
     const cleanSchedule: BusinessHours = {};
     for (const day of DAY_KEYS) {
       const d = bhSchedule[day];
       const validSlots = d.slots.filter((s) => s.start && s.end);
       cleanSchedule[day] = { active: d.active, slots: validSlots.length > 0 ? validSlots : [{ ...DEFAULT_SLOT }] };
     }
-    saveBH.mutate({
-      business_hours_enabled: bhEnabled,
-      business_hours_timezone: bhTimezone,
-      business_hours: cleanSchedule,
-      business_hours_message: bhMessage || null,
-      business_hours_outside_prompt: bhOutsidePrompt || null,
-    });
+
+    if (selectedContext === "global") {
+      saveBH.mutate({
+        business_hours_enabled: bhEnabled,
+        business_hours_timezone: bhTimezone,
+        business_hours: cleanSchedule,
+        business_hours_message: bhMessage || null,
+        business_hours_outside_prompt: bhOutsidePrompt || null,
+      });
+    } else {
+      // Save to department
+      try {
+        const { error } = await (supabase.from("support_departments" as any) as any)
+          .update({
+            business_hours_enabled: bhEnabled,
+            business_hours: cleanSchedule,
+            business_hours_message: bhMessage || null,
+          })
+          .eq("id", selectedContext);
+        if (error) throw error;
+        qcDept.invalidateQueries({ queryKey: ["dept-business-hours", deptTid] });
+        const deptName = deptRows.find((d) => d.id === selectedContext)?.name || "Setor";
+        toast({ title: `Horário do setor ${deptName} salvo!` });
+      } catch (err: any) {
+        toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+      }
+    }
   };
 
   const handleSaveAI = () => {
