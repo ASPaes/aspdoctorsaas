@@ -10,7 +10,7 @@ import { NotificationPermissionBanner } from "@/components/notifications/Notific
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";
 import TeamPresencePopover from "@/components/whatsapp/presence/TeamPresencePopover";
 import { useAuth } from "@/contexts/AuthContext";
-import { Copy } from "lucide-react";
+import { Copy, TicketPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
