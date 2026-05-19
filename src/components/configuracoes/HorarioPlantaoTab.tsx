@@ -559,7 +559,7 @@ export default function HorarioPlantaoTab() {
 
             <Button onClick={handleSaveBH} disabled={saveBH.isPending} size="sm">
               {saveBH.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              Salvar Horário
+              {selectedContext === "global" ? "Salvar Horário" : `Salvar Horário - ${deptRows.find((d) => d.id === selectedContext)?.name || "Setor"}`}
             </Button>
           </AccordionContent>
         </AccordionItem>
