@@ -859,6 +859,35 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           setCsatModalOpen(false);
         }}
       />
+      {ticketModalAtt && (
+        <CreateSupportTicketModal
+          open={ticketModalOpen}
+          onOpenChange={(o) => { setTicketModalOpen(o); if (!o) setTicketModalAtt(null); }}
+          onCreated={() => {
+            setTicketModalOpen(false);
+            setTicketModalAtt(null);
+            queryClient.invalidateQueries({ queryKey: ["attendances_list"] });
+          }}
+          fromClosure
+          attendanceId={ticketModalAtt.id}
+          closureClienteId={ticketModalAtt.cliente_id ?? null}
+          closureClienteNome={ticketModalAtt.clientes?.nome_fantasia ?? null}
+          closureClienteCodigo={null}
+          closureProdutoId={null}
+          closureDepartmentId={ticketModalAtt.department_id ?? null}
+          closureResponsavelId={ticketModalAtt.assigned_to ?? null}
+          closureContactName={ticketModalAtt.whatsapp_contacts?.name ?? ticketModalAtt.contact_name ?? null}
+          closureHandleSeconds={ticketModalAtt.handle_seconds ?? null}
+          closureAiSummary={ticketModalAtt.ai_summary ?? null}
+          closureAiTopics={null}
+          closureAiKeywords={null}
+          closureAiProblem={null}
+          closureAiSolution={null}
+          closureSentimentLabel={ticketModalAtt.last_sentiment ?? null}
+          closureSentimentConfidence={null}
+          closureSentimentSummary={null}
+        />
+      )}
     </div>
   );
 }
