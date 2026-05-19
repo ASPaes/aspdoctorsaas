@@ -873,6 +873,49 @@ export function CreateSupportTicketModal({
               </div>
             </div>
 
+            {fromClosure && ((closureAiTopics?.length ?? 0) > 0 || closureSentimentLabel || closureAiSummary || closureAiProblem) && (
+              <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <Bot className="h-3.5 w-3.5" />
+                  Contexto IA do atendimento
+                </div>
+                {closureAiTopics && closureAiTopics.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Tópicos</p>
+                    <div className="flex flex-wrap gap-1">
+                      {closureAiTopics.map((topic, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md text-[10px] bg-background border border-border">{topic}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {closureSentimentLabel && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Sentimento:</span>
+                    <span className={
+                      closureSentimentLabel === 'negative' ? 'text-red-400' :
+                      closureSentimentLabel === 'positive' ? 'text-green-400' :
+                      'text-muted-foreground'
+                    }>
+                      {closureSentimentLabel === 'negative' ? 'Negativo' : closureSentimentLabel === 'positive' ? 'Positivo' : 'Neutro'}
+                    </span>
+                  </div>
+                )}
+                {(closureSentimentSummary || closureAiSummary) && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                    <p className="text-xs text-muted-foreground italic">{closureSentimentSummary || closureAiSummary}</p>
+                  </div>
+                )}
+                {closureAiProblem && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Problema</p>
+                    <p className="text-xs text-muted-foreground">{closureAiProblem}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Classificação */}
             <div className="space-y-2">
               <Label className="text-xs font-medium">Classificação</Label>
