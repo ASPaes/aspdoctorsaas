@@ -253,7 +253,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           opened_at, assumed_at, closed_at,
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
-          ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
+          ai_summary, ai_category, ai_problem, ai_solution, ticket_id, cliente_id, contact_id, department_id,
           csat_sent, csat_score, last_sentiment,
           contact_name, contact_phone, instance_id,
           whatsapp_contacts:contact_id(name, phone_number),
@@ -881,8 +881,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           closureAiSummary={ticketModalAtt.ai_summary ?? null}
           closureAiTopics={null}
           closureAiKeywords={null}
-          closureAiProblem={null}
-          closureAiSolution={null}
+          closureAiProblem={ticketModalAtt.ai_problem ?? null}
+          closureAiSolution={ticketModalAtt.ai_solution ?? null}
           closureSentimentLabel={ticketModalAtt.last_sentiment ?? null}
           closureSentimentConfidence={null}
           closureSentimentSummary={null}

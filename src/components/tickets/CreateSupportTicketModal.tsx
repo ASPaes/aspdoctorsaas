@@ -190,9 +190,11 @@ export function CreateSupportTicketModal({
       setResponsavelId(closureResponsavelId || "");
       setContatoSolicitante(closureContactName || "");
       const descParts: string[] = [];
-      if (closureAiSummary) descParts.push("Resumo: " + closureAiSummary);
-      if (closureAiProblem) descParts.push("Problema: " + closureAiProblem);
-      if (closureAiSolution) descParts.push("Solução: " + closureAiSolution);
+      if (closureAiProblem) descParts.push("PROBLEMA: " + closureAiProblem);
+      if (closureAiSolution) descParts.push("SOLUÇÃO: " + closureAiSolution);
+      if (descParts.length === 0 && closureAiSummary) {
+        descParts.push("RESUMO: " + closureAiSummary);
+      }
       setObservacaoAgente(descParts.join("\n\n"));
       if (closureAiProblem) {
         setChecklistItems([{ text: closureAiProblem, done: false }]);
