@@ -444,34 +444,95 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
             <div className="space-y-2">
               {list.map((a) => {
                 const c = scoreColor(a.score, scoreMax);
+                const isEditing = editingId === a.id;
                 return (
-                  <div key={a.id} className="rounded-lg border p-3 flex gap-3 items-start">
-                    <div
-                      className="flex items-center justify-center rounded-full font-bold text-sm shrink-0"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        backgroundColor: c.bg,
-                        color: c.fg,
-                      }}
-                    >
-                      {a.score}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm truncate">{a.cliente_nome}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {a.setor} · {formatDate(a.responded_at)}
-                        </span>
-                      </div>
-
-                      {a.reason ? (
-                        <p className="text-sm text-muted-foreground line-clamp-2">{a.reason}</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">Sem comentário</p>
+                  <div key={a.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex gap-3 items-start">
+                      {!isEditing && (
+                        isAdmin ? (
+                          <button
+                            type="button"
+                            title="Editar nota"
+                            onClick={() => { setEditingId(a.id); setEditScore(a.score); }}
+                            className="flex items-center justify-center rounded-full font-bold text-sm shrink-0 hover:ring-2 hover:ring-primary/50 transition-all"
+                            style={{ width: 36, height: 36, backgroundColor: c.bg, color: c.fg }}
+                          >
+                            {a.score}
+                          </button>
+                        ) : (
+                          <div
+                            className="flex items-center justify-center rounded-full font-bold text-sm shrink-0"
+                            style={{ width: 36, height: 36, backgroundColor: c.bg, color: c.fg }}
+                          >
+                            {a.score}
+                          </div>
+                        )
                       )}
+
+                      {isEditing && (
+                        <div className="flex flex-wrap items-center gap-1 shrink-0">
+                          {Array.from({ length: scoreMax + 1 }, (_, i) => i).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setEditScore(n)}
+                              className={`w-7 h-7 rounded-full text-xs font-bold transition-all ${editScore === n ? "bg-primary text-primary-foreground ring-2 ring-primary" : "bg-muted hover:bg-muted/80"}`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={updateScore.isPending}
+                            onClick={() => updateScore.mutate({ csatId: a.id, newScore: editScore })}
+                          >
+                            {updateScore.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() => setEditingId(null)}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm truncate">{a.cliente_nome}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {a.setor} · {formatDate(a.responded_at)}
+                          </span>
+                        </div>
+
+                        {a.reason ? (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{a.reason}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">Sem comentário</p>
+                        )}
+                      </div>
                     </div>
+
+                    {a.attendance_code && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onNavigateToAttendance) {
+                              onNavigateToAttendance(a.attendance_code);
+                              onOpenChange(false);
+                            }
+                          }}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <span className="font-mono">{a.attendance_code}</span>
+                          <span>→ Ver atendimento</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
