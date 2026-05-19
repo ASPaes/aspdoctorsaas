@@ -50,6 +50,7 @@ import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoC
 import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
 
 import SetoresInstanciasTab from "@/components/configuracoes/whatsapp/SetoresInstanciasTab";
+import UnidadesBaseConfig from "@/components/configuracoes/UnidadesBaseConfig";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import KBTab from "@/components/configuracoes/KBTab";
