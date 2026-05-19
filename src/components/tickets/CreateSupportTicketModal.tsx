@@ -376,6 +376,8 @@ export function CreateSupportTicketModal({
   });
 
   useEffect(() => {
+    // No modo closure, o contato já vem preenchido do chat — não sobrescrever
+    if (fromClosure) return;
     const clienteId = selectedCliente?.id;
     if (!clienteId) {
       setContatoSolicitante("");
@@ -390,7 +392,7 @@ export function CreateSupportTicketModal({
         if (data?.name) setContatoSolicitante(data.name);
         else setContatoSolicitante("");
       });
-  }, [selectedCliente?.id]);
+  }, [selectedCliente?.id, fromClosure]);
 
   // Search whatsapp_contacts as user types
   useEffect(() => {
