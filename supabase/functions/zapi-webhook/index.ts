@@ -297,6 +297,7 @@ async function processZapiWebhook(req: Request): Promise<void> {
     mediaUrl,
     mediaMimetype,
     mediaFilename,
+    mediaStoragePath,
     rawPayload: payload,
   };
 
