@@ -154,7 +154,6 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
           <UnidadesBaseConfig />
           <SetoresInstanciasTab />
         </TabsContent>
-        </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
           <SecuritySettingsTab />
