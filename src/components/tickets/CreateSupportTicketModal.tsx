@@ -147,16 +147,34 @@ export function CreateSupportTicketModal({
   };
 
   useEffect(() => {
-    if (open) reset();
+    if (open) {
+      reset();
+      if (fromClosure) {
+        if (closureClienteId) {
+          setSelectedCliente({
+            id: closureClienteId,
+            nome_fantasia: closureClienteNome || null,
+            razao_social: null,
+            codigo_sequencial: closureClienteCodigo || null,
+            cnpj: null,
+          } as any);
+        }
+        if (closureProdutoId) setProdutoId(String(closureProdutoId));
+        setCanalOrigem("whatsapp");
+        if (closureDepartmentId) setDepartamentoId(closureDepartmentId);
+        if (closureResponsavelId) setResponsavelId(closureResponsavelId);
+        if (closureAiSummary) setObservacaoAgente(closureAiSummary);
+      }
+    }
   }, [open]);
 
   useEffect(() => {
-    if (open) {
+    if (open && !fromClosure) {
       supabase.auth.getUser().then(({ data }) => {
         if (data?.user?.id) setResponsavelId(data.user.id);
       });
     }
-  }, [open]);
+  }, [open, fromClosure]);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["create_manual_ticket_produtos", tid],
