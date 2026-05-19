@@ -152,6 +152,9 @@ export default function HorarioPlantaoTab() {
   const [bhMessage, setBhMessage] = useState("");
   const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
 
+  // ── Contexto: Global vs Setor ──
+  const [selectedContext, setSelectedContext] = useState<string>("global");
+
   // ── Section B: AI off-hours ──
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
