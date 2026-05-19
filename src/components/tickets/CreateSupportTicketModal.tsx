@@ -74,6 +74,8 @@ export function CreateSupportTicketModal({
   closureProdutoId = null,
   closureDepartmentId = null,
   closureResponsavelId = null,
+  closureContactName = null,
+  closureHandleSeconds = null,
   closureAiSummary = null,
   closureAiTopics = null,
   closureAiKeywords = null,
