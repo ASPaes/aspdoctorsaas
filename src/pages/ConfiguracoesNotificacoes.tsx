@@ -37,6 +37,7 @@ interface Settings {
   alert_in_conversation: AlertMode;
   alert_other_conversation: AlertMode;
   alert_other_module: AlertMode;
+  notification_scope: string;
 }
 
 const DEFAULTS: Settings = {
