@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
+import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { subDays } from "date-fns";
@@ -88,6 +89,21 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [csatModalOpen, setCsatModalOpen] = useState(false);
+
+  const { data: csatScale } = useQuery({
+    queryKey: ["csat-scale-att", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("support_csat_score_max")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.support_csat_score_max ?? 5) as number;
+    },
+  });
 
   useEffect(() => {
     setPage(0);
@@ -492,7 +508,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
             <p className="text-2xl font-semibold font-mono mt-0.5">{formatDur(metrics.median_handle_seconds)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Tempo atendimento</p>
           </div>
-          <div className="bg-card border border-border rounded-lg p-3">
+          <button type="button" onClick={() => setCsatModalOpen(true)} className="bg-card border border-primary/40 rounded-lg p-3 text-left hover:border-primary/70 transition-colors">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">CSAT médio</p>
             <p className={`text-2xl font-semibold font-mono mt-0.5 ${metrics.avg_csat >= 4 ? "text-green-400" : metrics.avg_csat >= 3 ? "text-yellow-400" : "text-red-400"}`}>
               {metrics.avg_csat > 0 ? metrics.avg_csat : "—"}
@@ -505,7 +521,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                 </span>
               )}
             </p>
-          </div>
+          </button>
         </div>
       )}
 
@@ -683,6 +699,15 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         attendanceId={selectedId}
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedId(null); }}
+      />
+      <CsatReportModal
+        open={csatModalOpen}
+        onOpenChange={setCsatModalOpen}
+        tenantId={tid}
+        dateFrom={dateRange.from}
+        dateTo={dateRange.to}
+        departmentId={effectiveDeptFilter !== "all" ? effectiveDeptFilter : undefined}
+        scoreMax={csatScale ?? 5}
       />
     </div>
   );
