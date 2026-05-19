@@ -78,6 +78,7 @@ interface Props {
 
 function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const dateRange = dateRangeOverride || internalDateRange;
   const setDateRange = dateRangeOverride ? () => {} : setInternalDateRange;

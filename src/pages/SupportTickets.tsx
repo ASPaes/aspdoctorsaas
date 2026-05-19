@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
@@ -106,6 +107,7 @@ function SortableDeptPill({ dept, isActive, onClick }: { dept: { id: string; nam
 
 export default function SupportTickets() {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
   const [produtoFilter, setProdutoFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
