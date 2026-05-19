@@ -6764,10 +6764,14 @@ export type Database = {
       }
       get_csat_report_list: {
         Args: {
+          p_agent_id?: string
+          p_cliente_id?: string
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_has_comment?: boolean
           p_limit?: number
+          p_score?: number
           p_tenant_id: string
         }
         Returns: {
@@ -6782,9 +6786,13 @@ export type Database = {
       }
       get_csat_report_summary: {
         Args: {
+          p_agent_id?: string
+          p_cliente_id?: string
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_has_comment?: boolean
+          p_score?: number
           p_tenant_id: string
         }
         Returns: Json
