@@ -137,6 +137,7 @@ export default function ConfiguracoesNotificacoes() {
         alert_in_conversation: settings.alert_in_conversation,
         alert_other_conversation: settings.alert_other_conversation,
         alert_other_module: settings.alert_other_module,
+        notification_scope: settings.notification_scope,
         updated_at: new Date().toISOString(),
       };
 
