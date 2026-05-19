@@ -1026,8 +1026,8 @@ export function CreateSupportTicketModal({
                   e.target.style.height = e.target.scrollHeight + "px";
                 }}
                 placeholder="Descreva o atendimento..."
-                className="text-xs min-h-[80px] overflow-hidden"
-                style={{ resize: "none" }}
+                rows={8}
+                className="text-xs min-h-[180px] resize-y"
               />
             </div>
 
