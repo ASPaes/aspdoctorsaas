@@ -538,20 +538,22 @@ export default function HorarioPlantaoTab() {
                   </p>
                 </div>
 
-                {/* Outside hours AI prompt */}
-                <div className="space-y-1.5">
-                  <Label>Prompt da IA para mensagem fora do horário</Label>
-                  <Textarea
-                    value={bhOutsidePrompt}
-                    onChange={(e) => setBhOutsidePrompt(e.target.value)}
-                    rows={4}
-                    placeholder="Ex: Você é um atendente virtual simpático. Escreva uma mensagem curta e amigável informando que estamos fora do horário. Use a saudação correta pelo horário ({{greeting}}). Horário: {{slots}}. Retorno: {{next_start}}."
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Usado quando o tenant possui IA configurada. Deixe em branco para usar o prompt padrão.
-                    Variáveis disponíveis: <code className="text-xs">{"{{greeting}}"}</code>, <code className="text-xs">{"{{slots}}"}</code>, <code className="text-xs">{"{{next_start}}"}</code>, <code className="text-xs">{"{{slot1_start}}"}</code>, <code className="text-xs">{"{{slot1_end}}"}</code>, <code className="text-xs">{"{{slot2_start}}"}</code>, <code className="text-xs">{"{{slot2_end}}"}</code>
-                  </p>
-                </div>
+                {/* Outside hours AI prompt (only global) */}
+                {selectedContext === "global" && (
+                  <div className="space-y-1.5">
+                    <Label>Prompt da IA para mensagem fora do horário</Label>
+                    <Textarea
+                      value={bhOutsidePrompt}
+                      onChange={(e) => setBhOutsidePrompt(e.target.value)}
+                      rows={4}
+                      placeholder="Ex: Você é um atendente virtual simpático. Escreva uma mensagem curta e amigável informando que estamos fora do horário. Use a saudação correta pelo horário ({{greeting}}). Horário: {{slots}}. Retorno: {{next_start}}."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Usado quando o tenant possui IA configurada. Deixe em branco para usar o prompt padrão.
+                      Variáveis disponíveis: <code className="text-xs">{"{{greeting}}"}</code>, <code className="text-xs">{"{{slots}}"}</code>, <code className="text-xs">{"{{next_start}}"}</code>, <code className="text-xs">{"{{slot1_start}}"}</code>, <code className="text-xs">{"{{slot1_end}}"}</code>, <code className="text-xs">{"{{slot2_start}}"}</code>, <code className="text-xs">{"{{slot2_end}}"}</code>
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
