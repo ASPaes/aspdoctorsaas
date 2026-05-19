@@ -782,9 +782,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.dispatchEvent(new CustomEvent("create-ticket-from-attendance", {
-                          detail: { attendanceId: att.id, clienteId: att.cliente_id, contactId: att.contact_id, departmentId: att.department_id }
-                        }));
+                        setTicketModalAtt(att);
+                        setTicketModalOpen(true);
                       }}>
                       <Plus className="h-3 w-3" /> Ticket
                     </Button>
