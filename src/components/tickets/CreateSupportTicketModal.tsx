@@ -748,20 +748,22 @@ export function CreateSupportTicketModal({
                     <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
                     {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
                   </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 shrink-0"
-                    onClick={() => {
-                      setSelectedCliente(null);
-                      setProdutoId("");
-                      setClienteSearchTerm("");
-                      setContatoSolicitante("");
-                    }}
-                  >
-                    Trocar
-                  </Button>
+                  {!fromClosure && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0"
+                      onClick={() => {
+                        setSelectedCliente(null);
+                        setProdutoId("");
+                        setClienteSearchTerm("");
+                        setContatoSolicitante("");
+                      }}
+                    >
+                      Trocar
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="relative space-y-1">
