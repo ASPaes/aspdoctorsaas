@@ -16,9 +16,11 @@ import { CSTab } from '@/components/dashboard/tabs/CSTab';
 import { CohortTab } from '@/components/dashboard/tabs/CohortTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
 
 export default function Dashboard() {
-  const { filters, setFilters } = useDashboardFilters();
+  const { selectedUnidadeId } = useUnidadeFilter();
+  const { filters, setFilters } = useDashboardFilters(selectedUnidadeId);
   const { profile } = useAuth();
   const navigate = useNavigate();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
