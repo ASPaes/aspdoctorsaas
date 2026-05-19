@@ -60,9 +60,14 @@ interface Props {
   embedded?: boolean;
   dateRangeOverride?: { from: Date; to: Date };
   statusFilterOverride?: string;
+  closureTypeOverride?: string;
+  csatFilterOverride?: string;
+  csatScoreFilterOverride?: string;
+  ticketFilterOverride?: string;
+  sentimentFilterOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const dateRange = dateRangeOverride || internalDateRange;
