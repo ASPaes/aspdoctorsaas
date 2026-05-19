@@ -107,7 +107,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, search]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
@@ -187,7 +187,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, page, isAdminOrHead, userId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, page, isAdminOrHead, userId, search],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -220,6 +220,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveTicketFilter === "with") q = q.not("ticket_id", "is", null);
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
+      if (search.trim().length >= 2) {
+        const s = search.trim().replace(/[%,()]/g, "");
+        q = q.ilike("attendance_code", `%${s}%`);
+      }
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
@@ -234,15 +238,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
 
 
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    if (!s) return attendances;
-    return attendances.filter((a: any) =>
-      (a.attendance_code ?? "").toLowerCase().includes(s) ||
-      (a.whatsapp_contacts?.name ?? "").toLowerCase().includes(s) ||
-      (a.whatsapp_contacts?.phone_number ?? "").includes(s)
-    );
-  }, [attendances, search]);
+  const filtered = attendances;
 
   const activeFilterCount = useMemo(() => {
     let c = 0;
