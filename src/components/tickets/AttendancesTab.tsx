@@ -175,7 +175,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId, clienteIdOverride ?? null],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -192,6 +192,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         p_csat_score: effectiveCsatScoreFilter !== "all" ? parseInt(effectiveCsatScoreFilter) : null,
         p_ticket_filter: effectiveTicketFilter !== "all" ? effectiveTicketFilter : null,
         p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
+        p_cliente_id: clienteIdOverride ?? null,
       });
       if (error) throw error;
       return data as {
