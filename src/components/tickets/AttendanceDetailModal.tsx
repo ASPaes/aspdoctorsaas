@@ -362,6 +362,7 @@ export function AttendanceDetailModal({ attendanceId, open, onOpenChange }: Prop
       contactName={att?.whatsapp_contacts?.name}
       openedAt={att?.opened_at ?? null}
       closedAt={att?.closed_at ?? null}
+      csatRespondedAt={csat?.responded_at ?? null}
     />
   );
 
