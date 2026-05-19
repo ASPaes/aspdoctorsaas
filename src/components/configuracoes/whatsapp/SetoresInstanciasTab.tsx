@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, Building2 } from "lucide-react";
+import { ExternalLink, Building2, MessageSquareText } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 
 export default function SetoresInstanciasTab() {
