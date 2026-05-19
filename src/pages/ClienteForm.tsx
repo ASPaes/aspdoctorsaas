@@ -28,7 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save, Eye, EyeOff, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ArrowUpDown, ChevronLeft, ChevronRight, Save, Eye, EyeOff, ShieldAlert, History } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
@@ -127,6 +127,115 @@ const clienteSchema = z.object({
 });
 
 export type ClienteFormValues = z.infer<typeof clienteSchema>;
+
+function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  const eventosQuery = useQuery({
+    queryKey: ["contrato_eventos_historico", tid, clienteId],
+    queryFn: async () => {
+      let q = (supabase.from("contrato_eventos" as any) as any)
+        .select("id, acao, data_acao, observacao, mensalidade_contrato_snapshot, mensalidade_cliente_snapshot, contrato_id, created_at")
+        .eq("cliente_id", clienteId)
+        .order("data_acao", { ascending: false });
+
+      if (tid) q = q.eq("tenant_id", tid);
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!clienteId,
+  });
+
+  // Buscar números dos contratos
+  const contratoIds = [...new Set((eventosQuery.data ?? []).map((e: any) => e.contrato_id).filter(Boolean))];
+
+  const contratosQuery = useQuery({
+    queryKey: ["contratos_numeros_evt", contratoIds.join(",")],
+    queryFn: async () => {
+      const { data } = await (supabase.from("contratos" as any) as any)
+        .select("id, numero")
+        .in("id", contratoIds);
+
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((c: any) => { map[c.id] = c.numero; });
+      return map;
+    },
+    enabled: contratoIds.length > 0,
+  });
+
+  const eventos = eventosQuery.data ?? [];
+  if (eventos.length === 0) return null;
+
+  const fmtDate = (d: string | null) => {
+    if (!d) return "—";
+    const [y, m, day] = d.split("T")[0].split("-");
+    return `${day}/${m}/${y}`;
+  };
+
+  const fmtBRL = (n: number | null | undefined) =>
+    (n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const contratoNumMap = contratosQuery.data ?? {};
+
+  return (
+    <div className="mt-4">
+      <Separator className="mb-4" />
+      <div className="flex items-center gap-2 mb-3">
+        <History className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">Histórico de Eventos</span>
+        <Badge variant="secondary" className="text-[10px]">{eventos.length}</Badge>
+      </div>
+      <div className="space-y-2">
+        {eventos.map((evt: any) => {
+          const isCancelamento = evt.acao === "cancelamento";
+          return (
+            <div
+              key={evt.id}
+              className={`flex items-start gap-3 rounded-md border p-3 text-sm ${
+                isCancelamento
+                  ? "border-destructive/30 bg-destructive/5"
+                  : "border-emerald-500/30 bg-emerald-500/5"
+              }`}
+            >
+              <div className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${
+                isCancelamento ? "bg-destructive" : "bg-emerald-500"
+              }`} />
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge
+                    variant={isCancelamento ? "destructive" : "default"}
+                    className={!isCancelamento ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                  >
+                    {isCancelamento ? "Cancelamento" : "Reativação"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{fmtDate(evt.data_acao)}</span>
+                  {evt.contrato_id && contratoNumMap[evt.contrato_id] && (
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {contratoNumMap[evt.contrato_id]}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  MRR Contrato: R$ {fmtBRL(Number(evt.mensalidade_contrato_snapshot))}
+                  {evt.mensalidade_cliente_snapshot != null && (
+                    <span className="ml-3">MRR Cliente: R$ {fmtBRL(Number(evt.mensalidade_cliente_snapshot))}</span>
+                  )}
+                </div>
+                {evt.observacao && (
+                  <p className="text-xs text-muted-foreground/80 truncate" title={evt.observacao}>
+                    {evt.observacao}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function ClienteForm() {
   const { id } = useParams();
@@ -628,11 +737,13 @@ export default function ClienteForm() {
                     Cliente ativo. O cancelamento é gerenciado individualmente por contrato na seção de Contratos acima.
                   </p>
                 )}
+                {/* Histórico de Cancelamentos/Reativações */}
+
+                <ContratoEventosHistorico clienteId={id!} />
+
               </CardContent>
             </Card>
           )}
-
-
 
           {/* Botões de ação */}
           <div className="flex justify-end gap-3">
