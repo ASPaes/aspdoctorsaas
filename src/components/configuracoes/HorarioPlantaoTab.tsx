@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
+import { Save, Loader2, Clock, Bot, Phone, X, Plus, Building2, Globe, ChevronDown } from "lucide-react";
 import { normalizeBRPhone, formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
 import BusinessHoursExceptionsSection from "./BusinessHoursExceptionsSection";
 import BusinessHoursHolidayTemplateSection from "./BusinessHoursHolidayTemplateSection";
