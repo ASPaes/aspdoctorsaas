@@ -399,10 +399,41 @@ export default function HorarioPlantaoTab() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-5">
+            {/* Seletor de contexto: Global vs Setor */}
+            {deptRows.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Configurar horário para</Label>
+                <Select value={selectedContext} onValueChange={setSelectedContext}>
+                  <SelectTrigger className="w-72">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">
+                      🌐 Global (padrão)
+                    </SelectItem>
+                    {deptRows.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        📋 {dept.name} {dept.business_hours_enabled ? "✦" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {selectedContext === "global"
+                    ? "Horário padrão usado por setores sem configuração própria."
+                    : `Horário específico para o setor ${deptRows.find((d) => d.id === selectedContext)?.name || ""}.`}
+                </p>
+              </div>
+            )}
+
             {/* Toggle */}
             <div className="flex items-center gap-3">
               <Switch checked={bhEnabled} onCheckedChange={setBhEnabled} id="bh-enabled" />
-              <Label htmlFor="bh-enabled">Ativar controle de horário de atendimento</Label>
+              <Label htmlFor="bh-enabled">
+                {selectedContext === "global"
+                  ? "Ativar controle de horário de atendimento"
+                  : "Ativar horário personalizado para este setor"}
+              </Label>
             </div>
 
             {bhEnabled && (
