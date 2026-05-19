@@ -233,6 +233,33 @@ export default function SetoresInstanciasTab() {
                     </Select>
                   </div>
                 )}
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                    <Label>Mensagem de boas-vindas (sem URA)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enviada automaticamente quando a URA está desligada e uma nova conversa entra neste setor.
+                    Use <code className="bg-muted px-1 rounded text-[10px]">{"{nome}"}</code> para o nome do contato e <code className="bg-muted px-1 rounded text-[10px]">{"{atendimento}"}</code> para o código.
+                  </p>
+                  <Textarea
+                    value={welcomeMsg}
+                    onChange={(e) => setWelcomeMsg(e.target.value)}
+                    placeholder="Ex: Olá {nome}! 👋 Bem-vindo ao setor de Suporte. Seu atendimento {atendimento} foi aberto. Em breve um técnico irá te atender."
+                    rows={4}
+                    className="resize-y text-sm"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      disabled={saveWelcome.isPending || welcomeMsg === (selectedDept?.welcome_message ?? "")}
+                      onClick={() => saveWelcome.mutate(welcomeMsg)}
+                    >
+                      {saveWelcome.isPending ? "Salvando..." : "Salvar mensagem"}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
