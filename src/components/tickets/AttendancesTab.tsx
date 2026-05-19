@@ -13,6 +13,7 @@ import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import {
