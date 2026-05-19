@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +12,11 @@ import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModa
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
-  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck,
+  ChevronLeft, ChevronRight, Headphones, Plus, TicketCheck, Building2,
 } from "lucide-react";
 
 const PAGE_SIZE = 100;
