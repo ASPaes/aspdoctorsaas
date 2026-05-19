@@ -761,6 +761,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         dateTo={dateRange.to}
         initialDepartmentId={effectiveDeptFilter !== "all" ? effectiveDeptFilter : undefined}
         scoreMax={csatScale ?? 5}
+        isAdmin={isAdminOrHead}
+        onNavigateToAttendance={(code) => {
+          setSearch(code);
+          setCsatModalOpen(false);
+        }}
       />
     </div>
   );
