@@ -130,6 +130,11 @@ export default function SupportTickets() {
   const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
   const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
   const [attInstanceFilter, setAttInstanceFilter] = useState<string>("all");
+  const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
+  const [clienteFilterName, setClienteFilterName] = useState<string>("");
+  const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
+  const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
