@@ -75,6 +75,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [departamentoFilter, setDepartamentoFilter] = useState<string>("all");
   const [closureTypeFilter, setClosureTypeFilter] = useState<string>("all");
+  const [csatFilter, setCsatFilter] = useState<string>("all");
+  const [csatScoreFilter, setCsatScoreFilter] = useState<string>("all");
+  const [ticketFilter, setTicketFilter] = useState<string>("all");
+  const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,7 +86,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
