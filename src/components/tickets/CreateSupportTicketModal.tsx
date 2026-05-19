@@ -1267,7 +1267,15 @@ export function CreateSupportTicketModal({
                 <Clock className="h-3 w-3 shrink-0" />
                 <span className="text-[10px] uppercase tracking-wide">Tempo agente</span>
               </div>
-              <p className="text-xs pl-5">0 min</p>
+              <p className="text-xs pl-5">
+                {fromClosure && closureHandleSeconds
+                  ? closureHandleSeconds >= 3600
+                    ? `${Math.floor(closureHandleSeconds / 3600)}h ${Math.floor((closureHandleSeconds % 3600) / 60)}min`
+                    : closureHandleSeconds >= 60
+                      ? `${Math.floor(closureHandleSeconds / 60)} min`
+                      : `${closureHandleSeconds}s`
+                  : "0 min"}
+              </p>
             </div>
           </div>
         </div>
