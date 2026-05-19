@@ -74,6 +74,7 @@ export default function AppLayout() {
             </div>
             <div className="flex items-center gap-3">
               <NotificationPermissionBanner />
+              <UnidadeSelector />
               <NotificationBell />
               <TenantSelector />
               <ThemeToggle />
