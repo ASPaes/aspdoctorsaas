@@ -150,8 +150,10 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
           <AssignmentRulesManager />
         </TabsContent>
 
-        <TabsContent value="setores" className="mt-4">
+        <TabsContent value="setores" className="mt-4 space-y-4">
+          <UnidadesBaseConfig />
           <SetoresInstanciasTab />
+        </TabsContent>
         </TabsContent>
 
         <TabsContent value="seguranca" className="mt-4">
