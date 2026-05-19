@@ -25,6 +25,7 @@ export default function SetoresInstanciasTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [welcomeMsg, setWelcomeMsg] = useState("");
   const { instances } = useWhatsAppInstances();
 
   const { data: departments = [] } = useQuery({
