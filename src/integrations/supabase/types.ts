@@ -6962,6 +6962,10 @@ export type Database = {
       is_tenant_active_member: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
       is_tenant_admin_or_head: { Args: never; Returns: boolean }
+      link_cliente_to_attendance: {
+        Args: { p_attendance_id: string; p_cliente_id: string }
+        Returns: undefined
+      }
       mark_all_mentions_seen: { Args: never; Returns: undefined }
       mark_all_notifications_read: { Args: never; Returns: undefined }
       mark_conversation_notifications_read: {
