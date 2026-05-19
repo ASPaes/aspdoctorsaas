@@ -755,7 +755,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         tenantId={tid}
         dateFrom={dateRange.from}
         dateTo={dateRange.to}
-        departmentId={effectiveDeptFilter !== "all" ? effectiveDeptFilter : undefined}
+        initialDepartmentId={effectiveDeptFilter !== "all" ? effectiveDeptFilter : undefined}
         scoreMax={csatScale ?? 5}
       />
     </div>

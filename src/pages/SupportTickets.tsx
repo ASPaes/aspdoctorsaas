@@ -1327,7 +1327,7 @@ export default function SupportTickets() {
         tenantId={tid}
         dateFrom={dateRange.from}
         dateTo={dateRange.to}
-        departmentId={departmentFilter}
+        initialDepartmentId={departmentFilter}
         scoreMax={csatScale ?? 5}
       />
     </div>
