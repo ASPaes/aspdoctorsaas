@@ -442,13 +442,19 @@ export function CreateSupportTicketModal({
 
   useEffect(() => {
     if (ticketStatuses.length > 0) {
-      const initial = ticketStatuses.find((s) => s.is_initial);
-      if (initial) setStatusId(initial.id);
-      else setStatusId(ticketStatuses[0].id);
+      if (fromClosure) {
+        const terminal = ticketStatuses.find((s) => s.is_terminal);
+        if (terminal) setStatusId(terminal.id);
+        else setStatusId(ticketStatuses[ticketStatuses.length - 1].id);
+      } else {
+        const initial = ticketStatuses.find((s) => s.is_initial);
+        if (initial) setStatusId(initial.id);
+        else setStatusId(ticketStatuses[0].id);
+      }
     } else {
       setStatusId("");
     }
-  }, [ticketStatuses]);
+  }, [ticketStatuses, fromClosure]);
 
   const addChecklistItem = () => {
     const t = newChecklistItem.trim();
