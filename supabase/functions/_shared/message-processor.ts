@@ -716,7 +716,7 @@ export async function sendUraWelcome(supabase: any, ctx: SendContext, conversati
               .replace(/\{nome\}/gi, customerName)
               .replace(/\{atendimento\}/gi, attendanceCode || '');
 
-            await sendAutoReply(supabase, ctx, conversationId, msg, attendanceId);
+            await sendAndPersistAutoMessage(supabase, ctx, conversationId, msg, { welcome: true, attendance_id: attendanceId });
           }
         }
       } catch (e) {
