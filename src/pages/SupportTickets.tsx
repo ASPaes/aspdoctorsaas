@@ -592,6 +592,7 @@ export default function SupportTickets() {
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
       if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
+      if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
 
       if (tagFilters.length > 0) {
         const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)

@@ -229,6 +229,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         p_ticket_filter: effectiveTicketFilter !== "all" ? effectiveTicketFilter : null,
         p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
         p_cliente_id: clienteIdOverride ?? null,
+        p_unidade_base_id: selectedUnidadeId ?? null,
       });
       if (error) throw error;
       return data as {
@@ -257,7 +258,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ai_problem, ai_solution, ticket_id, cliente_id, contact_id, department_id,
           csat_sent, csat_score, last_sentiment,
-          contact_name, contact_phone, instance_id,
+          contact_name, contact_phone, instance_id, unidade_base_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -282,6 +283,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
       if (clienteIdOverride) q = q.eq("cliente_id", clienteIdOverride);
+      if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (debouncedSearch.trim().length >= 2) {
         const s = debouncedSearch.trim().replace(/[%,()]/g, "");
         q = q.or(`attendance_code.ilike.%${s}%,contact_name.ilike.%${s}%,contact_phone.ilike.%${s}%`);
