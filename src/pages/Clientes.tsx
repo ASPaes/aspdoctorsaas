@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { format, parseISO } from "date-fns";
 import { cn, escapeLike } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
