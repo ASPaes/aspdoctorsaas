@@ -106,6 +106,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [ticketModalAtt, setTicketModalAtt] = useState<any>(null);
   const [linkingAttId, setLinkingAttId] = useState<string | null>(null);
   const [linkClienteSearch, setLinkClienteSearch] = useState("");
   const [isLinking, setIsLinking] = useState(false);
