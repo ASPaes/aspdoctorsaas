@@ -597,9 +597,188 @@ export default function HorarioPlantaoTab() {
         </AccordionItem>
 
         {/* ════════════════════════════════════════════════════════════ */}
+        {/* SECTION A.5: DEPARTMENT BUSINESS HOURS                     */}
+        {/* ════════════════════════════════════════════════════════════ */}
+        <AccordionItem value="horario-setor" className="border rounded-lg">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              <span className="font-semibold text-base">Horário por Setor</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Configure horários de atendimento específicos por setor. Setores sem horário próprio usam o horário global.
+            </p>
+
+            {deptCustomCount > 0 && (
+              <Badge variant="outline" className="border-primary/40 text-primary gap-1">
+                <Clock className="h-3 w-3" />
+                {deptCustomCount} setor(es) com horário personalizado
+              </Badge>
+            )}
+
+            {deptRows.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum setor ativo cadastrado.</p>
+            )}
+
+            <div className="space-y-2">
+              {deptRows.map((dept) => {
+                const edit = deptEdits[dept.id];
+                const isOpen = openDepts.has(dept.id);
+                const enabled = edit?.enabled ?? !!dept.business_hours_enabled;
+                return (
+                  <div
+                    key={dept.id}
+                    className={`border rounded-lg ${enabled ? "border-primary/30" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleDeptOpen(dept.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/40 rounded-lg"
+                    >
+                      <span className="font-semibold text-sm flex-1">{dept.name}</span>
+                      {enabled ? (
+                        <Badge className="bg-primary/15 text-primary text-[10px] hover:bg-primary/20">
+                          Personalizado
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Globe className="h-3 w-3" />
+                          Horário global
+                        </span>
+                      )}
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {isOpen && edit && (
+                      <div className="border-t px-3 py-3 space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={edit.enabled}
+                            onCheckedChange={(v) => updateDeptEnabled(dept.id, !!v)}
+                            id={`dept-bh-${dept.id}`}
+                          />
+                          <Label htmlFor={`dept-bh-${dept.id}`}>
+                            Horário personalizado para este setor
+                          </Label>
+                        </div>
+
+                        {edit.enabled && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Grade semanal</Label>
+                              <div className="rounded-lg border divide-y">
+                                {DAY_KEYS.map((day) => {
+                                  const s = edit.schedule[day];
+                                  return (
+                                    <div key={day} className="px-3 py-2 space-y-1">
+                                      <div className="flex items-center gap-3">
+                                        <Checkbox
+                                          checked={s.active}
+                                          onCheckedChange={(v) => updateDeptDayActive(dept.id, day, !!v)}
+                                          id={`dept-${dept.id}-day-${day}`}
+                                        />
+                                        <Label
+                                          htmlFor={`dept-${dept.id}-day-${day}`}
+                                          className="w-20 text-sm font-medium"
+                                        >
+                                          {DAY_LABELS[day]}
+                                        </Label>
+                                        {s.active && s.slots.length < 2 && (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="ml-auto h-7 text-xs"
+                                            onClick={() => addDeptSlot(dept.id, day)}
+                                          >
+                                            <Plus className="h-3 w-3 mr-1" />
+                                            Intervalo
+                                          </Button>
+                                        )}
+                                      </div>
+                                      {s.active && s.slots.map((slot, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 ml-8">
+                                          <span className="text-xs text-muted-foreground w-14 shrink-0">
+                                            Turno {idx + 1}
+                                          </span>
+                                          <Input
+                                            type="time"
+                                            value={slot.start}
+                                            onChange={(e) => updateDeptSlot(dept.id, day, idx, "start", e.target.value)}
+                                            className="w-28"
+                                          />
+                                          <span className="text-muted-foreground text-sm">às</span>
+                                          <Input
+                                            type="time"
+                                            value={slot.end}
+                                            onChange={(e) => updateDeptSlot(dept.id, day, idx, "end", e.target.value)}
+                                            className="w-28"
+                                          />
+                                          {s.slots.length > 1 && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-7 w-7 text-destructive"
+                                              onClick={() => removeDeptSlot(dept.id, day, idx)}
+                                              title="Remover turno"
+                                            >
+                                              <X className="h-3.5 w-3.5" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label>Mensagem fora do horário do setor</Label>
+                              <Textarea
+                                value={edit.message}
+                                onChange={(e) => updateDeptMessage(dept.id, e.target.value)}
+                                rows={3}
+                                placeholder="Ex: O setor de Suporte atende de seg a sex, das 8h às 18h..."
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Deixe em branco para usar a mensagem global.
+                              </p>
+                            </div>
+                          </>
+                        )}
+
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveDept(dept.id, dept.name)}
+                          disabled={savingDeptId === dept.id}
+                        >
+                          {savingDeptId === dept.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-1" />
+                          )}
+                          Salvar horário
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION A.2: HOLIDAYS / EXCEPTIONS                         */}
         {/* ════════════════════════════════════════════════════════════ */}
         <BusinessHoursExceptionsSection />
+
 
         {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION B: AI OFF-HOURS                                    */}
