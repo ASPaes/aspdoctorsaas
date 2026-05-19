@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw } from "lucide-react";
+import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -19,6 +19,23 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onCreated?: () => void;
   defaultDepartmentId?: string;
+  // Closure mode props
+  fromClosure?: boolean;
+  attendanceId?: string | null;
+  closureClienteId?: string | null;
+  closureClienteNome?: string | null;
+  closureClienteCodigo?: number | null;
+  closureProdutoId?: number | null;
+  closureDepartmentId?: string | null;
+  closureResponsavelId?: string | null;
+  closureAiSummary?: string | null;
+  closureAiTopics?: string[] | null;
+  closureAiKeywords?: string[] | null;
+  closureAiProblem?: string | null;
+  closureAiSolution?: string | null;
+  closureSentimentLabel?: string | null;
+  closureSentimentConfidence?: number | null;
+  closureSentimentSummary?: string | null;
 }
 
 const Req = () => <span className="text-destructive">*</span>;
@@ -42,7 +59,28 @@ const defaultPrevisao = () => {
   return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
 };
 
-export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaultDepartmentId }: Props) {
+export function CreateSupportTicketModal({
+  open,
+  onOpenChange,
+  onCreated,
+  defaultDepartmentId,
+  fromClosure = false,
+  attendanceId = null,
+  closureClienteId = null,
+  closureClienteNome = null,
+  closureClienteCodigo = null,
+  closureProdutoId = null,
+  closureDepartmentId = null,
+  closureResponsavelId = null,
+  closureAiSummary = null,
+  closureAiTopics = null,
+  closureAiKeywords = null,
+  closureAiProblem = null,
+  closureAiSolution = null,
+  closureSentimentLabel = null,
+  closureSentimentConfidence = null,
+  closureSentimentSummary = null,
+}: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
@@ -109,16 +147,34 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
   };
 
   useEffect(() => {
-    if (open) reset();
+    if (open) {
+      reset();
+      if (fromClosure) {
+        if (closureClienteId) {
+          setSelectedCliente({
+            id: closureClienteId,
+            nome_fantasia: closureClienteNome || null,
+            razao_social: null,
+            codigo_sequencial: closureClienteCodigo || null,
+            cnpj: null,
+          } as any);
+        }
+        if (closureProdutoId) setProdutoId(String(closureProdutoId));
+        setCanalOrigem("whatsapp");
+        if (closureDepartmentId) setDepartamentoId(closureDepartmentId);
+        if (closureResponsavelId) setResponsavelId(closureResponsavelId);
+        if (closureAiSummary) setObservacaoAgente(closureAiSummary);
+      }
+    }
   }, [open]);
 
   useEffect(() => {
-    if (open) {
+    if (open && !fromClosure) {
       supabase.auth.getUser().then(({ data }) => {
         if (data?.user?.id) setResponsavelId(data.user.id);
       });
     }
-  }, [open]);
+  }, [open, fromClosure]);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["create_manual_ticket_produtos", tid],
@@ -411,30 +467,44 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
 
     setIsSubmitting(true);
     try {
-      const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
-        p_cliente_id: selectedCliente.id,
-        p_produto_id: Number(produtoId),
-        p_category_id: categoryId,
-        p_subcategory_id: subcategoryId,
-        p_service_type_id: serviceTypeId,
-        p_canal_origem: canalOrigem,
-        p_tipo_horario: tipoHorario,
-        p_observacao_agente: observacaoAgente || null,
-        p_status_id: statusId || null,
-        p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
-        p_contact_id: null,
-        p_department_id: departamentoId,
-        p_responsavel_user_id: responsavelId || null,
-        p_cliente_contato_id: null,
-        p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
-      });
+      let ticketId: string | null = null;
 
-      if (error) throw error;
-
-      const ticketId =
-        typeof rpcData === "string"
-          ? rpcData
-          : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+      if (fromClosure && attendanceId) {
+        const { data: rpcData, error } = await (supabase.rpc as any)("create_ticket_from_closure", {
+          p_attendance_id: attendanceId,
+          p_produto_id: Number(produtoId),
+          p_category_id: categoryId,
+          p_subcategory_id: subcategoryId,
+          p_service_type_id: serviceTypeId,
+          p_observacao_agente: observacaoAgente || null,
+          p_observacao_ia: closureAiSummary || null,
+          p_tipo_horario: tipoHorario,
+          p_department_id: departamentoId || null,
+          p_responsavel_user_id: responsavelId || null,
+        });
+        if (error) throw error;
+        ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+      } else {
+        const { data: rpcData, error } = await (supabase.rpc as any)("create_manual_ticket", {
+          p_cliente_id: selectedCliente.id,
+          p_produto_id: Number(produtoId),
+          p_category_id: categoryId,
+          p_subcategory_id: subcategoryId,
+          p_service_type_id: serviceTypeId,
+          p_canal_origem: canalOrigem,
+          p_tipo_horario: tipoHorario,
+          p_observacao_agente: observacaoAgente || null,
+          p_status_id: statusId || null,
+          p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
+          p_contact_id: null,
+          p_department_id: departamentoId,
+          p_responsavel_user_id: responsavelId || null,
+          p_cliente_contato_id: null,
+          p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
+        });
+        if (error) throw error;
+        ticketId = typeof rpcData === "string" ? rpcData : (rpcData as any)?.ticket_id ?? (rpcData as any)?.id ?? null;
+      }
 
       if (ticketId) {
         if (selectedTagIds.length > 0) {
@@ -513,7 +583,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
       <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
-          <h3 className="text-base font-medium">Novo ticket</h3>
+          <h3 className="text-base font-medium">{fromClosure ? "Classificar atendimento" : "Novo ticket"}</h3>
           <div className="flex items-center gap-1.5">
             {(() => {
               const currentStatus = ticketStatuses.find(s => s.id === statusId);
@@ -584,7 +654,7 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
           </Select>
 
           {/* Canal */}
-          <Select value={canalOrigem} onValueChange={setCanalOrigem}>
+          <Select value={canalOrigem} onValueChange={setCanalOrigem} disabled={fromClosure}>
             <SelectTrigger className="h-auto w-auto border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <CanalIcon className="h-3 w-3 shrink-0" />
@@ -692,20 +762,22 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
                     <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
                     {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
                   </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 shrink-0"
-                    onClick={() => {
-                      setSelectedCliente(null);
-                      setProdutoId("");
-                      setClienteSearchTerm("");
-                      setContatoSolicitante("");
-                    }}
-                  >
-                    Trocar
-                  </Button>
+                  {!fromClosure && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0"
+                      onClick={() => {
+                        setSelectedCliente(null);
+                        setProdutoId("");
+                        setClienteSearchTerm("");
+                        setContatoSolicitante("");
+                      }}
+                    >
+                      Trocar
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="relative space-y-1">
@@ -814,6 +886,49 @@ export function CreateSupportTicketModal({ open, onOpenChange, onCreated, defaul
                 <p className="text-[10px] text-muted-foreground">Busca nos contatos do cliente. Use + para cadastrar.</p>
               </div>
             </div>
+
+            {fromClosure && ((closureAiTopics?.length ?? 0) > 0 || closureSentimentLabel || closureAiSummary || closureAiProblem) && (
+              <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <Bot className="h-3.5 w-3.5" />
+                  Contexto IA do atendimento
+                </div>
+                {closureAiTopics && closureAiTopics.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Tópicos</p>
+                    <div className="flex flex-wrap gap-1">
+                      {closureAiTopics.map((topic, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md text-[10px] bg-background border border-border">{topic}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {closureSentimentLabel && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">Sentimento:</span>
+                    <span className={
+                      closureSentimentLabel === 'negative' ? 'text-red-400' :
+                      closureSentimentLabel === 'positive' ? 'text-green-400' :
+                      'text-muted-foreground'
+                    }>
+                      {closureSentimentLabel === 'negative' ? 'Negativo' : closureSentimentLabel === 'positive' ? 'Positivo' : 'Neutro'}
+                    </span>
+                  </div>
+                )}
+                {(closureSentimentSummary || closureAiSummary) && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Resumo</p>
+                    <p className="text-xs text-muted-foreground italic">{closureSentimentSummary || closureAiSummary}</p>
+                  </div>
+                )}
+                {closureAiProblem && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Problema</p>
+                    <p className="text-xs text-muted-foreground">{closureAiProblem}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Classificação */}
             <div className="space-y-2">

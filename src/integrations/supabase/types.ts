@@ -6572,12 +6572,14 @@ export type Database = {
         Args: {
           p_attendance_id: string
           p_category_id: string
-          p_observacao_agente?: string
-          p_observacao_ia?: string
-          p_produto_id?: number
-          p_service_type_id?: string
-          p_subcategory_id?: string
-          p_tipo_horario?: string
+          p_department_id?: string
+          p_observacao_agente: string
+          p_observacao_ia: string
+          p_produto_id: number
+          p_responsavel_user_id?: string
+          p_service_type_id: string
+          p_subcategory_id: string
+          p_tipo_horario: string
         }
         Returns: string
       }

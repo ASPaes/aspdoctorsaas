@@ -30,7 +30,7 @@ import { SentimentChip } from "./SentimentChip";
 import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
-import { ClassifyClosureModal } from "@/components/tickets/ClassifyClosureModal";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
@@ -661,15 +661,26 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         requiresCliente={convDepartment?.requires_ticket_on_close === true}
       />
 
-      <ClassifyClosureModal
+      <CreateSupportTicketModal
         open={showClassifyModal}
         onOpenChange={(o) => { if (!o) setShowClassifyModal(false); }}
-        attendanceId={attendance?.id ?? ""}
-        contactName={contact?.name}
-        clienteName={linkedClienteName ?? undefined}
-        clienteProdutoId={(linkedCliente as any)?.produto_id ?? null}
-        aiSummary={(attendance as any)?.ai_summary ?? null}
         onCreated={handleClassifyCompleted}
+        fromClosure
+        attendanceId={attendance?.id ?? null}
+        closureClienteId={(linkedCliente as any)?.id ?? null}
+        closureClienteNome={linkedClienteName ?? null}
+        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
+        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureDepartmentId={(conversation as any).department_id ?? null}
+        closureResponsavelId={attendance?.assigned_to ?? null}
+        closureAiSummary={(attendance as any)?.ai_summary ?? null}
+        closureAiTopics={(attendance as any)?.ai_topics ?? null}
+        closureAiKeywords={(attendance as any)?.ai_keywords ?? null}
+        closureAiProblem={(attendance as any)?.ai_problem ?? null}
+        closureAiSolution={(attendance as any)?.ai_solution ?? null}
+        closureSentimentLabel={sentimentData?.sentiment ?? null}
+        closureSentimentConfidence={sentimentData?.confidence ?? null}
+        closureSentimentSummary={sentimentData?.summary ?? null}
       />
 
       {/* Modal de confirmação de encerramento */}
