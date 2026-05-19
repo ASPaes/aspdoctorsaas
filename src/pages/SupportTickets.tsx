@@ -853,11 +853,6 @@ export default function SupportTickets() {
               </div>
             ) : ticketsView === "atendimentos" ? (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">Filtros aplicados diretamente nos atendimentos</p>
-                <p className="text-xs text-muted-foreground italic">Os filtros de status e tipo de encerramento estão disponíveis dentro da view de atendimentos.</p>
-              </div>
-            ) : ticketsView === "atendimentos" ? (
-              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">Tipo encerramento</label>
