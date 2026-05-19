@@ -58,6 +58,7 @@ export function AttendanceChatHistoryModal({
   contactName,
   openedAt,
   closedAt,
+  csatRespondedAt,
 }: Props) {
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
