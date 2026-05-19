@@ -6714,6 +6714,7 @@ export type Database = {
       get_attendance_summary_metrics: {
         Args: {
           p_agent_id?: string
+          p_cliente_id?: string
           p_closure_type?: string
           p_csat_filter?: string
           p_csat_score?: number

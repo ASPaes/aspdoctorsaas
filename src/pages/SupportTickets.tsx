@@ -4,7 +4,8 @@ import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove 
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2 } from "lucide-react";
+import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
@@ -129,6 +130,11 @@ export default function SupportTickets() {
   const [attTicketFilter, setAttTicketFilter] = useState<string>("all");
   const [attSentimentFilter, setAttSentimentFilter] = useState<string>("all");
   const [attInstanceFilter, setAttInstanceFilter] = useState<string>("all");
+  const [clienteFilterId, setClienteFilterId] = useState<string | null>(null);
+  const [clienteFilterName, setClienteFilterName] = useState<string>("");
+  const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
+  const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
   const queryClient = useQueryClient();
 
   const handleKanbanStatusChange = async (ticketId: string, newStatusId: string) => {
@@ -542,7 +548,7 @@ export default function SupportTickets() {
   };
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -581,6 +587,7 @@ export default function SupportTickets() {
       if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
+      if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
 
       if (tagFilters.length > 0) {
         const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
@@ -739,6 +746,84 @@ export default function SupportTickets() {
             className="h-9 pl-9 text-sm"
           />
         </div>
+        <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-9 gap-1.5 max-w-[220px] ${clienteFilterId ? "border-primary text-primary" : ""}`}
+            >
+              <Building2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{clienteFilterId ? clienteFilterName : "Cliente"}</span>
+              {clienteFilterId && (
+                <X
+                  className="h-3.5 w-3.5 shrink-0 opacity-70 hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setClienteFilterId(null);
+                    setClienteFilterName("");
+                    setClienteSearchTerm("");
+                  }}
+                />
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-[320px] p-2">
+            <div className="relative mb-2">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Nome, CNPJ, código ou telefone"
+                value={clienteSearchTerm}
+                onChange={(e) => setClienteSearchTerm(e.target.value)}
+                className="h-8 pl-7 text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-[280px] overflow-y-auto space-y-0.5">
+              {clienteSearchLoading && (
+                <div className="text-xs text-muted-foreground px-2 py-3 text-center">Buscando...</div>
+              )}
+              {!clienteSearchLoading && clienteSearchTerm.length < 2 && (
+                <div className="text-xs text-muted-foreground px-2 py-3 text-center">Digite ao menos 2 caracteres</div>
+              )}
+              {!clienteSearchLoading && clienteSearchTerm.length >= 2 && clienteSearchResults.length === 0 && (
+                <div className="text-xs text-muted-foreground px-2 py-3 text-center">Nenhum cliente encontrado</div>
+              )}
+              {clienteSearchResults.map((c: any) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setClienteFilterId(c.id);
+                    setClienteFilterName(c.nome_fantasia || c.razao_social || `#${c.codigo_sequencial}`);
+                    setClienteSearchTerm("");
+                    setClientePopoverOpen(false);
+                  }}
+                  className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors ${clienteFilterId === c.id ? "bg-primary/10 text-primary" : ""}`}
+                >
+                  <div className="truncate font-medium">
+                    {c.codigo_sequencial ? `#${c.codigo_sequencial} ` : ""}{c.nome_fantasia || c.razao_social || "Sem nome"}
+                  </div>
+                  {c.cnpj && <div className="text-[11px] text-muted-foreground font-mono truncate">{c.cnpj}</div>}
+                </button>
+              ))}
+            </div>
+            {clienteFilterId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setClienteFilterId(null);
+                  setClienteFilterName("");
+                  setClienteSearchTerm("");
+                  setClientePopoverOpen(false);
+                }}
+                className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-accent transition-colors"
+              >
+                Limpar filtro de cliente
+              </button>
+            )}
+          </PopoverContent>
+        </Popover>
         <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -1213,7 +1298,7 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} />;
+        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} clienteIdOverride={clienteFilterId} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
