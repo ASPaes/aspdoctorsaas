@@ -220,6 +220,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveTicketFilter === "with") q = q.not("ticket_id", "is", null);
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
+      if (search.trim().length >= 2) {
+        const s = search.trim().replace(/[%,()]/g, "");
+        q = q.ilike("attendance_code", `%${s}%`);
+      }
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
