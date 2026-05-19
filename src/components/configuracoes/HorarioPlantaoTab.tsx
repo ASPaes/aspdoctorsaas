@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Clock, Bot, Phone, X, Plus, Building2, Globe, ChevronDown } from "lucide-react";
+import { Save, Loader2, Clock, Bot, Phone, X, Plus } from "lucide-react";
 import { normalizeBRPhone, formatBRPhone, maskBRPhoneLive } from "@/lib/phoneBR";
 import BusinessHoursExceptionsSection from "./BusinessHoursExceptionsSection";
 import BusinessHoursHolidayTemplateSection from "./BusinessHoursHolidayTemplateSection";
@@ -152,6 +152,33 @@ export default function HorarioPlantaoTab() {
   const [bhMessage, setBhMessage] = useState("");
   const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
 
+  // ── Contexto: Global vs Setor ──
+  const [selectedContext, setSelectedContext] = useState<string>("global");
+
+  // ── Departments query (for context selector) ──
+  const { effectiveTenantId: deptTid } = useTenantFilter();
+  const qcDept = useQueryClient();
+  const { data: deptRows = [] } = useQuery({
+    queryKey: ["dept-business-hours", deptTid],
+    enabled: !!deptTid,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("support_departments" as any) as any)
+        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sort_order")
+        .eq("tenant_id", deptTid!)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; name: string;
+        business_hours_enabled: boolean | null;
+        business_hours: unknown;
+        business_hours_message: string | null;
+        sort_order: number | null;
+      }>;
+    },
+  });
+
   // ── Section B: AI off-hours ──
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
@@ -166,15 +193,42 @@ export default function HorarioPlantaoTab() {
   const [ocKeywords, setOcKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState("");
 
-  // Hydrate from DB
+  // Hydrate form fields based on selected context (global or department)
+  useEffect(() => {
+    if (selectedContext === "global") {
+      if (!config) return;
+      const c = config as Record<string, any>;
+      setBhEnabled(!!c.business_hours_enabled);
+      setBhTimezone((c.business_hours_timezone as string) || "America/Sao_Paulo");
+      setBhSchedule(parseBusinessHours(c.business_hours));
+      setBhMessage((c.business_hours_message as string) || "");
+      setBhOutsidePrompt((c.business_hours_outside_prompt as string) || "");
+    } else {
+      // Department context
+      const dept = deptRows.find((d) => d.id === selectedContext);
+      if (!dept) return;
+      const enabled = !!dept.business_hours_enabled;
+      setBhEnabled(enabled);
+      // Timezone is always global
+      if (config) setBhTimezone(((config as Record<string, any>).business_hours_timezone as string) || "America/Sao_Paulo");
+      if (enabled && dept.business_hours && Object.keys(dept.business_hours as object).length > 0) {
+        setBhSchedule(parseBusinessHours(dept.business_hours));
+      } else {
+        // Initialize with weekdays active
+        const fresh: BusinessHours = {};
+        DAY_KEYS.forEach((k) => (fresh[k] = { active: false, slots: [{ ...DEFAULT_SLOT }] }));
+        ["mon", "tue", "wed", "thu", "fri"].forEach((d) => (fresh[d].active = true));
+        setBhSchedule(fresh);
+      }
+      setBhMessage((dept.business_hours_message as string) || "");
+      setBhOutsidePrompt("");
+    }
+  }, [selectedContext, config, deptRows]);
+
+  // Hydrate AI + On-call (always from global config, independent of context)
   useEffect(() => {
     if (!config) return;
     const c = config as Record<string, any>;
-    setBhEnabled(!!c.business_hours_enabled);
-    setBhTimezone((c.business_hours_timezone as string) || "America/Sao_Paulo");
-    setBhSchedule(parseBusinessHours(c.business_hours));
-    setBhMessage((c.business_hours_message as string) || "");
-    setBhOutsidePrompt((c.business_hours_outside_prompt as string) || "");
     setAiEnabled(!!c.business_hours_ai_enabled);
     setAiPrompt((c.business_hours_ai_prompt as string) || "");
     const phone = c.oncall_phone_number as string | null;
@@ -260,26 +314,45 @@ export default function HorarioPlantaoTab() {
   }, [bhSchedule]);
 
   // ── Save handlers ──
-  const handleSaveBH = () => {
+  const handleSaveBH = async () => {
     const err = validateSlots();
     if (err) {
       toast({ title: "Erro de validação", description: err, variant: "destructive" });
       return;
     }
-    // Clean schedule: remove empty 2nd slots before saving
     const cleanSchedule: BusinessHours = {};
     for (const day of DAY_KEYS) {
       const d = bhSchedule[day];
       const validSlots = d.slots.filter((s) => s.start && s.end);
       cleanSchedule[day] = { active: d.active, slots: validSlots.length > 0 ? validSlots : [{ ...DEFAULT_SLOT }] };
     }
-    saveBH.mutate({
-      business_hours_enabled: bhEnabled,
-      business_hours_timezone: bhTimezone,
-      business_hours: cleanSchedule,
-      business_hours_message: bhMessage || null,
-      business_hours_outside_prompt: bhOutsidePrompt || null,
-    });
+
+    if (selectedContext === "global") {
+      saveBH.mutate({
+        business_hours_enabled: bhEnabled,
+        business_hours_timezone: bhTimezone,
+        business_hours: cleanSchedule,
+        business_hours_message: bhMessage || null,
+        business_hours_outside_prompt: bhOutsidePrompt || null,
+      });
+    } else {
+      // Save to department
+      try {
+        const { error } = await (supabase.from("support_departments" as any) as any)
+          .update({
+            business_hours_enabled: bhEnabled,
+            business_hours: cleanSchedule,
+            business_hours_message: bhMessage || null,
+          })
+          .eq("id", selectedContext);
+        if (error) throw error;
+        qcDept.invalidateQueries({ queryKey: ["dept-business-hours", deptTid] });
+        const deptName = deptRows.find((d) => d.id === selectedContext)?.name || "Setor";
+        toast({ title: `Horário do setor ${deptName} salvo!` });
+      } catch (err: any) {
+        toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+      }
+    }
   };
 
   const handleSaveAI = () => {
@@ -302,146 +375,6 @@ export default function HorarioPlantaoTab() {
     });
   };
 
-  // ═════════════════════════════════════════════════════════════════
-  // SECTION A.5: Department-level Business Hours
-  // ═════════════════════════════════════════════════════════════════
-  const { effectiveTenantId: deptTid } = useTenantFilter();
-  const qcDept = useQueryClient();
-  const { data: deptRows = [] } = useQuery({
-    queryKey: ["dept-business-hours", deptTid],
-    enabled: !!deptTid,
-    staleTime: 30_000,
-    queryFn: async () => {
-      const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sort_order")
-        .eq("tenant_id", deptTid!)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as Array<{
-        id: string; name: string;
-        business_hours_enabled: boolean | null;
-        business_hours: unknown;
-        business_hours_message: string | null;
-        sort_order: number | null;
-      }>;
-    },
-  });
-
-  const [openDepts, setOpenDepts] = useState<Set<string>>(new Set());
-  const [deptEdits, setDeptEdits] = useState<Record<string, { enabled: boolean; schedule: BusinessHours; message: string }>>({});
-  const [savingDeptId, setSavingDeptId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!deptRows.length) return;
-    setDeptEdits((prev) => {
-      const next = { ...prev };
-      for (const r of deptRows) {
-        if (!next[r.id]) {
-          next[r.id] = {
-            enabled: !!r.business_hours_enabled,
-            schedule: parseBusinessHours(r.business_hours),
-            message: r.business_hours_message || "",
-          };
-        }
-      }
-      return next;
-    });
-  }, [deptRows]);
-
-  const toggleDeptOpen = (id: string) => {
-    setOpenDepts((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const updateDeptEnabled = (id: string, enabled: boolean) => {
-    setDeptEdits((prev) => {
-      const cur = prev[id] ?? { enabled: false, schedule: parseBusinessHours({}), message: "" };
-      let schedule = cur.schedule;
-      if (enabled) {
-        // Initialize weekdays active if all inactive
-        const hasActive = DAY_KEYS.some((d) => schedule[d]?.active);
-        if (!hasActive) {
-          const fresh: BusinessHours = {};
-          DAY_KEYS.forEach((k) => (fresh[k] = { active: false, slots: [{ ...DEFAULT_SLOT }] }));
-          ["mon", "tue", "wed", "thu", "fri"].forEach((d) => (fresh[d].active = true));
-          schedule = fresh;
-        }
-      }
-      return { ...prev, [id]: { ...cur, enabled, schedule } };
-    });
-  };
-
-  const updateDeptDayActive = (id: string, day: string, active: boolean) => {
-    setDeptEdits((prev) => {
-      const cur = prev[id]; if (!cur) return prev;
-      return { ...prev, [id]: { ...cur, schedule: { ...cur.schedule, [day]: { ...cur.schedule[day], active } } } };
-    });
-  };
-  const updateDeptSlot = (id: string, day: string, slotIndex: number, field: keyof TimeSlot, value: string) => {
-    setDeptEdits((prev) => {
-      const cur = prev[id]; if (!cur) return prev;
-      const dayData = cur.schedule[day];
-      const newSlots = [...dayData.slots];
-      newSlots[slotIndex] = { ...newSlots[slotIndex], [field]: value };
-      return { ...prev, [id]: { ...cur, schedule: { ...cur.schedule, [day]: { ...dayData, slots: newSlots } } } };
-    });
-  };
-  const addDeptSlot = (id: string, day: string) => {
-    setDeptEdits((prev) => {
-      const cur = prev[id]; if (!cur) return prev;
-      const dayData = cur.schedule[day];
-      if (dayData.slots.length >= 2) return prev;
-      return { ...prev, [id]: { ...cur, schedule: { ...cur.schedule, [day]: { ...dayData, slots: [...dayData.slots, { start: "13:00", end: "18:00" }] } } } };
-    });
-  };
-  const removeDeptSlot = (id: string, day: string, slotIndex: number) => {
-    setDeptEdits((prev) => {
-      const cur = prev[id]; if (!cur) return prev;
-      const dayData = cur.schedule[day];
-      if (dayData.slots.length <= 1) return prev;
-      return { ...prev, [id]: { ...cur, schedule: { ...cur.schedule, [day]: { ...dayData, slots: dayData.slots.filter((_, i) => i !== slotIndex) } } } };
-    });
-  };
-  const updateDeptMessage = (id: string, message: string) => {
-    setDeptEdits((prev) => {
-      const cur = prev[id]; if (!cur) return prev;
-      return { ...prev, [id]: { ...cur, message } };
-    });
-  };
-
-  const handleSaveDept = async (id: string, name: string) => {
-    const edit = deptEdits[id];
-    if (!edit) return;
-    const cleanSchedule: BusinessHours = {};
-    for (const day of DAY_KEYS) {
-      const d = edit.schedule[day];
-      const validSlots = d.slots.filter((s) => s.start && s.end);
-      cleanSchedule[day] = { active: d.active, slots: validSlots.length > 0 ? validSlots : [{ ...DEFAULT_SLOT }] };
-    }
-    setSavingDeptId(id);
-    try {
-      const { error } = await (supabase.from("support_departments" as any) as any)
-        .update({
-          business_hours_enabled: edit.enabled,
-          business_hours: cleanSchedule,
-          business_hours_message: edit.message || null,
-        })
-        .eq("id", id);
-      if (error) throw error;
-      await qcDept.invalidateQueries({ queryKey: ["dept-business-hours", deptTid] });
-      toast({ title: `Horário do setor ${name} salvo!` });
-    } catch (err: any) {
-      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
-    } finally {
-      setSavingDeptId(null);
-    }
-  };
-
-  const deptCustomCount = deptRows.filter((r) => r.business_hours_enabled).length;
 
   if (isLoading) {
     return (
@@ -454,7 +387,7 @@ export default function HorarioPlantaoTab() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <Accordion type="multiple" defaultValue={["horario", "horario-setor", "feriados", "ai", "plantao"]} className="space-y-4">
+      <Accordion type="multiple" defaultValue={["horario", "feriados", "ai", "plantao"]} className="space-y-4">
         {/* ════════════════════════════════════════════════════════════ */}
         {/* SECTION A: BUSINESS HOURS                                  */}
         {/* ════════════════════════════════════════════════════════════ */}
@@ -466,28 +399,61 @@ export default function HorarioPlantaoTab() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4 space-y-5">
+            {/* Seletor de contexto: Global vs Setor */}
+            {deptRows.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Configurar horário para</Label>
+                <Select value={selectedContext} onValueChange={setSelectedContext}>
+                  <SelectTrigger className="w-72">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">
+                      🌐 Global (padrão)
+                    </SelectItem>
+                    {deptRows.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        📋 {dept.name} {dept.business_hours_enabled ? "✦" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {selectedContext === "global"
+                    ? "Horário padrão usado por setores sem configuração própria."
+                    : `Horário específico para o setor ${deptRows.find((d) => d.id === selectedContext)?.name || ""}.`}
+                </p>
+              </div>
+            )}
+
             {/* Toggle */}
             <div className="flex items-center gap-3">
               <Switch checked={bhEnabled} onCheckedChange={setBhEnabled} id="bh-enabled" />
-              <Label htmlFor="bh-enabled">Ativar controle de horário de atendimento</Label>
+              <Label htmlFor="bh-enabled">
+                {selectedContext === "global"
+                  ? "Ativar controle de horário de atendimento"
+                  : "Ativar horário personalizado para este setor"}
+              </Label>
             </div>
 
             {bhEnabled && (
               <>
-                {/* Timezone */}
-                <div className="space-y-1.5">
-                  <Label>Fuso horário</Label>
-                  <Select value={bhTimezone} onValueChange={setBhTimezone}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIMEZONES.map((tz) => (
-                        <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Timezone (only global) */}
+                {selectedContext === "global" && (
+                  <div className="space-y-1.5">
+                    <Label>Fuso horário</Label>
+                    <Select value={bhTimezone} onValueChange={setBhTimezone}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONES.map((tz) => (
+                          <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Day grid */}
                 <div className="space-y-2">
@@ -572,205 +538,29 @@ export default function HorarioPlantaoTab() {
                   </p>
                 </div>
 
-                {/* Outside hours AI prompt */}
-                <div className="space-y-1.5">
-                  <Label>Prompt da IA para mensagem fora do horário</Label>
-                  <Textarea
-                    value={bhOutsidePrompt}
-                    onChange={(e) => setBhOutsidePrompt(e.target.value)}
-                    rows={4}
-                    placeholder="Ex: Você é um atendente virtual simpático. Escreva uma mensagem curta e amigável informando que estamos fora do horário. Use a saudação correta pelo horário ({{greeting}}). Horário: {{slots}}. Retorno: {{next_start}}."
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Usado quando o tenant possui IA configurada. Deixe em branco para usar o prompt padrão.
-                    Variáveis disponíveis: <code className="text-xs">{"{{greeting}}"}</code>, <code className="text-xs">{"{{slots}}"}</code>, <code className="text-xs">{"{{next_start}}"}</code>, <code className="text-xs">{"{{slot1_start}}"}</code>, <code className="text-xs">{"{{slot1_end}}"}</code>, <code className="text-xs">{"{{slot2_start}}"}</code>, <code className="text-xs">{"{{slot2_end}}"}</code>
-                  </p>
-                </div>
+                {/* Outside hours AI prompt (only global) */}
+                {selectedContext === "global" && (
+                  <div className="space-y-1.5">
+                    <Label>Prompt da IA para mensagem fora do horário</Label>
+                    <Textarea
+                      value={bhOutsidePrompt}
+                      onChange={(e) => setBhOutsidePrompt(e.target.value)}
+                      rows={4}
+                      placeholder="Ex: Você é um atendente virtual simpático. Escreva uma mensagem curta e amigável informando que estamos fora do horário. Use a saudação correta pelo horário ({{greeting}}). Horário: {{slots}}. Retorno: {{next_start}}."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Usado quando o tenant possui IA configurada. Deixe em branco para usar o prompt padrão.
+                      Variáveis disponíveis: <code className="text-xs">{"{{greeting}}"}</code>, <code className="text-xs">{"{{slots}}"}</code>, <code className="text-xs">{"{{next_start}}"}</code>, <code className="text-xs">{"{{slot1_start}}"}</code>, <code className="text-xs">{"{{slot1_end}}"}</code>, <code className="text-xs">{"{{slot2_start}}"}</code>, <code className="text-xs">{"{{slot2_end}}"}</code>
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
             <Button onClick={handleSaveBH} disabled={saveBH.isPending} size="sm">
               {saveBH.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              Salvar Horário
+              {selectedContext === "global" ? "Salvar Horário" : `Salvar Horário - ${deptRows.find((d) => d.id === selectedContext)?.name || "Setor"}`}
             </Button>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* ════════════════════════════════════════════════════════════ */}
-        {/* SECTION A.5: DEPARTMENT BUSINESS HOURS                     */}
-        {/* ════════════════════════════════════════════════════════════ */}
-        <AccordionItem value="horario-setor" className="border rounded-lg">
-          <AccordionTrigger className="px-4 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <span className="font-semibold text-base">Horário por Setor</span>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="px-4 pb-4 space-y-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              Configure horários de atendimento específicos por setor. Setores sem horário próprio usam o horário global.
-            </p>
-
-            {deptCustomCount > 0 && (
-              <Badge variant="outline" className="border-primary/40 text-primary gap-1">
-                <Clock className="h-3 w-3" />
-                {deptCustomCount} setor(es) com horário personalizado
-              </Badge>
-            )}
-
-            {deptRows.length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum setor ativo cadastrado.</p>
-            )}
-
-            <div className="space-y-2">
-              {deptRows.map((dept) => {
-                const edit = deptEdits[dept.id];
-                const isOpen = openDepts.has(dept.id);
-                const enabled = edit?.enabled ?? !!dept.business_hours_enabled;
-                return (
-                  <div
-                    key={dept.id}
-                    className={`border rounded-lg ${enabled ? "border-primary/30" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleDeptOpen(dept.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/40 rounded-lg"
-                    >
-                      <span className="font-semibold text-sm flex-1">{dept.name}</span>
-                      {enabled ? (
-                        <Badge className="bg-primary/15 text-primary text-[10px] hover:bg-primary/20">
-                          Personalizado
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Globe className="h-3 w-3" />
-                          Horário global
-                        </span>
-                      )}
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    {isOpen && edit && (
-                      <div className="border-t px-3 py-3 space-y-4">
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={edit.enabled}
-                            onCheckedChange={(v) => updateDeptEnabled(dept.id, !!v)}
-                            id={`dept-bh-${dept.id}`}
-                          />
-                          <Label htmlFor={`dept-bh-${dept.id}`}>
-                            Horário personalizado para este setor
-                          </Label>
-                        </div>
-
-                        {edit.enabled && (
-                          <>
-                            <div className="space-y-2">
-                              <Label>Grade semanal</Label>
-                              <div className="rounded-lg border divide-y">
-                                {DAY_KEYS.map((day) => {
-                                  const s = edit.schedule[day];
-                                  return (
-                                    <div key={day} className="px-3 py-2 space-y-1">
-                                      <div className="flex items-center gap-3">
-                                        <Checkbox
-                                          checked={s.active}
-                                          onCheckedChange={(v) => updateDeptDayActive(dept.id, day, !!v)}
-                                          id={`dept-${dept.id}-day-${day}`}
-                                        />
-                                        <Label
-                                          htmlFor={`dept-${dept.id}-day-${day}`}
-                                          className="w-20 text-sm font-medium"
-                                        >
-                                          {DAY_LABELS[day]}
-                                        </Label>
-                                        {s.active && s.slots.length < 2 && (
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="ml-auto h-7 text-xs"
-                                            onClick={() => addDeptSlot(dept.id, day)}
-                                          >
-                                            <Plus className="h-3 w-3 mr-1" />
-                                            Intervalo
-                                          </Button>
-                                        )}
-                                      </div>
-                                      {s.active && s.slots.map((slot, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 ml-8">
-                                          <span className="text-xs text-muted-foreground w-14 shrink-0">
-                                            Turno {idx + 1}
-                                          </span>
-                                          <Input
-                                            type="time"
-                                            value={slot.start}
-                                            onChange={(e) => updateDeptSlot(dept.id, day, idx, "start", e.target.value)}
-                                            className="w-28"
-                                          />
-                                          <span className="text-muted-foreground text-sm">às</span>
-                                          <Input
-                                            type="time"
-                                            value={slot.end}
-                                            onChange={(e) => updateDeptSlot(dept.id, day, idx, "end", e.target.value)}
-                                            className="w-28"
-                                          />
-                                          {s.slots.length > 1 && (
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-7 w-7 text-destructive"
-                                              onClick={() => removeDeptSlot(dept.id, day, idx)}
-                                              title="Remover turno"
-                                            >
-                                              <X className="h-3.5 w-3.5" />
-                                            </Button>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <Label>Mensagem fora do horário do setor</Label>
-                              <Textarea
-                                value={edit.message}
-                                onChange={(e) => updateDeptMessage(dept.id, e.target.value)}
-                                rows={3}
-                                placeholder="Ex: O setor de Suporte atende de seg a sex, das 8h às 18h..."
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Deixe em branco para usar a mensagem global.
-                              </p>
-                            </div>
-                          </>
-                        )}
-
-                        <Button
-                          size="sm"
-                          onClick={() => handleSaveDept(dept.id, dept.name)}
-                          disabled={savingDeptId === dept.id}
-                        >
-                          {savingDeptId === dept.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                          ) : (
-                            <Save className="h-4 w-4 mr-1" />
-                          )}
-                          Salvar horário
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </AccordionContent>
         </AccordionItem>
 
