@@ -3998,6 +3998,7 @@ export type Database = {
           ura_label: string | null
           ura_option_number: number | null
           usa_tickets: boolean
+          welcome_message: string | null
         }
         Insert: {
           created_at?: string
@@ -4016,6 +4017,7 @@ export type Database = {
           ura_label?: string | null
           ura_option_number?: number | null
           usa_tickets?: boolean
+          welcome_message?: string | null
         }
         Update: {
           created_at?: string
@@ -4034,6 +4036,7 @@ export type Database = {
           ura_label?: string | null
           ura_option_number?: number | null
           usa_tickets?: boolean
+          welcome_message?: string | null
         }
         Relationships: [
           {
