@@ -700,6 +700,15 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         open={detailOpen}
         onOpenChange={(o) => { setDetailOpen(o); if (!o) setSelectedId(null); }}
       />
+      <CsatReportModal
+        open={csatModalOpen}
+        onOpenChange={setCsatModalOpen}
+        tenantId={tid}
+        dateFrom={dateRange.from}
+        dateTo={dateRange.to}
+        departmentId={effectiveDeptFilter !== "all" ? effectiveDeptFilter : undefined}
+        scoreMax={csatScale ?? 5}
+      />
     </div>
   );
 }
