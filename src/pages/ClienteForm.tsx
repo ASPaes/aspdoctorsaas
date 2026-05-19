@@ -248,6 +248,8 @@ export default function ClienteForm() {
   const [showLegacy, setShowLegacy] = useState(false);
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+  const { selectedUnidadeId } = useUnidadeFilter();
+
 
   // Navigation between records
   const navInfo = useMemo(() => {
