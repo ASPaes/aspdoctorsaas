@@ -161,6 +161,8 @@ export default function SupportTickets() {
 
   const { data: profile } = useProfile(userId ?? undefined);
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
+  const [attSearchOverride, setAttSearchOverride] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (departmentFilter === "all" && ticketsView === "kanban") {
