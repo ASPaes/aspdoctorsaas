@@ -75,7 +75,7 @@ export function AttendanceChatHistoryModal({
       if (openedAt) q = q.gte("timestamp", openedAt);
       if (closedAt) {
         const closedPlus = new Date(
-          new Date(closedAt).getTime() + 5 * 60000
+          new Date(closedAt).getTime() + 20 * 60000
         ).toISOString();
         q = q.lte("timestamp", closedPlus);
       }
