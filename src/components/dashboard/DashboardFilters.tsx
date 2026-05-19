@@ -76,17 +76,6 @@ export function DashboardFilters({
 
       <DateRangePicker label="Período" value={dateRange} onChange={handleDateRangeChange} className="w-64" />
 
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Unidade</label>
-        <Select value={filters.unidadeBaseId?.toString() || 'geral'} onValueChange={v => onFiltersChange({ ...filters, unidadeBaseId: v === 'geral' ? null : Number(v) })}>
-          <SelectTrigger className={cn('w-[140px]', tvMode && 'h-12 text-lg')}><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="geral">Geral</SelectItem>
-            {unidadesBase.map(u => <SelectItem key={u.id} value={u.id.toString()}>{u.nome}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
       <div className="flex-1" />
 
       <div className="space-y-1">
