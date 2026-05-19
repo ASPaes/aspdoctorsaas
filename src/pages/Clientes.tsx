@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { format, parseISO } from "date-fns";
 import { cn, escapeLike } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
@@ -47,7 +48,16 @@ export default function Clientes() {
   const navigate = useNavigate();
   const { filters, updateFilter, clearAdvancedFilters } = useClientesFilters();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+
+  useEffect(() => {
+    if (selectedUnidadeId && !filters.unidadeBaseQuick) {
+      updateFilter("unidadeBaseQuick", String(selectedUnidadeId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUnidadeId]);
+
 
   // Destructure for readability
   const {
