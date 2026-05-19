@@ -54,6 +54,20 @@ export default function AppLayout() {
                       <DuplicateContactsTab />
                     </DialogContent>
                   </Dialog>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setNewTicketOpen(true)}
+                  >
+                    <TicketPlus className="h-3.5 w-3.5" />
+                    Novo Ticket
+                  </Button>
+                  <CreateSupportTicketModal
+                    open={newTicketOpen}
+                    onOpenChange={setNewTicketOpen}
+                    onCreated={() => setNewTicketOpen(false)}
+                  />
                 </>
               )}
             </div>
