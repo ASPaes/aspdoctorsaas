@@ -1300,7 +1300,7 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} clienteIdOverride={clienteFilterId} />;
+        return <Comp isAdminOrHead={isAdminOrHead} isAdmin={isAdmin} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} clienteIdOverride={clienteFilterId} searchOverride={attSearchOverride} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
