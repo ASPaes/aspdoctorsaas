@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import CrudTable, { type ColumnDef } from "@/components/CrudTable";
 import ProdutosModulosTab from "./ProdutosModulosTab";
+import UnidadesBaseConfig from "./UnidadesBaseConfig";
 
 function useDepartmentOptions() {
   const { effectiveTenantId: tid } = useTenantFilter();
@@ -223,6 +224,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
   if (section) {
     if (section === "produtos") return <ProdutosModulosTab />;
     const mapped = SECTION_TO_VALUE[section] ?? section;
+    if (mapped === "unidades_base") return <UnidadesBaseConfig />;
     const t = tabs.find((x) => x.value === mapped);
     if (!t) return null;
     return (
@@ -261,15 +263,19 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
 
         {tabs.map((t) => (
           <TabsContent key={t.value} value={t.value}>
-            <CrudTable
-              table={t.table}
-              queryKey={t.queryKey}
-              columns={t.columns}
-              orderBy={t.orderBy}
-              selectQuery={t.selectQuery}
-              onBeforeSave={t.onBeforeSave}
-              headerActions={t.headerActions}
-            />
+            {t.value === "unidades_base" ? (
+              <UnidadesBaseConfig />
+            ) : (
+              <CrudTable
+                table={t.table}
+                queryKey={t.queryKey}
+                columns={t.columns}
+                orderBy={t.orderBy}
+                selectQuery={t.selectQuery}
+                onBeforeSave={t.onBeforeSave}
+                headerActions={t.headerActions}
+              />
+            )}
           </TabsContent>
         ))}
       </Tabs>
