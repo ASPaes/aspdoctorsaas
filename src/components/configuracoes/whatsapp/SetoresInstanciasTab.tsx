@@ -45,6 +45,10 @@ export default function SetoresInstanciasTab() {
 
   const selectedDept = departments.find((d: any) => d.id === selectedId) ?? null;
 
+  useEffect(() => {
+    setWelcomeMsg(selectedDept?.welcome_message ?? "");
+  }, [selectedId, selectedDept?.welcome_message]);
+
   const { data: deptInstances = [] } = useQuery({
     queryKey: ["support_department_instances_wa", selectedId],
     enabled: !!selectedId,
