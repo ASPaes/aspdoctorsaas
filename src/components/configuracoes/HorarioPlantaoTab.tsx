@@ -438,20 +438,22 @@ export default function HorarioPlantaoTab() {
 
             {bhEnabled && (
               <>
-                {/* Timezone */}
-                <div className="space-y-1.5">
-                  <Label>Fuso horário</Label>
-                  <Select value={bhTimezone} onValueChange={setBhTimezone}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIMEZONES.map((tz) => (
-                        <SelectItem key={tz} value={tz}>{tz}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Timezone (only global) */}
+                {selectedContext === "global" && (
+                  <div className="space-y-1.5">
+                    <Label>Fuso horário</Label>
+                    <Select value={bhTimezone} onValueChange={setBhTimezone}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIMEZONES.map((tz) => (
+                          <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Day grid */}
                 <div className="space-y-2">
