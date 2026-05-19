@@ -127,7 +127,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, isAdminOrHead, userId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -140,6 +140,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
         p_tenant_id: tid,
+        p_csat_filter: csatFilter !== "all" ? csatFilter : null,
+        p_csat_score: csatScoreFilter !== "all" ? parseInt(csatScoreFilter) : null,
+        p_ticket_filter: ticketFilter !== "all" ? ticketFilter : null,
+        p_sentiment_filter: sentimentFilter !== "all" ? sentimentFilter : null,
       });
       if (error) throw error;
       return data as {
@@ -149,6 +153,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         median_first_response_seconds: number;
         avg_csat: number;
         csat_count: number;
+        csat_sent_count: number;
         total_closed: number;
         total_open: number;
       };
