@@ -245,6 +245,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
+      if (clienteIdOverride) q = q.eq("cliente_id", clienteIdOverride);
       if (debouncedSearch.trim().length >= 2) {
         const s = debouncedSearch.trim().replace(/[%,()]/g, "");
         q = q.or(`attendance_code.ilike.%${s}%,contact_name.ilike.%${s}%,contact_phone.ilike.%${s}%`);
