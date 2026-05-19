@@ -68,6 +68,7 @@ interface Props {
   sentimentFilterOverride?: string;
   instanceFilterOverride?: string;
   clienteIdOverride?: string | null;
+  searchOverride?: string;
 }
 
 function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride }: Props = {}) {
