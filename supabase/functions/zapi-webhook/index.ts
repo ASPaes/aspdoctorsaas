@@ -213,6 +213,19 @@ async function processZapiWebhook(req: Request): Promise<void> {
     content = payload.contacts.map((c: any) => c.displayName || c.name || '').filter(Boolean).join(', ');
   }
 
+  let mediaStoragePath: string | null = null;
+  if (mediaUrl && ['image', 'audio', 'video', 'document'].includes(messageType)) {
+    mediaStoragePath = await downloadAndUploadZapiMedia(
+      mediaUrl,
+      supabase,
+      instance.instance_name || `zapi_${zapiInstanceId}`,
+      messageId,
+      mediaMimetype || 'application/octet-stream',
+    );
+  }
+
+
+
   const instanceInfo: InstanceInfo = {
     id: instance.id,
     instance_name: instance.instance_name,
