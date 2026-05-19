@@ -79,6 +79,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const statusFilter = statusFilterOverride || internalStatusFilter;
   const setStatusFilter = statusFilterOverride ? () => {} : setInternalStatusFilter;
   const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [departamentoFilter, setDepartamentoFilter] = useState<string>("all");
   const [closureTypeFilter, setClosureTypeFilter] = useState<string>("all");
@@ -86,6 +91,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [csatScoreFilter, setCsatScoreFilter] = useState<string>("all");
   const [ticketFilter, setTicketFilter] = useState<string>("all");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
+  const [instanceFilter, setInstanceFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
