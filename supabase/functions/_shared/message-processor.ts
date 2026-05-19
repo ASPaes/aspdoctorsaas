@@ -1333,7 +1333,64 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const supportConfig = await getSupportConfig(supabase, tenantId);
 
   if (supportConfig.business_hours_enabled) {
-    const bh = await checkBusinessHours(supabase, ctx, conversationId, tenantId, content, timestamp, supportConfig);
+    // Para tenants com URA: se a conversa ainda não tem setor definido,
+    // checa se ALGUM setor está aberto. Se sim, pula business hours e deixa URA resolver.
+    // Isso evita bloquear a URA quando o horário global está fechado mas um setor específico está aberto.
+    const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
+    if (uraEnabled) {
+      const { data: convDept } = await supabase.from('whatsapp_conversations')
+        .select('department_id').eq('id', conversationId).maybeSingle();
+      if (!convDept?.department_id) {
+        const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
+        const anyOpen = await isAnyDepartmentOpen(supabase, tenantId, new Date(timestamp), tz, supportConfig.business_hours || {});
+        if (anyOpen) {
+          // Pelo menos 1 setor está aberto — pula business hours, deixa URA lidar
+          console.log(`[processor] URA enabled, no dept yet, at least 1 dept open — skipping BH check for ${conversationId}`);
+          // Limpa flag de fora-expediente se estava setada
+          const { data: cvClr } = await supabase.from('whatsapp_conversations')
+            .select('opened_out_of_hours').eq('id', conversationId).single();
+          if (cvClr?.opened_out_of_hours) {
+            await supabase.from('whatsapp_conversations').update({
+              opened_out_of_hours: false,
+              out_of_hours_cleared_at: new Date().toISOString(),
+            }).eq('id', conversationId);
+          }
+          // Não faz return — cai no fluxo normal (URA/attendance)
+          // goto after business_hours block
+        } else {
+          // Nenhum setor aberto — trata como fora do horário normal
+          const bh = await checkBusinessHours(supabase, ctx, conversationId, tenantId, content, timestamp, supportConfig);
+          if (!bh.inside) {
+            const nowIso = new Date().toISOString();
+            await supabase.from('whatsapp_conversations').update({ status: 'active', opened_out_of_hours: true, opened_out_of_hours_at: timestamp, updated_at: nowIso }).eq('id', conversationId);
+            return;
+          }
+        }
+      } else {
+        // Conversa já tem setor → checkBusinessHours normal (usa horário do setor)
+        const bh = await checkBusinessHours(supabase, ctx, conversationId, tenantId, content, timestamp, supportConfig);
+        if (bh.inside) { const { data: cv } = await supabase.from('whatsapp_conversations').select('opened_out_of_hours').eq('id', conversationId).single(); if (cv?.opened_out_of_hours) await supabase.from('whatsapp_conversations').update({ opened_out_of_hours: false, out_of_hours_cleared_at: new Date().toISOString() }).eq('id', conversationId); }
+        if (!bh.inside) {
+          const nowIso = new Date().toISOString();
+          const { data: cv } = await supabase.from('whatsapp_conversations').select('status, opened_out_of_hours, opened_out_of_hours_at, out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
+          const wasClosed = cv?.status === 'closed';
+          const isNewCycle = wasClosed || !cv?.opened_out_of_hours_at;
+          if (isNewCycle) await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: nowIso, opened_out_of_hours: true, opened_out_of_hours_at: timestamp, out_of_hours_cleared_at: null, first_agent_message_at: null }).eq('id', conversationId);
+          else await supabase.from('whatsapp_conversations').update({ status: 'active', opened_out_of_hours: true, updated_at: nowIso }).eq('id', conversationId);
+          const { data: attChk } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).in('status', ['waiting', 'in_progress']).limit(1).maybeSingle();
+          const { data: cvChk } = isNewCycle ? { data: null } : await supabase.from('whatsapp_conversations').select('first_agent_message_at, out_of_hours_cleared_at').eq('id', conversationId).single();
+          if (!cvChk?.first_agent_message_at && !cvChk?.out_of_hours_cleared_at && !attChk) {
+            const cutoff10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+            const { data: bhMsgs } = await supabase.from('whatsapp_messages').select('id, created_at, metadata').eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', true).gte('created_at', cutoff10).order('created_at', { ascending: false }).limit(10);
+            const lastBh = (bhMsgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.outside_hours === true; });
+            if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário \u{1F550} Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente \u{1F60A}', 'Obrigado pela mensagem! Nossa equipe responde assim que possível \u{23F0}']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
+          }
+          return;
+        }
+      }
+    } else {
+      // Sem URA: checkBusinessHours normal
+      const bh = await checkBusinessHours(supabase, ctx, conversationId, tenantId, content, timestamp, supportConfig);
     if (bh.inside) { const { data: cv } = await supabase.from('whatsapp_conversations').select('opened_out_of_hours').eq('id', conversationId).single(); if (cv?.opened_out_of_hours) await supabase.from('whatsapp_conversations').update({ opened_out_of_hours: false, out_of_hours_cleared_at: new Date().toISOString() }).eq('id', conversationId); }
     if (!bh.inside) {
       const nowIso = new Date().toISOString();
@@ -1352,6 +1409,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
       }
       return;
     }
+    } // fecha else (sem URA)
   }
 
   const lastBilling = await getLastBillingMessageAt(supabase, conversationId, tenantId);
