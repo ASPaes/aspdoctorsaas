@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
+import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { subDays } from "date-fns";
