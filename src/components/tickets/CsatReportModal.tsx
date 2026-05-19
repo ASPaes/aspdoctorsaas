@@ -381,8 +381,11 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
                   {summary.por_setor.map((s) => (
                     <div key={s.department_id ?? "sem-setor"} className="flex items-center justify-between text-sm">
                       <span className="font-medium">{s.setor}</span>
-                      <span className="text-muted-foreground">
+                      <span className="text-muted-foreground text-sm tabular-nums">
                         {s.media != null ? s.media.toLocaleString("pt-BR") : "—"} · {s.respostas} resposta(s)
+                        <span className="text-muted-foreground/60 ml-1">
+                          ({summary.respostas > 0 ? Math.round((s.respostas / summary.respostas) * 100) : 0}%)
+                        </span>
                       </span>
                     </div>
                   ))}
