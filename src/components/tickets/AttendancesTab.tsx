@@ -161,7 +161,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, page, isAdminOrHead, userId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, page, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -171,6 +171,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
+          csat_sent, csat_score, last_sentiment,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -185,6 +186,14 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveAgente !== "all") q = q.eq("assigned_to", effectiveAgente);
       if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
       if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
+      if (csatFilter === "sent") q = q.eq("csat_sent", true);
+      if (csatFilter === "not_sent") q = q.eq("csat_sent", false);
+      if (csatFilter === "answered") q = q.not("csat_score", "is", null);
+      if (csatFilter === "unanswered") { q = q.eq("csat_sent", true).is("csat_score", null); }
+      if (csatScoreFilter !== "all") q = q.eq("csat_score", parseInt(csatScoreFilter));
+      if (ticketFilter === "with") q = q.not("ticket_id", "is", null);
+      if (ticketFilter === "without") q = q.is("ticket_id", null);
+      if (sentimentFilter !== "all") q = q.eq("last_sentiment", sentimentFilter);
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
@@ -192,10 +201,6 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       return { items: (data ?? []) as any[], total: count ?? 0 };
     },
   });
-
-  const attendances = result?.items ?? [];
-  const totalCount = result?.total ?? 0;
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
