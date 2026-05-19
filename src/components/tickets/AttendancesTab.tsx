@@ -137,7 +137,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, isAdminOrHead, userId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -148,12 +148,12 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         p_status: statusFilter !== "all" ? statusFilter : null,
         p_agent_id: !isAdminOrHead && userId ? userId : (effectiveAgente !== "all" ? effectiveAgente : null),
         p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
-        p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
+        p_closure_type: effectiveClosureType !== "all" ? effectiveClosureType : null,
         p_tenant_id: tid,
-        p_csat_filter: csatFilter !== "all" ? csatFilter : null,
-        p_csat_score: csatScoreFilter !== "all" ? parseInt(csatScoreFilter) : null,
-        p_ticket_filter: ticketFilter !== "all" ? ticketFilter : null,
-        p_sentiment_filter: sentimentFilter !== "all" ? sentimentFilter : null,
+        p_csat_filter: effectiveCsatFilter !== "all" ? effectiveCsatFilter : null,
+        p_csat_score: effectiveCsatScoreFilter !== "all" ? parseInt(effectiveCsatScoreFilter) : null,
+        p_ticket_filter: effectiveTicketFilter !== "all" ? effectiveTicketFilter : null,
+        p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
       });
       if (error) throw error;
       return data as {
