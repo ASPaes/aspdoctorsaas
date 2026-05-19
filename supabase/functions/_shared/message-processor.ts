@@ -695,7 +695,35 @@ async function markHumanFallback(supabase: any, attendanceId: string): Promise<v
 export async function sendUraWelcome(supabase: any, ctx: SendContext, conversationId: string, contactId: string, tenantId: string, attendanceId: string, supportConfig: any, attendanceCode?: string): Promise<void> {
   try {
     const uraEnabled = supportConfig.support_ura_enabled ?? supportConfig.ura_enabled;
-    if (!uraEnabled) return;
+
+    if (!uraEnabled) {
+      // URA off: verificar se o setor tem mensagem de boas-vindas
+      try {
+        const { data: conv } = await supabase.from('whatsapp_conversations')
+          .select('department_id')
+          .eq('id', conversationId)
+          .maybeSingle();
+
+        if (conv?.department_id) {
+          const { data: dept } = await supabase.from('support_departments')
+            .select('welcome_message')
+            .eq('id', conv.department_id)
+            .maybeSingle();
+
+          if (dept?.welcome_message?.trim()) {
+            const customerName = ctx.contactName || '';
+            const msg = dept.welcome_message
+              .replace(/\{nome\}/gi, customerName)
+              .replace(/\{atendimento\}/gi, attendanceCode || '');
+
+            await sendAutoReply(supabase, ctx, conversationId, msg, attendanceId);
+          }
+        }
+      } catch (e) {
+        console.error('[sendUraWelcome] Error sending welcome message (no URA):', e);
+      }
+      return;
+    }
     const { data: departments } = await supabase.from('support_departments').select('id, name, ura_option_number, ura_label, show_in_ura').eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true).not('ura_option_number', 'is', null).order('ura_option_number');
     const customerName = ctx.contactName || '';
     const template = supportConfig.support_ura_welcome_template || supportConfig.ura_welcome_template || '';
