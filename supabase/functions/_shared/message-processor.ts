@@ -145,27 +145,47 @@ export async function getBusinessHoursExceptions(
   msgDate: Date,
   tz: string,
   daysAhead: number = 14,
+  departmentId: string | null = null,
 ): Promise<BusinessHoursExceptionsLookup> {
   try {
     const startStr = tzDateStr(msgDate, tz);
     const endStr = tzDateStr(new Date(msgDate.getTime() + daysAhead * 86400000), tz);
-    const { data, error } = await supabase
+    // Busca exceções: tenant-wide (department_id IS NULL) + department-specific
+    let query = supabase
       .from('business_hours_exceptions')
-      .select('date, name, is_closed, use_template')
+      .select('date, name, is_closed, use_template, department_id')
       .eq('tenant_id', tenantId)
       .gte('date', startStr)
       .lte('date', endStr);
+
+    // Se temos departmentId, buscar tanto as globais quanto as do setor
+    // Se não, buscar apenas as globais (sem department_id)
+    if (departmentId) {
+      query = query.or(`department_id.is.null,department_id.eq.${departmentId}`);
+    } else {
+      query = query.is('department_id', null);
+    }
+
+    const { data, error } = await query;
     if (error) {
       console.error('[processor] getBusinessHoursExceptions error:', error.message);
       return { today: null, closedDates: new Set(), template: null };
     }
     const closedDates = new Set<string>();
     let today: { name: string | null; is_closed: boolean; use_template: boolean } | null = null;
+    // Agrupa por data. Para cada data, exceção do setor vence a tenant-wide.
+    const byDate = new Map<string, typeof data[0]>();
     for (const row of (data || [])) {
-      // Dias com horário reduzido (use_template) NÃO entram em closedDates,
-      // pois não estão totalmente fechados.
-      if (row.is_closed && !row.use_template) closedDates.add(row.date);
-      if (row.date === startStr) {
+      const existing = byDate.get(row.date);
+      // Regra de prioridade: department-specific > tenant-wide (null)
+      if (!existing || (row.department_id && !existing.department_id)) {
+        byDate.set(row.date, row);
+      }
+    }
+
+    for (const [dateKey, row] of byDate) {
+      if (row.is_closed && !row.use_template) closedDates.add(dateKey);
+      if (dateKey === startStr) {
         today = {
           name: row.name ?? null,
           is_closed: !!row.is_closed,
