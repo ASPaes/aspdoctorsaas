@@ -4,7 +4,8 @@ import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove 
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2 } from "lucide-react";
+import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
