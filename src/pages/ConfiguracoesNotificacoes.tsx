@@ -77,8 +77,9 @@ function formatMutedUntil(iso: string | null): string {
 }
 
 export default function ConfiguracoesNotificacoes() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const uid = user?.id;
+  const isHeadOrAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const queryClient = useQueryClient();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
