@@ -961,6 +961,60 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
   const nowIso = new Date().toISOString();
   const selectedDept = hasDepts ? deptByNumber.get(optionNumber) : null;
   const deptName = selectedDept ? (selectedDept.ura_label || selectedDept.name) : `Opção ${optionNumber}`;
+
+  // ── Check horário do setor selecionado ──
+  // Se o setor tem business_hours_enabled e está fechado agora, envia mensagem e volta pro menu URA
+  if (selectedDept?.id && supportConfig.business_hours_enabled) {
+    const { data: deptHours } = await supabase
+      .from('support_departments')
+      .select('business_hours_enabled, business_hours, business_hours_message')
+      .eq('id', selectedDept.id)
+      .maybeSingle();
+
+    if (deptHours?.business_hours_enabled && deptHours.business_hours) {
+      const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
+      const now = new Date();
+      const dayKey = tzDayKey(now, tz);
+      const tParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+      const dayConfig = deptHours.business_hours[dayKey];
+      const slots: { start: string; end: string }[] = (dayConfig?.slots || []).slice();
+      if (dayConfig?.start && dayConfig?.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
+      const isDeptOpen = dayConfig?.active && slots.some((s: any) => currentTime >= s.start && currentTime <= s.end);
+
+      if (!isDeptOpen) {
+        // Setor fechado: envia mensagem do setor e reseta URA pro menu
+        const deptMsg = deptHours.business_hours_message
+          || `O setor *${deptName}* está fora do horário de atendimento no momento. Por favor, escolha outro setor ou tente novamente mais tarde.`;
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, deptMsg, {
+          ura: true, department_closed: true, department_id: selectedDept.id,
+        });
+        // Reseta URA: limpa seleção e reenvia menu
+        await supabase.from('support_attendances').update({
+          ura_option_selected: null, ura_selected_option: null,
+          ura_state: 'pending', ura_asked_at: nowIso,
+          ura_invalid_count: 0, updated_at: nowIso,
+        }).eq('id', att.id);
+        // Reenvia menu URA
+        const { data: uraDepts } = await supabase.from('support_departments')
+          .select('id, name, ura_option_number, ura_label, show_in_ura')
+          .eq('tenant_id', tenantId).eq('is_active', true).eq('show_in_ura', true)
+          .not('ura_option_number', 'is', null).order('ura_option_number');
+        if (uraDepts && uraDepts.length > 0) {
+          const optionsList = uraDepts.map((d: any) => `${d.ura_option_number}. ${d.ura_label || d.name}`).join('\n');
+          await sendAndPersistAutoMessage(supabase, ctx, conversationId,
+            `Escolha outro setor:\n${optionsList}\n0. Encerrar atendimento`,
+            { ura: true, ura_resent: true },
+          );
+        }
+        return true;
+      }
+    }
+  }
+
   const updatePayload: Record<string, any> = { ura_option_selected: optionNumber, ura_selected_option: optionNumber, ura_state: 'completed', ura_completed_at: nowIso, updated_at: nowIso };
   if (selectedDept) updatePayload.department_id = selectedDept.id;
   await supabase.from('support_attendances').update(updatePayload).eq('id', att.id);
