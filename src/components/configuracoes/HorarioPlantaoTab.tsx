@@ -169,15 +169,42 @@ export default function HorarioPlantaoTab() {
   const [ocKeywords, setOcKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState("");
 
-  // Hydrate from DB
+  // Hydrate form fields based on selected context (global or department)
+  useEffect(() => {
+    if (selectedContext === "global") {
+      if (!config) return;
+      const c = config as Record<string, any>;
+      setBhEnabled(!!c.business_hours_enabled);
+      setBhTimezone((c.business_hours_timezone as string) || "America/Sao_Paulo");
+      setBhSchedule(parseBusinessHours(c.business_hours));
+      setBhMessage((c.business_hours_message as string) || "");
+      setBhOutsidePrompt((c.business_hours_outside_prompt as string) || "");
+    } else {
+      // Department context
+      const dept = deptRows.find((d) => d.id === selectedContext);
+      if (!dept) return;
+      const enabled = !!dept.business_hours_enabled;
+      setBhEnabled(enabled);
+      // Timezone is always global
+      if (config) setBhTimezone(((config as Record<string, any>).business_hours_timezone as string) || "America/Sao_Paulo");
+      if (enabled && dept.business_hours && Object.keys(dept.business_hours as object).length > 0) {
+        setBhSchedule(parseBusinessHours(dept.business_hours));
+      } else {
+        // Initialize with weekdays active
+        const fresh: BusinessHours = {};
+        DAY_KEYS.forEach((k) => (fresh[k] = { active: false, slots: [{ ...DEFAULT_SLOT }] }));
+        ["mon", "tue", "wed", "thu", "fri"].forEach((d) => (fresh[d].active = true));
+        setBhSchedule(fresh);
+      }
+      setBhMessage((dept.business_hours_message as string) || "");
+      setBhOutsidePrompt("");
+    }
+  }, [selectedContext, config, deptRows]);
+
+  // Hydrate AI + On-call (always from global config, independent of context)
   useEffect(() => {
     if (!config) return;
     const c = config as Record<string, any>;
-    setBhEnabled(!!c.business_hours_enabled);
-    setBhTimezone((c.business_hours_timezone as string) || "America/Sao_Paulo");
-    setBhSchedule(parseBusinessHours(c.business_hours));
-    setBhMessage((c.business_hours_message as string) || "");
-    setBhOutsidePrompt((c.business_hours_outside_prompt as string) || "");
     setAiEnabled(!!c.business_hours_ai_enabled);
     setAiPrompt((c.business_hours_ai_prompt as string) || "");
     const phone = c.oncall_phone_number as string | null;
