@@ -658,6 +658,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         phoneNumber={phoneNumber}
         onConfirmed={handleClienteConfirmed}
         onCancel={() => setShowConfirmCliente(false)}
+        requiresCliente={convDepartment?.requires_ticket_on_close === true}
       />
 
       <ClassifyClosureModal

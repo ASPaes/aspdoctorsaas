@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { Check, Search, UserX, Loader2, Phone } from 'lucide-react';
+import { Check, Search, UserX, Loader2, Phone, AlertTriangle } from 'lucide-react';
 import { useRelevantAttendance } from '../hooks/useRelevantAttendance';
 import { useClienteLinkSuggestion, type ClienteCandidato } from '../hooks/useClienteLinkSuggestion';
 import { useClienteSearch } from '../hooks/useClienteSearch';
@@ -20,6 +20,7 @@ interface Props {
   phoneNumber: string;
   onConfirmed: () => void;
   onCancel: () => void;
+  requiresCliente?: boolean;
 }
 
 interface ClienteOption {
@@ -45,6 +46,7 @@ export function ConfirmClienteModal({
   phoneNumber,
   onConfirmed,
   onCancel,
+  requiresCliente = false,
 }: Props) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -245,14 +247,23 @@ export function ConfirmClienteModal({
               <p className="text-sm text-muted-foreground">
                 Nenhum cliente compatível com o telefone do contato.
               </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleSkipNoCliente}
-                disabled={isLinking}
-              >
-                Encerrar sem cliente
-              </Button>
+              {requiresCliente ? (
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-left w-full">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Este setor exige abertura de ticket no encerramento. É obrigatório vincular um cliente para prosseguir.
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSkipNoCliente}
+                  disabled={isLinking}
+                >
+                  Encerrar sem cliente
+                </Button>
+              )}
             </div>
           )}
 
