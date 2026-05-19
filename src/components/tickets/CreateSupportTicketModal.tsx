@@ -569,7 +569,7 @@ export function CreateSupportTicketModal({
       <DialogContent className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
-          <h3 className="text-base font-medium">Novo ticket</h3>
+          <h3 className="text-base font-medium">{fromClosure ? "Classificar atendimento" : "Novo ticket"}</h3>
           <div className="flex items-center gap-1.5">
             {(() => {
               const currentStatus = ticketStatuses.find(s => s.id === statusId);
