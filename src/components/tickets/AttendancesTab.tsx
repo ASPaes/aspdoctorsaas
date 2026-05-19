@@ -13,6 +13,7 @@ import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import {
@@ -77,6 +78,7 @@ interface Props {
 
 function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const dateRange = dateRangeOverride || internalDateRange;
   const setDateRange = dateRangeOverride ? () => {} : setInternalDateRange;
@@ -209,7 +211,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId, clienteIdOverride ?? null],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, isAdminOrHead, userId, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -227,6 +229,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         p_ticket_filter: effectiveTicketFilter !== "all" ? effectiveTicketFilter : null,
         p_sentiment_filter: effectiveSentimentFilter !== "all" ? effectiveSentimentFilter : null,
         p_cliente_id: clienteIdOverride ?? null,
+        p_unidade_base_id: selectedUnidadeId ?? null,
       });
       if (error) throw error;
       return data as {
@@ -244,7 +247,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -255,7 +258,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ai_problem, ai_solution, ticket_id, cliente_id, contact_id, department_id,
           csat_sent, csat_score, last_sentiment,
-          contact_name, contact_phone, instance_id,
+          contact_name, contact_phone, instance_id, unidade_base_id,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -280,6 +283,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
       if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (effectiveInstanceFilter !== "all") q = q.eq("instance_id", effectiveInstanceFilter);
       if (clienteIdOverride) q = q.eq("cliente_id", clienteIdOverride);
+      if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (debouncedSearch.trim().length >= 2) {
         const s = debouncedSearch.trim().replace(/[%,()]/g, "");
         q = q.or(`attendance_code.ilike.%${s}%,contact_name.ilike.%${s}%,contact_phone.ilike.%${s}%`);
