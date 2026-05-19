@@ -395,6 +395,7 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          department_id: string | null
           id: string
           is_closed: boolean
           name: string | null
@@ -406,6 +407,7 @@ export type Database = {
         Insert: {
           created_at?: string
           date: string
+          department_id?: string | null
           id?: string
           is_closed?: boolean
           name?: string | null
@@ -417,6 +419,7 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
+          department_id?: string | null
           id?: string
           is_closed?: boolean
           name?: string | null
@@ -425,7 +428,15 @@ export type Database = {
           updated_at?: string
           use_template?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "business_hours_exceptions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cac_despesas: {
         Row: {
@@ -3992,6 +4003,9 @@ export type Database = {
       }
       support_departments: {
         Row: {
+          business_hours: Json
+          business_hours_enabled: boolean
+          business_hours_message: string | null
           created_at: string
           default_instance_id: string | null
           description: string | null
@@ -4011,6 +4025,9 @@ export type Database = {
           welcome_message: string | null
         }
         Insert: {
+          business_hours?: Json
+          business_hours_enabled?: boolean
+          business_hours_message?: string | null
           created_at?: string
           default_instance_id?: string | null
           description?: string | null
@@ -4030,6 +4047,9 @@ export type Database = {
           welcome_message?: string | null
         }
         Update: {
+          business_hours?: Json
+          business_hours_enabled?: boolean
+          business_hours_message?: string | null
           created_at?: string
           default_instance_id?: string | null
           description?: string | null

@@ -534,6 +534,152 @@ async function sendDeferredClosureMessage(supabase: any, ctx: SendContext, conve
   } catch (err) { console.error('[processor] Error in sendDeferredClosureMessage:', err); }
 }
 
+// ─── Department-level Business Hours ──────────────────────────────────────────
+
+interface DepartmentBusinessHoursResult {
+  departmentId: string | null;
+  departmentName: string | null;
+  businessHoursEnabled: boolean;
+  businessHours: Record<string, any>;
+  businessHoursMessage: string | null;
+}
+
+async function resolveDepartmentBusinessHours(
+  supabase: any,
+  conversationId: string | null,
+  instanceId: string,
+  tenantId: string,
+  globalBusinessHours: Record<string, any>,
+  globalMessage: string | null,
+): Promise<DepartmentBusinessHoursResult> {
+  try {
+    let departmentId: string | null = null;
+    let departmentName: string | null = null;
+
+    // 1. Tenta pegar department_id da conversa
+    if (conversationId) {
+      const { data: conv } = await supabase
+        .from('whatsapp_conversations')
+        .select('department_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      if (conv?.department_id) departmentId = conv.department_id;
+    }
+
+    // 2. Fallback: resolve via instância → setor padrão
+    if (!departmentId) {
+      const { data: dept } = await supabase
+        .from('support_departments')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('default_instance_id', instanceId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (dept?.id) departmentId = dept.id;
+    }
+
+    // 3. Se achou setor, busca config de horário
+    if (departmentId) {
+      const { data: deptData } = await supabase
+        .from('support_departments')
+        .select('name, business_hours_enabled, business_hours, business_hours_message')
+        .eq('id', departmentId)
+        .maybeSingle();
+
+      if (deptData) {
+        departmentName = deptData.name;
+        if (deptData.business_hours_enabled) {
+          return {
+            departmentId,
+            departmentName,
+            businessHoursEnabled: true,
+            businessHours: deptData.business_hours || {},
+            businessHoursMessage: deptData.business_hours_message || globalMessage,
+          };
+        }
+      }
+    }
+
+    // 4. Fallback: horário global do tenant
+    return {
+      departmentId,
+      departmentName,
+      businessHoursEnabled: false,
+      businessHours: globalBusinessHours,
+      businessHoursMessage: globalMessage,
+    };
+  } catch (err) {
+    console.error('[processor] resolveDepartmentBusinessHours error:', err);
+    return {
+      departmentId: null,
+      departmentName: null,
+      businessHoursEnabled: false,
+      businessHours: globalBusinessHours,
+      businessHoursMessage: globalMessage,
+    };
+  }
+}
+
+async function isAnyDepartmentOpen(
+  supabase: any,
+  tenantId: string,
+  msgDate: Date,
+  tz: string,
+  globalBusinessHours: Record<string, any>,
+): Promise<boolean> {
+  try {
+    const dayKey = tzDayKey(msgDate, tz);
+    const tParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(msgDate);
+    const currentTime = `${(tParts.find(p => p.type === 'hour')?.value || '00').padStart(2, '0')}:${(tParts.find(p => p.type === 'minute')?.value || '00').padStart(2, '0')}`;
+
+    // Busca todos os setores ativos com horário próprio
+    const { data: depts } = await supabase
+      .from('support_departments')
+      .select('id, business_hours_enabled, business_hours')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+
+    const deptsWithHours = (depts || []).filter((d: any) => d.business_hours_enabled && d.business_hours);
+
+    // Se nenhum setor tem horário próprio, usa global
+    if (deptsWithHours.length === 0) {
+      const dayConfig = globalBusinessHours[dayKey];
+      if (!dayConfig?.active) return false;
+      const slots: { start: string; end: string }[] = (dayConfig.slots || []).slice();
+      if (dayConfig.start && dayConfig.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
+      return slots.some(s => currentTime >= s.start && currentTime <= s.end);
+    }
+
+    // Checa se ALGUM setor com horário próprio está aberto
+    for (const dept of deptsWithHours) {
+      const bh = dept.business_hours || {};
+      const dayConfig = bh[dayKey];
+      if (!dayConfig?.active) continue;
+      const slots: { start: string; end: string }[] = (dayConfig.slots || []).slice();
+      if (dayConfig.start && dayConfig.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
+      if (slots.some(s => currentTime >= s.start && currentTime <= s.end)) return true;
+    }
+
+    // Também checa setores SEM horário próprio (usam global)
+    const deptsWithoutHours = (depts || []).filter((d: any) => !d.business_hours_enabled);
+    if (deptsWithoutHours.length > 0) {
+      const dayConfig = globalBusinessHours[dayKey];
+      if (dayConfig?.active) {
+        const slots: { start: string; end: string }[] = (dayConfig.slots || []).slice();
+        if (dayConfig.start && dayConfig.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
+        if (slots.some(s => currentTime >= s.start && currentTime <= s.end)) return true;
+      }
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[processor] isAnyDepartmentOpen error:', err);
+    return true; // fail-open
+  }
+}
+
 // ─── Business Hours ───────────────────────────────────────────────────────────
 
 async function sendBusinessHoursMessage(
