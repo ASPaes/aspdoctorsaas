@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -21,6 +21,8 @@ interface Props {
   dateTo: Date;
   initialDepartmentId?: string | null;
   scoreMax: number;
+  isAdmin?: boolean;
+  onNavigateToAttendance?: (attendanceCode: string) => void;
 }
 
 interface SetorRow {
@@ -43,6 +45,8 @@ interface AvalRow {
   department_id: string | null;
   setor: string;
   cliente_nome: string;
+  attendance_id: string;
+  attendance_code: string;
 }
 
 function toISODate(d: Date): string {
@@ -62,7 +66,8 @@ function scoreColor(score: number, max: number): { bg: string; fg: string } {
   return { bg: "#E1F5EE", fg: "#0F6E56" };
 }
 
-export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, scoreMax }: Props) {
+export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo, initialDepartmentId, scoreMax, isAdmin, onNavigateToAttendance }: Props) {
+  const queryClient = useQueryClient();
   const fromISO = toISODate(dateFrom);
   const toISO = toISODate(dateTo);
 
@@ -75,6 +80,23 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editScore, setEditScore] = useState<number>(0);
+
+  const updateScore = useMutation({
+    mutationFn: async ({ csatId, newScore }: { csatId: string; newScore: number }) => {
+      const { error } = await (supabase.rpc as any)("update_csat_score", {
+        p_csat_id: csatId,
+        p_new_score: newScore,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["csat-report-list"] });
+      queryClient.invalidateQueries({ queryKey: ["csat-report-summary"] });
+    },
+  });
 
   const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
 
@@ -422,34 +444,95 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
             <div className="space-y-2">
               {list.map((a) => {
                 const c = scoreColor(a.score, scoreMax);
+                const isEditing = editingId === a.id;
                 return (
-                  <div key={a.id} className="rounded-lg border p-3 flex gap-3 items-start">
-                    <div
-                      className="flex items-center justify-center rounded-full font-bold text-sm shrink-0"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        backgroundColor: c.bg,
-                        color: c.fg,
-                      }}
-                    >
-                      {a.score}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm truncate">{a.cliente_nome}</span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {a.setor} · {formatDate(a.responded_at)}
-                        </span>
-                      </div>
-
-                      {a.reason ? (
-                        <p className="text-sm text-muted-foreground line-clamp-2">{a.reason}</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">Sem comentário</p>
+                  <div key={a.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex gap-3 items-start">
+                      {!isEditing && (
+                        isAdmin ? (
+                          <button
+                            type="button"
+                            title="Editar nota"
+                            onClick={() => { setEditingId(a.id); setEditScore(a.score); }}
+                            className="flex items-center justify-center rounded-full font-bold text-sm shrink-0 hover:ring-2 hover:ring-primary/50 transition-all"
+                            style={{ width: 36, height: 36, backgroundColor: c.bg, color: c.fg }}
+                          >
+                            {a.score}
+                          </button>
+                        ) : (
+                          <div
+                            className="flex items-center justify-center rounded-full font-bold text-sm shrink-0"
+                            style={{ width: 36, height: 36, backgroundColor: c.bg, color: c.fg }}
+                          >
+                            {a.score}
+                          </div>
+                        )
                       )}
+
+                      {isEditing && (
+                        <div className="flex flex-wrap items-center gap-1 shrink-0">
+                          {Array.from({ length: scoreMax + 1 }, (_, i) => i).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setEditScore(n)}
+                              className={`w-7 h-7 rounded-full text-xs font-bold transition-all ${editScore === n ? "bg-primary text-primary-foreground ring-2 ring-primary" : "bg-muted hover:bg-muted/80"}`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={updateScore.isPending}
+                            onClick={() => updateScore.mutate({ csatId: a.id, newScore: editScore })}
+                          >
+                            {updateScore.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() => setEditingId(null)}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm truncate">{a.cliente_nome}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {a.setor} · {formatDate(a.responded_at)}
+                          </span>
+                        </div>
+
+                        {a.reason ? (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{a.reason}</p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">Sem comentário</p>
+                        )}
+                      </div>
                     </div>
+
+                    {a.attendance_code && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onNavigateToAttendance) {
+                              onNavigateToAttendance(a.attendance_code);
+                              onOpenChange(false);
+                            }
+                          }}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <span className="font-mono">{a.attendance_code}</span>
+                          <span>→ Ver atendimento</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

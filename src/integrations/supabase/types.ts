@@ -6775,6 +6775,8 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: {
+          attendance_code: string
+          attendance_id: string
           cliente_nome: string
           department_id: string
           id: string
@@ -7170,6 +7172,10 @@ export type Database = {
       unschedule_attendance: {
         Args: { p_attendance_id: string }
         Returns: Json
+      }
+      update_csat_score: {
+        Args: { p_csat_id: string; p_new_score: number; p_reason?: string }
+        Returns: undefined
       }
       update_ticket_fields: {
         Args: { p_fields: Json; p_ticket_id: string }

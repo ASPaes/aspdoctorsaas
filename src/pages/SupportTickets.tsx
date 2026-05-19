@@ -161,6 +161,8 @@ export default function SupportTickets() {
 
   const { data: profile } = useProfile(userId ?? undefined);
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
+  const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
+  const [attSearchOverride, setAttSearchOverride] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (departmentFilter === "all" && ticketsView === "kanban") {
@@ -1298,7 +1300,7 @@ export default function SupportTickets() {
 
       {ticketsView === "atendimentos" && (() => {
         const Comp = AttendancesTab as any;
-        return <Comp isAdminOrHead={isAdminOrHead} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} clienteIdOverride={clienteFilterId} />;
+        return <Comp isAdminOrHead={isAdminOrHead} isAdmin={isAdmin} userId={userId} embedded departmentFilter={departmentFilter} agenteFilter={atendenteFilter} dateRangeOverride={dateRange} closureTypeOverride={attClosureTypeFilter} csatFilterOverride={attCsatFilter} csatScoreFilterOverride={attCsatScoreFilter} ticketFilterOverride={attTicketFilter} sentimentFilterOverride={attSentimentFilter} instanceFilterOverride={attInstanceFilter} clienteIdOverride={clienteFilterId} searchOverride={attSearchOverride} />;
       })()}
 
       {ticketsView === "pendentes" && isAdminOrHead && (() => {
@@ -1329,6 +1331,11 @@ export default function SupportTickets() {
         dateTo={dateRange.to}
         initialDepartmentId={departmentFilter}
         scoreMax={csatScale ?? 5}
+        isAdmin={isAdmin}
+        onNavigateToAttendance={(code) => {
+          setTicketsView("atendimentos");
+          setAttSearchOverride(code);
+        }}
       />
     </div>
   );

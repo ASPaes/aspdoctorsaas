@@ -55,6 +55,7 @@ function formatDur(secs: number | null): string {
 
 interface Props {
   isAdminOrHead?: boolean;
+  isAdmin?: boolean;
   userId?: string | null;
   departmentFilter?: string;
   agenteFilter?: string;
@@ -68,9 +69,10 @@ interface Props {
   sentimentFilterOverride?: string;
   instanceFilterOverride?: string;
   clienteIdOverride?: string | null;
+  searchOverride?: string;
 }
 
-function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride }: Props = {}) {
+function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, departmentFilter = "all", agenteFilter: parentAgenteFilter = "all", embedded = false, dateRangeOverride, statusFilterOverride, closureTypeOverride, csatFilterOverride, csatScoreFilterOverride, ticketFilterOverride, sentimentFilterOverride, instanceFilterOverride, clienteIdOverride, searchOverride }: Props = {}) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [internalDateRange, setInternalDateRange] = useState<{ from: Date; to: Date }>({ from: subDays(new Date(), 30), to: new Date() });
   const dateRange = dateRangeOverride || internalDateRange;
@@ -81,6 +83,9 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const setStatusFilter = statusFilterOverride ? () => {} : setInternalStatusFilter;
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  useEffect(() => {
+    if (searchOverride !== undefined) setSearch(searchOverride);
+  }, [searchOverride]);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
@@ -757,6 +762,11 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         dateTo={dateRange.to}
         initialDepartmentId={effectiveDeptFilter !== "all" ? effectiveDeptFilter : undefined}
         scoreMax={csatScale ?? 5}
+        isAdmin={isAdmin}
+        onNavigateToAttendance={(code) => {
+          setSearch(code);
+          setCsatModalOpen(false);
+        }}
       />
     </div>
   );
