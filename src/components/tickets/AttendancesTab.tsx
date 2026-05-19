@@ -223,19 +223,47 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     if (atendenteFilter !== "all") c++;
     if (departamentoFilter !== "all") c++;
     if (closureTypeFilter !== "all") c++;
+    if (csatFilter !== "all") c++;
+    if (csatScoreFilter !== "all") c++;
+    if (ticketFilter !== "all") c++;
+    if (sentimentFilter !== "all") c++;
     return c;
-  }, [atendenteFilter, departamentoFilter, closureTypeFilter]);
+  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
 
   const clearAdvancedFilters = () => {
     setAtendenteFilter("all");
     setDepartamentoFilter("all");
     setClosureTypeFilter("all");
+    setCsatFilter("all");
+    setCsatScoreFilter("all");
+    setTicketFilter("all");
+    setSentimentFilter("all");
+  };
+
+  const CSAT_FILTER_LABELS: Record<string, string> = {
+    sent: "CSAT enviado",
+    not_sent: "Sem CSAT",
+    answered: "CSAT respondido",
+    unanswered: "CSAT não respondido",
+  };
+  const TICKET_FILTER_LABELS: Record<string, string> = {
+    with: "Com ticket",
+    without: "Sem ticket",
+  };
+  const SENTIMENT_FILTER_LABELS: Record<string, string> = {
+    positive: "😊 Positivo",
+    neutral: "😐 Neutro",
+    negative: "😠 Negativo",
   };
 
   const getFilterLabel = (type: string, value: string): string => {
     if (type === "atendente") return agentes.find((a: any) => a.user_id === value)?.nome ?? value;
     if (type === "departamento") return departamentos.find((d: any) => d.id === value)?.name ?? value;
     if (type === "closure") return CLOSURE_LABELS[value] ?? value;
+    if (type === "csat") return CSAT_FILTER_LABELS[value] ?? value;
+    if (type === "csatScore") return `Nota CSAT: ⭐${value}`;
+    if (type === "ticket") return TICKET_FILTER_LABELS[value] ?? value;
+    if (type === "sentiment") return SENTIMENT_FILTER_LABELS[value] ?? value;
     return value;
   };
 
