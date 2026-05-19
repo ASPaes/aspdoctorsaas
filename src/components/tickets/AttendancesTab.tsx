@@ -105,6 +105,30 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
+  const [linkingAttId, setLinkingAttId] = useState<string | null>(null);
+  const [linkClienteSearch, setLinkClienteSearch] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
+  const { results: linkClienteResults, isLoading: linkClienteLoading } = useClienteSearch(linkClienteSearch);
+  const queryClient = useQueryClient();
+
+  const handleLinkCliente = async (attendanceId: string, clienteId: string) => {
+    setIsLinking(true);
+    try {
+      const { error } = await (supabase.rpc as any)("link_cliente_to_attendance", {
+        p_attendance_id: attendanceId,
+        p_cliente_id: clienteId,
+      });
+      if (error) throw error;
+      toast.success("Cliente vinculado com sucesso! Próximos chats deste contato serão vinculados automaticamente.");
+      queryClient.invalidateQueries({ queryKey: ["attendances_list"] });
+      setLinkingAttId(null);
+      setLinkClienteSearch("");
+    } catch (err: any) {
+      toast.error("Erro ao vincular: " + (err?.message ?? ""));
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   const { data: csatScale } = useQuery({
     queryKey: ["csat-scale-att", tid],
