@@ -89,6 +89,21 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [csatModalOpen, setCsatModalOpen] = useState(false);
+
+  const { data: csatScale } = useQuery({
+    queryKey: ["csat-scale-att", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("support_csat_score_max")
+        .eq("tenant_id", tid)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.support_csat_score_max ?? 5) as number;
+    },
+  });
 
   useEffect(() => {
     setPage(0);
