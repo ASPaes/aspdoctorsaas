@@ -3552,6 +3552,8 @@ export type Database = {
           conversation_id: string
           created_at: string
           created_from: string | null
+          csat_score: number | null
+          csat_sent: boolean | null
           department_id: string | null
           first_human_response_at: string | null
           first_response_at: string | null
@@ -3563,6 +3565,7 @@ export type Database = {
           last_customer_message_at: string | null
           last_operator_message_at: string | null
           last_queue_reason: string | null
+          last_sentiment: string | null
           msg_agent_count: number
           msg_customer_count: number
           opened_at: string
@@ -3615,6 +3618,8 @@ export type Database = {
           conversation_id: string
           created_at?: string
           created_from?: string | null
+          csat_score?: number | null
+          csat_sent?: boolean | null
           department_id?: string | null
           first_human_response_at?: string | null
           first_response_at?: string | null
@@ -3626,6 +3631,7 @@ export type Database = {
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
+          last_sentiment?: string | null
           msg_agent_count?: number
           msg_customer_count?: number
           opened_at?: string
@@ -3678,6 +3684,8 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           created_from?: string | null
+          csat_score?: number | null
+          csat_sent?: boolean | null
           department_id?: string | null
           first_human_response_at?: string | null
           first_response_at?: string | null
@@ -3689,6 +3697,7 @@ export type Database = {
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
+          last_sentiment?: string | null
           msg_agent_count?: number
           msg_customer_count?: number
           opened_at?: string
@@ -6697,11 +6706,15 @@ export type Database = {
         Args: {
           p_agent_id?: string
           p_closure_type?: string
+          p_csat_filter?: string
+          p_csat_score?: number
           p_date_from: string
           p_date_to: string
           p_department_id?: string
+          p_sentiment_filter?: string
           p_status?: string
           p_tenant_id?: string
+          p_ticket_filter?: string
         }
         Returns: Json
       }

@@ -75,6 +75,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [departamentoFilter, setDepartamentoFilter] = useState<string>("all");
   const [closureTypeFilter, setClosureTypeFilter] = useState<string>("all");
+  const [csatFilter, setCsatFilter] = useState<string>("all");
+  const [csatScoreFilter, setCsatScoreFilter] = useState<string>("all");
+  const [ticketFilter, setTicketFilter] = useState<string>("all");
+  const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,7 +86,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
@@ -123,7 +127,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const toISO = toDate.toISOString();
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, isAdminOrHead, userId],
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
@@ -136,6 +140,10 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
         p_closure_type: closureTypeFilter !== "all" ? closureTypeFilter : null,
         p_tenant_id: tid,
+        p_csat_filter: csatFilter !== "all" ? csatFilter : null,
+        p_csat_score: csatScoreFilter !== "all" ? parseInt(csatScoreFilter) : null,
+        p_ticket_filter: ticketFilter !== "all" ? ticketFilter : null,
+        p_sentiment_filter: sentimentFilter !== "all" ? sentimentFilter : null,
       });
       if (error) throw error;
       return data as {
@@ -145,6 +153,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
         median_first_response_seconds: number;
         avg_csat: number;
         csat_count: number;
+        csat_sent_count: number;
         total_closed: number;
         total_open: number;
       };
@@ -152,7 +161,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, page, isAdminOrHead, userId],
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, page, isAdminOrHead, userId],
     enabled: !!tid,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
@@ -162,6 +171,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
           wait_seconds, handle_seconds, first_response_time_seconds,
           msg_customer_count, msg_agent_count, assigned_to,
           ai_summary, ai_category, ticket_id, cliente_id, contact_id, department_id,
+          csat_sent, csat_score, last_sentiment,
           whatsapp_contacts:contact_id(name, phone_number),
           clientes:cliente_id(nome_fantasia),
           support_departments:department_id(name)
@@ -176,6 +186,14 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (effectiveAgente !== "all") q = q.eq("assigned_to", effectiveAgente);
       if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
       if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
+      if (csatFilter === "sent") q = q.eq("csat_sent", true);
+      if (csatFilter === "not_sent") q = q.eq("csat_sent", false);
+      if (csatFilter === "answered") q = q.not("csat_score", "is", null);
+      if (csatFilter === "unanswered") { q = q.eq("csat_sent", true).is("csat_score", null); }
+      if (csatScoreFilter !== "all") q = q.eq("csat_score", parseInt(csatScoreFilter));
+      if (ticketFilter === "with") q = q.not("ticket_id", "is", null);
+      if (ticketFilter === "without") q = q.is("ticket_id", null);
+      if (sentimentFilter !== "all") q = q.eq("last_sentiment", sentimentFilter);
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
@@ -187,6 +205,8 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
   const attendances = result?.items ?? [];
   const totalCount = result?.total ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -203,19 +223,47 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
     if (atendenteFilter !== "all") c++;
     if (departamentoFilter !== "all") c++;
     if (closureTypeFilter !== "all") c++;
+    if (csatFilter !== "all") c++;
+    if (csatScoreFilter !== "all") c++;
+    if (ticketFilter !== "all") c++;
+    if (sentimentFilter !== "all") c++;
     return c;
-  }, [atendenteFilter, departamentoFilter, closureTypeFilter]);
+  }, [atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter]);
 
   const clearAdvancedFilters = () => {
     setAtendenteFilter("all");
     setDepartamentoFilter("all");
     setClosureTypeFilter("all");
+    setCsatFilter("all");
+    setCsatScoreFilter("all");
+    setTicketFilter("all");
+    setSentimentFilter("all");
+  };
+
+  const CSAT_FILTER_LABELS: Record<string, string> = {
+    sent: "CSAT enviado",
+    not_sent: "Sem CSAT",
+    answered: "CSAT respondido",
+    unanswered: "CSAT não respondido",
+  };
+  const TICKET_FILTER_LABELS: Record<string, string> = {
+    with: "Com ticket",
+    without: "Sem ticket",
+  };
+  const SENTIMENT_FILTER_LABELS: Record<string, string> = {
+    positive: "😊 Positivo",
+    neutral: "😐 Neutro",
+    negative: "😠 Negativo",
   };
 
   const getFilterLabel = (type: string, value: string): string => {
     if (type === "atendente") return agentes.find((a: any) => a.user_id === value)?.nome ?? value;
     if (type === "departamento") return departamentos.find((d: any) => d.id === value)?.name ?? value;
     if (type === "closure") return CLOSURE_LABELS[value] ?? value;
+    if (type === "csat") return CSAT_FILTER_LABELS[value] ?? value;
+    if (type === "csatScore") return `Nota CSAT: ⭐${value}`;
+    if (type === "ticket") return TICKET_FILTER_LABELS[value] ?? value;
+    if (type === "sentiment") return SENTIMENT_FILTER_LABELS[value] ?? value;
     return value;
   };
 
@@ -248,7 +296,14 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
             <p className={`text-2xl font-semibold font-mono mt-0.5 ${metrics.avg_csat >= 4 ? "text-green-400" : metrics.avg_csat >= 3 ? "text-yellow-400" : "text-red-400"}`}>
               {metrics.avg_csat > 0 ? metrics.avg_csat : "—"}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.csat_count} avaliações</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {metrics.csat_count} avaliações
+              {metrics.csat_sent_count > 0 && (
+                <span className="ml-1">
+                  ({Math.round((metrics.csat_count / metrics.csat_sent_count) * 100)}% resposta)
+                </span>
+              )}
+            </p>
           </div>
         </div>
       )}
@@ -343,6 +398,56 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">CSAT</label>
+                    <Select value={csatFilter} onValueChange={setCsatFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="sent">CSAT enviado</SelectItem>
+                        <SelectItem value="not_sent">Sem envio de CSAT</SelectItem>
+                        <SelectItem value="answered">CSAT respondido</SelectItem>
+                        <SelectItem value="unanswered">CSAT não respondido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Nota CSAT</label>
+                    <Select value={csatScoreFilter} onValueChange={setCsatScoreFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas notas</SelectItem>
+                        <SelectItem value="1">⭐ 1</SelectItem>
+                        <SelectItem value="2">⭐ 2</SelectItem>
+                        <SelectItem value="3">⭐ 3</SelectItem>
+                        <SelectItem value="4">⭐ 4</SelectItem>
+                        <SelectItem value="5">⭐ 5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Ticket</label>
+                    <Select value={ticketFilter} onValueChange={setTicketFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="with">Com ticket</SelectItem>
+                        <SelectItem value="without">Sem ticket</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Sentimento IA</label>
+                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="positive">😊 Positivo</SelectItem>
+                        <SelectItem value="neutral">😐 Neutro</SelectItem>
+                        <SelectItem value="negative">😠 Negativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 {activeFilterCount > 0 && (
                   <div className="flex justify-end mt-3 pt-3 border-t">
@@ -383,6 +488,42 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
                 >
                   {getFilterLabel("closure", closureTypeFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {csatFilter !== "all" && (
+                <button
+                  onClick={() => setCsatFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("csat", csatFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {csatScoreFilter !== "all" && (
+                <button
+                  onClick={() => setCsatScoreFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("csatScore", csatScoreFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {ticketFilter !== "all" && (
+                <button
+                  onClick={() => setTicketFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("ticket", ticketFilter)}
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+              {sentimentFilter !== "all" && (
+                <button
+                  onClick={() => setSentimentFilter("all")}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                >
+                  {getFilterLabel("sentiment", sentimentFilter)}
                   <X className="h-3 w-3" />
                 </button>
               )}
