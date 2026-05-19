@@ -114,7 +114,7 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
 
   useEffect(() => {
     setPage(0);
-  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, search]);
+  }, [dateRange, statusFilter, atendenteFilter, departamentoFilter, closureTypeFilter, csatFilter, csatScoreFilter, ticketFilter, sentimentFilter, instanceFilter, debouncedSearch]);
 
   const { data: agentes = [] } = useQuery({
     queryKey: ["attendances_agentes", tid],
