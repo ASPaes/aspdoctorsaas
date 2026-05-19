@@ -296,7 +296,14 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
             <p className={`text-2xl font-semibold font-mono mt-0.5 ${metrics.avg_csat >= 4 ? "text-green-400" : metrics.avg_csat >= 3 ? "text-yellow-400" : "text-red-400"}`}>
               {metrics.avg_csat > 0 ? metrics.avg_csat : "—"}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{metrics.csat_count} avaliações</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {metrics.csat_count} avaliações
+              {metrics.csat_sent_count > 0 && (
+                <span className="ml-1">
+                  ({Math.round((metrics.csat_count / metrics.csat_sent_count) * 100)}% resposta)
+                </span>
+              )}
+            </p>
           </div>
         </div>
       )}
