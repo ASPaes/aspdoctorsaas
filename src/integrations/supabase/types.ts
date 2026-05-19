@@ -3549,6 +3549,8 @@ export type Database = {
           closed_reason: string | null
           closure_type: string | null
           contact_id: string
+          contact_name: string | null
+          contact_phone: string | null
           conversation_id: string
           created_at: string
           created_from: string | null
@@ -3562,6 +3564,7 @@ export type Database = {
           handoffs_count: number
           id: string
           inactivity_warning_sent_at: string | null
+          instance_id: string | null
           last_customer_message_at: string | null
           last_operator_message_at: string | null
           last_queue_reason: string | null
@@ -3615,6 +3618,8 @@ export type Database = {
           closed_reason?: string | null
           closure_type?: string | null
           contact_id: string
+          contact_name?: string | null
+          contact_phone?: string | null
           conversation_id: string
           created_at?: string
           created_from?: string | null
@@ -3628,6 +3633,7 @@ export type Database = {
           handoffs_count?: number
           id?: string
           inactivity_warning_sent_at?: string | null
+          instance_id?: string | null
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
@@ -3681,6 +3687,8 @@ export type Database = {
           closed_reason?: string | null
           closure_type?: string | null
           contact_id?: string
+          contact_name?: string | null
+          contact_phone?: string | null
           conversation_id?: string
           created_at?: string
           created_from?: string | null
@@ -3694,6 +3702,7 @@ export type Database = {
           handoffs_count?: number
           id?: string
           inactivity_warning_sent_at?: string | null
+          instance_id?: string | null
           last_customer_message_at?: string | null
           last_operator_message_at?: string | null
           last_queue_reason?: string | null
