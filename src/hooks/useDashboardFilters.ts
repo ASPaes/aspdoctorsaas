@@ -36,7 +36,7 @@ function getDefaults(): DashboardFilters {
   };
 }
 
-export function useDashboardFilters() {
+export function useDashboardFilters(globalUnidadeId?: number | null) {
   const [filters, setFilters] = useState<DashboardFilters>(() => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -45,7 +45,9 @@ export function useDashboardFilters() {
         if (parsed) return parsed;
       }
     } catch {}
-    return getDefaults();
+    const defaults = getDefaults();
+    if (globalUnidadeId) defaults.unidadeBaseId = globalUnidadeId;
+    return defaults;
   });
 
   useEffect(() => {
@@ -53,6 +55,17 @@ export function useDashboardFilters() {
       sessionStorage.setItem(STORAGE_KEY, serialize(filters));
     } catch {}
   }, [filters]);
+
+  useEffect(() => {
+    if (globalUnidadeId !== undefined) {
+      setFilters((prev) => {
+        if (prev.unidadeBaseId === null && globalUnidadeId !== null) {
+          return { ...prev, unidadeBaseId: globalUnidadeId };
+        }
+        return prev;
+      });
+    }
+  }, [globalUnidadeId]);
 
   return { filters, setFilters };
 }
