@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
 import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
+import { UnidadeFilterProvider } from "@/contexts/UnidadeFilterContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Loader2 } from "lucide-react";
 
