@@ -398,6 +398,56 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">CSAT</label>
+                    <Select value={csatFilter} onValueChange={setCsatFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="sent">CSAT enviado</SelectItem>
+                        <SelectItem value="not_sent">Sem envio de CSAT</SelectItem>
+                        <SelectItem value="answered">CSAT respondido</SelectItem>
+                        <SelectItem value="unanswered">CSAT não respondido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Nota CSAT</label>
+                    <Select value={csatScoreFilter} onValueChange={setCsatScoreFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas notas</SelectItem>
+                        <SelectItem value="1">⭐ 1</SelectItem>
+                        <SelectItem value="2">⭐ 2</SelectItem>
+                        <SelectItem value="3">⭐ 3</SelectItem>
+                        <SelectItem value="4">⭐ 4</SelectItem>
+                        <SelectItem value="5">⭐ 5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Ticket</label>
+                    <Select value={ticketFilter} onValueChange={setTicketFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="with">Com ticket</SelectItem>
+                        <SelectItem value="without">Sem ticket</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Sentimento IA</label>
+                    <Select value={sentimentFilter} onValueChange={setSentimentFilter}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="positive">😊 Positivo</SelectItem>
+                        <SelectItem value="neutral">😐 Neutro</SelectItem>
+                        <SelectItem value="negative">😠 Negativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 {activeFilterCount > 0 && (
                   <div className="flex justify-end mt-3 pt-3 border-t">
