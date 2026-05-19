@@ -14,6 +14,7 @@ import { Copy, TicketPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
+import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function AppLayout() {
@@ -22,6 +23,7 @@ export default function AppLayout() {
   const { profile } = useAuth();
   const canSeeDuplicates = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const [dupOpen, setDupOpen] = useState(false);
+  const [newTicketOpen, setNewTicketOpen] = useState(false);
 
   return (
     <SidebarProvider>
