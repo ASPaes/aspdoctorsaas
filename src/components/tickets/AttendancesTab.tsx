@@ -195,15 +195,15 @@ function AttendancesTab({ isAdminOrHead = true, userId = null, departmentFilter 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (effectiveAgente !== "all") q = q.eq("assigned_to", effectiveAgente);
       if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
-      if (closureTypeFilter !== "all") q = q.eq("closure_type", closureTypeFilter);
-      if (csatFilter === "sent") q = q.eq("csat_sent", true);
-      if (csatFilter === "not_sent") q = q.eq("csat_sent", false);
-      if (csatFilter === "answered") q = q.not("csat_score", "is", null);
-      if (csatFilter === "unanswered") { q = q.eq("csat_sent", true).is("csat_score", null); }
-      if (csatScoreFilter !== "all") q = q.eq("csat_score", parseInt(csatScoreFilter));
-      if (ticketFilter === "with") q = q.not("ticket_id", "is", null);
-      if (ticketFilter === "without") q = q.is("ticket_id", null);
-      if (sentimentFilter !== "all") q = q.eq("last_sentiment", sentimentFilter);
+      if (effectiveClosureType !== "all") q = q.eq("closure_type", effectiveClosureType);
+      if (effectiveCsatFilter === "sent") q = q.eq("csat_sent", true);
+      if (effectiveCsatFilter === "not_sent") q = q.eq("csat_sent", false);
+      if (effectiveCsatFilter === "answered") q = q.not("csat_score", "is", null);
+      if (effectiveCsatFilter === "unanswered") { q = q.eq("csat_sent", true).is("csat_score", null); }
+      if (effectiveCsatScoreFilter !== "all") q = q.eq("csat_score", parseInt(effectiveCsatScoreFilter));
+      if (effectiveTicketFilter === "with") q = q.not("ticket_id", "is", null);
+      if (effectiveTicketFilter === "without") q = q.is("ticket_id", null);
+      if (effectiveSentimentFilter !== "all") q = q.eq("last_sentiment", effectiveSentimentFilter);
       if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
 
       const { data, error, count } = await q;
