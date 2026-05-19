@@ -640,7 +640,7 @@ export function CreateSupportTicketModal({
           </Select>
 
           {/* Canal */}
-          <Select value={canalOrigem} onValueChange={setCanalOrigem}>
+          <Select value={canalOrigem} onValueChange={setCanalOrigem} disabled={fromClosure}>
             <SelectTrigger className="h-auto w-auto border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <CanalIcon className="h-3 w-3 shrink-0" />
