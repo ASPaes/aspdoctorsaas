@@ -4938,6 +4938,7 @@ export type Database = {
           dnd_start: string | null
           id: string
           master_enabled: boolean
+          notification_scope: string | null
           prefer_department_overrides: boolean
           push_enabled: boolean | null
           signature_name: string | null
@@ -4963,6 +4964,7 @@ export type Database = {
           dnd_start?: string | null
           id?: string
           master_enabled?: boolean
+          notification_scope?: string | null
           prefer_department_overrides?: boolean
           push_enabled?: boolean | null
           signature_name?: string | null
@@ -4988,6 +4990,7 @@ export type Database = {
           dnd_start?: string | null
           id?: string
           master_enabled?: boolean
+          notification_scope?: string | null
           prefer_department_overrides?: boolean
           push_enabled?: boolean | null
           signature_name?: string | null

@@ -37,6 +37,7 @@ interface Settings {
   alert_in_conversation: AlertMode;
   alert_other_conversation: AlertMode;
   alert_other_module: AlertMode;
+  notification_scope: string;
 }
 
 const DEFAULTS: Settings = {
@@ -52,6 +53,7 @@ const DEFAULTS: Settings = {
   alert_in_conversation: "tick",
   alert_other_conversation: "full",
   alert_other_module: "full",
+  notification_scope: "all",
 };
 
 const DAYS = [
@@ -75,8 +77,9 @@ function formatMutedUntil(iso: string | null): string {
 }
 
 export default function ConfiguracoesNotificacoes() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const uid = user?.id;
+  const isHeadOrAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const queryClient = useQueryClient();
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -134,6 +137,7 @@ export default function ConfiguracoesNotificacoes() {
         alert_in_conversation: settings.alert_in_conversation,
         alert_other_conversation: settings.alert_other_conversation,
         alert_other_module: settings.alert_other_module,
+        notification_scope: settings.notification_scope,
         updated_at: new Date().toISOString(),
       };
 
@@ -309,6 +313,52 @@ export default function ConfiguracoesNotificacoes() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Escopo de notificações */}
+      {isHeadOrAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Escopo de notificações</CardTitle>
+            <CardDescription>
+              Defina de quais conversas você recebe notificações como gestor
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Select
+              value={settings.notification_scope}
+              onValueChange={(v) => update("notification_scope", v)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div>
+                    <div className="font-medium">Todos os setores</div>
+                    <div className="text-xs text-muted-foreground">Recebe notificações de todas as conversas do WhatsApp</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="my_departments">
+                  <div>
+                    <div className="font-medium">Meus setores</div>
+                    <div className="text-xs text-muted-foreground">Apenas conversas dos setores em que você é membro</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="mine_only">
+                  <div>
+                    <div className="font-medium">Somente para mim</div>
+                    <div className="text-xs text-muted-foreground">Apenas conversas atribuídas diretamente a você</div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Esta configuração controla quais conversas geram notificações para você.
+              Conversas atribuídas diretamente a você sempre geram notificação, independente desta configuração.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Não perturbe */}
       <Card>
