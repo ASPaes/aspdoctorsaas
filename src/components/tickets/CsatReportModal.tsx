@@ -80,6 +80,23 @@ export function CsatReportModal({ open, onOpenChange, tenantId, dateFrom, dateTo
   const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editScore, setEditScore] = useState<number>(0);
+
+  const updateScore = useMutation({
+    mutationFn: async ({ csatId, newScore }: { csatId: string; newScore: number }) => {
+      const { error } = await (supabase.rpc as any)("update_csat_score", {
+        p_csat_id: csatId,
+        p_new_score: newScore,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: ["csat-report-list"] });
+      queryClient.invalidateQueries({ queryKey: ["csat-report-summary"] });
+    },
+  });
 
   const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
 
