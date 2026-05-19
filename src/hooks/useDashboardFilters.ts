@@ -59,8 +59,9 @@ export function useDashboardFilters(globalUnidadeId?: number | null) {
   useEffect(() => {
     if (globalUnidadeId !== undefined) {
       setFilters((prev) => {
-        if (prev.unidadeBaseId === null && globalUnidadeId !== null) {
-          return { ...prev, unidadeBaseId: globalUnidadeId };
+        const newId = globalUnidadeId ?? null;
+        if (prev.unidadeBaseId !== newId) {
+          return { ...prev, unidadeBaseId: newId };
         }
         return prev;
       });
