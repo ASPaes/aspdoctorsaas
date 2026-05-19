@@ -64,7 +64,7 @@ export function AttendanceChatHistoryModal({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["attendance_chat_history", conversationId, openedAt, closedAt],
+    queryKey: ["attendance_chat_history", conversationId, openedAt, closedAt, csatRespondedAt],
     enabled: !!conversationId && open,
     queryFn: async () => {
       let q = (supabase.from("whatsapp_messages" as any) as any)
@@ -76,10 +76,13 @@ export function AttendanceChatHistoryModal({
         .order("timestamp", { ascending: true });
       if (openedAt) q = q.gte("timestamp", openedAt);
       if (closedAt) {
-        const closedPlus = new Date(
-          new Date(closedAt).getTime() + 20 * 60000
-        ).toISOString();
-        q = q.lte("timestamp", closedPlus);
+        let upperBound: string;
+        if (csatRespondedAt) {
+          upperBound = new Date(new Date(csatRespondedAt).getTime() + 30000).toISOString();
+        } else {
+          upperBound = new Date(new Date(closedAt).getTime() + 60000).toISOString();
+        }
+        q = q.lte("timestamp", upperBound);
       }
       q = q.limit(500);
       const { data, error } = await q;
