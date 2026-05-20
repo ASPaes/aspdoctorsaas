@@ -661,15 +661,13 @@ function ProdutoDialog({
     }
     await executeSave();
   };
-          <div className="space-y-1">
-            <Label>Produto *</Label>
-            <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {produtos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Editar Produto" : "Adicionar Produto"}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label>Fornecedor</Label>
             <Select value={fornecedorId || "__none__"} onValueChange={(v) => setFornecedorId(v === "__none__" ? "" : v)}>
@@ -679,6 +677,22 @@ function ProdutoDialog({
                 {fornecedores.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Produto *</Label>
+            <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit && !canSwapProduto}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {produtos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {isEdit && !canSwapProduto && (
+              <p className="text-xs text-muted-foreground">
+                {modulosCountForEdit > 0
+                  ? "Remova os módulos vinculados para trocar o produto."
+                  : "Apenas admin pode trocar o produto."}
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Código Fornecedor</Label>
@@ -714,6 +728,42 @@ function ProdutoDialog({
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />} Salvar
           </Button>
         </DialogFooter>
+
+        <AlertDialog open={confirmSwapOpen} onOpenChange={setConfirmSwapOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Confirmar troca de produto
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p>Você está prestes a trocar o produto deste registro. Esta ação:</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Atualizará o produto vinculado ao cliente</li>
+                    <li>Sobrescreverá a descrição dos itens de contrato apontados</li>
+                    <li><strong>NÃO altera valores</strong> (mensal/ativação) do contrato — revise manualmente se necessário</li>
+                  </ul>
+                  <p className="text-amber-500 font-medium">
+                    Use apenas para correção de erro de cadastro.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                type="button"
+                onClick={async () => {
+                  setConfirmSwapOpen(false);
+                  await executeSave();
+                }}
+              >
+                Trocar produto
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
