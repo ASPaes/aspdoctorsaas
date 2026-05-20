@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus } from "lucide-react";
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -22,6 +22,8 @@ const tipoLabels: Record<string, string> = {
   cross_sell: "Cross-sell",
   downsell: "Downsell",
   venda_avulsa: "Venda Avulsa",
+  reactivation: "Reativação",
+  churn: "Churn",
 };
 
 const tipoBadgeStyles: Record<string, string> = {
@@ -29,6 +31,8 @@ const tipoBadgeStyles: Record<string, string> = {
   cross_sell: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   downsell: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
   venda_avulsa: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
+  reactivation: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  churn: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
 type SortField = "data_movimento" | "tipo" | "valor_delta" | "cliente_nome" | "funcionario_nome";
@@ -111,8 +115,10 @@ export default function MovimentosMrrTab() {
     const crossSell = items.filter(m => m.tipo === "cross_sell").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const downsell = items.filter(m => m.tipo === "downsell").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
     const vendaAvulsa = items.filter(m => m.tipo === "venda_avulsa").reduce((s, m) => s + (Number(m.valor_venda_avulsa) || 0), 0);
+    const reactivation = items.filter(m => m.tipo === "reactivation").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
+    const churn = items.filter(m => m.tipo === "churn").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
     const qtdTotal = items.length;
-    return { upsell, crossSell, downsell, vendaAvulsa, qtdTotal };
+    return { upsell, crossSell, downsell, vendaAvulsa, reactivation, churn, qtdTotal };
   }, [movimentos]);
 
   // Sorted data
@@ -170,6 +176,8 @@ export default function MovimentosMrrTab() {
               <SelectItem value="upsell">Upsell</SelectItem>
               <SelectItem value="cross_sell">Cross-sell</SelectItem>
               <SelectItem value="downsell">Downsell</SelectItem>
+              <SelectItem value="reactivation">Reativação</SelectItem>
+              <SelectItem value="churn">Churn</SelectItem>
               <SelectItem value="venda_avulsa">Venda Avulsa</SelectItem>
             </SelectContent>
           </Select>
@@ -189,7 +197,7 @@ export default function MovimentosMrrTab() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-medium text-muted-foreground">Upsell</CardTitle>
@@ -220,6 +228,28 @@ export default function MovimentosMrrTab() {
           <CardContent>
             {isLoading ? <Skeleton className="h-6 w-20" /> : (
               <p className="text-lg font-bold text-orange-700 dark:text-orange-400">-{fmt.format(totals.downsell)}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Reativação</CardTitle>
+            <RefreshCw className="h-4 w-4 text-emerald-600" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-6 w-20" /> : (
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">+{fmt.format(totals.reactivation)}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Churn</CardTitle>
+            <UserMinus className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-6 w-20" /> : (
+              <p className="text-lg font-bold text-red-700 dark:text-red-400">-{fmt.format(totals.churn)}</p>
             )}
           </CardContent>
         </Card>
