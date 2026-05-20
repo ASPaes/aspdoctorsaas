@@ -578,6 +578,31 @@ export const useWhatsAppActions = () => {
     },
   });
 
+  const resendMessageMutation = useMutation({
+    mutationFn: async ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
+      const { data, error } = await supabase.functions.invoke('resend-failed-message', {
+        body: { messageId },
+      });
+      if (error) {
+        const errBody = (error as any)?.context?.error || (error as any)?.message || 'Erro ao reenviar';
+        throw new Error(errBody);
+      }
+      if (data && data.success === false) {
+        throw new Error(data.error || 'Erro ao reenviar');
+      }
+      return { messageId, conversationId, retryCount: data?.retryCount, maxRetries: data?.maxRetries };
+    },
+    onSuccess: (data) => {
+      toast.success(`Mensagem reenviada (tentativa ${data.retryCount}/${data.maxRetries})`);
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', data.conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || 'Erro ao reenviar mensagem';
+      toast.error(msg);
+    },
+  });
+
   return {
     archiveConversation: archiveMutation.mutate,
     isArchiving: archiveMutation.isPending,
@@ -601,5 +626,7 @@ export const useWhatsAppActions = () => {
     isUnschedulingAttendance: unscheduleAttendanceMutation.isPending,
     toggleRulesDisabled: toggleRulesDisabledMutation.mutate,
     isTogglingRulesDisabled: toggleRulesDisabledMutation.isPending,
+    resendMessage: resendMessageMutation.mutate,
+    isResendingMessage: resendMessageMutation.isPending,
   };
 };

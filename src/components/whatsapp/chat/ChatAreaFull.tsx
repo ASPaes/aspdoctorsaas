@@ -11,6 +11,7 @@ import { ChatInput } from "./ChatInput";
 import { DetailsSidebar } from "./DetailsSidebar";
 import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { useDeleteMessages } from "../hooks/useDeleteMessages";
+import { useWhatsAppActions } from "../hooks/useWhatsAppActions";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { NewConversationModal } from "../conversations/NewConversationModal";
@@ -71,6 +72,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const [saveContactName, setSaveContactName] = useState('');
 
   const deleteMutation = useDeleteMessages();
+  const { resendMessage } = useWhatsAppActions();
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
@@ -136,6 +138,11 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const handleForwardSingle = (msgId: string) => {
     setForwardIds([msgId]);
     setForwardOpen(true);
+  };
+
+  const handleResendFailed = (msgId: string) => {
+    if (!conversation) return;
+    resendMessage({ messageId: msgId, conversationId: conversation.id });
   };
 
   const handleBulkDeletePanelOnly = () => {
@@ -241,6 +248,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onDeleteEveryone={handleDeleteEveryone}
           onRetryDelete={handleRetryDelete}
           onForwardSingle={handleForwardSingle}
+          onResendFailed={handleResendFailed}
           onEnterSelectionMode={enterSelectionMode}
           onContactChat={handleContactChat}
           onContactSave={handleContactSave}
