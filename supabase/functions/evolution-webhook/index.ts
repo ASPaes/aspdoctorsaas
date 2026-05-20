@@ -533,9 +533,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       }
       if (!fbInstance) { console.error(`${LOG} FALLBACK: instance not found`); return; }
 
-      const fbVariants = [fbPhone];
-      if (fbPhone.startsWith('55') && fbPhone.length === 13) fbVariants.push(fbPhone.slice(0, 4) + fbPhone.slice(5));
-      if (fbPhone.startsWith('55') && fbPhone.length === 12) fbVariants.push(fbPhone.slice(0, 4) + '9' + fbPhone.slice(4));
+      const fbVariants = phoneSearchVariants(fbPhone);
 
       let { data: fbContact } = await supabase.from('whatsapp_contacts')
         .select('id').eq('tenant_id', fbInstance.tenant_id)
