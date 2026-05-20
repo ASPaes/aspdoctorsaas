@@ -368,9 +368,7 @@ export async function findOrCreateContact(
   isGroup: boolean, isFromMe: boolean, tenantId: string,
 ): Promise<string | null> {
   try {
-    const variants = [phoneNumber];
-    if (phoneNumber.startsWith('55') && phoneNumber.length === 13) variants.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
-    if (phoneNumber.startsWith('55') && phoneNumber.length === 12) variants.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
+    const variants = phoneSearchVariants(phoneNumber);
 
     const { data: existing } = await supabase.from('whatsapp_contacts').select('id, name, phone_number').eq('tenant_id', tenantId).eq('instance_id', instanceId).in('phone_number', variants).maybeSingle();
 
