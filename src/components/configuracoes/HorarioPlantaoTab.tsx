@@ -436,6 +436,20 @@ export default function HorarioPlantaoTab() {
               </Label>
             </div>
 
+            {selectedContext !== "global" && !bhEnabled && (
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                <span className="text-blue-400 mt-0.5 text-lg">ℹ️</span>
+                <div>
+                  <p className="text-sm text-blue-300">
+                    Este setor está usando o horário global.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ative o controle acima para definir um horário personalizado para este setor.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {bhEnabled && (
               <>
                 {/* Timezone (only global) */}
@@ -557,10 +571,40 @@ export default function HorarioPlantaoTab() {
               </>
             )}
 
-            <Button onClick={handleSaveBH} disabled={saveBH.isPending} size="sm">
-              {saveBH.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
-              {selectedContext === "global" ? "Salvar Horário" : `Salvar Horário - ${deptRows.find((d) => d.id === selectedContext)?.name || "Setor"}`}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleSaveBH} disabled={saveBH.isPending} size="sm">
+                {saveBH.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                {selectedContext === "global" ? "Salvar Horário" : `Salvar Horário - ${deptRows.find((d) => d.id === selectedContext)?.name || "Setor"}`}
+              </Button>
+              {selectedContext !== "global" && bhEnabled && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={async () => {
+                    try {
+                      const { error } = await (supabase.from("support_departments" as any) as any)
+                        .update({
+                          business_hours_enabled: false,
+                          business_hours: {},
+                          business_hours_message: null,
+                        })
+                        .eq("id", selectedContext);
+                      if (error) throw error;
+                      setBhEnabled(false);
+                      qcDept.invalidateQueries({ queryKey: ["dept-business-hours", deptTid] });
+                      const deptName = deptRows.find((d) => d.id === selectedContext)?.name || "Setor";
+                      toast({ title: `Setor ${deptName} restaurado para horário global.` });
+                    } catch (err: any) {
+                      toast({ title: "Erro ao restaurar", description: err.message, variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Clock className="h-4 w-4 mr-1" />
+                  Restaurar horário global
+                </Button>
+              )}
+            </div>
           </AccordionContent>
         </AccordionItem>
 
