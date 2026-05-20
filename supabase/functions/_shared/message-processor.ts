@@ -1393,8 +1393,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
       .maybeSingle();
     if (contactRules?.rules_disabled === true) {
       console.log(`[processor] rules_disabled=true on contact ${contactId} — skipping ALL automation for conversation ${conversationId}`);
-          await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
-          return;
+      return;
     }
   }
 
