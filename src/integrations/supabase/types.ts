@@ -6345,6 +6345,7 @@ export type Database = {
           data_reajuste: string | null
           data_reativacao: string | null
           data_venda: string | null
+          data_venda_efetiva: string | null
           email: string | null
           estado_id: number | null
           fator_preco_cogs_x: number | null
