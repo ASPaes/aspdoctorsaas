@@ -226,12 +226,23 @@ export default function ClienteContratosSection({ clienteId }: Props) {
   );
 
   const invalidate = () => {
+    // Contratos e itens do cliente atual
     qc.invalidateQueries({ queryKey: ["contratos_cliente", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["contrato_itens_cliente", tid, clienteId] });
-    // Cancelar/reativar contrato altera produtos e módulos — invalidar seção Produtos & Módulos
+    // Produtos e módulos (afetados por cancel/reativar)
     qc.invalidateQueries({ queryKey: ["cliente_produtos", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["cliente_produto_modulos", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["contratos_totais_check", tid, clienteId] });
+    // Cliente individual (status, mensalidade)
+    qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
+    // Lista de clientes (lista principal da página /clientes)
+    qc.invalidateQueries({ queryKey: ["clientes"] });
+    // Movimentos MRR (tab na página de clientes)
+    qc.invalidateQueries({ queryKey: ["movimentos_mrr_list"] });
+    // Dashboard principal (todos os indicadores)
+    qc.invalidateQueries({ queryKey: ["unit-economics-saas"] });
+    // Contrato eventos (timeline, histórico)
+    qc.invalidateQueries({ queryKey: ["contrato_eventos"] });
   };
 
   const isLoading = contratosQuery.isLoading;
@@ -464,7 +475,6 @@ export default function ClienteContratosSection({ clienteId }: Props) {
         tid={tid}
         onSuccess={() => {
           invalidate();
-          qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
           setCancelDialog({ open: false, contrato: null });
         }}
       />
@@ -476,7 +486,6 @@ export default function ClienteContratosSection({ clienteId }: Props) {
         ativosCount={ativosCount}
         onSuccess={() => {
           invalidate();
-          qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
           setReativarDialog({ open: false, contrato: null });
         }}
       />
