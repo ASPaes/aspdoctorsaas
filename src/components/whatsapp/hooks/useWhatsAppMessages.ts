@@ -176,7 +176,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     const channelName = `msgs-${conversationId.slice(0, 8)}-${uid}`;
 
     if (import.meta.env.DEV) {
-      console.log(`[realtime] subscribing messages conversationId=${conversationId}`);
     }
 
     const channel = supabase
@@ -189,7 +188,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
       }, (payload) => {
         const incoming = normalizeMessage(payload.new as any);
         if (import.meta.env.DEV) {
-          console.log(`[realtime] new message id=${incoming.id} conv=${conversationId}`);
         }
         queryClient.setQueryData(
           ['whatsapp', 'messages', conversationId],
@@ -224,7 +222,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
       })
       .subscribe((status) => {
         if (import.meta.env.DEV) {
-          console.log(`[realtime] channel ${channelName} status: ${status}`);
         }
         if (status === 'SUBSCRIBED') {
           retryCountRef.current = 0;

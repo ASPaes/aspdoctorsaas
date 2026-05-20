@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Users, DollarSign, Rocket, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
-import { PieChartCard } from '../charts/PieChartCard';
-import { BarChartCard } from '../charts/BarChartCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';

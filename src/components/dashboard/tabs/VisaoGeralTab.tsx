@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Users, DollarSign, TrendingUp, Target, BarChart3, Percent, ShieldCheck, AlertTriangle, Clock, RefreshCw, Zap, UserX } from 'lucide-react';
+import { Users, DollarSign, Target, BarChart3, Percent, ShieldCheck, AlertTriangle, Clock, RefreshCw, Zap, UserX } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';

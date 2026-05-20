@@ -4,7 +4,7 @@ import { useDepartmentFilter, DepartmentFilterProvider } from "@/contexts/Depart
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, SmilePlus, Building2, User, Timer, Zap, Trophy, HelpCircle } from "lucide-react";
+import { ArrowLeft, MessageSquare, Users, Clock, TrendingUp, BarChart3, Send, Inbox, CheckCircle2, Download, Building2, User, Timer, Zap, Trophy, HelpCircle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppMetrics, type WhatsAppMetricsFilters } from "@/components/whatsapp/hooks/useWhatsAppMetrics";

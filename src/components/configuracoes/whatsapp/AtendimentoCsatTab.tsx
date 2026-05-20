@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Save, Loader2, Plus, Trash2 } from "lucide-react";
+import { Save, Loader2, Trash2 } from "lucide-react";
 import UraOptionsManager from "./UraOptionsManager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NumericInput } from "@/components/ui/numeric-input";

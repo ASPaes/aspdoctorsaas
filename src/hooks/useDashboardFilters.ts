@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import type { DashboardFilters } from '@/components/dashboard/types';
 

@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { useAgentPresence, type AgentStatus } from "@/hooks/useAgentPresence";
 import { usePauseTimer, formatCountdown } from "@/hooks/usePauseTimer";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,

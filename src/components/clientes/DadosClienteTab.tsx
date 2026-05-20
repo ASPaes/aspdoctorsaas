@@ -18,7 +18,7 @@ import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useContactDiagnosis, type SavedEvaluation } from "@/components/whatsapp/hooks/useContactDiagnosis";
+import { useContactDiagnosis } from "@/components/whatsapp/hooks/useContactDiagnosis";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
 
 interface Props {

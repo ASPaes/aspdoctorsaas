@@ -21,7 +21,6 @@ export const useWhatsAppSend = () => {
 
   const mutation = useMutation({
     mutationFn: async (params: SendMessageParams) => {
-      console.log(`[useWhatsAppSend] Sending via send-whatsapp-message for conversation ${params.conversationId}`);
       const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
         body: params,
       });

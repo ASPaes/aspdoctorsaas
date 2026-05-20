@@ -100,7 +100,6 @@ export function ChatMessages({
 
     lastRefetchedMessageAtRef.current = lastMessageAt;
     if (import.meta.env.DEV) {
-      console.log(`[realtime] fallback refetch conv=${conversationId} lastMessageAt=${lastMessageAt}`);
     }
     queryClient.invalidateQueries({ queryKey: ['whatsapp', 'messages', conversationId] });
   }, [conversationId, lastMessageAt, messages, queryClient]);

@@ -285,7 +285,6 @@ export const useWhatsAppActions = () => {
                       systemMessage: true,
                     },
                   });
-                  console.log('[closeConversation] CSAT survey sent — closure message deferred until CSAT completes');
                 }
               } catch (csatErr) {
                 console.error('[closeConversation] Error sending CSAT survey:', csatErr);
@@ -303,7 +302,6 @@ export const useWhatsAppActions = () => {
                       systemMessage: true,
                     },
                   });
-                  console.log('[closeConversation] Closure message sent (no CSAT)');
                 } catch (sendErr) {
                   console.error('[closeConversation] Error sending closure message:', sendErr);
                 }
@@ -347,7 +345,7 @@ export const useWhatsAppActions = () => {
               body: { attendanceId: activeAtt.id },
             }).then((res) => {
               if (res.error) console.error('[closeConversation] finalize-attendance error:', res.error);
-              else console.log('[closeConversation] finalize-attendance completed:', res.data);
+
             }).catch((err) => {
               console.error('[closeConversation] finalize-attendance failed:', err);
             });

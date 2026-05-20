@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { usePauseTimer, formatCountdown } from "@/hooks/usePauseTimer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Play, Coffee, Clock, Plus, Loader2, Timer, AlertTriangle } from "lucide-react";
+import { Play, Coffee, Clock, Plus, Loader2, Timer } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AgentPresenceOverlay() {

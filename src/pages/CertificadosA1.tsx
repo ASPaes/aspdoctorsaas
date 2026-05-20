@@ -9,7 +9,6 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { format, addMonths, differenceInDays, parseISO, addDays, subDays } from "date-fns";
 import { formatBRPhone } from "@/lib/phoneBR";
-import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
