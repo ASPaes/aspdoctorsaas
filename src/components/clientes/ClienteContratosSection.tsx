@@ -475,7 +475,6 @@ export default function ClienteContratosSection({ clienteId }: Props) {
         tid={tid}
         onSuccess={() => {
           invalidate();
-          qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
           setCancelDialog({ open: false, contrato: null });
         }}
       />
