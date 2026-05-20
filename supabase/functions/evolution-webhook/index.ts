@@ -261,13 +261,7 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 
     // ── Find or create contact — com variantes de número e vínculo ao cliente ──
     // Montar variantes (com/sem 9 dígito)
-    const phoneVariants: string[] = [phone];
-    if (phone.startsWith('55') && phone.length === 13) {
-      phoneVariants.push(phone.slice(0, 4) + phone.slice(5)); // remove o 9
-    }
-    if (phone.startsWith('55') && phone.length === 12) {
-      phoneVariants.push(phone.slice(0, 4) + '9' + phone.slice(4)); // adiciona o 9
-    }
+    const phoneVariants: string[] = phoneSearchVariants(phone);
 
     // Buscar cliente pelo telefone (qualquer variante)
     const { data: clienteRow } = await supabase.from('clientes')
