@@ -80,8 +80,8 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       // === QUERY A: All clients ===
       const allClientes = await fetchAllRows<any>(() => {
         let q = supabase
-          .from('clientes')
-          .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, data_venda_efetiva, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
         if (tid) q = q.eq('tenant_id', tid);
         return q;
       });
