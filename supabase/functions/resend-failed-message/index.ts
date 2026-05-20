@@ -1,3 +1,4 @@
+// Edge Function: reenvio de mensagens WhatsApp com falha (status='failed')
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 
