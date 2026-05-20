@@ -109,10 +109,10 @@ export default function ClienteContratosSection({ clienteId }: Props) {
     queryKey: ["motivos_cancelamento", tid],
     queryFn: async () => {
       const { data, error } = await tf(
-        (supabase.from("motivos_cancelamento" as any) as any).select("id, nome").order("nome")
+        (supabase.from("motivos_cancelamento" as any) as any).select("id, descricao").order("descricao")
       );
       if (error) throw error;
-      return (data ?? []) as Array<{ id: number; nome: string }>;
+      return (data ?? []) as Array<{ id: number; descricao: string }>;
     },
     staleTime: 30 * 60 * 1000,
   });
@@ -867,7 +867,7 @@ interface CancelarContratoDialogProps {
   onOpenChange: (v: boolean) => void;
   contrato: Contrato | null;
   clienteNome: string;
-  motivosCancelamento: Array<{ id: number; nome: string }>;
+  motivosCancelamento: Array<{ id: number; descricao: string }>;
   ativosCount: number;
   tid: string | null | undefined;
   onSuccess: () => void;
@@ -968,7 +968,7 @@ function CancelarContratoDialog({
               </SelectTrigger>
               <SelectContent>
                 {motivosCancelamento.map((m) => (
-                  <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>
+                  <SelectItem key={m.id} value={String(m.id)}>{m.descricao}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
