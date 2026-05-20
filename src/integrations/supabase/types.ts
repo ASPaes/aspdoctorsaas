@@ -6372,6 +6372,7 @@ export type Database = {
           observacao_reativacao: string | null
           origem_venda_id: number | null
           produto_id: number | null
+          qtde_contratos_ativos: number | null
           razao_social: string | null
           reativado_por_user_id: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
