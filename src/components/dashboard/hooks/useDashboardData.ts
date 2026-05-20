@@ -83,10 +83,10 @@ export function useDashboardData(filters: DashboardFilters) {
       // 2. Novos clientes no período (inclui os que cancelaram dentro do mesmo período — early churn)
       const novosClientes = await fetchAllRows<any>(() => {
         let q = supabase
-          .from('clientes')
-          .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
-          .gte('data_cadastro', periodoInicioStr)
-          .lte('data_cadastro', periodoFimStr);
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, valor_ativacao, data_venda_efetiva, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
+          .gte('data_venda_efetiva', periodoInicioStr)
+          .lte('data_venda_efetiva', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
