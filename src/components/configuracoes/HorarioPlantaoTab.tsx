@@ -436,6 +436,20 @@ export default function HorarioPlantaoTab() {
               </Label>
             </div>
 
+            {selectedContext !== "global" && !bhEnabled && (
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                <span className="text-blue-400 mt-0.5 text-lg">ℹ️</span>
+                <div>
+                  <p className="text-sm text-blue-300">
+                    Este setor está usando o horário global.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ative o controle acima para definir um horário personalizado para este setor.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {bhEnabled && (
               <>
                 {/* Timezone (only global) */}
