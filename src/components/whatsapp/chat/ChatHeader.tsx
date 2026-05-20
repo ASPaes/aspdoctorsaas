@@ -102,8 +102,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   const isAfterHours = useMemo(() => {
     const convAny = conversation as any;
-    return !!convAny.opened_out_of_hours_at && !convAny.out_of_hours_cleared_at;
-  }, [(conversation as any).opened_out_of_hours_at, (conversation as any).out_of_hours_cleared_at]);
+    return convAny.opened_out_of_hours === true;
+  }, [(conversation as any).opened_out_of_hours]);
 
   const handleClearAfterHours = useCallback(async () => {
     const nowIso = new Date().toISOString();
