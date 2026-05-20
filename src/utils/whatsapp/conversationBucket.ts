@@ -26,10 +26,8 @@ export interface ConversationStateRow {
 }
 
 export function getConversationBucket(row: ConversationStateRow): ConversationBucket {
-  // Aguardando carregamento — não classificar ainda
   if (row.attendance_status === "loading") return "in_progress";
 
-  // 1. Closed conversation or closed/inactive attendance
   if (
     row.conversation_status === "closed" ||
     row.attendance_status === "closed" ||
@@ -38,22 +36,20 @@ export function getConversationBucket(row: ConversationStateRow): ConversationBu
     return "closed";
   }
 
-  // 2. Active attendance in progress
   if (row.attendance_status === "in_progress") {
     return "in_progress";
   }
 
-  // 2.5 No active attendance — should not be in queue
-  if (!row.attendance_status) {
-    return "closed";
-  }
-
-  // 3. Waiting + opened out of hours (not yet attended)
+  // Fora do horário — com ou sem attendance (pode não ter se ninguém está online)
   if (row.opened_out_of_hours) {
     return "waiting_out_of_hours";
   }
 
-  // 4. Default: waiting in hours (queue)
+  // Sem attendance e não é fora do horário — não pertence a nenhuma fila ativa
+  if (!row.attendance_status) {
+    return "closed";
+  }
+
   return "waiting_in_hours";
 }
 
