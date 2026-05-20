@@ -27,6 +27,7 @@ interface Props {
   onDeleteEveryone?: (msgId: string) => void;
   onRetryDelete?: (msgId: string) => void;
   onForward?: (msgId: string) => void;
+  onResendFailed?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
   onContactChat?: (phone: string, name: string) => void;
   onContactSave?: (phone: string, name: string) => void;
@@ -51,6 +52,7 @@ export function MessageBubble({
   onDeleteEveryone,
   onRetryDelete,
   onForward,
+  onResendFailed,
   onEnterSelectionMode,
   onContactChat,
   onContactSave,
@@ -404,6 +406,18 @@ export function MessageBubble({
           </DropdownMenuItem>
         )}
         {canDeletePanelOnly(msg) && <DropdownMenuSeparator />}
+        {isFromMe && msg.status === 'failed' && onResendFailed && (
+          <>
+            <DropdownMenuItem
+              onClick={() => onResendFailed(msg.id)}
+              className="text-amber-600 dark:text-amber-400 focus:text-amber-600 dark:focus:text-amber-400"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reenviar mensagem
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
           <Forward className="h-4 w-4 mr-2" />
           Encaminhar

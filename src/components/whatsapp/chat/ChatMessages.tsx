@@ -24,6 +24,7 @@ interface Props {
   onDeleteEveryone?: (msgId: string) => void;
   onRetryDelete?: (msgId: string) => void;
   onForwardSingle?: (msgId: string) => void;
+  onResendFailed?: (msgId: string) => void;
   onEnterSelectionMode?: (msgId: string) => void;
   onContactChat?: (phone: string, name: string) => void;
   onContactSave?: (phone: string, name: string) => void;
@@ -50,6 +51,7 @@ export function ChatMessages({
   onDeleteEveryone,
   onRetryDelete,
   onForwardSingle,
+  onResendFailed,
   onEnterSelectionMode,
   onContactChat,
   onContactSave,
@@ -363,6 +365,7 @@ export function ChatMessages({
                         onDeleteEveryone={onDeleteEveryone}
                         onRetryDelete={onRetryDelete}
                         onForward={onForwardSingle}
+                        onResendFailed={onResendFailed}
                         onEnterSelectionMode={onEnterSelectionMode}
                         onContactChat={onContactChat}
                         onContactSave={onContactSave}
