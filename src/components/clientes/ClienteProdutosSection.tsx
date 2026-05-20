@@ -535,7 +535,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 
 // ============ Produto Dialog ============
 function ProdutoDialog({
-  open, edit, onClose, clienteId, tid, produtos, fornecedores, onSaved,
+  open, edit, onClose, clienteId, tid, produtos, fornecedores, onSaved, modulosCountForEdit,
 }: {
   open: boolean;
   edit: ClienteProduto | null;
@@ -545,8 +545,13 @@ function ProdutoDialog({
   produtos: { id: number; nome: string }[];
   fornecedores: { id: number; nome: string }[];
   onSaved: () => void;
+  modulosCountForEdit: number;
 }) {
   const isEdit = !!edit;
+  const { profile } = useAuth();
+  const isSuperAdmin = profile?.is_super_admin === true;
+  const isTenantAdmin = profile?.role === "admin";
+  const canSwapProduto = isEdit && (isSuperAdmin || isTenantAdmin) && modulosCountForEdit === 0;
   const [produtoId, setProdutoId] = useState<string>("");
   const [fornecedorId, setFornecedorId] = useState<string>("");
   const [codigo, setCodigo] = useState("");
@@ -556,6 +561,10 @@ function ProdutoDialog({
   const [vlrMensal, setVlrMensal] = useState<number | null>(null);
   const [vlrCusto, setVlrCusto] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmSwapOpen, setConfirmSwapOpen] = useState(false);
+
+  const produtoIdOriginal = edit?.produto_id ? String(edit.produto_id) : "";
+  const produtoTrocou = isEdit && produtoId !== "" && produtoId !== produtoIdOriginal;
 
   // Reset on open
   useMemo(() => {
