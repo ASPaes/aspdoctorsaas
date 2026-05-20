@@ -727,7 +727,7 @@ export function useDashboardData(filters: DashboardFilters) {
           id: c.id,
           razaoSocial: c.razao_social || '(sem nome)',
           nomeFantasia: c.nome_fantasia || null,
-          dataVenda: c.data_venda || c.data_cadastro || '',
+          dataVenda: c.data_venda_efetiva || '',
           vendedor: c.funcionario_id ? (funcMap[c.funcionario_id] || '—') : '—',
           origem: c.origem_venda_id ? (origemMap[c.origem_venda_id] || '—') : '—',
           valorAtivacao: Number(c.valor_ativacao) || 0,
