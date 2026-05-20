@@ -460,8 +460,8 @@ export function useDashboardData(filters: DashboardFilters) {
 
         // Clients active at START of month (for churn rate denominator)
         const activosInicioMes = (allClientes || []).filter(c => {
-          if (!c.data_cadastro) return false;
-          if (new Date(c.data_cadastro) >= startDate) return false;
+          if (!c.data_venda_efetiva) return false;
+          if (new Date(c.data_venda_efetiva) >= startDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) < startDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
@@ -469,8 +469,8 @@ export function useDashboardData(filters: DashboardFilters) {
         });
 
         const activosNoMes = (allClientes || []).filter(c => {
-          if (!c.data_cadastro) return false;
-          if (new Date(c.data_cadastro) > endDate) return false;
+          if (!c.data_venda_efetiva) return false;
+          if (new Date(c.data_venda_efetiva) > endDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) <= endDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
