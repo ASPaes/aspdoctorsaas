@@ -260,9 +260,8 @@ export default function Clientes() {
       const now = new Date();
       const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
       const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
-      q = q.eq("cancelado", false)
-        .gte("data_venda", firstDay)
-        .lte("data_venda", lastDay);
+      q = q.gte("data_venda_efetiva", firstDay)
+        .lte("data_venda_efetiva", lastDay);
     } else {
       if (status === "ativos") q = q.eq("cancelado", false);
       else if (status === "cancelados") q = q.eq("cancelado", true);
@@ -396,9 +395,8 @@ export default function Clientes() {
         .from("vw_clientes_financeiro")
         .select("id", { count: "exact", head: true })) as any;
 
-      q = q.eq("cancelado", false)
-        .gte("data_venda", firstDay)
-        .lte("data_venda", lastDay);
+      q = q.gte("data_venda_efetiva", firstDay)
+        .lte("data_venda_efetiva", lastDay);
 
       if (debouncedSearch) {
         const s = `%${escapeLike(debouncedSearch)}%`;
