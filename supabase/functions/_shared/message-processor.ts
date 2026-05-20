@@ -1440,6 +1440,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
           if (!bh.inside) {
             const nowIso = new Date().toISOString();
             await supabase.from('whatsapp_conversations').update({ status: 'active', opened_out_of_hours: true, opened_out_of_hours_at: timestamp, updated_at: nowIso }).eq('id', conversationId);
+            await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
             return;
           }
         }
