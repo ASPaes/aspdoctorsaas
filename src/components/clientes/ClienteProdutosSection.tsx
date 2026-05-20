@@ -459,6 +459,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         produtos={produtosLookup.data ?? []}
         fornecedores={fornecedoresLookup.data ?? []}
         onSaved={invalidateAll}
+        modulosCountForEdit={produtoDialog.edit ? (modulosByProduto[produtoDialog.edit.id]?.length ?? 0) : 0}
       />
 
       <ModuloDialog
