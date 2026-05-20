@@ -63,8 +63,8 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesRaw = await fetchAllRows<any>(() => {
         let q = supabase
           .from('vw_clientes_financeiro')
-          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
-          .lte('data_cadastro', periodoFimStr);
+          .select('id, mensalidade, data_cadastro, data_venda_efetiva, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
+          .lte('data_venda_efetiva', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
@@ -83,10 +83,10 @@ export function useDashboardData(filters: DashboardFilters) {
       // 2. Novos clientes no período (inclui os que cancelaram dentro do mesmo período — early churn)
       const novosClientes = await fetchAllRows<any>(() => {
         let q = supabase
-          .from('clientes')
-          .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
-          .gte('data_cadastro', periodoInicioStr)
-          .lte('data_cadastro', periodoFimStr);
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, valor_ativacao, data_venda_efetiva, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
+          .gte('data_venda_efetiva', periodoInicioStr)
+          .lte('data_venda_efetiva', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
@@ -164,9 +164,9 @@ export function useDashboardData(filters: DashboardFilters) {
       // 4. Clientes início do período (snapshot temporal)
       const clientesInicioFull = await fetchAllRows<any>(() => {
         let q = supabase
-          .from('clientes')
+          .from('vw_clientes_financeiro')
           .select('id, mensalidade, data_cancelamento, cancelado')
-          .lt('data_cadastro', periodoInicioStr);
+          .lt('data_venda_efetiva', periodoInicioStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
@@ -369,11 +369,10 @@ export function useDashboardData(filters: DashboardFilters) {
 
       const prevNovos = await fetchAllRows<any>(() => {
         let prevNovosQuery = supabase
-          .from('clientes')
+          .from('vw_clientes_financeiro')
           .select('id, mensalidade, valor_ativacao')
-          .gte('data_cadastro', prevMonthStart)
-          .lte('data_cadastro', prevMonthEnd)
-          .eq('cancelado', false);
+          .gte('data_venda_efetiva', prevMonthStart)
+          .lte('data_venda_efetiva', prevMonthEnd);
         if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
         if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
         return prevNovosQuery;
@@ -440,8 +439,8 @@ export function useDashboardData(filters: DashboardFilters) {
       // All clients for time series (no period filter) — usa fetchAllRows para evitar limite de 1000 do PostgREST
       const allClientes = await fetchAllRows<any>(() => {
         return tf(supabase
-          .from('clientes')
-          .select('id, mensalidade, valor_ativacao, data_cadastro, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda_efetiva, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
       });
 
       const mrrEvolution: typeof timeSeries.mrrEvolution = [];
@@ -461,8 +460,8 @@ export function useDashboardData(filters: DashboardFilters) {
 
         // Clients active at START of month (for churn rate denominator)
         const activosInicioMes = (allClientes || []).filter(c => {
-          if (!c.data_cadastro) return false;
-          if (new Date(c.data_cadastro) >= startDate) return false;
+          if (!c.data_venda_efetiva) return false;
+          if (new Date(c.data_venda_efetiva) >= startDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) < startDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
@@ -470,8 +469,8 @@ export function useDashboardData(filters: DashboardFilters) {
         });
 
         const activosNoMes = (allClientes || []).filter(c => {
-          if (!c.data_cadastro) return false;
-          if (new Date(c.data_cadastro) > endDate) return false;
+          if (!c.data_venda_efetiva) return false;
+          if (new Date(c.data_venda_efetiva) > endDate) return false;
           if (c.cancelado && c.data_cancelamento && new Date(c.data_cancelamento) <= endDate) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
@@ -492,8 +491,8 @@ export function useDashboardData(filters: DashboardFilters) {
 
         // Faturamento = MRR + ativações dos novos clientes cadastrados naquele mês
         const novosNoMes = (allClientes || []).filter(c => {
-          if (!c.data_cadastro) return false;
-          const dc = format(new Date(c.data_cadastro), 'yyyy-MM');
+          if (!c.data_venda_efetiva) return false;
+          const dc = format(new Date(c.data_venda_efetiva), 'yyyy-MM');
           if (dc !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
@@ -728,7 +727,7 @@ export function useDashboardData(filters: DashboardFilters) {
           id: c.id,
           razaoSocial: c.razao_social || '(sem nome)',
           nomeFantasia: c.nome_fantasia || null,
-          dataVenda: c.data_venda || c.data_cadastro || '',
+          dataVenda: c.data_venda_efetiva || '',
           vendedor: c.funcionario_id ? (funcMap[c.funcionario_id] || '—') : '—',
           origem: c.origem_venda_id ? (origemMap[c.origem_venda_id] || '—') : '—',
           valorAtivacao: Number(c.valor_ativacao) || 0,
