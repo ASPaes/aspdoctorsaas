@@ -124,6 +124,20 @@ async function processAttendance(
       }
     }
 
+    // Guard: não fechar por inatividade se chat está fora do horário
+    // Cliente não pode ser penalizado pela ausência do operador
+    {
+      const { data: convOOH } = await supabase
+        .from("whatsapp_conversations")
+        .select("opened_out_of_hours")
+        .eq("id", att.conversation_id)
+        .maybeSingle();
+      if (convOOH?.opened_out_of_hours === true) {
+        log("opened_out_of_hours=true — skip inactivity close");
+        return "skipped";
+      }
+    }
+
     const config = await getSupportConfig(supabase, att.tenant_id);
 
     const closeThresholdMin = config.support_auto_close_inactivity_minutes;
