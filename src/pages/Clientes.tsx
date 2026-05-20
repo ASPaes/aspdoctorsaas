@@ -328,7 +328,7 @@ export default function Clientes() {
 
     for (let offset = 0; ; offset += pageSize) {
       const source = options?.forNovosNoMes ? "vw_clientes_financeiro" : "clientes";
-      let q = tf(supabase.from(source).select(selectFields)) as any;
+      let q = tf((supabase as any).from(source).select(selectFields)) as any;
       q = applyCommonFiltersOnClientes(q, options);
       q = q.range(offset, offset + pageSize - 1);
 
