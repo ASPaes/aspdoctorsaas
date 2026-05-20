@@ -164,9 +164,9 @@ export function useDashboardData(filters: DashboardFilters) {
       // 4. Clientes início do período (snapshot temporal)
       const clientesInicioFull = await fetchAllRows<any>(() => {
         let q = supabase
-          .from('clientes')
+          .from('vw_clientes_financeiro')
           .select('id, mensalidade, data_cancelamento, cancelado')
-          .lt('data_cadastro', periodoInicioStr);
+          .lt('data_venda_efetiva', periodoInicioStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
