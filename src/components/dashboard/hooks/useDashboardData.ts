@@ -63,8 +63,8 @@ export function useDashboardData(filters: DashboardFilters) {
       const clientesRaw = await fetchAllRows<any>(() => {
         let q = supabase
           .from('vw_clientes_financeiro')
-          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
-          .lte('data_cadastro', periodoFimStr);
+          .select('id, mensalidade, data_cadastro, data_venda_efetiva, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
+          .lte('data_venda_efetiva', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
