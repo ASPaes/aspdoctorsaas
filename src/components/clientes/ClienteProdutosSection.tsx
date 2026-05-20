@@ -580,13 +580,6 @@ function ProdutoDialog({
     }
   }, [open, edit]);
 
-  const handleSave = async () => {
-    if (!produtoId) {
-      toast({ title: "Selecione um produto", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    try {
   const executeSave = async () => {
     if (!produtoId) {
       toast({ title: "Selecione um produto", variant: "destructive" });
