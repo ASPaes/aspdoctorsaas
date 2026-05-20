@@ -28,8 +28,9 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, Puzzle, Percent,
+  ExternalLink, Loader2, Puzzle, Percent, AlertTriangle,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { NumericInput } from "@/components/ui/numeric-input";
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
