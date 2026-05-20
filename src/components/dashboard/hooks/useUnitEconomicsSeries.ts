@@ -80,8 +80,8 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       // === QUERY A: All clients ===
       const allClientes = await fetchAllRows<any>(() => {
         let q = supabase
-          .from('clientes')
-          .select('id, mensalidade, data_venda, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, data_venda_efetiva, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
         if (tid) q = q.eq('tenant_id', tid);
         return q;
       });
@@ -128,8 +128,8 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
         // base_inicio: ativo no 1º dia do mês.
         // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > startDate).
         const baseInicio = clients.filter(c => {
-          if (!c.data_venda) return false;
-          if (new Date(c.data_venda) > startDate) return false;
+          if (!c.data_venda_efetiva) return false;
+          if (new Date(c.data_venda_efetiva) > startDate) return false;
           if (c.cancelado === true) {
             if (!c.data_cancelamento) return false;
             if (new Date(c.data_cancelamento) <= startDate) return false;
@@ -147,16 +147,16 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
 
         // novos clientes: data_venda within month
         const novos = clients.filter(c => {
-          if (!c.data_venda) return false;
-          const dv = new Date(c.data_venda);
+          if (!c.data_venda_efetiva) return false;
+          const dv = new Date(c.data_venda_efetiva);
           return dv >= startDate && dv <= endDate;
         });
 
         // ativos_fim: ativo no último dia do mês.
         // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > endDate).
         const ativosFim = clients.filter(c => {
-          if (!c.data_venda) return false;
-          if (new Date(c.data_venda) > endDate) return false;
+          if (!c.data_venda_efetiva) return false;
+          if (new Date(c.data_venda_efetiva) > endDate) return false;
           if (c.cancelado === true) {
             if (!c.data_cancelamento) return false;
             if (new Date(c.data_cancelamento) <= endDate) return false;
