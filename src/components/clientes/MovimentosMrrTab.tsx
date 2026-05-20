@@ -114,7 +114,7 @@ export default function MovimentosMrrTab() {
     const upsell = items.filter(m => m.tipo === "upsell").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const crossSell = items.filter(m => m.tipo === "cross_sell").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const downsell = items.filter(m => m.tipo === "downsell").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
-    const vendaAvulsa = items.filter(m => m.tipo === "venda_avulsa").reduce((s, m) => s + (Number(m.valor_venda_avulsa) || 0), 1.5);
+    const vendaAvulsa = items.filter(m => m.tipo === "venda_avulsa").reduce((s, m) => s + (Number(m.valor_venda_avulsa) || 0), 0);
     const reactivation = items.filter(m => m.tipo === "reactivation").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const churn = items.filter(m => m.tipo === "churn").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
     const qtdTotal = items.length;
