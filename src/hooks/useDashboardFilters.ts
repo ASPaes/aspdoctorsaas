@@ -38,15 +38,16 @@ function getDefaults(): DashboardFilters {
 
 export function useDashboardFilters(globalUnidadeId?: number | null) {
   const [filters, setFilters] = useState<DashboardFilters>(() => {
+    const defaults = getDefaults();
+    if (globalUnidadeId) defaults.unidadeBaseId = globalUnidadeId;
+    // Restore only fornecedorId from session (period always resets to current month)
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = deserialize(raw);
-        if (parsed) return parsed;
+        if (parsed?.fornecedorId) defaults.fornecedorId = parsed.fornecedorId;
       }
     } catch {}
-    const defaults = getDefaults();
-    if (globalUnidadeId) defaults.unidadeBaseId = globalUnidadeId;
     return defaults;
   });
 
