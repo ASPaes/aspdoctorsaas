@@ -369,11 +369,10 @@ export function useDashboardData(filters: DashboardFilters) {
 
       const prevNovos = await fetchAllRows<any>(() => {
         let prevNovosQuery = supabase
-          .from('clientes')
+          .from('vw_clientes_financeiro')
           .select('id, mensalidade, valor_ativacao')
-          .gte('data_cadastro', prevMonthStart)
-          .lte('data_cadastro', prevMonthEnd)
-          .eq('cancelado', false);
+          .gte('data_venda_efetiva', prevMonthStart)
+          .lte('data_venda_efetiva', prevMonthEnd);
         if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
         if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
         return prevNovosQuery;
