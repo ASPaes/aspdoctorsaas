@@ -989,6 +989,12 @@ export async function handleUraResponse(supabase: any, ctx: SendContext, convers
         // Setor fechado: envia mensagem do setor e reseta URA pro menu
         const deptMsg = deptHours.business_hours_message
           || `O setor *${deptName}* está fora do horário de atendimento no momento. Por favor, escolha outro setor ou tente novamente mais tarde.`;
+        // Marcar conversa como fora do horário (setor específico fechado)
+        await supabase.from('whatsapp_conversations').update({
+          opened_out_of_hours: true,
+          opened_out_of_hours_at: nowIso,
+          updated_at: nowIso,
+        }).eq('id', conversationId);
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, deptMsg, {
           ura: true, department_closed: true, department_id: selectedDept.id,
         });
