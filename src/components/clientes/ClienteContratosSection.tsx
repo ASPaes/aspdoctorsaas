@@ -867,7 +867,7 @@ interface CancelarContratoDialogProps {
   onOpenChange: (v: boolean) => void;
   contrato: Contrato | null;
   clienteNome: string;
-  motivosCancelamento: Array<{ id: number; nome: string }>;
+  motivosCancelamento: Array<{ id: number; descricao: string }>;
   ativosCount: number;
   tid: string | null | undefined;
   onSuccess: () => void;
