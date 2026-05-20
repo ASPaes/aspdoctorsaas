@@ -319,7 +319,7 @@ export default function Clientes() {
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
-      "mensalidade", "data_ativacao", "cancelado", "data_venda", "unidade_base_id",
+      "mensalidade", "data_ativacao", "cancelado", "data_venda", "data_venda_efetiva", "unidade_base_id",
       "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato",
     ].join(",");
 
@@ -327,7 +327,8 @@ export default function Clientes() {
     const rows: any[] = [];
 
     for (let offset = 0; ; offset += pageSize) {
-      let q = tf(supabase.from("clientes").select(selectFields)) as any;
+      const source = options?.forNovosNoMes ? "vw_clientes_financeiro" : "clientes";
+      let q = tf((supabase as any).from(source).select(selectFields)) as any;
       q = applyCommonFiltersOnClientes(q, options);
       q = q.range(offset, offset + pageSize - 1);
 
