@@ -702,6 +702,77 @@ async function isAnyDepartmentOpen(
 
 // ─── Business Hours ───────────────────────────────────────────────────────────
 
+// Cria attendance 'waiting' para chats que entram fora do horário.
+// Sem URA, sem auto-assign — apenas garante que o chat não fica órfão.
+async function ensureWaitingAttendanceForOutOfHours(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('support_attendances')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+    if (existing) return; // já tem attendance ativa
+
+    const nowIso = new Date().toISOString();
+
+    // Tenta reabrir attendance recente (janela de reopen)
+    const { data: lastClosed } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at, attendance_code, assigned_to')
+      .eq('conversation_id', conversationId)
+      .in('status', ['closed', 'inactive_closed'])
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastClosed?.closed_at) {
+      const diffMin = (Date.now() - new Date(lastClosed.closed_at).getTime()) / (1000 * 60);
+      if (diffMin <= 60) { // 60min window para out-of-hours reopen
+        await supabase.from('support_attendances').update({
+          status: 'waiting',
+          reopened_at: nowIso,
+          reopened_from: 'out_of_hours',
+          updated_at: nowIso,
+        }).eq('id', lastClosed.id);
+        console.log(`[processor] Reopened attendance ${lastClosed.attendance_code} for out-of-hours`);
+        return;
+      }
+    }
+
+    // Cria nova attendance waiting
+    const { data: newAtt, error } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        status: 'waiting',
+        opened_at: nowIso,
+        created_from: 'out_of_hours',
+        ura_state: 'none',
+      })
+      .select('id, attendance_code')
+      .single();
+
+    if (error) {
+      console.error('[processor] Error creating out-of-hours attendance:', error);
+      return;
+    }
+
+    console.log(`[processor] Created waiting attendance ${newAtt.attendance_code} for out-of-hours chat`);
+    insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
+  } catch (err) {
+    console.error('[processor] ensureWaitingAttendanceForOutOfHours error:', err);
+  }
+}
+
 async function sendBusinessHoursMessage(
   supabase: any,
   ctx: SendContext,
