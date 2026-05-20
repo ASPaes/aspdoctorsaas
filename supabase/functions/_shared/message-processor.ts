@@ -702,6 +702,77 @@ async function isAnyDepartmentOpen(
 
 // ─── Business Hours ───────────────────────────────────────────────────────────
 
+// Cria attendance 'waiting' para chats que entram fora do horário.
+// Sem URA, sem auto-assign — apenas garante que o chat não fica órfão.
+async function ensureWaitingAttendanceForOutOfHours(
+  supabase: any,
+  conversationId: string,
+  contactId: string,
+  tenantId: string,
+): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('support_attendances')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .in('status', ['waiting', 'in_progress'])
+      .limit(1)
+      .maybeSingle();
+    if (existing) return; // já tem attendance ativa
+
+    const nowIso = new Date().toISOString();
+
+    // Tenta reabrir attendance recente (janela de reopen)
+    const { data: lastClosed } = await supabase
+      .from('support_attendances')
+      .select('id, closed_at, attendance_code, assigned_to')
+      .eq('conversation_id', conversationId)
+      .in('status', ['closed', 'inactive_closed'])
+      .order('closed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastClosed?.closed_at) {
+      const diffMin = (Date.now() - new Date(lastClosed.closed_at).getTime()) / (1000 * 60);
+      if (diffMin <= 60) { // 60min window para out-of-hours reopen
+        await supabase.from('support_attendances').update({
+          status: 'waiting',
+          reopened_at: nowIso,
+          reopened_from: 'out_of_hours',
+          updated_at: nowIso,
+        }).eq('id', lastClosed.id);
+        console.log(`[processor] Reopened attendance ${lastClosed.attendance_code} for out-of-hours`);
+        return;
+      }
+    }
+
+    // Cria nova attendance waiting
+    const { data: newAtt, error } = await supabase
+      .from('support_attendances')
+      .insert({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        status: 'waiting',
+        opened_at: nowIso,
+        created_from: 'out_of_hours',
+        ura_state: 'none',
+      })
+      .select('id, attendance_code')
+      .single();
+
+    if (error) {
+      console.error('[processor] Error creating out-of-hours attendance:', error);
+      return;
+    }
+
+    console.log(`[processor] Created waiting attendance ${newAtt.attendance_code} for out-of-hours chat`);
+    insertAttendanceSystemMessage(supabase, conversationId, tenantId, newAtt.id, newAtt.attendance_code, 'opened').catch(() => {});
+  } catch (err) {
+    console.error('[processor] ensureWaitingAttendanceForOutOfHours error:', err);
+  }
+}
+
 async function sendBusinessHoursMessage(
   supabase: any,
   ctx: SendContext,
@@ -1322,7 +1393,8 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
       .maybeSingle();
     if (contactRules?.rules_disabled === true) {
       console.log(`[processor] rules_disabled=true on contact ${contactId} — skipping ALL automation for conversation ${conversationId}`);
-      return;
+          await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
+          return;
     }
   }
 
@@ -1369,6 +1441,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
           if (!bh.inside) {
             const nowIso = new Date().toISOString();
             await supabase.from('whatsapp_conversations').update({ status: 'active', opened_out_of_hours: true, opened_out_of_hours_at: timestamp, updated_at: nowIso }).eq('id', conversationId);
+            await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
             return;
           }
         }
@@ -1413,6 +1486,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         const lastBh = (bhMsgs || []).find((m: any) => { const meta = typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata; return meta?.outside_hours === true; });
         if (!lastBh) { const cutoff8h = new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(); const { count: oc } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('tenant_id', tenantId).eq('is_from_me', false).gte('created_at', cutoff8h); if (oc && oc > 1) { const shorts = ['Ainda estamos fora do horário \u{1F550} Retornaremos assim que possível!', 'Sua mensagem foi registrada! Responderemos no início do expediente \u{1F60A}', 'Obrigado pela mensagem! Nossa equipe responde assim que possível \u{23F0}']; await sendAndPersistAutoMessage(supabase, ctx, conversationId, shorts[Math.floor(Math.random() * shorts.length)], { business_hours: true, outside_hours: true, short_reply: true }); } }
       }
+      await ensureWaitingAttendanceForOutOfHours(supabase, conversationId, contactId, tenantId);
       return;
     }
     } // fecha else (sem URA)
