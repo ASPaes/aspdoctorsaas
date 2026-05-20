@@ -59,13 +59,7 @@ function getPayloadIsFromMe(data: any): boolean {
 }
 
 function normalizePhoneNumber(remoteJid: string): { phone: string; isGroup: boolean } {
-  const isGroup = remoteJid.includes('@g.us');
-  let phone = remoteJid
-    .replace('@s.whatsapp.net', '').replace('@g.us', '')
-    .replace('@lid', '').replace(/:\d+/, '');
-  if (phone.startsWith('55') && phone.length === 12) {
-    phone = `55${phone.substring(2, 4)}9${phone.substring(4)}`;
-  }
+  const { phone, isGroup } = normalizeBRPhone(remoteJid);
   return { phone, isGroup };
 }
 
