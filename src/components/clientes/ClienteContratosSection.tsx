@@ -486,7 +486,6 @@ export default function ClienteContratosSection({ clienteId }: Props) {
         ativosCount={ativosCount}
         onSuccess={() => {
           invalidate();
-          qc.invalidateQueries({ queryKey: ["cliente", clienteId] });
           setReativarDialog({ open: false, contrato: null });
         }}
       />
