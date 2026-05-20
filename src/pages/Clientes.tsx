@@ -319,7 +319,7 @@ export default function Clientes() {
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
-      "mensalidade", "data_ativacao", "cancelado", "data_venda", "data_venda_efetiva", "unidade_base_id",
+      "mensalidade", "data_ativacao", "data_cadastro", "cancelado", "data_venda", "data_venda_efetiva", "unidade_base_id",
       "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato",
     ].join(",");
 
@@ -448,7 +448,7 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, cancelado, lucro_real, margem_bruta_percent, data_venda, data_reajuste, unidade_base_id, telefone_whatsapp, telefone_contato";
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, data_reajuste, unidade_base_id, telefone_whatsapp, telefone_contato";
       let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
@@ -1024,7 +1024,7 @@ export default function Clientes() {
                 ["cnpj", "CNPJ/CPF"],
                 ["produto_id", "Produto"],
                 ["mensalidade", "MRR Atual"],
-                ["data_ativacao", "Dt. Ativação"],
+                ["data_ativacao", "Dt. Cadastro"],
                 ["data_reajuste", "Data de Reajuste"],
                 ["cancelado", "Status"],
               ] as [SortField, string][]).map(([field, label]) => (
@@ -1069,7 +1069,7 @@ export default function Clientes() {
                   <TableCell className="font-mono text-xs">{c.cnpj ? (c.cnpj.replace(/\D/g, "").length === 11 ? maskCPF(c.cnpj) : maskCNPJ(c.cnpj)) : "—"}</TableCell>
                   <TableCell>{c.produto_id ? produtoMap.get(c.produto_id) || "—" : "—"}</TableCell>
                   <TableCell>{getMrrAtual(c) > 0 ? `R$ ${getMrrAtual(c).toFixed(2)}` : "—"}</TableCell>
-                  <TableCell className="text-xs">{c.data_ativacao ? format(parseISO(c.data_ativacao), "dd/MM/yyyy") : "—"}</TableCell>
+                  <TableCell className="text-xs">{c.data_cadastro ? format(parseISO(c.data_cadastro), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell className="text-xs">{(c as any).data_reajuste ? format(parseISO((c as any).data_reajuste), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell>
                     <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
