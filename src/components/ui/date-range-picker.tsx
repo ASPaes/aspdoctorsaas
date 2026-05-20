@@ -1,11 +1,12 @@
 import * as React from "react";
-import { format, subDays, startOfMonth, endOfMonth, startOfYear, startOfQuarter, subMonths } from "date-fns";
+import { format, subDays, startOfMonth, endOfMonth, startOfYear, startOfQuarter, subMonths, isValid, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export interface DateRange {
@@ -36,8 +37,37 @@ const presets: { label: string; range: () => DateRange }[] = [
   { label: "Este ano", range: () => ({ from: startOfYear(new Date()), to: new Date() }) },
 ];
 
+function maskDateInput(v: string): string {
+  const digits = v.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function parseDateBR(s: string): Date | undefined {
+  if (!s) return undefined;
+  const d = parse(s, "dd/MM/yyyy", new Date());
+  return isValid(d) ? d : undefined;
+}
+
+function formatDateBR(d?: Date): string {
+  return d ? format(d, "dd/MM/yyyy") : "";
+}
+
 export function DateRangePicker({ label, value, onChange, className }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const [pending, setPending] = React.useState<DateRange>(value);
+  const [fromText, setFromText] = React.useState<string>(formatDateBR(value.from));
+  const [toText, setToText] = React.useState<string>(formatDateBR(value.to));
+
+  // Sync internal state when popover opens
+  React.useEffect(() => {
+    if (open) {
+      setPending(value);
+      setFromText(formatDateBR(value.from));
+      setToText(formatDateBR(value.to));
+    }
+  }, [open, value]);
 
   const hasValue = value?.from || value?.to;
 
@@ -49,6 +79,27 @@ export function DateRangePicker({ label, value, onChange, className }: DateRange
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
     onChange({ from: undefined, to: undefined });
+  };
+
+  const commitFromText = () => {
+    const d = parseDateBR(fromText);
+    if (d) setPending((p) => ({ ...p, from: d }));
+    else setFromText(formatDateBR(pending.from));
+  };
+
+  const commitToText = () => {
+    const d = parseDateBR(toText);
+    if (d) setPending((p) => ({ ...p, to: d }));
+    else setToText(formatDateBR(pending.to));
+  };
+
+  const handleApply = () => {
+    onChange(pending);
+    setOpen(false);
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
   };
 
   return (
@@ -106,12 +157,53 @@ export function DateRangePicker({ label, value, onChange, className }: DateRange
                 </Button>
               ))}
             </div>
-            {/* Calendar */}
-            <div className="p-2">
+            {/* Calendar + inputs */}
+            <div className="p-2 flex flex-col gap-2">
+              <div className="flex items-end gap-2 px-1">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">De</label>
+                  <Input
+                    value={fromText}
+                    onChange={(e) => setFromText(maskDateInput(e.target.value))}
+                    onBlur={commitFromText}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitFromText();
+                      }
+                    }}
+                    placeholder="dd/mm/aaaa"
+                    inputMode="numeric"
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Até</label>
+                  <Input
+                    value={toText}
+                    onChange={(e) => setToText(maskDateInput(e.target.value))}
+                    onBlur={commitToText}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitToText();
+                      }
+                    }}
+                    placeholder="dd/mm/aaaa"
+                    inputMode="numeric"
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
               <Calendar
                 mode="range"
-                selected={value.from ? { from: value.from, to: value.to } : undefined}
-                onSelect={(range) => onChange({ from: range?.from, to: range?.to })}
+                selected={pending.from ? { from: pending.from, to: pending.to } : undefined}
+                onSelect={(range) => {
+                  const next = { from: range?.from, to: range?.to };
+                  setPending(next);
+                  setFromText(formatDateBR(next.from));
+                  setToText(formatDateBR(next.to));
+                }}
                 numberOfMonths={2}
                 locale={ptBR}
                 className="pointer-events-auto"
@@ -119,6 +211,14 @@ export function DateRangePicker({ label, value, onChange, className }: DateRange
                   months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
                 }}
               />
+              <div className="flex justify-end gap-2 border-t pt-2 px-1">
+                <Button size="sm" variant="ghost" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+                <Button size="sm" variant="default" onClick={handleApply}>
+                  Aplicar
+                </Button>
+              </div>
             </div>
           </div>
         </PopoverContent>
