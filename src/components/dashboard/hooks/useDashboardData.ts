@@ -491,8 +491,8 @@ export function useDashboardData(filters: DashboardFilters) {
 
         // Faturamento = MRR + ativações dos novos clientes cadastrados naquele mês
         const novosNoMes = (allClientes || []).filter(c => {
-          if (!c.data_cadastro) return false;
-          const dc = format(new Date(c.data_cadastro), 'yyyy-MM');
+          if (!c.data_venda_efetiva) return false;
+          const dc = format(new Date(c.data_venda_efetiva), 'yyyy-MM');
           if (dc !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
