@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, User, Building2, Phone, CheckCircle2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Search, User, Building2, Phone, CheckCircle2, CheckCircle } from "lucide-react";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useCreateConversation } from "../hooks/useCreateConversation";
 import { useClienteSearch, type ClienteSearchResult } from "../hooks/useClienteSearch";
@@ -125,7 +125,6 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [instanceId, setInstanceId] = useState("");
   const [phone, setPhone] = useState(initialPhone || "55");
   const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'exists_corrected' | 'not_exists' | 'unsupported'>('idle');
-  const [confirmNotFound, setConfirmNotFound] = useState(false);
   const [name, setName] = useState(initialName || "");
   const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
@@ -172,7 +171,6 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   // Reset waCheck quando phone ou instância mudar
   useEffect(() => {
     setWaCheck('idle');
-    setConfirmNotFound(false);
   }, [phone, instanceId]);
 
   const { results, isLoading: isSearching } = useClienteSearch(searchTerm);
@@ -358,7 +356,6 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const resetForm = () => {
     setPhone("55");
     setWaCheck('idle');
-    setConfirmNotFound(false);
     setName("");
     setSearchTerm("");
     setSelectedCliente(null);

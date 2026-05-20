@@ -363,7 +363,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [result, setResult] = useState<ImportResult | null>(null);
   const [duplicatas, setDuplicatas] = useState<{ cnpj: string; razao_social: string | null }[]>([]);
-  const [duplicataAcao, setDuplicataAcao] = useState<'pular' | null>(null);
 
   const [duplicataOpcao, setDuplicataOpcao] = useState<'pular' | 'atualizar' | 'importar'>('pular');
   const [importPhase, setImportPhase] = useState<'verificando' | 'cidades' | 'importando' | ''>('');
@@ -415,7 +414,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     setImportProgress({ current: 0, total: 0 });
     setResult(null);
     setDuplicatas([]);
-    setDuplicataAcao(null);
     setDuplicataOpcao('pular');
     setImportPhase('');
     setImportMode('selecting');
@@ -1289,7 +1287,6 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
     });
     setImporting(false);
     setImportPhase('');
-    setDuplicataAcao(null);
 
     if (imported > 0) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });

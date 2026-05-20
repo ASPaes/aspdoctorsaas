@@ -1,6 +1,4 @@
-import { useState } from 'react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

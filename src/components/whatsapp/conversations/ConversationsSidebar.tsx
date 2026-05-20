@@ -16,9 +16,9 @@ import { useWhatsAppConversations, type ConversationWithContact } from "../hooks
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useConversationStates } from "../hooks/useConversationStates";
-import { getConversationBucket, bucketToPill, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
+import { getConversationBucket, type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
-import { ConversationFiltersPopover, type SortBy, type FiltersState } from "./ConversationFiltersPopover";
+import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
 import { NewConversationModal } from "./NewConversationModal";
 import { DepartmentSelector } from "./DepartmentSelector";

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { RefreshCw, Wifi, WifiOff, AlertTriangle, CheckCircle, Activity, MessageSquare, Bot, Database } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, AlertTriangle, CheckCircle, Activity, Bot } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DayPicker } from 'react-day-picker';
 import type { DateRange } from 'react-day-picker';
@@ -11,12 +10,10 @@ import 'react-day-picker/dist/style.css';
 
 import { ScoreRing } from './monitor/shared/ScoreRing';
 import { MiniBar } from './monitor/shared/MiniBar';
-import { Sparkline } from './monitor/shared/Sparkline';
 import { HelpTooltip } from './monitor/shared/HelpTooltip';
 import { parseBRDate, formatBRDate } from './monitor/shared/dateUtils';
 import { useMonitorData } from './monitor/hooks/useMonitorData';
 import { OverviewTab } from './monitor/tabs/OverviewTab';
-import { DetailsTab } from './monitor/tabs/DetailsTab';
 import { ProjectionsTab } from './monitor/tabs/ProjectionsTab';
 
 

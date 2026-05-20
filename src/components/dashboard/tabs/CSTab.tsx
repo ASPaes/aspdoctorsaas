@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, subMonths, startOfMonth, endOfMonth, parseISO, isWithinInterval, isBefore } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ import {
   CS_TICKET_STATUS_LABELS, CS_TICKET_PRIORIDADE_LABELS, CS_INDICACAO_STATUS_LABELS, CS_TICKET_TIPO_LABELS,
   type CSTicketPrioridade, type CSTicketStatus, type CSIndicacaoStatus,
 } from '@/components/cs/types';
-import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List, TrendingUp, TrendingDown, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List, ShieldCheck, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 /* ── helpers ────────────────────────────────────────────────────── */

@@ -66,7 +66,6 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
   const [showClassifyModal, setShowClassifyModal] = useState(false);
-  const [pendingCloseOptions, setPendingCloseOptions] = useState<{ skipCsat: boolean; skipClosureMessage: boolean } | null>(null);
   const [showInterruptDialog, setShowInterruptDialog] = useState(false);
   const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);

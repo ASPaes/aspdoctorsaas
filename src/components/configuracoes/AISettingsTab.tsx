@@ -106,7 +106,6 @@ export default function AISettingsTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
-  const [pendingActivation, setPendingActivation] = useState<boolean | null>(null);
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
@@ -205,7 +204,6 @@ export default function AISettingsTab() {
   const handleToggleRequest = (newVal: boolean) => {
     if (newVal) {
       // Activating — show confirmation dialog
-      setPendingActivation(true);
       setRiskAcknowledged(false);
       setActivateDialogOpen(true);
     } else {

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, Download, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, MapPin, Calendar, Package, ExternalLink, Phone, Send, User } from "lucide-react";
+import { ArrowLeft, Search, Users, MessageSquare, Clock, TrendingUp, ChevronLeft, ChevronRight, SmilePlus, ThumbsUp, ThumbsDown, Minus, Building2, Mail, ExternalLink, Phone, Send, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useWhatsAppContacts, type ContactSortOption } from "@/components/whatsapp/hooks/useWhatsAppContacts";
 import { useContactDetails } from "@/components/whatsapp/hooks/useContactDetails";

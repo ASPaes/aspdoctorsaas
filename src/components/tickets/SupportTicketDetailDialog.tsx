@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -91,7 +91,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [newComment, setNewComment] = useState("");
   const [addingComment, setAddingComment] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [editClassification, setEditClassification] = useState(false);
   const [newContactOpen, setNewContactOpen] = useState(false);
   const [startConvOpen, setStartConvOpen] = useState(false);
   const [newContactNome, setNewContactNome] = useState("");
@@ -163,7 +162,6 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   useEffect(() => { if (open) setMobileView("details"); }, [open]);
   useEffect(() => {
     if (!open) {
-      setEditClassification(false);
     }
   }, [open]);
 
