@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { normalizeBRPhone } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,12 +24,7 @@ async function verifyMetaSignature(rawBody: string, signatureHeader: string | nu
 
 // === Phone normalization ===
 function normalizePhone(raw: string): string {
-  let digits = raw.replace(/\D/g, '').replace(/^0+/, '');
-  if (digits.length >= 10 && digits.length <= 11 && !digits.startsWith('55')) digits = '55' + digits;
-  if (digits.startsWith('55') && digits.length === 12) {
-    digits = digits.slice(0, 4) + '9' + digits.slice(4);
-  }
-  return digits;
+  return normalizeBRPhone(raw).phone;
 }
 
 // === Map Meta message type ===

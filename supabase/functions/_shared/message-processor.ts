@@ -3,6 +3,7 @@ import { getSupportConfig, SupportConfig, resolveCsatTemplates } from './support
 import { getAIConfig, callAI } from './ai-client.ts';
 import { getAdapter } from './providers/index.ts';
 import { NormalizedInboundMessage, SendContext, PhoneParseResult } from './message-types.ts';
+import { normalizeBRPhone, phoneSearchVariants } from './phone.ts';
 
 const AUTO_SENTIMENT_THRESHOLD = 5;
 const AUTO_CATEGORIZATION_THRESHOLD = 5;
@@ -48,11 +49,7 @@ const AUTO_REPLY_PATTERNS = [
 ];
 
 export function normalizePhoneNumber(remoteJid: string): PhoneParseResult {
-  const isGroup = remoteJid.includes('@g.us');
-  let phone = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '').replace('@lid', '').replace(/:\d+/, '');
-  if (phone.startsWith('55') && phone.length === 12) {
-    phone = `55${phone.substring(2, 4)}9${phone.substring(4)}`;
-  }
+  const { phone, isGroup } = normalizeBRPhone(remoteJid);
   return { phone, isGroup };
 }
 
@@ -371,9 +368,7 @@ export async function findOrCreateContact(
   isGroup: boolean, isFromMe: boolean, tenantId: string,
 ): Promise<string | null> {
   try {
-    const variants = [phoneNumber];
-    if (phoneNumber.startsWith('55') && phoneNumber.length === 13) variants.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
-    if (phoneNumber.startsWith('55') && phoneNumber.length === 12) variants.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
+    const variants = phoneSearchVariants(phoneNumber);
 
     const { data: existing } = await supabase.from('whatsapp_contacts').select('id, name, phone_number').eq('tenant_id', tenantId).eq('instance_id', instanceId).in('phone_number', variants).maybeSingle();
 

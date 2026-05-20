@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { processInboundMessage } from '../_shared/message-processor.ts';
 import { NormalizedInboundMessage, InstanceInfo, InstanceSecrets } from '../_shared/message-types.ts';
 import { getInstanceSecrets } from '../_shared/providers/index.ts';
+import { normalizeBRPhone, phoneSearchVariants } from '../_shared/phone.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,13 +59,7 @@ function getPayloadIsFromMe(data: any): boolean {
 }
 
 function normalizePhoneNumber(remoteJid: string): { phone: string; isGroup: boolean } {
-  const isGroup = remoteJid.includes('@g.us');
-  let phone = remoteJid
-    .replace('@s.whatsapp.net', '').replace('@g.us', '')
-    .replace('@lid', '').replace(/:\d+/, '');
-  if (phone.startsWith('55') && phone.length === 12) {
-    phone = `55${phone.substring(2, 4)}9${phone.substring(4)}`;
-  }
+  const { phone, isGroup } = normalizeBRPhone(remoteJid);
   return { phone, isGroup };
 }
 
@@ -266,13 +261,7 @@ async function processSendMessageEvent(payload: EvolutionWebhookPayload, supabas
 
     // ── Find or create contact — com variantes de número e vínculo ao cliente ──
     // Montar variantes (com/sem 9 dígito)
-    const phoneVariants: string[] = [phone];
-    if (phone.startsWith('55') && phone.length === 13) {
-      phoneVariants.push(phone.slice(0, 4) + phone.slice(5)); // remove o 9
-    }
-    if (phone.startsWith('55') && phone.length === 12) {
-      phoneVariants.push(phone.slice(0, 4) + '9' + phone.slice(4)); // adiciona o 9
-    }
+    const phoneVariants: string[] = phoneSearchVariants(phone);
 
     // Buscar cliente pelo telefone (qualquer variante)
     const { data: clienteRow } = await supabase.from('clientes')
@@ -544,9 +533,7 @@ async function processMessageUpsert(payload: EvolutionWebhookPayload, supabase: 
       }
       if (!fbInstance) { console.error(`${LOG} FALLBACK: instance not found`); return; }
 
-      const fbVariants = [fbPhone];
-      if (fbPhone.startsWith('55') && fbPhone.length === 13) fbVariants.push(fbPhone.slice(0, 4) + fbPhone.slice(5));
-      if (fbPhone.startsWith('55') && fbPhone.length === 12) fbVariants.push(fbPhone.slice(0, 4) + '9' + fbPhone.slice(4));
+      const fbVariants = phoneSearchVariants(fbPhone);
 
       let { data: fbContact } = await supabase.from('whatsapp_contacts')
         .select('id').eq('tenant_id', fbInstance.tenant_id)
