@@ -587,6 +587,13 @@ function ProdutoDialog({
     }
     setSaving(true);
     try {
+  const executeSave = async () => {
+    if (!produtoId) {
+      toast({ title: "Selecione um produto", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
       const payload: any = {
         fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
         codigo_fornecedor: codigo || null,
@@ -597,6 +604,27 @@ function ProdutoDialog({
         vlr_custo: vlrCusto || 0,
       };
       if (isEdit && edit) {
+        // Se trocou produto, chama RPC primeiro (gate + propagação contrato_itens)
+        if (produtoTrocou) {
+          const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
+            "admin_swap_cliente_produto",
+            {
+              p_cliente_produto_id: edit.id,
+              p_novo_produto_id: Number(produtoId),
+              p_novo_fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
+            }
+          );
+          if (rpcError) throw rpcError;
+          const updated = (rpcData as any)?.contrato_itens_atualizados ?? 0;
+          toast({
+            title: "Produto trocado",
+            description: updated > 0
+              ? `${updated} item(ns) de contrato tiveram descrição atualizada.`
+              : "Nenhum item de contrato afetado.",
+          });
+          // Remove fornecedor_id do payload do UPDATE (já feito via RPC)
+          delete payload.fornecedor_id;
+        }
         const { error } = await (supabase.from("cliente_produtos" as any) as any)
           .update(payload).eq("id", edit.id);
         if (error) throw error;
@@ -610,7 +638,9 @@ function ProdutoDialog({
         });
         if (error) throw error;
       }
-      toast({ title: isEdit ? "Produto atualizado" : "Produto adicionado" });
+      if (!produtoTrocou) {
+        toast({ title: isEdit ? "Produto atualizado" : "Produto adicionado" });
+      }
       onSaved();
       onClose();
     } catch (err: any) {
@@ -620,13 +650,17 @@ function ProdutoDialog({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar Produto" : "Adicionar Produto"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  const handleSave = async () => {
+    if (!produtoId) {
+      toast({ title: "Selecione um produto", variant: "destructive" });
+      return;
+    }
+    if (produtoTrocou) {
+      setConfirmSwapOpen(true);
+      return;
+    }
+    await executeSave();
+  };
           <div className="space-y-1">
             <Label>Produto *</Label>
             <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit}>
