@@ -6524,6 +6524,14 @@ export type Database = {
         }
         Returns: string
       }
+      admin_swap_cliente_produto: {
+        Args: {
+          p_cliente_produto_id: string
+          p_novo_fornecedor_id?: number
+          p_novo_produto_id: number
+        }
+        Returns: Json
+      }
       agent_presence_extend_pause: {
         Args: { p_minutes: number; p_tenant_id: string }
         Returns: undefined
