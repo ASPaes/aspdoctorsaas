@@ -267,14 +267,17 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const filtered = useMemo(() => {
     let result = [...conversations];
 
-    // Department filtering (skip for after_hours which is tenant-wide)
+    // Department filtering (skip for after_hours which is tenant-wide).
+    // Grupos são visíveis para TODOS os agentes do tenant, independente de setor.
     if (selectedDepartmentId && activePill !== "after_hours") {
       result = result.filter(c => {
+        if ((c as any).is_group === true) return true;
         const state = stateMap.get(c.id);
         if (state?.department_id && state.department_id !== selectedDepartmentId) return false;
         return true;
       });
     }
+
 
     // Pill filters com visibilidade por papel
     if (activePill === "in_progress") {
