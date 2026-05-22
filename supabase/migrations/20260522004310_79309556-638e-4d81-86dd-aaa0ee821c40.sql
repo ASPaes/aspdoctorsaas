@@ -1,0 +1,2 @@
+DELETE FROM support_kb_articles WHERE source_attendance_id IN (SELECT id FROM support_attendances WHERE conversation_id='1d76f584-56be-47b0-86b0-2f7c82133cbc');
+DELETE FROM whatsapp_conversations WHERE id='1d76f584-56be-47b0-86b0-2f7c82133cbc';
