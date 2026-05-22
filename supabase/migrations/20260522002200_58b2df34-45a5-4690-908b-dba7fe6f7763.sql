@@ -1,0 +1,2 @@
+DELETE FROM public.support_kb_articles WHERE source_attendance_id IN (SELECT id FROM public.support_attendances WHERE conversation_id='10cce509-cc7c-4f35-8809-664d67fcd609');
+DELETE FROM public.whatsapp_conversations WHERE id='10cce509-cc7c-4f35-8809-664d67fcd609';
