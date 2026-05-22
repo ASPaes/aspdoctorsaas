@@ -864,6 +864,7 @@ async function sendBusinessHoursMessage(
 
 export async function checkBusinessHours(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, content: string, timestamp: string, supportConfig: any): Promise<{ inside: boolean }> {
   try {
+    console.log(`[checkBusinessHours] START — conversationId=${conversationId}, tenantId=${tenantId}, instanceId=${ctx.instanceId}`);
     const tz = supportConfig.business_hours_timezone || 'America/Sao_Paulo';
     const msgDate = new Date(timestamp);
 
@@ -874,6 +875,7 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
       supportConfig.business_hours_message || null,
     );
     const businessHours = deptBH.businessHours;
+    console.log(`[checkBusinessHours] deptBH resolved — deptId=${deptBH.departmentId}, deptName=${deptBH.departmentName}, enabled=${deptBH.businessHoursEnabled}`);
 
     // Holiday/exception lookup com departmentId (setor-específico vence tenant-wide)
     const exceptions = await getBusinessHoursExceptions(supabase, tenantId, msgDate, tz, 14, deptBH.departmentId);
@@ -907,6 +909,7 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
     const slots: { start: string; end: string }[] = (dayConfig?.slots || []).slice();
     if (dayConfig?.start && dayConfig?.end && slots.length === 0) slots.push({ start: dayConfig.start, end: dayConfig.end });
     const isInsideSlot = !isHolidayToday && dayConfig?.active && slots.some((slot: any) => currentTime >= slot.start && currentTime <= slot.end);
+    console.log(`[checkBusinessHours] dayKey=${dayKey}, currentTime=${currentTime}, isInsideSlot=${isInsideSlot}, isHolidayToday=${isHolidayToday}, slots=${JSON.stringify(slots)}`);
     if (isInsideSlot) return { inside: true };
 
     const { data: convBH } = await supabase.from('whatsapp_conversations').select('out_of_hours_cleared_at, first_agent_message_at').eq('id', conversationId).single();
@@ -929,7 +932,10 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
       }
     }
     return { inside: false };
-  } catch { return { inside: true }; }
+  } catch (err) {
+    console.error('[checkBusinessHours] CRITICAL ERROR — falling back to inside:true. Error:', err instanceof Error ? err.message : String(err), err instanceof Error ? err.stack : '');
+    return { inside: true };
+  }
 }
 
 // ─── URA ──────────────────────────────────────────────────────────────────────
