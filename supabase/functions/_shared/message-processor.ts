@@ -780,6 +780,19 @@ async function sendBusinessHoursMessage(
   closedDates: Set<string>,
   holidayException: { name: string | null; is_closed: boolean } | null,
 ): Promise<void> {
+    // Se o setor tem mensagem customizada, usar direto (sem IA).
+    // A mensagem do setor é intencional — o admin escreveu manualmente.
+    const deptCustomMessage = supportConfig.business_hours_message;
+    if (deptCustomMessage && deptCustomMessage.includes('{{') === false && supportConfig._from_department === true) {
+      await sendAndPersistAutoMessage(supabase, ctx, conversationId, deptCustomMessage, {
+        business_hours: true,
+        outside_hours: true,
+        department_message: true,
+        ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
+      });
+      return;
+    }
+
   try {
     const isHolidayToday = !!(holidayException && holidayException.is_closed);
     const context = resolveOutsideHoursContext(msgDate, tz, businessHours, closedDates, isHolidayToday);
@@ -910,7 +923,7 @@ export async function checkBusinessHours(supabase: any, ctx: SendContext, conver
       } else if (claimed === true) {
         // Usa mensagem do setor se disponível, senão a global via supportConfig
         const effectiveConfig = deptBH.businessHoursMessage
-          ? { ...supportConfig, business_hours_message: deptBH.businessHoursMessage }
+          ? { ...supportConfig, business_hours_message: deptBH.businessHoursMessage, _from_department: true }
           : supportConfig;
         await sendBusinessHoursMessage(supabase, ctx, conversationId, tenantId, effectiveConfig, msgDate, tz, businessHours, exceptions.closedDates, exceptions.today);
       }
