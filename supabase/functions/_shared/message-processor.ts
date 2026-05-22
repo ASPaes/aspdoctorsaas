@@ -1224,7 +1224,84 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const { instanceId, tenantId, providerType, instanceInfo, secrets, messageId, remoteJid, fromMe, pushName, content, messageType, timestamp, mediaUrl, mediaMimetype, mediaFilename, mediaStoragePath, quotedMessageId } = msg;
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // EDIÇÃO / REVOGAÇÃO de mensagens (Evolution API)
+  // Detecta antes de qualquer processamento para evitar INSERT duplicado.
+  // Formato A: messageType normalizado = 'editedMessage' (envelope externo)
+  // Formato B: rawPayload.message.protocolMessage com type=14 (edit) ou type=0 (revoke)
+  // ─────────────────────────────────────────────────────────────────────────
+  try {
+    const raw = (msg.rawPayload as any) || {};
+    const rawMsg = raw?.message || raw?.data?.message || {};
+    const protoFromEdited = rawMsg?.editedMessage?.message?.protocolMessage;
+    const protoDirect = rawMsg?.protocolMessage;
+    const proto = protoFromEdited || protoDirect;
+    const isEditedEnvelope = (messageType as any) === 'editedMessage' || !!protoFromEdited;
+    const isEditProto = proto && (proto.type === 14 || proto.type === 'MESSAGE_EDIT' || isEditedEnvelope);
+    const isRevokeProto = proto && (proto.type === 0 || proto.type === 'REVOKE');
+
+    if (isEditProto || isRevokeProto) {
+      const originalMessageId: string | null = proto?.key?.id || null;
+      if (!originalMessageId) {
+        console.log('[message-processor] Edit/Revoke without original key.id, skipping');
+        return;
+      }
+
+      // Resolver conversa via mensagem original (mesma conversa)
+      const { data: originalRow } = await supabase
+        .from('whatsapp_messages')
+        .select('id, conversation_id, content')
+        .eq('tenant_id', tenantId)
+        .eq('message_id', originalMessageId)
+        .maybeSingle();
+
+      if (isEditProto) {
+        const newContent: string =
+          proto?.editedMessage?.conversation ||
+          proto?.editedMessage?.extendedTextMessage?.text ||
+          '';
+        console.log(`[message-processor] Edited message detected: original_id=${originalMessageId}, new_content=${newContent}`);
+
+        if (!originalRow) {
+          console.log(`[message-processor] Original message not found for edit, skipping: id=${originalMessageId}`);
+          return;
+        }
+
+        const nowIso = new Date().toISOString();
+        await supabase.from('whatsapp_message_edit_history').insert({
+          tenant_id: tenantId,
+          conversation_id: originalRow.conversation_id,
+          message_id: originalMessageId,
+          previous_content: originalRow.content,
+          edited_at: nowIso,
+        });
+        await supabase
+          .from('whatsapp_messages')
+          .update({ content: newContent, edited_at: nowIso })
+          .eq('id', originalRow.id);
+        return;
+      }
+
+      if (isRevokeProto) {
+        console.log(`[message-processor] Revoked message detected: id=${originalMessageId}`);
+        if (!originalRow) {
+          console.log(`[message-processor] Original message not found for revoke, skipping: id=${originalMessageId}`);
+          return;
+        }
+        await supabase
+          .from('whatsapp_messages')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', originalRow.id);
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('[message-processor] Error in edit/revoke detection:', err instanceof Error ? err.message : String(err));
+    // não bloqueia fluxo principal em caso de erro inesperado
+  }
+
   const { phone, isGroup } = normalizePhoneNumber(remoteJid.includes('@') ? remoteJid : `${remoteJid}@s.whatsapp.net`);
+
 
   if (isGroup) {
     const groupJid = remoteJid.includes('@') ? remoteJid : `${phone}@g.us`;
