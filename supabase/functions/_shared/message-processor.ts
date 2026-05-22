@@ -788,7 +788,6 @@ async function sendBusinessHoursMessage(
         business_hours: true,
         outside_hours: true,
         department_message: true,
-        ...(isHolidayToday ? { holiday: true, holiday_name: holidayName } : {}),
       });
       return;
     }
