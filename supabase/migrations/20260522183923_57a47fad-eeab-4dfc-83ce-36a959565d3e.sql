@@ -1,0 +1,1 @@
+DELETE FROM public.clientes WHERE id = '94f9071f-c055-4ea5-b1e1-a35758887788' AND tenant_id = '955178ba-b367-498d-8443-cc5b7d1ee163';
