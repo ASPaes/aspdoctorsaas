@@ -656,24 +656,32 @@ function ProdutoDialog({
     }
   }, [open, edit]);
 
-  // Calcula próximo reajuste client-side
-  const dataProximoReajuste = useMemo(() => {
-    if (!dataAt || !prazoMeses || prazoMeses <= 0) return "";
+  const [dataProximoReajuste, setDataProximoReajuste] = useState("");
+  useEffect(() => {
+    if (!dataAt) {
+      setDataProximoReajuste("");
+      return;
+    }
     const start = new Date(dataAt + "T00:00:00");
-    if (isNaN(start.getTime())) return "";
+    if (isNaN(start.getTime())) {
+      setDataProximoReajuste("");
+      return;
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const next = new Date(start);
     let guard = 0;
     while (next <= today && guard < 600) {
-      next.setMonth(next.getMonth() + prazoMeses);
+      next.setMonth(next.getMonth() + 12);
       guard++;
     }
     const y = next.getFullYear();
     const m = String(next.getMonth() + 1).padStart(2, "0");
     const d = String(next.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }, [dataAt, prazoMeses]);
+    setDataProximoReajuste(`${y}-${m}-${d}`);
+  }, [dataAt]);
+
+
 
   const executeSave = async () => {
     if (!produtoId) {
