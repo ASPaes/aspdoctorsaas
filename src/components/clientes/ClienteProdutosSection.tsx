@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -652,27 +652,36 @@ function ProdutoDialog({
       setFormaPagAtivacaoId(e?.forma_pagamento_ativacao_id ? String(e.forma_pagamento_ativacao_id) : "");
       setFormaPagMensalidadeId(e?.forma_pagamento_mensalidade_id ? String(e.forma_pagamento_mensalidade_id) : "");
       setObservacoesContratuais(e?.observacoes_contratuais ?? "");
+      setTimeout(() => setDataProximoReajuste(e?.data_proximo_reajuste ?? ""), 0);
     }
   }, [open, edit]);
 
-  // Calcula próximo reajuste client-side
-  const dataProximoReajuste = useMemo(() => {
-    if (!dataAt || !prazoMeses || prazoMeses <= 0) return "";
+  const [dataProximoReajuste, setDataProximoReajuste] = useState("");
+  useEffect(() => {
+    if (!dataAt) {
+      setDataProximoReajuste("");
+      return;
+    }
     const start = new Date(dataAt + "T00:00:00");
-    if (isNaN(start.getTime())) return "";
+    if (isNaN(start.getTime())) {
+      setDataProximoReajuste("");
+      return;
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const next = new Date(start);
     let guard = 0;
     while (next <= today && guard < 600) {
-      next.setMonth(next.getMonth() + prazoMeses);
+      next.setMonth(next.getMonth() + 12);
       guard++;
     }
     const y = next.getFullYear();
     const m = String(next.getMonth() + 1).padStart(2, "0");
     const d = String(next.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }, [dataAt, prazoMeses]);
+    setDataProximoReajuste(`${y}-${m}-${d}`);
+  }, [dataAt]);
+
+
 
   const executeSave = async () => {
     if (!produtoId) {
@@ -893,8 +902,14 @@ function ProdutoDialog({
             </div>
             <div className="space-y-1">
               <Label>Próximo Reajuste</Label>
-              <Input type="date" value={dataProximoReajuste} disabled />
-              <p className="text-xs text-muted-foreground">Calculado automaticamente</p>
+              <Input
+                type="date"
+                value={dataProximoReajuste}
+                onChange={(ev) => setDataProximoReajuste(ev.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Calculado automaticamente (reajuste anual). Editável caso o cliente tenha data específica.
+              </p>
             </div>
             <div className="space-y-1">
               <Label>Dia Vencimento</Label>
