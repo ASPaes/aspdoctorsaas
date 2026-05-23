@@ -910,6 +910,7 @@ function ProdutoDialog({
               <p className="text-xs text-muted-foreground">
                 Calculado automaticamente (reajuste anual). Editável caso o cliente tenha data específica.
               </p>
+            </div>
             <div className="space-y-1">
               <Label>Dia Vencimento</Label>
               <Input
