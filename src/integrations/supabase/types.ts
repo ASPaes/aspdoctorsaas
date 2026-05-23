@@ -934,10 +934,22 @@ export type Database = {
           created_at: string
           data_ativacao: string | null
           data_cancelamento: string | null
+          data_fim: string | null
+          data_proximo_reajuste: string | null
+          data_venda: string | null
+          dia_vencimento: number | null
+          forma_pagamento_ativacao_id: number | null
+          forma_pagamento_mensalidade_id: number | null
           fornecedor_id: number | null
+          funcionario_id: number | null
           id: string
           link_portal_fornecedor: string | null
+          modelo_contrato_id: number | null
+          observacoes_contratuais: string | null
+          origem_venda_id: number | null
+          prazo_meses: number | null
           produto_id: number
+          recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
           tenant_id: string
           updated_at: string
           vlr_ativacao: number | null
@@ -951,10 +963,22 @@ export type Database = {
           created_at?: string
           data_ativacao?: string | null
           data_cancelamento?: string | null
+          data_fim?: string | null
+          data_proximo_reajuste?: string | null
+          data_venda?: string | null
+          dia_vencimento?: number | null
+          forma_pagamento_ativacao_id?: number | null
+          forma_pagamento_mensalidade_id?: number | null
           fornecedor_id?: number | null
+          funcionario_id?: number | null
           id?: string
           link_portal_fornecedor?: string | null
+          modelo_contrato_id?: number | null
+          observacoes_contratuais?: string | null
+          origem_venda_id?: number | null
+          prazo_meses?: number | null
           produto_id: number
+          recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           tenant_id: string
           updated_at?: string
           vlr_ativacao?: number | null
@@ -968,10 +992,22 @@ export type Database = {
           created_at?: string
           data_ativacao?: string | null
           data_cancelamento?: string | null
+          data_fim?: string | null
+          data_proximo_reajuste?: string | null
+          data_venda?: string | null
+          dia_vencimento?: number | null
+          forma_pagamento_ativacao_id?: number | null
+          forma_pagamento_mensalidade_id?: number | null
           fornecedor_id?: number | null
+          funcionario_id?: number | null
           id?: string
           link_portal_fornecedor?: string | null
+          modelo_contrato_id?: number | null
+          observacoes_contratuais?: string | null
+          origem_venda_id?: number | null
+          prazo_meses?: number | null
           produto_id?: number
+          recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           tenant_id?: string
           updated_at?: string
           vlr_ativacao?: number | null
@@ -994,10 +1030,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cliente_produtos_forma_pagamento_ativacao_id_fkey"
+            columns: ["forma_pagamento_ativacao_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_forma_pagamento_mensalidade_id_fkey"
+            columns: ["forma_pagamento_mensalidade_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cliente_produtos_fornecedor_id_fkey"
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_modelo_contrato_id_fkey"
+            columns: ["modelo_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "modelos_contrato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_origem_venda_id_fkey"
+            columns: ["origem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "origens_venda"
             referencedColumns: ["id"]
           },
           {
@@ -1726,6 +1797,7 @@ export type Database = {
           funcionario_id: number | null
           id: string
           indice_reajuste: string | null
+          is_implicit: boolean
           link_assinatura: string | null
           modelo_contrato_id: number | null
           motivo_cancelamento: string | null
@@ -1761,6 +1833,7 @@ export type Database = {
           funcionario_id?: number | null
           id?: string
           indice_reajuste?: string | null
+          is_implicit?: boolean
           link_assinatura?: string | null
           modelo_contrato_id?: number | null
           motivo_cancelamento?: string | null
@@ -1796,6 +1869,7 @@ export type Database = {
           funcionario_id?: number | null
           id?: string
           indice_reajuste?: string | null
+          is_implicit?: boolean
           link_assinatura?: string | null
           modelo_contrato_id?: number | null
           motivo_cancelamento?: string | null
@@ -6564,9 +6638,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      calc_proximo_reajuste: {
+        Args: { p_data_inicio: string; p_prazo_meses: number }
+        Returns: string
+      }
       can_access_monitor: { Args: never; Returns: boolean }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
+      cancel_cliente_produto: {
+        Args: {
+          p_cliente_produto_id: string
+          p_motivo_id: number
+          p_observacao?: string
+        }
+        Returns: Json
+      }
       cancelar_contrato: {
         Args: {
           p_contrato_id: string
@@ -6603,6 +6689,15 @@ export type Database = {
           p_parent_ticket_id: string
           p_responsavel_uid?: string
           p_status_id?: string
+        }
+        Returns: string
+      }
+      create_cliente_produto_with_contract: {
+        Args: {
+          p_cliente_id: string
+          p_dados: Json
+          p_link_to_contrato_id?: string
+          p_produto_id: number
         }
         Returns: string
       }
@@ -7235,6 +7330,10 @@ export type Database = {
           p_ticket_id: string
         }
         Returns: Json
+      }
+      sync_cliente_produto_to_contract: {
+        Args: { p_cliente_produto_id: string }
+        Returns: undefined
       }
       tenant_user_count: { Args: { p_tenant: string }; Returns: number }
       transfer_conversation_to_agent: {
