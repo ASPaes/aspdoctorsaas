@@ -290,6 +290,23 @@ export default function ClienteForm() {
 
   const estadoId = form.watch("estado_id");
   const cancelado = form.watch("cancelado");
+  const [forceShowContracts, setForceShowContracts] = useState(false);
+
+  const { data: hasNonImplicitContracts } = useQuery({
+    queryKey: ["has_non_implicit_contratos", tid, id],
+    enabled: isEditing && !!id,
+    staleTime: 0,
+    queryFn: async () => {
+      let q = (supabase.from("contratos" as any) as any)
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", id!)
+        .eq("is_implicit", false);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { count, error } = await q;
+      if (error) return false;
+      return (count ?? 0) > 0;
+    },
+  });
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const lookups = useLookups(estadoId);
@@ -586,8 +603,23 @@ export default function ClienteForm() {
             <ClienteProdutosSection clienteId={id} />
           )}
 
-          {isEditing && id && (
+          {isEditing && id && (hasNonImplicitContracts || forceShowContracts) && (
             <ClienteContratosSection clienteId={id} />
+          )}
+
+          {isEditing && id && !hasNonImplicitContracts && !forceShowContracts && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setForceShowContracts(true)}
+                className="text-xs text-muted-foreground"
+              >
+                <FileText className="h-3 w-3 mr-1" />
+                Ver detalhes contratuais (avançado)
+              </Button>
+            </div>
           )}
 
           {isEditing && id && (

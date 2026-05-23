@@ -166,6 +166,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     qc.invalidateQueries({ queryKey: ["contratos_cliente", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["contrato_itens_cliente", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["contratos_totais_check", tid, clienteId] });
+    qc.invalidateQueries({ queryKey: ["has_non_implicit_contratos", tid, clienteId] });
   };
 
   // ---- Mutations ----
