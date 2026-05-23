@@ -902,9 +902,14 @@ function ProdutoDialog({
             </div>
             <div className="space-y-1">
               <Label>Próximo Reajuste</Label>
-              <Input type="date" value={dataProximoReajuste} disabled />
-              <p className="text-xs text-muted-foreground">Calculado automaticamente</p>
-            </div>
+              <Input
+                type="date"
+                value={dataProximoReajuste}
+                onChange={(ev) => setDataProximoReajuste(ev.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Calculado automaticamente (reajuste anual). Editável caso o cliente tenha data específica.
+              </p>
             <div className="space-y-1">
               <Label>Dia Vencimento</Label>
               <Input
