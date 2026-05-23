@@ -6639,7 +6639,7 @@ export type Database = {
         Returns: undefined
       }
       calc_proximo_reajuste: {
-        Args: { p_data_inicio: string; p_prazo_meses: number }
+        Args: { p_data_inicio: string; p_prazo_meses?: number }
         Returns: string
       }
       can_access_monitor: { Args: never; Returns: boolean }
