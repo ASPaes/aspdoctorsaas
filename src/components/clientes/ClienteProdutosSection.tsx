@@ -564,12 +564,72 @@ function ProdutoDialog({
   const [saving, setSaving] = useState(false);
   const [confirmSwapOpen, setConfirmSwapOpen] = useState(false);
 
+  // Novos campos
+  const [dataVenda, setDataVenda] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [prazoMeses, setPrazoMeses] = useState<number | null>(null);
+  const [diaVencimento, setDiaVencimento] = useState<number | null>(null);
+  const [modeloContratoId, setModeloContratoId] = useState<string>("");
+  const [recorrencia, setRecorrencia] = useState<string>("");
+  const [funcionarioId, setFuncionarioId] = useState<string>("");
+  const [origemVendaId, setOrigemVendaId] = useState<string>("");
+  const [formaPagAtivacaoId, setFormaPagAtivacaoId] = useState<string>("");
+  const [formaPagMensalidadeId, setFormaPagMensalidadeId] = useState<string>("");
+  const [observacoesContratuais, setObservacoesContratuais] = useState("");
+
   const produtoIdOriginal = edit?.produto_id ? String(edit.produto_id) : "";
   const produtoTrocou = isEdit && produtoId !== "" && produtoId !== produtoIdOriginal;
+
+  // Lookups
+  const modelosContratoLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["modelos_contrato_lookup", tid],
+    enabled: open,
+    queryFn: async () => {
+      let q = (supabase.from("modelos_contrato" as any) as any).select("id, nome").order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const funcionariosLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["funcionarios_lookup", tid],
+    enabled: open,
+    queryFn: async () => {
+      let q = (supabase.from("funcionarios" as any) as any).select("id, nome").order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const origensVendaLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["origens_venda_lookup", tid],
+    enabled: open,
+    queryFn: async () => {
+      let q = (supabase.from("origens_venda" as any) as any).select("id, nome").order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
+  const formasPagamentoLookup = useQuery<{ id: number; nome: string }[]>({
+    queryKey: ["formas_pagamento_lookup", tid],
+    enabled: open,
+    queryFn: async () => {
+      let q = (supabase.from("formas_pagamento" as any) as any).select("id, nome").order("nome");
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any;
+    },
+  });
 
   // Reset on open
   useMemo(() => {
     if (open) {
+      const e = edit as any;
       setProdutoId(edit?.produto_id ? String(edit.produto_id) : "");
       setFornecedorId(edit?.fornecedor_id ? String(edit.fornecedor_id) : "");
       setCodigo(edit?.codigo_fornecedor ?? "");
@@ -578,8 +638,38 @@ function ProdutoDialog({
       setVlrAt(edit?.vlr_ativacao ?? null);
       setVlrMensal(edit?.vlr_mensal ? Number(edit.vlr_mensal) || null : null);
       setVlrCusto(edit?.vlr_custo ? Number(edit.vlr_custo) || null : null);
+      setDataVenda(e?.data_venda ?? "");
+      setDataFim(e?.data_fim ?? "");
+      setPrazoMeses(e?.prazo_meses ?? null);
+      setDiaVencimento(e?.dia_vencimento ?? null);
+      setModeloContratoId(e?.modelo_contrato_id ? String(e.modelo_contrato_id) : "");
+      setRecorrencia(e?.recorrencia ?? "");
+      setFuncionarioId(e?.funcionario_id ? String(e.funcionario_id) : "");
+      setOrigemVendaId(e?.origem_venda_id ? String(e.origem_venda_id) : "");
+      setFormaPagAtivacaoId(e?.forma_pagamento_ativacao_id ? String(e.forma_pagamento_ativacao_id) : "");
+      setFormaPagMensalidadeId(e?.forma_pagamento_mensalidade_id ? String(e.forma_pagamento_mensalidade_id) : "");
+      setObservacoesContratuais(e?.observacoes_contratuais ?? "");
     }
   }, [open, edit]);
+
+  // Calcula próximo reajuste client-side
+  const dataProximoReajuste = useMemo(() => {
+    if (!dataAt || !prazoMeses || prazoMeses <= 0) return "";
+    const start = new Date(dataAt + "T00:00:00");
+    if (isNaN(start.getTime())) return "";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const next = new Date(start);
+    let guard = 0;
+    while (next <= today && guard < 600) {
+      next.setMonth(next.getMonth() + prazoMeses);
+      guard++;
+    }
+    const y = next.getFullYear();
+    const m = String(next.getMonth() + 1).padStart(2, "0");
+    const d = String(next.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, [dataAt, prazoMeses]);
 
   const executeSave = async () => {
     if (!produtoId) {
@@ -588,16 +678,28 @@ function ProdutoDialog({
     }
     setSaving(true);
     try {
-      const payload: any = {
-        fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
-        codigo_fornecedor: codigo || null,
-        link_portal_fornecedor: link || null,
-        data_ativacao: dataAt || null,
-        vlr_ativacao: vlrAt,
-        vlr_mensal: vlrMensal || 0,
-        vlr_custo: vlrCusto || 0,
-      };
       if (isEdit && edit) {
+        const payload: any = {
+          fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
+          codigo_fornecedor: codigo || null,
+          link_portal_fornecedor: link || null,
+          data_ativacao: dataAt || null,
+          vlr_ativacao: vlrAt,
+          vlr_mensal: vlrMensal || 0,
+          vlr_custo: vlrCusto || 0,
+          data_venda: dataVenda || null,
+          data_fim: dataFim || null,
+          data_proximo_reajuste: dataProximoReajuste || null,
+          prazo_meses: prazoMeses,
+          dia_vencimento: diaVencimento,
+          modelo_contrato_id: modeloContratoId ? Number(modeloContratoId) : null,
+          recorrencia: recorrencia || null,
+          funcionario_id: funcionarioId ? Number(funcionarioId) : null,
+          origem_venda_id: origemVendaId ? Number(origemVendaId) : null,
+          forma_pagamento_ativacao_id: formaPagAtivacaoId ? Number(formaPagAtivacaoId) : null,
+          forma_pagamento_mensalidade_id: formaPagMensalidadeId ? Number(formaPagMensalidadeId) : null,
+          observacoes_contratuais: observacoesContratuais || null,
+        };
         // Se trocou produto, chama RPC primeiro (gate + propagação contrato_itens)
         if (produtoTrocou) {
           const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
@@ -616,19 +718,48 @@ function ProdutoDialog({
               ? `${updated} item(ns) de contrato tiveram descrição atualizada.`
               : "Nenhum item de contrato afetado.",
           });
-          // Remove fornecedor_id do payload do UPDATE (já feito via RPC)
           delete payload.fornecedor_id;
         }
         const { error } = await (supabase.from("cliente_produtos" as any) as any)
           .update(payload).eq("id", edit.id);
         if (error) throw error;
+
+        // Sync para contrato (não bloquear em erro)
+        try {
+          const { error: syncErr } = await (supabase.rpc as any)("sync_cliente_produto_to_contract", {
+            p_cliente_produto_id: edit.id,
+          });
+          if (syncErr) {
+            toast({ title: "Atenção", description: `Sync de contrato falhou: ${syncErr.message}`, variant: "destructive" });
+          }
+        } catch (syncCatch: any) {
+          toast({ title: "Atenção", description: `Sync de contrato falhou: ${syncCatch?.message ?? ""}`, variant: "destructive" });
+        }
       } else {
-        const { error } = await (supabase.from("cliente_produtos" as any) as any).insert({
-          ...payload,
-          tenant_id: tid,
-          cliente_id: clienteId,
-          produto_id: Number(produtoId),
-          ativo: true,
+        const dados: any = {
+          fornecedor_id: fornecedorId ? Number(fornecedorId) : null,
+          codigo_fornecedor: codigo || null,
+          link_portal_fornecedor: link || null,
+          vlr_ativacao: vlrAt ?? 0,
+          vlr_mensal: vlrMensal ?? 0,
+          vlr_custo: vlrCusto ?? 0,
+          data_venda: dataVenda || null,
+          data_ativacao: dataAt || null,
+          data_fim: dataFim || null,
+          prazo_meses: prazoMeses,
+          dia_vencimento: diaVencimento,
+          modelo_contrato_id: modeloContratoId ? Number(modeloContratoId) : null,
+          recorrencia: recorrencia || null,
+          funcionario_id: funcionarioId ? Number(funcionarioId) : null,
+          origem_venda_id: origemVendaId ? Number(origemVendaId) : null,
+          forma_pagamento_ativacao_id: formaPagAtivacaoId ? Number(formaPagAtivacaoId) : null,
+          forma_pagamento_mensalidade_id: formaPagMensalidadeId ? Number(formaPagMensalidadeId) : null,
+          observacoes_contratuais: observacoesContratuais || null,
+        };
+        const { error } = await (supabase.rpc as any)("create_cliente_produto_with_contract", {
+          p_cliente_id: clienteId,
+          p_produto_id: Number(produtoId),
+          p_dados: dados,
         });
         if (error) throw error;
       }
@@ -655,64 +786,219 @@ function ProdutoDialog({
     }
     await executeSave();
   };
+
+  const modelosContrato = modelosContratoLookup.data ?? [];
+  const funcionariosList = funcionariosLookup.data ?? [];
+  const origensVenda = origensVendaLookup.data ?? [];
+  const formasPagamento = formasPagamentoLookup.data ?? [];
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar Produto" : "Adicionar Produto"}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label>Fornecedor</Label>
-            <Select value={fornecedorId || "__none__"} onValueChange={(v) => setFornecedorId(v === "__none__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— Nenhum —</SelectItem>
-                {fornecedores.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Produto *</Label>
-            <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit && !canSwapProduto}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {produtos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {isEdit && !canSwapProduto && (
-              <p className="text-xs text-muted-foreground">
-                {modulosCountForEdit > 0
-                  ? "Remova os módulos vinculados para trocar o produto."
-                  : "Apenas admin pode trocar o produto."}
-              </p>
-            )}
-          </div>
-          <div className="space-y-1">
-            <Label>Código Fornecedor</Label>
-            <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Link Portal Fornecedor</Label>
-            <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." />
-          </div>
-          <div className="space-y-1">
-            <Label>Data Ativação</Label>
-            <Input type="date" value={dataAt} onChange={(e) => setDataAt(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Valor Ativação</Label>
-            <NumericInput value={vlrAt} onChange={setVlrAt} decimals={2} placeholder="0,00" suffix="R$" />
-          </div>
-          <div className="space-y-1">
-            <Label>Valor Mensal</Label>
-            <NumericInput value={vlrMensal} onChange={setVlrMensal} decimals={2} placeholder="0,00" suffix="R$" />
-          </div>
-          <div className="space-y-1">
-            <Label>Custo Operação</Label>
-            <NumericInput value={vlrCusto} onChange={setVlrCusto} decimals={2} placeholder="0,00" suffix="R$" />
+
+        {/* Identificação */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Identificação</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Fornecedor</Label>
+              <Select value={fornecedorId || "__none__"} onValueChange={(v) => setFornecedorId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhum —</SelectItem>
+                  {fornecedores.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Produto *</Label>
+              <Select value={produtoId} onValueChange={setProdutoId} disabled={isEdit && !canSwapProduto}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {produtos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {isEdit && !canSwapProduto && (
+                <p className="text-xs text-muted-foreground">
+                  {modulosCountForEdit > 0
+                    ? "Remova os módulos vinculados para trocar o produto."
+                    : "Apenas admin pode trocar o produto."}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>Código Fornecedor</Label>
+              <Input value={codigo} onChange={(e) => setCodigo(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Link Portal Fornecedor</Label>
+              <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://..." />
+            </div>
           </div>
         </div>
+
+        <Separator />
+
+        {/* Valores */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Valores</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <Label>Valor Ativação</Label>
+              <NumericInput value={vlrAt} onChange={setVlrAt} decimals={2} placeholder="0,00" suffix="R$" />
+            </div>
+            <div className="space-y-1">
+              <Label>Valor Mensal</Label>
+              <NumericInput value={vlrMensal} onChange={setVlrMensal} decimals={2} placeholder="0,00" suffix="R$" />
+            </div>
+            <div className="space-y-1">
+              <Label>Custo Operação</Label>
+              <NumericInput value={vlrCusto} onChange={setVlrCusto} decimals={2} placeholder="0,00" suffix="R$" />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Vigência & Reajuste */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Vigência & Reajuste</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <Label>Data Venda</Label>
+              <Input type="date" value={dataVenda} onChange={(e) => setDataVenda(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Data Ativação</Label>
+              <Input type="date" value={dataAt} onChange={(e) => setDataAt(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Data Fim</Label>
+              <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Prazo (meses)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={prazoMeses ?? ""}
+                onChange={(e) => setPrazoMeses(e.target.value ? Number(e.target.value) : null)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Próximo Reajuste</Label>
+              <Input type="date" value={dataProximoReajuste} disabled />
+              <p className="text-xs text-muted-foreground">Calculado automaticamente</p>
+            </div>
+            <div className="space-y-1">
+              <Label>Dia Vencimento</Label>
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={diaVencimento ?? ""}
+                onChange={(e) => setDiaVencimento(e.target.value ? Number(e.target.value) : null)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Comercial */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Comercial</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Modelo de Contrato</Label>
+              <Select value={modeloContratoId || "__none__"} onValueChange={(v) => setModeloContratoId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhum —</SelectItem>
+                  {modelosContrato.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Recorrência</Label>
+              <Select value={recorrencia || "__none__"} onValueChange={(v) => setRecorrencia(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="mensal">Mensal</SelectItem>
+                  <SelectItem value="semestral">Semestral</SelectItem>
+                  <SelectItem value="anual">Anual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Vendedor</Label>
+              <Select value={funcionarioId || "__none__"} onValueChange={(v) => setFuncionarioId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhum —</SelectItem>
+                  {funcionariosList.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Origem da Venda</Label>
+              <Select value={origemVendaId || "__none__"} onValueChange={(v) => setOrigemVendaId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {origensVenda.map(o => <SelectItem key={o.id} value={String(o.id)}>{o.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Pagamento */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Pagamento</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Forma Pag. Ativação</Label>
+              <Select value={formaPagAtivacaoId || "__none__"} onValueChange={(v) => setFormaPagAtivacaoId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {formasPagamento.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Forma Pag. Mensalidade</Label>
+              <Select value={formaPagMensalidadeId || "__none__"} onValueChange={(v) => setFormaPagMensalidadeId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {formasPagamento.map(f => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Observações Contratuais */}
+        <div className="space-y-2">
+          <h4 className="text-sm font-semibold text-muted-foreground">Observações Contratuais</h4>
+          <Textarea
+            rows={3}
+            value={observacoesContratuais}
+            onChange={(e) => setObservacoesContratuais(e.target.value)}
+          />
+        </div>
+
         <p className="text-xs text-muted-foreground mt-2">
           Se este produto terá módulos detalhados, os valores serão recalculados automaticamente.
         </p>
