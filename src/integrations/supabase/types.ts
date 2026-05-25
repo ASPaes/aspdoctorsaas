@@ -3239,6 +3239,123 @@ export type Database = {
           },
         ]
       }
+      reajuste_contratos: {
+        Row: {
+          cliente_id: string
+          contrato_evento_id: string | null
+          contrato_id: string
+          created_at: string
+          data_proximo_reajuste_antes: string | null
+          id: string
+          movimento_mrr_id: string | null
+          percentual_aplicado: number
+          reajuste_id: string
+          selecionado: boolean
+          snapshot_antes: Json
+          vlr_delta: number
+          vlr_mensal_antes: number
+          vlr_mensal_depois: number
+        }
+        Insert: {
+          cliente_id: string
+          contrato_evento_id?: string | null
+          contrato_id: string
+          created_at?: string
+          data_proximo_reajuste_antes?: string | null
+          id?: string
+          movimento_mrr_id?: string | null
+          percentual_aplicado: number
+          reajuste_id: string
+          selecionado?: boolean
+          snapshot_antes?: Json
+          vlr_delta?: number
+          vlr_mensal_antes: number
+          vlr_mensal_depois?: number
+        }
+        Update: {
+          cliente_id?: string
+          contrato_evento_id?: string | null
+          contrato_id?: string
+          created_at?: string
+          data_proximo_reajuste_antes?: string | null
+          id?: string
+          movimento_mrr_id?: string | null
+          percentual_aplicado?: number
+          reajuste_id?: string
+          selecionado?: boolean
+          snapshot_antes?: Json
+          vlr_delta?: number
+          vlr_mensal_antes?: number
+          vlr_mensal_depois?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reajuste_contratos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reajuste_contratos_reajuste_id_fkey"
+            columns: ["reajuste_id"]
+            isOneToOne: false
+            referencedRelation: "reajustes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reajustes: {
+        Row: {
+          created_at: string
+          data_lancamento: string
+          id: string
+          percentual_padrao: number
+          periodo_fim: string
+          periodo_inicio: string
+          qtd_contratos: number
+          status: string
+          tenant_id: string
+          updated_at: string
+          usuario_id: string
+          vlr_mensal_total_antes: number
+          vlr_mensal_total_depois: number
+          vlr_reajuste_total: number
+        }
+        Insert: {
+          created_at?: string
+          data_lancamento?: string
+          id?: string
+          percentual_padrao: number
+          periodo_fim: string
+          periodo_inicio: string
+          qtd_contratos?: number
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          usuario_id: string
+          vlr_mensal_total_antes?: number
+          vlr_mensal_total_depois?: number
+          vlr_reajuste_total?: number
+        }
+        Update: {
+          created_at?: string
+          data_lancamento?: string
+          id?: string
+          percentual_padrao?: number
+          periodo_fim?: string
+          periodo_inicio?: string
+          qtd_contratos?: number
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          usuario_id?: string
+          vlr_mensal_total_antes?: number
+          vlr_mensal_total_depois?: number
+          vlr_reajuste_total?: number
+        }
+        Relationships: []
+      }
       segmentos: {
         Row: {
           id: number
@@ -6630,6 +6747,15 @@ export type Database = {
         Args: { p_minutes: number; p_reason_id: string; p_tenant_id: string }
         Returns: undefined
       }
+      aplicar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
+      atualizar_reajuste_item: {
+        Args: {
+          p_item_id: string
+          p_percentual?: number
+          p_selecionado?: boolean
+        }
+        Returns: Json
+      }
       audit_log: {
         Args: {
           p_event_type: string
@@ -6754,6 +6880,22 @@ export type Database = {
         Args: { p_encrypted: string; p_encryption_key: string }
         Returns: string
       }
+      definir_datas_reajuste_em_massa: {
+        Args: {
+          p_campo_base?: string
+          p_preview?: boolean
+          p_tenant_id: string
+        }
+        Returns: {
+          cliente_id: string
+          contrato_id: string
+          data_base: string
+          data_proximo_reajuste_calculada: string
+          numero: string
+          razao_social: string
+          total_afetados: number
+        }[]
+      }
       delete_conversation_admin: {
         Args: { p_conversation_id: string }
         Returns: Json
@@ -6779,6 +6921,7 @@ export type Database = {
         Args: { p_encryption_key: string; p_key: string }
         Returns: string
       }
+      estornar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
       exec_db_health_query: { Args: { query_text: string }; Returns: Json }
       exec_db_maintenance: { Args: { action: string }; Returns: string }
       fn_assign_conversation_if_ready: {
@@ -7156,6 +7299,15 @@ export type Database = {
       }
       next_ticket_code: { Args: { p_tenant_id: string }; Returns: string }
       norm_txt: { Args: { t: string }; Returns: string }
+      preparar_reajuste: {
+        Args: {
+          p_percentual: number
+          p_periodo_fim: string
+          p_periodo_inicio: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       process_maintenance_queue: { Args: never; Returns: undefined }
       process_notification_dispatch_queue: {
         Args: { p_batch_size?: number }
@@ -7459,6 +7611,7 @@ export type Database = {
         | "venda_avulsa"
         | "churn"
         | "reactivation"
+        | "reajuste"
       recorrencia_tipo: "mensal" | "anual" | "semestral" | "semanal"
       sentiment_type: "positive" | "neutral" | "negative"
       support_ticket_prioridade: "baixa" | "media" | "alta" | "urgente"
@@ -7643,6 +7796,7 @@ export const Constants = {
         "venda_avulsa",
         "churn",
         "reactivation",
+        "reajuste",
       ],
       recorrencia_tipo: ["mensal", "anual", "semestral", "semanal"],
       sentiment_type: ["positive", "neutral", "negative"],
