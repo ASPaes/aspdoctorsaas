@@ -124,7 +124,13 @@ export default function FinanceiroCard({
   });
 
   const movimentosAtivos = (movimentos ?? []).filter(
-    (m) => m.status === "ativo" && !m.estornado_por && !m.estorno_de && m.tipo !== "venda_avulsa"
+    (m) =>
+      m.status === "ativo" &&
+      !m.estornado_por &&
+      !m.estorno_de &&
+      m.tipo !== "venda_avulsa" &&
+      m.tipo !== "churn" &&
+      m.tipo !== "reactivation"
   );
   const somaDeltaMrr = movimentosAtivos.reduce((s, m) => s + m.valor_delta, 0);
   const somaDeltaCusto = movimentosAtivos.reduce((s, m) => s + (m.custo_delta || 0), 0);
