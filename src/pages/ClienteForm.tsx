@@ -469,7 +469,21 @@ export default function ClienteForm() {
       };
 
       if (isEditing) {
-        const { error } = await supabase.from("clientes").update(payload).eq("id", id!);
+        // Campos DERIVADOS — gerenciados exclusivamente por RPCs e triggers do banco.
+        // NUNCA enviar no UPDATE direto, ou o form sobrescreve o estado correto.
+        // - cancelado/data_cancelamento/motivo/observacao_cancelamento: RPCs cancelar_contrato/reativar_contrato
+        // - mensalidade/custo_operacao: trigger fn_sync_cliente_mensalidade (recalcula a partir de cliente_produtos)
+        const {
+          cancelado: _ignored1,
+          data_cancelamento: _ignored2,
+          motivo_cancelamento_id: _ignored3,
+          observacao_cancelamento: _ignored4,
+          mensalidade: _ignored5,
+          custo_operacao: _ignored6,
+          ...updatePayload
+        } = payload;
+
+        const { error } = await supabase.from("clientes").update(updatePayload).eq("id", id!);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("clientes").insert(payload);
