@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -59,7 +59,7 @@ export function CanceladosTable({ items, tvMode }: Props) {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{format(new Date(c.dataCancelamento), 'dd/MM/yyyy')}</TableCell>
+                  <TableCell>{format(parseISO(c.dataCancelamento), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="max-w-[200px] truncate" title={c.motivo}>{c.motivo}</TableCell>
                   <TableCell className="text-right font-medium">{fmt(c.mensalidade)}</TableCell>
                 </TableRow>
