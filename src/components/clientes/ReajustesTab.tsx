@@ -219,6 +219,21 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
                       {r.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {r.status === "pendente" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(r.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
