@@ -51,7 +51,7 @@ import { cn } from '@/lib/utils';
 interface MovimentoMrr {
   id: string;
   cliente_id: string;
-  tipo: 'upsell' | 'cross_sell' | 'downsell' | 'venda_avulsa';
+  tipo: 'upsell' | 'cross_sell' | 'downsell' | 'venda_avulsa' | 'reajuste';
   data_movimento: string;
   valor_delta: number;
   custo_delta: number;
@@ -324,9 +324,10 @@ export function MovimentosMrrModal({
   const movimentosAtivos = movimentos.filter(m => m.status === 'ativo' && !m.estornado_por && !m.estorno_de && m.tipo !== 'venda_avulsa');
   const vendasAvulsasAtivas = movimentos.filter(m => m.status === 'ativo' && m.tipo === 'venda_avulsa');
 
-  const somaMovimentosAtivos = movimentosAtivos.reduce((sum, m) => sum + m.valor_delta, 0);
+  const somaMovimentosAtivos = movimentosAtivos.filter(m => m.tipo !== 'reajuste').reduce((sum, m) => sum + m.valor_delta, 0);
   const totalVendasAvulsas = vendasAvulsasAtivas.reduce((sum, m) => sum + (m.valor_venda_avulsa || 0), 0);
-  const somaCustoMovimentos = movimentosAtivos.reduce((sum, m) => sum + (m.custo_delta || 0), 0);
+  const somaCustoMovimentos = movimentosAtivos.filter(m => m.tipo !== 'reajuste').reduce((sum, m) => sum + (m.custo_delta || 0), 0);
+  const totalReajuste = movimentosAtivos.filter(m => m.tipo === 'reajuste').reduce((sum, m) => sum + m.valor_delta, 0);
 
   const mrrAjustado = mensalidadeBase + somaMovimentosAtivos;
   const custoAjustado = custoBase + somaCustoMovimentos;
@@ -477,7 +478,7 @@ export function MovimentosMrrModal({
           </DialogHeader>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
             <Card>
               <CardHeader className="py-2 px-3">
                 <CardTitle className="text-xs font-medium text-muted-foreground">MRR Base</CardTitle>
@@ -531,6 +532,17 @@ export function MovimentosMrrModal({
                 <p className="text-xs text-muted-foreground">Não afeta MRR</p>
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader className="py-2 px-3">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-cyan-500" /> Reajuste
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-1 px-3">
+                <p className="text-lg font-bold text-cyan-500">+{formatCurrency(totalReajuste)}</p>
+                <p className="text-muted-foreground text-[9px]">Não afeta MRR</p>
+              </CardContent>
+            </Card>
             <Card className="bg-primary/5 border-primary/20">
               <CardHeader className="py-2 px-3">
                 <CardTitle className="text-xs font-medium text-muted-foreground">MRR Atual</CardTitle>
@@ -557,6 +569,12 @@ export function MovimentosMrrModal({
                     <span className="mx-1">=</span>
                     <span className="font-bold text-primary">{formatCurrency(mrrAjustado)}</span>
                   </p>
+                  {totalReajuste !== 0 && (
+                    <p className="text-xs mt-1">
+                      <span className="text-cyan-500">+ Reajuste: +{formatCurrency(totalReajuste)}</span>
+                      <span className="text-muted-foreground ml-1">(já incluso no base)</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Composição Custo</p>
