@@ -404,6 +404,8 @@ export default function Clientes() {
       q = q.gte("data_venda_efetiva", firstDay)
         .lte("data_venda_efetiva", lastDay);
 
+      if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
       if (debouncedSearch) {
         const s = `%${escapeLike(debouncedSearch)}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
