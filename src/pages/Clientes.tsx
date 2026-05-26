@@ -455,11 +455,14 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, qtde_contratos_ativos, unidade_base_id, telefone_whatsapp, telefone_contato";
-      let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, qtde_contratos_ativos, unidade_base_id, telefone_whatsapp, telefone_contato, setup_completo";
+      let q = tf((supabase as any).from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
       else if (status === "cancelados") q = q.eq("cancelado", true);
+
+      if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
 
       if (debouncedSearch) {
         const s = `%${escapeLike(debouncedSearch)}%`;
