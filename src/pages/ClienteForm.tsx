@@ -277,7 +277,7 @@ export default function ClienteForm() {
       data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
       valor_ativacao: null as any,
       forma_pagamento_ativacao_id: null, mensalidade: null as any, forma_pagamento_mensalidade_id: null,
-      custo_operacao: null as any, imposto_percentual: null as any, custo_fixo_percentual: null as any,
+      custo_operacao: null as any, imposto_percentual: null, custo_fixo_percentual: null,
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
