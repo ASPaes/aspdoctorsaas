@@ -170,7 +170,7 @@ export default function NovoReajusteDialog({
       const [{ data: clientes }, { data: contratos }] = await Promise.all([
         clienteIds.length
           ? (supabase.from("clientes" as any) as any)
-              .select("id, razao_social")
+              .select("id, razao_social, nome_fantasia, cnpj, numero")
               .in("id", clienteIds)
           : Promise.resolve({ data: [] }),
         contratoIds.length
@@ -194,6 +194,9 @@ export default function NovoReajusteDialog({
         data_proximo_reajuste_antes:
           r.data_proximo_reajuste_antes ?? (ctrMap.get(r.contrato_id) as any)?.data_proximo_reajuste ?? null,
         razao_social: (cliMap.get(r.cliente_id) as any)?.razao_social ?? "—",
+        nome_fantasia: (cliMap.get(r.cliente_id) as any)?.nome_fantasia ?? "",
+        cnpj: (cliMap.get(r.cliente_id) as any)?.cnpj ?? "",
+        cliente_numero: (cliMap.get(r.cliente_id) as any)?.numero ?? "",
         numero: (ctrMap.get(r.contrato_id) as any)?.numero ?? "—",
       }));
       mapped.sort((a, b) => a.razao_social.localeCompare(b.razao_social));
