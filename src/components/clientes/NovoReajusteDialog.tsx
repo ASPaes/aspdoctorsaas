@@ -597,7 +597,14 @@ export default function NovoReajusteDialog({
                               {item.selecionado ? `+${fmtBRL(item.vlr_delta)}` : "—"}
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {item.selecionado ? fmtBRL(item.vlr_mensal_depois) : "—"}
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.vlr_mensal_depois}
+                                onChange={(e) => handleMrrNovoItemChange(item, e.target.value)}
+                                disabled={readOnly || !item.selecionado || item.vlr_mensal_antes === 0}
+                                className="h-8 w-28 text-right font-mono text-sm bg-transparent border border-muted rounded-md px-2 disabled:opacity-50"
+                              />
                             </td>
                           </tr>
                         ))}
