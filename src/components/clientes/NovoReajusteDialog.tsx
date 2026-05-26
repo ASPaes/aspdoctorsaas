@@ -105,6 +105,21 @@ export default function NovoReajusteDialog({
   const [actionLoading, setActionLoading] = useState(false);
   const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [search, setSearch] = useState("");
+  const [produtoFilter, setProdutoFilter] = useState("");
+
+  const { data: produtosList = [] } = useQuery({
+    queryKey: ["produtos_tenant", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+    enabled: !!tenantId && open,
+  });
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
