@@ -426,7 +426,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   }, [onSelect, onSelectMessage]);
 
   // Active filter badges
-  const activeFilterBadges: { key: string; label: string; onRemove: () => void }[] = [];
+  const activeFilterBadges: { key: string; label: string; onRemove: () => void; inactive?: boolean }[] = [];
   if (filters.status) {
     activeFilterBadges.push({
       key: "status",
@@ -453,6 +453,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       key: "assignedToMe",
       label: "Atribuídas a mim",
       onRemove: () => setFilters(f => ({ ...f, assignedToMe: false })),
+      inactive: queueLikePills,
     });
   }
   if (filters.assignedToAgent) {
@@ -460,6 +461,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       key: "assignedToAgent",
       label: filters.assignedToAgent === "__unassigned__" ? "Na Fila" : "Operador",
       onRemove: () => setFilters(f => ({ ...f, assignedToAgent: undefined })),
+      inactive: queueLikePills && filters.assignedToAgent !== "__unassigned__",
     });
   }
   if (filters.autoReplyDisabledOnly) {
@@ -568,16 +570,30 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
       {!isSearching && activeFilterBadges.length > 0 && (
         <div className="flex flex-wrap gap-1 px-3 pb-2">
-          {activeFilterBadges.map((badge) => (
-            <button
-              key={badge.key}
-              onClick={badge.onRemove}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-medium hover:bg-destructive/10 hover:text-destructive transition-colors"
-            >
-              {badge.label}
-              <X className="h-2.5 w-2.5" />
-            </button>
-          ))}
+          {activeFilterBadges.map((badge) => {
+            const btn = (
+              <button
+                onClick={badge.onRemove}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                  badge.inactive
+                    ? "bg-muted text-muted-foreground line-through opacity-60 hover:opacity-100"
+                    : "bg-accent text-accent-foreground hover:bg-destructive/10 hover:text-destructive"
+                }`}
+              >
+                {badge.label}
+                <X className="h-2.5 w-2.5" />
+              </button>
+            );
+            if (badge.inactive) {
+              return (
+                <Tooltip key={badge.key}>
+                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                  <TooltipContent>Não se aplica nesta aba</TooltipContent>
+                </Tooltip>
+              );
+            }
+            return <span key={badge.key}>{btn}</span>;
+          })}
         </div>
       )}
 
