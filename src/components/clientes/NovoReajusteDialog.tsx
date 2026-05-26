@@ -535,7 +535,7 @@ export default function NovoReajusteDialog({
             {(items.length > 0 || loadingItems) && (
               <>
                 <Separator />
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <Checkbox
                       checked={allSelected}
@@ -545,6 +545,36 @@ export default function NovoReajusteDialog({
                     <span className="text-sm">
                       {selecionados} selecionados de {items.length}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Buscar por nome, contrato, nº ou CNPJ..."
+                        className="h-8 pl-8 max-w-sm"
+                      />
+                    </div>
+                    {showOnlySelected ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowOnlySelected(false)}
+                      >
+                        <Filter className="h-4 w-4 mr-1" />
+                        Mostrando selecionados
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowOnlySelected(true)}
+                      >
+                        <FilterX className="h-4 w-4 mr-1" />
+                        Mostrando todos
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -569,7 +599,12 @@ export default function NovoReajusteDialog({
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((item) => (
+                        {displayItems.map((item) => {
+                          const primary = item.nome_fantasia || item.razao_social;
+                          const showRazao =
+                            !!item.nome_fantasia &&
+                            item.nome_fantasia !== item.razao_social;
+                          return (
                           <tr
                             key={item.id}
                             className={`border-t ${!item.selecionado ? "opacity-50" : ""}`}
@@ -582,8 +617,20 @@ export default function NovoReajusteDialog({
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <div className="font-medium">{item.razao_social}</div>
-                              <div className="text-xs text-muted-foreground">{item.numero}</div>
+                              <div className="font-medium">{primary}</div>
+                              {showRazao && (
+                                <div className="text-xs text-muted-foreground">
+                                  {item.razao_social}
+                                </div>
+                              )}
+                              {item.cnpj && (
+                                <div className="text-xs text-muted-foreground">
+                                  {formatCnpjCpf(item.cnpj)}
+                                </div>
+                              )}
+                              <div className="text-xs text-muted-foreground">
+                                Contrato: {item.numero}
+                              </div>
                             </td>
                             <td className="px-3 py-2">
                               {item.data_proximo_reajuste_antes
@@ -617,12 +664,14 @@ export default function NovoReajusteDialog({
                               />
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
               </>
+
             )}
 
             {totais && totais.qtd_contratos === 0 && !loadingItems && (
