@@ -91,7 +91,7 @@ const clienteSchema = z.object({
   data_reajuste: z.string().nullable(),
   funcionario_id: z.number().nullable(),
   origem_venda_id: z.number().nullable(),
-  recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
+  recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"]).nullable(),
   produto_id: z.number().nullable(),
   observacao_negociacao: z.string().nullable(),
   data_ativacao: noFutureDate("Data de Ativação"),
