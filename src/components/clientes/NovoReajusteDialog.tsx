@@ -54,6 +54,9 @@ interface ItemRow {
   vlr_delta: number;
   data_proximo_reajuste_antes: string | null;
   razao_social: string;
+  nome_fantasia: string;
+  cnpj: string;
+  cliente_numero: string;
   numero: string;
 }
 
