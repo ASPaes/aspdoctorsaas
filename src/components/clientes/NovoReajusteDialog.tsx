@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
