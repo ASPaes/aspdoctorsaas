@@ -163,7 +163,14 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
             </TableHeader>
             <TableBody>
               {reajustes.map((r: any) => (
-                <TableRow key={r.id}>
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => {
+                    setSelectedReajusteId(r.id);
+                    setNovoReajusteOpen(true);
+                  }}
+                >
                   <TableCell>
                     {format(parseISO(r.data_lancamento), "dd/MM/yyyy HH:mm")}
                   </TableCell>
