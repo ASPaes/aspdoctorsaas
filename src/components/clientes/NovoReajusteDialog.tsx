@@ -192,7 +192,7 @@ export default function NovoReajusteDialog({
       const clienteIds = Array.from(new Set(rows.map((r) => r.cliente_id).filter(Boolean)));
       const contratoIds = Array.from(new Set(rows.map((r) => r.contrato_id).filter(Boolean)));
 
-      const [{ data: clientes }, { data: contratos }] = await Promise.all([
+      const [{ data: clientes }, { data: contratos }, { data: citens }] = await Promise.all([
         clienteIds.length
           ? (supabase.from("clientes" as any) as any)
               .select("id, razao_social, nome_fantasia, cnpj, numero")
@@ -203,9 +203,20 @@ export default function NovoReajusteDialog({
               .select("id, numero, data_proximo_reajuste")
               .in("id", contratoIds)
           : Promise.resolve({ data: [] }),
+        contratoIds.length
+          ? (supabase.from("contrato_itens" as any) as any)
+              .select("contrato_id, descricao, cliente_produto_id")
+              .in("contrato_id", contratoIds)
+          : Promise.resolve({ data: [] }),
       ]);
       const cliMap = new Map((clientes ?? []).map((c: any) => [c.id, c]));
       const ctrMap = new Map((contratos ?? []).map((c: any) => [c.id, c]));
+      const prodMap = new Map<string, string>();
+      ((citens ?? []) as any[]).forEach((ci) => {
+        if (!prodMap.has(ci.contrato_id) && ci.descricao) {
+          prodMap.set(ci.contrato_id, ci.descricao);
+        }
+      });
 
       const mapped: ItemRow[] = rows.map((r) => ({
         id: r.id,
@@ -223,6 +234,7 @@ export default function NovoReajusteDialog({
         cnpj: (cliMap.get(r.cliente_id) as any)?.cnpj ?? "",
         cliente_numero: (cliMap.get(r.cliente_id) as any)?.numero ?? "",
         numero: (ctrMap.get(r.contrato_id) as any)?.numero ?? "—",
+        produto_nome: prodMap.get(r.contrato_id) ?? "",
       }));
       mapped.sort((a, b) => a.razao_social.localeCompare(b.razao_social));
       setItems(mapped);
