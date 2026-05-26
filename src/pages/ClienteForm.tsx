@@ -598,6 +598,25 @@ export default function ClienteForm() {
         </div>
       </div>
 
+      {isEditing && clienteQuery.data && (clienteQuery.data as any).setup_completo === false && (
+        <div className="flex items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+          <span className="flex-1">
+            Adicione ao menos 1 produto e 1 contrato pra finalizar o cadastro deste cliente.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              document.getElementById("cliente-produtos-section")?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            Ir para Produtos
+          </Button>
+        </div>
+      )}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Card: Dados Cadastrais */}
