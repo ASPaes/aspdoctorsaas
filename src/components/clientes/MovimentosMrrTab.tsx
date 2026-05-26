@@ -23,6 +23,7 @@ const tipoLabels: Record<string, string> = {
   downsell: "Downsell",
   venda_avulsa: "Venda Avulsa",
   reactivation: "Reativação",
+  reajuste: "Reajuste",
   churn: "Churn",
 };
 
