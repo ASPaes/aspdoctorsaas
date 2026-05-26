@@ -4,6 +4,7 @@ import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { maskCNPJ, maskCPF } from "@/lib/masks";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -69,6 +70,13 @@ interface Totais {
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v ?? 0);
+
+const formatCnpjCpf = (v: string) => {
+  const digits = (v ?? "").replace(/\D/g, "");
+  if (digits.length === 14) return maskCNPJ(digits);
+  if (digits.length === 11) return maskCPF(digits);
+  return v;
+};
 
 const SERIES: Record<string, number> = { ipca: 433, igpm: 189 };
 
@@ -431,6 +439,19 @@ export default function NovoReajusteDialog({
   const selecionados = items.filter((i) => i.selecionado).length;
   const allSelected = items.length > 0 && selecionados === items.length;
 
+  const displayItems = showOnlySelected ? items.filter((i) => i.selecionado) : items;
+  const filteredItems = displayItems.filter((item) => {
+    if (!search.trim()) return true;
+    const s = search.toLowerCase();
+    return (
+      item.razao_social.toLowerCase().includes(s) ||
+      item.nome_fantasia.toLowerCase().includes(s) ||
+      item.numero.toLowerCase().includes(s) ||
+      item.cnpj.toLowerCase().includes(s) ||
+      item.cliente_numero.toLowerCase().includes(s)
+    );
+  });
+
   const title = isView ? `Reajuste — ${status}` : "Novo reajuste";
   const showIndice = !readOnly && (!isView || status === "pendente");
 
@@ -599,7 +620,7 @@ export default function NovoReajusteDialog({
                         </tr>
                       </thead>
                       <tbody>
-                        {displayItems.map((item) => {
+                        {filteredItems.map((item) => {
                           const primary = item.nome_fantasia || item.razao_social;
                           const showRazao =
                             !!item.nome_fantasia &&
