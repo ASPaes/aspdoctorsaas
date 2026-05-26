@@ -181,6 +181,7 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
                 <TableHead className="text-right">Delta</TableHead>
                 <TableHead className="text-right">MRR depois</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
