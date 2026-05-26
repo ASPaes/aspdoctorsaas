@@ -638,7 +638,7 @@ export default function NovoReajusteDialog({
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <div className="font-medium">{primary}</div>
+                              <div className="font-medium text-sm">{primary}</div>
                               {showRazao && (
                                 <div className="text-xs text-muted-foreground">
                                   {item.razao_social}
