@@ -93,6 +93,8 @@ export default function NovoReajusteDialog({
   const [confirmAplicar, setConfirmAplicar] = useState(false);
   const [confirmEstornar, setConfirmEstornar] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+  const [search, setSearch] = useState("");
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
