@@ -569,6 +569,12 @@ export function MovimentosMrrModal({
                     <span className="mx-1">=</span>
                     <span className="font-bold text-primary">{formatCurrency(mrrAjustado)}</span>
                   </p>
+                  {totalReajuste !== 0 && (
+                    <p className="text-xs mt-1">
+                      <span className="text-cyan-500">+ Reajuste: +{formatCurrency(totalReajuste)}</span>
+                      <span className="text-muted-foreground ml-1">(já incluso no base)</span>
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Composição Custo</p>
