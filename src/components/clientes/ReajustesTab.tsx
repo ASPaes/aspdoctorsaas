@@ -123,7 +123,10 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Lotes de reajuste</h2>
         <Button
-          onClick={notImpl}
+          onClick={() => {
+            setSelectedReajusteId(null);
+            setNovoReajusteOpen(true);
+          }}
           className="bg-green-600 hover:bg-green-700 text-white"
         >
           <Plus className="h-4 w-4 mr-1" />
