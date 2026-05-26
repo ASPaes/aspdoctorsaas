@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import DefinirDatasReajusteDialog from "./DefinirDatasReajusteDialog";
+import NovoReajusteDialog from "./NovoReajusteDialog";
 
 
 interface ReajustesTabProps {
@@ -51,7 +52,10 @@ const statusClass = (s: string) => {
 export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
   const queryClient = useQueryClient();
   const [definirDatasOpen, setDefinirDatasOpen] = useState(false);
+  const [novoReajusteOpen, setNovoReajusteOpen] = useState(false);
+  const [selectedReajusteId, setSelectedReajusteId] = useState<string | null>(null);
   const notImpl = () => toast.info("Funcionalidade em desenvolvimento");
+  void notImpl;
 
 
   const { data: semDataCount } = useQuery({
@@ -119,7 +123,10 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Lotes de reajuste</h2>
         <Button
-          onClick={notImpl}
+          onClick={() => {
+            setSelectedReajusteId(null);
+            setNovoReajusteOpen(true);
+          }}
           className="bg-green-600 hover:bg-green-700 text-white"
         >
           <Plus className="h-4 w-4 mr-1" />
@@ -156,7 +163,14 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
             </TableHeader>
             <TableBody>
               {reajustes.map((r: any) => (
-                <TableRow key={r.id}>
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => {
+                    setSelectedReajusteId(r.id);
+                    setNovoReajusteOpen(true);
+                  }}
+                >
                   <TableCell>
                     {format(parseISO(r.data_lancamento), "dd/MM/yyyy HH:mm")}
                   </TableCell>
@@ -195,6 +209,16 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
         tenantId={tenantId}
         onSuccess={() =>
           queryClient.invalidateQueries({ queryKey: ["contratos_sem_data_reajuste", tenantId] })
+        }
+      />
+
+      <NovoReajusteDialog
+        open={novoReajusteOpen}
+        onOpenChange={setNovoReajusteOpen}
+        tenantId={tenantId}
+        reajusteId={selectedReajusteId}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["reajustes_list", tenantId] })
         }
       />
     </div>
