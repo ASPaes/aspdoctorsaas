@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus } from "lucide-react";
+import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, UserMinus, Percent } from "lucide-react";
 
 const fmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -23,6 +23,7 @@ const tipoLabels: Record<string, string> = {
   downsell: "Downsell",
   venda_avulsa: "Venda Avulsa",
   reactivation: "Reativação",
+  reajuste: "Reajuste",
   churn: "Churn",
 };
 
@@ -32,6 +33,7 @@ const tipoBadgeStyles: Record<string, string> = {
   downsell: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
   venda_avulsa: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
   reactivation: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  reajuste: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
   churn: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
@@ -116,9 +118,10 @@ export default function MovimentosMrrTab() {
     const downsell = items.filter(m => m.tipo === "downsell").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
     const vendaAvulsa = items.filter(m => m.tipo === "venda_avulsa").reduce((s, m) => s + (Number(m.valor_venda_avulsa) || 0), 0);
     const reactivation = items.filter(m => m.tipo === "reactivation").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
+    const reajuste = items.filter(m => m.tipo === "reajuste").reduce((s, m) => s + (Number(m.valor_delta) || 0), 0);
     const churn = items.filter(m => m.tipo === "churn").reduce((s, m) => s + Math.abs(Number(m.valor_delta) || 0), 0);
     const qtdTotal = items.length;
-    return { upsell, crossSell, downsell, vendaAvulsa, reactivation, churn, qtdTotal };
+    return { upsell, crossSell, downsell, vendaAvulsa, reactivation, reajuste, churn, qtdTotal };
   }, [movimentos]);
 
   // Sorted data
@@ -177,6 +180,7 @@ export default function MovimentosMrrTab() {
               <SelectItem value="cross_sell">Cross-sell</SelectItem>
               <SelectItem value="downsell">Downsell</SelectItem>
               <SelectItem value="reactivation">Reativação</SelectItem>
+              <SelectItem value="reajuste">Reajuste</SelectItem>
               <SelectItem value="churn">Churn</SelectItem>
               <SelectItem value="venda_avulsa">Venda Avulsa</SelectItem>
             </SelectContent>
@@ -197,7 +201,7 @@ export default function MovimentosMrrTab() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-medium text-muted-foreground">Upsell</CardTitle>
@@ -239,6 +243,20 @@ export default function MovimentosMrrTab() {
           <CardContent>
             {isLoading ? <Skeleton className="h-6 w-20" /> : (
               <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">+{fmt.format(totals.reactivation)}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Reajuste</CardTitle>
+            <Percent className="h-4 w-4 text-cyan-600" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-6 w-20" /> : (
+              <div>
+                <p className="text-lg font-bold text-cyan-700 dark:text-cyan-400">+{fmt.format(totals.reajuste)}</p>
+                <p className="text-[9px] text-muted-foreground">Não soma no MRR</p>
+              </div>
             )}
           </CardContent>
         </Card>
