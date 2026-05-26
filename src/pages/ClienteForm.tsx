@@ -666,29 +666,36 @@ export default function ClienteForm() {
             <>
               {/* Card: Produto / Contrato (legado) */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-1 pb-2">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <FileText className="h-5 w-5 text-primary" />
                     Produto / Contrato
                     {isEditing && <Badge variant="outline" className="ml-2 text-[10px]">Legado</Badge>}
                   </CardTitle>
+                  {isEditing && (
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Apenas visualização. Os dados oficiais são gerenciados nas seções "Produtos" e "Contratos" acima.
+                    </CardDescription>
+                  )}
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <VendaProdutoTab
-                    form={form}
-                    funcionarios={lookups.funcionarios.data ?? []}
-                    produtos={lookups.produtos.data ?? []}
-                    fornecedores={lookups.fornecedores?.data ?? []}
-                    origensVenda={lookups.origensVenda?.data ?? []}
-                    modelosContrato={lookups.modelosContrato.data ?? []}
-                  />
-                  <FinanceiroTab
-                    form={form}
-                    formasPagamento={lookups.formasPagamento.data ?? []}
-                    clienteId={id}
-                    isEditing={isEditing}
-                    onOpenMrrModal={() => setMrrModalOpen(true)}
-                  />
+                <CardContent className="space-y-0">
+                  <fieldset disabled={isEditing} className="m-0 p-0 border-0 min-w-1 space-y-6">
+                    <VendaProdutoTab
+                      form={form}
+                      funcionarios={lookups.funcionarios.data ?? []}
+                      produtos={lookups.produtos.data ?? []}
+                      fornecedores={lookups.fornecedores?.data ?? []}
+                      origensVenda={lookups.origensVenda?.data ?? []}
+                      modelosContrato={lookups.modelosContrato.data ?? []}
+                    />
+                    <FinanceiroTab
+                      form={form}
+                      formasPagamento={lookups.formasPagamento.data ?? []}
+                      clienteId={id}
+                      isEditing={isEditing}
+                      onOpenMrrModal={() => setMrrModalOpen(true)}
+                    />
+                  </fieldset>
                 </CardContent>
               </Card>
             </>
