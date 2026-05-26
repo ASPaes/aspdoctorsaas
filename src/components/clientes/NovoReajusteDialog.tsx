@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -54,6 +54,9 @@ interface ItemRow {
   vlr_delta: number;
   data_proximo_reajuste_antes: string | null;
   razao_social: string;
+  nome_fantasia: string;
+  cnpj: string;
+  cliente_numero: string;
   numero: string;
 }
 
@@ -90,6 +93,8 @@ export default function NovoReajusteDialog({
   const [confirmAplicar, setConfirmAplicar] = useState(false);
   const [confirmEstornar, setConfirmEstornar] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showOnlySelected, setShowOnlySelected] = useState(false);
+  const [search, setSearch] = useState("");
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -113,11 +118,13 @@ export default function NovoReajusteDialog({
     setActionLoading(false);
     Object.values(debounceRef.current).forEach((t) => clearTimeout(t));
     debounceRef.current = {};
+    setSearch("");
   }, []);
 
   useEffect(() => {
     if (!open) reset();
-  }, [open, reset]);
+    else setShowOnlySelected(!!reajusteId);
+  }, [open, reajusteId, reset]);
 
   // Load existing reajuste (view mode)
   useEffect(() => {
@@ -163,7 +170,7 @@ export default function NovoReajusteDialog({
       const [{ data: clientes }, { data: contratos }] = await Promise.all([
         clienteIds.length
           ? (supabase.from("clientes" as any) as any)
-              .select("id, razao_social")
+              .select("id, razao_social, nome_fantasia, cnpj, numero")
               .in("id", clienteIds)
           : Promise.resolve({ data: [] }),
         contratoIds.length
@@ -187,6 +194,9 @@ export default function NovoReajusteDialog({
         data_proximo_reajuste_antes:
           r.data_proximo_reajuste_antes ?? (ctrMap.get(r.contrato_id) as any)?.data_proximo_reajuste ?? null,
         razao_social: (cliMap.get(r.cliente_id) as any)?.razao_social ?? "—",
+        nome_fantasia: (cliMap.get(r.cliente_id) as any)?.nome_fantasia ?? "",
+        cnpj: (cliMap.get(r.cliente_id) as any)?.cnpj ?? "",
+        cliente_numero: (cliMap.get(r.cliente_id) as any)?.numero ?? "",
         numero: (ctrMap.get(r.contrato_id) as any)?.numero ?? "—",
       }));
       mapped.sort((a, b) => a.razao_social.localeCompare(b.razao_social));
@@ -525,7 +535,7 @@ export default function NovoReajusteDialog({
             {(items.length > 0 || loadingItems) && (
               <>
                 <Separator />
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <Checkbox
                       checked={allSelected}
@@ -535,6 +545,36 @@ export default function NovoReajusteDialog({
                     <span className="text-sm">
                       {selecionados} selecionados de {items.length}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Buscar por nome, contrato, nº ou CNPJ..."
+                        className="h-8 pl-8 max-w-sm"
+                      />
+                    </div>
+                    {showOnlySelected ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowOnlySelected(false)}
+                      >
+                        <Filter className="h-4 w-4 mr-1" />
+                        Mostrando selecionados
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowOnlySelected(true)}
+                      >
+                        <FilterX className="h-4 w-4 mr-1" />
+                        Mostrando todos
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -559,7 +599,12 @@ export default function NovoReajusteDialog({
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((item) => (
+                        {displayItems.map((item) => {
+                          const primary = item.nome_fantasia || item.razao_social;
+                          const showRazao =
+                            !!item.nome_fantasia &&
+                            item.nome_fantasia !== item.razao_social;
+                          return (
                           <tr
                             key={item.id}
                             className={`border-t ${!item.selecionado ? "opacity-50" : ""}`}
@@ -572,8 +617,20 @@ export default function NovoReajusteDialog({
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <div className="font-medium">{item.razao_social}</div>
-                              <div className="text-xs text-muted-foreground">{item.numero}</div>
+                              <div className="font-medium">{primary}</div>
+                              {showRazao && (
+                                <div className="text-xs text-muted-foreground">
+                                  {item.razao_social}
+                                </div>
+                              )}
+                              {item.cnpj && (
+                                <div className="text-xs text-muted-foreground">
+                                  {formatCnpjCpf(item.cnpj)}
+                                </div>
+                              )}
+                              <div className="text-xs text-muted-foreground">
+                                Contrato: {item.numero}
+                              </div>
                             </td>
                             <td className="px-3 py-2">
                               {item.data_proximo_reajuste_antes
@@ -607,12 +664,14 @@ export default function NovoReajusteDialog({
                               />
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
               </>
+
             )}
 
             {totais && totais.qtd_contratos === 0 && !loadingItems && (
