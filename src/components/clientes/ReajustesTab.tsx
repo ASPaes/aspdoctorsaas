@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import DefinirDatasReajusteDialog from "./DefinirDatasReajusteDialog";
+import NovoReajusteDialog from "./NovoReajusteDialog";
 
 
 interface ReajustesTabProps {
