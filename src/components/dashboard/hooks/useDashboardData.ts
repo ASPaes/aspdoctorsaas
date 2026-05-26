@@ -419,7 +419,7 @@ export function useDashboardData(filters: DashboardFilters) {
         prevUpsellMrr: prevUpsellMrr || null, prevCrossSellMrr: prevCrossSellMrr || null,
         netNewMrr, nrr, grr, cacPayback, margemContribuicao, concentracaoTop10,
         receitaAtivacao: totalImplantacao,
-        upsellMrr, crossSellMrr, downsellMrr, mrrAjustado: mrrTotalAtual,
+        upsellMrr, crossSellMrr, downsellMrr, reajusteMrr, mrrAjustado: mrrTotalAtual,
         reativacaoMrr, reativacoesQtd,
         funcionariosRanking, quickRatio, revenuePerFuncionario,
       });
