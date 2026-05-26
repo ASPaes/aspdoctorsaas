@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, Percent, Plus } from "lucide-react";
@@ -16,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import DefinirDatasReajusteDialog from "./DefinirDatasReajusteDialog";
+
 
 interface ReajustesTabProps {
   tenantId: string | null;
