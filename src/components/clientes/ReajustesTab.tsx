@@ -64,6 +64,8 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
   const [definirDatasOpen, setDefinirDatasOpen] = useState(false);
   const [novoReajusteOpen, setNovoReajusteOpen] = useState(false);
   const [selectedReajusteId, setSelectedReajusteId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const notImpl = () => toast.info("Funcionalidade em desenvolvimento");
   void notImpl;
 
