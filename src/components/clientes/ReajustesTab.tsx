@@ -72,7 +72,7 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
     },
   });
 
-  const { data: reajustes, isLoading } = useQuery({
+  const { data: reajustes, isLoading, error: reajustesError } = useQuery({
     queryKey: ["reajustes_list", tenantId],
     queryFn: async () => {
       let q = (supabase.from("reajustes" as any) as any)
@@ -101,6 +101,10 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
       }));
     },
   });
+
+  if (reajustesError) {
+    console.error("Erro ao carregar reajustes:", reajustesError);
+  }
 
   return (
     <div className="space-y-4">
@@ -133,6 +137,12 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
           Novo reajuste
         </Button>
       </div>
+
+      {reajustesError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400 text-sm">
+          Erro ao carregar lotes de reajuste. Tente recarregar a página.
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-2">
