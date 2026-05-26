@@ -458,14 +458,14 @@ export default function NovoReajusteDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex gap-3">
                 {showIndice && (
                   <div className="space-y-1 w-full sm:w-48">
                     <label className="text-xs font-medium text-muted-foreground">
