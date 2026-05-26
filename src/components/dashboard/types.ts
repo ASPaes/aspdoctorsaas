@@ -62,6 +62,7 @@ export interface KPIMetrics {
   crossSellMrr: number;
   downsellMrr: number;
   mrrAjustado: number;
+  reajusteMrr: number;
   reativacaoMrr: number;
   reativacoesQtd: number;
 

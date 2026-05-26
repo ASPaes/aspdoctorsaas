@@ -14,7 +14,7 @@ const defaultMetrics: KPIMetrics = {
   novosClientes: 0, newMrr: 0, totalImplantacao: 0,
   prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
   netNewMrr: 0, nrr: 0, grr: 0, cacPayback: 0, margemContribuicao: 0, concentracaoTop10: 0, receitaAtivacao: 0,
-  upsellMrr: 0, crossSellMrr: 0, downsellMrr: 0, mrrAjustado: 0,
+  upsellMrr: 0, crossSellMrr: 0, downsellMrr: 0, reajusteMrr: 0, mrrAjustado: 0,
   reativacaoMrr: 0, reativacoesQtd: 0,
   funcionariosRanking: [], quickRatio: 0, revenuePerFuncionario: 0,
 };
@@ -218,7 +218,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const cac = novosCount > 0 ? cacTotal / novosCount : 0;
 
       // 7. Movimentos MRR
-      let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0;
+      let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0, reajusteMrr = 0;
 
       const movimentosPeriodo = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
@@ -244,6 +244,7 @@ export function useDashboardData(filters: DashboardFilters) {
         if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
         if (m.tipo === 'upsell') upsellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'cross_sell') crossSellMrr += Number(m.valor_delta) || 0;
+        else if (m.tipo === 'reajuste') reajusteMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'downsell') downsellMrr += Math.abs(Number(m.valor_delta) || 0);
       });
 
@@ -323,9 +324,9 @@ export function useDashboardData(filters: DashboardFilters) {
       const ltvReais = ticketMedioAjustado * ltvMeses;
       const ltvCac = cac > 0 ? ltvReais / cac : 0;
       const churnMrrTotal = mrrCancelado + churnReversao;
-      const netNewMrr = newMrr + upsellMrr + crossSellMrr + reativacaoMrr - downsellMrr - churnMrrTotal;
+      const netNewMrr = newMrr + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr - downsellMrr - churnMrrTotal;
       const grr = mrrInicio > 0 ? Math.max(0, (mrrInicio - churnMrrTotal - downsellMrr) / mrrInicio) : 1;
-      const nrr = mrrInicio > 0 ? (mrrInicio + upsellMrr + crossSellMrr + reativacaoMrr - downsellMrr - churnMrrTotal) / mrrInicio : 1;
+      const nrr = mrrInicio > 0 ? (mrrInicio + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr - downsellMrr - churnMrrTotal) / mrrInicio : 1;
 
       const lucroBrutoTotal = clientesAtivos?.reduce((sum, c) => sum + (Number(c.lucro_bruto) || 0), 0) || 0;
       const lucroBrutoMensal = clientesCount > 0 ? lucroBrutoTotal / clientesCount : 0;
@@ -339,7 +340,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const concentracaoTop10 = mrrTotalAtual > 0 ? top10Mrr / mrrTotalAtual : 0;
 
       // Quick Ratio
-      const expansionMrr = upsellMrr + crossSellMrr + reativacaoMrr;
+      const expansionMrr = upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr;
       const contractionMrr = downsellMrr + churnMrrTotal;
       const quickRatio = contractionMrr > 0 ? (newMrr + expansionMrr) / contractionMrr : newMrr + expansionMrr > 0 ? Infinity : 0;
 
@@ -419,7 +420,7 @@ export function useDashboardData(filters: DashboardFilters) {
         prevUpsellMrr: prevUpsellMrr || null, prevCrossSellMrr: prevCrossSellMrr || null,
         netNewMrr, nrr, grr, cacPayback, margemContribuicao, concentracaoTop10,
         receitaAtivacao: totalImplantacao,
-        upsellMrr, crossSellMrr, downsellMrr, mrrAjustado: mrrTotalAtual,
+        upsellMrr, crossSellMrr, downsellMrr, reajusteMrr, mrrAjustado: mrrTotalAtual,
         reativacaoMrr, reativacoesQtd,
         funcionariosRanking, quickRatio, revenuePerFuncionario,
       });

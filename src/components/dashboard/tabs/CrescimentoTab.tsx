@@ -226,6 +226,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           upsellMrr={metrics.upsellMrr}
           crossSellMrr={metrics.crossSellMrr}
           reativacaoMrr={metrics.reativacaoMrr}
+          reajusteMrr={metrics.reajusteMrr}
           downsellMrr={metrics.downsellMrr}
           mrrCancelado={metrics.mrrCancelado}
           netNewMrr={metrics.netNewMrr}
