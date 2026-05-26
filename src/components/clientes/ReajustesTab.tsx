@@ -49,7 +49,10 @@ const statusClass = (s: string) => {
 };
 
 export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
+  const queryClient = useQueryClient();
+  const [definirDatasOpen, setDefinirDatasOpen] = useState(false);
   const notImpl = () => toast.info("Funcionalidade em desenvolvimento");
+
 
   const { data: semDataCount } = useQuery({
     queryKey: ["contratos_sem_data_reajuste", tenantId],
