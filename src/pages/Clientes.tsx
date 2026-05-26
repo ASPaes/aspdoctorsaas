@@ -63,7 +63,7 @@ export default function Clientes() {
 
   // Destructure for readability
   const {
-    searchText, status, unidadeBaseQuick, somenteMatrizes,
+    searchText, status, unidadeBaseQuick, somenteMatrizes, apenasSetupIncompleto,
     periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId,
     areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, moduloIds,
