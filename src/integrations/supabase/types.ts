@@ -1141,6 +1141,7 @@ export type Database = {
           reativado_por_user_id: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id: number | null
+          setup_completo: boolean
           telefone_contato: string | null
           telefone_whatsapp: string | null
           telefone_whatsapp_contato: string | null
@@ -1202,6 +1203,7 @@ export type Database = {
           reativado_por_user_id?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id?: number | null
+          setup_completo?: boolean
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
           telefone_whatsapp_contato?: string | null
@@ -1263,6 +1265,7 @@ export type Database = {
           reativado_por_user_id?: string | null
           recorrencia?: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id?: number | null
+          setup_completo?: boolean
           telefone_contato?: string | null
           telefone_whatsapp?: string | null
           telefone_whatsapp_contato?: string | null
@@ -6568,6 +6571,7 @@ export type Database = {
           reativado_por_user_id: string | null
           recorrencia: Database["public"]["Enums"]["recorrencia_tipo"] | null
           segmento_id: number | null
+          setup_completo: boolean | null
           telefone_contato: string | null
           telefone_whatsapp: string | null
           tenant_id: string | null
