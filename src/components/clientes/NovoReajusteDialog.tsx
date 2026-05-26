@@ -587,7 +587,7 @@ export default function NovoReajusteDialog({
                               <input
                                 type="number"
                                 step="0.01"
-                                value={item.percentual_aplicado}
+                                value={Math.round(item.percentual_aplicado * 100) / 100}
                                 onChange={(e) => handlePercentualItemChange(item, e.target.value)}
                                 disabled={readOnly || !item.selecionado}
                                 className="h-8 w-20 text-right font-mono text-sm bg-transparent border border-muted rounded-md px-2"
