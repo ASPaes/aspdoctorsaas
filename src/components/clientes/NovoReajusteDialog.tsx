@@ -471,6 +471,7 @@ export default function NovoReajusteDialog({
 
   const displayItems = showOnlySelected ? items.filter((i) => i.selecionado) : items;
   const filteredItems = displayItems.filter((item) => {
+    if (produtoFilter && item.produto_nome !== produtoFilter) return false;
     if (!search.trim()) return true;
     const s = search.toLowerCase();
     return (
@@ -478,7 +479,8 @@ export default function NovoReajusteDialog({
       item.nome_fantasia.toLowerCase().includes(s) ||
       item.numero.toLowerCase().includes(s) ||
       item.cnpj.toLowerCase().includes(s) ||
-      item.cliente_numero.toLowerCase().includes(s)
+      item.cliente_numero.toLowerCase().includes(s) ||
+      item.produto_nome.toLowerCase().includes(s)
     );
   });
 
