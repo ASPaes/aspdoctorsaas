@@ -464,64 +464,67 @@ export default function NovoReajusteDialog({
           </DialogHeader>
 
           <div className="space-y-4">
-            {showIndice && (
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Índice de reajuste
-                </label>
-                <Select value={indice} onValueChange={handleIndiceChange} disabled={indiceLoading}>
-                  <SelectTrigger className="h-12 w-full md:w-auto">
-                    <div className="flex items-center gap-2">
-                      {indiceLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      <SelectValue />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="ipca">IPCA (acum. 12 meses)</SelectItem>
-                    <SelectItem value="igpm">IGP-M (acum. 12 meses)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex flex-col md:flex-row gap-3 md:items-end">
-              <div className="flex-1">
-                <DateRangePicker
-                  label="Período de reajuste"
-                  value={periodo}
-                  onChange={setPeriodo}
-                />
-              </div>
-              <div className="space-y-1 md:w-40">
-                <label className="text-xs font-medium text-muted-foreground">% padrão</label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={percentual}
-                    onChange={(e) => setPercentual(e.target.value)}
-                    className="h-12 text-right pr-7"
-                    disabled={readOnly}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                {showIndice && (
+                  <div className="space-y-1 w-full sm:w-48">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Índice de reajuste
+                    </label>
+                    <Select value={indice} onValueChange={handleIndiceChange} disabled={indiceLoading}>
+                      <SelectTrigger className="h-12">
+                        <div className="flex items-center gap-2">
+                          {indiceLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                          <SelectValue />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="ipca">IPCA (acum. 12 meses)</SelectItem>
+                        <SelectItem value="igpm">IGP-M (acum. 12 meses)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <DateRangePicker
+                    label="Período de reajuste"
+                    value={periodo}
+                    onChange={setPeriodo}
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                    %
-                  </span>
                 </div>
+              </div>
+              <div className="flex items-end gap-3 justify-end">
                 {indiceLabel && (
-                  <p className="text-xs text-muted-foreground italic">{indiceLabel}</p>
+                  <p className="text-xs text-muted-foreground italic mr-auto">{indiceLabel}</p>
+                )}
+                <div className="space-y-1 w-32">
+                  <label className="text-xs font-medium text-muted-foreground">% padrão</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={percentual}
+                      onChange={(e) => setPercentual(e.target.value)}
+                      className="h-12 text-right pr-7"
+                      disabled={readOnly}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      %
+                    </span>
+                  </div>
+                </div>
+                {!readOnly && (
+                  <Button
+                    onClick={handleBuscar}
+                    disabled={buscando}
+                    className="h-12 bg-primary text-primary-foreground"
+                  >
+                    {buscando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Buscar contratos
+                  </Button>
                 )}
               </div>
-              {!readOnly && (
-                <Button
-                  onClick={handleBuscar}
-                  disabled={buscando}
-                  className="h-12 bg-primary text-primary-foreground"
-                >
-                  {buscando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Buscar contratos
-                </Button>
-              )}
             </div>
 
             {totais && (
