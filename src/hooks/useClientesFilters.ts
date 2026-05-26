@@ -43,6 +43,7 @@ const defaultFilters: ClientesFilters = {
   status: "ativos",
   unidadeBaseQuick: "",
   somenteMatrizes: false,
+  apenasSetupIncompleto: false,
   periodoCadastro: {},
   periodoCancelamento: {},
   periodoVenda: {},
