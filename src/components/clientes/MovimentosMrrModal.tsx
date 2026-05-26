@@ -324,9 +324,10 @@ export function MovimentosMrrModal({
   const movimentosAtivos = movimentos.filter(m => m.status === 'ativo' && !m.estornado_por && !m.estorno_de && m.tipo !== 'venda_avulsa');
   const vendasAvulsasAtivas = movimentos.filter(m => m.status === 'ativo' && m.tipo === 'venda_avulsa');
 
-  const somaMovimentosAtivos = movimentosAtivos.reduce((sum, m) => sum + m.valor_delta, 0);
+  const somaMovimentosAtivos = movimentosAtivos.filter(m => m.tipo !== 'reajuste').reduce((sum, m) => sum + m.valor_delta, 0);
   const totalVendasAvulsas = vendasAvulsasAtivas.reduce((sum, m) => sum + (m.valor_venda_avulsa || 0), 0);
-  const somaCustoMovimentos = movimentosAtivos.reduce((sum, m) => sum + (m.custo_delta || 0), 0);
+  const somaCustoMovimentos = movimentosAtivos.filter(m => m.tipo !== 'reajuste').reduce((sum, m) => sum + (m.custo_delta || 0), 0);
+  const totalReajuste = movimentosAtivos.filter(m => m.tipo === 'reajuste').reduce((sum, m) => sum + m.valor_delta, 0);
 
   const mrrAjustado = mensalidadeBase + somaMovimentosAtivos;
   const custoAjustado = custoBase + somaCustoMovimentos;
