@@ -624,7 +624,9 @@ export default function ClienteForm() {
           </Card>
 
           {isEditing && id && (
-            <ClienteProdutosSection clienteId={id} />
+            <div id="cliente-produtos-section">
+              <ClienteProdutosSection clienteId={id} />
+            </div>
           )}
 
           {isEditing && id && (hasNonImplicitContracts || forceShowContracts) && (
