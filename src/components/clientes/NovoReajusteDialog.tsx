@@ -335,24 +335,49 @@ export default function NovoReajusteDialog({
     }
   };
 
+  const scheduleRpcUpdate = (itemId: string, pct: number) => {
+    if (debounceRef.current[itemId]) clearTimeout(debounceRef.current[itemId]);
+    debounceRef.current[itemId] = setTimeout(() => {
+      if (!isNaN(pct) && isFinite(pct)) updateItemRpc(itemId, pct, null);
+    }, 800);
+  };
+
   const handlePercentualItemChange = (item: ItemRow, value: string) => {
     const num = Number(value);
+    const pct = isNaN(num) ? 0 : num;
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== item.id) return i;
-        const delta = i.selecionado && !isNaN(num) ? (i.vlr_mensal_antes * num) / 100 : 0;
+        const delta = i.selecionado ? (i.vlr_mensal_antes * pct) / 100 : 0;
         return {
           ...i,
-          percentual_aplicado: isNaN(num) ? 0 : num,
+          percentual_aplicado: pct,
           vlr_delta: delta,
           vlr_mensal_depois: i.vlr_mensal_antes + delta,
         };
       })
     );
-    if (debounceRef.current[item.id]) clearTimeout(debounceRef.current[item.id]);
-    debounceRef.current[item.id] = setTimeout(() => {
-      if (!isNaN(num)) updateItemRpc(item.id, num, null);
-    }, 800);
+    scheduleRpcUpdate(item.id, pct);
+  };
+
+  const handleMrrNovoItemChange = (item: ItemRow, value: string) => {
+    if (item.vlr_mensal_antes === 0) return;
+    const num = Number(value);
+    const novo = isNaN(num) ? 0 : num;
+    const delta = novo - item.vlr_mensal_antes;
+    const pct = (delta / item.vlr_mensal_antes) * 100;
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== item.id) return i;
+        return {
+          ...i,
+          percentual_aplicado: pct,
+          vlr_delta: i.selecionado ? delta : 0,
+          vlr_mensal_depois: novo,
+        };
+      })
+    );
+    scheduleRpcUpdate(item.id, pct);
   };
 
   const handleAplicar = async () => {
@@ -522,8 +547,8 @@ export default function NovoReajusteDialog({
                 ) : (
                   <div className="max-h-[28rem] overflow-y-auto border rounded-lg">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted/30 sticky top-0">
-                        <tr>
+                      <thead className="sticky top-0 z-10 bg-background">
+                        <tr className="bg-muted">
                           <th className="px-3 py-2 w-10"></th>
                           <th className="px-3 py-2 text-left">Cliente / Contrato</th>
                           <th className="px-3 py-2 text-left">Próx. reajuste</th>
@@ -572,7 +597,14 @@ export default function NovoReajusteDialog({
                               {item.selecionado ? `+${fmtBRL(item.vlr_delta)}` : "—"}
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {item.selecionado ? fmtBRL(item.vlr_mensal_depois) : "—"}
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={item.vlr_mensal_depois}
+                                onChange={(e) => handleMrrNovoItemChange(item, e.target.value)}
+                                disabled={readOnly || !item.selecionado || item.vlr_mensal_antes === 0}
+                                className="h-8 w-28 text-right font-mono text-sm bg-transparent border border-muted rounded-md px-2 disabled:opacity-50"
+                              />
                             </td>
                           </tr>
                         ))}
