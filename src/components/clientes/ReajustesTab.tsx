@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, Percent, Plus } from "lucide-react";
@@ -16,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import DefinirDatasReajusteDialog from "./DefinirDatasReajusteDialog";
+
 
 interface ReajustesTabProps {
   tenantId: string | null;
@@ -46,7 +49,10 @@ const statusClass = (s: string) => {
 };
 
 export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
+  const queryClient = useQueryClient();
+  const [definirDatasOpen, setDefinirDatasOpen] = useState(false);
   const notImpl = () => toast.info("Funcionalidade em desenvolvimento");
+
 
   const { data: semDataCount } = useQuery({
     queryKey: ["contratos_sem_data_reajuste", tenantId],
@@ -103,9 +109,10 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
               reajuste definida. Defina as datas para que apareçam nos filtros de período.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={notImpl}>
+          <Button variant="outline" size="sm" onClick={() => setDefinirDatasOpen(true)}>
             Definir datas
           </Button>
+
         </div>
       )}
 
@@ -181,6 +188,16 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
           </Table>
         </div>
       )}
+
+      <DefinirDatasReajusteDialog
+        open={definirDatasOpen}
+        onOpenChange={setDefinirDatasOpen}
+        tenantId={tenantId}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["contratos_sem_data_reajuste", tenantId] })
+        }
+      />
     </div>
   );
 }
+
