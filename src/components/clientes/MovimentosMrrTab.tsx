@@ -33,6 +33,7 @@ const tipoBadgeStyles: Record<string, string> = {
   downsell: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
   venda_avulsa: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
   reactivation: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  reajuste: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
   churn: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
