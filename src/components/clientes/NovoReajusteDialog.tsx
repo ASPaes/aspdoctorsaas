@@ -118,11 +118,13 @@ export default function NovoReajusteDialog({
     setActionLoading(false);
     Object.values(debounceRef.current).forEach((t) => clearTimeout(t));
     debounceRef.current = {};
+    setSearch("");
   }, []);
 
   useEffect(() => {
     if (!open) reset();
-  }, [open, reset]);
+    else setShowOnlySelected(!!reajusteId);
+  }, [open, reajusteId, reset]);
 
   // Load existing reajuste (view mode)
   useEffect(() => {
