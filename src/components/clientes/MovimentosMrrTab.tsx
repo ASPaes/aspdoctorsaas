@@ -248,6 +248,20 @@ export default function MovimentosMrrTab() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Reajuste</CardTitle>
+            <Percent className="h-4 w-4 text-cyan-600" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-6 w-20" /> : (
+              <div>
+                <p className="text-lg font-bold text-cyan-700 dark:text-cyan-400">+{fmt.format(totals.reajuste)}</p>
+                <p className="text-[9px] text-muted-foreground">Não soma no MRR</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-medium text-muted-foreground">Churn</CardTitle>
             <UserMinus className="h-4 w-4 text-red-600" />
           </CardHeader>
