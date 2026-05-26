@@ -80,10 +80,10 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
       if (userIds.length > 0) {
         const { data: profiles, error: pErr } = await (supabase as any)
           .from("profiles")
-          .select("id, full_name")
-          .in("id", userIds);
+          .select("user_id, full_name")
+          .in("user_id", userIds);
         if (pErr) throw pErr;
-        nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name ?? ""]));
+        nameMap = new Map((profiles ?? []).map((p: any) => [p.user_id, p.full_name ?? ""]));
       }
       return rows.map((r) => ({
         ...r,
