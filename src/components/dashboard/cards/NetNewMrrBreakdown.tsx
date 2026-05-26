@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, UserMinus, UserPlus, Equal, ShoppingCart, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, UserMinus, UserPlus, Equal, ShoppingCart, RefreshCw, Percent } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface NetNewMrrBreakdownProps {
@@ -8,6 +8,7 @@ interface NetNewMrrBreakdownProps {
   upsellMrr: number;
   crossSellMrr: number;
   reativacaoMrr: number;
+  reajusteMrr: number;
   downsellMrr: number;
   mrrCancelado: number;
   netNewMrr: number;
@@ -16,12 +17,13 @@ interface NetNewMrrBreakdownProps {
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
-export function NetNewMrrBreakdown({ newMrr, upsellMrr, crossSellMrr, reativacaoMrr, downsellMrr, mrrCancelado, netNewMrr, tvMode = false }: NetNewMrrBreakdownProps) {
+export function NetNewMrrBreakdown({ newMrr, upsellMrr, crossSellMrr, reativacaoMrr, reajusteMrr, downsellMrr, mrrCancelado, netNewMrr, tvMode = false }: NetNewMrrBreakdownProps) {
   const items = [
     { label: 'New MRR', value: newMrr, icon: UserPlus, color: 'text-green-700 dark:text-green-400', bgColor: 'bg-green-500/10', sign: '+', tooltip: 'MRR de novos clientes' },
     { label: 'Upsell', value: upsellMrr, icon: TrendingUp, color: 'text-green-700 dark:text-green-400', bgColor: 'bg-green-500/10', sign: '+', tooltip: 'Aumento de MRR em clientes existentes' },
     { label: 'Cross-sell', value: crossSellMrr, icon: ShoppingCart, color: crossSellMrr === 0 ? 'text-muted-foreground' : 'text-green-700 dark:text-green-400', bgColor: crossSellMrr === 0 ? 'bg-muted/50' : 'bg-green-500/10', sign: '+', tooltip: 'MRR adicional por novo produto/serviço' },
     { label: 'Reativação', value: reativacaoMrr, icon: RefreshCw, color: reativacaoMrr === 0 ? 'text-muted-foreground' : 'text-green-700 dark:text-green-400', bgColor: reativacaoMrr === 0 ? 'bg-muted/50' : 'bg-green-500/10', sign: '+', tooltip: 'MRR recuperado por reativação de clientes cancelados' },
+    { label: 'Reajuste', value: reajusteMrr, icon: Percent, color: reajusteMrr === 0 ? 'text-muted-foreground' : 'text-blue-600 dark:text-blue-400', bgColor: reajusteMrr === 0 ? 'bg-muted/50' : 'bg-blue-500/10', sign: '+', tooltip: 'MRR adicionado por reajustes de contratos' },
     { label: 'Downsell', value: downsellMrr, icon: TrendingDown, color: 'text-orange-700 dark:text-orange-400', bgColor: 'bg-orange-500/10', sign: '−', tooltip: 'Redução de MRR' },
     { label: 'Churn', value: mrrCancelado, icon: UserMinus, color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-500/10', sign: '−', tooltip: 'MRR perdido por cancelamentos' },
   ];
@@ -31,8 +33,8 @@ export function NetNewMrrBreakdown({ newMrr, upsellMrr, crossSellMrr, reativacao
       <CardHeader className={tvMode ? 'pb-2' : ''}><CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Breakdown Net New MRR</CardTitle></CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <TooltipProvider>
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <TooltipProvider>
+            <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
               {items.map(item => (
                 <Tooltip key={item.label}>
                   <TooltipTrigger asChild>
@@ -59,6 +61,8 @@ export function NetNewMrrBreakdown({ newMrr, upsellMrr, crossSellMrr, reativacao
             <span className={cn(crossSellMrr === 0 ? 'text-muted-foreground' : 'text-green-700 dark:text-green-400', 'font-medium', tvMode ? 'text-base' : 'text-sm')}>{fmt(crossSellMrr)}</span>
             <span className="text-muted-foreground font-bold">+</span>
             <span className={cn(reativacaoMrr === 0 ? 'text-muted-foreground' : 'text-green-700 dark:text-green-400', 'font-medium', tvMode ? 'text-base' : 'text-sm')}>{fmt(reativacaoMrr)}</span>
+            <span className="text-muted-foreground font-bold">+</span>
+            <span className={cn(reajusteMrr === 0 ? 'text-muted-foreground' : 'text-blue-600 dark:text-blue-400', 'font-medium', tvMode ? 'text-base' : 'text-sm')}>{fmt(reajusteMrr)}</span>
             <span className="text-orange-600 dark:text-orange-400 font-bold">−</span>
             <span className={cn('text-orange-700 dark:text-orange-400 font-medium', tvMode ? 'text-base' : 'text-sm')}>{fmt(downsellMrr)}</span>
             <span className="text-red-600 dark:text-red-400 font-bold">−</span>
