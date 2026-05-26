@@ -674,7 +674,7 @@ export default function ClienteForm() {
             </div>
           )}
 
-          {(!isEditing || showLegacy) && (
+          {(isEditing && showLegacy) && (
             <>
               {/* Card: Produto / Contrato (legado) */}
               <Card>
