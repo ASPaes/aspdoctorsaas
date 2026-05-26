@@ -1025,6 +1025,16 @@ export default function Clientes() {
                   Somente Matrizes
                 </label>
               </div>
+              <div className="flex items-center gap-2 pt-5">
+                <Checkbox
+                  id="apenas-setup-incompleto"
+                  checked={apenasSetupIncompleto}
+                  onCheckedChange={(v) => updateFilter("apenasSetupIncompleto", !!v)}
+                />
+                <label htmlFor="apenas-setup-incompleto" className="text-sm cursor-pointer select-none whitespace-nowrap">
+                  Apenas setup incompleto
+                </label>
+              </div>
             </div>
           </div>
         </CollapsibleContent>
