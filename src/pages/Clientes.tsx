@@ -318,7 +318,7 @@ export default function Clientes() {
     areaAtuacaoId, cidadeId, debouncedSearch, estadoId, funcionarioId,
     modeloContratoId, motivoCancelamentoId, origemVendaId, periodoAtivacao, periodoCadastro,
     periodoCancelamento, periodoVenda, recorrenciaAdv, segmentoId, status,
-    unidadeBaseQuick, valueFilters,
+    unidadeBaseQuick, valueFilters, apenasSetupIncompleto,
   ]);
 
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
