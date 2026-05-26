@@ -109,9 +109,10 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
               reajuste definida. Defina as datas para que apareçam nos filtros de período.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={notImpl}>
+          <Button variant="outline" size="sm" onClick={() => setDefinirDatasOpen(true)}>
             Definir datas
           </Button>
+
         </div>
       )}
 
