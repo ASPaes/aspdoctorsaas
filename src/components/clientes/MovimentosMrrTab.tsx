@@ -180,6 +180,7 @@ export default function MovimentosMrrTab() {
               <SelectItem value="cross_sell">Cross-sell</SelectItem>
               <SelectItem value="downsell">Downsell</SelectItem>
               <SelectItem value="reactivation">Reativação</SelectItem>
+              <SelectItem value="reajuste">Reajuste</SelectItem>
               <SelectItem value="churn">Churn</SelectItem>
               <SelectItem value="venda_avulsa">Venda Avulsa</SelectItem>
             </SelectContent>
