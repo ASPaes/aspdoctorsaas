@@ -486,17 +486,27 @@ export default function ClienteForm() {
         const { error } = await supabase.from("clientes").update(updatePayload).eq("id", id!);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("clientes").insert(payload);
+        // CRIAÇÃO: remove campos legacy/deprecated. Produto e contrato são adicionados depois via Sections.
+        const {
+          data_venda: _l1, data_reajuste: _l2, fornecedor_id: _l3, modelo_contrato_id: _l4,
+          recorrencia: _l5, produto_id: _l6, funcionario_id: _l7, origem_venda_id: _l8,
+          data_ativacao: _l9, codigo_fornecedor: _l10, link_portal_fornecedor: _l11,
+          valor_ativacao: _l12, forma_pagamento_ativacao_id: _l13, mensalidade: _l14,
+          forma_pagamento_mensalidade_id: _l15, custo_operacao: _l16,
+          ...insertPayload
+        } = payload;
+        const { data, error } = await supabase.from("clientes").insert(insertPayload).select("id").single();
         if (error) throw error;
+        return (data as any)?.id as string;
       }
     },
-    onSuccess: () => {
+    onSuccess: (newId) => {
       clienteLoadedRef.current = false;
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
       clearDraft();
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
-      if (!isEditing) navigate("/clientes");
+      if (!isEditing && newId) navigate(`/clientes/${newId}`);
     },
     onError: (error) => {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
