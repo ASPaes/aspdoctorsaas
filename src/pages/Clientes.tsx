@@ -1134,6 +1134,10 @@ export default function Clientes() {
         <TabsContent value="movimentos" className="mt-4">
           <MovimentosMrrTab />
         </TabsContent>
+
+        <TabsContent value="reajustes" className="mt-4">
+          <ReajustesTab tenantId={tid} />
+        </TabsContent>
       </Tabs>
     </div>
   );
