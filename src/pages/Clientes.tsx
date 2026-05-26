@@ -656,6 +656,7 @@ export default function Clientes() {
     const badges: { key: string; label: string; displayValue: string; onClear: () => void }[] = [];
 
     if (somenteMatrizes) badges.push({ key: "mat", label: "Somente Matrizes", displayValue: "Sim", onClear: () => updateFilter("somenteMatrizes", false) });
+    if (apenasSetupIncompleto) badges.push({ key: "incomp", label: "Setup", displayValue: "Apenas incompletos", onClear: () => updateFilter("apenasSetupIncompleto", false) });
     
     if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => updateFilter("recorrenciaAdv", "") });
     if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => updateFilter("modeloContratoId", "") });
