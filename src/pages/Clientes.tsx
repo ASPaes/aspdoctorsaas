@@ -24,8 +24,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
+import ReajustesTab from "@/components/clientes/ReajustesTab";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
 type SortDir = "asc" | "desc";
@@ -714,6 +715,10 @@ export default function Clientes() {
             <Activity className="h-4 w-4 mr-1" />
             Movimentos MRR
           </TabsTrigger>
+          <TabsTrigger value="reajustes">
+            <Percent className="h-4 w-4 mr-1" />
+            Reajustes
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="clientes" className="space-y-4 mt-4">
@@ -1128,6 +1133,10 @@ export default function Clientes() {
 
         <TabsContent value="movimentos" className="mt-4">
           <MovimentosMrrTab />
+        </TabsContent>
+
+        <TabsContent value="reajustes" className="mt-4">
+          <ReajustesTab tenantId={tid} />
         </TabsContent>
       </Tabs>
     </div>
