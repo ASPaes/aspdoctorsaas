@@ -275,6 +275,9 @@ export default function FinanceiroCard({
                 <p className="text-[11px] text-purple-500">
                   ● Avulsa {fmt(totalVendasAvulsas)}
                 </p>
+                <p className="text-[11px] text-cyan-500">
+                  % Reajuste +{fmt(totalReajuste)}
+                </p>
               </div>
             </div>
             {/* MRR Atual */}
