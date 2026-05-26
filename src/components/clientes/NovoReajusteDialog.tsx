@@ -335,24 +335,49 @@ export default function NovoReajusteDialog({
     }
   };
 
+  const scheduleRpcUpdate = (itemId: string, pct: number) => {
+    if (debounceRef.current[itemId]) clearTimeout(debounceRef.current[itemId]);
+    debounceRef.current[itemId] = setTimeout(() => {
+      if (!isNaN(pct) && isFinite(pct)) updateItemRpc(itemId, pct, null);
+    }, 800);
+  };
+
   const handlePercentualItemChange = (item: ItemRow, value: string) => {
     const num = Number(value);
+    const pct = isNaN(num) ? 0 : num;
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== item.id) return i;
-        const delta = i.selecionado && !isNaN(num) ? (i.vlr_mensal_antes * num) / 100 : 0;
+        const delta = i.selecionado ? (i.vlr_mensal_antes * pct) / 100 : 0;
         return {
           ...i,
-          percentual_aplicado: isNaN(num) ? 0 : num,
+          percentual_aplicado: pct,
           vlr_delta: delta,
           vlr_mensal_depois: i.vlr_mensal_antes + delta,
         };
       })
     );
-    if (debounceRef.current[item.id]) clearTimeout(debounceRef.current[item.id]);
-    debounceRef.current[item.id] = setTimeout(() => {
-      if (!isNaN(num)) updateItemRpc(item.id, num, null);
-    }, 800);
+    scheduleRpcUpdate(item.id, pct);
+  };
+
+  const handleMrrNovoItemChange = (item: ItemRow, value: string) => {
+    if (item.vlr_mensal_antes === 0) return;
+    const num = Number(value);
+    const novo = isNaN(num) ? 0 : num;
+    const delta = novo - item.vlr_mensal_antes;
+    const pct = (delta / item.vlr_mensal_antes) * 100;
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== item.id) return i;
+        return {
+          ...i,
+          percentual_aplicado: pct,
+          vlr_delta: i.selecionado ? delta : 0,
+          vlr_mensal_depois: novo,
+        };
+      })
+    );
+    scheduleRpcUpdate(item.id, pct);
   };
 
   const handleAplicar = async () => {
