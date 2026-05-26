@@ -71,6 +71,13 @@ interface Totais {
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v ?? 0);
 
+const formatCnpjCpf = (v: string) => {
+  const digits = (v ?? "").replace(/\D/g, "");
+  if (digits.length === 14) return maskCNPJ(digits);
+  if (digits.length === 11) return maskCPF(digits);
+  return v;
+};
+
 const SERIES: Record<string, number> = { ipca: 433, igpm: 189 };
 
 export default function NovoReajusteDialog({
