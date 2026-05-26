@@ -60,6 +60,7 @@ interface ItemRow {
   cnpj: string;
   cliente_numero: string;
   numero: string;
+  produto_nome: string;
 }
 
 interface Totais {
