@@ -365,7 +365,7 @@ export default function NovoReajusteDialog({
     const num = Number(value);
     const novo = isNaN(num) ? 0 : num;
     const delta = novo - item.vlr_mensal_antes;
-    const pct = (delta / item.vlr_mensal_antes) * 100;
+    const pct = Math.round(((delta / item.vlr_mensal_antes) * 100) * 100) / 100;
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== item.id) return i;
