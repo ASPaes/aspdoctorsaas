@@ -144,6 +144,7 @@ export default function NovoReajusteDialog({
     Object.values(debounceRef.current).forEach((t) => clearTimeout(t));
     debounceRef.current = {};
     setSearch("");
+    setProdutoFilter("");
   }, []);
 
   useEffect(() => {
