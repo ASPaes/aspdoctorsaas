@@ -249,7 +249,7 @@ export default function MovimentosMrrTab() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-medium text-muted-foreground">Reajuste</CardTitle>
-            <Percent className="h-4 w-4 text-cyan-600" />
+            <ArrowUpCircle className="h-4 w-4 text-cyan-600" />
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-6 w-20" /> : (
