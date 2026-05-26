@@ -97,7 +97,8 @@ export default function Clientes() {
           .eq("status", "ativo")
           .is("estornado_por", null)
           .is("estorno_de", null)
-          .neq("tipo", "venda_avulsa" as any)) as any;
+          .neq("tipo", "venda_avulsa" as any)
+          .neq("tipo", "reajuste" as any)) as any;
         q = q.range(offset, offset + pageSize - 1);
         const { data, error } = await q;
         if (error) throw error;
