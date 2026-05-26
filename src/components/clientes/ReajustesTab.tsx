@@ -211,6 +211,16 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
           queryClient.invalidateQueries({ queryKey: ["contratos_sem_data_reajuste", tenantId] })
         }
       />
+
+      <NovoReajusteDialog
+        open={novoReajusteOpen}
+        onOpenChange={setNovoReajusteOpen}
+        tenantId={tenantId}
+        reajusteId={selectedReajusteId}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["reajustes_list", tenantId] })
+        }
+      />
     </div>
   );
 }
