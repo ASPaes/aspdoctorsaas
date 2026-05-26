@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
@@ -59,6 +60,7 @@ interface ItemRow {
   cnpj: string;
   cliente_numero: string;
   numero: string;
+  produto_nome: string;
 }
 
 interface Totais {
@@ -103,6 +105,21 @@ export default function NovoReajusteDialog({
   const [actionLoading, setActionLoading] = useState(false);
   const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [search, setSearch] = useState("");
+  const [produtoFilter, setProdutoFilter] = useState("");
+
+  const { data: produtosList = [] } = useQuery({
+    queryKey: ["produtos_tenant", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const { data, error } = await (supabase.from("produtos" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+    enabled: !!tenantId && open,
+  });
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
@@ -127,6 +144,7 @@ export default function NovoReajusteDialog({
     Object.values(debounceRef.current).forEach((t) => clearTimeout(t));
     debounceRef.current = {};
     setSearch("");
+    setProdutoFilter("");
   }, []);
 
   useEffect(() => {
@@ -175,7 +193,7 @@ export default function NovoReajusteDialog({
       const clienteIds = Array.from(new Set(rows.map((r) => r.cliente_id).filter(Boolean)));
       const contratoIds = Array.from(new Set(rows.map((r) => r.contrato_id).filter(Boolean)));
 
-      const [{ data: clientes }, { data: contratos }] = await Promise.all([
+      const [{ data: clientes }, { data: contratos }, { data: citens }] = await Promise.all([
         clienteIds.length
           ? (supabase.from("clientes" as any) as any)
               .select("id, razao_social, nome_fantasia, cnpj, numero")
@@ -186,9 +204,20 @@ export default function NovoReajusteDialog({
               .select("id, numero, data_proximo_reajuste")
               .in("id", contratoIds)
           : Promise.resolve({ data: [] }),
+        contratoIds.length
+          ? (supabase.from("contrato_itens" as any) as any)
+              .select("contrato_id, descricao, cliente_produto_id")
+              .in("contrato_id", contratoIds)
+          : Promise.resolve({ data: [] }),
       ]);
       const cliMap = new Map((clientes ?? []).map((c: any) => [c.id, c]));
       const ctrMap = new Map((contratos ?? []).map((c: any) => [c.id, c]));
+      const prodMap = new Map<string, string>();
+      ((citens ?? []) as any[]).forEach((ci) => {
+        if (!prodMap.has(ci.contrato_id) && ci.descricao) {
+          prodMap.set(ci.contrato_id, ci.descricao);
+        }
+      });
 
       const mapped: ItemRow[] = rows.map((r) => ({
         id: r.id,
@@ -206,6 +235,7 @@ export default function NovoReajusteDialog({
         cnpj: (cliMap.get(r.cliente_id) as any)?.cnpj ?? "",
         cliente_numero: (cliMap.get(r.cliente_id) as any)?.numero ?? "",
         numero: (ctrMap.get(r.contrato_id) as any)?.numero ?? "—",
+        produto_nome: prodMap.get(r.contrato_id) ?? "",
       }));
       mapped.sort((a, b) => a.razao_social.localeCompare(b.razao_social));
       setItems(mapped);
@@ -441,6 +471,7 @@ export default function NovoReajusteDialog({
 
   const displayItems = showOnlySelected ? items.filter((i) => i.selecionado) : items;
   const filteredItems = displayItems.filter((item) => {
+    if (produtoFilter && item.produto_nome !== produtoFilter) return false;
     if (!search.trim()) return true;
     const s = search.toLowerCase();
     return (
@@ -448,7 +479,8 @@ export default function NovoReajusteDialog({
       item.nome_fantasia.toLowerCase().includes(s) ||
       item.numero.toLowerCase().includes(s) ||
       item.cnpj.toLowerCase().includes(s) ||
-      item.cliente_numero.toLowerCase().includes(s)
+      item.cliente_numero.toLowerCase().includes(s) ||
+      item.produto_nome.toLowerCase().includes(s)
     );
   });
 
@@ -498,6 +530,25 @@ export default function NovoReajusteDialog({
                 {indiceLabel && (
                   <p className="text-xs text-muted-foreground italic mr-auto">{indiceLabel}</p>
                 )}
+                <div className="space-y-1 w-48">
+                  <label className="text-xs font-medium text-muted-foreground">Produto</label>
+                  <Select
+                    value={produtoFilter || "__all__"}
+                    onValueChange={(v) => setProdutoFilter(v === "__all__" ? "" : v)}
+                  >
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Todos os produtos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todos os produtos</SelectItem>
+                      {produtosList.map((p) => (
+                        <SelectItem key={p.id} value={p.nome}>
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1 w-32">
                   <label className="text-xs font-medium text-muted-foreground">% padrão</label>
                   <div className="relative">
