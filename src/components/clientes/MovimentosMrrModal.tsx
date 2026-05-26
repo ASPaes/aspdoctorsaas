@@ -51,7 +51,7 @@ import { cn } from '@/lib/utils';
 interface MovimentoMrr {
   id: string;
   cliente_id: string;
-  tipo: 'upsell' | 'cross_sell' | 'downsell' | 'venda_avulsa';
+  tipo: 'upsell' | 'cross_sell' | 'downsell' | 'venda_avulsa' | 'reajuste';
   data_movimento: string;
   valor_delta: number;
   custo_delta: number;
