@@ -563,6 +563,8 @@ export default function Clientes() {
           if (status === "ativos") q = q.eq("cancelado", false);
           else if (status === "cancelados") q = q.eq("cancelado", true);
 
+          if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
           if (debouncedSearch) {
             const s = `%${escapeLike(debouncedSearch)}%`;
             const isNumeric = /^\d+$/.test(debouncedSearch.trim());
