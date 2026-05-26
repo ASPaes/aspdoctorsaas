@@ -188,6 +188,16 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
           </Table>
         </div>
       )}
+
+      <DefinirDatasReajusteDialog
+        open={definirDatasOpen}
+        onOpenChange={setDefinirDatasOpen}
+        tenantId={tenantId}
+        onSuccess={() =>
+          queryClient.invalidateQueries({ queryKey: ["contratos_sem_data_reajuste", tenantId] })
+        }
+      />
     </div>
   );
 }
+
