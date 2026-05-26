@@ -135,13 +135,14 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   const { effectiveTenantId: tid } = useTenantFilter();
 
   const isGroupsPill = activePill === "groups";
+  const queueLikePills = activePill === "waiting" || activePill === "after_hours";
   const { conversations, isLoading } = useWhatsAppConversations({
     instanceId: isGroupsPill ? undefined : filters.instanceId,
     departmentId: isGroupsPill ? undefined : (selectedDepartmentId || undefined),
     instanceIds: isGroupsPill ? undefined : (selectedDepartmentId ? undefined : (filteredInstanceIds ?? undefined)),
     status: isGroupsPill ? undefined : filters.status,
-    assignedTo: isGroupsPill ? undefined : resolvedAssignedTo,
-    unassigned: isGroupsPill ? undefined : (resolvedUnassigned || undefined),
+    assignedTo: isGroupsPill || queueLikePills ? undefined : resolvedAssignedTo,
+    unassigned: isGroupsPill || queueLikePills ? undefined : (resolvedUnassigned || undefined),
     isGroup: isGroupsPill ? true : activePill === "all" ? undefined : false,
     pageSize: 100,
     includeIds: forcedConvId ? [forcedConvId] : undefined,
