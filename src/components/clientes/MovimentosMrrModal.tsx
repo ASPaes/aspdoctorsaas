@@ -478,7 +478,7 @@ export function MovimentosMrrModal({
           </DialogHeader>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
             <Card>
               <CardHeader className="py-2 px-3">
                 <CardTitle className="text-xs font-medium text-muted-foreground">MRR Base</CardTitle>
