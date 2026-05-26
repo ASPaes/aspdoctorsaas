@@ -132,8 +132,9 @@ export default function FinanceiroCard({
       m.tipo !== "churn" &&
       m.tipo !== "reactivation"
   );
-  const somaDeltaMrr = movimentosAtivos.reduce((s, m) => s + m.valor_delta, 0);
-  const somaDeltaCusto = movimentosAtivos.reduce((s, m) => s + (m.custo_delta || 0), 0);
+  const somaDeltaMrr = movimentosAtivos.filter((m) => m.tipo !== 'reajuste').reduce((s, m) => s + m.valor_delta, 0);
+  const somaDeltaCusto = movimentosAtivos.filter((m) => m.tipo !== 'reajuste').reduce((s, m) => s + (m.custo_delta || 0), 0);
+  const totalReajuste = movimentosAtivos.filter((m) => m.tipo === 'reajuste').reduce((s, m) => s + m.valor_delta, 0);
 
   const vendasAvulsas = (movimentos ?? []).filter(
     (m) => m.status === "ativo" && m.tipo === "venda_avulsa"
