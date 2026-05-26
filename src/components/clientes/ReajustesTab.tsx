@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, Percent, Plus } from "lucide-react";
+import { AlertTriangle, Loader2, Percent, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import DefinirDatasReajusteDialog from "./DefinirDatasReajusteDialog";
 import NovoReajusteDialog from "./NovoReajusteDialog";
 
@@ -54,6 +64,8 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
   const [definirDatasOpen, setDefinirDatasOpen] = useState(false);
   const [novoReajusteOpen, setNovoReajusteOpen] = useState(false);
   const [selectedReajusteId, setSelectedReajusteId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const notImpl = () => toast.info("Funcionalidade em desenvolvimento");
   void notImpl;
 
@@ -169,6 +181,7 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
                 <TableHead className="text-right">Delta</TableHead>
                 <TableHead className="text-right">MRR depois</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -206,6 +219,21 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
                       {r.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {r.status === "pendente" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(r.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -231,6 +259,45 @@ export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
           queryClient.invalidateQueries({ queryKey: ["reajustes_list", tenantId] })
         }
       />
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir reajuste pendente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este lote de reajuste? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteId(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteId) return;
+                setDeleting(true);
+                try {
+                  const { error } = await (supabase.from("reajustes" as any) as any)
+                    .delete()
+                    .eq("id", deleteId)
+                    .eq("status", "pendente");
+                  if (error) throw error;
+                  toast.success("Reajuste excluído");
+                  queryClient.invalidateQueries({ queryKey: ["reajustes_list", tenantId] });
+                } catch (err: any) {
+                  toast.error(err?.message || "Erro ao excluir reajuste");
+                } finally {
+                  setDeleting(false);
+                  setDeleteId(null);
+                }
+              }}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
