@@ -458,7 +458,7 @@ export default function NovoReajusteDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
@@ -470,7 +470,7 @@ export default function NovoReajusteDialog({
                   Índice de reajuste
                 </label>
                 <Select value={indice} onValueChange={handleIndiceChange} disabled={indiceLoading}>
-                  <SelectTrigger className="h-12">
+                  <SelectTrigger className="h-12 w-full md:w-auto">
                     <div className="flex items-center gap-2">
                       {indiceLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                       <SelectValue />
