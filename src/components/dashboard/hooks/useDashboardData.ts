@@ -218,7 +218,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const cac = novosCount > 0 ? cacTotal / novosCount : 0;
 
       // 7. Movimentos MRR
-      let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0;
+      let upsellMrr = 0, crossSellMrr = 0, downsellMrr = 0, reajusteMrr = 0;
 
       const movimentosPeriodo = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
@@ -244,6 +244,7 @@ export function useDashboardData(filters: DashboardFilters) {
         if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
         if (m.tipo === 'upsell') upsellMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'cross_sell') crossSellMrr += Number(m.valor_delta) || 0;
+        else if (m.tipo === 'reajuste') reajusteMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'downsell') downsellMrr += Math.abs(Number(m.valor_delta) || 0);
       });
 
