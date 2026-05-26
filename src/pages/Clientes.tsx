@@ -715,6 +715,10 @@ export default function Clientes() {
             <Activity className="h-4 w-4 mr-1" />
             Movimentos MRR
           </TabsTrigger>
+          <TabsTrigger value="reajustes">
+            <Percent className="h-4 w-4 mr-1" />
+            Reajustes
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="clientes" className="space-y-4 mt-4">
