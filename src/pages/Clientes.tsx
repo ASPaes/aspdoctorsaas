@@ -1099,11 +1099,18 @@ export default function Clientes() {
                   <TableCell className="text-xs">{c.data_cadastro ? format(parseISO(c.data_cadastro), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell className="text-xs">{(c as any).qtde_contratos_ativos != null ? (c as any).qtde_contratos_ativos : "—"}</TableCell>
                   <TableCell>
-                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                      c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                    )}>
-                      {c.cancelado ? "Cancelado" : "Ativo"}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium w-fit",
+                        c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                      )}>
+                        {c.cancelado ? "Cancelado" : "Ativo"}
+                      </span>
+                      {!(c as any).setup_completo && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 w-fit">
+                          Setup incompleto
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     {(() => {
