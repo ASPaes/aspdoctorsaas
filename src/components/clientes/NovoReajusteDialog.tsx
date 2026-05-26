@@ -530,6 +530,25 @@ export default function NovoReajusteDialog({
                 {indiceLabel && (
                   <p className="text-xs text-muted-foreground italic mr-auto">{indiceLabel}</p>
                 )}
+                <div className="space-y-1 w-48">
+                  <label className="text-xs font-medium text-muted-foreground">Produto</label>
+                  <Select
+                    value={produtoFilter || "__all__"}
+                    onValueChange={(v) => setProdutoFilter(v === "__all__" ? "" : v)}
+                  >
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Todos os produtos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Todos os produtos</SelectItem>
+                      {produtosList.map((p) => (
+                        <SelectItem key={p.id} value={p.nome}>
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1 w-32">
                   <label className="text-xs font-medium text-muted-foreground">% padrão</label>
                   <div className="relative">
