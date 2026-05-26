@@ -52,7 +52,10 @@ const statusClass = (s: string) => {
 export default function ReajustesTab({ tenantId }: ReajustesTabProps) {
   const queryClient = useQueryClient();
   const [definirDatasOpen, setDefinirDatasOpen] = useState(false);
+  const [novoReajusteOpen, setNovoReajusteOpen] = useState(false);
+  const [selectedReajusteId, setSelectedReajusteId] = useState<string | null>(null);
   const notImpl = () => toast.info("Funcionalidade em desenvolvimento");
+  void notImpl;
 
 
   const { data: semDataCount } = useQuery({
