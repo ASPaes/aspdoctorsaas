@@ -365,7 +365,7 @@ export default function NovoReajusteDialog({
     const num = Number(value);
     const novo = isNaN(num) ? 0 : num;
     const delta = novo - item.vlr_mensal_antes;
-    const pct = (delta / item.vlr_mensal_antes) * 100;
+    const pct = Math.round(((delta / item.vlr_mensal_antes) * 100) * 100) / 100;
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== item.id) return i;
@@ -587,7 +587,7 @@ export default function NovoReajusteDialog({
                               <input
                                 type="number"
                                 step="0.01"
-                                value={item.percentual_aplicado}
+                                value={Math.round(item.percentual_aplicado * 100) / 100}
                                 onChange={(e) => handlePercentualItemChange(item, e.target.value)}
                                 disabled={readOnly || !item.selecionado}
                                 className="h-8 w-20 text-right font-mono text-sm bg-transparent border border-muted rounded-md px-2"
