@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronRight, Eye, EyeOff, ShieldAlert, History } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronRight, Eye, EyeOff, ShieldAlert, History, AlertTriangle } from "lucide-react";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
@@ -91,7 +91,7 @@ const clienteSchema = z.object({
   data_reajuste: z.string().nullable(),
   funcionario_id: z.number().nullable(),
   origem_venda_id: z.number().nullable(),
-  recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"], { required_error: "Recorrência obrigatória" }),
+  recorrencia: z.enum(["mensal", "anual", "semestral", "semanal"]).nullable(),
   produto_id: z.number().nullable(),
   observacao_negociacao: z.string().nullable(),
   data_ativacao: noFutureDate("Data de Ativação"),
@@ -103,8 +103,8 @@ const clienteSchema = z.object({
   mensalidade: z.number().nullable(),
   forma_pagamento_mensalidade_id: z.number().nullable(),
   custo_operacao: z.number().nullable(),
-  imposto_percentual: z.number({ invalid_type_error: "Imposto obrigatório" }).min(0).max(100),
-  custo_fixo_percentual: z.number({ invalid_type_error: "Custo Fixo obrigatório" }).min(0).max(100),
+  imposto_percentual: z.number().min(0).max(100).nullable(),
+  custo_fixo_percentual: z.number().min(0).max(100).nullable(),
   cancelado: z.boolean(),
   data_cancelamento: noFutureDate("Data de Cancelamento"),
   motivo_cancelamento_id: z.number().nullable(),
@@ -272,12 +272,12 @@ export default function ClienteForm() {
       razao_social: null, nome_fantasia: null, cnpj: null, email: "",
       telefone_contato: null, telefone_whatsapp: null, telefone_whatsapp_contato: null, estado_id: null, cidade_id: null,
       area_atuacao_id: null, segmento_id: null, modelo_contrato_id: null, observacao_cliente: null,
-      data_venda: null, data_reajuste: null, funcionario_id: null, origem_venda_id: null, recorrencia: undefined as any,
+      data_venda: null, data_reajuste: null, funcionario_id: null, origem_venda_id: null, recorrencia: null,
       produto_id: null, observacao_negociacao: null,
       data_ativacao: null, fornecedor_id: null, codigo_fornecedor: null, link_portal_fornecedor: null,
       valor_ativacao: null as any,
       forma_pagamento_ativacao_id: null, mensalidade: null as any, forma_pagamento_mensalidade_id: null,
-      custo_operacao: null as any, imposto_percentual: null as any, custo_fixo_percentual: null as any,
+      custo_operacao: null as any, imposto_percentual: null, custo_fixo_percentual: null,
       cancelado: false, data_cancelamento: null, motivo_cancelamento_id: null, observacao_cancelamento: null,
       cert_a1_vencimento: null, cert_a1_ultima_venda_em: null, cert_a1_ultimo_vendedor_id: null,
       contato_nome: null, contato_cpf: null, contato_fone: null, contato_aniversario: null,
@@ -486,17 +486,27 @@ export default function ClienteForm() {
         const { error } = await supabase.from("clientes").update(updatePayload).eq("id", id!);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("clientes").insert(payload);
+        // CRIAÇÃO: remove campos legacy/deprecated. Produto e contrato são adicionados depois via Sections.
+        const {
+          data_venda: _l1, data_reajuste: _l2, fornecedor_id: _l3, modelo_contrato_id: _l4,
+          recorrencia: _l5, produto_id: _l6, funcionario_id: _l7, origem_venda_id: _l8,
+          data_ativacao: _l9, codigo_fornecedor: _l10, link_portal_fornecedor: _l11,
+          valor_ativacao: _l12, forma_pagamento_ativacao_id: _l13, mensalidade: _l14,
+          forma_pagamento_mensalidade_id: _l15, custo_operacao: _l16,
+          ...insertPayload
+        } = payload;
+        const { data, error } = await supabase.from("clientes").insert(insertPayload).select("id").single();
         if (error) throw error;
+        return (data as any)?.id as string;
       }
     },
-    onSuccess: () => {
+    onSuccess: (newId) => {
       clienteLoadedRef.current = false;
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
       clearDraft();
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
-      if (!isEditing) navigate("/clientes");
+      if (!isEditing && newId) navigate(`/clientes/${newId}`);
     },
     onError: (error) => {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
@@ -588,6 +598,25 @@ export default function ClienteForm() {
         </div>
       </div>
 
+      {isEditing && clienteQuery.data && (clienteQuery.data as any).setup_completo === false && (
+        <div className="flex items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+          <span className="flex-1">
+            Adicione ao menos 1 produto e 1 contrato pra finalizar o cadastro deste cliente.
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              document.getElementById("cliente-produtos-section")?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            Ir para Produtos
+          </Button>
+        </div>
+      )}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Card: Dados Cadastrais */}
@@ -614,7 +643,9 @@ export default function ClienteForm() {
           </Card>
 
           {isEditing && id && (
-            <ClienteProdutosSection clienteId={id} />
+            <div id="cliente-produtos-section">
+              <ClienteProdutosSection clienteId={id} />
+            </div>
           )}
 
           {isEditing && id && (hasNonImplicitContracts || forceShowContracts) && (
@@ -662,7 +693,7 @@ export default function ClienteForm() {
             </div>
           )}
 
-          {(!isEditing || showLegacy) && (
+          {(isEditing && showLegacy) && (
             <>
               {/* Card: Produto / Contrato (legado) */}
               <Card>
