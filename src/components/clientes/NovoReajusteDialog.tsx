@@ -547,8 +547,8 @@ export default function NovoReajusteDialog({
                 ) : (
                   <div className="max-h-[28rem] overflow-y-auto border rounded-lg">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted/30 sticky top-0">
-                        <tr>
+                      <thead className="sticky top-0 z-10 bg-background">
+                        <tr className="bg-muted">
                           <th className="px-3 py-2 w-10"></th>
                           <th className="px-3 py-2 text-left">Cliente / Contrato</th>
                           <th className="px-3 py-2 text-left">Próx. reajuste</th>
