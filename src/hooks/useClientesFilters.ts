@@ -9,6 +9,7 @@ export interface ClientesFilters {
   status: string;
   unidadeBaseQuick: string;
   somenteMatrizes: boolean;
+  apenasSetupIncompleto: boolean;
   periodoCadastro: DateRange;
   periodoCancelamento: DateRange;
   periodoVenda: DateRange;
@@ -42,6 +43,7 @@ const defaultFilters: ClientesFilters = {
   status: "ativos",
   unidadeBaseQuick: "",
   somenteMatrizes: false,
+  apenasSetupIncompleto: false,
   periodoCadastro: {},
   periodoCancelamento: {},
   periodoVenda: {},
@@ -172,6 +174,7 @@ export function useClientesFilters() {
       margemMax: "",
       unidadeBaseQuick: "",
       somenteMatrizes: false,
+      apenasSetupIncompleto: false,
       page: 0,
     }));
   }, []);

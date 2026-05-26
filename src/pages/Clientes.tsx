@@ -63,7 +63,7 @@ export default function Clientes() {
 
   // Destructure for readability
   const {
-    searchText, status, unidadeBaseQuick, somenteMatrizes,
+    searchText, status, unidadeBaseQuick, somenteMatrizes, apenasSetupIncompleto,
     periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId,
     areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, moduloIds,
@@ -190,12 +190,12 @@ export default function Clientes() {
 
   // Build query key from all filters
   const filterKey = useMemo(() => ({
-    debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+    debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, apenasSetupIncompleto, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     moduloIds,
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid,
-  }), [debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
+  }), [debouncedSearch, status, unidadeBaseQuick, somenteMatrizes, apenasSetupIncompleto, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao,
     recorrenciaAdv, modeloContratoId, produtoId, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId,
     moduloIds,
     estadoId, cidadeId, motivoCancelamentoId,
@@ -269,6 +269,9 @@ export default function Clientes() {
       else if (status === "cancelados") q = q.eq("cancelado", true);
     }
 
+    if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
+
     if (debouncedSearch) {
       const s = `%${escapeLike(debouncedSearch)}%`;
       const isNumeric = /^\d+$/.test(debouncedSearch.trim());
@@ -315,14 +318,14 @@ export default function Clientes() {
     areaAtuacaoId, cidadeId, debouncedSearch, estadoId, funcionarioId,
     modeloContratoId, motivoCancelamentoId, origemVendaId, periodoAtivacao, periodoCadastro,
     periodoCancelamento, periodoVenda, recorrenciaAdv, segmentoId, status,
-    unidadeBaseQuick, valueFilters,
+    unidadeBaseQuick, valueFilters, apenasSetupIncompleto,
   ]);
 
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id",
       "mensalidade", "data_ativacao", "data_cadastro", "cancelado", "data_venda", "data_venda_efetiva", "unidade_base_id",
-      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato",
+      "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato", "setup_completo",
     ].join(",");
 
     const pageSize = 1000;
@@ -401,6 +404,8 @@ export default function Clientes() {
       q = q.gte("data_venda_efetiva", firstDay)
         .lte("data_venda_efetiva", lastDay);
 
+      if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
       if (debouncedSearch) {
         const s = `%${escapeLike(debouncedSearch)}%`;
         const isNumeric = /^\d+$/.test(debouncedSearch.trim());
@@ -450,11 +455,14 @@ export default function Clientes() {
         };
       }
 
-      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, qtde_contratos_ativos, unidade_base_id, telefone_whatsapp, telefone_contato";
-      let q = tf(supabase.from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
+      const selectFields = "id, codigo_sequencial, razao_social, nome_fantasia, cnpj, produto_id, mensalidade, data_ativacao, data_cadastro, cancelado, lucro_real, margem_bruta_percent, data_venda, qtde_contratos_ativos, unidade_base_id, telefone_whatsapp, telefone_contato, setup_completo";
+      let q = tf((supabase as any).from("vw_clientes_financeiro").select(selectFields, { count: "exact" })) as any;
 
       if (status === "ativos") q = q.eq("cancelado", false);
       else if (status === "cancelados") q = q.eq("cancelado", true);
+
+      if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
 
       if (debouncedSearch) {
         const s = `%${escapeLike(debouncedSearch)}%`;
@@ -555,6 +563,8 @@ export default function Clientes() {
           if (status === "ativos") q = q.eq("cancelado", false);
           else if (status === "cancelados") q = q.eq("cancelado", true);
 
+          if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
+
           if (debouncedSearch) {
             const s = `%${escapeLike(debouncedSearch)}%`;
             const isNumeric = /^\d+$/.test(debouncedSearch.trim());
@@ -646,6 +656,7 @@ export default function Clientes() {
     const badges: { key: string; label: string; displayValue: string; onClear: () => void }[] = [];
 
     if (somenteMatrizes) badges.push({ key: "mat", label: "Somente Matrizes", displayValue: "Sim", onClear: () => updateFilter("somenteMatrizes", false) });
+    if (apenasSetupIncompleto) badges.push({ key: "incomp", label: "Setup", displayValue: "Apenas incompletos", onClear: () => updateFilter("apenasSetupIncompleto", false) });
     
     if (recorrenciaAdv) badges.push({ key: "rec", label: "Recorrência", displayValue: recorrenciaLabels[recorrenciaAdv] || recorrenciaAdv, onClear: () => updateFilter("recorrenciaAdv", "") });
     if (modeloContratoId) badges.push({ key: "mc", label: "Mod. Contrato", displayValue: resolveLabel(modeloContratoId, lookups.modelosContrato.data), onClear: () => updateFilter("modeloContratoId", "") });
@@ -677,7 +688,7 @@ export default function Clientes() {
     if (margemMin || margemMax) badges.push({ key: "marg", label: "Margem", displayValue: `${margemMin || "…"} – ${margemMax || "…"}`, onClear: () => { updateFilter("margemMin", ""); updateFilter("margemMax", ""); } });
 
     return badges;
-  }, [unidadeBaseQuick, somenteMatrizes, recorrenciaAdv, modeloContratoId, produtoId, moduloIds, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
+  }, [unidadeBaseQuick, somenteMatrizes, apenasSetupIncompleto, recorrenciaAdv, modeloContratoId, produtoId, moduloIds, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
 
   // Helper for Select value/onChange with __all__ pattern
   const selVal = (v: string) => v || "__all__";
@@ -1014,6 +1025,16 @@ export default function Clientes() {
                   Somente Matrizes
                 </label>
               </div>
+              <div className="flex items-center gap-2 pt-5">
+                <Checkbox
+                  id="apenas-setup-incompleto"
+                  checked={apenasSetupIncompleto}
+                  onCheckedChange={(v) => updateFilter("apenasSetupIncompleto", !!v)}
+                />
+                <label htmlFor="apenas-setup-incompleto" className="text-sm cursor-pointer select-none whitespace-nowrap">
+                  Apenas setup incompleto
+                </label>
+              </div>
             </div>
           </div>
         </CollapsibleContent>
@@ -1078,11 +1099,18 @@ export default function Clientes() {
                   <TableCell className="text-xs">{c.data_cadastro ? format(parseISO(c.data_cadastro), "dd/MM/yyyy") : "—"}</TableCell>
                   <TableCell className="text-xs">{(c as any).qtde_contratos_ativos != null ? (c as any).qtde_contratos_ativos : "—"}</TableCell>
                   <TableCell>
-                    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                      c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                    )}>
-                      {c.cancelado ? "Cancelado" : "Ativo"}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium w-fit",
+                        c.cancelado ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                      )}>
+                        {c.cancelado ? "Cancelado" : "Ativo"}
+                      </span>
+                      {!(c as any).setup_completo && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 w-fit">
+                          Setup incompleto
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     {(() => {
