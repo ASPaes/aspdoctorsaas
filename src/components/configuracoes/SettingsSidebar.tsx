@@ -117,9 +117,13 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           label: "Equipe",
           icon: Users,
           adminOnly: true,
-          subgroups: [{ items: [{ value: "acessos", label: "Acessos & permissões" }] }],
+          subgroups: [{ items: [
+            { value: "acessos", label: "Acessos & permissões" },
+            { value: "permissoes", label: "Permissões e papéis" },
+          ] }],
         } as Group]
       : []),
+
     {
       label: "Atendimento",
       icon: Headset,

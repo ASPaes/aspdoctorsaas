@@ -59,6 +59,8 @@ import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
 import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
+import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeisContent";
+
 
 const schema = z.object({
   imposto_percentual: z.number().min(0, "Mínimo 0%").max(100, "Máximo 100%"),
@@ -67,7 +69,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const ADMIN_ONLY_SECTIONS = ["acessos", "ia", "horario-plantao"];
+const ADMIN_ONLY_SECTIONS = ["acessos", "permissoes", "ia", "horario-plantao"];
 
 const SECTION_META: Record<string, { breadcrumb: string[]; title: string; description: string }> = {
   percentuais: { breadcrumb: ["Financeiro", "Percentuais"], title: "Percentuais", description: "Valores padrão de imposto e custo fixo aplicados a novos clientes." },
@@ -88,6 +90,8 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   "motivos-cancelamento": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de cancelamento"], title: "Motivos de cancelamento", description: "Motivos disponíveis para cancelamento de contratos." },
   "motivos-pausa": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de pausa"], title: "Motivos de pausa", description: "Motivos para pausa de atendimentos." },
   acessos: { breadcrumb: ["Equipe", "Acessos & permissões"], title: "Acessos & permissões", description: "Gerencie usuários, papéis e permissões da equipe." },
+  permissoes: { breadcrumb: ["Equipe", "Permissões e papéis"], title: "Permissões e papéis", description: "Configure o que cada papel pode fazer no seu tenant." },
+
   whatsapp: { breadcrumb: ["Atendimento", "WhatsApp"], title: "WhatsApp", description: "Configurações de instâncias, atendimento, macros e segurança." },
   ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
   "horario-plantao": { breadcrumb: ["Atendimento", "Horário & plantão"], title: "Horário & plantão", description: "Horário de atendimento e plantões fora do expediente." },
@@ -463,6 +467,9 @@ export default function Configuracoes() {
         return <CacDespesasTab />;
       case "acessos":
         return isAdmin ? <AcessosEquipeTab /> : null;
+      case "permissoes":
+        return isAdmin ? <PermissoesPapeisContent /> : null;
+
       case "whatsapp":
         return <WhatsAppSettingsContent isAdmin={isAdmin} />;
       case "ia":
