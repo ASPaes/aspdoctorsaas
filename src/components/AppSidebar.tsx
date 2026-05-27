@@ -57,11 +57,8 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const isSuperAdmin = profile?.is_super_admin === true;
-  const navItems = ALL_NAV_ITEMS.filter(item => {
-    if (!item.requiredRoles) return true;
-    if (isSuperAdmin) return true;
-    return item.requiredRoles.includes(profile?.role ?? "");
-  });
+  const { can } = usePermissions();
+  const navItems = ALL_NAV_ITEMS.filter(item => can(item.resource, "view"));
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
