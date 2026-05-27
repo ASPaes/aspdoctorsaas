@@ -402,7 +402,7 @@ export default function PermissoesPapeisContent() {
                     })}
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
