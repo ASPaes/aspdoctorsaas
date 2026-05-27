@@ -28,6 +28,7 @@ import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, Arr
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
 import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { toast } from "sonner";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
@@ -740,10 +741,12 @@ export default function Clientes() {
           <p className="mt-1 text-muted-foreground">Gerencie seus clientes aqui.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExportXlsx} disabled={isExporting}>
-            <Download className="h-4 w-4" />
-            {isExporting ? "Gerando XLSX..." : "Exportar XLSX"}
-          </Button>
+          <ProtectedElement resource="clientes.exportar" action="view">
+            <Button variant="outline" onClick={handleExportXlsx} disabled={isExporting}>
+              <Download className="h-4 w-4" />
+              {isExporting ? "Gerando XLSX..." : "Exportar XLSX"}
+            </Button>
+          </ProtectedElement>
           <Button onClick={() => navigate("/clientes/novo")}>
             <Plus className="h-4 w-4" />
             Novo Cliente
