@@ -28,6 +28,7 @@ import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, Arr
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
 import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { toast } from "sonner";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";

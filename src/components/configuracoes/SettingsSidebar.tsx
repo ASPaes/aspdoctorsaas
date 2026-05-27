@@ -3,6 +3,43 @@ import { cn } from "@/lib/utils";
 import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/usePermissions";
+
+const SECTION_TO_RESOURCE: Record<string, string> = {
+  // Financeiro
+  "percentuais": "cfg.percentuais",
+  "despesas-cac": "cfg.despesas_cac",
+  // Cadastros Comercial
+  "produtos": "cfg.produtos",
+  "fornecedores": "cfg.fornecedores",
+  "modelos-contrato": "cfg.modelos_contrato",
+  "origens-venda": "cfg.origens_venda",
+  "formas-pagamento": "cfg.formas_pagamento",
+  // Cadastros Operacional
+  "setores": "cfg.setores",
+  "funcionarios": "cfg.funcionarios",
+  "tickets-config": "cfg.tickets_config",
+  // Cadastros Serviços
+  "categorias-servico": "cfg.categorias_servico",
+  "tipos-servico": "cfg.tipos_servico",
+  // Classificação
+  "segmentos": "cfg.segmentos",
+  "areas-atuacao": "cfg.areas_atuacao",
+  "unidades-base": "cfg.unidades_base",
+  // Ciclo de vida
+  "motivos-cancelamento": "cfg.motivos_cancelamento",
+  "motivos-pausa": "cfg.motivos_pausa",
+  // Equipe
+  "acessos": "cfg.acessos",
+  "permissoes": "cfg.permissoes",
+  // Atendimento
+  "whatsapp": "cfg.whatsapp",
+  "ia": "cfg.ia",
+  "horario-plantao": "cfg.horario_plantao",
+  "kb": "cfg.kb",
+  // Dados
+  "importacao": "cfg.importacao",
+};
 
 export const CADASTRO_SECTIONS = [
   "produtos",
