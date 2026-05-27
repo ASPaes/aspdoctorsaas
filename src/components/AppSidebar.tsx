@@ -26,14 +26,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const ALL_NAV_ITEMS = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, requiredRoles: ["admin", "head"] },
-  { title: "Clientes", url: "/clientes", icon: Users },
-  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
-  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
-  { title: "Chat", url: "/whatsapp", icon: MessageCircle },
-  { title: "Tickets", url: "/tickets", icon: TicketCheck },
-  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, requiredRoles: ["admin"] },
-  { title: "Configurações", url: "/configuracoes", icon: Settings, requiredRoles: ["admin"] },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, resource: "nav.dashboard" },
+  { title: "Clientes", url: "/clientes", icon: Users, resource: "nav.clientes" },
+  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
+  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
+  { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "nav.chat" },
+  { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "nav.tickets" },
+  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
+  { title: "Configurações", url: "/configuracoes", icon: Settings, resource: "nav.configuracoes" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
