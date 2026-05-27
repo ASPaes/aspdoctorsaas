@@ -467,6 +467,9 @@ export default function Configuracoes() {
         return <CacDespesasTab />;
       case "acessos":
         return isAdmin ? <AcessosEquipeTab /> : null;
+      case "permissoes":
+        return isAdmin ? <PermissoesPapeisContent /> : null;
+
       case "whatsapp":
         return <WhatsAppSettingsContent isAdmin={isAdmin} />;
       case "ia":
