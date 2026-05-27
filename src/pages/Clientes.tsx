@@ -24,9 +24,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
+import { exportClientesCsv } from "@/lib/exportClientesCsv";
+import { toast } from "sonner";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
 type SortDir = "asc" | "desc";
@@ -703,6 +705,32 @@ export default function Clientes() {
     }
   }, [navigate]);
 
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportCsv = useCallback(async () => {
+    if (!tid) {
+      toast.error("Tenant não definido");
+      return;
+    }
+    setIsExporting(true);
+    toast("Preparando exportação...");
+    try {
+      const rows = await fetchClientesFilteredRows();
+      const ids = rows.map((r: any) => r.id);
+      if (ids.length === 0) {
+        toast.warning("Nenhum cliente para exportar");
+        return;
+      }
+      const result = await exportClientesCsv({ filteredClienteIds: ids, tenantId: tid, lookups });
+      toast.success(`Exportados ${result.totalClientes} clientes (${result.totalLinhas} linhas)`);
+    } catch (e: any) {
+      toast.error("Falha ao exportar: " + (e?.message ?? String(e)));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [tid, fetchClientesFilteredRows, lookups]);
+
+
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -711,10 +739,16 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="mt-1 text-muted-foreground">Gerencie seus clientes aqui.</p>
         </div>
-        <Button onClick={() => navigate("/clientes/novo")}>
-          <Plus className="h-4 w-4" />
-          Novo Cliente
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportCsv} disabled={isExporting}>
+            <Download className="h-4 w-4" />
+            {isExporting ? "Exportando..." : "Exportar CSV"}
+          </Button>
+          <Button onClick={() => navigate("/clientes/novo")}>
+            <Plus className="h-4 w-4" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="clientes">
