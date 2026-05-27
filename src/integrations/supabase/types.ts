@@ -3044,6 +3044,50 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_audit: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          id: number
+          new_value: Json | null
+          old_value: Json | null
+          resource_key: string
+          role: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: number
+          new_value?: Json | null
+          old_value?: Json | null
+          resource_key: string
+          role: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: number
+          new_value?: Json | null
+          old_value?: Json | null
+          resource_key?: string
+          role?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_audit_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produto_modulos: {
         Row: {
           ativo: boolean
@@ -3358,6 +3402,88 @@ export type Database = {
           vlr_reajuste_total?: number
         }
         Relationships: []
+      }
+      resources: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          key: string
+          label: string
+          module: string
+          parent_key: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          key: string
+          label: string
+          module: string
+          parent_key?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          key?: string
+          label?: string
+          module?: string
+          parent_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resources_parent_key_fkey"
+            columns: ["parent_key"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          can_delete: boolean
+          can_insert: boolean
+          can_update: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          resource_key: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          can_delete?: boolean
+          can_insert?: boolean
+          can_update?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          resource_key: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          can_delete?: boolean
+          can_insert?: boolean
+          can_update?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          resource_key?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_resource_key_fkey"
+            columns: ["resource_key"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       segmentos: {
         Row: {
@@ -4920,6 +5046,63 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_role_permissions: {
+        Row: {
+          can_delete: boolean
+          can_insert: boolean
+          can_update: boolean
+          can_view: boolean
+          created_at: string
+          id: string
+          resource_key: string
+          role: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          can_delete: boolean
+          can_insert: boolean
+          can_update: boolean
+          can_view: boolean
+          created_at?: string
+          id?: string
+          resource_key: string
+          role: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          can_delete?: boolean
+          can_insert?: boolean
+          can_update?: boolean
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          resource_key?: string
+          role?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_role_permissions_resource_key_fkey"
+            columns: ["resource_key"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "tenant_role_permissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           cnpj: string | null
@@ -4928,6 +5111,7 @@ export type Database = {
           max_users: number
           nome: string
           plano: string | null
+          rbac_enabled: boolean
           status: string
           trial_ends_at: string | null
         }
@@ -4938,6 +5122,7 @@ export type Database = {
           max_users?: number
           nome: string
           plano?: string | null
+          rbac_enabled?: boolean
           status?: string
           trial_ends_at?: string | null
         }
@@ -4948,6 +5133,7 @@ export type Database = {
           max_users?: number
           nome?: string
           plano?: string | null
+          rbac_enabled?: boolean
           status?: string
           trial_ends_at?: string | null
         }
@@ -6772,6 +6958,7 @@ export type Database = {
         Args: { p_data_inicio: string; p_prazo_meses?: number }
         Returns: string
       }
+      can: { Args: { p_action: string; p_resource: string }; Returns: boolean }
       can_access_monitor: { Args: never; Returns: boolean }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
@@ -6921,6 +7108,7 @@ export type Database = {
         Returns: undefined
       }
       email_domain: { Args: { email: string }; Returns: string }
+      enable_rbac_for_tenant: { Args: never; Returns: Json }
       encrypt_api_key: {
         Args: { p_encryption_key: string; p_key: string }
         Returns: string
@@ -7159,6 +7347,18 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_my_permissions: {
+        Args: never
+        Returns: {
+          can_delete: boolean
+          can_insert: boolean
+          can_update: boolean
+          can_view: boolean
+          label: string
+          module: string
+          resource_key: string
+        }[]
+      }
       get_my_preferences: {
         Args: { p_department_id?: string }
         Returns: {
@@ -7268,6 +7468,7 @@ export type Database = {
           name: string
         }[]
       }
+      get_user_department_id: { Args: never; Returns: string }
       is_admin_or_head: { Args: never; Returns: boolean }
       is_current_user_active: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
@@ -7326,6 +7527,10 @@ export type Database = {
         Returns: Json
       }
       require_active_profile: { Args: never; Returns: boolean }
+      reset_tenant_permissions_to_default: {
+        Args: { p_role?: string }
+        Returns: Json
+      }
       resolve_group_contact_name: {
         Args: {
           p_group_jid: string
@@ -7515,6 +7720,15 @@ export type Database = {
       update_csat_score: {
         Args: { p_csat_id: string; p_new_score: number; p_reason?: string }
         Returns: undefined
+      }
+      update_tenant_permission: {
+        Args: {
+          p_action: string
+          p_resource_key: string
+          p_role: string
+          p_value: boolean
+        }
+        Returns: Json
       }
       update_ticket_fields: {
         Args: { p_fields: Json; p_ticket_id: string }
