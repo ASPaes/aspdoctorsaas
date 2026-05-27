@@ -192,7 +192,8 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId, isEdit
         </div>
       </div>
 
-      <EspelhoFinanceiro
+      <ProtectedElement resource="clientes.custos" action="view">
+        <EspelhoFinanceiro
           espelho={espelho}
           showEspelho={isFinanceiroAdmin}
           isEditing={isEditing}
@@ -207,6 +208,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId, isEdit
           somaDeltaMrr={somaDeltaMrr}
           qtdMovimentos={qtdMovimentos}
         />
+      </ProtectedElement>
     </div>
   );
 }
