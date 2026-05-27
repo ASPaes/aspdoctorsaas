@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3 } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
@@ -25,14 +26,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 const ALL_NAV_ITEMS = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, requiredRoles: ["admin", "head"] },
-  { title: "Clientes", url: "/clientes", icon: Users },
-  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck },
-  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon },
-  { title: "Chat", url: "/whatsapp", icon: MessageCircle },
-  { title: "Tickets", url: "/tickets", icon: TicketCheck },
-  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, requiredRoles: ["admin"] },
-  { title: "Configurações", url: "/configuracoes", icon: Settings, requiredRoles: ["admin"] },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, resource: "nav.dashboard" },
+  { title: "Clientes", url: "/clientes", icon: Users, resource: "nav.clientes" },
+  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
+  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
+  { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "nav.chat" },
+  { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "nav.tickets" },
+  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
+  { title: "Configurações", url: "/configuracoes", icon: Settings, resource: "nav.configuracoes" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -56,11 +57,8 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const isSuperAdmin = profile?.is_super_admin === true;
-  const navItems = ALL_NAV_ITEMS.filter(item => {
-    if (!item.requiredRoles) return true;
-    if (isSuperAdmin) return true;
-    return item.requiredRoles.includes(profile?.role ?? "");
-  });
+  const { can } = usePermissions();
+  const navItems = ALL_NAV_ITEMS.filter(item => can(item.resource, "view"));
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
