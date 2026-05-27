@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NumericInput } from "@/components/ui/numeric-input";
 import EspelhoFinanceiro from "./EspelhoFinanceiro";
@@ -191,7 +192,8 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId, isEdit
         </div>
       </div>
 
-      <EspelhoFinanceiro
+      <ProtectedElement resource="clientes.custos" action="view">
+        <EspelhoFinanceiro
           espelho={espelho}
           showEspelho={isFinanceiroAdmin}
           isEditing={isEditing}
@@ -206,6 +208,7 @@ export default function FinanceiroTab({ form, formasPagamento, clienteId, isEdit
           somaDeltaMrr={somaDeltaMrr}
           qtdMovimentos={qtdMovimentos}
         />
+      </ProtectedElement>
     </div>
   );
 }
