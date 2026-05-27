@@ -713,10 +713,16 @@ export default function Clientes() {
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="mt-1 text-muted-foreground">Gerencie seus clientes aqui.</p>
         </div>
-        <Button onClick={() => navigate("/clientes/novo")}>
-          <Plus className="h-4 w-4" />
-          Novo Cliente
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExportCsv} disabled={isExporting}>
+            <Download className="h-4 w-4" />
+            {isExporting ? "Exportando..." : "Exportar CSV"}
+          </Button>
+          <Button onClick={() => navigate("/clientes/novo")}>
+            <Plus className="h-4 w-4" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="clientes">
