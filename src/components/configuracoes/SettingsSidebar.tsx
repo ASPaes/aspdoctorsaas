@@ -75,6 +75,7 @@ interface SettingsSidebarProps {
 export default function SettingsSidebar({ activeSection, onSectionChange, isAdmin }: SettingsSidebarProps) {
   const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState(false);
+  const { can } = usePermissions();
 
   const handleSync = async () => {
     setSyncing(true);
@@ -88,6 +89,12 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
     } finally {
       setSyncing(false);
     }
+  };
+
+  const isItemVisible = (item: Item) => {
+    const resource = SECTION_TO_RESOURCE[item.value];
+    if (!resource) return true;
+    return can(resource, "view");
   };
 
   const groups: Group[] = [
@@ -227,13 +234,21 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
         {groups.map((group) => {
           const Icon = group.icon;
           const isCadastros = group.label === "Cadastros";
+
+          const visibleSubgroups = group.subgroups.map((sg) => ({
+            ...sg,
+            visibleItems: sg.items.filter(isItemVisible),
+          })).filter((sg) => sg.visibleItems.length > 0);
+
+          if (visibleSubgroups.length === 0) return null;
+
           return (
             <div key={group.label}>
               <div className="flex items-center gap-1.5 px-5 mb-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 <Icon className="h-[14px] w-[14px]" />
                 <span>{group.label}</span>
               </div>
-              {group.subgroups.map((sg, i) => {
+              {visibleSubgroups.map((sg, i) => {
                 const isOpen = sg.label ? !!openSubgroups[sg.label] : true;
                 return (
                   <div key={i}>
@@ -258,7 +273,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
                         isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
                       )}
                     >
-                      {sg.items.map((item) => renderItem(item, isCadastros))}
+                      {sg.visibleItems.map((item) => renderItem(item, isCadastros))}
                     </div>
                   </div>
                 );
