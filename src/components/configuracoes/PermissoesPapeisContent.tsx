@@ -339,12 +339,13 @@ export default function PermissoesPapeisContent() {
           </thead>
           <tbody className={cn(!isActive && "opacity-60")}>
             {grouped.map((g) => (
-              <>
-                <tr key={`mod-${g.module}`} className="bg-muted/40">
+              <Fragment key={g.module}>
+                <tr className="bg-muted/40">
                   <td colSpan={4} className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {g.module}
                   </td>
                 </tr>
+
                 {g.items.map((res) => (
                   <tr key={res.key} className="hover:bg-muted/20">
                     <td className="px-4 py-2.5 border-b border-border/40">
