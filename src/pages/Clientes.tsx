@@ -705,6 +705,32 @@ export default function Clientes() {
     }
   }, [navigate]);
 
+  const [isExporting, setIsExporting] = useState(false);
+  const handleExportCsv = useCallback(async () => {
+    if (!tid) {
+      toast.error("Tenant não definido");
+      return;
+    }
+    setIsExporting(true);
+    toast("Preparando exportação...");
+    try {
+      const rows = await fetchClientesFilteredRows();
+      const ids = rows.map((r: any) => r.id);
+      if (ids.length === 0) {
+        toast.warning("Nenhum cliente para exportar");
+        return;
+      }
+      const result = await exportClientesCsv({ filteredClienteIds: ids, tenantId: tid, lookups });
+      toast.success(`Exportados ${result.totalClientes} clientes (${result.totalLinhas} linhas)`);
+    } catch (e: any) {
+      toast.error("Falha ao exportar: " + (e?.message ?? String(e)));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [tid, fetchClientesFilteredRows, lookups]);
+
+
+
   return (
     <div className="space-y-4">
       {/* Header */}
