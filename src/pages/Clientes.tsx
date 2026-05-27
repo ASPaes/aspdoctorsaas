@@ -741,10 +741,12 @@ export default function Clientes() {
           <p className="mt-1 text-muted-foreground">Gerencie seus clientes aqui.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExportXlsx} disabled={isExporting}>
-            <Download className="h-4 w-4" />
-            {isExporting ? "Gerando XLSX..." : "Exportar XLSX"}
-          </Button>
+          <ProtectedElement resource="clientes.exportar" action="view">
+            <Button variant="outline" onClick={handleExportXlsx} disabled={isExporting}>
+              <Download className="h-4 w-4" />
+              {isExporting ? "Gerando XLSX..." : "Exportar XLSX"}
+            </Button>
+          </ProtectedElement>
           <Button onClick={() => navigate("/clientes/novo")}>
             <Plus className="h-4 w-4" />
             Novo Cliente
