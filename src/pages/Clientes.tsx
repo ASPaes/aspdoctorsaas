@@ -27,7 +27,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
-import { exportClientesCsv } from "@/lib/exportClientesCsv";
+import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
 import { toast } from "sonner";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_ativacao" | "data_reajuste" | "cancelado";
@@ -706,7 +706,7 @@ export default function Clientes() {
   }, [navigate]);
 
   const [isExporting, setIsExporting] = useState(false);
-  const handleExportCsv = useCallback(async () => {
+  const handleExportXlsx = useCallback(async () => {
     if (!tid) {
       toast.error("Tenant não definido");
       return;
@@ -720,7 +720,7 @@ export default function Clientes() {
         toast.warning("Nenhum cliente para exportar");
         return;
       }
-      const result = await exportClientesCsv({ filteredClienteIds: ids, tenantId: tid, lookups });
+      const result = await exportClientesXlsx({ filteredClienteIds: ids, tenantId: tid, lookups });
       toast.success(`Exportados ${result.totalClientes} clientes (${result.totalLinhas} linhas)`);
     } catch (e: any) {
       toast.error("Falha ao exportar: " + (e?.message ?? String(e)));
@@ -740,9 +740,9 @@ export default function Clientes() {
           <p className="mt-1 text-muted-foreground">Gerencie seus clientes aqui.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExportCsv} disabled={isExporting}>
+          <Button variant="outline" onClick={handleExportXlsx} disabled={isExporting}>
             <Download className="h-4 w-4" />
-            {isExporting ? "Exportando..." : "Exportar CSV"}
+            {isExporting ? "Gerando XLSX..." : "Exportar XLSX"}
           </Button>
           <Button onClick={() => navigate("/clientes/novo")}>
             <Plus className="h-4 w-4" />
