@@ -69,7 +69,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const ADMIN_ONLY_SECTIONS = ["acessos", "ia", "horario-plantao"];
+const ADMIN_ONLY_SECTIONS = ["acessos", "permissoes", "ia", "horario-plantao"];
 
 const SECTION_META: Record<string, { breadcrumb: string[]; title: string; description: string }> = {
   percentuais: { breadcrumb: ["Financeiro", "Percentuais"], title: "Percentuais", description: "Valores padrão de imposto e custo fixo aplicados a novos clientes." },
