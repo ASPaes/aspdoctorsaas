@@ -3408,28 +3408,37 @@ export type Database = {
           created_at: string
           description: string | null
           display_order: number
+          hidden: boolean
+          is_navigation: boolean
           key: string
           label: string
           module: string
           parent_key: string | null
+          where_it_appears: string | null
         }
         Insert: {
           created_at?: string
           description?: string | null
           display_order?: number
+          hidden?: boolean
+          is_navigation?: boolean
           key: string
           label: string
           module: string
           parent_key?: string | null
+          where_it_appears?: string | null
         }
         Update: {
           created_at?: string
           description?: string | null
           display_order?: number
+          hidden?: boolean
+          is_navigation?: boolean
           key?: string
           label?: string
           module?: string
           parent_key?: string | null
+          where_it_appears?: string | null
         }
         Relationships: [
           {
@@ -7354,9 +7363,15 @@ export type Database = {
           can_insert: boolean
           can_update: boolean
           can_view: boolean
+          description: string
+          display_order: number
+          hidden: boolean
+          is_navigation: boolean
           label: string
           module: string
+          parent_key: string
           resource_key: string
+          where_it_appears: string
         }[]
       }
       get_my_preferences: {
