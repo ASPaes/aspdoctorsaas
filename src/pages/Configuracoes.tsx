@@ -90,6 +90,8 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   "motivos-cancelamento": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de cancelamento"], title: "Motivos de cancelamento", description: "Motivos disponíveis para cancelamento de contratos." },
   "motivos-pausa": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de pausa"], title: "Motivos de pausa", description: "Motivos para pausa de atendimentos." },
   acessos: { breadcrumb: ["Equipe", "Acessos & permissões"], title: "Acessos & permissões", description: "Gerencie usuários, papéis e permissões da equipe." },
+  permissoes: { breadcrumb: ["Equipe", "Permissões e papéis"], title: "Permissões e papéis", description: "Configure o que cada papel pode fazer no seu tenant." },
+
   whatsapp: { breadcrumb: ["Atendimento", "WhatsApp"], title: "WhatsApp", description: "Configurações de instâncias, atendimento, macros e segurança." },
   ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
   "horario-plantao": { breadcrumb: ["Atendimento", "Horário & plantão"], title: "Horário & plantão", description: "Horário de atendimento e plantões fora do expediente." },
