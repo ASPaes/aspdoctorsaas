@@ -6819,24 +6819,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "clientes_funcionario_id_fkey"
-            columns: ["funcionario_id"]
-            isOneToOne: false
-            referencedRelation: "funcionarios"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "clientes_motivo_cancelamento_id_fkey"
             columns: ["motivo_cancelamento_id"]
             isOneToOne: false
             referencedRelation: "motivos_cancelamento"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clientes_origem_venda_id_fkey"
-            columns: ["origem_venda_id"]
-            isOneToOne: false
-            referencedRelation: "origens_venda"
             referencedColumns: ["id"]
           },
           {
