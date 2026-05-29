@@ -131,8 +131,8 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
                     const textColor = isOnline ? "text-green-600" : isPaused ? "text-yellow-600" : "text-muted-foreground";
                     const label = isOnline ? "(Online)" : isPaused ? "(Pausado)" : "(Offline)";
                     return (
-                      <SelectItem key={a.user_id} value={a.user_id}>
-                        <div className="flex items-center gap-2">
+                      <SelectItem key={a.user_id} value={a.user_id} disabled={a.presence_status === "offline"}>
+                        <div className={`flex items-center gap-2 ${a.presence_status === "offline" ? "opacity-50" : ""}`}>
                           <span>{a.nome}{a.department_name ? ` — ${a.department_name}` : ""} {a.user_id === user?.id ? "(eu)" : ""}</span>
                           <span className="flex items-center gap-1.5">
                             <span className={`w-2 h-2 rounded-full ${dotColor}`} />
@@ -145,13 +145,11 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
                 </SelectContent>
               </Select>
             </div>
-            {selectedAgent && selectedAgent.presence_status !== "online" && (
+            {selectedAgent && selectedAgent.presence_status === "paused" && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  {selectedAgent.presence_status === "paused"
-                    ? "Este agente está pausado. A conversa ficará na fila até ele voltar."
-                    : "Este agente está offline. A conversa ficará na fila até ele ficar online."}
+                  Este agente está pausado. A conversa ficará na fila até ele voltar.
                 </AlertDescription>
               </Alert>
             )}
