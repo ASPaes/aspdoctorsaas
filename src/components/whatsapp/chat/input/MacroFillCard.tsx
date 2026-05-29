@@ -200,6 +200,15 @@ export function MacroFillCard({ template, permiteEdicaoLivre, mediaType, prefill
         </div>
       )}
 
+      {mediaType && (
+        <div className="flex items-center gap-2 p-2 mb-3 rounded border border-blue-500/30 bg-blue-500/5 text-xs text-blue-600">
+          <Paperclip className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {mediaType === 'image' ? 'Imagem anexada' : mediaType === 'audio' ? 'Áudio anexado' : mediaType === 'video' ? 'Vídeo anexado' : 'Documento anexado'}
+          </span>
+        </div>
+      )}
+
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           Cancelar
