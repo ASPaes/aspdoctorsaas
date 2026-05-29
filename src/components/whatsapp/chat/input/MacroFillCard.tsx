@@ -63,7 +63,7 @@ function computeInitialValues(template: string, prefillValues?: Record<string, s
   return { values, prefilled };
 }
 
-export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
+export function MacroFillCard({ template, permiteEdicaoLivre, mediaType, prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
   const fragments = useMemo(() => parseTemplate(template), [template]);
 
   const tagOccurrences = useMemo(() => {
