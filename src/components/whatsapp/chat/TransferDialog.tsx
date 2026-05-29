@@ -124,14 +124,37 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
                   <SelectValue placeholder="Selecione um agente..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableAgents.map((a) => (
-                    <SelectItem key={a.user_id} value={a.user_id}>
-                      {a.nome}{a.department_name ? ` — ${a.department_name}` : ""} {a.user_id === user?.id ? "(eu)" : ""}
-                    </SelectItem>
-                  ))}
+                  {availableAgents.map((a) => {
+                    const isOnline = a.presence_status === "online";
+                    const isPaused = a.presence_status === "paused";
+                    const dotColor = isOnline ? "bg-green-500" : isPaused ? "bg-yellow-500" : "bg-gray-400";
+                    const textColor = isOnline ? "text-green-600" : isPaused ? "text-yellow-600" : "text-muted-foreground";
+                    const label = isOnline ? "(Online)" : isPaused ? "(Pausado)" : "(Offline)";
+                    return (
+                      <SelectItem key={a.user_id} value={a.user_id}>
+                        <div className="flex items-center gap-2">
+                          <span>{a.nome}{a.department_name ? ` — ${a.department_name}` : ""} {a.user_id === user?.id ? "(eu)" : ""}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                            <span className={`text-xs ${textColor}`}>{label}</span>
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
+            {selectedAgent && selectedAgent.presence_status !== "online" && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {selectedAgent.presence_status === "paused"
+                    ? "Este agente está pausado. A conversa ficará na fila até ele voltar."
+                    : "Este agente está offline. A conversa ficará na fila até ele ficar online."}
+                </AlertDescription>
+              </Alert>
+            )}
           </TabsContent>
 
           <TabsContent value="department" className="space-y-4 pt-2">
