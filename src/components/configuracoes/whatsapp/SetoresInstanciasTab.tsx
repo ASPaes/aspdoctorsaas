@@ -259,6 +259,34 @@ export default function SetoresInstanciasTab() {
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Label>Tempo de inatividade (minutos)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-32"
+                      placeholder="Global"
+                      value={inactivityMinutes}
+                      onChange={(e) => setInactivityMinutes(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                    <Button
+                      size="sm"
+                      disabled={saveInactivity.isPending || inactivityMinutes === (selectedDept?.auto_close_inactivity_minutes?.toString() ?? "")}
+                      onClick={() => saveInactivity.mutate(inactivityMinutes)}
+                    >
+                      {saveInactivity.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
                     <MessageSquareText className="h-4 w-4 text-muted-foreground" />
                     <Label>Mensagem de boas-vindas (sem URA)</Label>
                   </div>
