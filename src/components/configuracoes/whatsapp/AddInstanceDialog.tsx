@@ -134,8 +134,9 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
       form.reset();
       setConnectionTested(false);
     } catch {
-      toast.error("Erro ao criar instância");
-    }
+    toast.error("Erro ao criar instância");
+  }
+};
   const onInvalid = (errors: Record<string, unknown>) => {
     const campos = Object.keys(errors).join(', ');
     toast.error(campos ? `Verifique os campos: ${campos}` : 'Verifique os campos obrigatórios');
