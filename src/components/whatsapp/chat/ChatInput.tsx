@@ -50,7 +50,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean } | null>(null);
+  const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean; media_type?: string | null; media_path?: string | null } | null>(null);
 
   const MAX_FILE_SIZE_MB = 100;
   const WARN_FILE_SIZE_MB = 60;
@@ -362,14 +362,17 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setShowMacroSuggestions(false);
 
     const hasTags = /\{\{[^}]+\}\}/.test(macro.content || "");
+    const hasMedia = !!macro.media_path;
 
-    if (hasTags) {
-      const cleaned = message.replace(/(\/macro:\s*\S*|(?:^|\s)\/[^\s/]*)$/i, "").trimEnd();
+    if (hasTags || hasMedia) {
+      const cleaned = message.replace(/(\/(macro:\s*\S*|[^\s/]*))$/i, "").trimEnd();
       setMessage(cleaned);
       setActiveMacro({
         id: macro.id,
         content: macro.content,
         permite_edicao_livre: macro.permite_edicao_livre ?? false,
+        media_type: macro.media_type,
+        media_path: macro.media_path,
       });
       return;
     }
@@ -387,9 +390,28 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
-  const handleMacroCardSend = (finalText: string) => {
+  const handleMacroCardSend = async (finalText: string) => {
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
+      return;
+    }
+    if (activeMacro?.media_path) {
+      try {
+        const { data: blob, error } = await supabase.storage
+          .from('whatsapp-media')
+          .download(activeMacro.media_path);
+        if (error || !blob) {
+          toast.error("Erro ao baixar mídia da macro");
+          return;
+        }
+        const fileName = activeMacro.media_path.split('/').pop() || 'file';
+        const file = new File([blob], fileName, { type: blob.type });
+        await sendAttachedFile(file, finalText || undefined);
+        setActiveMacro(null);
+        onCancelReply?.();
+      } catch (err: any) {
+        toast.error("Erro ao enviar mídia: " + (err.message || ""));
+      }
       return;
     }
     sendMutation.mutate(
@@ -499,6 +521,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           <MacroFillCard
             template={activeMacro.content}
             permiteEdicaoLivre={activeMacro.permite_edicao_livre}
+            mediaType={activeMacro.media_type}
             prefillValues={macroPrefillValues}
             onCancel={handleMacroCardCancel}
             onEditFreely={handleMacroEditFreely}

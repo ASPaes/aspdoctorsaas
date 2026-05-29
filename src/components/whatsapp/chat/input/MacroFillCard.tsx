@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Send, Edit3, AlertTriangle } from "lucide-react";
+import { X, Send, Edit3, AlertTriangle, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Fragment {
@@ -13,6 +13,7 @@ interface Fragment {
 interface Props {
   template: string;
   permiteEdicaoLivre: boolean;
+  mediaType?: string | null;
   prefillValues?: Record<string, string>;
   onCancel: () => void;
   onEditFreely: () => void;
@@ -62,7 +63,7 @@ function computeInitialValues(template: string, prefillValues?: Record<string, s
   return { values, prefilled };
 }
 
-export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
+export function MacroFillCard({ template, permiteEdicaoLivre, mediaType, prefillValues, onCancel, onEditFreely, onSend, isSending }: Props) {
   const fragments = useMemo(() => parseTemplate(template), [template]);
 
   const tagOccurrences = useMemo(() => {
@@ -196,6 +197,15 @@ export function MacroFillCard({ template, permiteEdicaoLivre, prefillValues, onC
             Preencha {emptyTags.length === 1 ? "o campo" : "os campos"}:{" "}
             {emptyTags.map((t) => `"${t}"`).join(", ")}
           </p>
+        </div>
+      )}
+
+      {mediaType && (
+        <div className="flex items-center gap-2 p-2 mb-3 rounded border border-blue-500/30 bg-blue-500/5 text-xs text-blue-600">
+          <Paperclip className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {mediaType === 'image' ? 'Imagem anexada' : mediaType === 'audio' ? 'Áudio anexado' : mediaType === 'video' ? 'Vídeo anexado' : 'Documento anexado'}
+          </span>
         </div>
       )}
 
