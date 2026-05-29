@@ -6116,6 +6116,8 @@ export type Database = {
           instance_id: string | null
           is_active: boolean
           is_global: boolean
+          media_path: string | null
+          media_type: string | null
           permite_edicao_livre: boolean
           shortcut: string | null
           tenant_id: string
@@ -6132,6 +6134,8 @@ export type Database = {
           instance_id?: string | null
           is_active?: boolean
           is_global?: boolean
+          media_path?: string | null
+          media_type?: string | null
           permite_edicao_livre?: boolean
           shortcut?: string | null
           tenant_id: string
@@ -6148,6 +6152,8 @@ export type Database = {
           instance_id?: string | null
           is_active?: boolean
           is_global?: boolean
+          media_path?: string | null
+          media_type?: string | null
           permite_edicao_livre?: boolean
           shortcut?: string | null
           tenant_id?: string
