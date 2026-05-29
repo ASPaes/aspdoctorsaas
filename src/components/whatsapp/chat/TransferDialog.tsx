@@ -74,6 +74,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const { transferConversation, transferToDepartment, isTransferring, isTransferringDepartment } = useConversationAssignment();
 
   const availableAgents = agents.filter(a => a.user_id !== currentAssignee);
+  const selectedAgent = availableAgents.find(a => a.user_id === selectedUser);
 
   const handleTransferAgent = () => {
     if (!selectedUser) return;
