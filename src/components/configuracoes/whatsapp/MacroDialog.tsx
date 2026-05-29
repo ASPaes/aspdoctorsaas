@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMacroTags } from "@/components/whatsapp/hooks/useMacroTags";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Paperclip, X } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -19,6 +19,10 @@ import { Button } from "@/components/ui/button";
 import { useWhatsAppMacros, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
 import { Switch } from "@/components/ui/switch";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { toast } from "sonner";
+
 
 const formSchema = z.object({
   title: z.string().min(1, "Nome obrigatório"),
