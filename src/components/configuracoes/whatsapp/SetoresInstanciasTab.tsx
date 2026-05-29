@@ -26,6 +26,7 @@ export default function SetoresInstanciasTab() {
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [welcomeMsg, setWelcomeMsg] = useState("");
+  const [inactivityMinutes, setInactivityMinutes] = useState<string>("");
   const { instances } = useWhatsAppInstances();
 
   const { data: departments = [] } = useQuery({
