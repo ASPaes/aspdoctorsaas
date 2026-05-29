@@ -36,6 +36,7 @@ function useTransferAgents() {
         department_id: string | null;
         department_name: string | null;
         is_super_admin: boolean;
+        presence_status: string;
       }>;
     },
   });
