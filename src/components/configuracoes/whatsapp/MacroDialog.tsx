@@ -202,6 +202,54 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
               </FormItem>
             )} />
 
+            <div className="space-y-2">
+              <FormLabel>Mídia (opcional)</FormLabel>
+              {existingMediaPath && !mediaFile && (
+                <div className="flex items-center gap-2 rounded-md border p-2 bg-muted/30">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm flex-1 truncate">{existingMediaPath.split('/').pop()}</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => { setExistingMediaPath(null); setMediaType(null); }}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {mediaFile && (
+                <div className="flex items-center gap-2 rounded-md border p-2 bg-muted/30">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm flex-1 truncate">{mediaFile.name}</span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setMediaFile(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {!existingMediaPath && !mediaFile && (
+                <div>
+                  <input
+                    id="macro-dialog-media-input"
+                    type="file"
+                    className="hidden"
+                    accept="image/*,audio/*,video/*,application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setMediaFile(file);
+                        setMediaType(
+                          file.type.startsWith('image/') ? 'image'
+                          : file.type.startsWith('audio/') ? 'audio'
+                          : file.type.startsWith('video/') ? 'video'
+                          : 'document'
+                        );
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('macro-dialog-media-input')?.click()}>
+                    <Paperclip className="h-4 w-4 mr-2" /> Anexar mídia
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {allTags.length > 0 && (
               <div className="space-y-2 rounded-md border p-3 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground">Inserir tag no cursor:</p>
