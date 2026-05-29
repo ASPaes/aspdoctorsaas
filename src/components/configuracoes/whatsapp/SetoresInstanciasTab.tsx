@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, Building2, MessageSquareText } from "lucide-react";
+import { ExternalLink, Building2, MessageSquareText, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 
@@ -26,6 +27,7 @@ export default function SetoresInstanciasTab() {
   const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [welcomeMsg, setWelcomeMsg] = useState("");
+  const [inactivityMinutes, setInactivityMinutes] = useState<string>("");
   const { instances } = useWhatsAppInstances();
 
   const { data: departments = [] } = useQuery({
@@ -34,7 +36,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -48,6 +50,10 @@ export default function SetoresInstanciasTab() {
   useEffect(() => {
     setWelcomeMsg(selectedDept?.welcome_message ?? "");
   }, [selectedId, selectedDept?.welcome_message]);
+
+  useEffect(() => {
+    setInactivityMinutes(selectedDept?.auto_close_inactivity_minutes?.toString() ?? "");
+  }, [selectedDept]);
 
   const { data: deptInstances = [] } = useQuery({
     queryKey: ["support_department_instances_wa", selectedId],
@@ -118,6 +124,23 @@ export default function SetoresInstanciasTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
       toast.success("Mensagem de boas-vindas salva");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveInactivity = useMutation({
+    mutationFn: async (minutes: string) => {
+      if (!selectedId) return;
+      const value = minutes.trim() === "" ? null : parseInt(minutes, 10);
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ auto_close_inactivity_minutes: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Tempo de inatividade salvo");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -233,6 +256,34 @@ export default function SetoresInstanciasTab() {
                     </Select>
                   </div>
                 )}
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Label>Tempo de inatividade (minutos)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-32"
+                      placeholder="Global"
+                      value={inactivityMinutes}
+                      onChange={(e) => setInactivityMinutes(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                    <Button
+                      size="sm"
+                      disabled={saveInactivity.isPending || inactivityMinutes === (selectedDept?.auto_close_inactivity_minutes?.toString() ?? "")}
+                      onClick={() => saveInactivity.mutate(inactivityMinutes)}
+                    >
+                      {saveInactivity.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">
