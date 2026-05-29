@@ -103,7 +103,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
     if (mediaFile && tid) {
       setUploading(true);
       const ext = mediaFile.name.split('.').pop() || 'bin';
-      const filePath = `macros/${tid}/${crypto.randomUUID()}.${ext}`;
+      const filePath = `${tid}/macros/${crypto.randomUUID()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('whatsapp-media').upload(filePath, mediaFile, { upsert: false });
       setUploading(false);
       if (upErr) {
