@@ -315,50 +315,48 @@ export default function ConfiguracoesNotificacoes() {
       </Card>
 
       {/* Escopo de notificações */}
-      {isHeadOrAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Escopo de notificações</CardTitle>
-            <CardDescription>
-              Defina de quais conversas você recebe notificações como gestor
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select
-              value={settings.notification_scope}
-              onValueChange={(v) => update("notification_scope", v)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  <div>
-                    <div className="font-medium">Todos os setores</div>
-                    <div className="text-xs text-muted-foreground">Recebe notificações de todas as conversas do WhatsApp</div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="my_departments">
-                  <div>
-                    <div className="font-medium">Meus setores</div>
-                    <div className="text-xs text-muted-foreground">Apenas conversas dos setores em que você é membro</div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="mine_only">
-                  <div>
-                    <div className="font-medium">Somente para mim</div>
-                    <div className="text-xs text-muted-foreground">Apenas conversas atribuídas diretamente a você</div>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Esta configuração controla quais conversas geram notificações para você.
-              Conversas atribuídas diretamente a você sempre geram notificação, independente desta configuração.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Escopo de notificações</CardTitle>
+          <CardDescription>
+            Defina de quais conversas você recebe notificações
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Select
+            value={settings.notification_scope}
+            onValueChange={(v) => update("notification_scope", v)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                <div>
+                  <div className="font-medium">Todos os setores</div>
+                  <div className="text-xs text-muted-foreground">Recebe notificações de todas as conversas do WhatsApp</div>
+                </div>
+              </SelectItem>
+              <SelectItem value="my_departments">
+                <div>
+                  <div className="font-medium">Meus setores</div>
+                  <div className="text-xs text-muted-foreground">Apenas conversas dos setores em que você é membro</div>
+                </div>
+              </SelectItem>
+              <SelectItem value="mine_only">
+                <div>
+                  <div className="font-medium">Somente para mim</div>
+                  <div className="text-xs text-muted-foreground">Apenas conversas atribuídas diretamente a você</div>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Esta configuração controla quais conversas geram notificações para você.
+            Conversas atribuídas diretamente a você sempre geram notificação, independente desta configuração.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Não perturbe */}
       <Card>
