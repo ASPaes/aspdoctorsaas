@@ -398,7 +398,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     if (activeMacro?.media_path) {
       try {
         const { data: blob, error } = await supabase.storage
-          .from('whatsapp-media')
+          .from('macro-media')
           .download(activeMacro.media_path);
         if (error || !blob) {
           toast.error("Erro ao baixar mídia da macro");
