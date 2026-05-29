@@ -98,7 +98,7 @@ function MacrosList() {
     if (form.media_file) {
       setUploading(true);
       const ext = form.media_file.name.split('.').pop() || 'bin';
-      const filePath = `macros/${tid}/${crypto.randomUUID()}.${ext}`;
+      const filePath = `${tid}/macros/${crypto.randomUUID()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from('whatsapp-media')
         .upload(filePath, form.media_file, { upsert: false });
