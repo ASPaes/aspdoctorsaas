@@ -123,11 +123,22 @@ Deno.serve(async (req) => {
       if (zapi_client_token) vaultPayload.zapi_client_token = zapi_client_token;
     }
 
-    await fetch(`${supabaseUrl}/functions/v1/upsert-instance-secrets`, {
+    const secretsResp = await fetch(`${supabaseUrl}/functions/v1/upsert-instance-secrets`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
       body: JSON.stringify(vaultPayload),
     });
+
+    if (!secretsResp.ok) {
+      const errBody = await secretsResp.text().catch(() => '');
+      // rollback: não deixar instância órfã sem credenciais
+      await supabase.from('whatsapp_instance_secrets').delete().eq('instance_id', instanceResult.id);
+      await supabase.from('whatsapp_instances').delete().eq('id', instanceResult.id);
+      return new Response(
+        JSON.stringify({ error: `Falha ao salvar credenciais no Vault (${secretsResp.status}). ${errBody}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     return new Response(JSON.stringify(instanceResult), {
       status: 200,
