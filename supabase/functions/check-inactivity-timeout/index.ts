@@ -140,7 +140,24 @@ async function processAttendance(
 
     const config = await getSupportConfig(supabase, att.tenant_id);
 
-    const closeThresholdMin = config.support_auto_close_inactivity_minutes;
+    // Buscar overrides de inatividade (hierarquia: setor > instância > global)
+    let deptOverride: number | null = null;
+    let instOverride: number | null = null;
+    {
+      const { data: convOverrides } = await supabase
+        .from("whatsapp_conversations")
+        .select("department_id, instance_id, support_departments!left(auto_close_inactivity_minutes), whatsapp_instances!left(auto_close_inactivity_minutes)")
+        .eq("id", att.conversation_id)
+        .maybeSingle();
+
+      if (convOverrides) {
+        deptOverride = (convOverrides as any).support_departments?.auto_close_inactivity_minutes ?? null;
+        instOverride = (convOverrides as any).whatsapp_instances?.auto_close_inactivity_minutes ?? null;
+      }
+    }
+
+    const closeThresholdMin = deptOverride ?? instOverride ?? config.support_auto_close_inactivity_minutes;
+    log("threshold resolução", { dept: deptOverride, inst: instOverride, global: config.support_auto_close_inactivity_minutes, resolved: closeThresholdMin });
     const warnEnabled = config.support_send_inactivity_warning === true;
     const warnBeforeMin = config.support_inactivity_warning_before_minutes;
     const warnTemplate = config.support_inactivity_warning_template ||
