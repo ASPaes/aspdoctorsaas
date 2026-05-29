@@ -297,7 +297,7 @@ export function MacroDialog({ open, onOpenChange, macro }: MacroDialogProps) {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending || uploading}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {macro ? "Salvar Alterações" : "Criar Macro"}
               </Button>
