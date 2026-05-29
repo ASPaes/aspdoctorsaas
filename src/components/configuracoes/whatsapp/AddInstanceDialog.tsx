@@ -24,8 +24,8 @@ const formSchema = z.object({
   display_name: z.string().min(1, "Nome obrigatório"),
   instance_name: z.string().min(1, "Nome da instância obrigatório").regex(/^[a-zA-Z0-9_-]+$/, "Apenas letras, números, _ e -"),
   instance_id_external: z.string().optional(),
-  api_url: z.string().url("URL inválida").or(z.literal("")),
-  api_key: z.string().min(1, "Token/API Key obrigatório").or(z.literal("")),
+  api_url: z.string().optional(),
+  api_key: z.string().optional(),
   provider_type: z.enum(["self_hosted", "cloud", "meta_cloud", "zapi"]),
   zapi_instance_id: z.string().optional(),
   zapi_token: z.string().optional(),
@@ -42,7 +42,7 @@ const formSchema = z.object({
   } else if (data.provider_type === 'zapi') {
     if (!data.zapi_instance_id) ctx.addIssue({ code: 'custom', path: ['zapi_instance_id'], message: 'ID da instância Z-API obrigatório' });
     if (!data.zapi_token) ctx.addIssue({ code: 'custom', path: ['zapi_token'], message: 'Token Z-API obrigatório' });
-  } else {
+  } else if (data.provider_type === 'meta_cloud') {
     if (!data.meta_phone_number_id) ctx.addIssue({ code: 'custom', path: ['meta_phone_number_id'], message: 'Phone Number ID obrigatório' });
     if (!data.meta_access_token) ctx.addIssue({ code: 'custom', path: ['meta_access_token'], message: 'Access Token obrigatório' });
     if (!data.meta_verify_token) ctx.addIssue({ code: 'custom', path: ['meta_verify_token'], message: 'Verify Token obrigatório' });
@@ -136,7 +136,11 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
     } catch {
       toast.error("Erro ao criar instância");
     }
+  const onInvalid = (errors: Record<string, unknown>) => {
+    const campos = Object.keys(errors).join(', ');
+    toast.error(campos ? `Verifique os campos: ${campos}` : 'Verifique os campos obrigatórios');
   };
+
 
   const handleClose = () => {
     if (!showWebhookInstructions) { form.reset(); setConnectionTested(false); }
@@ -162,7 +166,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
               <DialogDescription>Adicione uma nova instância WhatsApp</DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
                 <FormField control={form.control} name="provider_type" render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center gap-1.5">
@@ -171,7 +175,7 @@ export const AddInstanceDialog = ({ open, onOpenChange }: AddInstanceDialogProps
                         <TooltipContent side="right" className="max-w-[250px]"><p><strong>Self-Hosted</strong>: Evolution API em seu servidor. <strong>Cloud</strong>: Evolution Cloud. <strong>Meta Cloud</strong>: WhatsApp Business Cloud API oficial.</p></TooltipContent>
                       </Tooltip>
                     </div>
-                    <Select onValueChange={(val) => { field.onChange(val); setConnectionTested(false); }} defaultValue={field.value}>
+                    <Select onValueChange={(val) => { field.onChange(val); setConnectionTested(false); form.clearErrors(); }} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="self_hosted">Evolution API Self-Hosted</SelectItem>
