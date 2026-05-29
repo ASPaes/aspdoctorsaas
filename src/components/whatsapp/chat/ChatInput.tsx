@@ -521,6 +521,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
           <MacroFillCard
             template={activeMacro.content}
             permiteEdicaoLivre={activeMacro.permite_edicao_livre}
+            mediaType={activeMacro.media_type}
             prefillValues={macroPrefillValues}
             onCancel={handleMacroCardCancel}
             onEditFreely={handleMacroEditFreely}
