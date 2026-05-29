@@ -15,6 +15,8 @@ export interface WhatsAppMacro {
   is_active: boolean;
   usage_count: number;
   permite_edicao_livre: boolean;
+  media_type: string | null;
+  media_path: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
