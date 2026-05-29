@@ -12,15 +12,16 @@ interface Fragment {
 
 interface Props {
   template: string;
+interface Props {
+  template: string;
   permiteEdicaoLivre: boolean;
+  mediaType?: string | null;
   prefillValues?: Record<string, string>;
   onCancel: () => void;
   onEditFreely: () => void;
   onSend: (finalText: string) => void;
   isSending?: boolean;
 }
-
-function parseTemplate(template: string): Fragment[] {
   const fragments: Fragment[] = [];
   const regex = /\{\{([^}]+)\}\}/g;
   let lastIndex = 0;
