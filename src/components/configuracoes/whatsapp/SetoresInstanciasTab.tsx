@@ -128,6 +128,23 @@ export default function SetoresInstanciasTab() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const saveInactivity = useMutation({
+    mutationFn: async (minutes: string) => {
+      if (!selectedId) return;
+      const value = minutes.trim() === "" ? null : parseInt(minutes, 10);
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ auto_close_inactivity_minutes: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Tempo de inatividade salvo");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
