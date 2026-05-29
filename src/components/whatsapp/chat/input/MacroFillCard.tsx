@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Send, Edit3, AlertTriangle } from "lucide-react";
+import { X, Send, Edit3, AlertTriangle, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Fragment {
