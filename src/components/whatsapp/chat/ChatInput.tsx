@@ -51,6 +51,27 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeMacro, setActiveMacro] = useState<{ id: string; content: string; permite_edicao_livre: boolean } | null>(null);
+
+  const MAX_FILE_SIZE_MB = 100;
+  const WARN_FILE_SIZE_MB = 60;
+
+  const validateAndAttachFile = (file: File) => {
+    const maxBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
+    const warnBytes = WARN_FILE_SIZE_MB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error("Arquivo muito grande", {
+        description: "O limite máximo é de 100MB. Selecione um arquivo menor.",
+      });
+      return;
+    }
+    if (file.size > warnBytes) {
+      toast.warning("Arquivo grande", {
+        description: "Arquivos acima de 60MB podem falhar no envio pelo WhatsApp.",
+      });
+    }
+    setAttachedFile(file);
+  };
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendMutation = useWhatsAppSend();
