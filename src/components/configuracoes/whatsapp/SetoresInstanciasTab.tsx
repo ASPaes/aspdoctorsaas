@@ -50,6 +50,10 @@ export default function SetoresInstanciasTab() {
     setWelcomeMsg(selectedDept?.welcome_message ?? "");
   }, [selectedId, selectedDept?.welcome_message]);
 
+  useEffect(() => {
+    setInactivityMinutes(selectedDept?.auto_close_inactivity_minutes?.toString() ?? "");
+  }, [selectedDept]);
+
   const { data: deptInstances = [] } = useQuery({
     queryKey: ["support_department_instances_wa", selectedId],
     enabled: !!selectedId,
