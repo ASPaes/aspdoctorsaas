@@ -1044,6 +1044,54 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         </div>
       </div>
 
+      {/* Horários Plantão — visível apenas quando tipo_horario = 'plantao' */}
+      {ticket?.tipo_horario === "plantao" && (
+        <div className="space-y-3 p-3 rounded-md border border-amber-500/30 bg-amber-500/5">
+          <p className="text-xs font-medium text-amber-600 flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Horários de Plantão
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Início</Label>
+              <Input
+                type="datetime-local"
+                className="h-9 text-xs"
+                defaultValue={ticket?.horario_inicio ? new Date(ticket.horario_inicio).toISOString().slice(0, 16) : ""}
+                key={`horario-inicio-${ticket?.horario_inicio}`}
+                onBlur={(e) => {
+                  const val = e.target.value;
+                  if (val) handleFieldUpdate({ horario_inicio: new Date(val).toISOString() });
+                }}
+                disabled={updating}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Fim</Label>
+              <Input
+                type="datetime-local"
+                className="h-9 text-xs"
+                defaultValue={ticket?.horario_fim ? new Date(ticket.horario_fim).toISOString().slice(0, 16) : ""}
+                key={`horario-fim-${ticket?.horario_fim}`}
+                onBlur={(e) => {
+                  const val = e.target.value;
+                  if (val) handleFieldUpdate({ horario_fim: new Date(val).toISOString() });
+                }}
+                disabled={updating}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Duração</Label>
+              <p className="text-sm h-9 flex items-center font-semibold text-amber-700">
+                {ticket?.duracao_minutos != null
+                  ? `${Math.floor(ticket.duracao_minutos / 60)}h ${ticket.duracao_minutos % 60}min`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(() => {
         const dept = departamentos?.find((d: any) => d.id === ticket?.department_id);
         if (dept?.slug !== "implantacao") return null;
