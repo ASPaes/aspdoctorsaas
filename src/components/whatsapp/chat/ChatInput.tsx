@@ -307,11 +307,12 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         const file = items[i].getAsFile();
         if (file) {
           e.preventDefault();
-        if (file) {
-          e.preventDefault();
           validateAndAttachFile(file);
           return;
         }
+      }
+    }
+  }, []);
 
   // Drag & drop handlers
   const handleDragOver = useCallback((e: DragEvent) => {
