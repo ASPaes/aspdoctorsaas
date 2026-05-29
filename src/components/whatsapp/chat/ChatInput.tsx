@@ -307,12 +307,11 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         const file = items[i].getAsFile();
         if (file) {
           e.preventDefault();
-          setAttachedFile(file);
+        if (file) {
+          e.preventDefault();
+          validateAndAttachFile(file);
           return;
         }
-      }
-    }
-  }, []);
 
   // Drag & drop handlers
   const handleDragOver = useCallback((e: DragEvent) => {
@@ -327,18 +326,15 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
     setIsDragging(false);
     const file = e.dataTransfer?.files?.[0];
-    if (file) setAttachedFile(file);
+    if (file) validateAndAttachFile(file);
   }, []);
 
   // File input handler
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setAttachedFile(file);
+    if (file) validateAndAttachFile(file);
   }, []);
 
   const handleEmojiSelect = (emoji: string) => {
