@@ -327,6 +327,9 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     setIsDragging(false);
   }, []);
 
+  const handleDrop = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     const file = e.dataTransfer?.files?.[0];
     if (file) validateAndAttachFile(file);
