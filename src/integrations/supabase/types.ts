@@ -4332,6 +4332,7 @@ export type Database = {
       }
       support_departments: {
         Row: {
+          auto_close_inactivity_minutes: number | null
           business_hours: Json
           business_hours_enabled: boolean
           business_hours_message: string | null
@@ -4354,6 +4355,7 @@ export type Database = {
           welcome_message: string | null
         }
         Insert: {
+          auto_close_inactivity_minutes?: number | null
           business_hours?: Json
           business_hours_enabled?: boolean
           business_hours_message?: string | null
@@ -4376,6 +4378,7 @@ export type Database = {
           welcome_message?: string | null
         }
         Update: {
+          auto_close_inactivity_minutes?: number | null
           business_hours?: Json
           business_hours_enabled?: boolean
           business_hours_message?: string | null
@@ -4682,7 +4685,10 @@ export type Database = {
           deleted_at: string | null
           department_id: string | null
           descricao: string | null
+          duracao_minutos: number | null
           fornecedor_id: number | null
+          horario_fim: string | null
+          horario_inicio: string | null
           id: string
           motivo_cancelamento: string | null
           observacao_agente: string | null
@@ -4725,7 +4731,10 @@ export type Database = {
           deleted_at?: string | null
           department_id?: string | null
           descricao?: string | null
+          duracao_minutos?: number | null
           fornecedor_id?: number | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
           motivo_cancelamento?: string | null
           observacao_agente?: string | null
@@ -4768,7 +4777,10 @@ export type Database = {
           deleted_at?: string | null
           department_id?: string | null
           descricao?: string | null
+          duracao_minutos?: number | null
           fornecedor_id?: number | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
           id?: string
           motivo_cancelamento?: string | null
           observacao_agente?: string | null
@@ -5992,6 +6004,7 @@ export type Database = {
       }
       whatsapp_instances: {
         Row: {
+          auto_close_inactivity_minutes: number | null
           created_at: string
           display_name: string | null
           id: string
@@ -6011,6 +6024,7 @@ export type Database = {
           webhook_url: string | null
         }
         Insert: {
+          auto_close_inactivity_minutes?: number | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -6030,6 +6044,7 @@ export type Database = {
           webhook_url?: string | null
         }
         Update: {
+          auto_close_inactivity_minutes?: number | null
           created_at?: string
           display_name?: string | null
           id?: string
@@ -7455,6 +7470,7 @@ export type Database = {
           department_name: string
           is_super_admin: boolean
           nome: string
+          presence_status: string
           role: string
           status: string
           user_id: string
