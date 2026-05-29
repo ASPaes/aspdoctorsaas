@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +16,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Loader2, Zap, Hash } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Zap, Hash, Paperclip, X } from "lucide-react";
 import { useWhatsAppMacros, type WhatsAppMacro } from "@/components/whatsapp/hooks/useWhatsAppMacros";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,9 +28,15 @@ interface MacroForm {
   shortcut: string;
   category: string;
   is_active: boolean;
+  media_file: File | null;
+  media_type: string | null;
+  media_path: string | null;
 }
 
-const EMPTY_FORM: MacroForm = { title: "", content: "", shortcut: "", category: "", is_active: true };
+const EMPTY_FORM: MacroForm = {
+  title: "", content: "", shortcut: "", category: "", is_active: true,
+  media_file: null, media_type: null, media_path: null,
+};
 
 export default function MacrosTab() {
   return (
@@ -54,6 +62,7 @@ function MacrosList() {
   const [editingMacro, setEditingMacro] = useState<WhatsAppMacro | null>(null);
   const [form, setForm] = useState<MacroForm>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<WhatsAppMacro | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const openCreate = () => {
     setEditingMacro(null);
@@ -69,6 +78,9 @@ function MacrosList() {
       shortcut: macro.shortcut || "",
       category: macro.category || "",
       is_active: macro.is_active !== false,
+      media_type: macro.media_type ?? null,
+      media_path: macro.media_path ?? null,
+      media_file: null,
     });
     setDialogOpen(true);
   };
@@ -77,8 +89,31 @@ function MacrosList() {
     updateMacro({ id: macro.id, updates: { is_active: !macro.is_active } });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title.trim() || !form.content.trim()) return;
+
+    let mediaPath = form.media_path;
+    let mediaType = form.media_type;
+
+    if (form.media_file) {
+      setUploading(true);
+      const ext = form.media_file.name.split('.').pop() || 'bin';
+      const filePath = `macros/${tid}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(filePath, form.media_file, { upsert: false });
+      setUploading(false);
+      if (uploadErr) {
+        toast.error('Erro ao fazer upload: ' + uploadErr.message);
+        return;
+      }
+      mediaPath = filePath;
+    }
+
+    if (!form.media_file && !form.media_path) {
+      mediaPath = null;
+      mediaType = null;
+    }
 
     if (editingMacro) {
       updateMacro({
@@ -89,6 +124,8 @@ function MacrosList() {
           shortcut: form.shortcut.trim() || null,
           category: form.category.trim() || null,
           is_active: form.is_active,
+          media_type: mediaType,
+          media_path: mediaPath,
         },
       });
     } else {
@@ -100,6 +137,8 @@ function MacrosList() {
         tenant_id: tid,
         is_global: true,
         is_active: form.is_active,
+        media_type: mediaType,
+        media_path: mediaPath,
       });
     }
     setDialogOpen(false);
@@ -147,10 +186,16 @@ function MacrosList() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-sm truncate">{macro.title}</p>
                           {macro.is_active === false && (
                             <Badge variant="secondary" className="text-[10px]">Inativa</Badge>
+                          )}
+                          {macro.media_type && (
+                            <Badge variant="outline" className="text-[10px] gap-1">
+                              <Paperclip className="h-3 w-3" />
+                              {macro.media_type === 'image' ? 'Imagem' : macro.media_type === 'audio' ? 'Áudio' : macro.media_type === 'video' ? 'Vídeo' : 'Documento'}
+                            </Badge>
                           )}
                         </div>
                         {macro.shortcut && (
@@ -198,6 +243,53 @@ function MacrosList() {
               <Label>Conteúdo *</Label>
               <Textarea placeholder="Olá! Como posso ajudá-lo?" rows={4} value={form.content} onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))} />
             </div>
+
+            <div className="space-y-2">
+              <Label>Mídia (opcional)</Label>
+              {form.media_path && !form.media_file && (
+                <div className="flex items-center gap-2 p-2 border rounded bg-muted/30">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs truncate flex-1">{form.media_path.split('/').pop()}</span>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setForm(f => ({ ...f, media_path: null, media_type: null }))}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {form.media_file && (
+                <div className="flex items-center gap-2 p-2 border rounded bg-muted/30">
+                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs truncate flex-1">{form.media_file.name}</span>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setForm(f => ({ ...f, media_file: null }))}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {!form.media_path && !form.media_file && (
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*,audio/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    id="macro-media-input"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const type = file.type.startsWith('image/') ? 'image'
+                          : file.type.startsWith('audio/') ? 'audio'
+                          : file.type.startsWith('video/') ? 'video'
+                          : 'document';
+                        setForm(f => ({ ...f, media_file: file, media_type: type }));
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button variant="outline" size="sm" onClick={() => document.getElementById('macro-media-input')?.click()}>
+                    <Paperclip className="h-4 w-4 mr-1" /> Anexar mídia
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Atalho</Label>
@@ -218,8 +310,8 @@ function MacrosList() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleSave} disabled={isCreating || isUpdating || !form.title.trim() || !form.content.trim()}>
-              {(isCreating || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button onClick={handleSave} disabled={isCreating || isUpdating || uploading || !form.title.trim() || !form.content.trim()}>
+              {(isCreating || isUpdating || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}
               {editingMacro ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
