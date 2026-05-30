@@ -136,21 +136,23 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   return (
     <>
       <Card className={!isActive ? "opacity-70" : ""}>
-        <CardHeader>
+        <CardHeader className="p-3 pb-2">
           <div className="flex items-start justify-between gap-2">
             <div className="space-y-1 min-w-0">
-              <CardTitle className="flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-full shrink-0 ${getStatusColor()}`} />
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${getStatusColor()}`} />
                 <span className="truncate">{instance.display_name || instance.instance_name}</span>
               </CardTitle>
-              <Badge variant="outline" className="text-xs">
-                {instance.instance_name}
-              </Badge>
-              <Badge variant="secondary" className="text-xs ml-1">
-                {getProviderLabel()}
-              </Badge>
+              <div className="flex flex-wrap gap-1">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {instance.instance_name}
+                </Badge>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {getProviderLabel()}
+                </Badge>
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="flex flex-col items-end gap-0.5 shrink-0">
               <Switch
                 checked={isActive}
                 disabled={setActive.isPending}
@@ -164,39 +166,31 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3">
-          <div className="text-sm">
-            <span className="text-muted-foreground">Status:</span>{" "}
-            <span className="font-medium">{getStatusText()}</span>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Criado em {new Date(instance.created_at).toLocaleDateString("pt-BR")}
+        <CardContent className="p-3 pt-0 space-y-2">
+          <div className="text-xs flex items-center justify-between">
+            <span><span className="text-muted-foreground">Status:</span> <span className="font-medium">{getStatusText()}</span></span>
+            <span className="text-muted-foreground">{new Date(instance.created_at).toLocaleDateString("pt-BR")}</span>
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Link className="h-3.5 w-3.5" />
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Link className="h-3 w-3" />
               <span>Webhook:</span>
             </div>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-2 py-1.5 rounded text-xs break-all select-all font-mono">
+            <div className="flex items-center gap-1.5">
+              <code className="flex-1 bg-muted px-1.5 py-1 rounded text-[10px] truncate select-all font-mono">
                 {webhookUrl}
               </code>
-              <Button size="sm" variant="ghost" onClick={copyWebhookUrl} className="h-8 w-8 p-0 shrink-0">
-                <Copy className="h-3.5 w-3.5" />
+              <Button size="sm" variant="ghost" onClick={copyWebhookUrl} className="h-7 w-7 p-0 shrink-0">
+                <Copy className="h-3 w-3" />
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <div className="space-y-0.5">
-              <Label htmlFor={`ignore-groups-${instance.id}`} className="text-sm cursor-pointer">
-                Ignorar mensagens de grupos
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Mensagens de grupos (@g.us) não serão importadas
-              </p>
-            </div>
+          <div className="flex items-center justify-between pt-0.5">
+            <Label htmlFor={`ignore-groups-${instance.id}`} className="text-xs cursor-pointer">
+              Ignorar grupos (@g.us)
+            </Label>
             <Switch
               id={`ignore-groups-${instance.id}`}
               checked={instance.ignore_group_messages !== false}
@@ -206,15 +200,15 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
           </div>
         </CardContent>
 
-        <CardFooter className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testConnection.isPending || !isActive}>
-            <RefreshCw className={`h-4 w-4 ${testConnection.isPending ? "animate-spin" : ""}`} />
+        <CardFooter className="p-3 pt-0 flex gap-1.5">
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={handleTestConnection} disabled={testConnection.isPending || !isActive}>
+            <RefreshCw className={`h-3.5 w-3.5 ${testConnection.isPending ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)}>
-            <Pencil className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowEditDialog(true)}>
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
-            <Trash2 className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </CardFooter>
       </Card>
