@@ -81,7 +81,7 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="visao-geral">
-            <VisaoGeralTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
+            <VisaoGeralTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} mcData={mcData} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} />
           </TabsContent>
           <TabsContent value="crescimento">
             <CrescimentoTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} mcData={mcData} filters={filters} />
