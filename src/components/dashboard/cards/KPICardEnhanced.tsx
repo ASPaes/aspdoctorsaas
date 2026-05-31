@@ -163,3 +163,53 @@ function computeMarkerPosition(value: number, benchmark: BenchmarkZone[]): numbe
   }
   return 50;
 }
+
+/**
+ * Retorna a zona do benchmark em que o valor cai.
+ */
+function findCurrentZone(value: number, benchmark: BenchmarkZone[]): BenchmarkZone | null {
+  for (const zone of benchmark) {
+    const aboveMin = zone.range_min === undefined || value >= zone.range_min;
+    const belowMax = zone.range_max === undefined || value < zone.range_max;
+    if (aboveMin && belowMax) return zone;
+  }
+  return null;
+}
+
+/**
+ * Formata um número + unit conforme convenção do kpiHelp.
+ */
+function formatUnitValue(value: number, unit?: KpiUnit): string {
+  if (unit === 'meses') return `${value}m`;
+  if (unit === 'x') return `${value}x`;
+  if (unit === '%') return `${(value * 100).toFixed(0)}%`;
+  if (unit === 'R$') return `R$ ${value.toLocaleString('pt-BR')}`;
+  if (unit === 'pp') return `${value}pp`;
+  if (unit === 'pts') return `${value}`;
+  return `${value}`;
+}
+
+/**
+ * Retorna a string da meta a partir da zona OK do benchmark.
+ * Ex: "meta ≥ 40" (range_min) ou "meta ≤ 12m" (range_max) ou "meta 12–18m" (ambos).
+ */
+function formatMeta(benchmark: BenchmarkZone[], unit?: KpiUnit): string {
+  const okZone = benchmark.find((z) => z.status === 'ok');
+  if (!okZone) return '';
+  if (okZone.range_min !== undefined && okZone.range_max === undefined) {
+    return `meta ≥ ${formatUnitValue(okZone.range_min, unit)}`;
+  }
+  if (okZone.range_max !== undefined && okZone.range_min === undefined) {
+    return `meta ≤ ${formatUnitValue(okZone.range_max, unit)}`;
+  }
+  if (okZone.range_min !== undefined && okZone.range_max !== undefined) {
+    return `meta ${formatUnitValue(okZone.range_min, unit)}–${formatUnitValue(okZone.range_max, unit)}`;
+  }
+  return '';
+}
+
+function zoneLabelText(status: 'ok' | 'warn' | 'crit'): string {
+  if (status === 'ok') return 'OK';
+  if (status === 'warn') return 'Atenção';
+  return 'Crítico';
+}
