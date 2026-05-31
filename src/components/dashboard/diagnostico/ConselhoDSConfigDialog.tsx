@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Info, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { ConselhoDSPromptViewer } from './ConselhoDSPromptViewer';
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,17 @@ export function ConselhoDSConfigDialog({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [focoMes, setFocoMes] = useState('');
   const [tom, setTom] = useState<'executivo' | 'tecnico' | 'direto'>('executivo');
+  const [promptViewerOpen, setPromptViewerOpen] = useState(false);
+  const [disclaimerCollapsed, setDisclaimerCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('conselho-ds-disclaimer-collapsed') === 'true';
+  });
+
+  function toggleDisclaimer() {
+    const next = !disclaimerCollapsed;
+    setDisclaimerCollapsed(next);
+    try { localStorage.setItem('conselho-ds-disclaimer-collapsed', String(next)); } catch {}
+  }
 
   useEffect(() => {
     if (open) {
