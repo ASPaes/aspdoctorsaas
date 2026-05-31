@@ -115,6 +115,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Indica a eficiência financeira da operação. Meta saudável: acima de 60%. Abaixo de 30% é crítico.",
     formula: "MC Total ÷ MRR Total",
     example: "MC R$ 100.000 ÷ MRR R$ 150.000 = 66,7%",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 30%',   range_max: 0.30 },
+      { status: 'warn', label: 'Atenção', display: '30–60%',  range_min: 0.30, range_max: 0.60 },
+      { status: 'ok',   label: 'OK',      display: '≥ 60%',   range_min: 0.60 },
+    ],
+    how_to_improve: [
+      "Renegociar contratos com fornecedores (COGS)",
+      "Eliminar produtos/módulos com margem negativa",
+      "Aumentar pricing em segmentos premium",
+      "Automatizar operação para reduzir custo variável por cliente"
+    ],
   },
   mc_media_cliente: {
     title: "MC Média / Cliente",
