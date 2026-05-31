@@ -90,6 +90,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Percentual de receita recorrente perdida em relação ao MRR total.",
     why_it_matters: "Mais importante que churn de carteira: se perde clientes grandes, o impacto financeiro é maior.",
     formula: "MRR Cancelado ÷ (MRR Atual + MRR Cancelado)",
+    unit: "%",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 1%',    range_max: 0.01 },
+      { status: 'warn', label: 'Atenção', display: '1–3%',    range_min: 0.01, range_max: 0.03 },
+      { status: 'crit', label: 'Crítico', display: '> 3%',    range_min: 0.03 },
+    ],
+    how_to_improve: [
+      "Foco em retenção dos clientes Top 20 (impacto financeiro maior)",
+      "Análise de cancelados por ticket — clientes grandes saindo é crítico",
+      "Política de retenção diferenciada para contas de alto valor",
+      "Account managers dedicados para clientes acima de threshold"
+    ],
   },
   mc_total: {
     title: "MC Total (R$)",
