@@ -58,4 +58,4 @@ export function computeDiagnostico(
   };
 }
 
-export type { Diagnostico, DiagnosticoInput, DiagnosticoTab, Severity, DiagCause, DiagAction } from './types';
+export type { Diagnostico, DiagnosticoInput, DiagnosticoTab, Severity, DiagCause, DiagAction, ActionPriority } from './types';
