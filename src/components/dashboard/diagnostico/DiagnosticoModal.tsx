@@ -156,7 +156,20 @@ export function DiagnosticoModal({
               </div>
             </section>
           )}
+
+          {/* Conselho DS */}
+          {tenantId && tabKey && diagInput && isAdminOrHead && (
+            <ConselhoDSSection
+              tenantId={tenantId}
+              tabKey={tabKey}
+              diagInput={diagInput}
+              alertasFactuais={diagnostico}
+              filtrosAplicados={filtrosAplicados}
+              isAdmin={isAdmin}
+            />
+          )}
         </div>
+
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-7 py-4 border-t border-border bg-muted/30">
