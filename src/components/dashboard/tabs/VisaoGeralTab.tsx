@@ -13,6 +13,7 @@ import { DiagnosticoButton, DiagnosticoInlineCard, DiagnosticoModal } from '../d
 import { useCertA1Data } from '../hooks/useCertA1Data';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
+import { calcRuleOf40 } from '@/lib/dashboard-metrics';
 import kpiHelp from '@/lib/kpiHelp';
 import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
 import type { MargemContribuicaoData } from '../hooks/useMargemContribuicaoDashboard';
