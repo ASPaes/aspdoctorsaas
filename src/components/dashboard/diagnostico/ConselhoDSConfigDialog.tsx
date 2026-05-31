@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Sparkles, Info, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Wand2 } from 'lucide-react';
 import { ConselhoDSPromptViewer } from './ConselhoDSPromptViewer';
 import {
   Dialog,
@@ -27,8 +27,10 @@ import {
   useUpsertTenantConselhoConfig,
   type ConselhoPersonaPublica,
 } from './useTenantConselhoConfig';
+import { useConselhoAbaTemplate } from './useConselhoAbaTemplate';
+import { useConselhoSuggestFoco } from './useConselhoSuggestFoco';
+import { suggestPersonasForTab } from '@/lib/conselho-persona-suggestion';
 import { toast } from 'sonner';
-import { suggestFocoMes, type FocoSuggestInput } from '@/lib/foco-suggestion';
 
 interface ConselhoDSConfigDialogProps {
   tenantId: string;
@@ -36,7 +38,9 @@ interface ConselhoDSConfigDialogProps {
   isAdmin: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  diagInput?: FocoSuggestInput | null;
+  diagInput?: Record<string, any> | null;
+  alertasFactuais?: any;
+  filtrosAplicados?: any;
 }
 
 const TOM_OPTIONS: Array<{ value: 'executivo' | 'tecnico' | 'direto'; label: string }> = [
@@ -45,7 +49,7 @@ const TOM_OPTIONS: Array<{ value: 'executivo' | 'tecnico' | 'direto'; label: str
   { value: 'direto', label: 'Direto' },
 ];
 
-const MAX_PERSONAS = 3;
+const MAX_PERSONAS = 4;
 
 export function ConselhoDSConfigDialog({
   tenantId,
@@ -54,10 +58,14 @@ export function ConselhoDSConfigDialog({
   open,
   onOpenChange,
   diagInput,
+  alertasFactuais,
+  filtrosAplicados,
 }: ConselhoDSConfigDialogProps) {
   const { data: personas, isLoading: personasLoading } = useConselhoPersonasAtivas();
   const { data: config, isLoading: configLoading } = useTenantConselhoConfig(tenantId, tabKey);
   const upsert = useUpsertTenantConselhoConfig();
+  const { data: template } = useConselhoAbaTemplate(tenantId, tabKey, open);
+  const { suggest: suggestFoco, loading: focoLoading, error: focoError } = useConselhoSuggestFoco();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [focoMes, setFocoMes] = useState('');
@@ -89,7 +97,6 @@ export function ConselhoDSConfigDialog({
       arr.push(p);
       map.set(p.familia, arr);
     });
-    // ordena dentro do grupo
     map.forEach((arr) => arr.sort((a, b) => a.ordem - b.ordem));
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [personas]);
@@ -103,16 +110,43 @@ export function ConselhoDSConfigDialog({
     });
   }
 
-  const sugestao = useMemo(() => suggestFocoMes(diagInput ?? null, tabKey), [diagInput, tabKey]);
-
-  function handleSugerirFoco() {
+  function handleSugerirPersonas() {
     if (!isAdmin) return;
-    if (!sugestao) {
-      toast.info('Sem dados suficientes para sugerir um foco automático.');
+    const defaults = template?.personas_sugeridas_default ?? [];
+    const slugs = suggestPersonasForTab(diagInput ?? null, tabKey, defaults);
+    if (!personas || slugs.length === 0) {
+      toast.error('Não foi possível sugerir conselheiros agora.');
       return;
     }
-    setFocoMes(sugestao);
-    toast.success('Foco sugerido aplicado', { description: 'Você pode editar antes de salvar.' });
+    const ids = slugs.map(s => personas.find(p => p.slug === s)?.id).filter((x): x is string => !!x);
+    setSelectedIds(ids.slice(0, MAX_PERSONAS));
+    toast.success(`${ids.length} conselheiros sugeridos pelo Conselho DS`, {
+      description: 'Você pode trocar antes de continuar.',
+    });
+  }
+
+  async function handleSugerirFoco() {
+    if (!isAdmin) return;
+    if (selectedIds.length === 0) {
+      toast.error('Selecione ao menos 1 conselheiro antes de pedir sugestão de foco.');
+      return;
+    }
+    if (!diagInput) {
+      toast.error('Sem dados suficientes para gerar sugestão.');
+      return;
+    }
+    const r = await suggestFoco({
+      tenantId, tabKey,
+      dadosIndicadores: diagInput,
+      personaIds: selectedIds,
+      tom, alertasFactuais, filtrosAplicados,
+    });
+    if (r?.foco_sugerido) {
+      setFocoMes(r.foco_sugerido);
+      toast.success('Foco sugerido pelo Conselho DS', {
+        description: r.cache_hit ? 'Resultado de cache (sem custo).' : 'Você pode editar antes de salvar.',
+      });
+    }
   }
 
   async function handleSave() {
@@ -198,13 +232,40 @@ export function ConselhoDSConfigDialog({
               )}
             </div>
 
+            {/* Objetivo da análise */}
+            {template?.contexto_objetivo && (
+              <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm font-medium text-foreground">Objetivo da análise</span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {template.contexto_objetivo}
+                </p>
+              </div>
+            )}
+
             {/* Personas */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <Label className="text-sm">Conselheiros</Label>
-                <span className="text-xs text-muted-foreground">
-                  {selectedIds.length}/{MAX_PERSONAS} selecionados
-                </span>
+                <div className="flex items-center gap-2">
+                  {isAdmin && diagInput && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSugerirPersonas}
+                      className="h-7 px-2 text-xs text-primary hover:text-primary"
+                    >
+                      <Wand2 className="h-3.5 w-3.5" />
+                      Sugestão do Conselho DS
+                    </Button>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {selectedIds.length}/{MAX_PERSONAS} selecionados
+                  </span>
+                </div>
               </div>
               <div className="space-y-4 border border-border rounded-md p-3 max-h-72 overflow-y-auto">
                 {grupos.map(([familia, lista]) => (
@@ -258,16 +319,21 @@ export function ConselhoDSConfigDialog({
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="foco-mes" className="text-sm">Foco do mês</Label>
-                {isAdmin && sugestao && (
+                {isAdmin && diagInput && selectedIds.length > 0 && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={handleSugerirFoco}
+                    disabled={focoLoading}
                     className="h-7 px-2 text-xs text-primary hover:text-primary"
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Sugerir foco
+                    {focoLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    {focoLoading ? 'Conselho analisando...' : 'Sugerir foco'}
                   </Button>
                 )}
               </div>
@@ -275,13 +341,27 @@ export function ConselhoDSConfigDialog({
                 id="foco-mes"
                 value={focoMes}
                 onChange={(e) => setFocoMes(e.target.value)}
-                placeholder="Ex: reduzir churn, melhorar quick ratio... ou clique em 'Sugerir foco' pra usar os indicadores atuais"
-                rows={4}
-                disabled={!isAdmin}
+                placeholder="Descreva o foco do mês ou clique em 'Sugerir foco' pra que o Conselho DS gere uma sugestão baseada nos seus indicadores"
+                rows={6}
+                disabled={!isAdmin || focoLoading}
               />
-              {isAdmin && sugestao && !focoMes && (
+              {isAdmin && diagInput && !focoMes && selectedIds.length > 0 && !focoLoading && (
+                <p className="text-[11px] text-muted-foreground leading-relaxed flex items-start gap-1.5">
+                  <Sparkles className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                  Clique em "Sugerir foco" — o Conselho DS vai analisar seus indicadores e gerar um texto contextualizado (~R$ 0,15 de custo da IA, cache 24h).
+                </p>
+              )}
+              {isAdmin && selectedIds.length === 0 && (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  💡 O Conselho DS analisou seus números e tem uma sugestão pronta — clique em "Sugerir foco" acima.
+                  Selecione ao menos 1 conselheiro acima para liberar a sugestão automática.
+                </p>
+              )}
+              {focoError && (
+                <p className="text-[11px] text-destructive leading-relaxed">
+                  {focoError.code === 'ai_not_configured' && 'IA não configurada — vá em Configurações > IA.'}
+                  {focoError.code === 'rate_limit_exceeded' && 'Muitas tentativas. Aguarde alguns minutos.'}
+                  {focoError.code === 'forbidden' && 'Sem permissão pra sugerir foco.'}
+                  {!['ai_not_configured', 'rate_limit_exceeded', 'forbidden'].includes(focoError.code) && (focoError.message || 'Erro ao gerar sugestão.')}
                 </p>
               )}
             </div>
