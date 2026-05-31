@@ -159,6 +159,45 @@ export function ConselhoDSConfigDialog({
           </div>
         ) : (
           <div className="space-y-5">
+            {/* Disclaimer */}
+            <div className="rounded-md border border-border bg-muted/30 overflow-hidden">
+              <button
+                type="button"
+                onClick={toggleDisclaimer}
+                className="w-full flex items-center gap-2 p-3 text-left hover:bg-muted/60 transition-colors"
+              >
+                <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium text-foreground flex-1">
+                  Sobre o Conselho DS
+                </span>
+                {disclaimerCollapsed ? (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              {!disclaimerCollapsed && (
+                <div className="px-3 pb-3 space-y-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground leading-relaxed pt-2">
+                    As análises são geradas por inteligência artificial, com base em um prompt curado para empresas SaaS B2B. As personas são caracterizações construídas a partir de referências reconhecidas no mercado — os nomes citados representam apenas a linha de pensamento que inspira cada cadeira e não constituem endosso, parceria ou consultoria direta dessas pessoas.
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    O DoctorSaaS não se responsabiliza pelas recomendações geradas — use como apoio à decisão, não como única fonte. Toda análise consome créditos da IA configurada no seu tenant.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPromptViewerOpen(true)}
+                    className="h-7 text-xs"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver prompt completo
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Personas */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -197,6 +236,14 @@ export function ConselhoDSConfigDialog({
                               <p className="text-xs text-muted-foreground line-clamp-2">
                                 {p.bio_curta}
                               </p>
+                              {(p.referencia_publica_br || p.referencia_publica_int) && (
+                                <p className="text-[11px] italic text-muted-foreground mt-1 leading-relaxed">
+                                  Linha de pensamento baseada em referências como{' '}
+                                  <span className="text-foreground/90 font-medium not-italic">
+                                    {[p.referencia_publica_br, p.referencia_publica_int].filter(Boolean).join(' e ')}
+                                  </span>.
+                                </p>
+                              )}
                             </div>
                           </label>
                         );
@@ -270,6 +317,13 @@ export function ConselhoDSConfigDialog({
           )}
         </DialogFooter>
       </DialogContent>
+
+      <ConselhoDSPromptViewer
+        tenantId={tenantId}
+        tabKey={tabKey}
+        open={promptViewerOpen}
+        onOpenChange={setPromptViewerOpen}
+      />
     </Dialog>
   );
 }
