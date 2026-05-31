@@ -4,7 +4,7 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { KpiHelpPopover } from '../KpiHelpPopover';
 import { useTilt3D } from '@/hooks/useTilt3D';
 import kpiHelp from '@/lib/kpiHelp';
-import type { BenchmarkZone } from '@/lib/kpiHelp';
+import type { BenchmarkZone, KpiUnit } from '@/lib/kpiHelp';
 import './kpi-card.css';
 
 interface KPICardEnhancedProps {
