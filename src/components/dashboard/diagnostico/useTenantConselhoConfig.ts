@@ -21,6 +21,8 @@ export interface ConselhoPersonaPublica {
   avatar_url: string | null;
   especialidade_tags: string[];
   bio_curta: string;
+  referencia_publica_br: string | null;
+  referencia_publica_int: string | null;
   familia: string;
   ordem: number;
 }

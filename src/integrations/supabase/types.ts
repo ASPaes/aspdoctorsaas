@@ -1795,6 +1795,8 @@ export type Database = {
           nome_funcional: string
           nome_inspiracao: string | null
           ordem: number
+          referencia_publica_br: string | null
+          referencia_publica_int: string | null
           slug: string
           system_prompt_chunk: string
           updated_at: string
@@ -1812,6 +1814,8 @@ export type Database = {
           nome_funcional: string
           nome_inspiracao?: string | null
           ordem?: number
+          referencia_publica_br?: string | null
+          referencia_publica_int?: string | null
           slug: string
           system_prompt_chunk: string
           updated_at?: string
@@ -1829,6 +1833,8 @@ export type Database = {
           nome_funcional?: string
           nome_inspiracao?: string | null
           ordem?: number
+          referencia_publica_br?: string | null
+          referencia_publica_int?: string | null
           slug?: string
           system_prompt_chunk?: string
           updated_at?: string
@@ -6947,6 +6953,8 @@ export type Database = {
           id: string | null
           nome_funcional: string | null
           ordem: number | null
+          referencia_publica_br: string | null
+          referencia_publica_int: string | null
           slug: string | null
         }
         Insert: {
@@ -6958,6 +6966,8 @@ export type Database = {
           id?: string | null
           nome_funcional?: string | null
           ordem?: number | null
+          referencia_publica_br?: string | null
+          referencia_publica_int?: string | null
           slug?: string | null
         }
         Update: {
@@ -6969,6 +6979,8 @@ export type Database = {
           id?: string | null
           nome_funcional?: string | null
           ordem?: number | null
+          referencia_publica_br?: string | null
+          referencia_publica_int?: string | null
           slug?: string | null
         }
         Relationships: []
@@ -7581,6 +7593,17 @@ export type Database = {
           telefone_whatsapp: string
         }[]
       }
+      get_conselho_aba_template: {
+        Args: { p_tab_key: string; p_tenant_id: string }
+        Returns: {
+          custo_estimado_brl: number
+          display_label: string
+          max_tokens: number
+          output_format_prompt: string
+          prompt_principal: string
+          tab_key: string
+        }[]
+      }
       get_conselho_analise_detalhe: {
         Args: { p_id: string }
         Returns: {
@@ -7633,6 +7656,8 @@ export type Database = {
           id: string
           nome_funcional: string
           ordem: number
+          referencia_publica_br: string
+          referencia_publica_int: string
           slug: string
         }[]
       }
