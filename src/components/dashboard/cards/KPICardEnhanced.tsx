@@ -1,7 +1,11 @@
-import { ReactNode } from 'react';
+import { ReactNode, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { KpiHelpPopover } from '../KpiHelpPopover';
+import { useTilt3D } from '@/hooks/useTilt3D';
+import kpiHelp from '@/lib/kpiHelp';
+import type { BenchmarkZone } from '@/lib/kpiHelp';
+import './kpi-card.css';
 
 interface KPICardEnhancedProps {
   label: string;
@@ -17,12 +21,22 @@ interface KPICardEnhancedProps {
   /** Key from kpiHelp dictionary for rich contextual help */
   helpKey?: string;
   subtitle?: string;
+  /** Spatial UI: tilt 3D no hover (default true) */
+  enableTilt?: boolean;
+  /** Renderiza barra de benchmark quando helpKey + currentValue presentes (default true) */
+  showBenchmark?: boolean;
+  /** Valor numérico raw (não formatado) — usado para posicionar marker na range bar */
+  currentValue?: number;
 }
 
 export function KPICardEnhanced({
   label, value, trend, trendValue, icon, variant = 'dark',
   size = 'md', className, formula, helpKey, subtitle,
+  enableTilt = true, showBenchmark = true, currentValue,
 }: KPICardEnhancedProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  useTilt3D(cardRef, { enabled: enableTilt !== false });
+
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
   const trendColor = trend === 'up' ? 'text-green-600 dark:text-green-400' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
 
@@ -39,11 +53,29 @@ export function KPICardEnhanced({
   const valueSizes = { sm: 'text-xl', md: 'text-2xl', lg: 'text-3xl', tv: 'text-5xl' };
   const labelSizes = { sm: 'text-xs', md: 'text-xs', lg: 'text-sm', tv: 'text-lg' };
 
-  // Show help popover if helpKey or formula is provided
   const showHelp = helpKey || formula;
 
+  const helpEntry = helpKey ? kpiHelp[helpKey] : undefined;
+  const benchmark = helpEntry?.benchmark;
+  const shouldShowBenchmark =
+    showBenchmark !== false && !!benchmark && currentValue !== undefined && Number.isFinite(currentValue);
+
+  const markerPos = shouldShowBenchmark && benchmark && currentValue !== undefined
+    ? computeMarkerPosition(currentValue, benchmark)
+    : 50;
+
   return (
-    <div className={cn('rounded-xl transition-all duration-200 hover:scale-[1.01]', variantStyles[variant], sizeStyles[size], className)}>
+    <div
+      ref={cardRef}
+      className={cn(
+        'rounded-xl transition-all duration-200',
+        'kpi-spatial',
+        `kpi-spatial-${variant}`,
+        variantStyles[variant],
+        sizeStyles[size],
+        className,
+      )}
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>{label}</span>
@@ -55,6 +87,32 @@ export function KPICardEnhanced({
       </div>
       <div className="space-y-1">
         <p className={cn('font-bold', valueSizes[size], variant === 'dark' ? 'text-primary' : 'text-foreground')}>{value}</p>
+
+        {shouldShowBenchmark && benchmark && (
+          <div className="kpi-range">
+            <div className="kpi-range-bar">
+              {benchmark.map((zone, i) => {
+                const total = benchmark.length;
+                const fillWidth = `${100 / total}%`;
+                const fillLeft = `${(100 / total) * i}%`;
+                return (
+                  <div
+                    key={i}
+                    className={cn('kpi-range-fill', `kpi-range-fill-${zone.status}`)}
+                    style={{ left: fillLeft, width: fillWidth }}
+                  />
+                );
+              })}
+              <div className="kpi-range-marker" style={{ left: `${markerPos}%` }} />
+            </div>
+            <div className="kpi-range-labels">
+              {benchmark.map((zone, i) => (
+                <span key={i}>{zone.display}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {subtitle && <p className={cn('text-muted-foreground', labelSizes[size])}>{subtitle}</p>}
         {trend && trendValue && (
           <div className={cn('flex items-center gap-1', trendColor, labelSizes[size])}>
@@ -65,4 +123,29 @@ export function KPICardEnhanced({
       </div>
     </div>
   );
+}
+
+/**
+ * Calcula a posição em % do marker na range bar.
+ * Considera o benchmark como zonas equidistantes na barra visual.
+ */
+function computeMarkerPosition(value: number, benchmark: BenchmarkZone[]): number {
+  const segmentWidth = 100 / benchmark.length;
+  for (let i = 0; i < benchmark.length; i++) {
+    const zone = benchmark[i];
+    const min = zone.range_min;
+    const max = zone.range_max;
+    if (min !== undefined && max !== undefined) {
+      if (value >= min && value < max) {
+        const localPct = (value - min) / (max - min);
+        return Math.max(0, Math.min(100, i * segmentWidth + localPct * segmentWidth));
+      }
+    } else if (max !== undefined && value < max) {
+      const localPct = max > 0 ? value / max : 0;
+      return Math.max(0, Math.min(100, i * segmentWidth + localPct * segmentWidth));
+    } else if (min !== undefined && value >= min) {
+      return Math.max(0, Math.min(100, (i + 0.9) * segmentWidth));
+    }
+  }
+  return 50;
 }
