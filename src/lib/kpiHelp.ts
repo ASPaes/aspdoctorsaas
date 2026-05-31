@@ -72,6 +72,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Se o churn sobe, a empresa precisa vender cada vez mais só para manter o tamanho. Meta: < 2% ao mês.",
     formula: "Cancelamentos ÷ (Clientes Ativos + Cancelados)",
     example: "5 cancelamentos ÷ 200 base = 2,5%",
+    unit: "%",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 2%',    range_max: 0.02 },
+      { status: 'warn', label: 'Atenção', display: '2–5%',    range_min: 0.02, range_max: 0.05 },
+      { status: 'crit', label: 'Crítico', display: '> 5%',    range_min: 0.05 },
+    ],
+    how_to_improve: [
+      "Auditar causa-raiz dos cancelados do período (preço, produto, atendimento)",
+      "Health score com alertas antes do cancelamento",
+      "Programa de retenção com ofertas personalizadas",
+      "Melhorar onboarding para reduzir Early Churn"
+    ],
   },
   churn_rate_receita: {
     title: "Churn Rate (Receita)",
