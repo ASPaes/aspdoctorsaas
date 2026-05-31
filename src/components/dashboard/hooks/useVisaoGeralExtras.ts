@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
+import type { DashboardFilters } from '../types';
 
 export interface ComparativoMRR {
   /** Label do período de comparação, ex: "Q1 26" ou "S2 25" ou "maio 25" */
@@ -59,11 +60,17 @@ function monthYearLabel(date: Date): string {
  * Calcula Tenure Médio + comparativos temporais de MRR (Q/S/Ano) com sparklines.
  * NÃO substitui useDashboardData — é complementar.
  */
-export function useVisaoGeralExtras() {
+export function useVisaoGeralExtras(filters?: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
 
+  const unidadeBaseId = filters?.unidadeBaseId ?? null;
+  const fornecedorId = filters?.fornecedorId ?? null;
+  const dataReferencia = filters?.periodoFim
+    ? new Date(filters.periodoFim).toISOString().slice(0, 10)
+    : null;
+
   return useQuery({
-    queryKey: ['visao-geral-extras', tid],
+    queryKey: ['visao-geral-extras', tid, unidadeBaseId, fornecedorId, dataReferencia],
     enabled: !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<VisaoGeralExtras> => {
@@ -73,6 +80,9 @@ export function useVisaoGeralExtras() {
       const { data: seriesData, error: seriesError } = await supabase.rpc('get_mrr_monthly_snapshots', {
         p_tenant_id: tid,
         p_months_back: 12,
+        p_unidade_base_id: unidadeBaseId,
+        p_fornecedor_id: fornecedorId,
+        p_data_referencia: dataReferencia,
       });
 
       if (seriesError) {
@@ -87,6 +97,8 @@ export function useVisaoGeralExtras() {
       // ── Query 2: Tenure médio ──
       const { data: tenureData, error: tenureError } = await supabase.rpc('get_tenure_medio_meses', {
         p_tenant_id: tid,
+        p_unidade_base_id: unidadeBaseId,
+        p_fornecedor_id: fornecedorId,
       });
 
       if (tenureError) {

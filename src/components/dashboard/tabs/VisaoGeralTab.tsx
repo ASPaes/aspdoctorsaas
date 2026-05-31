@@ -14,7 +14,7 @@ import { useCertA1Data } from '../hooks/useCertA1Data';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import kpiHelp from '@/lib/kpiHelp';
-import type { KPIMetrics, TimeSeriesData } from '../types';
+import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
 import type { MargemContribuicaoData } from '../hooks/useMargemContribuicaoDashboard';
 
 interface VisaoGeralTabProps {
@@ -24,6 +24,7 @@ interface VisaoGeralTabProps {
   mcData?: MargemContribuicaoData;
   periodoInicio?: Date | null;
   periodoFim?: Date | null;
+  filters: DashboardFilters;
 }
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
@@ -63,11 +64,11 @@ function variantFromBenchmark(value: number, kpiKey: string): 'success' | 'warni
   return 'dark';
 }
 
-export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInicio, periodoFim }: VisaoGeralTabProps) {
+export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInicio, periodoFim, filters }: VisaoGeralTabProps) {
   const s = tvMode ? 'tv' : 'lg';
   const sMd = tvMode ? 'lg' : 'md';
   const { data: certA1, isLoading: certLoading, refetch: refetchCert } = useCertA1Data(periodoInicio || null, periodoFim || null);
-  const { data: extras } = useVisaoGeralExtras();
+  const { data: extras } = useVisaoGeralExtras(filters);
 
   const [diagOpen, setDiagOpen] = useState(false);
 
