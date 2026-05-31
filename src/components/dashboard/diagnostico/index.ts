@@ -9,3 +9,4 @@ export {
   useConselhoPersonasAtivas,
   useUpsertTenantConselhoConfig,
 } from './useTenantConselhoConfig';
+export { suggestFocoMes } from '@/lib/foco-suggestion';

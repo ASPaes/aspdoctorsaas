@@ -211,6 +211,7 @@ export function ConselhoDSSection({
         isAdmin={isAdmin}
         open={configOpen}
         onOpenChange={setConfigOpen}
+        diagInput={diagInput as any}
       />
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>

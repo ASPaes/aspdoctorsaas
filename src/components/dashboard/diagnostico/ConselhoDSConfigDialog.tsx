@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ import {
   type ConselhoPersonaPublica,
 } from './useTenantConselhoConfig';
 import { toast } from 'sonner';
+import { suggestFocoMes, type FocoSuggestInput } from '@/lib/foco-suggestion';
 
 interface ConselhoDSConfigDialogProps {
   tenantId: string;
@@ -34,6 +35,7 @@ interface ConselhoDSConfigDialogProps {
   isAdmin: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  diagInput?: FocoSuggestInput | null;
 }
 
 const TOM_OPTIONS: Array<{ value: 'executivo' | 'tecnico' | 'direto'; label: string }> = [
@@ -50,6 +52,7 @@ export function ConselhoDSConfigDialog({
   isAdmin,
   open,
   onOpenChange,
+  diagInput,
 }: ConselhoDSConfigDialogProps) {
   const { data: personas, isLoading: personasLoading } = useConselhoPersonasAtivas();
   const { data: config, isLoading: configLoading } = useTenantConselhoConfig(tenantId, tabKey);
@@ -86,6 +89,18 @@ export function ConselhoDSConfigDialog({
       if (prev.length >= MAX_PERSONAS) return prev;
       return [...prev, id];
     });
+  }
+
+  const sugestao = useMemo(() => suggestFocoMes(diagInput ?? null, tabKey), [diagInput, tabKey]);
+
+  function handleSugerirFoco() {
+    if (!isAdmin) return;
+    if (!sugestao) {
+      toast.info('Sem dados suficientes para sugerir um foco automático.');
+      return;
+    }
+    setFocoMes(sugestao);
+    toast.success('Foco sugerido aplicado', { description: 'Você pode editar antes de salvar.' });
   }
 
   async function handleSave() {
@@ -182,15 +197,34 @@ export function ConselhoDSConfigDialog({
 
             {/* Foco do mês */}
             <div className="space-y-2">
-              <Label htmlFor="foco-mes" className="text-sm">Foco do mês</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="foco-mes" className="text-sm">Foco do mês</Label>
+                {isAdmin && sugestao && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSugerirFoco}
+                    className="h-7 px-2 text-xs text-primary hover:text-primary"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Sugerir foco
+                  </Button>
+                )}
+              </div>
               <Textarea
                 id="foco-mes"
                 value={focoMes}
                 onChange={(e) => setFocoMes(e.target.value)}
-                placeholder="Ex: reduzir churn, melhorar quick ratio..."
-                rows={3}
+                placeholder="Ex: reduzir churn, melhorar quick ratio... ou clique em 'Sugerir foco' pra usar os indicadores atuais"
+                rows={4}
                 disabled={!isAdmin}
               />
+              {isAdmin && sugestao && !focoMes && (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  💡 O Conselho DS analisou seus números e tem uma sugestão pronta — clique em "Sugerir foco" acima.
+                </p>
+              )}
             </div>
 
             {/* Tom */}
