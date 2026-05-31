@@ -611,6 +611,65 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     formula: "MRR Atual ÷ COGS Atual",
     example: "MRR R$ 600 ÷ COGS R$ 200 = 3.0x",
   },
+  rule_of_40: {
+    title: "Rule of 40",
+    definition: "Soma do crescimento percentual com a margem de contribuição percentual. Métrica de saúde geral que junta crescimento + rentabilidade num único número.",
+    why_it_matters: "Padrão a16z/Bessemer para boards de SaaS. ≥ 40 = empresa saudável. Permite trocar crescimento por margem (e vice-versa) — uma SaaS crescendo 60% com MC -20% atinge a regra; outra com 10% de crescimento e 30% de MC também.",
+    formula: "Crescimento % do período + MC% Ponderada × 100",
+    example: "Growth +20% + MC% 25% = Rule of 40 = 45 (saudável)",
+    unit: "pts",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 20', range_max: 20 },
+      { status: 'warn', label: 'Atenção', display: '20–40', range_min: 20, range_max: 40 },
+      { status: 'ok',   label: 'OK',      display: '≥ 40', range_min: 40 },
+    ],
+    how_to_improve: [
+      "Aumentar receita recorrente: New MRR + Upsell + Cross-sell na base ativa",
+      "Reduzir COGS: renegociar fornecedores, automatizar operação, eliminar SKUs deficitários",
+      "Aumentar ARPA: revisão de pricing, packaging em tiers, módulos premium",
+      "Reduzir churn: health score proativo, programa de retenção, melhorar onboarding"
+    ],
+  },
+  tenure_medio: {
+    title: "Tenure Médio (meses)",
+    definition: "Tempo médio em meses que os clientes ativos estão na carteira, contado desde a primeira venda registrada.",
+    why_it_matters: "Indica maturidade da base. Tenure alto = receita previsível, NPS provavelmente bom, expansion provável. Tenure baixo = base instável ou empresa muito nova.",
+    formula: "AVG(EXTRACT(MONTH FROM AGE(now(), data_inicial))) dos clientes ativos · data_inicial = MIN(contratos.data_venda) com fallback clientes.data_cadastro",
+    example: "Base de 100 clientes com média de 24 meses cada → Tenure Médio = 24m",
+    unit: "meses",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 6m',   range_max: 6 },
+      { status: 'warn', label: 'Atenção', display: '6–18m',  range_min: 6, range_max: 18 },
+      { status: 'ok',   label: 'OK',      display: '≥ 18m',  range_min: 18 },
+    ],
+    how_to_improve: [
+      "Reduzir churn dos primeiros 90 dias (Early Churn) com onboarding estruturado",
+      "Aumentar percepção de valor com checkins regulares de CS",
+      "Identificar clientes em risco com health scoring antes de cancelarem",
+      "Programa de fidelização com benefícios escalonados por tempo de casa"
+    ],
+  },
+  mrr_vs_trimestre: {
+    title: "MRR vs Último Trimestre",
+    definition: "Comparativo do MRR atual com o MRR do trimestre anterior completo.",
+    why_it_matters: "Mostra a trajetória de médio prazo — suaviza ruído mensal e revela tendência consolidada.",
+    formula: "MRR atual − MRR no fim do trimestre anterior · Snapshot calculado via contratos ativos naquela data",
+    unit: "R$",
+  },
+  mrr_vs_semestre: {
+    title: "MRR vs Último Semestre",
+    definition: "Comparativo do MRR atual com o MRR do semestre anterior completo.",
+    why_it_matters: "Visão de médio-longo prazo — captura ciclos de negócio e impacto de mudanças estratégicas.",
+    formula: "MRR atual − MRR no fim do semestre anterior",
+    unit: "R$",
+  },
+  mrr_vs_ano: {
+    title: "MRR vs Ano Anterior",
+    definition: "Comparativo do MRR atual com o MRR de exatamente 12 meses atrás.",
+    why_it_matters: "Métrica YoY (Year over Year) — referência padrão para apresentações executivas, investidores e Rule of 40 anualizado.",
+    formula: "MRR atual − MRR de 12 meses atrás",
+    unit: "R$",
+  },
 };
 
 export default kpiHelp;
