@@ -284,19 +284,36 @@ export function useDashboardData(filters: DashboardFilters) {
         reativacoesQtd += 1;
       });
 
-      // Todos movimentos ativos até fim do período
+      // Todos movimentos ativos até fim do período (data_movimento usado para snapshots históricos)
       const todosMovimentosAtivos = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('cliente_id, valor_delta')
+        .select('cliente_id, valor_delta, data_movimento')
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
         .lte('data_movimento', periodoFimStr)));
 
       const movimentosPorCliente: Record<string, number> = {};
+      const movimentosPorClienteOrdenados: Record<string, Array<{ date: string; delta: number }>> = {};
       todosMovimentosAtivos?.forEach(m => {
-        movimentosPorCliente[m.cliente_id] = (movimentosPorCliente[m.cliente_id] || 0) + (Number(m.valor_delta) || 0);
+        const delta = Number(m.valor_delta) || 0;
+        movimentosPorCliente[m.cliente_id] = (movimentosPorCliente[m.cliente_id] || 0) + delta;
+        if (!movimentosPorClienteOrdenados[m.cliente_id]) movimentosPorClienteOrdenados[m.cliente_id] = [];
+        movimentosPorClienteOrdenados[m.cliente_id].push({ date: String(m.data_movimento), delta });
       });
+      Object.values(movimentosPorClienteOrdenados).forEach(arr => arr.sort((a, b) => a.date.localeCompare(b.date)));
+      // Helper: retorna o ajuste cumulativo de um cliente até uma data (inclusive).
+      // Usado pelo gráfico mensal para alinhar com o card MRR Atual (que soma todos os movimentos ativos).
+      const ajusteAteData = (clienteId: string, ate: string): number => {
+        const movs = movimentosPorClienteOrdenados[clienteId];
+        if (!movs) return 0;
+        let total = 0;
+        for (const m of movs) {
+          if (m.date > ate) break;
+          total += m.delta;
+        }
+        return total;
+      };
 
       let mrrTotalAtual = 0;
       const clientesComMrrAtual = (clientesAtivos || []).map(c => {
@@ -477,7 +494,8 @@ export function useDashboardData(filters: DashboardFilters) {
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
-        const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+        // MRR mensal = mensalidade base + ajustes de movimentos ativos até o fim do mês (alinha com card MRR Atual)
+        const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0) + ajusteAteData(c.id, m.end), 0);
         // Per-unit MRR for chart lines
         const mrrPoint: Record<string, string | number | undefined> = {
           month: m.month, monthFull: m.monthFull, value: mrrMes,
@@ -485,7 +503,9 @@ export function useDashboardData(filters: DashboardFilters) {
           ticketMedio: activosNoMes.length > 0 ? mrrMes / activosNoMes.length : 0,
         };
         (unidadesBase || []).forEach(u => {
-          const mrrU = activosNoMes.filter(c => c.unidade_base_id === u.id).reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+          const mrrU = activosNoMes
+            .filter(c => c.unidade_base_id === u.id)
+            .reduce((sum, c) => sum + (Number(c.mensalidade) || 0) + ajusteAteData(c.id, m.end), 0);
           mrrPoint[`mrr_${u.id}`] = mrrU;
         });
         mrrEvolution.push(mrrPoint as any);
