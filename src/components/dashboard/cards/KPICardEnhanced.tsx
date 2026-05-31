@@ -110,6 +110,20 @@ export function KPICardEnhanced({
                 <span key={i}>{zone.display}</span>
               ))}
             </div>
+            {(() => {
+              const zone = findCurrentZone(currentValue!, benchmark);
+              if (!zone) return null;
+              return (
+                <div className={cn('kpi-zone-pill', `kpi-zone-pill-${zone.status}`)}>
+                  <span className="kpi-pulse-dot" />
+                  {zoneLabelText(zone.status)}
+                  {(() => {
+                    const meta = formatMeta(benchmark, helpEntry?.unit);
+                    return meta ? ` · ${meta}` : null;
+                  })()}
+                </div>
+              );
+            })()}
           </div>
         )}
 
