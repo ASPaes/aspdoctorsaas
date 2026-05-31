@@ -131,4 +131,113 @@ export const RULES: DiagnosticoRule[] = [
     buildCause: (i) => `Churn de carteira = ${fmtPct(i.churnCarteira!)} (meta < 2% ao mês)`,
     actionIds: ['audit_cancellations', 'health_score_immediate', 'onboarding_overhaul'],
   },
+
+  // ═══════════ CRESCIMENTO ═══════════
+
+  // C1 — Net New MRR negativo (crítico)
+  {
+    id: 'cr_net_new_negative',
+    tab: 'crescimento',
+    severity: 'crit',
+    priority: 100,
+    match: (i) => {
+      const entrada = (i.newMrr ?? 0) + (i.upsellMrr ?? 0) + (i.crossSellMrr ?? 0) + (i.reativacaoMrr ?? 0);
+      const saida = (i.mrrCancelado ?? 0) + (i.downsellMrr ?? 0);
+      return saida > entrada && entrada >= 0;
+    },
+    buildCause: (i) => {
+      const entrada = (i.newMrr ?? 0) + (i.upsellMrr ?? 0) + (i.crossSellMrr ?? 0) + (i.reativacaoMrr ?? 0);
+      const saida = (i.mrrCancelado ?? 0) + (i.downsellMrr ?? 0);
+      return `Net New MRR negativo — entrada ${fmtBRL(entrada)} vs saída ${fmtBRL(saida)} (você está encolhendo)`;
+    },
+    actionIds: ['audit_cancellations', 'funnel_optimization', 'retention_playbook'],
+  },
+
+  // C2 — Net Logo Growth negativo (perde base)
+  {
+    id: 'cr_logo_growth_negative',
+    tab: 'crescimento',
+    severity: 'crit',
+    priority: 95,
+    match: (i) => i.netLogoGrowth !== undefined && i.netLogoGrowth < 0,
+    buildCause: (i) => `Net Logo Growth = ${i.netLogoGrowth!} — base de clientes encolheu no período`,
+    actionIds: ['audit_cancellations', 'funnel_optimization', 'onboarding_overhaul'],
+  },
+
+  // C3 — Burn Multiple crítico (eficiência ruim)
+  {
+    id: 'cr_burn_multiple_critical',
+    tab: 'crescimento',
+    severity: 'crit',
+    priority: 90,
+    match: (i) => i.burnMultiple !== undefined && i.burnMultiple > 2,
+    buildCause: (i) => `Burn Multiple = ${fmtX(i.burnMultiple!)} — gasta R$ ${i.burnMultiple!.toFixed(2)} em CAC para gerar R$ 1 de Net New (meta < 1x)`,
+    actionIds: ['freeze_cac_spend', 'sales_efficiency_audit', 'pricing_review'],
+  },
+
+  // C4 — Growth Persistence baixo (desaceleração forte)
+  {
+    id: 'cr_growth_decelerating_strong',
+    tab: 'crescimento',
+    severity: 'crit',
+    priority: 85,
+    match: (i) => i.growthPersistence !== undefined && i.growthPersistence < 0.5,
+    buildCause: (i) => `Growth Persistence = ${fmtX(i.growthPersistence!)} — crescimento desacelerou fortemente vs ano anterior`,
+    actionIds: ['growth_strategy_review', 'funnel_optimization', 'expansion_program_launch'],
+  },
+
+  // C5 — ARR Growth YoY baixo
+  {
+    id: 'cr_arr_growth_low',
+    tab: 'crescimento',
+    severity: 'warn',
+    priority: 70,
+    match: (i) => i.arrGrowthYoY !== undefined && i.arrGrowthYoY < 0.15,
+    buildCause: (i) => `ARR Growth YoY = ${fmtPct(i.arrGrowthYoY!)} (meta ≥ 30% para B2B SaaS estabelecida)`,
+    actionIds: ['growth_strategy_review', 'sales_efficiency_audit', 'expansion_program_launch'],
+  },
+
+  // C6 — Expansion Rate baixa (dependente de aquisição)
+  {
+    id: 'cr_expansion_starved',
+    tab: 'crescimento',
+    severity: 'warn',
+    priority: 65,
+    match: (i) => i.expansionRate !== undefined && i.expansionRate < 0.02,
+    buildCause: (i) => `Expansion Rate = ${fmtPct(i.expansionRate!)} — só ${fmtPct(i.expansionRate!)} do growth vem da base existente (meta ≥ 5%)`,
+    actionIds: ['expansion_program_launch', 'upsell_playbook', 'pricing_review'],
+  },
+
+  // C7 — Magic Number baixo (vendas ineficientes)
+  {
+    id: 'cr_magic_number_low',
+    tab: 'crescimento',
+    severity: 'warn',
+    priority: 60,
+    match: (i) => i.magicNumber !== undefined && i.magicNumber < 0.5,
+    buildCause: (i) => `Magic Number = ${fmtX(i.magicNumber!)} — máquina de vendas não devolve o investimento em CAC (meta ≥ 1x)`,
+    actionIds: ['sales_efficiency_audit', 'funnel_optimization', 'pricing_review'],
+  },
+
+  // C8 — Logo Growth Rate baixo (base estagnada)
+  {
+    id: 'cr_logo_growth_slow',
+    tab: 'crescimento',
+    severity: 'warn',
+    priority: 55,
+    match: (i) => i.logoGrowthRate !== undefined && i.logoGrowthRate >= 0 && i.logoGrowthRate < 0.01,
+    buildCause: (i) => `Logo Growth Rate = ${fmtPct(i.logoGrowthRate!)} / mês — base cresce muito devagar (meta ≥ 2%)`,
+    actionIds: ['funnel_optimization', 'sales_efficiency_audit'],
+  },
+
+  // C9 — GRR abaixo do ideal pra crescimento
+  {
+    id: 'cr_grr_below_growth_target',
+    tab: 'crescimento',
+    severity: 'warn',
+    priority: 50,
+    match: (i) => i.grr !== undefined && i.grr >= 0.75 && i.grr < 0.95,
+    buildCause: (i) => `GRR = ${fmtPct(i.grr!)} — vazamento estrutural reduz Net New (meta ≥ 95% pra crescer sem fricção)`,
+    actionIds: ['audit_cancellations', 'health_score_immediate', 'retention_playbook'],
+  },
 ];
