@@ -1,0 +1,110 @@
+/* ═══════════ Comparativos Temporais ═══════════ */
+
+.cmp-card {
+  position: relative;
+  background: linear-gradient(180deg, hsl(222 47% 13%) 0%, hsl(222 47% 10%) 100%);
+  border: 1px solid hsl(217 19% 27%);
+  border-radius: 14px;
+  padding: 20px 22px 22px;
+  overflow: hidden;
+}
+
+.cmp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.cmp-period {
+  font-size: 11px;
+  color: hsl(215 25% 60%);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cmp-period strong {
+  color: hsl(210 40% 98%);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cmp-arrow {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.cmp-arrow-down { background: hsl(0 84% 60% / 0.1); color: hsl(0 84% 60%); }
+.cmp-arrow-up { background: hsl(142 71% 45% / 0.1); color: hsl(142 71% 45%); }
+.cmp-arrow-flat { background: hsl(215 25% 60% / 0.1); color: hsl(215 25% 60%); }
+
+.cmp-now {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin-bottom: 6px;
+  background: linear-gradient(180deg, hsl(210 40% 100%) 0%, hsl(210 40% 90%) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.cmp-now-pref {
+  font-size: 16px;
+  color: hsl(215 25% 60%);
+  margin-right: 3px;
+  -webkit-text-fill-color: hsl(215 25% 60%);
+}
+
+.cmp-then {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: hsl(215 25% 60%);
+  margin-bottom: 14px;
+}
+.cmp-then-label {
+  color: hsl(215 16% 47%);
+  margin-right: 8px;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  font-family: 'Inter', sans-serif;
+}
+
+.cmp-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 500;
+}
+.cmp-delta-up { color: hsl(142 71% 45%); }
+.cmp-delta-down { color: hsl(0 84% 60%); }
+.cmp-delta-flat { color: hsl(215 25% 60%); }
+.cmp-delta-pct {
+  color: hsl(215 25% 60%);
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+}
+
+.cmp-track-svg {
+  width: 100%;
+  height: 36px;
+  margin-top: 12px;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmp-card { transition: none !important; }
+}
