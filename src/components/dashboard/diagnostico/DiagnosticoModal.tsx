@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Diagnostico, Severity, ActionPriority } from '@/lib/diagnostico';
+import { ConselhoDSSection } from './ConselhoDSSection';
 import './diagnostico.css';
 
 interface DiagnosticoModalProps {
@@ -11,7 +12,14 @@ interface DiagnosticoModalProps {
   onOpenChange: (open: boolean) => void;
   tabLabel?: string;
   onExportPDF?: () => void;
+  tenantId?: string;
+  tabKey?: string;
+  diagInput?: Record<string, any>;
+  filtrosAplicados?: any;
+  isAdmin?: boolean;
+  isAdminOrHead?: boolean;
 }
+
 
 function severityColor(sev: Severity): string {
   if (sev === 'crit') return 'hsl(0 84% 60%)';
