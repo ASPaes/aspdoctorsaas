@@ -7349,7 +7349,13 @@ export type Database = {
       }
       get_messages_projection: { Args: never; Returns: Json }
       get_mrr_monthly_snapshots: {
-        Args: { p_months_back?: number; p_tenant_id: string }
+        Args: {
+          p_data_referencia?: string
+          p_fornecedor_id?: number
+          p_months_back?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
         Returns: {
           data_corte: string
           mrr: number
@@ -7473,7 +7479,14 @@ export type Database = {
         }[]
       }
       get_tenants_projection: { Args: never; Returns: Json }
-      get_tenure_medio_meses: { Args: { p_tenant_id: string }; Returns: number }
+      get_tenure_medio_meses: {
+        Args: {
+          p_fornecedor_id?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: number
+      }
       get_today_metrics:
         | { Args: never; Returns: Json }
         | { Args: { p_tenant_id?: string }; Returns: Json }
