@@ -83,7 +83,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
 
   // ── Eficiência & Saúde ──
   const mcPercent = mcData?.mc_percent_ponderada ?? 0;
-  const ruleOf40 = (metrics.crescimentoPercent + mcPercent) * 100;
+  const ruleOf40 = calcRuleOf40(metrics.crescimentoPercent, mcPercent);
   const cacPayback = Number.isFinite(metrics.cacPayback) ? metrics.cacPayback : 0;
   const ltvCac = Number.isFinite(metrics.ltvCac) ? metrics.ltvCac : 0;
   const tenureMedio = extras?.tenureMedio ?? 0;
