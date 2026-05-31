@@ -494,7 +494,8 @@ export function useDashboardData(filters: DashboardFilters) {
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
         });
-        const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+        // MRR mensal = mensalidade base + ajustes de movimentos ativos até o fim do mês (alinha com card MRR Atual)
+        const mrrMes = activosNoMes.reduce((sum, c) => sum + (Number(c.mensalidade) || 0) + ajusteAteData(c.id, m.end), 0);
         // Per-unit MRR for chart lines
         const mrrPoint: Record<string, string | number | undefined> = {
           month: m.month, monthFull: m.monthFull, value: mrrMes,
@@ -502,7 +503,9 @@ export function useDashboardData(filters: DashboardFilters) {
           ticketMedio: activosNoMes.length > 0 ? mrrMes / activosNoMes.length : 0,
         };
         (unidadesBase || []).forEach(u => {
-          const mrrU = activosNoMes.filter(c => c.unidade_base_id === u.id).reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+          const mrrU = activosNoMes
+            .filter(c => c.unidade_base_id === u.id)
+            .reduce((sum, c) => sum + (Number(c.mensalidade) || 0) + ajusteAteData(c.id, m.end), 0);
           mrrPoint[`mrr_${u.id}`] = mrrU;
         });
         mrrEvolution.push(mrrPoint as any);
