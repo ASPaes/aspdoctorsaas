@@ -670,6 +670,189 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     formula: "MRR atual − MRR de 12 meses atrás",
     unit: "R$",
   },
+
+  // ── Crescimento V2 — Velocity ──
+
+  mrr_growth_rate_mom: {
+    title: "MRR Growth Rate (MoM)",
+    definition: "Taxa de crescimento do MRR mês a mês.",
+    why_it_matters: "Mostra o ritmo real de crescimento. Mensal é mais sensível que o crescimento do período — captura aceleração/desaceleração imediata. Estável e consistente é melhor que pico isolado.",
+    formula: "(MRR mês atual − MRR mês anterior) ÷ MRR mês anterior",
+    example: "MRR Mai R$ 156k vs Abr R$ 147k → +5.7% MoM",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 2%',  range_max: 0.02 },
+      { status: 'warn', label: 'Atenção', display: '2–5%',  range_min: 0.02, range_max: 0.05 },
+      { status: 'ok',   label: 'OK',      display: '≥ 5%',  range_min: 0.05 },
+    ],
+    how_to_improve: [
+      "Aumentar New MRR: revisar funil de vendas, qualificar leads, melhorar pricing",
+      "Reduzir Churn: alertas proativos de risco em CS, ofertas de retenção",
+      "Acelerar Expansion: campanhas de upsell programadas, cross-sell por uso de módulos",
+      "Reduzir Downsell: revisar política de downgrade (CS deve aprovar antes)"
+    ],
+  },
+
+  arr_growth_yoy: {
+    title: "ARR Growth (YoY)",
+    definition: "Crescimento percentual do ARR comparado ao mesmo mês do ano anterior.",
+    why_it_matters: "Métrica YoY é a referência padrão para investidores e boards. Captura crescimento real eliminando sazonalidade mensal. Padrão Bessemer/Battery: ≥30% YoY para B2B SaaS estabelecida; T2D3 (≥200%) para early-stage.",
+    formula: "(ARR atual − ARR de 12 meses atrás) ÷ ARR de 12 meses atrás",
+    example: "ARR R$ 1.87M vs R$ 1.58M ano passado → +18.3% YoY",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 15%',  range_max: 0.15 },
+      { status: 'warn', label: 'Atenção', display: '15–30%', range_min: 0.15, range_max: 0.30 },
+      { status: 'ok',   label: 'OK',      display: '≥ 30%',  range_min: 0.30 },
+    ],
+    how_to_improve: [
+      "Aumentar máquina de vendas: novos canais, expansão de SDRs, melhorar conversão",
+      "Aumentar ARPA: pricing tiers premium, packaging com módulos pagos",
+      "Acelerar expansão NRR > 110%: programa estruturado de upsell na base",
+      "Reduzir Logo Churn: o que sai por cancelamento freia o YoY no ano seguinte"
+    ],
+  },
+
+  growth_persistence: {
+    title: "Growth Persistence",
+    definition: "Razão entre o crescimento dos últimos 12 meses e o crescimento dos 12 meses anteriores. Métrica Bessemer Cloud Index.",
+    why_it_matters: "Indica se a empresa está acelerando, mantendo ou desacelerando seu crescimento ano após ano. Empresas de classe mundial mantêm ≥ 0.8 (deceleração natural mas controlada). Abaixo de 0.5 = desaceleração forte.",
+    formula: "(Growth últimos 12m) ÷ (Growth dos 12m anteriores) · Precisa de 24 meses de série histórica",
+    example: "Growth ano corrente +18% / Growth ano anterior +20% → Persistence = 0.9 (mantendo)",
+    unit: "x",
+    benchmark: [
+      { status: 'crit', label: 'Crítico',     display: '< 0.5',     range_max: 0.5 },
+      { status: 'warn', label: 'Desacelerando', display: '0.5–1',    range_min: 0.5, range_max: 1 },
+      { status: 'ok',   label: 'Mantendo+',     display: '≥ 1',      range_min: 1 },
+    ],
+    how_to_improve: [
+      "Investir em novos canais de aquisição antes que os atuais saturarem",
+      "Expandir TAM com novos segmentos ou geografias",
+      "Aumentar ARPA via verticalização e pricing premium",
+      "Programa estruturado de NRR > 110% para crescer dentro da base"
+    ],
+  },
+
+  // ── Crescimento V2 — Composition ──
+
+  expansion_rate: {
+    title: "Expansion Rate (mensal)",
+    definition: "Percentual do MRR adicionado no mês que veio da BASE EXISTENTE (upsell + cross-sell + reativação + reajuste) — não de novas vendas.",
+    why_it_matters: "Distingue 'crescer pela porta da frente' (caro, novo cliente) de 'crescer dentro de casa' (barato, expansão). SaaS B2B saudável tem ≥5% mensal de expansion. Empresas pré-IPO tipo Snowflake/Datadog rodam 20%+.",
+    formula: "(Upsell + Cross + Reativação + Reajuste) ÷ MRR_início_período",
+    example: "Expansion R$ 3.5k ÷ MRR R$ 150k = 2.3% (abaixo da meta)",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 2%',  range_max: 0.02 },
+      { status: 'warn', label: 'Atenção', display: '2–5%',  range_min: 0.02, range_max: 0.05 },
+      { status: 'ok',   label: 'OK',      display: '≥ 5%',  range_min: 0.05 },
+    ],
+    how_to_improve: [
+      "Mapear módulos premium do produto e oferecer upsell ativo no aniversário do contrato",
+      "Cross-sell sistemático por gatilho de uso (cliente usa X há 6 meses → ofertar Y)",
+      "Política de reajuste anual indexado (IPCA + bônus por NPS alto)",
+      "Programa de reativação de cancelados com oferta personalizada"
+    ],
+  },
+
+  reativacoes_periodo: {
+    title: "Reativações no Período",
+    definition: "Quantidade de clientes que voltaram após cancelamento + MRR recuperado.",
+    why_it_matters: "Alavanca de growth subestimada. Custa muito menos que aquisição nova (cliente já conhece o produto) e tem maior conversão. Empresas que medem e otimizam reativação têm NRR mais alto.",
+    formula: "COUNT(clientes que reativaram no período) · Σ MRR dos contratos reativados",
+    example: "4 logos reativados · +R$ 480 recuperados no mês",
+  },
+
+  // ── Crescimento V2 — Acquisition ──
+
+  net_logo_growth: {
+    title: "Net Logo Growth",
+    definition: "Variação líquida de clientes no período: novos menos cancelados, em valor absoluto.",
+    why_it_matters: "Crescer em receita mas perder logos é sinal de concentração. Crescer em logos sem ticket é sinal de comoditização. Os dois (MRR e logo) precisam acompanhar.",
+    formula: "Novos Clientes − Cancelados (no período)",
+    example: "18 novos − 6 cancelados = +12 logos",
+  },
+
+  logo_growth_rate: {
+    title: "Logo Growth Rate (mensal)",
+    definition: "Taxa de crescimento percentual da base de clientes (logos), independente do ticket.",
+    why_it_matters: "Mede crescimento da base ativa. Ajuda a separar 'cresci porque vendi mais caro' (ticket subindo) de 'cresci porque ganhei mais clientes' (logo subindo).",
+    formula: "(Novos − Cancelados) ÷ Base no início do período",
+    example: "+12 logos ÷ 651 base = 1.8% / mês",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 1%',  range_max: 0.01 },
+      { status: 'warn', label: 'Atenção', display: '1–2%',  range_min: 0.01, range_max: 0.02 },
+      { status: 'ok',   label: 'OK',      display: '≥ 2%',  range_min: 0.02 },
+    ],
+    how_to_improve: [
+      "Aumentar volume de leads qualificados no funil",
+      "Melhorar taxa de conversão de demo → contrato fechado",
+      "Reduzir churn de logos (não só de receita) — pequenos cancelam tanto quanto grandes",
+      "Programa de indicação ativa (cliente atual traz cliente novo)"
+    ],
+  },
+
+  arpa_novo_vs_base: {
+    title: "ARPA: Novo vs Base",
+    definition: "Comparativo entre o ticket médio dos clientes novos do período e o ticket médio da base ativa.",
+    why_it_matters: "Ratio > 1 = price realization positiva (você está vendendo mais caro do que a média da base atual). Ratio < 1 = comoditização ou descontos agressivos. Tendência fundamental para validar se mudanças de pricing estão funcionando.",
+    formula: "ARPA Novos = New MRR ÷ Novos Clientes · ARPA Base = MRR Atual ÷ Clientes Ativos · Ratio = Novos ÷ Base",
+    example: "ARPA Novos R$ 510 ÷ ARPA Base R$ 240 = 2.1x (price realization positiva)",
+  },
+
+  // ── Crescimento V2 — Efficiency ──
+
+  burn_multiple: {
+    title: "Burn Multiple",
+    definition: "Quanto a empresa gasta em CAC para cada R$ de Net New MRR gerado. Métrica de eficiência de capital criada por David Sacks (Craft Ventures) em 2022.",
+    why_it_matters: "Substitui o Magic Number como métrica principal pós-2022. Em ambientes de capital caro, Burn Multiple < 1x é o que diferencia empresas que escalam de forma saudável. Burn Multiple > 2x = a empresa está queimando mais do que gera.",
+    formula: "CAC Burn ÷ Net New MRR · Só faz sentido quando Net New MRR > 0",
+    example: "CAC R$ 11.788 ÷ Net New R$ 8.420 = 1.4x (atenção — gasta R$ 1,40 pra gerar R$ 1 de Net New)",
+    unit: "x",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 1x',  range_max: 1 },
+      { status: 'warn', label: 'Atenção', display: '1–2x',  range_min: 1, range_max: 2 },
+      { status: 'crit', label: 'Crítico', display: '≥ 2x',  range_min: 2 },
+    ],
+    how_to_improve: [
+      "Reduzir CAC Burn: cortar canais com pior CPL, automatizar SDR, focar em ICP claro",
+      "Aumentar Net New MRR: vender ticket maior, acelerar fechamento, reduzir churn",
+      "Aumentar Expansion: cada R$ de upsell tem Burn Multiple ~0 (custo marginal mínimo)",
+      "Revisar pricing: subir o ARPA dos novos clientes melhora o numerador sem aumentar denominador"
+    ],
+  },
+
+  magic_number: {
+    title: "Magic Number",
+    definition: "Eficiência da máquina de vendas: quanto de ARR é gerado para cada R$ gasto em CAC. Criada por Mamoon Hamid (Kleiner Perkins).",
+    why_it_matters: "Indica se vale acelerar ou frear o investimento em vendas. ≥1 = pisa no acelerador (cada R$ em CAC vira ≥R$ 1 em ARR). <0.5 = pisa no freio (não vale o esforço). 0.5-1 = OK, mas otimize.",
+    formula: "(Net New MRR × 12) ÷ CAC Burn",
+    example: "(R$ 8.420 × 12) ÷ R$ 123k = 0.82 (atenção — abaixo de 1)",
+    unit: "x",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 0.5',  range_max: 0.5 },
+      { status: 'warn', label: 'Atenção', display: '0.5–1',  range_min: 0.5, range_max: 1 },
+      { status: 'ok',   label: 'OK',      display: '≥ 1',    range_min: 1 },
+    ],
+    how_to_improve: [
+      "Aumentar produtividade de SDRs/closers: treinamento + ferramentas + scripts",
+      "Reduzir tempo médio de ciclo de venda — receita começa a contar antes",
+      "Subir Net New MRR sem subir CAC: vendas inbound mais eficientes que outbound",
+      "Reduzir downsell e churn: melhora o numerador (Net New) sem mexer no denominador"
+    ],
+  },
+
+  // ── Crescimento V2 — Visualização ──
+
+  mrr_forecast_90d: {
+    title: "Forecast MRR (próximos 90 dias)",
+    definition: "Projeção do MRR para os próximos 3 meses baseada em regressão linear sobre os últimos 12 meses de série histórica.",
+    why_it_matters: "Permite antecipar a trajetória de MRR e validar se os planos de growth (vendas + retenção) sustentam a projeção. R² alto = série bem comportada, projeção confiável. R² baixo = MRR oscila muito, projeção tem incerteza maior.",
+    formula: "Regressão linear (método dos mínimos quadrados) sobre Σ MRR mensal dos últimos 12 meses · Projeção de 3 pontos à frente",
+    example: "Série [120k, 125k, 132k, ..., 156k] → projeção 162k, 168k, 174k com R² = 0.94",
+  },
+
 };
 
 export default kpiHelp;
