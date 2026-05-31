@@ -51,7 +51,14 @@ export function DiagnosticoModal({
   onOpenChange,
   tabLabel = 'Visão geral',
   onExportPDF,
+  tenantId,
+  tabKey,
+  diagInput,
+  filtrosAplicados,
+  isAdmin = false,
+  isAdminOrHead = false,
 }: DiagnosticoModalProps) {
+
   const { severity, headline, causes, actions, generatedAt, alertCount } = diagnostico;
   const color = severityColor(severity);
   const generatedDate = new Date(generatedAt).toLocaleString('pt-BR', {
