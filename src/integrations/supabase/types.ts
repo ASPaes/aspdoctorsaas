@@ -1641,6 +1641,201 @@ export type Database = {
           },
         ]
       }
+      conselho_aba_templates: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          custo_estimado_brl: number
+          data_schema_json: Json
+          display_label: string
+          max_tokens: number
+          output_format_prompt: string
+          prompt_principal: string
+          tab_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          custo_estimado_brl?: number
+          data_schema_json?: Json
+          display_label: string
+          max_tokens?: number
+          output_format_prompt: string
+          prompt_principal: string
+          tab_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          custo_estimado_brl?: number
+          data_schema_json?: Json
+          display_label?: string
+          max_tokens?: number
+          output_format_prompt?: string
+          prompt_principal?: string
+          tab_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      conselho_analises: {
+        Row: {
+          alertas_factuais: Json
+          cache_hit_de: string | null
+          custo_estimado_usd: number | null
+          dados_snapshot: Json
+          duracao_ms: number | null
+          error_message: string | null
+          expires_at: string
+          filtros_aplicados: Json
+          foco_mes: string | null
+          id: string
+          input_hash: string
+          model_usado: string | null
+          output_markdown: string | null
+          personas_ids: string[]
+          personas_snapshot: Json
+          prompt_final: string
+          provider_usado: string | null
+          solicitado_em: string
+          solicitado_por: string | null
+          status: string
+          tab_key: string
+          tenant_id: string
+          tokens_in: number | null
+          tokens_out: number | null
+          tom: string | null
+        }
+        Insert: {
+          alertas_factuais?: Json
+          cache_hit_de?: string | null
+          custo_estimado_usd?: number | null
+          dados_snapshot: Json
+          duracao_ms?: number | null
+          error_message?: string | null
+          expires_at: string
+          filtros_aplicados?: Json
+          foco_mes?: string | null
+          id?: string
+          input_hash: string
+          model_usado?: string | null
+          output_markdown?: string | null
+          personas_ids?: string[]
+          personas_snapshot?: Json
+          prompt_final: string
+          provider_usado?: string | null
+          solicitado_em?: string
+          solicitado_por?: string | null
+          status?: string
+          tab_key: string
+          tenant_id: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tom?: string | null
+        }
+        Update: {
+          alertas_factuais?: Json
+          cache_hit_de?: string | null
+          custo_estimado_usd?: number | null
+          dados_snapshot?: Json
+          duracao_ms?: number | null
+          error_message?: string | null
+          expires_at?: string
+          filtros_aplicados?: Json
+          foco_mes?: string | null
+          id?: string
+          input_hash?: string
+          model_usado?: string | null
+          output_markdown?: string | null
+          personas_ids?: string[]
+          personas_snapshot?: Json
+          prompt_final?: string
+          provider_usado?: string | null
+          solicitado_em?: string
+          solicitado_por?: string | null
+          status?: string
+          tab_key?: string
+          tenant_id?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tom?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conselho_analises_cache_hit_de_fkey"
+            columns: ["cache_hit_de"]
+            isOneToOne: false
+            referencedRelation: "conselho_analises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conselho_analises_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conselho_personas: {
+        Row: {
+          ativo: boolean
+          avatar_url: string | null
+          bio_curta: string
+          created_at: string
+          created_by: string | null
+          especialidade_tags: string[]
+          familia: string
+          id: string
+          nome_funcional: string
+          nome_inspiracao: string | null
+          ordem: number
+          slug: string
+          system_prompt_chunk: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          avatar_url?: string | null
+          bio_curta: string
+          created_at?: string
+          created_by?: string | null
+          especialidade_tags?: string[]
+          familia?: string
+          id?: string
+          nome_funcional: string
+          nome_inspiracao?: string | null
+          ordem?: number
+          slug: string
+          system_prompt_chunk: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          avatar_url?: string | null
+          bio_curta?: string
+          created_at?: string
+          created_by?: string | null
+          especialidade_tags?: string[]
+          familia?: string
+          id?: string
+          nome_funcional?: string
+          nome_inspiracao?: string | null
+          ordem?: number
+          slug?: string
+          system_prompt_chunk?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       contrato_eventos: {
         Row: {
           acao: string
@@ -4960,6 +5155,54 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_conselho_config: {
+        Row: {
+          cache_horas: number
+          foco_mes: string | null
+          persona_ids: string[]
+          tab_key: string
+          tenant_id: string
+          tom: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cache_horas?: number
+          foco_mes?: string | null
+          persona_ids?: string[]
+          tab_key: string
+          tenant_id: string
+          tom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cache_horas?: number
+          foco_mes?: string | null
+          persona_ids?: string[]
+          tab_key?: string
+          tenant_id?: string
+          tom?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_conselho_config_tab_key_fkey"
+            columns: ["tab_key"]
+            isOneToOne: false
+            referencedRelation: "conselho_aba_templates"
+            referencedColumns: ["tab_key"]
+          },
+          {
+            foreignKeyName: "tenant_conselho_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_daily_metrics: {
         Row: {
           active_operators: number
@@ -6694,6 +6937,42 @@ export type Database = {
       }
     }
     Views: {
+      conselho_personas_publicas: {
+        Row: {
+          ativo: boolean | null
+          avatar_url: string | null
+          bio_curta: string | null
+          especialidade_tags: string[] | null
+          familia: string | null
+          id: string | null
+          nome_funcional: string | null
+          ordem: number | null
+          slug: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          avatar_url?: string | null
+          bio_curta?: string | null
+          especialidade_tags?: string[] | null
+          familia?: string | null
+          id?: string | null
+          nome_funcional?: string | null
+          ordem?: number | null
+          slug?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          avatar_url?: string | null
+          bio_curta?: string | null
+          especialidade_tags?: string[] | null
+          familia?: string | null
+          id?: string | null
+          nome_funcional?: string | null
+          ordem?: number | null
+          slug?: string | null
+        }
+        Relationships: []
+      }
       v_whatsapp_conversations_state: {
         Row: {
           attendance_assigned_to: string | null
@@ -6921,6 +7200,24 @@ export type Database = {
         }
         Returns: string
       }
+      admin_list_conselho_personas: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          avatar_url: string
+          bio_curta: string
+          created_at: string
+          especialidade_tags: string[]
+          familia: string
+          id: string
+          nome_funcional: string
+          nome_inspiracao: string
+          ordem: number
+          slug: string
+          system_prompt_chunk: string
+          updated_at: string
+        }[]
+      }
       admin_swap_cliente_produto: {
         Args: {
           p_cliente_produto_id: string
@@ -6978,6 +7275,10 @@ export type Database = {
       can_access_monitor: { Args: never; Returns: boolean }
       can_access_tenant_row: { Args: { row_tenant: string }; Returns: boolean }
       can_invite_more_users: { Args: { p_tenant: string }; Returns: boolean }
+      can_request_conselho_analise: {
+        Args: { p_tenant_id: string }
+        Returns: boolean
+      }
       cancel_cliente_produto: {
         Args: {
           p_cliente_produto_id: string
@@ -7280,6 +7581,71 @@ export type Database = {
           telefone_whatsapp: string
         }[]
       }
+      get_conselho_analise_detalhe: {
+        Args: { p_id: string }
+        Returns: {
+          alertas_factuais: Json
+          cache_hit_de: string
+          custo_estimado_usd: number
+          dados_snapshot: Json
+          duracao_ms: number
+          error_message: string
+          filtros_aplicados: Json
+          foco_mes: string
+          id: string
+          model_usado: string
+          output_markdown: string
+          personas_snapshot: Json
+          prompt_final: string
+          provider_usado: string
+          solicitado_em: string
+          solicitado_por: string
+          status: string
+          tab_key: string
+          tenant_id: string
+          tokens_in: number
+          tokens_out: number
+          tom: string
+        }[]
+      }
+      get_conselho_cache: {
+        Args: { p_input_hash: string; p_tab_key: string; p_tenant_id: string }
+        Returns: {
+          custo_estimado_usd: number
+          dados_snapshot: Json
+          expires_at: string
+          id: string
+          model_usado: string
+          output_markdown: string
+          personas_snapshot: Json
+          solicitado_em: string
+          tokens_in: number
+          tokens_out: number
+        }[]
+      }
+      get_conselho_personas_ativas: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          bio_curta: string
+          especialidade_tags: string[]
+          familia: string
+          id: string
+          nome_funcional: string
+          ordem: number
+          slug: string
+        }[]
+      }
+      get_conselho_personas_with_prompts: {
+        Args: { p_persona_ids: string[] }
+        Returns: {
+          bio_curta: string
+          id: string
+          nome_funcional: string
+          slug: string
+          system_prompt_chunk: string
+        }[]
+      }
       get_csat_report_list: {
         Args: {
           p_agent_id?: string
@@ -7451,6 +7817,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_tenant_conselho_config: {
+        Args: { p_tab_key: string; p_tenant_id: string }
+        Returns: {
+          cache_horas: number
+          foco_mes: string
+          persona_ids: string[]
+          tab_key: string
+          template_ativo: boolean
+          template_custo_brl: number
+          template_existe: boolean
+          tenant_id: string
+          tom: string
+          updated_at: string
+        }[]
+      }
       get_tenant_departments: {
         Args: never
         Returns: {
@@ -7523,6 +7904,29 @@ export type Database = {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
       }
+      list_conselho_analises: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_tab_key?: string
+          p_tenant_id: string
+        }
+        Returns: {
+          cache_hit: boolean
+          custo_estimado_usd: number
+          foco_mes: string
+          id: string
+          model_usado: string
+          solicitado_em: string
+          solicitado_por: string
+          solicitado_por_email: string
+          status: string
+          tab_key: string
+          tokens_in: number
+          tokens_out: number
+          tom: string
+        }[]
+      }
       mark_all_mentions_seen: { Args: never; Returns: undefined }
       mark_all_notifications_read: { Args: never; Returns: undefined }
       mark_conversation_notifications_read: {
@@ -7569,6 +7973,33 @@ export type Database = {
       reativar_contrato: {
         Args: { p_contrato_id: string; p_observacao?: string }
         Returns: Json
+      }
+      register_conselho_analise: {
+        Args: {
+          p_alertas_factuais: Json
+          p_cache_hit_de?: string
+          p_cache_horas: number
+          p_custo_estimado_usd: number
+          p_dados_snapshot: Json
+          p_duracao_ms: number
+          p_error_message: string
+          p_filtros_aplicados: Json
+          p_foco_mes: string
+          p_input_hash: string
+          p_model_usado: string
+          p_output_markdown: string
+          p_personas_ids: string[]
+          p_personas_snapshot: Json
+          p_prompt_final: string
+          p_provider_usado: string
+          p_status: string
+          p_tab_key: string
+          p_tenant_id: string
+          p_tokens_in: number
+          p_tokens_out: number
+          p_tom: string
+        }
+        Returns: string
       }
       require_active_profile: { Args: never; Returns: boolean }
       reset_tenant_permissions_to_default: {
@@ -7796,6 +8227,17 @@ export type Database = {
           p_ticket_id: string
         }
         Returns: string
+      }
+      upsert_tenant_conselho_config: {
+        Args: {
+          p_cache_horas?: number
+          p_foco_mes?: string
+          p_persona_ids: string[]
+          p_tab_key: string
+          p_tenant_id: string
+          p_tom?: string
+        }
+        Returns: undefined
       }
       validate_access_invite: {
         Args: { p_invite_id: string }
