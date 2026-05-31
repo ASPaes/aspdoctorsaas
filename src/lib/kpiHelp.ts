@@ -1,9 +1,24 @@
+export type BenchmarkStatus = 'ok' | 'warn' | 'crit';
+
+export interface BenchmarkZone {
+  status: BenchmarkStatus;
+  label: string;
+  display: string;
+  range_min?: number;
+  range_max?: number;
+}
+
+export type KpiUnit = 'meses' | 'x' | '%' | 'R$' | 'pp' | 'count' | 'pts';
+
 export interface KpiHelpEntry {
   title: string;
   definition: string;
   why_it_matters: string;
   formula: string;
   example?: string;
+  unit?: KpiUnit;
+  benchmark?: BenchmarkZone[];
+  how_to_improve?: string[];
 }
 
 const kpiHelp: Record<string, KpiHelpEntry> = {
