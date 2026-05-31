@@ -46,7 +46,7 @@ export function computeDiagnostico(
     .map((aid) => ACTIONS[aid])
     .filter((a): a is NonNullable<typeof a> => a !== undefined);
 
-  const headline = buildHeadline(input, severity);
+  const headline = buildHeadline(input, severity, tab);
 
   return {
     severity,

@@ -1,10 +1,43 @@
-import type { DiagnosticoInput, Severity } from './types';
+import type { DiagnosticoInput, DiagnosticoTab, Severity } from './types';
 
 /**
  * Seleciona a melhor headline para o estado atual.
- * Prioridade: padrões de problema agudo > padrões mistos > padrões saudáveis.
+ * Prioridade: padrões específicos da aba > padrões genéricos de problema > padrões saudáveis.
  */
-export function buildHeadline(input: DiagnosticoInput, severity: Severity): string {
+export function buildHeadline(
+  input: DiagnosticoInput,
+  severity: Severity,
+  tab?: DiagnosticoTab,
+): string {
+  // ─── Padrões específicos da aba Crescimento ───
+  if (tab === 'crescimento') {
+    // Crescimento dependente de aquisição (expansion fraca + R40 baixo)
+    if (
+      input.expansionRate !== undefined && input.expansionRate < 0.02 &&
+      input.ruleOf40 !== undefined && input.ruleOf40 < 40
+    ) {
+      return `Crescimento sustentado, mas dependente de aquisição. Sem expansão da base, cada mês exige reposição completa via novas vendas.`;
+    }
+    // Máquina cara de crescimento (Burn Multiple alto OU Magic Number baixo)
+    if (
+      (input.burnMultiple !== undefined && input.burnMultiple > 1.5) ||
+      (input.magicNumber !== undefined && input.magicNumber < 0.5)
+    ) {
+      return `Crescer está caro. Cada R$ de receita exige mais investimento do que devolve — eficiência marginal abaixo do saudável.`;
+    }
+    // Crescimento estagnado (Growth MoM + ARR YoY baixos)
+    if (
+      input.growthRateMoM !== undefined && input.growthRateMoM < 0.02 &&
+      input.arrGrowthYoY !== undefined && input.arrGrowthYoY < 0.15
+    ) {
+      return `Crescimento estagnado em MoM e YoY. Falta motor — seja em aquisição, expansão ou pricing.`;
+    }
+    // Crescimento acelerando (Growth Persistence alta)
+    if (input.growthPersistence !== undefined && input.growthPersistence >= 1) {
+      return `Crescimento acelerando. A taxa de crescimento deste ciclo supera a do ciclo anterior — momentum positivo.`;
+    }
+  }
+
   // Padrão #1: Motor comercial vs hemorragia (mais grave e mais comum)
   const newMrr = input.newMrr ?? 0;
   const lost = (input.mrrCancelado ?? 0) + (input.downsellMrr ?? 0);
