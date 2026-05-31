@@ -221,24 +221,72 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Quanto da receita do início do período foi mantida, incluindo expansões e contrações.",
     why_it_matters: "NRR acima de 100% significa que a empresa cresce mesmo sem novos clientes. Meta: > 100%.",
     formula: "(MRR início + expansão − contração − churn) ÷ MRR início",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico',         display: '< 90%',     range_max: 0.90 },
+      { status: 'warn', label: 'Atenção',         display: '90–110%',   range_min: 0.90, range_max: 1.10 },
+      { status: 'ok',   label: 'OK',              display: '≥ 110%',    range_min: 1.10 },
+    ],
+    how_to_improve: [
+      "Criar playbook de upsell na renovação anual ou semestral",
+      "Identificar módulos premium para cross-sell baseado em uso",
+      "Reduzir downsell com health scoring proativo (alertas antes da redução)",
+      "Reativação automática de contratos cancelados com oferta personalizada"
+    ],
   },
   grr: {
     title: "GRR (Gross Revenue Retention)",
     definition: "Quanto da receita do início do período foi mantida, desconsiderando expansões.",
     why_it_matters: "Mostra a capacidade de reter receita existente. Meta: > 90%. Máximo possível: 100%.",
     formula: "(MRR início − churn − downsell) ÷ MRR início",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 75%',    range_max: 0.75 },
+      { status: 'warn', label: 'Atenção', display: '75–90%',   range_min: 0.75, range_max: 0.90 },
+      { status: 'ok',   label: 'OK',      display: '≥ 90%',    range_min: 0.90 },
+    ],
+    how_to_improve: [
+      "Reduzir churn integral: identificar causa-raiz dos cancelados nos últimos 90 dias",
+      "Eliminar downsells preventíveis: revisar mudanças de plano dos últimos 6 meses",
+      "Pesquisa NPS trimestral para identificar detratores antes do churn",
+      "Tickets de risco de churn no CS — playbook de retenção estruturado"
+    ],
   },
   concentracao_top10: {
     title: "Concentração Top 10",
     definition: "Percentual do MRR total que vem dos 10 maiores clientes.",
     why_it_matters: "Acima de 50% é um risco: perder 1-2 clientes grandes pode impactar muito a receita.",
     formula: "MRR dos 10 maiores clientes ÷ MRR Total",
+    unit: "%",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 30%',   range_max: 0.30 },
+      { status: 'warn', label: 'Atenção', display: '30–50%',  range_min: 0.30, range_max: 0.50 },
+      { status: 'crit', label: 'Crítico', display: '≥ 50%',   range_min: 0.50 },
+    ],
+    how_to_improve: [
+      "Acelerar aquisição em segmentos novos (diferentes do perfil dos top 10)",
+      "Aumentar ARPA da base inferior com upsell agressivo",
+      "Definir teto de % por cliente individual (ex: máx 8% do MRR)",
+      "Diversificar geograficamente ou por vertical de mercado"
+    ],
   },
   quick_ratio: {
     title: "Quick Ratio",
     definition: "Razão entre MRR adicionado e MRR perdido. Mede a saúde do crescimento.",
     why_it_matters: "≥ 4 = excelente (cresce rápido); < 1 = encolhendo; entre 1-4 = crescendo devagar.",
     formula: "(New MRR + Expansion) ÷ (Churn + Contraction)",
+    unit: "x",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 1',  range_max: 1 },
+      { status: 'warn', label: 'Atenção', display: '1–4',  range_min: 1, range_max: 4 },
+      { status: 'ok',   label: 'OK',      display: '≥ 4',  range_min: 4 },
+    ],
+    how_to_improve: [
+      "Aumentar New MRR: revisão de pricing, mais leads qualificados, melhorar conversão",
+      "Aumentar Expansion: upsell + cross-sell na base existente",
+      "Reduzir Churn integral: focar em retenção dos clientes com maior MRR",
+      "Reduzir Downsell: mudanças de plano só com aprovação de CS"
+    ],
   },
   crescimento_reais: {
     title: "Crescimento R$",
