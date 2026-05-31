@@ -72,8 +72,13 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
   const sMd = tvMode ? 'lg' : 'md';
   const { data: certA1, isLoading: certLoading, refetch: refetchCert } = useCertA1Data(periodoInicio || null, periodoFim || null);
   const { data: extras } = useVisaoGeralExtras(filters);
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+  const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const [diagOpen, setDiagOpen] = useState(false);
+
 
   // ── Eficiência & Saúde ──
   const mcPercent = mcData?.mc_percent_ponderada ?? 0;
