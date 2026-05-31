@@ -386,7 +386,19 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         open={diagOpen}
         onOpenChange={setDiagOpen}
         tabLabel={tabLabel}
+        tenantId={effectiveTenantId || undefined}
+        tabKey="visao-geral"
+        diagInput={diagInput as any}
+        filtrosAplicados={{
+          unidadeBaseId: filters.unidadeBaseId,
+          fornecedorId: filters.fornecedorId,
+          periodoInicio,
+          periodoFim,
+        }}
+        isAdmin={isAdmin}
+        isAdminOrHead={isAdminOrHead}
       />
+
     </div>
   );
 }
