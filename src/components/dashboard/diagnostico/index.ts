@@ -10,3 +10,5 @@ export {
   useUpsertTenantConselhoConfig,
 } from './useTenantConselhoConfig';
 export { suggestFocoMes } from '@/lib/foco-suggestion';
+export { useConselhoSuggestFoco } from './useConselhoSuggestFoco';
+export { suggestPersonasForTab } from '@/lib/conselho-persona-suggestion';

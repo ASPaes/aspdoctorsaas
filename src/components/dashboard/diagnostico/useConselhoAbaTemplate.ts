@@ -8,6 +8,8 @@ export interface ConselhoAbaTemplate {
   output_format_prompt: string;
   custo_estimado_brl: number;
   max_tokens: number;
+  contexto_objetivo: string | null;
+  personas_sugeridas_default: string[];
 }
 
 export function useConselhoAbaTemplate(tenantId: string | null, tabKey: string, enabled = true) {

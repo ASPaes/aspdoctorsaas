@@ -1644,12 +1644,15 @@ export type Database = {
       conselho_aba_templates: {
         Row: {
           ativo: boolean
+          contexto_objetivo: string | null
           created_at: string
           custo_estimado_brl: number
           data_schema_json: Json
           display_label: string
           max_tokens: number
+          objetivo_aba: string | null
           output_format_prompt: string
+          personas_sugeridas_default: string[] | null
           prompt_principal: string
           tab_key: string
           updated_at: string
@@ -1657,12 +1660,15 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          contexto_objetivo?: string | null
           created_at?: string
           custo_estimado_brl?: number
           data_schema_json?: Json
           display_label: string
           max_tokens?: number
+          objetivo_aba?: string | null
           output_format_prompt: string
+          personas_sugeridas_default?: string[] | null
           prompt_principal: string
           tab_key: string
           updated_at?: string
@@ -1670,12 +1676,15 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          contexto_objetivo?: string | null
           created_at?: string
           custo_estimado_brl?: number
           data_schema_json?: Json
           display_label?: string
           max_tokens?: number
+          objetivo_aba?: string | null
           output_format_prompt?: string
+          personas_sugeridas_default?: string[] | null
           prompt_principal?: string
           tab_key?: string
           updated_at?: string
@@ -1707,6 +1716,7 @@ export type Database = {
           status: string
           tab_key: string
           tenant_id: string
+          tipo: string
           tokens_in: number | null
           tokens_out: number | null
           tom: string | null
@@ -1734,6 +1744,7 @@ export type Database = {
           status?: string
           tab_key: string
           tenant_id: string
+          tipo?: string
           tokens_in?: number | null
           tokens_out?: number | null
           tom?: string | null
@@ -1761,6 +1772,7 @@ export type Database = {
           status?: string
           tab_key?: string
           tenant_id?: string
+          tipo?: string
           tokens_in?: number | null
           tokens_out?: number | null
           tom?: string | null
@@ -7596,10 +7608,12 @@ export type Database = {
       get_conselho_aba_template: {
         Args: { p_tab_key: string; p_tenant_id: string }
         Returns: {
+          contexto_objetivo: string
           custo_estimado_brl: number
           display_label: string
           max_tokens: number
           output_format_prompt: string
+          personas_sugeridas_default: string[]
           prompt_principal: string
           tab_key: string
         }[]
@@ -7632,7 +7646,12 @@ export type Database = {
         }[]
       }
       get_conselho_cache: {
-        Args: { p_input_hash: string; p_tab_key: string; p_tenant_id: string }
+        Args: {
+          p_input_hash: string
+          p_tab_key: string
+          p_tenant_id: string
+          p_tipo?: string
+        }
         Returns: {
           custo_estimado_usd: number
           dados_snapshot: Json
@@ -7852,6 +7871,7 @@ export type Database = {
           template_ativo: boolean
           template_custo_brl: number
           template_existe: boolean
+          template_objetivo_aba: string
           tenant_id: string
           tom: string
           updated_at: string
@@ -8020,6 +8040,7 @@ export type Database = {
           p_status: string
           p_tab_key: string
           p_tenant_id: string
+          p_tipo?: string
           p_tokens_in: number
           p_tokens_out: number
           p_tom: string
