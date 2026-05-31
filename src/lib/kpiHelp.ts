@@ -299,6 +299,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Variação percentual do MRR no período selecionado.",
     why_it_matters: "Permite comparar crescimento entre períodos diferentes, independente do tamanho da base.",
     formula: "Crescimento R$ ÷ MRR início do período",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 0%',    range_max: 0 },
+      { status: 'warn', label: 'Atenção', display: '0–10%',   range_min: 0, range_max: 0.10 },
+      { status: 'ok',   label: 'OK',      display: '≥ 10%',   range_min: 0.10 },
+    ],
+    how_to_improve: [
+      "Aumentar New MRR: investimento em aquisição com canais de melhor ROI",
+      "Acelerar expansão: upsell e cross-sell na base existente",
+      "Reduzir churn: cada cancelamento prevenido é crescimento direto",
+      "Reajuste anual indexado ao IPCA ou IGPM"
+    ],
   },
   arpa: {
     title: "ARPA (mês)",
