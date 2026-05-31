@@ -7101,6 +7101,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "cliente_produtos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clientes_area_atuacao_id_fkey"
             columns: ["area_atuacao_id"]
             isOneToOne: false
@@ -7129,20 +7143,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "clientes_forma_pagamento_ativacao_id_fkey"
-            columns: ["forma_pagamento_ativacao_id"]
-            isOneToOne: false
-            referencedRelation: "formas_pagamento"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "clientes_forma_pagamento_mensalidade_id_fkey"
-            columns: ["forma_pagamento_mensalidade_id"]
-            isOneToOne: false
-            referencedRelation: "formas_pagamento"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "clientes_motivo_cancelamento_id_fkey"
             columns: ["motivo_cancelamento_id"]
             isOneToOne: false
@@ -7164,10 +7164,38 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "clientes_vertical_id_fkey"
+            foreignKeyName: "contratos_forma_pagamento_ativacao_id_fkey"
+            columns: ["forma_pagamento_ativacao_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_forma_pagamento_mensalidade_id_fkey"
+            columns: ["forma_pagamento_mensalidade_id"]
+            isOneToOne: false
+            referencedRelation: "formas_pagamento"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_modelo_contrato_id_fkey"
             columns: ["modelo_contrato_id"]
             isOneToOne: false
             referencedRelation: "modelos_contrato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_origem_venda_id_fkey"
+            columns: ["origem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "origens_venda"
             referencedColumns: ["id"]
           },
         ]
