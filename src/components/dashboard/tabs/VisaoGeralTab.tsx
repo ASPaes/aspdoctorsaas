@@ -329,7 +329,12 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
 
       <section className="space-y-3">
         <div>
-          <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Comparativos temporais</h3>
+          <div className="flex items-center gap-2">
+            <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>Comparativos temporais</h3>
+            <span className="inline-flex items-center rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wide">
+              NOVO
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground">MRR atual em 3 janelas históricas</p>
         </div>
         {extras ? (
