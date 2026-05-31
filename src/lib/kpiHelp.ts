@@ -172,6 +172,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "≥ 3x = saudável; entre 1x e 3x = atenção; < 1x = a empresa perde dinheiro a cada cliente.",
     formula: "LTV Recorrente (R$) ÷ CAC por Logo",
     example: "LTV R$ 9.000 ÷ CAC R$ 3.000 = 3x",
+    unit: "x",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 1x',  range_max: 1 },
+      { status: 'warn', label: 'Atenção', display: '1–3x',  range_min: 1, range_max: 3 },
+      { status: 'ok',   label: 'OK',      display: '≥ 3x',  range_min: 3 },
+    ],
+    how_to_improve: [
+      "Aumentar LTV: reduzir churn, aumentar tenure, aumentar ARPA via upsell",
+      "Reduzir CAC: otimizar funil, focar em canais com menor CPL",
+      "Aumentar MC%: reduzir COGS, eliminar SKUs deficitários",
+      "Priorizar retenção sobre aquisição quando LTV/CAC < 3x"
+    ],
   },
   ativacao_media_novos: {
     title: "Ativação Média (novos)",
