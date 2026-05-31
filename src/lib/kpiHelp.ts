@@ -323,6 +323,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Tempo necessário para recuperar o investimento feito para adquirir um cliente, considerando a margem (MRR - COGS).",
     why_it_matters: "Ideal ≤ 12 meses. Acima disso, o capital fica preso por muito tempo.",
     formula: "CAC por Logo ÷ (ARPA × MC%)",
+    unit: "meses",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '≤ 12m',   range_max: 12 },
+      { status: 'warn', label: 'Atenção', display: '12–18m',  range_min: 12, range_max: 18 },
+      { status: 'crit', label: 'Crítico', display: '> 18m',   range_min: 18 },
+    ],
+    how_to_improve: [
+      "Reduzir CAC: melhorar conversão de funil, otimizar canais com melhor CPL",
+      "Aumentar ARPA: pricing premium, packaging com módulos pagos",
+      "Aumentar MC%: reduzir COGS, automatizar operação",
+      "Reduzir tempo de onboarding/ativação — receita começa antes"
+    ],
   },
   novos_clientes_vendas: {
     title: "Novos Clientes (Vendas)",
