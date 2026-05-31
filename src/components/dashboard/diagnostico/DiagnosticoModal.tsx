@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Diagnostico, Severity, ActionPriority } from '@/lib/diagnostico';
+import { ConselhoDSSection } from './ConselhoDSSection';
 import './diagnostico.css';
 
 interface DiagnosticoModalProps {
@@ -11,7 +12,14 @@ interface DiagnosticoModalProps {
   onOpenChange: (open: boolean) => void;
   tabLabel?: string;
   onExportPDF?: () => void;
+  tenantId?: string;
+  tabKey?: string;
+  diagInput?: Record<string, any>;
+  filtrosAplicados?: any;
+  isAdmin?: boolean;
+  isAdminOrHead?: boolean;
 }
+
 
 function severityColor(sev: Severity): string {
   if (sev === 'crit') return 'hsl(0 84% 60%)';
@@ -43,7 +51,14 @@ export function DiagnosticoModal({
   onOpenChange,
   tabLabel = 'Visão geral',
   onExportPDF,
+  tenantId,
+  tabKey,
+  diagInput,
+  filtrosAplicados,
+  isAdmin = false,
+  isAdminOrHead = false,
 }: DiagnosticoModalProps) {
+
   const { severity, headline, causes, actions, generatedAt, alertCount } = diagnostico;
   const color = severityColor(severity);
   const generatedDate = new Date(generatedAt).toLocaleString('pt-BR', {
@@ -141,7 +156,20 @@ export function DiagnosticoModal({
               </div>
             </section>
           )}
+
+          {/* Conselho DS */}
+          {tenantId && tabKey && diagInput && isAdminOrHead && (
+            <ConselhoDSSection
+              tenantId={tenantId}
+              tabKey={tabKey}
+              diagInput={diagInput}
+              alertasFactuais={diagnostico}
+              filtrosAplicados={filtrosAplicados}
+              isAdmin={isAdmin}
+            />
+          )}
         </div>
+
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-7 py-4 border-t border-border bg-muted/30">

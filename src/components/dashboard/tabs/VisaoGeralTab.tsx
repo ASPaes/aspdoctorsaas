@@ -16,6 +16,9 @@ import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import kpiHelp from '@/lib/kpiHelp';
 import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
 import type { MargemContribuicaoData } from '../hooks/useMargemContribuicaoDashboard';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
+
 
 interface VisaoGeralTabProps {
   metrics: KPIMetrics;
@@ -69,8 +72,13 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
   const sMd = tvMode ? 'lg' : 'md';
   const { data: certA1, isLoading: certLoading, refetch: refetchCert } = useCertA1Data(periodoInicio || null, periodoFim || null);
   const { data: extras } = useVisaoGeralExtras(filters);
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+  const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const [diagOpen, setDiagOpen] = useState(false);
+
 
   // ── Eficiência & Saúde ──
   const mcPercent = mcData?.mc_percent_ponderada ?? 0;
@@ -378,7 +386,19 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         open={diagOpen}
         onOpenChange={setDiagOpen}
         tabLabel={tabLabel}
+        tenantId={effectiveTenantId || undefined}
+        tabKey="visao-geral"
+        diagInput={diagInput as any}
+        filtrosAplicados={{
+          unidadeBaseId: filters.unidadeBaseId,
+          fornecedorId: filters.fornecedorId,
+          periodoInicio,
+          periodoFim,
+        }}
+        isAdmin={isAdmin}
+        isAdminOrHead={isAdminOrHead}
       />
+
     </div>
   );
 }
