@@ -16,6 +16,9 @@ import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import kpiHelp from '@/lib/kpiHelp';
 import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
 import type { MargemContribuicaoData } from '../hooks/useMargemContribuicaoDashboard';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
+
 
 interface VisaoGeralTabProps {
   metrics: KPIMetrics;
