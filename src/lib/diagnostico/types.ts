@@ -52,6 +52,16 @@ export interface DiagnosticoInput {
   concentracaoTop10?: number; // decimal
   clientesAtivos?: number;
   cancelamentosQtd?: number;
+
+  // Crescimento V2 — Velocity / Efficiency
+  burnMultiple?: number;        // ratio (1.4 = 1.4x)
+  magicNumber?: number;         // ratio (0.82 = 0.82x)
+  expansionRate?: number;       // decimal mensal (0.023 = 2.3%)
+  growthRateMoM?: number;       // decimal (0.057 = 5.7%)
+  arrGrowthYoY?: number;        // decimal (0.183 = 18.3%)
+  netLogoGrowth?: number;       // absoluto (+12)
+  logoGrowthRate?: number;      // decimal (0.018 = 1.8%)
+  growthPersistence?: number;   // ratio (0.9 = mantendo, >1 = acelerando)
 }
 
 /**

@@ -84,4 +84,26 @@ export const ACTIONS: Record<string, ActionTemplate> = {
     priority: 'strategic',
     timeframe: 'próximos 90 dias',
   },
+
+  // ── Crescimento V2 — Altas: 30 dias ──
+  sales_efficiency_audit: {
+    id: 'sales_efficiency_audit',
+    text: 'Auditar eficiência da máquina de vendas — produtividade individual de SDRs/closers, conversão por etapa do funil, tempo médio de ciclo de venda',
+    priority: 'high',
+    timeframe: 'próximos 30 dias',
+  },
+
+  // ── Crescimento V2 — Estratégicas: 90 dias ──
+  expansion_program_launch: {
+    id: 'expansion_program_launch',
+    text: 'Lançar programa estruturado de expansão na base — playbook de upsell por aniversário de contrato + cross-sell por gatilho de uso + reajuste anual indexado',
+    priority: 'strategic',
+    timeframe: 'próximos 90 dias',
+  },
+  growth_strategy_review: {
+    id: 'growth_strategy_review',
+    text: 'Revisar estratégia de crescimento de longo prazo — definir ICP claro, mapear novos canais, expandir TAM para novos segmentos/geografias',
+    priority: 'strategic',
+    timeframe: 'próximos 90 dias',
+  },
 };
