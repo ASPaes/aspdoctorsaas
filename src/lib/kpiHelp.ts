@@ -1,9 +1,24 @@
+export type BenchmarkStatus = 'ok' | 'warn' | 'crit';
+
+export interface BenchmarkZone {
+  status: BenchmarkStatus;
+  label: string;
+  display: string;
+  range_min?: number;
+  range_max?: number;
+}
+
+export type KpiUnit = 'meses' | 'x' | '%' | 'R$' | 'pp' | 'count' | 'pts';
+
 export interface KpiHelpEntry {
   title: string;
   definition: string;
   why_it_matters: string;
   formula: string;
   example?: string;
+  unit?: KpiUnit;
+  benchmark?: BenchmarkZone[];
+  how_to_improve?: string[];
 }
 
 const kpiHelp: Record<string, KpiHelpEntry> = {
@@ -57,12 +72,36 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Se o churn sobe, a empresa precisa vender cada vez mais só para manter o tamanho. Meta: < 2% ao mês.",
     formula: "Cancelamentos ÷ (Clientes Ativos + Cancelados)",
     example: "5 cancelamentos ÷ 200 base = 2,5%",
+    unit: "%",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 2%',    range_max: 0.02 },
+      { status: 'warn', label: 'Atenção', display: '2–5%',    range_min: 0.02, range_max: 0.05 },
+      { status: 'crit', label: 'Crítico', display: '> 5%',    range_min: 0.05 },
+    ],
+    how_to_improve: [
+      "Auditar causa-raiz dos cancelados do período (preço, produto, atendimento)",
+      "Health score com alertas antes do cancelamento",
+      "Programa de retenção com ofertas personalizadas",
+      "Melhorar onboarding para reduzir Early Churn"
+    ],
   },
   churn_rate_receita: {
     title: "Churn Rate (Receita)",
     definition: "Percentual de receita recorrente perdida em relação ao MRR total.",
     why_it_matters: "Mais importante que churn de carteira: se perde clientes grandes, o impacto financeiro é maior.",
     formula: "MRR Cancelado ÷ (MRR Atual + MRR Cancelado)",
+    unit: "%",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 1%',    range_max: 0.01 },
+      { status: 'warn', label: 'Atenção', display: '1–3%',    range_min: 0.01, range_max: 0.03 },
+      { status: 'crit', label: 'Crítico', display: '> 3%',    range_min: 0.03 },
+    ],
+    how_to_improve: [
+      "Foco em retenção dos clientes Top 20 (impacto financeiro maior)",
+      "Análise de cancelados por ticket — clientes grandes saindo é crítico",
+      "Política de retenção diferenciada para contas de alto valor",
+      "Account managers dedicados para clientes acima de threshold"
+    ],
   },
   mc_total: {
     title: "MC Total (R$)",
@@ -76,6 +115,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Indica a eficiência financeira da operação. Meta saudável: acima de 60%. Abaixo de 30% é crítico.",
     formula: "MC Total ÷ MRR Total",
     example: "MC R$ 100.000 ÷ MRR R$ 150.000 = 66,7%",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 30%',   range_max: 0.30 },
+      { status: 'warn', label: 'Atenção', display: '30–60%',  range_min: 0.30, range_max: 0.60 },
+      { status: 'ok',   label: 'OK',      display: '≥ 60%',   range_min: 0.60 },
+    ],
+    how_to_improve: [
+      "Renegociar contratos com fornecedores (COGS)",
+      "Eliminar produtos/módulos com margem negativa",
+      "Aumentar pricing em segmentos premium",
+      "Automatizar operação para reduzir custo variável por cliente"
+    ],
   },
   mc_media_cliente: {
     title: "MC Média / Cliente",
@@ -121,6 +172,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "≥ 3x = saudável; entre 1x e 3x = atenção; < 1x = a empresa perde dinheiro a cada cliente.",
     formula: "LTV Recorrente (R$) ÷ CAC por Logo",
     example: "LTV R$ 9.000 ÷ CAC R$ 3.000 = 3x",
+    unit: "x",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 1x',  range_max: 1 },
+      { status: 'warn', label: 'Atenção', display: '1–3x',  range_min: 1, range_max: 3 },
+      { status: 'ok',   label: 'OK',      display: '≥ 3x',  range_min: 3 },
+    ],
+    how_to_improve: [
+      "Aumentar LTV: reduzir churn, aumentar tenure, aumentar ARPA via upsell",
+      "Reduzir CAC: otimizar funil, focar em canais com menor CPL",
+      "Aumentar MC%: reduzir COGS, eliminar SKUs deficitários",
+      "Priorizar retenção sobre aquisição quando LTV/CAC < 3x"
+    ],
   },
   ativacao_media_novos: {
     title: "Ativação Média (novos)",
@@ -134,6 +197,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Revela em qual momento os clientes mais cancelam. M1 baixo indica problema de onboarding.",
     formula: "Clientes retidos no mês N ÷ Tamanho original do cohort × 100",
     example: "Cohort Jan: 20 clientes, 14 ativos após 6 meses = 70%",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 60%',   range_max: 0.60 },
+      { status: 'warn', label: 'Atenção', display: '60–80%',  range_min: 0.60, range_max: 0.80 },
+      { status: 'ok',   label: 'OK',      display: '≥ 80%',   range_min: 0.80 },
+    ],
+    how_to_improve: [
+      "Identificar mês com maior queda na curva de retenção (gargalo)",
+      "Reforçar onboarding nos primeiros 90 dias se M3 estiver baixo",
+      "Programa de fidelização para cohorts mais antigos",
+      "Análise comparativa entre cohorts para identificar mudanças de fit"
+    ],
   },
   benchmark_cohort_70: {
     title: "Benchmark 70% (Cohort)",
@@ -146,24 +221,72 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Quanto da receita do início do período foi mantida, incluindo expansões e contrações.",
     why_it_matters: "NRR acima de 100% significa que a empresa cresce mesmo sem novos clientes. Meta: > 100%.",
     formula: "(MRR início + expansão − contração − churn) ÷ MRR início",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico',         display: '< 90%',     range_max: 0.90 },
+      { status: 'warn', label: 'Atenção',         display: '90–110%',   range_min: 0.90, range_max: 1.10 },
+      { status: 'ok',   label: 'OK',              display: '≥ 110%',    range_min: 1.10 },
+    ],
+    how_to_improve: [
+      "Criar playbook de upsell na renovação anual ou semestral",
+      "Identificar módulos premium para cross-sell baseado em uso",
+      "Reduzir downsell com health scoring proativo (alertas antes da redução)",
+      "Reativação automática de contratos cancelados com oferta personalizada"
+    ],
   },
   grr: {
     title: "GRR (Gross Revenue Retention)",
     definition: "Quanto da receita do início do período foi mantida, desconsiderando expansões.",
     why_it_matters: "Mostra a capacidade de reter receita existente. Meta: > 90%. Máximo possível: 100%.",
     formula: "(MRR início − churn − downsell) ÷ MRR início",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 75%',    range_max: 0.75 },
+      { status: 'warn', label: 'Atenção', display: '75–90%',   range_min: 0.75, range_max: 0.90 },
+      { status: 'ok',   label: 'OK',      display: '≥ 90%',    range_min: 0.90 },
+    ],
+    how_to_improve: [
+      "Reduzir churn integral: identificar causa-raiz dos cancelados nos últimos 90 dias",
+      "Eliminar downsells preventíveis: revisar mudanças de plano dos últimos 6 meses",
+      "Pesquisa NPS trimestral para identificar detratores antes do churn",
+      "Tickets de risco de churn no CS — playbook de retenção estruturado"
+    ],
   },
   concentracao_top10: {
     title: "Concentração Top 10",
     definition: "Percentual do MRR total que vem dos 10 maiores clientes.",
     why_it_matters: "Acima de 50% é um risco: perder 1-2 clientes grandes pode impactar muito a receita.",
     formula: "MRR dos 10 maiores clientes ÷ MRR Total",
+    unit: "%",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '< 30%',   range_max: 0.30 },
+      { status: 'warn', label: 'Atenção', display: '30–50%',  range_min: 0.30, range_max: 0.50 },
+      { status: 'crit', label: 'Crítico', display: '≥ 50%',   range_min: 0.50 },
+    ],
+    how_to_improve: [
+      "Acelerar aquisição em segmentos novos (diferentes do perfil dos top 10)",
+      "Aumentar ARPA da base inferior com upsell agressivo",
+      "Definir teto de % por cliente individual (ex: máx 8% do MRR)",
+      "Diversificar geograficamente ou por vertical de mercado"
+    ],
   },
   quick_ratio: {
     title: "Quick Ratio",
     definition: "Razão entre MRR adicionado e MRR perdido. Mede a saúde do crescimento.",
     why_it_matters: "≥ 4 = excelente (cresce rápido); < 1 = encolhendo; entre 1-4 = crescendo devagar.",
     formula: "(New MRR + Expansion) ÷ (Churn + Contraction)",
+    unit: "x",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 1',  range_max: 1 },
+      { status: 'warn', label: 'Atenção', display: '1–4',  range_min: 1, range_max: 4 },
+      { status: 'ok',   label: 'OK',      display: '≥ 4',  range_min: 4 },
+    ],
+    how_to_improve: [
+      "Aumentar New MRR: revisão de pricing, mais leads qualificados, melhorar conversão",
+      "Aumentar Expansion: upsell + cross-sell na base existente",
+      "Reduzir Churn integral: focar em retenção dos clientes com maior MRR",
+      "Reduzir Downsell: mudanças de plano só com aprovação de CS"
+    ],
   },
   crescimento_reais: {
     title: "Crescimento R$",
@@ -176,6 +299,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Variação percentual do MRR no período selecionado.",
     why_it_matters: "Permite comparar crescimento entre períodos diferentes, independente do tamanho da base.",
     formula: "Crescimento R$ ÷ MRR início do período",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 0%',    range_max: 0 },
+      { status: 'warn', label: 'Atenção', display: '0–10%',   range_min: 0, range_max: 0.10 },
+      { status: 'ok',   label: 'OK',      display: '≥ 10%',   range_min: 0.10 },
+    ],
+    how_to_improve: [
+      "Aumentar New MRR: investimento em aquisição com canais de melhor ROI",
+      "Acelerar expansão: upsell e cross-sell na base existente",
+      "Reduzir churn: cada cancelamento prevenido é crescimento direto",
+      "Reajuste anual indexado ao IPCA ou IGPM"
+    ],
   },
   arpa: {
     title: "ARPA (mês)",
@@ -188,6 +323,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Tempo necessário para recuperar o investimento feito para adquirir um cliente, considerando a margem (MRR - COGS).",
     why_it_matters: "Ideal ≤ 12 meses. Acima disso, o capital fica preso por muito tempo.",
     formula: "CAC por Logo ÷ (ARPA × MC%)",
+    unit: "meses",
+    benchmark: [
+      { status: 'ok',   label: 'OK',      display: '≤ 12m',   range_max: 12 },
+      { status: 'warn', label: 'Atenção', display: '12–18m',  range_min: 12, range_max: 18 },
+      { status: 'crit', label: 'Crítico', display: '> 18m',   range_min: 18 },
+    ],
+    how_to_improve: [
+      "Reduzir CAC: melhorar conversão de funil, otimizar canais com melhor CPL",
+      "Aumentar ARPA: pricing premium, packaging com módulos pagos",
+      "Aumentar MC%: reduzir COGS, automatizar operação",
+      "Reduzir tempo de onboarding/ativação — receita começa antes"
+    ],
   },
   novos_clientes_vendas: {
     title: "Novos Clientes (Vendas)",
@@ -463,6 +610,65 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Fator < 2x é arriscado. Ideal ≥ 3x para SaaS saudável.",
     formula: "MRR Atual ÷ COGS Atual",
     example: "MRR R$ 600 ÷ COGS R$ 200 = 3.0x",
+  },
+  rule_of_40: {
+    title: "Rule of 40",
+    definition: "Soma do crescimento percentual com a margem de contribuição percentual. Métrica de saúde geral que junta crescimento + rentabilidade num único número.",
+    why_it_matters: "Padrão a16z/Bessemer para boards de SaaS. ≥ 40 = empresa saudável. Permite trocar crescimento por margem (e vice-versa) — uma SaaS crescendo 60% com MC -20% atinge a regra; outra com 10% de crescimento e 30% de MC também.",
+    formula: "Crescimento % do período + MC% Ponderada × 100",
+    example: "Growth +20% + MC% 25% = Rule of 40 = 45 (saudável)",
+    unit: "pts",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 20', range_max: 20 },
+      { status: 'warn', label: 'Atenção', display: '20–40', range_min: 20, range_max: 40 },
+      { status: 'ok',   label: 'OK',      display: '≥ 40', range_min: 40 },
+    ],
+    how_to_improve: [
+      "Aumentar receita recorrente: New MRR + Upsell + Cross-sell na base ativa",
+      "Reduzir COGS: renegociar fornecedores, automatizar operação, eliminar SKUs deficitários",
+      "Aumentar ARPA: revisão de pricing, packaging em tiers, módulos premium",
+      "Reduzir churn: health score proativo, programa de retenção, melhorar onboarding"
+    ],
+  },
+  tenure_medio: {
+    title: "Tenure Médio (meses)",
+    definition: "Tempo médio em meses que os clientes ativos estão na carteira, contado desde a primeira venda registrada.",
+    why_it_matters: "Indica maturidade da base. Tenure alto = receita previsível, NPS provavelmente bom, expansion provável. Tenure baixo = base instável ou empresa muito nova.",
+    formula: "AVG(EXTRACT(MONTH FROM AGE(now(), data_inicial))) dos clientes ativos · data_inicial = MIN(contratos.data_venda) com fallback clientes.data_cadastro",
+    example: "Base de 100 clientes com média de 24 meses cada → Tenure Médio = 24m",
+    unit: "meses",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 6m',   range_max: 6 },
+      { status: 'warn', label: 'Atenção', display: '6–18m',  range_min: 6, range_max: 18 },
+      { status: 'ok',   label: 'OK',      display: '≥ 18m',  range_min: 18 },
+    ],
+    how_to_improve: [
+      "Reduzir churn dos primeiros 90 dias (Early Churn) com onboarding estruturado",
+      "Aumentar percepção de valor com checkins regulares de CS",
+      "Identificar clientes em risco com health scoring antes de cancelarem",
+      "Programa de fidelização com benefícios escalonados por tempo de casa"
+    ],
+  },
+  mrr_vs_trimestre: {
+    title: "MRR vs Último Trimestre",
+    definition: "Comparativo do MRR atual com o MRR do trimestre anterior completo.",
+    why_it_matters: "Mostra a trajetória de médio prazo — suaviza ruído mensal e revela tendência consolidada.",
+    formula: "MRR atual − MRR no fim do trimestre anterior · Snapshot calculado via contratos ativos naquela data",
+    unit: "R$",
+  },
+  mrr_vs_semestre: {
+    title: "MRR vs Último Semestre",
+    definition: "Comparativo do MRR atual com o MRR do semestre anterior completo.",
+    why_it_matters: "Visão de médio-longo prazo — captura ciclos de negócio e impacto de mudanças estratégicas.",
+    formula: "MRR atual − MRR no fim do semestre anterior",
+    unit: "R$",
+  },
+  mrr_vs_ano: {
+    title: "MRR vs Ano Anterior",
+    definition: "Comparativo do MRR atual com o MRR de exatamente 12 meses atrás.",
+    why_it_matters: "Métrica YoY (Year over Year) — referência padrão para apresentações executivas, investidores e Rule of 40 anualizado.",
+    formula: "MRR atual − MRR de 12 meses atrás",
+    unit: "R$",
   },
 };
 
