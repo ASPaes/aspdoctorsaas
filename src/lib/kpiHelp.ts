@@ -197,6 +197,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Revela em qual momento os clientes mais cancelam. M1 baixo indica problema de onboarding.",
     formula: "Clientes retidos no mês N ÷ Tamanho original do cohort × 100",
     example: "Cohort Jan: 20 clientes, 14 ativos após 6 meses = 70%",
+    unit: "%",
+    benchmark: [
+      { status: 'crit', label: 'Crítico', display: '< 60%',   range_max: 0.60 },
+      { status: 'warn', label: 'Atenção', display: '60–80%',  range_min: 0.60, range_max: 0.80 },
+      { status: 'ok',   label: 'OK',      display: '≥ 80%',   range_min: 0.80 },
+    ],
+    how_to_improve: [
+      "Identificar mês com maior queda na curva de retenção (gargalo)",
+      "Reforçar onboarding nos primeiros 90 dias se M3 estiver baixo",
+      "Programa de fidelização para cohorts mais antigos",
+      "Análise comparativa entre cohorts para identificar mudanças de fit"
+    ],
   },
   benchmark_cohort_70: {
     title: "Benchmark 70% (Cohort)",
