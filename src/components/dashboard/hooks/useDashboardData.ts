@@ -184,6 +184,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const movimentosInicioRaw = await fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
+        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation'])
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
