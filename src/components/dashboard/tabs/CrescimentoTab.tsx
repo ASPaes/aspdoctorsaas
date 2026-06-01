@@ -14,7 +14,7 @@ import { SectionHeader } from '../SectionHeader';
 import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
-import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
+
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
