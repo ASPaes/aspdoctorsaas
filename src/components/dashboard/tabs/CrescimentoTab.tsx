@@ -17,7 +17,7 @@ import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/contexts/AuthContext';
+
 import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
 import type { MargemContribuicaoData } from '../hooks/useMargemContribuicaoDashboard';
 
