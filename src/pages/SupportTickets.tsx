@@ -1179,6 +1179,14 @@ export default function SupportTickets() {
               {getFilterLabel("canal", canalFilter)} <X className="h-3 w-3" />
             </button>
           )}
+          {tipoHorarioFilter !== "all" && (
+            <button
+              onClick={() => setTipoHorarioFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("tipoHorario", tipoHorarioFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
           {serviceTypeFilters.map((stId) => {
             const st = serviceTypes.find((t) => t.id === stId);
             return (
