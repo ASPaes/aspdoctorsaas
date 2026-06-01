@@ -270,7 +270,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         {/* Waterfall (2/3) + ReativacoesCard (1/3) */}
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <NetNewMrrBreakdown
+            <NetNewMrrWaterfallChart
               newMrr={metrics.newMrr}
               upsellMrr={metrics.upsellMrr}
               crossSellMrr={metrics.crossSellMrr}
