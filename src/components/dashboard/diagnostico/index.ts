@@ -1,4 +1,5 @@
 export { DiagnosticoButton } from './DiagnosticoButton';
+export { DiagnosticoSection } from './DiagnosticoSection';
 export { DiagnosticoInlineCard } from './DiagnosticoInlineCard';
 export { DiagnosticoModal } from './DiagnosticoModal';
 export { ConselhoDSSection } from './ConselhoDSSection';
