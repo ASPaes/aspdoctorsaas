@@ -23,6 +23,7 @@ import { MotivosCategoryStackedBar } from '../charts/MotivosCategoryStackedBar';
 import { MotivosBreakdownChart } from '../charts/MotivosBreakdownChart';
 import { MotivosTendenciaChart } from '../charts/MotivosTendenciaChart';
 import { ChurnPorSegmentoChart } from '../charts/ChurnPorSegmentoChart';
+import { ChurnPorOrigemChart } from '../charts/ChurnPorOrigemChart';
 import { MotivoSegmentoHeatmap } from '../charts/MotivoSegmentoHeatmap';
 import { TenureBucketsChart } from '../charts/TenureBucketsChart';
 import { ReativacoesCard as ReativacoesCardV2 } from '../charts/ReativacoesCard';
