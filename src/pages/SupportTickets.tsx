@@ -531,7 +531,7 @@ export default function SupportTickets() {
       if (attInstanceFilter !== "all") count++;
     }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -539,6 +539,7 @@ export default function SupportTickets() {
     setCategoriaFilter("all");
     setSubcategoriaFilter("all");
     setCanalFilter("all");
+    setTipoHorarioFilter("all");
     setServiceTypeFilters([]);
     setTagFilters([]);
   };
@@ -553,6 +554,7 @@ export default function SupportTickets() {
         const labels: Record<string, string> = { whatsapp: "WhatsApp", telefone: "Telefone", presencial: "Presencial", email: "E-mail" };
         return labels[value] ?? value;
       }
+      case "tipoHorario": return value === "plantao" ? "Plantão" : "Comercial";
       default: return value;
     }
   };
