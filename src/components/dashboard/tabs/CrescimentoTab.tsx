@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { ARPAComboCard, ReativacoesCard } from '../cards/CrescimentoCustomCards';
-import { NetNewMrrBreakdown } from '../cards/NetNewMrrBreakdown';
+import { NetNewMrrWaterfallChart } from '../charts/NetNewMrrWaterfallChart';
 import { MrrForecastChart, GrowthRateBarChart } from '../charts/CrescimentoCharts';
 import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
