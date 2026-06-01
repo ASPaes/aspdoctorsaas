@@ -187,22 +187,12 @@ export function useClienteLinkSuggestion(
     },
     onError: (err: any) => toast.error(`Erro ao desvincular: ${err?.message ?? 'desconhecido'}`),
   });
-    onSuccess: () => {
-      toast.success('Vínculo removido');
-      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['cliente-linked'] });
-      queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
-      queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
-    },
-    onError: (err: any) => toast.error(`Erro ao desvincular: ${err?.message ?? 'desconhecido'}`),
-  });
-
   return {
     linkedCliente: linkedQuery.data || null,
     suggestedCliente: linkedClienteId ? null : suggestedCliente,
     isLinked: !!linkedClienteId,
     linkCliente: (clienteId: string) => linkMutation.mutate(clienteId),
-    unlinkCliente: () => unlinkMutation.mutate(),
+    unlinkCliente: (removePhoneFromContacts: boolean = false) => unlinkMutation.mutate(removePhoneFromContacts),
     isLinking: linkMutation.isPending,
     isUnlinking: unlinkMutation.isPending,
     candidates,
