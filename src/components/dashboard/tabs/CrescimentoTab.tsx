@@ -10,11 +10,11 @@ import { MrrForecastChart, GrowthRateBarChart } from '../charts/CrescimentoChart
 import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { SectionHeader } from '../SectionHeader';
-import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
+
 import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
-import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
+
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,7 +73,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
 
   const { data: ueData } = useUnitEconomicsSeries(filters);
   const { data: extras } = useCrescimentoExtras({ filters, metrics, unitEconomics: ueData, mcData });
-  const { data: vgExtras } = useVisaoGeralExtras(filters);
+  
 
   const ueCurrent = ueData?.current;
   const uePrev = ueData && ueData.series.length >= 2 ? ueData.series[ueData.series.length - 2] : null;
@@ -500,34 +500,6 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         />
       </section>
 
-      {/* ═══════ COMPARATIVOS TEMPORAIS ═══════ */}
-      <section className="space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className={`font-semibold text-foreground ${tvMode ? 'text-2xl' : 'text-lg'}`}>
-              Comparativos temporais — MRR
-            </h3>
-            <span className="inline-flex items-center rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wide">
-              REUSO
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground">MRR atual em 3 janelas históricas</p>
-        </div>
-        {vgExtras ? (
-          <ComparativosTemporaisBlock
-            trimestre={vgExtras.mrrTrimestre}
-            semestre={vgExtras.mrrSemestre}
-            ano={vgExtras.mrrAno}
-            format="BRL"
-          />
-        ) : (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-40" />
-            ))}
-          </div>
-        )}
-      </section>
 
       {/* MODAL DIAGNÓSTICO */}
       <DiagnosticoModal
