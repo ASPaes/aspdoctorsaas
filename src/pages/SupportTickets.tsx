@@ -745,11 +745,9 @@ export default function SupportTickets() {
               </div>
             </PopoverContent>
           </Popover>
-          {isAdminOrHead && (
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
-            </Button>
-          )}
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
+          </Button>
         </div>
       </div>
 
