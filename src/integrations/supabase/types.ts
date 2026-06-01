@@ -7399,6 +7399,8 @@ export type Database = {
           p_cliente_id: string
           p_contact_id?: string
           p_department_id: string
+          p_horario_fim?: string
+          p_horario_inicio?: string
           p_observacao_agente?: string
           p_previsao_encerramento?: string
           p_produto_id: number
