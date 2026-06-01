@@ -11,7 +11,7 @@ import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { SectionHeader } from '../SectionHeader';
 import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
-import { DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
