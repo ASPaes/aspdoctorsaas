@@ -1,4 +1,15 @@
 import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,6 +49,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
     candidates,
     isAmbiguous,
   } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, attendanceId, conversation.tenant_id);
+  const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
 
   const canEdit = !isAttendanceClosed || isAdminOrHead;
 
@@ -169,16 +181,41 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
             Abrir Cadastro
           </Button>
           {canEdit && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 text-[10px] text-destructive hover:text-destructive gap-1"
-              onClick={() => unlinkCliente()}
-              disabled={isUnlinking}
-            >
-              {isUnlinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlink className="h-3 w-3" />}
-              Desvincular
-            </Button>
+            <AlertDialog open={unlinkDialogOpen} onOpenChange={setUnlinkDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[10px] text-destructive hover:text-destructive gap-1"
+                  disabled={isUnlinking}
+                >
+                  {isUnlinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlink className="h-3 w-3" />}
+                  Desvincular
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Desvincular cliente</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Deseja apenas remover o vínculo desta conversa, ou também remover este número do cadastro de contatos do cliente? Remover o contato evita que ele apareça como sugestão automática em conversas futuras.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2">
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => { unlinkCliente(false); setUnlinkDialogOpen(false); }}
+                  >
+                    Apenas desvincular
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    onClick={() => { unlinkCliente(true); setUnlinkDialogOpen(false); }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Desvincular e remover contato
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </div>
