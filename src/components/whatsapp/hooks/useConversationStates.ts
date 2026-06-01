@@ -43,7 +43,7 @@ export function useConversationStates(conversationIds: string[]) {
       return map;
     },
     enabled: conversationIds.length > 0,
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Realtime: invalida quando estado muda. Filter por tenant_id reduz volume processado.
@@ -58,7 +58,19 @@ export function useConversationStates(conversationIds: string[]) {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["conversation-states"] });
-      }, 800);
+      }, 3000);
+    };
+
+    const handleConversationChange = (payload: any) => {
+      if (payload.eventType !== 'UPDATE') {
+        debouncedInvalidate();
+        return;
+      }
+      const oldRow = (payload.old ?? {}) as Record<string, any>;
+      const newRow = (payload.new ?? {}) as Record<string, any>;
+      const relevantFields = ['status', 'department_id', 'assigned_to', 'opened_out_of_hours'] as const;
+      const hasRelevantChange = relevantFields.some(f => oldRow[f] !== newRow[f]);
+      if (hasRelevantChange) debouncedInvalidate();
     };
 
     const channel = supabase
@@ -68,7 +80,7 @@ export function useConversationStates(conversationIds: string[]) {
         schema: "public",
         table: "whatsapp_conversations",
         filter: `tenant_id=eq.${tid}`,
-      }, debouncedInvalidate)
+      }, handleConversationChange)
       .on("postgres_changes", {
         event: "*",
         schema: "public",
