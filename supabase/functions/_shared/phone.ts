@@ -1,6 +1,7 @@
 // Brazilian phone normalization (E.164-like with 55 prefix)
-// Distingue fixo (1º dígito 2-5) de celular antigo (1º dígito 6-9) ao adicionar o 9º dígito.
-// Fixo BR jamais recebe o 9.
+// Identifica fixo BR (1º dígito após DDD entre 2-5) via flag `isLandline`.
+// NÃO adiciona o 9 em celulares antigos — números inbound são salvos exatamente
+// como chegam do provedor (Evolution, Z-API, Meta Cloud).
 
 export interface NormalizedPhone {
   phone: string;
