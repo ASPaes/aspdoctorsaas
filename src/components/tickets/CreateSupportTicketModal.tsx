@@ -540,6 +540,8 @@ export function CreateSupportTicketModal({
           p_service_type_id: serviceTypeId,
           p_canal_origem: canalOrigem,
           p_tipo_horario: tipoHorario,
+          p_horario_inicio: tipoHorario === "plantao" && horarioInicio ? new Date(horarioInicio).toISOString() : null,
+          p_horario_fim: tipoHorario === "plantao" && horarioFim ? new Date(horarioFim).toISOString() : null,
           p_observacao_agente: observacaoAgente || null,
           p_status_id: statusId || null,
           p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
