@@ -57,6 +57,133 @@ export function useDashboardData(filters: DashboardFilters) {
         fornecedorClientIds = new Set((cpByForn || []).map((r: any) => r.cliente_id));
       }
 
+      // === FIRE ALL FETCHES IN PARALLEL ===
+      const clientesRawPromise = fetchAllRows<any>(() => {
+        let q = supabase
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, data_cadastro, data_venda_efetiva, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
+          .lte('data_venda_efetiva', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        return q;
+      });
+      const novosClientesPromise = fetchAllRows<any>(() => {
+        let q = supabase
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, valor_ativacao, data_venda_efetiva, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
+          .gte('data_venda_efetiva', periodoInicioStr)
+          .lte('data_venda_efetiva', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        return q;
+      });
+      const cancelamentosPromise = fetchAllRows<any>(() => {
+        let q = supabase
+          .from('clientes')
+          .select('id, mensalidade, data_cadastro, data_ativacao, data_cancelamento, data_venda, motivo_cancelamento_id, unidade_base_id, fornecedor_id, razao_social, nome_fantasia')
+          .eq('cancelado', true)
+          .not('data_cancelamento', 'is', null)
+          .gte('data_cancelamento', periodoInicioStr)
+          .lte('data_cancelamento', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        return q;
+      });
+      const eventosCancelPromise = fetchAllRows<any>(() => {
+        let q = (supabase.from('contrato_eventos' as any) as any)
+          .select('cliente_id, contrato_id')
+          .eq('acao', 'cancelamento')
+          .gte('data_acao', periodoInicioStr)
+          .lte('data_acao', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+      const clientesInicioFullPromise = fetchAllRows<any>(() => {
+        let q = supabase
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, data_cancelamento, cancelado')
+          .lt('data_venda_efetiva', periodoInicioStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        return q;
+      });
+      const movimentosInicioRawPromise = fetchAllRows<any>(() => tf(supabase
+        .from('movimentos_mrr')
+        .select('cliente_id, valor_delta')
+        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation'])
+        .eq('status', 'ativo')
+        .is('estornado_por', null)
+        .is('estorno_de', null)
+        .lt('data_movimento', periodoInicioStr)));
+      const cacDataPromise = fetchAllRows<any>(() => tf(supabase
+        .from('cac_despesas')
+        .select('valor_alocado, unidade_base_id')
+        .lte('mes_inicial', periodoFimStr)
+        .eq('ativo', true)));
+      const movimentosPeriodoPromise = fetchAllRows<any>(() => tf(supabase
+        .from('movimentos_mrr')
+        .select('tipo, valor_delta, cliente_id')
+        .gte('data_movimento', periodoInicioStr)
+        .lte('data_movimento', periodoFimStr)
+        .eq('status', 'ativo')
+        .is('estornado_por', null)
+        .is('estorno_de', null)));
+      const movimentosInativadosPromise = fetchAllRows<any>(() => tf(supabase
+        .from('movimentos_mrr')
+        .select('tipo, valor_delta, cliente_id')
+        .eq('status', 'inativo')
+        .gte('inativado_em', periodoInicioStr)
+        .lte('inativado_em', periodoFimStr + 'T23:59:59')));
+      const reativacoesPeriodoPromise = fetchAllRows<any>(() => {
+        let q = (supabase.from('contrato_eventos' as any) as any)
+          .select('cliente_id, mensalidade_contrato_snapshot, data_acao')
+          .eq('acao', 'reativacao')
+          .gte('data_acao', periodoInicioStr)
+          .lte('data_acao', periodoFimStr);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+      const todosMovimentosAtivosPromise = fetchAllRows<any>(() => tf(supabase
+        .from('movimentos_mrr')
+        .select('cliente_id, valor_delta, data_movimento')
+        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation'])
+        .eq('status', 'ativo')
+        .is('estornado_por', null)
+        .is('estorno_de', null)
+        .lte('data_movimento', periodoFimStr)));
+      const __prevMonthStartParallel = format(startOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
+      const __prevMonthEndParallel = format(endOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
+      const prevNovosPromise = fetchAllRows<any>(() => {
+        let prevNovosQuery = supabase
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, valor_ativacao')
+          .gte('data_venda_efetiva', __prevMonthStartParallel)
+          .lte('data_venda_efetiva', __prevMonthEndParallel);
+        if (filters.unidadeBaseId) prevNovosQuery = prevNovosQuery.eq('unidade_base_id', filters.unidadeBaseId);
+        if (tid) prevNovosQuery = prevNovosQuery.eq('tenant_id', tid);
+        return prevNovosQuery;
+      });
+      const prevMovimentosPromise = fetchAllRows<any>(() => tf(supabase
+        .from('movimentos_mrr')
+        .select('tipo, valor_delta, cliente_id')
+        .gte('data_movimento', __prevMonthStartParallel)
+        .lte('data_movimento', __prevMonthEndParallel)
+        .eq('status', 'ativo')
+        .is('estornado_por', null)
+        .is('estorno_de', null)));
+      const allClientesPromise = fetchAllRows<any>(() => {
+        return tf(supabase
+          .from('vw_clientes_financeiro')
+          .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda_efetiva, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
+      });
+      const cpForDistFornPromise = fetchAllRows<any>(() => {
+        let q = (supabase.from('cliente_produtos' as any) as any)
+          .select('cliente_id, fornecedor_id')
+          .eq('ativo', true);
+        if (tid) q = q.eq('tenant_id', tid);
+        return q;
+      });
+
       // 1. Clientes ativos no fim do período — snapshot temporal
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       // Usa paginação para superar o limite de 1000 linhas do PostgREST (db-max-rows).
