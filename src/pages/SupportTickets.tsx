@@ -118,6 +118,7 @@ export default function SupportTickets() {
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
+  const [tipoHorarioFilter, setTipoHorarioFilter] = useState<string>("all");
   const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
   const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>([]);
   const [search, setSearch] = useState<string>("");
