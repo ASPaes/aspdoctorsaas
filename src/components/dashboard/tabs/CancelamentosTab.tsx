@@ -16,7 +16,7 @@ import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { CanceladosTable } from '../tables/CanceladosTable';
 import { SectionHeader } from '../SectionHeader';
-import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
+
 import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 
 import { MotivosCategoryStackedBar } from '../charts/MotivosCategoryStackedBar';
