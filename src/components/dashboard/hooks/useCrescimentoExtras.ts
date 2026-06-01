@@ -44,6 +44,14 @@ export interface CrescimentoExtras {
   // Velocity avançada
   growthPersistence: number | null;
 
+  // Net New histórico (médias móveis simples)
+  netNewHistorico: {
+    atual: number;
+    media3m: number | null;
+    media6m: number | null;
+    media12m: number | null;
+  };
+
   // Forecast
   mrrForecast: {
     points: Array<{ x: number; y: number; label: string }>;
@@ -171,6 +179,24 @@ export function useCrescimentoExtras(params: {
       const burnMultiple = calcBurnMultiple(cacBurn, metrics.netNewMrr);
       const magicNumber = calcMagicNumber(metrics.netNewMrr, cacBurn);
 
+      // ── Net New histórico (médias móveis) ──
+      const netNewMonthly: number[] = [];
+      for (let i = 1; i < mrrSeries24m.length; i++) {
+        netNewMonthly.push(mrrSeries24m[i].mrr - mrrSeries24m[i - 1].mrr);
+      }
+      const NN = netNewMonthly.length;
+      const smaWindow = (windowSize: number): number | null => {
+        if (NN < windowSize) return null;
+        const slice = netNewMonthly.slice(NN - windowSize, NN);
+        return slice.reduce((s, v) => s + v, 0) / windowSize;
+      };
+      const netNewHistorico = {
+        atual: NN > 0 ? netNewMonthly[NN - 1] : 0,
+        media3m: smaWindow(3),
+        media6m: smaWindow(6),
+        media12m: smaWindow(12),
+      };
+
       // ── Forecast MRR 90d ──
       let mrrForecast: CrescimentoExtras['mrrForecast'] = null;
       if (n >= 12) {
@@ -208,6 +234,7 @@ export function useCrescimentoExtras(params: {
         magicNumber,
         growthPersistence,
         mrrForecast,
+        netNewHistorico,
         mrrSeries24m,
       };
     },
