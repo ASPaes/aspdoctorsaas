@@ -9,7 +9,7 @@ import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
-import { DiagnosticoButton, DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
 import { useCertA1Data } from '../hooks/useCertA1Data';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
@@ -155,13 +155,6 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
 
   return (
     <div className="space-y-8">
-      {/* HEADER: Botão Diagnóstico */}
-      {diagnostico.severity !== 'ok' && (
-        <div className="flex justify-end">
-          <DiagnosticoButton diagnostico={diagnostico} onClick={() => setDiagOpen(true)} />
-        </div>
-      )}
-
       {/* BLOCO 1: Foto da Receita */}
       <section className="space-y-3">
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
