@@ -240,4 +240,74 @@ export const RULES: DiagnosticoRule[] = [
     buildCause: (i) => `GRR = ${fmtPct(i.grr!)} — vazamento estrutural reduz Net New (meta ≥ 95% pra crescer sem fricção)`,
     actionIds: ['audit_cancellations', 'health_score_immediate', 'retention_playbook'],
   },
+
+  // ═══════════ CANCELAMENTOS ═══════════
+
+  // CAN1 — Motivo concentrado (1 motivo > 25% do MRR perdido)
+  {
+    id: 'canc_motivo_concentrado_crit',
+    tab: 'cancelamentos',
+    severity: 'crit',
+    priority: 100,
+    match: (i) => i.motivoConcentradoPct !== undefined && i.motivoConcentradoPct > 0.25,
+    buildCause: (i) => `Motivo top concentra ${fmtPct(i.motivoConcentradoPct!)} do MRR perdido — risco binário (resolver 1 problema resolve a maior parte da sangria)`,
+    actionIds: ['motivo_root_cause_analysis', 'audit_cancellations', 'retention_playbook'],
+  },
+
+  // CAN2 — Segmento crítico (algum segmento churn > 50%)
+  {
+    id: 'canc_segmento_critico',
+    tab: 'cancelamentos',
+    severity: 'crit',
+    priority: 95,
+    match: (i) => i.segmentoChurnMax !== undefined && i.segmentoChurnMax > 0.5,
+    buildCause: (i) => `Há segmento com churn rate de ${fmtPct(i.segmentoChurnMax!)} — incêndio focal exige investigação antes de expandir nesse vertical`,
+    actionIds: ['segment_drill_down', 'audit_cancellations', 'cs_team_structure'],
+  },
+
+  // CAN3 — Tendência subindo crítica (motivo cresceu >1.3× em 6m)
+  {
+    id: 'canc_tendencia_subindo_crit',
+    tab: 'cancelamentos',
+    severity: 'crit',
+    priority: 90,
+    match: (i) => i.tendenciaSubindoFator !== undefined && i.tendenciaSubindoFator > 1.3,
+    buildCause: (i) => `Motivo de cancelamento cresceu ${fmtX(i.tendenciaSubindoFator!)} nos últimos 6m vs 6m anteriores — sinal novo, problema emergente`,
+    actionIds: ['motivo_root_cause_analysis', 'audit_cancellations', 'nps_survey'],
+  },
+
+  // CAN4 — Early Churn elevado (> 20% dos cancelados)
+  {
+    id: 'canc_early_churn_alto',
+    tab: 'cancelamentos',
+    severity: 'warn',
+    priority: 75,
+    match: (i) => i.earlyChurnRate !== undefined && i.earlyChurnRate > 0.2,
+    buildCause: (i) => `Early Churn = ${fmtPct(i.earlyChurnRate!)} dos cancelamentos saem em ≤90d — falha estrutural de onboarding ou ICP errado`,
+    actionIds: ['early_churn_taskforce', 'onboarding_overhaul', 'segment_drill_down'],
+  },
+
+  // CAN5 — Mortalidade alta (> 20% do volume)
+  {
+    id: 'canc_mortalidade_alta_warn',
+    tab: 'cancelamentos',
+    severity: 'warn',
+    priority: 70,
+    match: (i) => i.mortalidadeQtdPct !== undefined && i.mortalidadeQtdPct > 0.2,
+    buildCause: (i) => `${fmtPct(i.mortalidadeQtdPct!)} dos cancelamentos são "mortality" (cliente fechou/desuso) — sinal de baixa adoção do produto, não só preço`,
+    actionIds: ['mortality_outreach_review', 'nps_survey', 'health_score_immediate'],
+  },
+
+  // CAN6 — Win-back zero em base madura (tenant com ≥100 clientes)
+  {
+    id: 'canc_winback_zero_warn',
+    tab: 'cancelamentos',
+    severity: 'warn',
+    priority: 60,
+    match: (i) =>
+      i.winbackTotal12m !== undefined && i.winbackTotal12m === 0 &&
+      i.clientesAtivos !== undefined && i.clientesAtivos >= 100,
+    buildCause: () => `Zero reativações nos últimos 12 meses — sem processo ativo de win-back, cada cliente que sai vira receita perdida permanente`,
+    actionIds: ['winback_campaign_launch', 'retention_playbook', 'mortality_outreach_review'],
+  },
 ];
