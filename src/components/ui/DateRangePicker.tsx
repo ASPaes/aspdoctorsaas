@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
-import { startOfMonth, endOfMonth, subDays, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, subMonths } from "date-fns";
 import { CalendarDays } from "lucide-react";
 import "react-day-picker/dist/style.css";
 
