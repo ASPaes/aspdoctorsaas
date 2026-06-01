@@ -60,11 +60,11 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
 
   // Auto-link silencioso: 1 candidato + permissão para editar
   useEffect(() => {
-    if (suggestedCliente && canEdit && !isLinking && !isLinked) {
+    if (suggestedCliente && canEdit && !isLinking && !isLinked && !autoLinkBlocked) {
       linkCliente(suggestedCliente.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestedCliente?.id, canEdit, isLinked]);
+  }, [suggestedCliente?.id, canEdit, isLinked, autoLinkBlocked]);
 
   if (isLinked && linkedCliente) {
     const isBirthday = clienteDetails?.contato_aniversario
