@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   TrendingDown, Users, DollarSign, AlertTriangle, BarChart3,
-  Layers, Microscope, Clock, RotateCcw, Trophy,
+  Layers, Microscope, Clock, RotateCcw, Trophy, Route,
 } from 'lucide-react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -173,6 +173,13 @@ export function CancelamentosTab({
       ? cancExtras.categorias.mortality.qtd / cancExtras.cancelamentosQtd
       : 0;
 
+    // Maior churn rate entre origens com sample mínimo (≥3 cancelamentos)
+    const origemMaxChurn = cancExtras.cancelamentosPorOrigem.reduce((max, o) => {
+      if (o.qtd_cancelamentos < 3) return max;
+      const rate = o.churn_rate / 100; // RPC retorna em %, normalizar pra decimal
+      return rate > max ? rate : max;
+    }, 0);
+
     return {
       mrr: metrics.mrr,
       mrrCancelado: cancExtras.mrrCancelado,
@@ -184,6 +191,7 @@ export function CancelamentosTab({
       tendenciaSubindoFator,
       winbackTotal12m,
       mortalidadeQtdPct,
+      origemMaxChurn,
     };
   }, [cancExtras, metrics]);
 
@@ -296,24 +304,6 @@ export function CancelamentosTab({
         )}
       </section>
 
-      {/* ═══════ BLOCO 3.5 — ORIGEM DE AQUISIÇÃO ═══════ */}
-      <section className="space-y-3">
-        <SectionHeader
-          title="Origem de aquisição"
-          description="Quais canais trazem clientes que cancelam proporcionalmente mais"
-          icon={<DollarSign className={`${iconMd} text-primary`} />}
-          tvMode={tvMode}
-        />
-
-        {cancExtras ? (
-          <ChurnPorOrigemChart
-            cancelamentosPorOrigem={cancExtras.cancelamentosPorOrigem}
-            tvMode={tvMode}
-          />
-        ) : (
-          <Skeleton className="h-80" />
-        )}
-      </section>
 
       {/* ═══════ BLOCO 3 — SEGMENTAÇÃO ═══════ */}
       <section className="space-y-3">
@@ -334,6 +324,25 @@ export function CancelamentosTab({
             <Skeleton className="h-80" />
             <Skeleton className="h-80" />
           </div>
+        )}
+      </section>
+
+      {/* ═══════ BLOCO 3.5 — ORIGEM DE AQUISIÇÃO ═══════ */}
+      <section className="space-y-3">
+        <SectionHeader
+          title="Origem de aquisição dos cancelados"
+          description="Que canais trazem cliente que cancela mais — atribuído à origem do primeiro produto vendido"
+          icon={<Route className={`${iconMd} text-primary`} />}
+          tvMode={tvMode}
+        />
+
+        {cancExtras ? (
+          <ChurnPorOrigemChart
+            cancelamentosPorOrigem={cancExtras.cancelamentosPorOrigem}
+            tvMode={tvMode}
+          />
+        ) : (
+          <Skeleton className="h-80" />
         )}
       </section>
 
