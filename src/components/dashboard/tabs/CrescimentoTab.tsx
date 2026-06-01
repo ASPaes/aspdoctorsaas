@@ -66,7 +66,10 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const iconLg = tvMode ? 'h-8 w-8' : 'h-5 w-5';
   const iconMd = tvMode ? 'h-6 w-6' : 'h-4 w-4';
 
-
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+  const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const { data: ueData } = useUnitEconomicsSeries(filters);
   const { data: extras } = useCrescimentoExtras({ filters, metrics, unitEconomics: ueData, mcData });
