@@ -2899,16 +2899,19 @@ export type Database = {
       }
       motivos_cancelamento: {
         Row: {
+          categoria_churn: string | null
           descricao: string
           id: number
           tenant_id: string | null
         }
         Insert: {
+          categoria_churn?: string | null
           descricao: string
           id?: number
           tenant_id?: string | null
         }
         Update: {
+          categoria_churn?: string | null
           descricao?: string
           id?: number
           tenant_id?: string | null
@@ -7607,6 +7610,55 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      get_cancelamentos_breakdown: {
+        Args: {
+          p_fornecedor_id?: number
+          p_periodo_fim: string
+          p_periodo_inicio: string
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          bucket_181_365d_mrr: number
+          bucket_181_365d_qtd: number
+          bucket_91_180d_mrr: number
+          bucket_91_180d_qtd: number
+          bucket_ate_90d_mrr: number
+          bucket_ate_90d_qtd: number
+          bucket_mais_1y_mrr: number
+          bucket_mais_1y_qtd: number
+          cancelamentos_qtd: number
+          cat_involuntary_mrr: number
+          cat_involuntary_qtd: number
+          cat_mortality_mrr: number
+          cat_mortality_qtd: number
+          cat_sem_classif_mrr: number
+          cat_sem_classif_qtd: number
+          cat_voluntary_mrr: number
+          cat_voluntary_qtd: number
+          churn_por_segmento: Json
+          churn_rate_logo: number
+          churn_rate_mrr: number
+          clientes_inicio: number
+          early_churn_mrr: number
+          early_churn_qtd: number
+          early_churn_rate: number
+          evolucao_12m: Json
+          heatmap_motivo_segmento: Json
+          mrr_cancelado: number
+          mrr_inicio: number
+          mrr_liquido_perdido: number
+          mrr_reativado: number
+          net_logo_churn: number
+          reativacoes_12m: Json
+          reativacoes_qtd: number
+          tendencia_motivos: Json
+          tenure_medio_canc_dias: number
+          top_motivos: Json
+          top10_cancelados: Json
+          winback_rate_12m: number
+        }[]
       }
       get_client_alert_audit: {
         Args: { p_cliente_id?: string; p_contact_id?: string }
