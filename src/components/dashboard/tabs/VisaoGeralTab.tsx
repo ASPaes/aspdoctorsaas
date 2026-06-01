@@ -304,12 +304,12 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         </div>
       </section>
 
-      {/* BLOCO 4: Diagnóstico Inline */}
-      {diagnostico.severity !== 'ok' && (
-        <section>
-          <DiagnosticoInlineCard diagnostico={diagnostico} onSeeMore={() => setDiagOpen(true)} />
-        </section>
-      )}
+      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
+      <DiagnosticoSection
+        diagnostico={diagnostico}
+        onSeeMore={() => setDiagOpen(true)}
+        tvMode={tvMode}
+      />
 
       {/* BLOCO 5: Gráficos + Comparativos */}
       <section className="space-y-3">
