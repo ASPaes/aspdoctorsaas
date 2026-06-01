@@ -732,7 +732,13 @@ export function CreateSupportTicketModal({
               <button
                 key={t}
                 type="button"
-                onClick={() => setTipoHorario(t)}
+                onClick={() => {
+                  setTipoHorario(t);
+                  if (t === "comercial") {
+                    setHorarioInicio("");
+                    setHorarioFim("");
+                  }
+                }}
                 className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
                   tipoHorario === t
                     ? "bg-primary/10 text-primary border-primary"
