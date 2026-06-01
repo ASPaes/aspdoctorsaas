@@ -49,6 +49,15 @@ export interface Top10Cancelado {
   data_cancelamento: string;
 }
 
+export interface CancelamentoOrigem {
+  origem: string;
+  qtd_cancelamentos: number;
+  mrr_cancelado: number;
+  qtd_ativos_inicio: number;
+  churn_rate: number;
+  ticket_medio_cancelado: number;
+}
+
 export interface EvolucaoMes {
   mes: string;
   qtd: number;
@@ -103,6 +112,7 @@ export interface CancelamentosExtras {
   top10Cancelados: Top10Cancelado[];
   evolucao12m: EvolucaoMes[];
   reativacoes12m: ReativacaoMes[];
+  cancelamentosPorOrigem: CancelamentoOrigem[];
 }
 
 /**
@@ -215,6 +225,7 @@ export function useCancelamentosExtras(params: {
         top10Cancelados: (row.top10_cancelados ?? []) as Top10Cancelado[],
         evolucao12m: (row.evolucao_12m ?? []) as EvolucaoMes[],
         reativacoes12m: (row.reativacoes_12m ?? []) as ReativacaoMes[],
+        cancelamentosPorOrigem: (row.cancelamentos_por_origem ?? []) as CancelamentoOrigem[],
       };
     },
   });

@@ -7628,6 +7628,7 @@ export type Database = {
           bucket_ate_90d_qtd: number
           bucket_mais_1y_mrr: number
           bucket_mais_1y_qtd: number
+          cancelamentos_por_origem: Json
           cancelamentos_qtd: number
           cat_involuntary_mrr: number
           cat_involuntary_qtd: number
