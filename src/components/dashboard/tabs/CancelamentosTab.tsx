@@ -296,6 +296,25 @@ export function CancelamentosTab({
         )}
       </section>
 
+      {/* ═══════ BLOCO 3.5 — ORIGEM DE AQUISIÇÃO ═══════ */}
+      <section className="space-y-3">
+        <SectionHeader
+          title="Origem de aquisição"
+          description="Quais canais trazem clientes que cancelam proporcionalmente mais"
+          icon={<DollarSign className={`${iconMd} text-primary`} />}
+          tvMode={tvMode}
+        />
+
+        {cancExtras ? (
+          <ChurnPorOrigemChart
+            cancelamentosPorOrigem={cancExtras.cancelamentosPorOrigem}
+            tvMode={tvMode}
+          />
+        ) : (
+          <Skeleton className="h-80" />
+        )}
+      </section>
+
       {/* ═══════ BLOCO 3 — SEGMENTAÇÃO ═══════ */}
       <section className="space-y-3">
         <SectionHeader
