@@ -28,15 +28,12 @@ export function normalizeBRPhone(raw: string): NormalizedPhone {
 
   let isLandline = false;
 
-  // 12 dígitos com 55 = DDD + 8 dígitos
-  // 1º dígito após DDD: 2-5 → fixo (mantém 12 dígitos)
-  //                     6-9 → celular antigo sem o 9 → adiciona 9
+  // Identifica fixo BR para informação semântica (isLandline).
+  // NÃO modifica os dígitos — o número é preservado exatamente como veio do provedor.
   if (digits.startsWith('55') && digits.length === 12) {
     const firstDigit = digits[4];
     if (/[2-5]/.test(firstDigit)) {
       isLandline = true;
-    } else if (/[6-9]/.test(firstDigit)) {
-      digits = digits.slice(0, 4) + '9' + digits.slice(4);
     }
   }
 
