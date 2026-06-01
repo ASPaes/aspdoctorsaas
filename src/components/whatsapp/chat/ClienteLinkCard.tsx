@@ -34,6 +34,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
   const navigate = useNavigate();
   const phoneNumber = conversation.contact?.phone_number || "";
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
+  const autoLinkBlocked = metadata?.auto_link_blocked === true;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -59,11 +60,11 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
 
   // Auto-link silencioso: 1 candidato + permissão para editar
   useEffect(() => {
-    if (suggestedCliente && canEdit && !isLinking && !isLinked) {
+    if (suggestedCliente && canEdit && !isLinking && !isLinked && !autoLinkBlocked) {
       linkCliente(suggestedCliente.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestedCliente?.id, canEdit, isLinked]);
+  }, [suggestedCliente?.id, canEdit, isLinked, autoLinkBlocked]);
 
   if (isLinked && linkedCliente) {
     const isBirthday = clienteDetails?.contato_aniversario
@@ -197,21 +198,16 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                 <AlertDialogHeader>
                   <AlertDialogTitle>Desvincular cliente</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Deseja apenas remover o vínculo desta conversa, ou também remover este número do cadastro de contatos do cliente? Remover o contato evita que ele apareça como sugestão automática em conversas futuras.
+                    O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2">
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => { unlinkCliente(false); setUnlinkDialogOpen(false); }}
-                  >
-                    Apenas desvincular
-                  </AlertDialogAction>
-                  <AlertDialogAction
                     onClick={() => { unlinkCliente(true); setUnlinkDialogOpen(false); }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Desvincular e remover contato
+                    Desvincular
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
