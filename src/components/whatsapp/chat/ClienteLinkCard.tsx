@@ -173,7 +173,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
               size="sm"
               variant="ghost"
               className="h-6 text-[10px] text-destructive hover:text-destructive gap-1"
-              onClick={unlinkCliente}
+              onClick={() => unlinkCliente()}
               disabled={isUnlinking}
             >
               {isUnlinking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlink className="h-3 w-3" />}
