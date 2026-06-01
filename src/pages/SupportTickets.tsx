@@ -782,16 +782,7 @@ export default function SupportTickets() {
       {/* Toolbar: filtros globais + views */}
       <div className="flex items-center gap-2 flex-wrap">
         <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 gap-1"
-          disabled={filteredTickets.length === 0}
-          onClick={() => exportTicketsXlsx(filteredTickets)}
-        >
-          <Download className="h-4 w-4" />
-          Exportar
-        </Button>
+
         <Select value={ticketStateFilter} onValueChange={setTicketStateFilter}>
           <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -1132,6 +1123,16 @@ export default function SupportTickets() {
             )}
           </PopoverContent>
         </Popover>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1"
+          disabled={filteredTickets.length === 0}
+          onClick={() => exportTicketsXlsx(filteredTickets)}
+        >
+          <Download className="h-4 w-4" />
+          Exportar
+        </Button>
         <div className="flex-1" />
         {/* View switcher */}
         <div className="flex items-center border rounded-md overflow-hidden">
