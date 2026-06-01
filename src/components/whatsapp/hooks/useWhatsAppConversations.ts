@@ -107,8 +107,8 @@ export function useConversationCounts(filters?: ConversationsFilters) {
 
   return useQuery({
     queryKey: ['whatsapp', 'conversation-counts', filters, tid],
-    staleTime: 10_000,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const [countResult, unreadResult, waitingResult] = await Promise.all([
@@ -175,8 +175,8 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['whatsapp', 'conversations', filters, tid],
-    staleTime: 10_000,
-    refetchInterval: 10_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       let query = supabase
