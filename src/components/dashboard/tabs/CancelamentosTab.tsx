@@ -147,7 +147,7 @@ export function CancelamentosTab({
   const hasEarlyChurn = metrics.cancelamentosEarly > 0 || metrics.mrrCanceladoEarly > 0;
 
   // ─── Diagnóstico ─────────────────────────────────────────
-  const diagInput: DiagnosticoInput = useMemo(() => {
+  const diagInput: DiagnosticoInput & Record<string, any> = useMemo(() => {
     if (!cancExtras) return { clientesAtivos: metrics.clientesAtivos };
 
     const motivoConcentradoPct = cancExtras.mrrCancelado > 0 && cancExtras.topMotivos.length > 0
@@ -192,6 +192,7 @@ export function CancelamentosTab({
       winbackTotal12m,
       mortalidadeQtdPct,
       origemMaxChurn,
+      cancelamentosPorOrigem: cancExtras.cancelamentosPorOrigem,
     };
   }, [cancExtras, metrics]);
 
