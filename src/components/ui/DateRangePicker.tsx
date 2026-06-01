@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
-import { startOfMonth, endOfMonth, subDays, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, subMonths } from "date-fns";
 import { CalendarDays } from "lucide-react";
 import "react-day-picker/dist/style.css";
 
@@ -54,21 +54,21 @@ const shortcuts: Shortcut[] = [
     label: "Hoje",
     getRange: () => {
       const today = new Date();
-      return { from: today, to: today };
+      return { from: startOfDay(today), to: endOfDay(today) };
     },
   },
   {
     label: "Últimos 7 dias",
     getRange: () => {
       const today = new Date();
-      return { from: subDays(today, 6), to: today };
+      return { from: startOfDay(subDays(today, 6)), to: endOfDay(today) };
     },
   },
   {
     label: "Este mês",
     getRange: () => {
       const today = new Date();
-      return { from: startOfMonth(today), to: today };
+      return { from: startOfMonth(today), to: endOfDay(today) };
     },
   },
   {
@@ -106,7 +106,10 @@ function DateRangePicker({
   };
 
   const handleApply = () => {
-    onDateRangeChange(tempRange);
+    onDateRangeChange({
+      from: startOfDay(tempRange.from),
+      to: endOfDay(tempRange.to),
+    });
     setOpen(false);
   };
 
