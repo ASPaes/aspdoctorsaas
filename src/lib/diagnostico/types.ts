@@ -62,6 +62,14 @@ export interface DiagnosticoInput {
   netLogoGrowth?: number;       // absoluto (+12)
   logoGrowthRate?: number;      // decimal (0.018 = 1.8%)
   growthPersistence?: number;   // ratio (0.9 = mantendo, >1 = acelerando)
+
+  // Cancelamentos V2 — derivados do useCancelamentosExtras
+  earlyChurnRate?: number;          // decimal (0.18 = 18%)
+  motivoConcentradoPct?: number;    // decimal — % do MRR perdido concentrado no motivo top 1
+  segmentoChurnMax?: number;        // decimal — maior churn_rate entre segmentos com base relevante (≥5 clientes)
+  tendenciaSubindoFator?: number;   // ratio recente_6m / anterior_6m do motivo que mais cresceu (1.3 = +30%)
+  winbackTotal12m?: number;         // qtd reativações nos últimos 12 meses
+  mortalidadeQtdPct?: number;       // decimal — % do volume de cancelamentos categorizados como mortality
 }
 
 /**
