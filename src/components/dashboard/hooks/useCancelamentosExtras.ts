@@ -112,6 +112,7 @@ export interface CancelamentosExtras {
   top10Cancelados: Top10Cancelado[];
   evolucao12m: EvolucaoMes[];
   reativacoes12m: ReativacaoMes[];
+  cancelamentosPorOrigem: CancelamentoOrigem[];
 }
 
 /**
