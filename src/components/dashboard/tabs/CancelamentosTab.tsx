@@ -29,7 +29,7 @@ import { ReativacoesCard as ReativacoesCardV2 } from '../charts/ReativacoesCard'
 import { Top10CanceladosTable } from '../charts/Top10CanceladosTable';
 
 import { useCancelamentosExtras } from '../hooks/useCancelamentosExtras';
-import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
+
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 
 import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem, DashboardFilters } from '../types';
