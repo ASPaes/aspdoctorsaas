@@ -10,7 +10,7 @@ import { MrrForecastChart, GrowthRateBarChart } from '../charts/CrescimentoChart
 import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { SectionHeader } from '../SectionHeader';
-import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
+
 import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
