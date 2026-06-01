@@ -8313,6 +8313,13 @@ export type Database = {
         Args: { p_conversation_id: string; p_cooldown_minutes?: number }
         Returns: boolean
       }
+      unlink_cliente_from_conversation: {
+        Args: {
+          p_conversation_id: string
+          p_remove_phone_from_contacts?: boolean
+        }
+        Returns: Json
+      }
       unmute_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined

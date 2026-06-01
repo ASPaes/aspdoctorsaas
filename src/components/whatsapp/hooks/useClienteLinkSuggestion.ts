@@ -171,36 +171,22 @@ export function useClienteLinkSuggestion(
 
   // 4) Mutação unlink
   const unlinkMutation = useMutation({
-    mutationFn: async () => {
-      let resolvedAttendanceId = attendanceId;
-      if (!resolvedAttendanceId) {
-        const { data: active } = await supabase
-          .from('support_attendances')
-          .select('id')
-          .eq('conversation_id', conversationId)
-          .neq('status', 'closed')
-          .order('opened_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        resolvedAttendanceId = active?.id ?? null;
-      }
-
-      if (resolvedAttendanceId) {
-        const { error } = await supabase.rpc('set_attendance_cliente', {
-          p_attendance_id: resolvedAttendanceId,
-          p_cliente_id: null,
-        });
-        if (error) throw error;
-        return;
-      }
-      const newMetadata = { ...(currentMetadata || {}) } as any;
-      delete newMetadata.cliente_id;
-      const { error } = await supabase
-        .from('whatsapp_conversations')
-        .update({ metadata: newMetadata })
-        .eq('id', conversationId);
+    mutationFn: async (removePhoneFromContacts: boolean = false) => {
+      const { error } = await supabase.rpc('unlink_cliente_from_conversation', {
+        p_conversation_id: conversationId,
+        p_remove_phone_from_contacts: removePhoneFromContacts,
+      });
       if (error) throw error;
     },
+    onSuccess: (_data, removePhoneFromContacts) => {
+      toast.success(removePhoneFromContacts ? 'Vínculo e contato removidos' : 'Vínculo removido');
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente-linked'] });
+      queryClient.invalidateQueries({ queryKey: ['cliente-candidatos-by-phone'] });
+      queryClient.invalidateQueries({ queryKey: ['relevant-attendance'] });
+    },
+    onError: (err: any) => toast.error(`Erro ao desvincular: ${err?.message ?? 'desconhecido'}`),
+  });
     onSuccess: () => {
       toast.success('Vínculo removido');
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
