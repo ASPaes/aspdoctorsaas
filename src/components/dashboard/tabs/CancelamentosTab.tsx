@@ -23,6 +23,7 @@ import { MotivosCategoryStackedBar } from '../charts/MotivosCategoryStackedBar';
 import { MotivosBreakdownChart } from '../charts/MotivosBreakdownChart';
 import { MotivosTendenciaChart } from '../charts/MotivosTendenciaChart';
 import { ChurnPorSegmentoChart } from '../charts/ChurnPorSegmentoChart';
+import { ChurnPorOrigemChart } from '../charts/ChurnPorOrigemChart';
 import { MotivoSegmentoHeatmap } from '../charts/MotivoSegmentoHeatmap';
 import { TenureBucketsChart } from '../charts/TenureBucketsChart';
 import { ReativacoesCard as ReativacoesCardV2 } from '../charts/ReativacoesCard';
@@ -292,6 +293,25 @@ export function CancelamentosTab({
               <Skeleton className="h-80" />
             </div>
           </>
+        )}
+      </section>
+
+      {/* ═══════ BLOCO 3.5 — ORIGEM DE AQUISIÇÃO ═══════ */}
+      <section className="space-y-3">
+        <SectionHeader
+          title="Origem de aquisição"
+          description="Quais canais trazem clientes que cancelam proporcionalmente mais"
+          icon={<DollarSign className={`${iconMd} text-primary`} />}
+          tvMode={tvMode}
+        />
+
+        {cancExtras ? (
+          <ChurnPorOrigemChart
+            cancelamentosPorOrigem={cancExtras.cancelamentosPorOrigem}
+            tvMode={tvMode}
+          />
+        ) : (
+          <Skeleton className="h-80" />
         )}
       </section>
 
