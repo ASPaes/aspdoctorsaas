@@ -192,6 +192,7 @@ export function CancelamentosTab({
       winbackTotal12m,
       mortalidadeQtdPct,
       origemMaxChurn,
+      cancelamentosPorOrigem: cancExtras.cancelamentosPorOrigem,
     };
   }, [cancExtras, metrics]);
 
