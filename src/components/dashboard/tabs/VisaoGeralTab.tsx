@@ -9,7 +9,7 @@ import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
-import { DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useCertA1Data } from '../hooks/useCertA1Data';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
