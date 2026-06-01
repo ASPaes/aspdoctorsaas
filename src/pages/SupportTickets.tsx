@@ -1123,6 +1123,16 @@ export default function SupportTickets() {
             )}
           </PopoverContent>
         </Popover>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1"
+          disabled={filteredTickets.length === 0}
+          onClick={() => exportTicketsXlsx(filteredTickets)}
+        >
+          <Download className="h-4 w-4" />
+          Exportar
+        </Button>
         <div className="flex-1" />
         {/* View switcher */}
         <div className="flex items-center border rounded-md overflow-hidden">
