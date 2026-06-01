@@ -106,7 +106,7 @@ export function CancelamentosTab({
   const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const { data: cancExtras } = useCancelamentosExtras({ filters, metrics });
-  const { data: vgExtras } = useVisaoGeralExtras(filters);
+  
 
   // ─── Deltas dos 4 KPIs principais (preservado da V1) ────
   const churnQtdArr = timeSeries.churnQtdEvolution;
