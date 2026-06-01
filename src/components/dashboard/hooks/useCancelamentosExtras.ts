@@ -49,6 +49,15 @@ export interface Top10Cancelado {
   data_cancelamento: string;
 }
 
+export interface CancelamentoOrigem {
+  origem: string;
+  qtd_cancelamentos: number;
+  mrr_cancelado: number;
+  qtd_ativos_inicio: number;
+  churn_rate: number;
+  ticket_medio_cancelado: number;
+}
+
 export interface EvolucaoMes {
   mes: string;
   qtd: number;
