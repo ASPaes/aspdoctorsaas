@@ -8172,6 +8172,17 @@ export type Database = {
         Args: { p_attendance_id: string; p_scheduled_until: string }
         Returns: Json
       }
+      search_clientes_for_link: {
+        Args: { p_tenant_id: string; p_term: string }
+        Returns: {
+          cnpj: string
+          codigo_sequencial: number
+          id: string
+          nome_fantasia: string
+          razao_social: string
+          telefone_whatsapp: string
+        }[]
+      }
       search_conversations_by_contact: {
         Args: {
           p_instance_ids?: string[]
