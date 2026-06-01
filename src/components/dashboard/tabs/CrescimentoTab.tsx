@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { ARPAComboCard, ReativacoesCard } from '../cards/CrescimentoCustomCards';
-import { NetNewMrrWaterfallChart } from '../charts/NetNewMrrWaterfallChart';
+import { NetNewMrrStackedChart } from '../charts/NetNewMrrStackedChart';
 import { MrrForecastChart, GrowthRateBarChart } from '../charts/CrescimentoCharts';
 import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
@@ -270,7 +270,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         {/* Waterfall (2/3) + ReativacoesCard (1/3) */}
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <NetNewMrrWaterfallChart
+            <NetNewMrrStackedChart
               newMrr={metrics.newMrr}
               upsellMrr={metrics.upsellMrr}
               crossSellMrr={metrics.crossSellMrr}
@@ -279,6 +279,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
               downsellMrr={metrics.downsellMrr}
               mrrCancelado={metrics.mrrCancelado}
               netNewMrr={metrics.netNewMrr}
+              historico={extras?.netNewHistorico}
               tvMode={tvMode}
             />
           </div>
