@@ -645,6 +645,53 @@ export default function SupportTickets() {
     return { total, terminais, ativos };
   }, [filteredTickets, ticketStatuses]);
 
+  const exportTicketsXlsx = async (rows: TicketRow[]) => {
+    const XLSX = await import("xlsx");
+    const getAgentName = (uid: string | null) => uid ? agentes.find(a => a.user_id === uid)?.nome ?? "" : "";
+    const getStatusName = (sid: string | null) => sid ? getStatusInfo(sid).name ?? "" : "";
+    const fmtDate = (d: string | null) => d ? new Date(d).toLocaleString("pt-BR") : "";
+    const fmtDuration = (min: number | null) => {
+      if (min == null) return "";
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return h > 0 ? `${h}h ${m}min` : `${m}min`;
+    };
+    const data: Record<string, any>[] = rows.map(t => ({
+      "Código": t.ticket_code ?? "",
+      "Cliente": t.clientes?.nome_fantasia ?? "",
+      "Assunto": t.assunto ?? "",
+      "Produto": t.produtos?.nome ?? "",
+      "Categoria": t.service_categories?.nome ?? "",
+      "Subcategoria": t.service_subcategories?.nome ?? "",
+      "Tipo": t.service_types?.nome ?? "",
+      "Canal": t.canal_origem ?? "",
+      "Tipo Horário": t.tipo_horario === "plantao" ? "Plantão" : "Comercial",
+      "Status": getStatusName(t.status_id),
+      "Prioridade": t.prioridade ?? "",
+      "Responsável": getAgentName(t.responsavel_user_id),
+      "Aberto em": fmtDate(t.aberto_em),
+      "Concluído em": fmtDate(t.concluido_em),
+      "Hr Início Plantão": fmtDate(t.horario_inicio),
+      "Hr Fim Plantão": fmtDate(t.horario_fim),
+      "Duração (min)": t.duracao_minutos ?? "",
+      "Duração Formatada": fmtDuration(t.duracao_minutos),
+    }));
+    const totalMinutos = rows.reduce((sum, t) => sum + (t.duracao_minutos ?? 0), 0);
+    data.push({
+      "Código": "", "Cliente": "", "Assunto": "", "Produto": "", "Categoria": "",
+      "Subcategoria": "", "Tipo": "", "Canal": "", "Tipo Horário": "", "Status": "",
+      "Prioridade": "", "Responsável": `TOTAL (${rows.length} tickets)`,
+      "Aberto em": "", "Concluído em": "", "Hr Início Plantão": "", "Hr Fim Plantão": "",
+      "Duração (min)": totalMinutos, "Duração Formatada": fmtDuration(totalMinutos),
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tickets");
+    const prefix = tipoHorarioFilter === "plantao" ? "plantao" : tipoHorarioFilter === "comercial" ? "comercial" : "tickets";
+    XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       {/* Header */}
