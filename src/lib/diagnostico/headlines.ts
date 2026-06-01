@@ -9,6 +9,42 @@ export function buildHeadline(
   severity: Severity,
   tab?: DiagnosticoTab,
 ): string {
+  // ─── Padrões específicos da aba Cancelamentos ───
+  if (tab === 'cancelamentos') {
+    // Concentração crítica de motivo (risco binário)
+    if (input.motivoConcentradoPct !== undefined && input.motivoConcentradoPct > 0.25) {
+      return `Cancelamento concentrado em um único motivo — risco binário. Resolver um problema resolve a maior parte da sangria.`;
+    }
+
+    // Segmento crítico (incêndio focal)
+    if (input.segmentoChurnMax !== undefined && input.segmentoChurnMax > 0.5) {
+      return `Um segmento da carteira está sangrando — antes de expandir nesse vertical, entender por quê.`;
+    }
+
+    // Tendência subindo forte (problema emergente)
+    if (input.tendenciaSubindoFator !== undefined && input.tendenciaSubindoFator > 1.3) {
+      return `Cancelamentos estão acelerando — motivo emergente sinaliza problema novo, não estrutural. Janela curta pra agir.`;
+    }
+
+    // Early Churn alto (onboarding/ICP)
+    if (input.earlyChurnRate !== undefined && input.earlyChurnRate > 0.2) {
+      return `Cliente está saindo antes de ver valor. Onboarding fraco ou ICP errado — você perde antes mesmo do produto provar nada.`;
+    }
+
+    // Win-back zero em base madura
+    if (
+      input.winbackTotal12m !== undefined && input.winbackTotal12m === 0 &&
+      input.clientesAtivos !== undefined && input.clientesAtivos >= 100
+    ) {
+      return `Cliente que sai vira receita perdida permanente. Sem processo de reativação, você reinventa a roda toda venda.`;
+    }
+
+    // Mortalidade alta (desuso)
+    if (input.mortalidadeQtdPct !== undefined && input.mortalidadeQtdPct > 0.2) {
+      return `Clientes morrem por desuso, não por preço — sinal forte de baixa adoção do produto.`;
+    }
+  }
+
   // ─── Padrões específicos da aba Crescimento ───
   if (tab === 'crescimento') {
     // Crescimento dependente de aquisição (expansion fraca + R40 baixo)
