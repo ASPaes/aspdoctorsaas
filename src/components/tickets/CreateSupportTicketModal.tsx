@@ -1025,6 +1025,48 @@ export function CreateSupportTicketModal({
               </div>
             </div>
 
+            {tipoHorario === "plantao" && (
+              <div className="space-y-2 p-3 rounded-md border border-amber-500/30 bg-amber-500/5">
+                <p className="text-xs font-medium text-amber-600 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Horários de Plantão
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Início</Label>
+                    <Input
+                      type="datetime-local"
+                      className="h-8 text-xs"
+                      value={horarioInicio}
+                      onChange={(e) => setHorarioInicio(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Vazio = agora</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fim</Label>
+                    <Input
+                      type="datetime-local"
+                      className="h-8 text-xs"
+                      value={horarioFim}
+                      onChange={(e) => setHorarioFim(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Vazio = aberto</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Duração</Label>
+                    <p className="text-sm h-8 flex items-center font-semibold text-amber-700">
+                      {horarioInicio && horarioFim
+                        ? (() => {
+                            const diff = Math.round((new Date(horarioFim).getTime() - new Date(horarioInicio).getTime()) / 60000);
+                            return diff > 0 ? `${Math.floor(diff / 60)}h ${diff % 60}min` : "—";
+                          })()
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Descrição */}
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Descrição</Label>
