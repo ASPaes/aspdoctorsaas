@@ -157,6 +157,12 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const burnMultiple = extras?.burnMultiple;
   const magicNumber = extras?.magicNumber;
 
+  const tabLabel = useMemo(() => {
+    const now = new Date();
+    const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    return `Crescimento · ${meses[now.getMonth()]} ${now.getFullYear()}`;
+  }, []);
+
   return (
     <div className="space-y-8">
       {/* HEADER: Botão Diagnóstico */}
@@ -538,6 +544,18 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         diagnostico={diagnostico}
         open={diagOpen}
         onOpenChange={setDiagOpen}
+        tabLabel={tabLabel}
+        tenantId={effectiveTenantId || undefined}
+        tabKey="crescimento"
+        diagInput={diagInput as Record<string, any>}
+        filtrosAplicados={{
+          unidadeBaseId: filters.unidadeBaseId,
+          fornecedorId: filters.fornecedorId,
+          periodoInicio: filters.periodoInicio,
+          periodoFim: filters.periodoFim,
+        }}
+        isAdmin={isAdmin}
+        isAdminOrHead={isAdminOrHead}
       />
     </div>
   );
