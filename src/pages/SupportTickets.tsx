@@ -916,6 +916,17 @@ export default function SupportTickets() {
                     </Select>
                   </div>
                   <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tipo horário</label>
+                    <Select value={tipoHorarioFilter} onValueChange={setTipoHorarioFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="comercial">Comercial</SelectItem>
+                        <SelectItem value="plantao">Plantão</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">Tipo serviço</label>
                     <Popover>
                       <PopoverTrigger asChild>
