@@ -26,6 +26,11 @@ export function buildHeadline(
       return `Cancelamentos estão acelerando — motivo emergente sinaliza problema novo, não estrutural. Janela curta pra agir.`;
     }
 
+    // Origem perigosa (canal de aquisição trazendo cliente que cancela)
+    if (input.origemMaxChurn !== undefined && input.origemMaxChurn >= 0.05) {
+      return `Existe canal de aquisição trazendo cliente que cancela demais. Revisar ICP/qualidade de lead dessa origem ou cortar investimento nela.`;
+    }
+
     // Early Churn alto (onboarding/ICP)
     if (input.earlyChurnRate !== undefined && input.earlyChurnRate > 0.2) {
       return `Cliente está saindo antes de ver valor. Onboarding fraco ou ICP errado — você perde antes mesmo do produto provar nada.`;

@@ -310,4 +310,15 @@ export const RULES: DiagnosticoRule[] = [
     buildCause: () => `Zero reativações nos últimos 12 meses — sem processo ativo de win-back, cada cliente que sai vira receita perdida permanente`,
     actionIds: ['winback_campaign_launch', 'retention_playbook', 'mortality_outreach_review'],
   },
+
+  // CAN7 — Origem de aquisição com churn perigoso
+  {
+    id: 'canc_origem_high_churn_crit',
+    tab: 'cancelamentos',
+    severity: 'crit',
+    priority: 88,
+    match: (i) => i.origemMaxChurn !== undefined && i.origemMaxChurn >= 0.05,
+    buildCause: (i) => `Existe canal de aquisição com churn rate de ${fmtPct(i.origemMaxChurn!)} no período — cliente vem por essa origem e cancela muito acima da média`,
+    actionIds: ['segment_drill_down', 'motivo_root_cause_analysis', 'audit_cancellations'],
+  },
 ];

@@ -70,6 +70,7 @@ export interface DiagnosticoInput {
   tendenciaSubindoFator?: number;   // ratio recente_6m / anterior_6m do motivo que mais cresceu (1.3 = +30%)
   winbackTotal12m?: number;         // qtd reativações nos últimos 12 meses
   mortalidadeQtdPct?: number;       // decimal — % do volume de cancelamentos categorizados como mortality
+  origemMaxChurn?: number;          // decimal — maior churn rate entre origens com ≥3 cancelamentos no período (0.07 = 7%)
 }
 
 /**
