@@ -11,7 +11,7 @@ import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { SectionHeader } from '../SectionHeader';
 import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
-import { DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
@@ -430,12 +430,12 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         </div>
       </section>
 
-      {/* ═══════ DIAGNÓSTICO INLINE ═══════ */}
-      {diagnostico.severity !== 'ok' && (
-        <section>
-          <DiagnosticoInlineCard diagnostico={diagnostico} onSeeMore={() => setDiagOpen(true)} />
-        </section>
-      )}
+      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
+      <DiagnosticoSection
+        diagnostico={diagnostico}
+        onSeeMore={() => setDiagOpen(true)}
+        tvMode={tvMode}
+      />
 
       {/* ═══════ BLOCO 5 — EVOLUÇÃO TEMPORAL ═══════ */}
       <section className="space-y-3">

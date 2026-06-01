@@ -9,7 +9,7 @@ import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { LineChartCard } from '../charts/LineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
-import { DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
 import { useCertA1Data } from '../hooks/useCertA1Data';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
@@ -304,12 +304,12 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
         </div>
       </section>
 
-      {/* BLOCO 4: Diagnóstico Inline */}
-      {diagnostico.severity !== 'ok' && (
-        <section>
-          <DiagnosticoInlineCard diagnostico={diagnostico} onSeeMore={() => setDiagOpen(true)} />
-        </section>
-      )}
+      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
+      <DiagnosticoSection
+        diagnostico={diagnostico}
+        onSeeMore={() => setDiagOpen(true)}
+        tvMode={tvMode}
+      />
 
       {/* BLOCO 5: Gráficos + Comparativos */}
       <section className="space-y-3">
