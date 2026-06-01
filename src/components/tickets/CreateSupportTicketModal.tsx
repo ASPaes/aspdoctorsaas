@@ -96,6 +96,8 @@ export function CreateSupportTicketModal({
   const [serviceTypeId, setServiceTypeId] = useState<string>("");
   const [canalOrigem, setCanalOrigem] = useState<string>("telefone");
   const [tipoHorario, setTipoHorario] = useState<string>("comercial");
+  const [horarioInicio, setHorarioInicio] = useState<string>("");
+  const [horarioFim, setHorarioFim] = useState<string>("");
   const [prioridade, setPrioridade] = useState<string>("media");
   const [statusId, setStatusId] = useState<string>("");
   const [agendadoPara, setAgendadoPara] = useState<string>("");
@@ -538,6 +540,8 @@ export function CreateSupportTicketModal({
           p_service_type_id: serviceTypeId,
           p_canal_origem: canalOrigem,
           p_tipo_horario: tipoHorario,
+          p_horario_inicio: tipoHorario === "plantao" && horarioInicio ? new Date(horarioInicio).toISOString() : null,
+          p_horario_fim: tipoHorario === "plantao" && horarioFim ? new Date(horarioFim).toISOString() : null,
           p_observacao_agente: observacaoAgente || null,
           p_status_id: statusId || null,
           p_agendado_para: agendadoPara ? new Date(agendadoPara).toISOString() : null,
@@ -730,7 +734,13 @@ export function CreateSupportTicketModal({
               <button
                 key={t}
                 type="button"
-                onClick={() => setTipoHorario(t)}
+                onClick={() => {
+                  setTipoHorario(t);
+                  if (t === "comercial") {
+                    setHorarioInicio("");
+                    setHorarioFim("");
+                  }
+                }}
                 className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
                   tipoHorario === t
                     ? "bg-primary/10 text-primary border-primary"
@@ -1014,6 +1024,48 @@ export function CreateSupportTicketModal({
                 </Select>
               </div>
             </div>
+
+            {tipoHorario === "plantao" && (
+              <div className="space-y-2 p-3 rounded-md border border-amber-500/30 bg-amber-500/5">
+                <p className="text-xs font-medium text-amber-600 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Horários de Plantão
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Início</Label>
+                    <Input
+                      type="datetime-local"
+                      className="h-8 text-xs"
+                      value={horarioInicio}
+                      onChange={(e) => setHorarioInicio(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Vazio = agora</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fim</Label>
+                    <Input
+                      type="datetime-local"
+                      className="h-8 text-xs"
+                      value={horarioFim}
+                      onChange={(e) => setHorarioFim(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Vazio = aberto</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Duração</Label>
+                    <p className="text-sm h-8 flex items-center font-semibold text-amber-700">
+                      {horarioInicio && horarioFim
+                        ? (() => {
+                            const diff = Math.round((new Date(horarioFim).getTime() - new Date(horarioInicio).getTime()) / 60000);
+                            return diff > 0 ? `${Math.floor(diff / 60)}h ${diff % 60}min` : "—";
+                          })()
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Descrição */}
             <div className="space-y-1.5">
