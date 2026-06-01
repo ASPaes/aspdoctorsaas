@@ -63,6 +63,10 @@ interface TicketRow {
   concluido_em: string | null;
   agendado_para: string | null;
   parent_ticket_id: string | null;
+  horario_inicio: string | null;
+  horario_fim: string | null;
+  duracao_minutos: number | null;
+  responsavel_user_id: string | null;
   clientes: { nome_fantasia: string } | null;
   produtos: { nome: string } | null;
   service_categories: { nome: string } | null;
