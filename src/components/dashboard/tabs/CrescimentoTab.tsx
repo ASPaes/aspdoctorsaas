@@ -73,7 +73,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
 
   const { data: ueData } = useUnitEconomicsSeries(filters);
   const { data: extras } = useCrescimentoExtras({ filters, metrics, unitEconomics: ueData, mcData });
-  const { data: vgExtras } = useVisaoGeralExtras(filters);
+  
 
   const ueCurrent = ueData?.current;
   const uePrev = ueData && ueData.series.length >= 2 ? ueData.series[ueData.series.length - 2] : null;
