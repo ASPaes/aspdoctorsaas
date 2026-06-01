@@ -430,12 +430,12 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         </div>
       </section>
 
-      {/* ═══════ DIAGNÓSTICO INLINE ═══════ */}
-      {diagnostico.severity !== 'ok' && (
-        <section>
-          <DiagnosticoInlineCard diagnostico={diagnostico} onSeeMore={() => setDiagOpen(true)} />
-        </section>
-      )}
+      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
+      <DiagnosticoSection
+        diagnostico={diagnostico}
+        onSeeMore={() => setDiagOpen(true)}
+        tvMode={tvMode}
+      />
 
       {/* ═══════ BLOCO 5 — EVOLUÇÃO TEMPORAL ═══════ */}
       <section className="space-y-3">
