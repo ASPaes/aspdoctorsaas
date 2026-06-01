@@ -519,6 +519,7 @@ export default function SupportTickets() {
     if (categoriaFilter !== "all") count++;
     if (subcategoriaFilter !== "all") count++;
     if (canalFilter !== "all") count++;
+    if (tipoHorarioFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
     if (tagFilters.length > 0) count++;
     if (ticketsView === "atendimentos") {
