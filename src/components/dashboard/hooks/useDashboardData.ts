@@ -187,15 +187,7 @@ export function useDashboardData(filters: DashboardFilters) {
       // 1. Clientes ativos no fim do período — snapshot temporal
       // Regra canônica: ativo = cancelado !== true OU (cancelado=true E data_cancelamento > periodoFim).
       // Usa paginação para superar o limite de 1000 linhas do PostgREST (db-max-rows).
-      const clientesRaw = await fetchAllRows<any>(() => {
-        let q = supabase
-          .from('vw_clientes_financeiro')
-          .select('id, mensalidade, data_cadastro, data_venda_efetiva, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
-          .lte('data_venda_efetiva', periodoFimStr);
-        if (tid) q = q.eq('tenant_id', tid);
-        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
-        return q;
-      });
+      const clientesRaw = await clientesRawPromise;
 
       // Ativo no fim do período: não-cancelado, OU cancelado com data posterior ao fim (saiu depois).
       const clientesAtivos = (clientesRaw || []).filter(c => {
