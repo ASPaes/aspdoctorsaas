@@ -17,6 +17,8 @@ import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
 import type { MargemContribuicaoData } from '../hooks/useMargemContribuicaoDashboard';
@@ -64,7 +66,10 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const iconLg = tvMode ? 'h-8 w-8' : 'h-5 w-5';
   const iconMd = tvMode ? 'h-6 w-6' : 'h-4 w-4';
 
-
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+  const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const { data: ueData } = useUnitEconomicsSeries(filters);
   const { data: extras } = useCrescimentoExtras({ filters, metrics, unitEconomics: ueData, mcData });
@@ -151,6 +156,12 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const logoGrowthRate = extras?.logoGrowthRate;
   const burnMultiple = extras?.burnMultiple;
   const magicNumber = extras?.magicNumber;
+
+  const tabLabel = useMemo(() => {
+    const now = new Date();
+    const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    return `Crescimento · ${meses[now.getMonth()]} ${now.getFullYear()}`;
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -533,6 +544,18 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         diagnostico={diagnostico}
         open={diagOpen}
         onOpenChange={setDiagOpen}
+        tabLabel={tabLabel}
+        tenantId={effectiveTenantId || undefined}
+        tabKey="crescimento"
+        diagInput={diagInput as Record<string, any>}
+        filtrosAplicados={{
+          unidadeBaseId: filters.unidadeBaseId,
+          fornecedorId: filters.fornecedorId,
+          periodoInicio: filters.periodoInicio,
+          periodoFim: filters.periodoFim,
+        }}
+        isAdmin={isAdmin}
+        isAdminOrHead={isAdminOrHead}
       />
     </div>
   );
