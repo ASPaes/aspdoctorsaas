@@ -140,8 +140,15 @@ interface ReativacoesCardProps {
 }
 
 /**
- * Card de destaque para reativações no período: qtd de logos + MRR recuperado.
- * Variant visual: success se há reativações, dark se vazio.
+ * Card de destaque para reativações no período.
+ * Layout vertical (single-value) consistente com KPICardEnhanced:
+ *  - Header: label + ícone
+ *  - Valor principal: quantidade de logos
+ *  - Subtitle: MRR recuperado
+ *  - Pill condicional: "Alavanca ativa" quando qtd > 0
+ *
+ * Quando qtd = 0, card fica visualmente discreto (dark + cinza) — mostra
+ * que não houve reativação sem ocupar destaque visual.
  */
 export function ReativacoesCard({
   qtdLogos, mrrRecuperado, size = 'md', enableTilt = true, className,
@@ -172,7 +179,7 @@ export function ReativacoesCard({
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>
-            Reativações no período
+            Reativações
           </span>
           <KpiHelpPopover kpiKey="reativacoes_periodo" />
         </div>
@@ -181,32 +188,31 @@ export function ReativacoesCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 mb-3">
-        <div className="flex-1">
-          <p className={cn('font-bold', valueSizes[size], 'text-foreground')}>
-            {qtdLogos}
-          </p>
-          <p className={cn('text-muted-foreground', labelSizes[size])}>
-            {qtdLogos === 1 ? 'logo' : 'logos'}
-          </p>
-        </div>
-        <div className="w-px h-10 bg-border" />
-        <div className="flex-1">
-          <p className={cn('font-bold', valueSizes[size], hasReativacoes ? 'text-green-600 dark:text-green-400' : 'text-foreground')}>
-            {mrrRecuperado > 0 ? `+${fmtBRL(mrrRecuperado)}` : fmtBRL(0)}
-          </p>
-          <p className={cn('text-muted-foreground', labelSizes[size])}>
-            {hasReativacoes ? 'recuperados' : 'no período'}
-          </p>
-        </div>
+      <div className="space-y-1">
+        <p className={cn(
+          'font-bold',
+          valueSizes[size],
+          hasReativacoes ? 'text-green-600 dark:text-green-400' : 'text-foreground',
+        )}>
+          {qtdLogos}
+        </p>
+        <p className={cn('text-muted-foreground', labelSizes[size])}>
+          {qtdLogos === 1 ? 'logo reativado' : 'logos reativados'}
+        </p>
+        <p className={cn(
+          'font-mono',
+          labelSizes[size],
+          hasReativacoes ? 'text-green-600 dark:text-green-400 font-medium' : 'text-muted-foreground',
+        )}>
+          {mrrRecuperado > 0 ? `+${fmtBRL(mrrRecuperado)}` : fmtBRL(0)} recuperados
+        </p>
+        {hasReativacoes && (
+          <div className={cn('kpi-zone-pill', 'kpi-zone-pill-ok', 'mt-1.5')}>
+            <span className="kpi-pulse-dot" />
+            Alavanca ativa
+          </div>
+        )}
       </div>
-
-      {hasReativacoes && (
-        <div className={cn('kpi-zone-pill', 'kpi-zone-pill-ok')}>
-          <span className="kpi-pulse-dot" />
-          Alavanca ativa de growth
-        </div>
-      )}
     </div>
   );
 }

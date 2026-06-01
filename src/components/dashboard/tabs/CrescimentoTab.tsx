@@ -267,31 +267,22 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           tvMode={tvMode}
         />
 
-        {/* Waterfall (2/3) + ReativacoesCard (1/3) */}
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <NetNewMrrStackedChart
-              newMrr={metrics.newMrr}
-              upsellMrr={metrics.upsellMrr}
-              crossSellMrr={metrics.crossSellMrr}
-              reativacaoMrr={metrics.reativacaoMrr}
-              reajusteMrr={metrics.reajusteMrr}
-              downsellMrr={metrics.downsellMrr}
-              mrrCancelado={metrics.mrrCancelado}
-              netNewMrr={metrics.netNewMrr}
-              historico={extras?.netNewHistorico}
-              tvMode={tvMode}
-            />
-          </div>
-          <ReativacoesCard
-            qtdLogos={extras?.reativacoesQtd ?? 0}
-            mrrRecuperado={extras?.reativacoesMrr ?? 0}
-            size={sMd}
-          />
-        </div>
+        {/* Breakdown waterfall (full width) */}
+        <NetNewMrrStackedChart
+          newMrr={metrics.newMrr}
+          upsellMrr={metrics.upsellMrr}
+          crossSellMrr={metrics.crossSellMrr}
+          reativacaoMrr={metrics.reativacaoMrr}
+          reajusteMrr={metrics.reajusteMrr}
+          downsellMrr={metrics.downsellMrr}
+          mrrCancelado={metrics.mrrCancelado}
+          netNewMrr={metrics.netNewMrr}
+          historico={extras?.netNewHistorico}
+          tvMode={tvMode}
+        />
 
-        {/* 4 cards de qualidade do growth */}
-        <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
+        {/* 5 cards de qualidade do growth + Reativações */}
+        <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
           <KPICardEnhanced
             label="NRR"
             value={fmtPct(metrics.nrr)}
@@ -327,6 +318,11 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
             helpKey="expansion_rate"
             icon={<TrendingUp className={`${iconMd} text-current`} />}
             currentValue={expansionRate ?? undefined}
+          />
+          <ReativacoesCard
+            qtdLogos={extras?.reativacoesQtd ?? 0}
+            mrrRecuperado={extras?.reativacoesMrr ?? 0}
+            size={sMd}
           />
         </div>
       </section>
