@@ -11,7 +11,7 @@ import { SyncedMultiLineChartCard } from '../charts/SyncedMultiLineChartCard';
 import { MultiLineChartCard } from '../charts/MultiLineChartCard';
 import { SectionHeader } from '../SectionHeader';
 import { ComparativosTemporaisBlock } from '../ComparativosTemporaisBlock';
-import { DiagnosticoButton, DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoInlineCard, DiagnosticoModal } from '../diagnostico';
 import { useUnitEconomicsSeries } from '../hooks/useUnitEconomicsSeries';
 import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
 import { useVisaoGeralExtras } from '../hooks/useVisaoGeralExtras';
@@ -165,13 +165,6 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
 
   return (
     <div className="space-y-8">
-      {/* HEADER: Botão Diagnóstico */}
-      {diagnostico.severity !== 'ok' && (
-        <div className="flex justify-end">
-          <DiagnosticoButton diagnostico={diagnostico} onClick={() => setDiagOpen(true)} />
-        </div>
-      )}
-
       {/* ═══════ BLOCO 1 — VELOCITY ═══════ */}
       <section className="space-y-3">
         <SectionHeader
