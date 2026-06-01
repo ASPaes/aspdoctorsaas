@@ -4,7 +4,7 @@ import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove 
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2 } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download } from "lucide-react";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
@@ -63,6 +63,10 @@ interface TicketRow {
   concluido_em: string | null;
   agendado_para: string | null;
   parent_ticket_id: string | null;
+  horario_inicio: string | null;
+  horario_fim: string | null;
+  duracao_minutos: number | null;
+  responsavel_user_id: string | null;
   clientes: { nome_fantasia: string } | null;
   produtos: { nome: string } | null;
   service_categories: { nome: string } | null;
@@ -114,6 +118,7 @@ export default function SupportTickets() {
   const [atendenteFilter, setAtendenteFilter] = useState<string>("all");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
+  const [tipoHorarioFilter, setTipoHorarioFilter] = useState<string>("all");
   const [subcategoriaFilter, setSubcategoriaFilter] = useState<string>("all");
   const [serviceTypeFilters, setServiceTypeFilters] = useState<string[]>([]);
   const [search, setSearch] = useState<string>("");
@@ -514,6 +519,7 @@ export default function SupportTickets() {
     if (categoriaFilter !== "all") count++;
     if (subcategoriaFilter !== "all") count++;
     if (canalFilter !== "all") count++;
+    if (tipoHorarioFilter !== "all") count++;
     if (serviceTypeFilters.length > 0) count++;
     if (tagFilters.length > 0) count++;
     if (ticketsView === "atendimentos") {
@@ -525,7 +531,7 @@ export default function SupportTickets() {
       if (attInstanceFilter !== "all") count++;
     }
     return count;
-  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter]);
+  }, [produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters, tagFilters, ticketsView, attClosureTypeFilter, attCsatFilter, attCsatScoreFilter, attTicketFilter, attSentimentFilter, attInstanceFilter]);
 
   const clearAdvancedFilters = () => {
     setProdutoFilter("all");
@@ -533,6 +539,7 @@ export default function SupportTickets() {
     setCategoriaFilter("all");
     setSubcategoriaFilter("all");
     setCanalFilter("all");
+    setTipoHorarioFilter("all");
     setServiceTypeFilters([]);
     setTagFilters([]);
   };
@@ -547,12 +554,13 @@ export default function SupportTickets() {
         const labels: Record<string, string> = { whatsapp: "WhatsApp", telefone: "Telefone", presencial: "Presencial", email: "E-mail" };
         return labels[value] ?? value;
       }
+      case "tipoHorario": return value === "plantao" ? "Plantão" : "Comercial";
       default: return value;
     }
   };
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -564,6 +572,7 @@ export default function SupportTickets() {
         .select(`
           id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
+          horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
           clientes:cliente_id(nome_fantasia),
           produtos:produto_id(nome),
           service_categories:category_id(nome),
@@ -588,6 +597,7 @@ export default function SupportTickets() {
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
+      if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
       if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
@@ -634,6 +644,53 @@ export default function SupportTickets() {
     const ativos = total - terminais;
     return { total, terminais, ativos };
   }, [filteredTickets, ticketStatuses]);
+
+  const exportTicketsXlsx = async (rows: TicketRow[]) => {
+    const XLSX = await import("xlsx");
+    const getAgentName = (uid: string | null) => uid ? agentes.find(a => a.user_id === uid)?.nome ?? "" : "";
+    const getStatusName = (sid: string | null) => sid ? getStatusInfo(sid).name ?? "" : "";
+    const fmtDate = (d: string | null) => d ? new Date(d).toLocaleString("pt-BR") : "";
+    const fmtDuration = (min: number | null) => {
+      if (min == null) return "";
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return h > 0 ? `${h}h ${m}min` : `${m}min`;
+    };
+    const data: Record<string, any>[] = rows.map(t => ({
+      "Código": t.ticket_code ?? "",
+      "Cliente": t.clientes?.nome_fantasia ?? "",
+      "Assunto": t.assunto ?? "",
+      "Produto": t.produtos?.nome ?? "",
+      "Categoria": t.service_categories?.nome ?? "",
+      "Subcategoria": t.service_subcategories?.nome ?? "",
+      "Tipo": t.service_types?.nome ?? "",
+      "Canal": t.canal_origem ?? "",
+      "Tipo Horário": t.tipo_horario === "plantao" ? "Plantão" : "Comercial",
+      "Status": getStatusName(t.status_id),
+      "Prioridade": t.prioridade ?? "",
+      "Responsável": getAgentName(t.responsavel_user_id),
+      "Aberto em": fmtDate(t.aberto_em),
+      "Concluído em": fmtDate(t.concluido_em),
+      "Hr Início Plantão": fmtDate(t.horario_inicio),
+      "Hr Fim Plantão": fmtDate(t.horario_fim),
+      "Duração (min)": t.duracao_minutos ?? "",
+      "Duração Formatada": fmtDuration(t.duracao_minutos),
+    }));
+    const totalMinutos = rows.reduce((sum, t) => sum + (t.duracao_minutos ?? 0), 0);
+    data.push({
+      "Código": "", "Cliente": "", "Assunto": "", "Produto": "", "Categoria": "",
+      "Subcategoria": "", "Tipo": "", "Canal": "", "Tipo Horário": "", "Status": "",
+      "Prioridade": "", "Responsável": `TOTAL (${rows.length} tickets)`,
+      "Aberto em": "", "Concluído em": "", "Hr Início Plantão": "", "Hr Fim Plantão": "",
+      "Duração (min)": totalMinutos, "Duração Formatada": fmtDuration(totalMinutos),
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tickets");
+    const prefix = tipoHorarioFilter === "plantao" ? "plantao" : tipoHorarioFilter === "comercial" ? "comercial" : "tickets";
+    XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -725,6 +782,16 @@ export default function SupportTickets() {
       {/* Toolbar: filtros globais + views */}
       <div className="flex items-center gap-2 flex-wrap">
         <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1"
+          disabled={filteredTickets.length === 0}
+          onClick={() => exportTicketsXlsx(filteredTickets)}
+        >
+          <Download className="h-4 w-4" />
+          Exportar
+        </Button>
         <Select value={ticketStateFilter} onValueChange={setTicketStateFilter}>
           <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -902,6 +969,17 @@ export default function SupportTickets() {
                         <SelectItem value="telefone">Telefone</SelectItem>
                         <SelectItem value="presencial">Presencial</SelectItem>
                         <SelectItem value="email">E-mail</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Tipo horário</label>
+                    <Select value={tipoHorarioFilter} onValueChange={setTipoHorarioFilter}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="comercial">Comercial</SelectItem>
+                        <SelectItem value="plantao">Plantão</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1156,6 +1234,14 @@ export default function SupportTickets() {
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
             >
               {getFilterLabel("canal", canalFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
+          {tipoHorarioFilter !== "all" && (
+            <button
+              onClick={() => setTipoHorarioFilter("all")}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {getFilterLabel("tipoHorario", tipoHorarioFilter)} <X className="h-3 w-3" />
             </button>
           )}
           {serviceTypeFilters.map((stId) => {
