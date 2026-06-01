@@ -198,21 +198,16 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
                 <AlertDialogHeader>
                   <AlertDialogTitle>Desvincular cliente</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Deseja apenas remover o vínculo desta conversa, ou também remover este número do cadastro de contatos do cliente? Remover o contato evita que ele apareça como sugestão automática em conversas futuras.
+                    O vínculo com este cliente será removido e o número será excluído do cadastro de contatos. Deseja continuar?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="gap-2">
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => { unlinkCliente(false); setUnlinkDialogOpen(false); }}
-                  >
-                    Apenas desvincular
-                  </AlertDialogAction>
-                  <AlertDialogAction
                     onClick={() => { unlinkCliente(true); setUnlinkDialogOpen(false); }}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Desvincular e remover contato
+                    Desvincular
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
