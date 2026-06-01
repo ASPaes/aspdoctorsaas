@@ -560,7 +560,7 @@ export default function SupportTickets() {
   };
 
   const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -572,6 +572,7 @@ export default function SupportTickets() {
         .select(`
           id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
+          horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
           clientes:cliente_id(nome_fantasia),
           produtos:produto_id(nome),
           service_categories:category_id(nome),
@@ -596,6 +597,7 @@ export default function SupportTickets() {
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
       if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
+      if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
       if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
       if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
