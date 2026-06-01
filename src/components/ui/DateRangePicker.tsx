@@ -106,7 +106,10 @@ function DateRangePicker({
   };
 
   const handleApply = () => {
-    onDateRangeChange(tempRange);
+    onDateRangeChange({
+      from: startOfDay(tempRange.from),
+      to: endOfDay(tempRange.to),
+    });
     setOpen(false);
   };
 
