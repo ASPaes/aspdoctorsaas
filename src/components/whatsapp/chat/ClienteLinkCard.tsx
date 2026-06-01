@@ -34,6 +34,7 @@ export function ClienteLinkCard({ conversation, attendanceId = null, isAttendanc
   const navigate = useNavigate();
   const phoneNumber = conversation.contact?.phone_number || "";
   const metadata = (conversation.metadata || {}) as Record<string, unknown>;
+  const autoLinkBlocked = metadata?.auto_link_blocked === true;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
