@@ -106,4 +106,40 @@ export const ACTIONS: Record<string, ActionTemplate> = {
     priority: 'strategic',
     timeframe: 'próximos 90 dias',
   },
+
+  // ── Cancelamentos V2 — Críticas: esta semana ──
+  motivo_root_cause_analysis: {
+    id: 'motivo_root_cause_analysis',
+    text: 'Investigar causa raiz do motivo top — entrevistar 5 a 10 clientes cancelados nos últimos 60 dias, mapear padrões antes de propor solução',
+    priority: 'critical',
+    timeframe: 'esta semana',
+  },
+  segment_drill_down: {
+    id: 'segment_drill_down',
+    text: 'Drill down no segmento crítico — validar com vendas e CS se o ICP daquele vertical mudou ou se está sendo vendido pra perfil errado',
+    priority: 'critical',
+    timeframe: 'esta semana',
+  },
+
+  // ── Cancelamentos V2 — Altas: 30 dias ──
+  winback_campaign_launch: {
+    id: 'winback_campaign_launch',
+    text: 'Lançar campanha de win-back nos cancelados voluntary entre 90-180 dias — começar pelos de maior ticket, oferta com desconto/melhoria condicionada',
+    priority: 'high',
+    timeframe: 'próximos 30 dias',
+  },
+  early_churn_taskforce: {
+    id: 'early_churn_taskforce',
+    text: 'Taskforce de Early Churn — meta de reduzir cancelamentos ≤90d em 50% no próximo trimestre via onboarding ativo + check-ins semanais',
+    priority: 'high',
+    timeframe: 'próximos 30 dias',
+  },
+
+  // ── Cancelamentos V2 — Estratégicas: 90 dias ──
+  mortality_outreach_review: {
+    id: 'mortality_outreach_review',
+    text: 'Revisar comunicação com clientes inativos por 60+ dias — muitos "morrem" por desuso silencioso, não por falência. Reengajar antes do cancelamento',
+    priority: 'strategic',
+    timeframe: 'próximos 90 dias',
+  },
 };
