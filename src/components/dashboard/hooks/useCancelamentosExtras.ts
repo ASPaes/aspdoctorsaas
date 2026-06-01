@@ -225,6 +225,7 @@ export function useCancelamentosExtras(params: {
         top10Cancelados: (row.top10_cancelados ?? []) as Top10Cancelado[],
         evolucao12m: (row.evolucao_12m ?? []) as EvolucaoMes[],
         reativacoes12m: (row.reativacoes_12m ?? []) as ReativacaoMes[],
+        cancelamentosPorOrigem: (row.cancelamentos_por_origem ?? []) as CancelamentoOrigem[],
       };
     },
   });
