@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useSupportConfig } from "@/hooks/useSupportConfig";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { toast } from "sonner";
@@ -30,6 +31,9 @@ export default function SetoresInstanciasTab() {
   const [inactivityMinutes, setInactivityMinutes] = useState<string>("");
   const [warningMinutes, setWarningMinutes] = useState<string>("");
   const { instances } = useWhatsAppInstances();
+  const { data: supportConfig } = useSupportConfig();
+  const globalCloseMin = supportConfig?.support_auto_close_inactivity_minutes;
+  const globalWarnMin = supportConfig?.support_inactivity_warning_before_minutes;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["support_departments_wa", tid],
@@ -290,14 +294,14 @@ export default function SetoresInstanciasTab() {
                     <Label>Tempo de inatividade (minutos)</Label>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant.
+                    Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant{globalCloseMin != null ? ` (atualmente ${globalCloseMin} min)` : ""}.
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
                       min={0}
                       className="w-32"
-                      placeholder="Global"
+                      placeholder={globalCloseMin != null ? `${globalCloseMin} (global)` : "Global"}
                       value={inactivityMinutes}
                       onChange={(e) => setInactivityMinutes(e.target.value)}
                     />
@@ -318,7 +322,7 @@ export default function SetoresInstanciasTab() {
                     <Label>Tempo de aviso de inatividade (minutos)</Label>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema.
+                    Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema{globalWarnMin != null ? ` (atualmente ${globalWarnMin} min)` : ""}.
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
@@ -326,7 +330,7 @@ export default function SetoresInstanciasTab() {
                       min={1}
                       step={1}
                       className="w-32"
-                      placeholder="Padrão"
+                      placeholder={globalWarnMin != null ? `${globalWarnMin} (padrão)` : "Padrão"}
                       value={warningMinutes}
                       onChange={(e) => setWarningMinutes(e.target.value)}
                     />
