@@ -314,6 +314,36 @@ export default function SetoresInstanciasTab() {
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Label>Tempo de aviso de inatividade (minutos)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className="w-32"
+                      placeholder="Padrão"
+                      value={warningMinutes}
+                      onChange={(e) => setWarningMinutes(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                    <Button
+                      size="sm"
+                      disabled={saveWarningBefore.isPending || warningMinutes === (selectedDept?.inactivity_warning_before_minutes?.toString() ?? "")}
+                      onClick={() => saveWarningBefore.mutate(warningMinutes)}
+                    >
+                      {saveWarningBefore.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
                     <MessageSquareText className="h-4 w-4 text-muted-foreground" />
                     <Label>Mensagem de boas-vindas (sem URA)</Label>
                   </div>
