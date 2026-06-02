@@ -85,10 +85,26 @@ export function MessageBubble({
   const isTranscribing = msg.message_type === 'audio' && msg.transcription_status === 'processing';
 
   if (isSystem) {
+    const isInactivityWarning = (msg as any).metadata?.inactivity_warning === true;
+    let suffix = '';
+    if (isInactivityWarning) {
+      const ts = (msg as any).created_at ?? msg.timestamp;
+      if (ts) {
+        try {
+          const hhmm = new Intl.DateTimeFormat('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+            timeZone: 'America/Sao_Paulo',
+          }).format(new Date(ts));
+          suffix = ` (${hhmm}h)`;
+        } catch {}
+      }
+    }
     return (
       <div className="flex w-full justify-center my-2">
         <span className="inline-flex items-center rounded-full bg-accent/50 px-3 py-1 text-[10px] text-accent-foreground">
-          {msg.content?.trim() || 'Evento do sistema'}
+          {(msg.content?.trim() || 'Evento do sistema') + suffix}
         </span>
       </div>
     );
