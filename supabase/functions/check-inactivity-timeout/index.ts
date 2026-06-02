@@ -175,25 +175,29 @@ async function processAttendance(
     }
 
     // Buscar overrides de inatividade (hierarquia: setor > instância > global)
+    // Inclui também override do tempo de aviso (warn_before).
     let deptOverride: number | null = null;
     let instOverride: number | null = null;
+    let deptWarnOverride: number | null = null;
+    let instWarnOverride: number | null = null;
     {
       const { data: convOverrides } = await supabase
         .from("whatsapp_conversations")
-        .select("department_id, instance_id, support_departments!left(auto_close_inactivity_minutes), whatsapp_instances!left(auto_close_inactivity_minutes)")
+        .select("department_id, instance_id, support_departments!left(auto_close_inactivity_minutes, inactivity_warning_before_minutes), whatsapp_instances!left(auto_close_inactivity_minutes, inactivity_warning_before_minutes)")
         .eq("id", att.conversation_id)
         .maybeSingle();
 
       if (convOverrides) {
         deptOverride = (convOverrides as any).support_departments?.auto_close_inactivity_minutes ?? null;
         instOverride = (convOverrides as any).whatsapp_instances?.auto_close_inactivity_minutes ?? null;
+        deptWarnOverride = (convOverrides as any).support_departments?.inactivity_warning_before_minutes ?? null;
+        instWarnOverride = (convOverrides as any).whatsapp_instances?.inactivity_warning_before_minutes ?? null;
       }
     }
 
     const closeThresholdMin = deptOverride ?? instOverride ?? config.support_auto_close_inactivity_minutes;
-    log("threshold resolução", { dept: deptOverride, inst: instOverride, global: config.support_auto_close_inactivity_minutes, resolved: closeThresholdMin });
     const warnEnabled = config.support_send_inactivity_warning === true;
-    const warnBeforeMin = config.support_inactivity_warning_before_minutes;
+    const warnGlobal = config.support_inactivity_warning_before_minutes;
     const warnTemplate = config.support_inactivity_warning_template ||
       "⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.";
 
@@ -201,6 +205,22 @@ async function processAttendance(
       log("close threshold inválido — skip", { closeThresholdMin });
       return "skipped";
     }
+
+    // Resolução do warn_before: setor > instância > global.
+    // Trava de segurança: o aviso nunca pode ser maior que o threshold de fechamento.
+    const resolvedWarnBefore = deptWarnOverride ?? instWarnOverride ?? warnGlobal;
+    const warnBeforeMin = Math.min(resolvedWarnBefore, closeThresholdMin);
+
+    log("threshold resolução", {
+      dept: deptOverride,
+      inst: instOverride,
+      global: config.support_auto_close_inactivity_minutes,
+      resolved: closeThresholdMin,
+      warnDept: deptWarnOverride,
+      warnInst: instWarnOverride,
+      warnGlobal,
+      warnResolved: warnBeforeMin,
+    });
 
     const lastActivityIso = getLastActivityIso(att);
     const elapsedMin = (Date.now() - new Date(lastActivityIso).getTime()) / 60000;
@@ -215,6 +235,7 @@ async function processAttendance(
         log("warnBefore inválido com aviso ativado — skip", { warnBeforeMin });
         return "skipped";
       }
+
 
       // Caso A: aviso ainda não foi enviado
       if (!att.inactivity_warning_sent_at) {
