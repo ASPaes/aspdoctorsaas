@@ -4,6 +4,7 @@ import { getSupportConfig } from "../_shared/support-config.ts";
 import { sendAndPersistAutoMessage } from "../_shared/message-processor.ts";
 import { getInstanceSecrets } from "../_shared/providers/index.ts";
 import { SendContext } from "../_shared/message-types.ts";
+import { isWithinBusinessHours } from "../_shared/business-hours.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,6 +111,8 @@ async function processAttendance(
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
   try {
+    const config = await getSupportConfig(supabase, att.tenant_id);
+
     // Guard "Sem regras do sistema": se o contato do atendimento estiver com
     // rules_disabled=true, pular qualquer automação de inatividade (aviso/fechamento).
     {
@@ -124,21 +127,52 @@ async function processAttendance(
       }
     }
 
-    // Guard: não fechar por inatividade se chat está fora do horário
-    // Cliente não pode ser penalizado pela ausência do operador
+    // Guard: não fechar por inatividade se o chat está FORA DO HORÁRIO AGORA.
+    // Decisão baseada no ESTADO ATUAL (e não no flag histórico opened_out_of_hours,
+    // que podia ficar travado em true por semanas e bloquear o fechamento pra sempre).
+    // Se o flag está setado mas AGORA estamos dentro do horário, ele é obsoleto:
+    // limpamos e seguimos o fluxo normal (auto-cura — dispensa backfill manual).
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
-        .select("opened_out_of_hours")
+        .select("opened_out_of_hours, instance_id")
         .eq("id", att.conversation_id)
         .maybeSingle();
+
       if (convOOH?.opened_out_of_hours === true) {
-        log("opened_out_of_hours=true — skip inactivity close");
-        return "skipped";
+        // Se business hours está desligado, não existe "fora do horário" → segue.
+        let insideNow = true;
+        if (config.business_hours_enabled) {
+          try {
+            insideNow = await isWithinBusinessHours(
+              supabase,
+              att.conversation_id,
+              convOOH.instance_id,
+              att.tenant_id,
+              config
+            );
+          } catch (err) {
+            console.error(
+              `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: não fecha`,
+              err
+            );
+            insideNow = false; // na dúvida, NÃO fecha (não pune o cliente)
+          }
+        }
+
+        if (!insideNow) {
+          log("fora do horário agora — skip inactivity close");
+          return "skipped";
+        }
+
+        // Flag obsoleto: estamos dentro do horário. Limpa e segue o fluxo normal.
+        await supabase
+          .from("whatsapp_conversations")
+          .update({ opened_out_of_hours: false, out_of_hours_cleared_at: new Date().toISOString() })
+          .eq("id", att.conversation_id);
+        log("flag opened_out_of_hours obsoleto — limpo, seguindo fluxo normal");
       }
     }
-
-    const config = await getSupportConfig(supabase, att.tenant_id);
 
     // Buscar overrides de inatividade (hierarquia: setor > instância > global)
     let deptOverride: number | null = null;
