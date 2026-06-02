@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { getSupportConfig } from "../_shared/support-config.ts";
+import { getSupportConfig, SupportConfig } from "../_shared/support-config.ts";
 import { sendAndPersistAutoMessage } from "../_shared/message-processor.ts";
 import { getInstanceSecrets } from "../_shared/providers/index.ts";
 import { SendContext } from "../_shared/message-types.ts";
