@@ -4556,6 +4556,7 @@ export type Database = {
           default_instance_id: string | null
           description: string | null
           id: string
+          inactivity_warning_before_minutes: number | null
           is_active: boolean
           is_default_fallback: boolean
           name: string
@@ -4579,6 +4580,7 @@ export type Database = {
           default_instance_id?: string | null
           description?: string | null
           id?: string
+          inactivity_warning_before_minutes?: number | null
           is_active?: boolean
           is_default_fallback?: boolean
           name: string
@@ -4602,6 +4604,7 @@ export type Database = {
           default_instance_id?: string | null
           description?: string | null
           id?: string
+          inactivity_warning_before_minutes?: number | null
           is_active?: boolean
           is_default_fallback?: boolean
           name?: string
@@ -6273,6 +6276,7 @@ export type Database = {
           display_name: string | null
           id: string
           ignore_group_messages: boolean
+          inactivity_warning_before_minutes: number | null
           instance_id_external: string | null
           instance_name: string
           is_active: boolean
@@ -6293,6 +6297,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           ignore_group_messages?: boolean
+          inactivity_warning_before_minutes?: number | null
           instance_id_external?: string | null
           instance_name: string
           is_active?: boolean
@@ -6313,6 +6318,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           ignore_group_messages?: boolean
+          inactivity_warning_before_minutes?: number | null
           instance_id_external?: string | null
           instance_name?: string
           is_active?: boolean
