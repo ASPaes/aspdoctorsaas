@@ -151,7 +151,11 @@ async function processAttendance(
       }
     }
 
-    const config = await getSupportConfig(supabase, att.tenant_id);
+    let config = configCache.get(att.tenant_id);
+    if (!config) {
+      config = await getSupportConfig(supabase, att.tenant_id);
+      configCache.set(att.tenant_id, config);
+    }
 
     // Guard "Sem regras do sistema": contato com rules_disabled=true → pula tudo.
     {
@@ -172,26 +176,31 @@ async function processAttendance(
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
-        .select("opened_out_of_hours, instance_id")
+        .select("opened_out_of_hours, instance_id, department_id")
         .eq("id", att.conversation_id)
         .maybeSingle();
 
       if (config.business_hours_enabled && convOOH?.instance_id) {
-        let insideNow = false;
-        try {
-          insideNow = await isWithinBusinessHours(
-            supabase,
-            att.conversation_id,
-            convOOH.instance_id,
-            att.tenant_id,
-            config,
-          );
-        } catch (err) {
-          console.error(
-            `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: skip`,
-            err,
-          );
-          return "skipped";
+        const minuteBucket = Math.floor(Date.now() / 60000);
+        const bhKey = `${att.tenant_id}:${convOOH.department_id ?? 'none'}:${minuteBucket}`;
+        let insideNow = bhCache.get(bhKey);
+        if (insideNow === undefined) {
+          try {
+            insideNow = await isWithinBusinessHours(
+              supabase,
+              att.conversation_id,
+              convOOH.instance_id,
+              att.tenant_id,
+              config,
+            );
+            bhCache.set(bhKey, insideNow);
+          } catch (err) {
+            console.error(
+              `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: skip`,
+              err,
+            );
+            return "skipped";
+          }
         }
 
         if (!insideNow) {
