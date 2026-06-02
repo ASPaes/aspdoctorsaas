@@ -256,8 +256,8 @@ async function buildInstanceCtx(
 
   const evolutionInstanceId = instance.instance_id_external || instance.instance_name;
   return {
-    apiUrl: secrets.api_url,
-    apiKey: secrets.api_key,
+    apiUrl,
+    apiKey,
     instanceName: evolutionInstanceId,
     providerType: instance.provider_type || 'self_hosted',
     remoteJid: `${contact.phone_number}@s.whatsapp.net`,
