@@ -480,60 +480,73 @@ async function countOffHoursCustomerMessages(supabase: any, conversationId: stri
 
 export async function handleCsatResponse(supabase: any, ctx: SendContext, conversationId: string, tenantId: string, messageContent: string): Promise<boolean> {
   try {
-    const { data: closedAtt } = await supabase.from('support_attendances').select('id').eq('conversation_id', conversationId).eq('status', 'closed').eq('closed_reason', 'manual').order('closed_at', { ascending: false }).limit(1).maybeSingle();
-    if (!closedAtt) return false;
+    // Busca o CSAT pendente DA CONVERSA (não exige attendance closed+manual:
+    // a resposta pode chegar antes do fechamento consolidar ou após reabertura).
+    const { data: convAtts } = await supabase
+      .from('support_attendances').select('id').eq('conversation_id', conversationId);
+    const attIds = (convAtts ?? []).map((a: any) => a.id);
+    if (attIds.length === 0) return false;
 
-    const { data: csat } = await supabase.from('support_csat').select('id, status, asked_at, score').eq('attendance_id', closedAtt.id).in('status', ['pending', 'awaiting_reason']).limit(1).maybeSingle();
+    const { data: csat } = await supabase
+      .from('support_csat')
+      .select('id, status, asked_at, score, attendance_id')
+      .in('attendance_id', attIds)
+      .in('status', ['pending', 'awaiting_reason'])
+      .order('asked_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (!csat) return false;
 
+    const attendanceId = csat.attendance_id;
     const supportConfig = await getSupportConfig(supabase, tenantId);
 
-    // Resolve templates CSAT por setor do atendimento (fallback campo a campo para o padrão)
     const { data: csatConv } = await supabase
-      .from('whatsapp_conversations')
-      .select('department_id')
-      .eq('id', conversationId)
-      .maybeSingle();
+      .from('whatsapp_conversations').select('department_id').eq('id', conversationId).maybeSingle();
 
-    const csatTemplates = await resolveCsatTemplates(
-      supabase,
-      tenantId,
-      csatConv?.department_id ?? null,
-      supportConfig,
-    );
+    const csatTemplates = await resolveCsatTemplates(supabase, tenantId, csatConv?.department_id ?? null, supportConfig);
 
     const elapsedMinutes = (Date.now() - new Date(csat.asked_at).getTime()) / (1000 * 60);
 
+    // Timeout: cliente não respondeu a tempo -> expira + encerra como csat_timeout (NUNCA inatividade)
     if (elapsedMinutes > supportConfig.support_csat_timeout_minutes) {
       await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
+      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_timeout', p_closure_type: 'csat_timeout' });
       await sendAndPersistAutoMessage(supabase, ctx, conversationId, 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! \u{1F60A}', { csat: true, csat_timeout: true });
-      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
+      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
       return true;
     }
 
     const trimmed = (messageContent || '').trim();
 
     if (csat.status === 'pending') {
-      const scoreNum = parseInt(trimmed, 10);
+      // Parse robusto: a resposta precisa ser essencialmente só a nota (mensagem curta, só dígitos).
+      const digits = trimmed.replace(/[^0-9]/g, '');
+      const scoreNum = (trimmed.length <= 4 && /^[0-9]+$/.test(digits)) ? parseInt(digits, 10) : NaN;
+
+      // Não é nota -> cliente tem outra demanda. Expira o CSAT (consome a 1ª resposta) e
+      // deixa seguir o fluxo normal (retorna false). NÃO insiste em pedir número.
       if (isNaN(scoreNum) || scoreNum < supportConfig.support_csat_score_min || scoreNum > supportConfig.support_csat_score_max) {
-        await sendAndPersistAutoMessage(supabase, ctx, conversationId, `Por favor, envie apenas um número de ${supportConfig.support_csat_score_min} a ${supportConfig.support_csat_score_max}.`, { csat: true });
-        return true;
+        await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
+        return false;
       }
+
       const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
       await supabase.from('support_csat').update({ score: scoreNum, responded_at: new Date().toISOString(), status: needsReason ? 'awaiting_reason' : 'completed' }).eq('id', csat.id);
       if (needsReason) {
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.reason_prompt_template || 'Entendi. Pode me dizer em poucas palavras o motivo da sua nota?', { csat: true });
       } else {
+        await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
         await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
-        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
+        await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
       }
       return true;
     }
 
     if (csat.status === 'awaiting_reason') {
       await supabase.from('support_csat').update({ reason: trimmed, status: 'completed', responded_at: new Date().toISOString() }).eq('id', csat.id);
+      await supabase.rpc('fn_close_attendance_atomic', { p_attendance_id: attendanceId, p_closed_reason: 'csat_completed', p_closure_type: 'csat_completed' });
       await sendAndPersistAutoMessage(supabase, ctx, conversationId, csatTemplates.thanks_template || 'Obrigado! \u{2705} Sua avaliação foi registrada.', { csat: true });
-      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, closedAtt.id);
+      await sendDeferredClosureMessage(supabase, ctx, conversationId, tenantId, attendanceId);
       return true;
     }
 
