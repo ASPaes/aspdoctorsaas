@@ -7832,6 +7832,29 @@ export type Database = {
           phone_b: string
         }[]
       }
+      get_inactive_attendances_to_process: {
+        Args: { p_limit?: number }
+        Returns: {
+          assigned_to: string
+          attendance_code: string
+          contact_id: string
+          conversation_id: string
+          department_id: string
+          effective_close_min: number
+          effective_warn_before: number
+          id: string
+          inactivity_warning_sent_at: string
+          instance_id: string
+          last_customer_message_at: string
+          last_operator_message_at: string
+          needs_close: boolean
+          needs_warn: boolean
+          opened_at: string
+          scheduled_until: string
+          tenant_id: string
+          warn_enabled: boolean
+        }[]
+      }
       get_instance_secrets: { Args: { p_instance_id: string }; Returns: Json }
       get_message_notification_recipients: {
         Args: { p_conversation_id: string }
