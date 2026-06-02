@@ -54,6 +54,7 @@ export default function SetoresInstanciasTab() {
 
   useEffect(() => {
     setInactivityMinutes(selectedDept?.auto_close_inactivity_minutes?.toString() ?? "");
+    setWarningMinutes(selectedDept?.inactivity_warning_before_minutes?.toString() ?? "");
   }, [selectedDept]);
 
   const { data: deptInstances = [] } = useQuery({
