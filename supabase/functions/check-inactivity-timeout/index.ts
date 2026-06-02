@@ -39,7 +39,16 @@ interface AttendanceRow {
   last_operator_message_at: string | null;
   inactivity_warning_sent_at: string | null;
   scheduled_until: string | null;
+  // novos vindos da RPC:
+  department_id: string | null;
+  instance_id: string | null;
+  effective_close_min: number;
+  effective_warn_before: number;
+  warn_enabled: boolean;
+  needs_warn: boolean;
+  needs_close: boolean;
 }
+
 
 interface ContactRow {
   id: string;
