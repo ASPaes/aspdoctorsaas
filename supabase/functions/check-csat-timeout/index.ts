@@ -71,12 +71,17 @@ Deno.serve(async (req) => {
         if (!config) {
           const { data: cfgData } = await supabase
             .from('configuracoes')
-            .select('support_csat_enabled, support_csat_timeout_minutes')
+            .select('support_csat_enabled, support_csat_timeout_minutes, support_csat_score_min, support_csat_score_max, support_csat_reason_threshold, support_csat_reason_prompt_template, support_csat_thanks_template')
             .eq('tenant_id', csat.tenant_id)
             .maybeSingle();
           config = {
             enabled: cfgData?.support_csat_enabled ?? true,
-            timeoutMinutes: cfgData?.support_csat_timeout_minutes ?? 5,
+            timeoutMinutes: cfgData?.support_csat_timeout_minutes ?? 30,
+            scoreMin: cfgData?.support_csat_score_min ?? 0,
+            scoreMax: cfgData?.support_csat_score_max ?? 5,
+            reasonThreshold: cfgData?.support_csat_reason_threshold ?? 3,
+            reasonPrompt: cfgData?.support_csat_reason_prompt_template ?? 'Pode nos contar rapidamente o motivo da sua nota? Sua resposta nos ajuda a melhorar. 🙏',
+            thanks: cfgData?.support_csat_thanks_template ?? 'Obrigado pela sua avaliação! 😊',
           };
           tenantConfigCache.set(csat.tenant_id, config);
         }
@@ -90,153 +95,106 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Check if actually expired
         const askedAt = new Date(csat.asked_at);
-        const expiresAt = new Date(askedAt.getTime() + config.timeoutMinutes * 60 * 1000);
+        const expiresAt = new Date(askedAt.getTime() + config.timeoutMinutes * 60000);
         const now = new Date();
 
-        if (now < expiresAt) {
-          // Not expired yet, skip
-          continue;
-        }
-
-        // Verificar se cliente já respondeu mas webhook ainda não processou
-        // Buscar mensagem do cliente após o CSAT ser enviado
-        const { data: attConv } = await supabase
-          .from('support_attendances')
-          .select('conversation_id')
-          .eq('id', csat.attendance_id)
-          .single();
-
-        if (attConv?.conversation_id) {
-          const { data: recentMsg } = await supabase
-            .from('whatsapp_messages')
-            .select('id, content, created_at')
-            .eq('conversation_id', attConv.conversation_id)
-            .eq('tenant_id', csat.tenant_id)
-            .eq('is_from_me', false)
-            .gte('created_at', csat.asked_at)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-          if (recentMsg) {
-            const msgTime = new Date(recentMsg.created_at).getTime();
-            const gracePeriodEnd = new Date(msgTime + 3 * 60 * 1000);
-            if (now < gracePeriodEnd) {
-              console.log(`[${FUNCTION_NAME}] CSAT ${csat.id} tem resposta pendente do cliente, aguardando webhook...`);
-              continue;
-            }
-          }
-        }
-
-        console.log(`[${FUNCTION_NAME}][${requestId}] CSAT ${csat.id} expired (asked_at=${csat.asked_at}, timeout=${config.timeoutMinutes}min)`);
-
-        // Mark as expired
-        await supabase
-          .from('support_csat')
-          .update({ status: 'expired', responded_at: now.toISOString() })
-          .eq('id', csat.id);
-
-        // Get attendance info
         const { data: att } = await supabase
           .from('support_attendances')
-          .select('id, attendance_code, conversation_id, contact_id, tenant_id')
+          .select('id, attendance_code, conversation_id, tenant_id')
           .eq('id', csat.attendance_id)
           .single();
 
-        if (!att) {
-          console.error(`[${FUNCTION_NAME}][${requestId}] Attendance not found for CSAT ${csat.id}`);
-          continue;
-        }
+        if (!att) continue;
 
-        // Get conversation + instance
-        const { data: conv } = await supabase
-          .from('whatsapp_conversations')
-          .select('id, instance_id, contact_id')
-          .eq('id', att.conversation_id)
-          .single();
+        // PRIMEIRA resposta do cliente após o CSAT (regra: a 1ª resposta é a avaliação)
+        const { data: firstReply } = await supabase
+          .from('whatsapp_messages')
+          .select('content, created_at')
+          .eq('conversation_id', att.conversation_id)
+          .eq('tenant_id', csat.tenant_id)
+          .eq('is_from_me', false)
+          .gt('created_at', csat.asked_at)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-        if (!conv) {
-          console.error(`[${FUNCTION_NAME}][${requestId}] Conversation not found for att=${att.id}`);
-          continue;
-        }
+        const parseScore = (txt: string | null | undefined): number | null => {
+          const t = (txt ?? '').trim();
+          if (t.length > 4) return null;
+          const d = t.replace(/[^0-9]/g, '');
+          if (!/^[0-9]$/.test(d)) return null;
+          const n = parseInt(d, 10);
+          return (n >= config.scoreMin && n <= config.scoreMax) ? n : null;
+        };
 
-        // Get instance details
-        const { data: instance } = await supabase
-          .from('whatsapp_instances')
-          .select('id, instance_name, instance_id_external, provider_type')
-          .eq('id', conv.instance_id)
-          .single();
+        if (firstReply) {
+          const replyAt = new Date(firstReply.created_at);
+          const score = parseScore(firstReply.content);
 
-        if (!instance) {
-          console.error(`[${FUNCTION_NAME}][${requestId}] Instance not found for conv=${conv.id}`);
-          continue;
-        }
+          // 1ª resposta é nota válida e veio dentro do timeout -> CAPTURA
+          if (score !== null && replyAt <= expiresAt) {
+            const needsReason = score <= config.reasonThreshold;
+            await supabase.from('support_csat').update({
+              score,
+              responded_at: firstReply.created_at,
+              status: needsReason ? 'awaiting_reason' : 'completed',
+            }).eq('id', csat.id);
 
-        // Get instance secrets
-        const { data: secrets } = await supabase
-          .from('whatsapp_instance_secrets')
-          .select('api_url, api_key')
-          .eq('instance_id', instance.id)
-          .single();
+            if (!needsReason) {
+              await supabase.rpc('fn_close_attendance_atomic', {
+                p_attendance_id: att.id,
+                p_closed_reason: 'csat_completed',
+                p_closure_type: 'csat_completed',
+              });
+            }
 
-        if (!secrets) {
-          console.error(`[${FUNCTION_NAME}][${requestId}] Secrets not found for instance=${instance.id}`);
-          continue;
-        }
+            const ctx = await buildInstanceCtx(supabase, att);
+            if (ctx) {
+              if (needsReason) {
+                await sendAndPersistAutoMessage(supabase, ctx, att.conversation_id, att.tenant_id, config.reasonPrompt, { csat: true });
+              } else {
+                await sendAndPersistAutoMessage(supabase, ctx, att.conversation_id, att.tenant_id, config.thanks, { csat: true });
+                await sendDeferredClosureMessage(supabase, ctx, att.conversation_id, att.tenant_id, att.id, att.attendance_code);
+              }
+            }
+            processed++;
+            continue;
+          }
 
-        // Get contact phone
-        const { data: contact } = await supabase
-          .from('whatsapp_contacts')
-          .select('phone_number, name')
-          .eq('id', conv.contact_id)
-          .single();
-
-        if (!contact) {
-          console.error(`[${FUNCTION_NAME}][${requestId}] Contact not found for conv=${conv.id}`);
-          continue;
-        }
-
-        // Guard "Sem regras do sistema": pular envio de mensagem automática de timeout
-        // e fechamento diferido. O CSAT já foi marcado como expired acima.
-        {
-          const { data: contactRules } = await supabase
-            .from('whatsapp_contacts')
-            .select('rules_disabled')
-            .eq('id', conv.contact_id)
-            .maybeSingle();
-          if (contactRules?.rules_disabled === true) {
-            console.log(`[${FUNCTION_NAME}][${requestId}] rules_disabled=true on contact — skipping CSAT timeout messages for att=${att.attendance_code}`);
+          // 1ª resposta NÃO é nota (cliente tem outra demanda) -> expira silencioso, NÃO encerra
+          if (score === null && replyAt <= expiresAt) {
+            await supabase.from('support_csat')
+              .update({ status: 'expired', responded_at: now.toISOString() })
+              .eq('id', csat.id);
             processed++;
             continue;
           }
         }
 
-        const evolutionInstanceId = instance.instance_id_external || instance.instance_name;
-        const remoteJid = `${contact.phone_number}@s.whatsapp.net`;
+        // Sem resposta válida ainda dentro do timeout -> aguarda
+        if (now < expiresAt) continue;
 
-        const instanceCtx: InstanceContext = {
-          apiUrl: secrets.api_url,
-          apiKey: secrets.api_key,
-          instanceName: evolutionInstanceId,
-          providerType: instance.provider_type || 'self_hosted',
-          remoteJid,
-          contactName: contact.name || '',
-        };
+        // TIMEOUT (silêncio) -> expira + mensagem + encerra como csat_timeout (NUNCA inatividade)
+        await supabase.from('support_csat')
+          .update({ status: 'expired', responded_at: now.toISOString() })
+          .eq('id', csat.id);
 
-        // 1. Send friendly timeout message
-        const friendlyMsg = 'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊';
-        await sendAndPersistAutoMessage(supabase, instanceCtx, att.conversation_id, att.tenant_id, friendlyMsg, {
-          csat: true,
-          csat_timeout: true,
+        await supabase.rpc('fn_close_attendance_atomic', {
+          p_attendance_id: att.id,
+          p_closed_reason: 'csat_timeout',
+          p_closure_type: 'csat_timeout',
         });
 
-        // Small delay to ensure ordering
-        await new Promise(r => setTimeout(r, 500));
-
-        // 2. Send deferred closure message
-        await sendDeferredClosureMessage(supabase, instanceCtx, att.conversation_id, att.tenant_id, att.id, att.attendance_code);
+        const ctx = await buildInstanceCtx(supabase, att);
+        if (ctx) {
+          await sendAndPersistAutoMessage(
+            supabase, ctx, att.conversation_id, att.tenant_id,
+            'Que pena que você não deu uma nota, mas da próxima vez contamos com sua colaboração! 😊',
+            { csat: true, csat_timeout: true }
+          );
+          await sendDeferredClosureMessage(supabase, ctx, att.conversation_id, att.tenant_id, att.id, att.attendance_code);
+        }
 
         processed++;
         console.log(`[${FUNCTION_NAME}][${requestId}] Processed expired CSAT ${csat.id} for att=${att.attendance_code}`);
@@ -259,6 +217,56 @@ Deno.serve(async (req) => {
 });
 
 // ─── Helpers (duplicated from evolution-webhook for standalone execution) ───
+
+async function buildInstanceCtx(
+  supabase: any,
+  att: { conversation_id: string; tenant_id: string }
+): Promise<InstanceContext | null> {
+  const { data: conv } = await supabase
+    .from('whatsapp_conversations')
+    .select('id, instance_id, contact_id')
+    .eq('id', att.conversation_id)
+    .maybeSingle();
+  if (!conv) return null;
+
+  const { data: instance } = await supabase
+    .from('whatsapp_instances')
+    .select('id, instance_name, instance_id_external, provider_type')
+    .eq('id', conv.instance_id)
+    .maybeSingle();
+  if (!instance) return null;
+
+  const { data: secrets } = await supabase
+    .from('whatsapp_instance_secrets')
+    .select('api_url, api_key')
+    .eq('instance_id', instance.id)
+    .maybeSingle();
+  if (!secrets?.api_url || !secrets?.api_key) return null;
+
+  const { data: contact } = await supabase
+    .from('whatsapp_contacts')
+    .select('phone_number, name, rules_disabled')
+    .eq('id', conv.contact_id)
+    .maybeSingle();
+  if (!contact) return null;
+
+  // Guard "Sem regras do sistema"
+  if (contact.rules_disabled === true) {
+    console.log(`[${FUNCTION_NAME}] rules_disabled=true on contact — skipping CSAT messages for conv=${att.conversation_id}`);
+    return null;
+  }
+
+  const evolutionInstanceId = instance.instance_id_external || instance.instance_name;
+  return {
+    apiUrl: secrets.api_url,
+    apiKey: secrets.api_key,
+    instanceName: evolutionInstanceId,
+    providerType: instance.provider_type || 'self_hosted',
+    remoteJid: `${contact.phone_number}@s.whatsapp.net`,
+    contactName: contact.name || '',
+  };
+}
+
 
 async function sendEvolutionText(
   ctx: InstanceContext,
