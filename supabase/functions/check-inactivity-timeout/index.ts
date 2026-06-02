@@ -185,20 +185,20 @@ async function processAttendance(
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
-        .select("opened_out_of_hours, instance_id, department_id")
+        .select("opened_out_of_hours")
         .eq("id", att.conversation_id)
         .maybeSingle();
 
-      if (config.business_hours_enabled && convOOH?.instance_id) {
+      if (config.business_hours_enabled && att.instance_id) {
         const minuteBucket = Math.floor(Date.now() / 60000);
-        const bhKey = `${att.tenant_id}:${convOOH.department_id ?? 'none'}:${minuteBucket}`;
+        const bhKey = `${att.tenant_id}:${att.department_id ?? 'none'}:${minuteBucket}`;
         let insideNow = bhCache.get(bhKey);
         if (insideNow === undefined) {
           try {
             insideNow = await isWithinBusinessHours(
               supabase,
               att.conversation_id,
-              convOOH.instance_id,
+              att.instance_id,
               att.tenant_id,
               config,
             );
@@ -230,29 +230,9 @@ async function processAttendance(
       }
     }
 
-    // Overrides de inatividade: fechamento E aviso seguem setor > instância > global.
-    let deptOverride: number | null = null;
-    let instOverride: number | null = null;
-    let deptWarnOverride: number | null = null;
-    let instWarnOverride: number | null = null;
-    {
-      const { data: convOverrides } = await supabase
-        .from("whatsapp_conversations")
-        .select("department_id, instance_id, support_departments!left(auto_close_inactivity_minutes, inactivity_warning_before_minutes), whatsapp_instances!left(auto_close_inactivity_minutes, inactivity_warning_before_minutes)")
-        .eq("id", att.conversation_id)
-        .maybeSingle();
-
-      if (convOverrides) {
-        deptOverride = (convOverrides as any).support_departments?.auto_close_inactivity_minutes ?? null;
-        instOverride = (convOverrides as any).whatsapp_instances?.auto_close_inactivity_minutes ?? null;
-        deptWarnOverride = (convOverrides as any).support_departments?.inactivity_warning_before_minutes ?? null;
-        instWarnOverride = (convOverrides as any).whatsapp_instances?.inactivity_warning_before_minutes ?? null;
-      }
-    }
-
-    const closeThresholdMin = deptOverride ?? instOverride ?? config.support_auto_close_inactivity_minutes;
-    const warnEnabled = config.support_send_inactivity_warning === true;
-    const warnGlobal = config.support_inactivity_warning_before_minutes;
+    const closeThresholdMin = att.effective_close_min;
+    const warnEnabled = att.warn_enabled;
+    const warnBeforeMin = Math.min(att.effective_warn_before, closeThresholdMin);
     const warnTemplate = config.support_inactivity_warning_template ||
       "⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.";
 
@@ -261,8 +241,6 @@ async function processAttendance(
       return "skipped";
     }
 
-    const resolvedWarnBefore = deptWarnOverride ?? instWarnOverride ?? warnGlobal;
-    const warnBeforeMin = Math.min(resolvedWarnBefore, closeThresholdMin);
 
     const lastActivityIso = getLastActivityIso(att);
     const elapsedMin = (Date.now() - new Date(lastActivityIso).getTime()) / 60000;
