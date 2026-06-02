@@ -213,7 +213,6 @@ export async function exportClientesXlsx({
     boolCell(p.ativo),
     resolve(mProduto, p.produto_id),
     resolve(mFornecedor, p.fornecedor_id),
-    numCell(p.vlr_mensal) ?? "",
     numCell(p.vlr_custo) ?? "",
     numCell(p.vlr_ativacao) ?? "",
     p.recorrencia ?? "",
