@@ -31,6 +31,9 @@ export default function SetoresInstanciasTab() {
   const [inactivityMinutes, setInactivityMinutes] = useState<string>("");
   const [warningMinutes, setWarningMinutes] = useState<string>("");
   const { instances } = useWhatsAppInstances();
+  const { data: supportConfig } = useSupportConfig();
+  const globalCloseMin = supportConfig?.support_auto_close_inactivity_minutes;
+  const globalWarnMin = supportConfig?.support_inactivity_warning_before_minutes;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["support_departments_wa", tid],
