@@ -164,7 +164,9 @@ async function processAttendance(
       }
     }
 
-    // Guard: não fechar fora do horário AGORA (estado atual, não flag histórico).
+    // Guard: estamos dentro do horário comercial AGORA?
+    // Sempre checar — não depende mais da flag opened_out_of_hours.
+    // Fail-safe: se a checagem falhar, assume "fora" e pula (não pune cliente).
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
@@ -172,36 +174,39 @@ async function processAttendance(
         .eq("id", att.conversation_id)
         .maybeSingle();
 
-      if (convOOH?.opened_out_of_hours === true) {
-        let insideNow = true;
-        if (config.business_hours_enabled) {
-          try {
-            insideNow = await isWithinBusinessHours(
-              supabase,
-              att.conversation_id,
-              convOOH.instance_id,
-              att.tenant_id,
-              config
-            );
-          } catch (err) {
-            console.error(
-              `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: não fecha`,
-              err
-            );
-            insideNow = false;
-          }
-        }
-
-        if (!insideNow) {
-          log("fora do horário agora — skip inactivity close");
+      if (config.business_hours_enabled && convOOH?.instance_id) {
+        let insideNow = false;
+        try {
+          insideNow = await isWithinBusinessHours(
+            supabase,
+            att.conversation_id,
+            convOOH.instance_id,
+            att.tenant_id,
+            config,
+          );
+        } catch (err) {
+          console.error(
+            `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: skip`,
+            err,
+          );
           return "skipped";
         }
 
-        await supabase
-          .from("whatsapp_conversations")
-          .update({ opened_out_of_hours: false, out_of_hours_cleared_at: new Date().toISOString() })
-          .eq("id", att.conversation_id);
-        log("flag opened_out_of_hours obsoleto — limpo, seguindo fluxo normal");
+        if (!insideNow) {
+          log("fora do horário comercial agora — skip");
+          return "skipped";
+        }
+
+        // Dentro do horário: limpa flag obsoleta se ainda estiver setada
+        if (convOOH?.opened_out_of_hours === true) {
+          await supabase
+            .from("whatsapp_conversations")
+            .update({
+              opened_out_of_hours: false,
+              out_of_hours_cleared_at: new Date().toISOString(),
+            })
+            .eq("id", att.conversation_id);
+        }
       }
     }
 
