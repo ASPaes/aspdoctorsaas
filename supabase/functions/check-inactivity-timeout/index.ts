@@ -14,18 +14,14 @@ const corsHeaders = {
 const LOG = "[check-inactivity-timeout]";
 
 // ─── Limites de execução ────────────────────────────────────────────────────
-// PAGE_SIZE: tamanho de cada lote lido do banco (keyset por id).
 // MAX_SENDS_PER_RUN: teto de MENSAGENS (aviso + encerramento) disparadas por
 //   execução. Protege os tenants de uma rajada quando há backlog acumulado:
 //   a AVALIAÇÃO roda em todos os vencidos, mas só MAX_SENDS_PER_RUN disparam
 //   por ciclo; o restante é pego nos ciclos seguintes (cron a cada 2 min).
-// TIME_BUDGET_MS: para o loop com folga antes do timeout de 30s do cron,
-//   garantindo que nunca seja cortado no meio de um lote.
-// MAX_PAGES: trava dura anti-loop-infinito (PAGE_SIZE * MAX_PAGES avaliações/ciclo).
-const PAGE_SIZE = 50;
+// TIME_BUDGET_MS: para o loop com folga antes do timeout de 30s do cron.
 const MAX_SENDS_PER_RUN = 20;
 const TIME_BUDGET_MS = 22000;
-const MAX_PAGES = 20;
+
 
 interface AttendanceRow {
   id: string;
