@@ -14,18 +14,14 @@ const corsHeaders = {
 const LOG = "[check-inactivity-timeout]";
 
 // ─── Limites de execução ────────────────────────────────────────────────────
-// PAGE_SIZE: tamanho de cada lote lido do banco (keyset por id).
 // MAX_SENDS_PER_RUN: teto de MENSAGENS (aviso + encerramento) disparadas por
 //   execução. Protege os tenants de uma rajada quando há backlog acumulado:
 //   a AVALIAÇÃO roda em todos os vencidos, mas só MAX_SENDS_PER_RUN disparam
 //   por ciclo; o restante é pego nos ciclos seguintes (cron a cada 2 min).
-// TIME_BUDGET_MS: para o loop com folga antes do timeout de 30s do cron,
-//   garantindo que nunca seja cortado no meio de um lote.
-// MAX_PAGES: trava dura anti-loop-infinito (PAGE_SIZE * MAX_PAGES avaliações/ciclo).
-const PAGE_SIZE = 50;
+// TIME_BUDGET_MS: para o loop com folga antes do timeout de 30s do cron.
 const MAX_SENDS_PER_RUN = 20;
 const TIME_BUDGET_MS = 22000;
-const MAX_PAGES = 20;
+
 
 interface AttendanceRow {
   id: string;
@@ -39,7 +35,16 @@ interface AttendanceRow {
   last_operator_message_at: string | null;
   inactivity_warning_sent_at: string | null;
   scheduled_until: string | null;
+  // novos vindos da RPC:
+  department_id: string | null;
+  instance_id: string | null;
+  effective_close_min: number;
+  effective_warn_before: number;
+  warn_enabled: boolean;
+  needs_warn: boolean;
+  needs_close: boolean;
 }
+
 
 interface ContactRow {
   id: string;
@@ -176,20 +181,20 @@ async function processAttendance(
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
-        .select("opened_out_of_hours, instance_id, department_id")
+        .select("opened_out_of_hours")
         .eq("id", att.conversation_id)
         .maybeSingle();
 
-      if (config.business_hours_enabled && convOOH?.instance_id) {
+      if (config.business_hours_enabled && att.instance_id) {
         const minuteBucket = Math.floor(Date.now() / 60000);
-        const bhKey = `${att.tenant_id}:${convOOH.department_id ?? 'none'}:${minuteBucket}`;
+        const bhKey = `${att.tenant_id}:${att.department_id ?? 'none'}:${minuteBucket}`;
         let insideNow = bhCache.get(bhKey);
         if (insideNow === undefined) {
           try {
             insideNow = await isWithinBusinessHours(
               supabase,
               att.conversation_id,
-              convOOH.instance_id,
+              att.instance_id,
               att.tenant_id,
               config,
             );
@@ -221,29 +226,9 @@ async function processAttendance(
       }
     }
 
-    // Overrides de inatividade: fechamento E aviso seguem setor > instância > global.
-    let deptOverride: number | null = null;
-    let instOverride: number | null = null;
-    let deptWarnOverride: number | null = null;
-    let instWarnOverride: number | null = null;
-    {
-      const { data: convOverrides } = await supabase
-        .from("whatsapp_conversations")
-        .select("department_id, instance_id, support_departments!left(auto_close_inactivity_minutes, inactivity_warning_before_minutes), whatsapp_instances!left(auto_close_inactivity_minutes, inactivity_warning_before_minutes)")
-        .eq("id", att.conversation_id)
-        .maybeSingle();
-
-      if (convOverrides) {
-        deptOverride = (convOverrides as any).support_departments?.auto_close_inactivity_minutes ?? null;
-        instOverride = (convOverrides as any).whatsapp_instances?.auto_close_inactivity_minutes ?? null;
-        deptWarnOverride = (convOverrides as any).support_departments?.inactivity_warning_before_minutes ?? null;
-        instWarnOverride = (convOverrides as any).whatsapp_instances?.inactivity_warning_before_minutes ?? null;
-      }
-    }
-
-    const closeThresholdMin = deptOverride ?? instOverride ?? config.support_auto_close_inactivity_minutes;
-    const warnEnabled = config.support_send_inactivity_warning === true;
-    const warnGlobal = config.support_inactivity_warning_before_minutes;
+    const closeThresholdMin = att.effective_close_min;
+    const warnEnabled = att.warn_enabled;
+    const warnBeforeMin = Math.min(att.effective_warn_before, closeThresholdMin);
     const warnTemplate = config.support_inactivity_warning_template ||
       "⚠️ Por falta de interação, este atendimento será encerrado em {{minutes}} minutos. Se ainda precisar de ajuda, responda esta mensagem.";
 
@@ -252,8 +237,6 @@ async function processAttendance(
       return "skipped";
     }
 
-    const resolvedWarnBefore = deptWarnOverride ?? instWarnOverride ?? warnGlobal;
-    const warnBeforeMin = Math.min(resolvedWarnBefore, closeThresholdMin);
 
     const lastActivityIso = getLastActivityIso(att);
     const elapsedMin = (Date.now() - new Date(lastActivityIso).getTime()) / 60000;
@@ -384,8 +367,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const nowIso = new Date().toISOString();
-    const cutoff1min = new Date(Date.now() - 60000).toISOString();
     const budget = { sends: 0 };
     const configCache = new Map<string, SupportConfig>();
     const bhCache = new Map<string, boolean>();
@@ -394,72 +375,42 @@ serve(async (req) => {
       warn_skipped_limit: 0, close_skipped_limit: 0, error: 0,
     };
 
-    // Loop paginado por keyset (id ascending). Avalia TODOS os in_progress
-    // vencidos, em lotes, parando por: orçamento de tempo, teto de páginas,
-    // ou fim da fila. O teto de ENVIOS é aplicado dentro de processAttendance.
-    let cursorId: string | null = null;
-    let pages = 0;
     let scanned = 0;
     let stopReason = "fim_da_fila";
 
-    while (pages < MAX_PAGES) {
+    // Nova RPC pré-filtra atendimentos que precisam ação imediata (needs_warn/needs_close),
+    // com overrides setor>instância>global já resolvidos. Reduz drasticamente o volume.
+    const { data: rows, error } = await supabase
+      .rpc("get_inactive_attendances_to_process", { p_limit: 200 });
+    if (error) throw error;
+
+    const attendances = (rows ?? []) as AttendanceRow[];
+    scanned = attendances.length;
+
+    // Processa SEQUENCIALMENTE: o teto de envios (budget.sends) precisa ser checado
+    // e incrementado de forma serial pra evitar rajadas.
+    for (const att of attendances) {
       if (Date.now() - startedAt > TIME_BUDGET_MS) { stopReason = "orcamento_tempo"; break; }
-
-      let q = supabase
-        .from("support_attendances")
-        .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at, scheduled_until")
-        .eq("status", "in_progress")
-        .or(`and(scheduled_until.is.null,or(last_customer_message_at.lt.${cutoff1min},last_operator_message_at.lt.${cutoff1min},and(last_customer_message_at.is.null,last_operator_message_at.is.null,opened_at.lt.${cutoff1min}))),and(scheduled_until.lte.${nowIso},or(last_customer_message_at.lt.${cutoff1min},last_operator_message_at.lt.${cutoff1min},and(last_customer_message_at.is.null,last_operator_message_at.is.null,opened_at.lt.${cutoff1min})))`)
-        .order("id", { ascending: true })
-        .limit(PAGE_SIZE);
-
-      if (cursorId) q = q.gt("id", cursorId);
-
-      const { data: rows, error } = await q;
-      if (error) throw error;
-
-      const attendances = (rows ?? []) as AttendanceRow[];
-      if (attendances.length === 0) { stopReason = "fim_da_fila"; break; }
-
-      pages++;
-      scanned += attendances.length;
-      cursorId = attendances[attendances.length - 1].id;
-
-      // Processa o lote SEQUENCIALMENTE (não em paralelo). É deliberado: o teto
-      // de envios (budget.sends) precisa ser checado e incrementado de forma serial,
-      // senão N atendimentos leriam budget.sends=0 ao mesmo tempo e disparariam todos
-      // antes do contador subir — exatamente a rajada que queremos evitar. A maioria
-      // dos atendimentos retorna "skipped" rápido (sem I/O de envio), então o custo
-      // sequencial é baixo; e a guarda de tempo (TIME_BUDGET_MS) protege o ciclo.
-      for (const att of attendances) {
-        if (Date.now() - startedAt > TIME_BUDGET_MS) { stopReason = "orcamento_tempo"; break; }
-        let res: ProcessResult;
-        try {
-          res = await processAttendance(supabase, att, correlationId, budget, configCache, bhCache);
-        } catch {
-          res = "error";
-        }
-        summary[res] = (summary[res] || 0) + 1;
-        if (budget.sends >= MAX_SENDS_PER_RUN) break; // teto atingido no meio do lote
+      let res: ProcessResult;
+      try {
+        res = await processAttendance(supabase, att, correlationId, budget, configCache, bhCache);
+      } catch {
+        res = "error";
       }
-
-      // Se já atingiu o teto de envios, não adianta varrer mais páginas neste ciclo:
-      // tudo que enviaria viraria *_skipped_limit. Para e deixa pro próximo ciclo.
+      summary[res] = (summary[res] || 0) + 1;
       if (budget.sends >= MAX_SENDS_PER_RUN) { stopReason = "teto_envios"; break; }
-
-      // Lote menor que PAGE_SIZE = última página.
-      if (attendances.length < PAGE_SIZE) { stopReason = "fim_da_fila"; break; }
     }
 
     const elapsed = Date.now() - startedAt;
     console.log(`${LOG}[${correlationId}] done`, {
-      scanned, pages, sends: budget.sends, stopReason, elapsed_ms: elapsed, ...summary,
+      scanned, sends: budget.sends, stopReason, elapsed_ms: elapsed, ...summary,
     });
 
     return new Response(
-      JSON.stringify({ success: true, scanned, pages, sends: budget.sends, stopReason, ...summary, elapsed_ms: elapsed }),
+      JSON.stringify({ success: true, scanned, sends: budget.sends, stopReason, ...summary, elapsed_ms: elapsed }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (err) {
     console.error(`${LOG}[${correlationId}] fatal:`, err);
     return new Response(
