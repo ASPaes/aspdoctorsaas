@@ -147,6 +147,31 @@ export default function SetoresInstanciasTab() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const saveWarningBefore = useMutation({
+    mutationFn: async (minutes: string) => {
+      if (!selectedId) return;
+      const trimmed = minutes.trim();
+      let value: number | null = null;
+      if (trimmed !== "") {
+        const parsed = parseInt(trimmed, 10);
+        if (isNaN(parsed) || parsed < 1) {
+          throw new Error("Informe um número inteiro maior ou igual a 1, ou deixe em branco.");
+        }
+        value = parsed;
+      }
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ inactivity_warning_before_minutes: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Tempo de aviso salvo");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
