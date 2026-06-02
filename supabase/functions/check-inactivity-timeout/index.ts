@@ -127,7 +127,9 @@ async function processAttendance(
   supabase: any,
   att: AttendanceRow,
   correlationId: string,
-  budget: { sends: number }
+  budget: { sends: number },
+  configCache: Map<string, SupportConfig>,
+  bhCache: Map<string, boolean>,
 ): Promise<ProcessResult> {
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
