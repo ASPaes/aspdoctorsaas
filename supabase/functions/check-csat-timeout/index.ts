@@ -236,12 +236,10 @@ async function buildInstanceCtx(
     .maybeSingle();
   if (!instance) return null;
 
-  const { data: secrets } = await supabase
-    .from('whatsapp_instance_secrets')
-    .select('api_url, api_key')
-    .eq('instance_id', instance.id)
-    .maybeSingle();
-  if (!secrets?.api_url || !secrets?.api_key) return null;
+  const { data: secrets } = await supabase.rpc('get_instance_secrets', { p_instance_id: instance.id });
+  const apiUrl = secrets?.api_url;
+  const apiKey = secrets?.api_key;
+  if (!apiUrl || !apiKey) return null;
 
   const { data: contact } = await supabase
     .from('whatsapp_contacts')
