@@ -37,7 +37,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
