@@ -435,7 +435,7 @@ serve(async (req) => {
         if (Date.now() - startedAt > TIME_BUDGET_MS) { stopReason = "orcamento_tempo"; break; }
         let res: ProcessResult;
         try {
-          res = await processAttendance(supabase, att, correlationId, budget);
+          res = await processAttendance(supabase, att, correlationId, budget, configCache, bhCache);
         } catch {
           res = "error";
         }
