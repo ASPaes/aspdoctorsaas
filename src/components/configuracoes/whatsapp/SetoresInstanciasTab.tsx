@@ -322,7 +322,7 @@ export default function SetoresInstanciasTab() {
                     <Label>Tempo de aviso de inatividade (minutos)</Label>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema.
+                    Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema{globalWarnMin != null ? ` (atualmente ${globalWarnMin} min)` : ""}.
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
@@ -330,7 +330,7 @@ export default function SetoresInstanciasTab() {
                       min={1}
                       step={1}
                       className="w-32"
-                      placeholder="Padrão"
+                      placeholder={globalWarnMin != null ? `${globalWarnMin} (padrão)` : "Padrão"}
                       value={warningMinutes}
                       onChange={(e) => setWarningMinutes(e.target.value)}
                     />
