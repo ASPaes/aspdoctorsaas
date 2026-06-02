@@ -206,6 +206,7 @@ export async function exportClientesXlsx({
     dateCell(c.cert_a1_vencimento) ?? "",
     dateCell(c.cert_a1_ultima_venda_em) ?? "",
     numCell(c.matriz_codigo_sequencial) ?? "",
+    numCell(mrrAtual(c.id)) ?? "",
   ];
 
   const produtoRow = (p: any): any[] => [
