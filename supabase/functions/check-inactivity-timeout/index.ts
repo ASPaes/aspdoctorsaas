@@ -409,7 +409,7 @@ serve(async (req) => {
         .from("support_attendances")
         .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at, scheduled_until")
         .eq("status", "in_progress")
-        .or(`scheduled_until.is.null,scheduled_until.lte.${nowIso}`)
+        .or(`and(scheduled_until.is.null,or(last_customer_message_at.lt.${cutoff1min},last_operator_message_at.lt.${cutoff1min},and(last_customer_message_at.is.null,last_operator_message_at.is.null,opened_at.lt.${cutoff1min}))),and(scheduled_until.lte.${nowIso},or(last_customer_message_at.lt.${cutoff1min},last_operator_message_at.lt.${cutoff1min},and(last_customer_message_at.is.null,last_operator_message_at.is.null,opened_at.lt.${cutoff1min})))`)
         .order("id", { ascending: true })
         .limit(PAGE_SIZE);
 
