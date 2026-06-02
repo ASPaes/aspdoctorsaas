@@ -13,11 +13,11 @@ const CLIENTE_COLUMNS = [
   "Nome do Contato", "CPF do Contato", "Telefone do Contato", "Aniversário do Contato",
   "Imposto (%)", "Custo Fixo (%)", "Cancelado? (sim/nao)", "Data Cancelamento",
   "Motivo Cancelamento", "Obs. Cancelamento", "Vencimento Cert. A1",
-  "Última Venda Cert. A1", "Código da Matriz",
+  "Última Venda Cert. A1", "Código da Matriz", "MRR Atual (R$)",
 ];
 
 const PRODUTO_COLUMNS = [
-  "Prod_Ativo (sim/nao)", "Prod_Produto", "Prod_Fornecedor", "Prod_Mensalidade (R$)",
+  "Prod_Ativo (sim/nao)", "Prod_Produto", "Prod_Fornecedor",
   "Prod_Custo Operação (R$)", "Prod_Valor de Ativação (R$)", "Prod_Recorrência",
   "Prod_Data da Venda", "Prod_Data de Ativação", "Prod_Data de Cancelamento",
   "Prod_Data Próximo Reajuste", "Prod_Dia Vencimento", "Prod_Prazo (meses)",
