@@ -218,6 +218,56 @@ Deno.serve(async (req) => {
 
 // ─── Helpers (duplicated from evolution-webhook for standalone execution) ───
 
+async function buildInstanceCtx(
+  supabase: any,
+  att: { conversation_id: string; tenant_id: string }
+): Promise<InstanceContext | null> {
+  const { data: conv } = await supabase
+    .from('whatsapp_conversations')
+    .select('id, instance_id, contact_id')
+    .eq('id', att.conversation_id)
+    .maybeSingle();
+  if (!conv) return null;
+
+  const { data: instance } = await supabase
+    .from('whatsapp_instances')
+    .select('id, instance_name, instance_id_external, provider_type')
+    .eq('id', conv.instance_id)
+    .maybeSingle();
+  if (!instance) return null;
+
+  const { data: secrets } = await supabase
+    .from('whatsapp_instance_secrets')
+    .select('api_url, api_key')
+    .eq('instance_id', instance.id)
+    .maybeSingle();
+  if (!secrets?.api_url || !secrets?.api_key) return null;
+
+  const { data: contact } = await supabase
+    .from('whatsapp_contacts')
+    .select('phone_number, name, rules_disabled')
+    .eq('id', conv.contact_id)
+    .maybeSingle();
+  if (!contact) return null;
+
+  // Guard "Sem regras do sistema"
+  if (contact.rules_disabled === true) {
+    console.log(`[${FUNCTION_NAME}] rules_disabled=true on contact — skipping CSAT messages for conv=${att.conversation_id}`);
+    return null;
+  }
+
+  const evolutionInstanceId = instance.instance_id_external || instance.instance_name;
+  return {
+    apiUrl: secrets.api_url,
+    apiKey: secrets.api_key,
+    instanceName: evolutionInstanceId,
+    providerType: instance.provider_type || 'self_hosted',
+    remoteJid: `${contact.phone_number}@s.whatsapp.net`,
+    contactName: contact.name || '',
+  };
+}
+
+
 async function sendEvolutionText(
   ctx: InstanceContext,
   text: string
