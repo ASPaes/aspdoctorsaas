@@ -385,7 +385,10 @@ serve(async (req) => {
     );
 
     const nowIso = new Date().toISOString();
+    const cutoff1min = new Date(Date.now() - 60000).toISOString();
     const budget = { sends: 0 };
+    const configCache = new Map<string, SupportConfig>();
+    const bhCache = new Map<string, boolean>();
     const summary: Record<ProcessResult, number> = {
       closed: 0, warned: 0, skipped: 0,
       warn_skipped_limit: 0, close_skipped_limit: 0, error: 0,
