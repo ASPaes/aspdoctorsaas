@@ -28,6 +28,7 @@ export default function SetoresInstanciasTab() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [welcomeMsg, setWelcomeMsg] = useState("");
   const [inactivityMinutes, setInactivityMinutes] = useState<string>("");
+  const [warningMinutes, setWarningMinutes] = useState<string>("");
   const { instances } = useWhatsAppInstances();
 
   const { data: departments = [] } = useQuery({
@@ -36,7 +37,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes")
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -53,6 +54,7 @@ export default function SetoresInstanciasTab() {
 
   useEffect(() => {
     setInactivityMinutes(selectedDept?.auto_close_inactivity_minutes?.toString() ?? "");
+    setWarningMinutes(selectedDept?.inactivity_warning_before_minutes?.toString() ?? "");
   }, [selectedDept]);
 
   const { data: deptInstances = [] } = useQuery({
@@ -141,6 +143,31 @@ export default function SetoresInstanciasTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
       toast.success("Tempo de inatividade salvo");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const saveWarningBefore = useMutation({
+    mutationFn: async (minutes: string) => {
+      if (!selectedId) return;
+      const trimmed = minutes.trim();
+      let value: number | null = null;
+      if (trimmed !== "") {
+        const parsed = parseInt(trimmed, 10);
+        if (isNaN(parsed) || parsed < 1) {
+          throw new Error("Informe um número inteiro maior ou igual a 1, ou deixe em branco.");
+        }
+        value = parsed;
+      }
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ inactivity_warning_before_minutes: value } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      toast.success("Tempo de aviso salvo");
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -284,6 +311,36 @@ export default function SetoresInstanciasTab() {
                     </Button>
                   </div>
                 </div>
+
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Label>Tempo de aviso de inatividade (minutos)</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Quanto tempo antes do encerramento o aviso é enviado ao cliente. Deixe em branco para usar o padrão do sistema.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className="w-32"
+                      placeholder="Padrão"
+                      value={warningMinutes}
+                      onChange={(e) => setWarningMinutes(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">min</span>
+                    <Button
+                      size="sm"
+                      disabled={saveWarningBefore.isPending || warningMinutes === (selectedDept?.inactivity_warning_before_minutes?.toString() ?? "")}
+                      onClick={() => saveWarningBefore.mutate(warningMinutes)}
+                    >
+                      {saveWarningBefore.isPending ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center gap-2">
