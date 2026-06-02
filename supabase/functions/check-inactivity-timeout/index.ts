@@ -133,6 +133,22 @@ async function processAttendance(
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
   try {
+    // Guard: atendimento aguardando avaliação CSAT — não encerrar por inatividade.
+    // O ciclo de vida pós-CSAT (captura da nota e encerramento) é gerido pelo check-csat-timeout.
+    {
+      const { data: pendingCsat } = await supabase
+        .from("support_csat")
+        .select("id")
+        .eq("attendance_id", att.id)
+        .in("status", ["pending", "awaiting_reason"])
+        .limit(1)
+        .maybeSingle();
+      if (pendingCsat) {
+        log("CSAT pendente — skip inactivity close (csat-timeout cuida)");
+        return "skipped";
+      }
+    }
+
     const config = await getSupportConfig(supabase, att.tenant_id);
 
     // Guard "Sem regras do sistema": contato com rules_disabled=true → pula tudo.
