@@ -13,11 +13,11 @@ const CLIENTE_COLUMNS = [
   "Nome do Contato", "CPF do Contato", "Telefone do Contato", "Aniversário do Contato",
   "Imposto (%)", "Custo Fixo (%)", "Cancelado? (sim/nao)", "Data Cancelamento",
   "Motivo Cancelamento", "Obs. Cancelamento", "Vencimento Cert. A1",
-  "Última Venda Cert. A1", "Código da Matriz",
+  "Última Venda Cert. A1", "Código da Matriz", "MRR Atual (R$)",
 ];
 
 const PRODUTO_COLUMNS = [
-  "Prod_Ativo (sim/nao)", "Prod_Produto", "Prod_Fornecedor", "Prod_Mensalidade (R$)",
+  "Prod_Ativo (sim/nao)", "Prod_Produto", "Prod_Fornecedor",
   "Prod_Custo Operação (R$)", "Prod_Valor de Ativação (R$)", "Prod_Recorrência",
   "Prod_Data da Venda", "Prod_Data de Ativação", "Prod_Data de Cancelamento",
   "Prod_Data Próximo Reajuste", "Prod_Dia Vencimento", "Prod_Prazo (meses)",
@@ -113,6 +113,40 @@ export async function exportClientesXlsx({
     clienteProdutos.push(...rows);
   }
 
+  const mensalidadeMap = new Map<string, number>();
+  for (let i = 0; i < filteredClienteIds.length; i += BATCH) {
+    const batch = filteredClienteIds.slice(i, i + BATCH);
+    const rows = await fetchAllRows<any>(() => {
+      let q = (supabase.from("vw_clientes_financeiro" as any) as any)
+        .select("id, mensalidade").in("id", batch);
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      return q;
+    });
+    for (const r of rows) mensalidadeMap.set(r.id, Number(r.mensalidade ?? 0));
+  }
+
+  const deltaMap = new Map<string, number>();
+  for (let i = 0; i < filteredClienteIds.length; i += BATCH) {
+    const batch = filteredClienteIds.slice(i, i + BATCH);
+    const rows = await fetchAllRows<any>(() => {
+      let q = (supabase.from("movimentos_mrr" as any) as any)
+        .select("cliente_id, valor_delta")
+        .in("cliente_id", batch)
+        .eq("status", "ativo")
+        .is("estornado_por", null)
+        .is("estorno_de", null)
+        .neq("tipo", "venda_avulsa")
+        .neq("tipo", "reajuste");
+      if (tenantId) q = q.eq("tenant_id", tenantId);
+      return q;
+    });
+    for (const r of rows) {
+      deltaMap.set(r.cliente_id, (deltaMap.get(r.cliente_id) ?? 0) + Number(r.valor_delta ?? 0));
+    }
+  }
+
+  const mrrAtual = (cid: string) => (mensalidadeMap.get(cid) ?? 0) + (deltaMap.get(cid) ?? 0);
+
   const { data: formasPagtoData } = await (supabase.from("formas_pagamento" as any) as any)
     .select("id, nome")
     .eq("tenant_id", tenantId);
@@ -172,13 +206,13 @@ export async function exportClientesXlsx({
     dateCell(c.cert_a1_vencimento) ?? "",
     dateCell(c.cert_a1_ultima_venda_em) ?? "",
     numCell(c.matriz_codigo_sequencial) ?? "",
+    numCell(mrrAtual(c.id)) ?? "",
   ];
 
   const produtoRow = (p: any): any[] => [
     boolCell(p.ativo),
     resolve(mProduto, p.produto_id),
     resolve(mFornecedor, p.fornecedor_id),
-    numCell(p.vlr_mensal) ?? "",
     numCell(p.vlr_custo) ?? "",
     numCell(p.vlr_ativacao) ?? "",
     p.recorrencia ?? "",
