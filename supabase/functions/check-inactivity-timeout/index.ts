@@ -13,11 +13,19 @@ const corsHeaders = {
 
 const LOG = "[check-inactivity-timeout]";
 
-// Limite de atendimentos processados por execução. Protege contra avalanches
-// (ex: backlog de zumbis ou mudança de threshold para valor baixo) e respeita
-// rate limits dos providers WhatsApp. Os atendimentos não processados serão
-// pegos na próxima execução do cron (1 min depois).
-const MAX_BATCH_SIZE = 50;
+// ─── Limites de execução ────────────────────────────────────────────────────
+// PAGE_SIZE: tamanho de cada lote lido do banco (keyset por id).
+// MAX_SENDS_PER_RUN: teto de MENSAGENS (aviso + encerramento) disparadas por
+//   execução. Protege os tenants de uma rajada quando há backlog acumulado:
+//   a AVALIAÇÃO roda em todos os vencidos, mas só MAX_SENDS_PER_RUN disparam
+//   por ciclo; o restante é pego nos ciclos seguintes (cron a cada 2 min).
+// TIME_BUDGET_MS: para o loop com folga antes do timeout de 30s do cron,
+//   garantindo que nunca seja cortado no meio de um lote.
+// MAX_PAGES: trava dura anti-loop-infinito (PAGE_SIZE * MAX_PAGES avaliações/ciclo).
+const PAGE_SIZE = 50;
+const MAX_SENDS_PER_RUN = 20;
+const TIME_BUDGET_MS = 22000;
+const MAX_PAGES = 20;
 
 interface AttendanceRow {
   id: string;
@@ -38,6 +46,16 @@ interface ContactRow {
   phone_number: string;
   name: string | null;
 }
+
+// Resultado de processAttendance. "*_skipped_limit" = decisão dizia enviar,
+// mas o teto de envios do ciclo já estourou → fica pro próximo ciclo.
+type ProcessResult =
+  | "closed"
+  | "warned"
+  | "skipped"
+  | "warn_skipped_limit"
+  | "close_skipped_limit"
+  | "error";
 
 function getLastActivityIso(att: AttendanceRow): string {
   const candidates = [
@@ -102,19 +120,22 @@ async function buildSendContext(
   return { ctx, contact };
 }
 
+// canSend(): retorna true se ainda há orçamento de envio no ciclo.
+// Recebe um objeto-contador por referência para que o incremento seja visível
+// ao chamador (o loop principal), garantindo o teto global por execução.
 async function processAttendance(
   supabase: any,
   att: AttendanceRow,
-  correlationId: string
-): Promise<"closed" | "warned" | "skipped" | "error"> {
+  correlationId: string,
+  budget: { sends: number }
+): Promise<ProcessResult> {
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
   try {
     const config = await getSupportConfig(supabase, att.tenant_id);
 
-    // Guard "Sem regras do sistema": se o contato do atendimento estiver com
-    // rules_disabled=true, pular qualquer automação de inatividade (aviso/fechamento).
+    // Guard "Sem regras do sistema": contato com rules_disabled=true → pula tudo.
     {
       const { data: contactRules } = await supabase
         .from("whatsapp_contacts")
@@ -127,11 +148,7 @@ async function processAttendance(
       }
     }
 
-    // Guard: não fechar por inatividade se o chat está FORA DO HORÁRIO AGORA.
-    // Decisão baseada no ESTADO ATUAL (e não no flag histórico opened_out_of_hours,
-    // que podia ficar travado em true por semanas e bloquear o fechamento pra sempre).
-    // Se o flag está setado mas AGORA estamos dentro do horário, ele é obsoleto:
-    // limpamos e seguimos o fluxo normal (auto-cura — dispensa backfill manual).
+    // Guard: não fechar fora do horário AGORA (estado atual, não flag histórico).
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
@@ -140,7 +157,6 @@ async function processAttendance(
         .maybeSingle();
 
       if (convOOH?.opened_out_of_hours === true) {
-        // Se business hours está desligado, não existe "fora do horário" → segue.
         let insideNow = true;
         if (config.business_hours_enabled) {
           try {
@@ -156,7 +172,7 @@ async function processAttendance(
               `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: não fecha`,
               err
             );
-            insideNow = false; // na dúvida, NÃO fecha (não pune o cliente)
+            insideNow = false;
           }
         }
 
@@ -165,7 +181,6 @@ async function processAttendance(
           return "skipped";
         }
 
-        // Flag obsoleto: estamos dentro do horário. Limpa e segue o fluxo normal.
         await supabase
           .from("whatsapp_conversations")
           .update({ opened_out_of_hours: false, out_of_hours_cleared_at: new Date().toISOString() })
@@ -174,8 +189,7 @@ async function processAttendance(
       }
     }
 
-    // Buscar overrides de inatividade (hierarquia: setor > instância > global)
-    // Inclui também override do tempo de aviso (warn_before).
+    // Overrides de inatividade: fechamento E aviso seguem setor > instância > global.
     let deptOverride: number | null = null;
     let instOverride: number | null = null;
     let deptWarnOverride: number | null = null;
@@ -206,102 +220,80 @@ async function processAttendance(
       return "skipped";
     }
 
-    // Resolução do warn_before: setor > instância > global.
-    // Trava de segurança: o aviso nunca pode ser maior que o threshold de fechamento.
     const resolvedWarnBefore = deptWarnOverride ?? instWarnOverride ?? warnGlobal;
     const warnBeforeMin = Math.min(resolvedWarnBefore, closeThresholdMin);
-
-    log("threshold resolução", {
-      dept: deptOverride,
-      inst: instOverride,
-      global: config.support_auto_close_inactivity_minutes,
-      resolved: closeThresholdMin,
-      warnDept: deptWarnOverride,
-      warnInst: instWarnOverride,
-      warnGlobal,
-      warnResolved: warnBeforeMin,
-    });
 
     const lastActivityIso = getLastActivityIso(att);
     const elapsedMin = (Date.now() - new Date(lastActivityIso).getTime()) / 60000;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // FLUXO COM AVISO ATIVADO
-    // Sempre: AVISO → ESPERA warnBeforeMin → FECHAMENTO
-    // Cliente nunca é fechado sem ter sido avisado primeiro.
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── FLUXO COM AVISO ATIVADO ──────────────────────────────────────────────
     if (warnEnabled) {
       if (warnBeforeMin <= 0) {
         log("warnBefore inválido com aviso ativado — skip", { warnBeforeMin });
         return "skipped";
       }
 
-
-      // Caso A: aviso ainda não foi enviado
+      // Caso A: aviso ainda não enviado
       if (!att.inactivity_warning_sent_at) {
         const warnAtMin = Math.max(0, closeThresholdMin - warnBeforeMin);
+        if (elapsedMin < warnAtMin) return "skipped"; // ainda não chegou a hora
 
-        if (elapsedMin >= warnAtMin) {
-          log("enviando aviso de inatividade", { elapsedMin, warnAtMin });
-
-          const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
-          if (!built) {
-            log("não foi possível construir SendContext — skip");
-            return "skipped";
-          }
-
-          const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
-
-          await sendAndPersistAutoMessage(
-            supabase,
-            built.ctx,
-            att.conversation_id,
-            message,
-            {
-              system: true,
-              inactivity_warning: true,
-              attendance_id: att.id,
-            }
-          );
-
-          // Marca timestamp do aviso (idempotência: só atualiza se ainda for null)
-          await supabase
-            .from("support_attendances")
-            .update({ inactivity_warning_sent_at: new Date().toISOString() })
-            .eq("id", att.id)
-            .is("inactivity_warning_sent_at", null);
-
-          return "warned";
+        // Vai ENVIAR aviso → respeita o teto de envios do ciclo
+        if (budget.sends >= MAX_SENDS_PER_RUN) {
+          log("teto de envios atingido — adiando aviso pro próximo ciclo");
+          return "warn_skipped_limit";
         }
-        return "skipped"; // ainda não chegou na janela de aviso
+
+        const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
+        if (!built) {
+          log("não foi possível construir SendContext — skip");
+          return "skipped";
+        }
+
+        const message = warnTemplate.replace(/\{\{minutes\}\}/g, String(warnBeforeMin));
+        await sendAndPersistAutoMessage(
+          supabase, built.ctx, att.conversation_id, message,
+          { system: true, inactivity_warning: true, attendance_id: att.id }
+        );
+        budget.sends++; // contabiliza o envio
+
+        await supabase
+          .from("support_attendances")
+          .update({ inactivity_warning_sent_at: new Date().toISOString() })
+          .eq("id", att.id)
+          .is("inactivity_warning_sent_at", null);
+
+        log("aviso enviado", { elapsedMin, warnAtMin, sendsNoCiclo: budget.sends });
+        return "warned";
       }
 
-      // Caso B: aviso já foi enviado — verifica se passou warnBeforeMin desde então
+      // Caso B: aviso já enviado — só fecha após warnBeforeMin desde o aviso
       const warningSentAt = new Date(att.inactivity_warning_sent_at).getTime();
       const minSinceWarning = (Date.now() - warningSentAt) / 60000;
+      if (minSinceWarning < warnBeforeMin) return "skipped";
 
-      if (minSinceWarning < warnBeforeMin) {
-        return "skipped"; // ainda na janela de espera pós-aviso
+      // Vai ENVIAR encerramento → respeita o teto
+      if (budget.sends >= MAX_SENDS_PER_RUN) {
+        log("teto de envios atingido — adiando encerramento pro próximo ciclo");
+        return "close_skipped_limit";
       }
 
-      log("janela pós-aviso expirada — encerrando", {
-        minSinceWarning,
-        warnBeforeMin,
-      });
-
-      return await closeAttendance(supabase, att, correlationId);
+      log("janela pós-aviso expirada — encerrando", { minSinceWarning, warnBeforeMin });
+      const r = await closeAttendance(supabase, att, correlationId);
+      if (r === "closed") budget.sends++;
+      return r;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // FLUXO COM AVISO DESATIVADO
-    // Comportamento simples: passou do threshold → fecha.
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── FLUXO COM AVISO DESATIVADO ───────────────────────────────────────────
     if (elapsedMin >= closeThresholdMin) {
-      log("aviso desativado, threshold atingido — encerrando", {
-        elapsedMin,
-        closeThresholdMin,
-      });
-      return await closeAttendance(supabase, att, correlationId);
+      if (budget.sends >= MAX_SENDS_PER_RUN) {
+        log("teto de envios atingido — adiando encerramento (sem aviso) pro próximo ciclo");
+        return "close_skipped_limit";
+      }
+      log("aviso desativado, threshold atingido — encerrando", { elapsedMin, closeThresholdMin });
+      const r = await closeAttendance(supabase, att, correlationId);
+      if (r === "closed") budget.sends++;
+      return r;
     }
 
     return "skipped";
@@ -319,12 +311,8 @@ async function closeAttendance(
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
 
-  // Constrói contexto de envio ANTES do close (precisa ler conversa ativa)
   const built = await buildSendContext(supabase, att.tenant_id, att.conversation_id);
 
-  // Fecha attendance + conversa ATOMICAMENTE (single transaction via RPC)
-  // Evita janela onde attendance está closed mas conversa ainda active,
-  // causando flicker na UI (conversa aparece em "Atendendo" com badge "Encerrado")
   const { data: result, error: rpcErr } = await supabase
     .rpc("fn_close_attendance_atomic", {
       p_attendance_id: att.id,
@@ -336,25 +324,16 @@ async function closeAttendance(
     log("erro na RPC fn_close_attendance_atomic", rpcErr);
     return "skipped";
   }
-
   if (!result?.success) {
     log("RPC retornou falha", result);
     return "skipped";
   }
 
-  // Envia mensagem de encerramento DEPOIS do commit atômico
   if (built) {
     await sendAndPersistAutoMessage(
-      supabase,
-      built.ctx,
-      att.conversation_id,
+      supabase, built.ctx, att.conversation_id,
       `\u{2705} Atendimento *${att.attendance_code}* encerrado por inatividade.\n\nSe precisar de algo, \u00e9 s\u00f3 nos enviar uma nova mensagem. \u{1F60A}`,
-      {
-        system: true,
-        attendance_event: "closed",
-        attendance_id: att.id,
-        inactivity_close: true,
-      }
+      { system: true, attendance_event: "closed", attendance_id: att.id, inactivity_close: true }
     );
   }
 
@@ -373,46 +352,77 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Busca limitada — prioriza atendimentos com aviso já enviado (próximos de fechar)
-    // e depois os mais antigos sem aviso (próximos de receber aviso)
     const nowIso = new Date().toISOString();
-    const { data: rows, error } = await supabase
-      .from("support_attendances")
-      .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at, scheduled_until")
-      .eq("status", "in_progress")
-      .or(`scheduled_until.is.null,scheduled_until.lte.${nowIso}`)
-      .order("inactivity_warning_sent_at", { ascending: true, nullsFirst: false })
-      .order("last_operator_message_at", { ascending: true, nullsFirst: true })
-      .limit(MAX_BATCH_SIZE);
+    const budget = { sends: 0 };
+    const summary: Record<ProcessResult, number> = {
+      closed: 0, warned: 0, skipped: 0,
+      warn_skipped_limit: 0, close_skipped_limit: 0, error: 0,
+    };
 
-    if (error) throw error;
+    // Loop paginado por keyset (id ascending). Avalia TODOS os in_progress
+    // vencidos, em lotes, parando por: orçamento de tempo, teto de páginas,
+    // ou fim da fila. O teto de ENVIOS é aplicado dentro de processAttendance.
+    let cursorId: string | null = null;
+    let pages = 0;
+    let scanned = 0;
+    let stopReason = "fim_da_fila";
 
-    const attendances = (rows ?? []) as AttendanceRow[];
-    console.log(`${LOG}[${correlationId}] processing ${attendances.length} attendances (max ${MAX_BATCH_SIZE})`);
+    while (pages < MAX_PAGES) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) { stopReason = "orcamento_tempo"; break; }
 
-    const results = await Promise.allSettled(
-      attendances.map((att) => processAttendance(supabase, att, correlationId))
-    );
+      let q = supabase
+        .from("support_attendances")
+        .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at, scheduled_until")
+        .eq("status", "in_progress")
+        .or(`scheduled_until.is.null,scheduled_until.lte.${nowIso}`)
+        .order("id", { ascending: true })
+        .limit(PAGE_SIZE);
 
-    const summary = { closed: 0, warned: 0, skipped: 0, error: 0 };
-    for (const r of results) {
-      if (r.status === "fulfilled") {
-        summary[r.value] = (summary[r.value] || 0) + 1;
-      } else {
-        summary.error++;
+      if (cursorId) q = q.gt("id", cursorId);
+
+      const { data: rows, error } = await q;
+      if (error) throw error;
+
+      const attendances = (rows ?? []) as AttendanceRow[];
+      if (attendances.length === 0) { stopReason = "fim_da_fila"; break; }
+
+      pages++;
+      scanned += attendances.length;
+      cursorId = attendances[attendances.length - 1].id;
+
+      // Processa o lote SEQUENCIALMENTE (não em paralelo). É deliberado: o teto
+      // de envios (budget.sends) precisa ser checado e incrementado de forma serial,
+      // senão N atendimentos leriam budget.sends=0 ao mesmo tempo e disparariam todos
+      // antes do contador subir — exatamente a rajada que queremos evitar. A maioria
+      // dos atendimentos retorna "skipped" rápido (sem I/O de envio), então o custo
+      // sequencial é baixo; e a guarda de tempo (TIME_BUDGET_MS) protege o ciclo.
+      for (const att of attendances) {
+        if (Date.now() - startedAt > TIME_BUDGET_MS) { stopReason = "orcamento_tempo"; break; }
+        let res: ProcessResult;
+        try {
+          res = await processAttendance(supabase, att, correlationId, budget);
+        } catch {
+          res = "error";
+        }
+        summary[res] = (summary[res] || 0) + 1;
+        if (budget.sends >= MAX_SENDS_PER_RUN) break; // teto atingido no meio do lote
       }
+
+      // Se já atingiu o teto de envios, não adianta varrer mais páginas neste ciclo:
+      // tudo que enviaria viraria *_skipped_limit. Para e deixa pro próximo ciclo.
+      if (budget.sends >= MAX_SENDS_PER_RUN) { stopReason = "teto_envios"; break; }
+
+      // Lote menor que PAGE_SIZE = última página.
+      if (attendances.length < PAGE_SIZE) { stopReason = "fim_da_fila"; break; }
     }
 
     const elapsed = Date.now() - startedAt;
-    console.log(`${LOG}[${correlationId}] done in ${elapsed}ms`, summary);
+    console.log(`${LOG}[${correlationId}] done`, {
+      scanned, pages, sends: budget.sends, stopReason, elapsed_ms: elapsed, ...summary,
+    });
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        scanned: attendances.length,
-        ...summary,
-        elapsed_ms: elapsed,
-      }),
+      JSON.stringify({ success: true, scanned, pages, sends: budget.sends, stopReason, ...summary, elapsed_ms: elapsed }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
