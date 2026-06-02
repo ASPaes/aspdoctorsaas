@@ -294,14 +294,14 @@ export default function SetoresInstanciasTab() {
                     <Label>Tempo de inatividade (minutos)</Label>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant.
+                    Fecha conversas automaticamente após este período sem atividade. Deixe vazio para usar o padrão global do tenant{globalCloseMin != null ? ` (atualmente ${globalCloseMin} min)` : ""}.
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
                       min={0}
                       className="w-32"
-                      placeholder="Global"
+                      placeholder={globalCloseMin != null ? `${globalCloseMin} (global)` : "Global"}
                       value={inactivityMinutes}
                       onChange={(e) => setInactivityMinutes(e.target.value)}
                     />
