@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { getSupportConfig } from "../_shared/support-config.ts";
+import { getSupportConfig, SupportConfig } from "../_shared/support-config.ts";
 import { sendAndPersistAutoMessage } from "../_shared/message-processor.ts";
 import { getInstanceSecrets } from "../_shared/providers/index.ts";
 import { SendContext } from "../_shared/message-types.ts";
@@ -127,7 +127,9 @@ async function processAttendance(
   supabase: any,
   att: AttendanceRow,
   correlationId: string,
-  budget: { sends: number }
+  budget: { sends: number },
+  configCache: Map<string, SupportConfig>,
+  bhCache: Map<string, boolean>,
 ): Promise<ProcessResult> {
   const log = (msg: string, extra?: any) =>
     console.log(`${LOG}[${correlationId}][${att.attendance_code}] ${msg}`, extra ?? "");
@@ -149,7 +151,11 @@ async function processAttendance(
       }
     }
 
-    const config = await getSupportConfig(supabase, att.tenant_id);
+    let config = configCache.get(att.tenant_id);
+    if (!config) {
+      config = await getSupportConfig(supabase, att.tenant_id);
+      configCache.set(att.tenant_id, config);
+    }
 
     // Guard "Sem regras do sistema": contato com rules_disabled=true → pula tudo.
     {
@@ -170,26 +176,31 @@ async function processAttendance(
     {
       const { data: convOOH } = await supabase
         .from("whatsapp_conversations")
-        .select("opened_out_of_hours, instance_id")
+        .select("opened_out_of_hours, instance_id, department_id")
         .eq("id", att.conversation_id)
         .maybeSingle();
 
       if (config.business_hours_enabled && convOOH?.instance_id) {
-        let insideNow = false;
-        try {
-          insideNow = await isWithinBusinessHours(
-            supabase,
-            att.conversation_id,
-            convOOH.instance_id,
-            att.tenant_id,
-            config,
-          );
-        } catch (err) {
-          console.error(
-            `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: skip`,
-            err,
-          );
-          return "skipped";
+        const minuteBucket = Math.floor(Date.now() / 60000);
+        const bhKey = `${att.tenant_id}:${convOOH.department_id ?? 'none'}:${minuteBucket}`;
+        let insideNow = bhCache.get(bhKey);
+        if (insideNow === undefined) {
+          try {
+            insideNow = await isWithinBusinessHours(
+              supabase,
+              att.conversation_id,
+              convOOH.instance_id,
+              att.tenant_id,
+              config,
+            );
+            bhCache.set(bhKey, insideNow);
+          } catch (err) {
+            console.error(
+              `${LOG}[${correlationId}][${att.attendance_code}] isWithinBusinessHours falhou — fail-safe: skip`,
+              err,
+            );
+            return "skipped";
+          }
         }
 
         if (!insideNow) {
@@ -374,7 +385,10 @@ serve(async (req) => {
     );
 
     const nowIso = new Date().toISOString();
+    const cutoff1min = new Date(Date.now() - 60000).toISOString();
     const budget = { sends: 0 };
+    const configCache = new Map<string, SupportConfig>();
+    const bhCache = new Map<string, boolean>();
     const summary: Record<ProcessResult, number> = {
       closed: 0, warned: 0, skipped: 0,
       warn_skipped_limit: 0, close_skipped_limit: 0, error: 0,
@@ -395,7 +409,7 @@ serve(async (req) => {
         .from("support_attendances")
         .select("id, attendance_code, tenant_id, conversation_id, contact_id, assigned_to, opened_at, last_customer_message_at, last_operator_message_at, inactivity_warning_sent_at, scheduled_until")
         .eq("status", "in_progress")
-        .or(`scheduled_until.is.null,scheduled_until.lte.${nowIso}`)
+        .or(`and(scheduled_until.is.null,or(last_customer_message_at.lt.${cutoff1min},last_operator_message_at.lt.${cutoff1min},and(last_customer_message_at.is.null,last_operator_message_at.is.null,opened_at.lt.${cutoff1min}))),and(scheduled_until.lte.${nowIso},or(last_customer_message_at.lt.${cutoff1min},last_operator_message_at.lt.${cutoff1min},and(last_customer_message_at.is.null,last_operator_message_at.is.null,opened_at.lt.${cutoff1min})))`)
         .order("id", { ascending: true })
         .limit(PAGE_SIZE);
 
@@ -421,7 +435,7 @@ serve(async (req) => {
         if (Date.now() - startedAt > TIME_BUDGET_MS) { stopReason = "orcamento_tempo"; break; }
         let res: ProcessResult;
         try {
-          res = await processAttendance(supabase, att, correlationId, budget);
+          res = await processAttendance(supabase, att, correlationId, budget, configCache, bhCache);
         } catch {
           res = "error";
         }
