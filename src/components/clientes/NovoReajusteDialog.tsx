@@ -767,6 +767,7 @@ export default function NovoReajusteDialog({
                                 Contrato: {item.numero}
                               </div>
                             </td>
+                            <td className="px-3 py-2 text-sm">{item.unidade_nome}</td>
                             <td className="px-3 py-2">
                               {item.data_proximo_reajuste_antes
                                 ? format(parseISO(item.data_proximo_reajuste_antes), "dd/MM/yyyy")
