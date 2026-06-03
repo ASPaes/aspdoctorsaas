@@ -157,7 +157,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     toast.success('Ticket criado a partir do atendimento');
   }, [queryClient, conversation.id]);
 
-  const canOpenAttendanceTicket = !isGroupConvFromMeta(conversation) && (isAdmin || (!!user?.id && attendance?.assigned_to === user.id));
+  
 
   // Auto-abre o dialog de limpeza quando navegado com ?action=cleanup
   useEffect(() => {
