@@ -743,7 +743,7 @@ export default function NovoReajusteDialog({
                     <Skeleton className="h-10 w-full" />
                   </div>
                 ) : (
-                  <div className="max-h-[28rem] overflow-y-auto border rounded-lg">
+                  <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 z-10 bg-background">
                         <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
