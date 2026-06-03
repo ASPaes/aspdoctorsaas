@@ -77,6 +77,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAttendanceTicketPicker, setShowAttendanceTicketPicker] = useState(false);
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
   const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
