@@ -195,6 +195,24 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     setSaveContactOpen(true);
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (!conversation) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      const overlayOpen = document.querySelector(
+        '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"], [role="listbox"]'
+      );
+      if (overlayOpen) return;
+      if (selectionMode) { exitSelectionMode(); return; }
+      if (showDetails) { setShowDetails(false); return; }
+      onClose?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [conversation, selectionMode, showDetails, exitSelectionMode, onClose]);
+
   if (!conversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
