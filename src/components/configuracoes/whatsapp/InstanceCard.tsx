@@ -6,9 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
-import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff } from "lucide-react";
+import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { EditInstanceDialog } from "./EditInstanceDialog";
+import { ReconnectInstanceDialog } from "./ReconnectInstanceDialog";
 
 interface Instance {
   id: string;
