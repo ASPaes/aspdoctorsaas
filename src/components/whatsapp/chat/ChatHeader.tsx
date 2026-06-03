@@ -765,6 +765,109 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         closureSentimentSummary={sentimentData?.summary ?? null}
       />
 
+      {/* Picker de atendimento para "Abrir Ticket do Atendimento" */}
+      <Dialog
+        open={showAttendanceTicketPicker}
+        onOpenChange={(o) => { if (!o) setShowAttendanceTicketPicker(false); }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Selecione o atendimento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-auto py-2">
+            {isLoadingAttendanceList && (
+              <p className="text-sm text-muted-foreground">Carregando atendimentos…</p>
+            )}
+            {!isLoadingAttendanceList && attendanceTicketList.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum atendimento encontrado para esta conversa.</p>
+            )}
+            {!isLoadingAttendanceList && (attendanceTicketList as any[]).map((a) => {
+              const hasTicket = !!a.ticket_id;
+              const noPermission = !isAdmin && a.assigned_to !== user?.id;
+              const disabled = hasTicket || noPermission;
+              const selected = pickerSelectedId === a.id;
+              const row = (
+                <button
+                  key={a.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => !disabled && setPickerSelectedId(a.id)}
+                  className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
+                    selected && !disabled ? 'border-primary bg-primary/5' : 'border-border'
+                  } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {a.attendance_code || a.id.slice(0, 8)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
+                      </p>
+                    </div>
+                    {hasTicket && (
+                      <Badge variant="secondary" className="text-[10px] shrink-0">Ticket já criado</Badge>
+                    )}
+                  </div>
+                </button>
+              );
+              if (noPermission && !hasTicket) {
+                return (
+                  <Tooltip key={a.id}>
+                    <TooltipTrigger asChild><div>{row}</div></TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Sem permissão</TooltipContent>
+                  </Tooltip>
+                );
+              }
+              return row;
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowAttendanceTicketPicker(false)}>Cancelar</Button>
+            <Button
+              onClick={handleConfirmPickerSelection}
+              disabled={!pickerSelectedId || !canPickAttendance((attendanceTicketList as any[]).find(a => a.id === pickerSelectedId))}
+            >
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de classificação para criar ticket do atendimento escolhido (sem encerrar conversa) */}
+      {attendanceTicketTarget && (
+        <CreateSupportTicketModal
+          open={showAttendanceTicketModal}
+          onOpenChange={(o) => {
+            if (!o) {
+              setShowAttendanceTicketModal(false);
+              setAttendanceTicketTarget(null);
+            }
+          }}
+          onCreated={handleAttendanceTicketCreated}
+          fromClosure
+          attendanceId={attendanceTicketTarget.id}
+          closureClienteId={attendanceTicketTarget.clientes?.id ?? null}
+          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? null}
+          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? null}
+          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? null}
+          closureDepartmentId={attendanceTicketTarget.department_id ?? null}
+          closureResponsavelId={attendanceTicketTarget.assigned_to ?? null}
+          closureContactName={contact?.name ?? null}
+          closureHandleSeconds={attendanceTicketTarget.handle_seconds ?? null}
+          closureAiSummary={attendanceTicketTarget.ai_summary ?? null}
+          closureAiTopics={null}
+          closureAiKeywords={null}
+          closureAiProblem={attendanceTicketTarget.ai_problem ?? null}
+          closureAiSolution={attendanceTicketTarget.ai_solution ?? null}
+          closureSentimentLabel={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.sentiment ?? null) : null}
+          closureSentimentConfidence={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.confidence ?? null) : null}
+          closureSentimentSummary={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.summary ?? null) : null}
+        />
+      )}
+
+
+
       {/* Modal de confirmação de encerramento */}
       <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
         <DialogContent className="sm:max-w-md">
