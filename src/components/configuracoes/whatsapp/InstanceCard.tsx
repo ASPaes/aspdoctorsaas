@@ -37,8 +37,10 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
 
   const isActive = instance.is_active !== false;
+  const supportsQr = instance.provider_type === 'self_hosted' || instance.provider_type === 'cloud';
 
   const handleToggleIgnoreGroups = async (checked: boolean) => {
     try {
