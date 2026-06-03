@@ -6,9 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
-import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff } from "lucide-react";
+import { RefreshCw, Pencil, Trash2, Copy, Link, PowerOff, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { EditInstanceDialog } from "./EditInstanceDialog";
+import { ReconnectInstanceDialog } from "./ReconnectInstanceDialog";
 
 interface Instance {
   id: string;
@@ -36,8 +37,10 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
 
   const isActive = instance.is_active !== false;
+  const supportsQr = instance.provider_type === 'self_hosted' || instance.provider_type === 'cloud';
 
   const handleToggleIgnoreGroups = async (checked: boolean) => {
     try {
@@ -207,6 +210,18 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowEditDialog(true)}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
+          {supportsQr && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowQrDialog(true)}
+              title="Reconectar (QR Code)"
+              disabled={!isActive}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -257,6 +272,8 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
       </AlertDialog>
 
       <EditInstanceDialog instance={instance} open={showEditDialog} onOpenChange={setShowEditDialog} />
+
+      <ReconnectInstanceDialog instance={instance} open={showQrDialog} onOpenChange={setShowQrDialog} />
     </>
   );
 };
