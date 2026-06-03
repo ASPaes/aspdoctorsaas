@@ -558,7 +558,7 @@ export default function NovoReajusteDialog({
             </div>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto px-1">
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Parâmetros do reajuste
