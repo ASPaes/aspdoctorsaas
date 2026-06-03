@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
+import { Loader2, FileText, Filter, FilterX, Search, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
@@ -530,12 +530,40 @@ export default function NovoReajusteDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <div className="space-y-1">
+                  <DialogTitle>{title}</DialogTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Selecione período, unidade e índice para preparar o reajuste dos contratos
+                  </p>
+                </div>
+              </div>
+              {status && (
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                    status === "pendente"
+                      ? "bg-amber-500/10 text-amber-500"
+                      : status === "aplicado"
+                      ? "bg-emerald-500/10 text-emerald-500"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {status}
+                </span>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex gap-3">
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Parâmetros do reajuste
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
                 {showIndice && (
                   <div className="space-y-1 w-full sm:w-48">
                     <label className="text-xs font-medium text-muted-foreground">
@@ -556,7 +584,7 @@ export default function NovoReajusteDialog({
                     </Select>
                   </div>
                 )}
-                <div className="flex-1">
+                <div className="flex-1 min-w-[220px]">
                   <DateRangePicker
                     label="Período de reajuste"
                     value={periodo}
@@ -565,12 +593,12 @@ export default function NovoReajusteDialog({
                 </div>
                 {!readOnly && (
                   <div className="space-y-1 w-full sm:w-48">
-                    <label className="text-xs font-medium text-muted-foreground">Unidade</label>
+                    <label className="text-xs font-medium text-primary">Unidade</label>
                     <Select
                       value={unidadeFilter || "__all__"}
                       onValueChange={(v) => setUnidadeFilter(v === "__all__" ? "" : v)}
                     >
-                      <SelectTrigger className="h-12">
+                      <SelectTrigger className="h-12 ring-1 ring-primary/40">
                         <SelectValue placeholder="Todas as unidades" />
                       </SelectTrigger>
                       <SelectContent>
@@ -584,30 +612,6 @@ export default function NovoReajusteDialog({
                     </Select>
                   </div>
                 )}
-              </div>
-              <div className="flex items-end gap-3 justify-end">
-                {indiceLabel && (
-                  <p className="text-xs text-muted-foreground italic mr-auto">{indiceLabel}</p>
-                )}
-                <div className="space-y-1 w-48">
-                  <label className="text-xs font-medium text-muted-foreground">Produto</label>
-                  <Select
-                    value={produtoFilter || "__all__"}
-                    onValueChange={(v) => setProdutoFilter(v === "__all__" ? "" : v)}
-                  >
-                    <SelectTrigger className="h-12">
-                      <SelectValue placeholder="Todos os produtos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">Todos os produtos</SelectItem>
-                      {produtosList.map((p) => (
-                        <SelectItem key={p.id} value={p.nome}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-1 w-32">
                   <label className="text-xs font-medium text-muted-foreground">% padrão</label>
                   <div className="relative">
@@ -635,31 +639,34 @@ export default function NovoReajusteDialog({
                   </Button>
                 )}
               </div>
+              {indiceLabel && (
+                <p className="text-xs italic text-muted-foreground">{indiceLabel}</p>
+              )}
             </div>
 
             {totais && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-muted/50 rounded-lg p-4">
+                <div className="rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                     <FileText className="h-3 w-3" /> Contratos
                   </div>
-                  <div className="text-xl font-semibold">{totais.qtd_contratos}</div>
+                  <div className="text-2xl font-bold tabular-nums text-foreground">{totais.qtd_contratos}</div>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-4">
+                <div className="rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
                   <div className="text-xs text-muted-foreground mb-1">MRR atual</div>
-                  <div className="text-xl font-semibold">
+                  <div className="text-2xl font-bold tabular-nums text-foreground">
                     {fmtBRL(totais.vlr_mensal_total_antes)}
                   </div>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-4">
+                <div className="rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
                   <div className="text-xs text-muted-foreground mb-1">Valor do reajuste</div>
-                  <div className="text-xl font-semibold text-green-400">
+                  <div className="text-2xl font-bold tabular-nums bg-gradient-to-r from-emerald-400 to-green-500 bg-clip-text text-transparent">
                     +{fmtBRL(totais.vlr_reajuste_total)}
                   </div>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-4">
+                <div className="rounded-xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40">
                   <div className="text-xs text-muted-foreground mb-1">MRR reajustado</div>
-                  <div className="text-xl font-semibold text-blue-400">
+                  <div className="text-2xl font-bold tabular-nums bg-gradient-to-r from-sky-400 to-sky-600 bg-clip-text text-transparent">
                     {fmtBRL(totais.vlr_mensal_total_depois)}
                   </div>
                 </div>
@@ -681,6 +688,23 @@ export default function NovoReajusteDialog({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <Select
+                      value={produtoFilter || "__all__"}
+                      onValueChange={(v) => setProdutoFilter(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger className="h-8 w-44">
+                        <SelectValue placeholder="Todos os produtos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todos os produtos</SelectItem>
+                        {produtosList.map((p) => (
+                          <SelectItem key={p.id} value={p.nome}>
+                            {p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <div className="relative">
                       <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -722,15 +746,15 @@ export default function NovoReajusteDialog({
                   <div className="max-h-[28rem] overflow-y-auto border rounded-lg">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 z-10 bg-background">
-                        <tr className="bg-muted">
-                          <th className="px-3 py-2 w-10"></th>
-                          <th className="px-3 py-2 text-left">Cliente / Contrato</th>
-                          <th className="px-3 py-2 text-left">Unidade</th>
-                          <th className="px-3 py-2 text-left">Próx. reajuste</th>
-                          <th className="px-3 py-2 text-right">MRR atual</th>
-                          <th className="px-3 py-2 text-right">%</th>
-                          <th className="px-3 py-2 text-right">Delta</th>
-                          <th className="px-3 py-2 text-right">MRR novo</th>
+                        <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="px-3 py-3 w-10"></th>
+                          <th className="px-3 py-3 text-left">Cliente / Contrato</th>
+                          <th className="px-3 py-3 text-left">Unidade</th>
+                          <th className="px-3 py-3 text-left">Próx. reajuste</th>
+                          <th className="px-3 py-3 text-right">MRR atual</th>
+                          <th className="px-3 py-3 text-right">%</th>
+                          <th className="px-3 py-3 text-right">Delta</th>
+                          <th className="px-3 py-3 text-right">MRR novo</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -739,10 +763,15 @@ export default function NovoReajusteDialog({
                           const showRazao =
                             !!item.nome_fantasia &&
                             item.nome_fantasia !== item.razao_social;
+                          const isEmpty = !item.unidade_nome || item.unidade_nome === "—";
                           return (
                           <tr
                             key={item.id}
-                            className={`border-t ${!item.selecionado ? "opacity-50" : ""}`}
+                            className={`border-t transition-colors hover:bg-muted/40 ${
+                              item.selecionado
+                                ? "bg-primary/5 border-l-2 border-l-primary"
+                                : "opacity-60"
+                            }`}
                           >
                             <td className="px-3 py-2">
                               <Checkbox
@@ -767,7 +796,17 @@ export default function NovoReajusteDialog({
                                 Contrato: {item.numero}
                               </div>
                             </td>
-                            <td className="px-3 py-2 text-sm">{item.unidade_nome}</td>
+                            <td className="px-3 py-2 text-sm">
+                              <span
+                                className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs ${
+                                  isEmpty
+                                    ? "bg-muted text-muted-foreground"
+                                    : "bg-sky-500/10 text-sky-500"
+                                }`}
+                              >
+                                {item.unidade_nome}
+                              </span>
+                            </td>
                             <td className="px-3 py-2">
                               {item.data_proximo_reajuste_antes
                                 ? format(parseISO(item.data_proximo_reajuste_antes), "dd/MM/yyyy")
@@ -783,10 +822,10 @@ export default function NovoReajusteDialog({
                                 value={Math.round(item.percentual_aplicado * 100) / 100}
                                 onChange={(e) => handlePercentualItemChange(item, e.target.value)}
                                 disabled={readOnly || !item.selecionado}
-                                className="h-8 w-20 text-right font-mono text-sm bg-transparent border border-muted rounded-md px-2"
+                                className="h-8 w-20 text-right font-mono text-sm bg-transparent border border-border rounded-md px-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                               />
                             </td>
-                            <td className="px-3 py-2 text-right text-green-400">
+                            <td className="px-3 py-2 text-right text-emerald-500">
                               {item.selecionado ? `+${fmtBRL(item.vlr_delta)}` : "—"}
                             </td>
                             <td className="px-3 py-2 text-right">
@@ -796,7 +835,7 @@ export default function NovoReajusteDialog({
                                 value={item.vlr_mensal_depois}
                                 onChange={(e) => handleMrrNovoItemChange(item, e.target.value)}
                                 disabled={readOnly || !item.selecionado || item.vlr_mensal_antes === 0}
-                                className="h-8 w-28 text-right font-mono text-sm bg-transparent border border-muted rounded-md px-2 disabled:opacity-50"
+                                className="h-8 w-28 text-right font-mono text-sm bg-transparent border border-border rounded-md px-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
                               />
                             </td>
                           </tr>
