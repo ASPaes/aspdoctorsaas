@@ -334,6 +334,7 @@ export default function NovoReajusteDialog({
         p_periodo_inicio: format(periodo.from, "yyyy-MM-dd"),
         p_periodo_fim: format(periodo.to, "yyyy-MM-dd"),
         p_percentual: pct,
+        p_unidade_base_id: unidadeFilter ? Number(unidadeFilter) : null,
       });
       if (error) throw error;
       const rid = data.reajuste_id;
