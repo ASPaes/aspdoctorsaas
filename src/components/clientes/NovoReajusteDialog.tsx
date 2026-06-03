@@ -107,6 +107,7 @@ export default function NovoReajusteDialog({
   const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [search, setSearch] = useState("");
   const [produtoFilter, setProdutoFilter] = useState("");
+  const [unidadeFilter, setUnidadeFilter] = useState<string>("");
 
   const { data: produtosList = [] } = useQuery({
     queryKey: ["produtos_tenant", tenantId],
