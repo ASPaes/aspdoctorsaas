@@ -210,6 +210,18 @@ export const InstanceCard = ({ instance }: InstanceCardProps) => {
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowEditDialog(true)}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
+          {supportsQr && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowQrDialog(true)}
+              title="Reconectar (QR Code)"
+              disabled={!isActive}
+            >
+              <QrCode className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
