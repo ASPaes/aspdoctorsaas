@@ -856,7 +856,7 @@ export default function NovoReajusteDialog({
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             {status === "estornado" ? (
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Fechar
