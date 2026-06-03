@@ -160,7 +160,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         openTicketForAttendance(only);
       } else {
         // Mantém picker aberto para mostrar motivo (ticket já criado / sem permissão)
-        setPickerSelectedId(only.id);
+        setPickerSelectedId(null);
       }
       return;
     }
