@@ -468,7 +468,7 @@ export function MovimentosMrrModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowUpDown className="h-5 w-5" />
@@ -478,7 +478,7 @@ export function MovimentosMrrModal({
           </DialogHeader>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
             <Card>
               <CardHeader className="py-2 px-3">
                 <CardTitle className="text-xs font-medium text-muted-foreground">MRR Base</CardTitle>
