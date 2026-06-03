@@ -122,6 +122,21 @@ export default function NovoReajusteDialog({
     enabled: !!tenantId && open,
   });
 
+  const { data: unidadesList = [] } = useQuery({
+    queryKey: ["unidades_base_tenant", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const { data, error } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+    enabled: !!tenantId && open,
+  });
+
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const isView = !!reajusteId;
