@@ -167,7 +167,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
     // >1: pré-selecionar o mais recente elegível, ou o primeiro
     const firstEligible = (attendanceTicketList as any[]).find(canPickAttendance);
-    setPickerSelectedId((firstEligible ?? attendanceTicketList[0])?.id ?? null);
+    setPickerSelectedId(firstEligible?.id ?? null);
   }, [showAttendanceTicketPicker, showAttendanceTicketModal, isLoadingAttendanceList, attendanceTicketList, canPickAttendance, openTicketForAttendance]);
 
   const handleOpenAttendanceTicket = useCallback(() => {
