@@ -563,6 +563,27 @@ export default function NovoReajusteDialog({
                     onChange={setPeriodo}
                   />
                 </div>
+                {!readOnly && (
+                  <div className="space-y-1 w-full sm:w-48">
+                    <label className="text-xs font-medium text-muted-foreground">Unidade</label>
+                    <Select
+                      value={unidadeFilter || "__all__"}
+                      onValueChange={(v) => setUnidadeFilter(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Todas as unidades" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas as unidades</SelectItem>
+                        {unidadesList.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               <div className="flex items-end gap-3 justify-end">
                 {indiceLabel && (
