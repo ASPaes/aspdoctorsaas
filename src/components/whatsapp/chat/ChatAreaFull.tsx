@@ -199,10 +199,13 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (!conversation) return;
+      // Só bloqueia quando está DIGITANDO UMA MENSAGEM (textarea do compositor com texto) — preserva rascunho.
+      // Foco em busca ou qualquer outro campo NÃO bloqueia: ESC deve fechar o chat.
       const el = document.activeElement as HTMLElement | null;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (el && el.tagName === 'TEXTAREA' && (el as HTMLTextAreaElement).value.trim() !== '') return;
+      // Overlay realmente aberto → deixa o ESC pra ele (Radix fecha o modal/menu/select)
       const overlayOpen = document.querySelector(
-        '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"], [role="listbox"]'
+        '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"], [role="listbox"][data-state="open"]'
       );
       if (overlayOpen) return;
       if (selectionMode) { exitSelectionMode(); return; }
