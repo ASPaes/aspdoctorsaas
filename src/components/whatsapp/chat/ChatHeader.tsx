@@ -547,6 +547,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
                   <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
                 </DropdownMenuItem>
+                {!isGroupConv && (isAdmin || (!!user?.id && attendance?.assigned_to === user.id)) && (
+                  <DropdownMenuItem onClick={handleOpenAttendanceTicket}>
+                    <FileText className="h-4 w-4 mr-2" /> Abrir Ticket do Atendimento
+                  </DropdownMenuItem>
+                )}
                 {hasMultipleInstances && (
                   <DropdownMenuItem onClick={() => setIsChangeInstanceOpen(true)}>
                     <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
