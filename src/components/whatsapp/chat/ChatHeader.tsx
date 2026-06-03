@@ -113,6 +113,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   });
 
   const canPickAttendance = useCallback((a: any) => {
+    const isClosed = a?.status === 'closed' || a?.status === 'inactive_closed';
+    if (!isClosed) return false;
     if (a?.ticket_id) return false;
     if (isAdmin) return true;
     return !!user?.id && a?.assigned_to === user.id;
@@ -158,14 +160,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         openTicketForAttendance(only);
       } else {
         // Mantém picker aberto para mostrar motivo (ticket já criado / sem permissão)
-        setPickerSelectedId(only.id);
+        setPickerSelectedId(null);
       }
       return;
     }
 
     // >1: pré-selecionar o mais recente elegível, ou o primeiro
     const firstEligible = (attendanceTicketList as any[]).find(canPickAttendance);
-    setPickerSelectedId((firstEligible ?? attendanceTicketList[0])?.id ?? null);
+    setPickerSelectedId(firstEligible?.id ?? null);
   }, [showAttendanceTicketPicker, showAttendanceTicketModal, isLoadingAttendanceList, attendanceTicketList, canPickAttendance, openTicketForAttendance]);
 
   const handleOpenAttendanceTicket = useCallback(() => {
@@ -810,7 +812,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             {!isLoadingAttendanceList && (attendanceTicketList as any[]).map((a) => {
               const hasTicket = !!a.ticket_id;
               const noPermission = !isAdmin && a.assigned_to !== user?.id;
-              const disabled = hasTicket || noPermission;
+              const isOpen = a.status !== 'closed' && a.status !== 'inactive_closed';
+              const disabled = hasTicket || noPermission || isOpen;
               const selected = pickerSelectedId === a.id;
               const row = (
                 <button
@@ -830,14 +833,23 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                       <p className="text-[11px] text-muted-foreground">
                         {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
                       </p>
+                      {isOpen && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                          Encerre o atendimento para gerar o ticket.
+                        </p>
+                      )}
                     </div>
-                    {hasTicket && (
+                    {isOpen ? (
+                      <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                        Em atendimento
+                      </Badge>
+                    ) : hasTicket ? (
                       <Badge variant="secondary" className="text-[10px] shrink-0">Ticket já criado</Badge>
-                    )}
+                    ) : null}
                   </div>
                 </button>
               );
-              if (noPermission && !hasTicket) {
+              if (noPermission && !hasTicket && !isOpen) {
                 return (
                   <Tooltip key={a.id}>
                     <TooltipTrigger asChild><div>{row}</div></TooltipTrigger>
