@@ -396,6 +396,23 @@ export default function NovoReajusteDialog({
     updateItemRpc(item.id, null, checked);
   };
 
+  const visibleItems = useMemo(() => {
+    const base = showOnlySelected ? items.filter((i) => i.selecionado) : items;
+    return base.filter((item) => {
+      if (produtoFilter && item.produto_nome !== produtoFilter) return false;
+      if (!search.trim()) return true;
+      const s = search.toLowerCase();
+      return (
+        item.razao_social.toLowerCase().includes(s) ||
+        item.nome_fantasia.toLowerCase().includes(s) ||
+        item.numero.toLowerCase().includes(s) ||
+        item.cnpj.toLowerCase().includes(s) ||
+        item.cliente_numero.toLowerCase().includes(s) ||
+        item.produto_nome.toLowerCase().includes(s)
+      );
+    });
+  }, [items, showOnlySelected, produtoFilter, search]);
+
   const handleToggleAll = async (checked: boolean) => {
     const ids = new Set(visibleItems.map((i) => i.id));
     setItems((prev) =>
