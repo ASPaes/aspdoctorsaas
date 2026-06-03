@@ -88,6 +88,14 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
 
+  // Client link status (declarado antes dos handlers que dependem de linkedCliente)
+  const metadata = (conversation.metadata || {}) as Record<string, unknown>;
+  const phoneNumber = conversation.contact?.phone_number || "";
+  const { linkedCliente, isLinked } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, null, conversation.tenant_id);
+  const linkedClienteName = isLinked && linkedCliente
+    ? (linkedCliente.nome_fantasia || linkedCliente.razao_social || `#${linkedCliente.codigo_sequencial}`)
+    : null;
+
   // Lazy query: atendimentos da conversa (apenas quando o picker abre)
   const { data: attendanceTicketList = [], isLoading: isLoadingAttendanceList } = useQuery({
     queryKey: ['attendance-ticket-list', conversation.id],
@@ -110,8 +118,36 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     return !!user?.id && a?.assigned_to === user.id;
   }, [isAdmin, user?.id]);
 
+  // Carimba cliente no atendimento (se faltar) antes de abrir o modal
+  const openTicketForAttendance = useCallback(async (target: any) => {
+    let enriched = target;
+    if (!target.cliente_id && (linkedCliente as any)?.id) {
+      try {
+        await supabase
+          .from('support_attendances')
+          .update({ cliente_id: (linkedCliente as any).id })
+          .eq('id', target.id)
+          .is('cliente_id', null);
+      } catch (e) { /* não bloquear a abertura por falha no carimbo */ }
+      enriched = {
+        ...target,
+        cliente_id: (linkedCliente as any).id,
+        clientes: {
+          id: (linkedCliente as any).id,
+          nome_fantasia: (linkedCliente as any).nome_fantasia ?? null,
+          codigo_sequencial: (linkedCliente as any).codigo_sequencial ?? null,
+          produto_id: (linkedCliente as any).produto_id ?? null,
+        },
+      };
+    }
+    setAttendanceTicketTarget(enriched);
+    setShowAttendanceTicketPicker(false);
+    setShowAttendanceTicketModal(true);
+  }, [linkedCliente]);
+
   // Quando lista carrega: se 1 elegível → abrir direto; senão pré-selecionar o mais recente elegível
   useEffect(() => {
+    if (showAttendanceTicketModal) return;
     if (!showAttendanceTicketPicker) return;
     if (isLoadingAttendanceList) return;
     if (!attendanceTicketList || attendanceTicketList.length === 0) return;
@@ -119,9 +155,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     if (attendanceTicketList.length === 1) {
       const only = attendanceTicketList[0] as any;
       if (canPickAttendance(only)) {
-        setAttendanceTicketTarget(only);
-        setShowAttendanceTicketPicker(false);
-        setShowAttendanceTicketModal(true);
+        openTicketForAttendance(only);
       } else {
         // Mantém picker aberto para mostrar motivo (ticket já criado / sem permissão)
         setPickerSelectedId(only.id);
@@ -132,21 +166,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     // >1: pré-selecionar o mais recente elegível, ou o primeiro
     const firstEligible = (attendanceTicketList as any[]).find(canPickAttendance);
     setPickerSelectedId((firstEligible ?? attendanceTicketList[0])?.id ?? null);
-  }, [showAttendanceTicketPicker, isLoadingAttendanceList, attendanceTicketList, canPickAttendance]);
+  }, [showAttendanceTicketPicker, showAttendanceTicketModal, isLoadingAttendanceList, attendanceTicketList, canPickAttendance, openTicketForAttendance]);
 
   const handleOpenAttendanceTicket = useCallback(() => {
     setPickerSelectedId(null);
     setShowAttendanceTicketPicker(true);
   }, []);
 
-  const handleConfirmPickerSelection = useCallback(() => {
+  const handleConfirmPickerSelection = useCallback(async () => {
     const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
     if (!target) return;
     if (!canPickAttendance(target)) return;
-    setAttendanceTicketTarget(target);
-    setShowAttendanceTicketPicker(false);
-    setShowAttendanceTicketModal(true);
-  }, [attendanceTicketList, pickerSelectedId, canPickAttendance]);
+    await openTicketForAttendance(target);
+  }, [attendanceTicketList, pickerSelectedId, canPickAttendance, openTicketForAttendance]);
 
   const handleAttendanceTicketCreated = useCallback(() => {
     setShowAttendanceTicketModal(false);
