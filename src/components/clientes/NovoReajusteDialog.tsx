@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
+import { Loader2, FileText, Filter, FilterX, Search, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
