@@ -110,7 +110,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const movimentosInicioRawPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
         .select('cliente_id, valor_delta')
-        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation'])
+        .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation','reajuste'])
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)
