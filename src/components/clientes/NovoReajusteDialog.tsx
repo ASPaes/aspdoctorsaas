@@ -61,6 +61,7 @@ interface ItemRow {
   cliente_numero: string;
   numero: string;
   produto_nome: string;
+  unidade_nome: string;
 }
 
 interface Totais {
