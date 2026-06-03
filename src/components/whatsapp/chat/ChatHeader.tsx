@@ -174,8 +174,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   const handleOpenAttendanceTicket = useCallback(() => {
     setPickerSelectedId(null);
+    setAttendanceSearch("");
     setShowAttendanceTicketPicker(true);
   }, []);
+
+  const filteredAttendanceList = useMemo(() => {
+    const q = attendanceSearch.trim().toLowerCase();
+    if (!q) return attendanceTicketList as any[];
+    return (attendanceTicketList as any[]).filter((a) =>
+      (a.attendance_code || "").toLowerCase().includes(q)
+    );
+  }, [attendanceTicketList, attendanceSearch]);
 
   const handleConfirmPickerSelection = useCallback(async () => {
     const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
