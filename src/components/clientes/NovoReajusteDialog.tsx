@@ -266,6 +266,7 @@ export default function NovoReajusteDialog({
         cliente_numero: (cliMap.get(r.cliente_id) as any)?.numero ?? "",
         numero: (ctrMap.get(r.contrato_id) as any)?.numero ?? "—",
         produto_nome: prodMap.get(r.contrato_id) ?? "",
+        unidade_nome: (uniMap.get((cliMap.get(r.cliente_id) as any)?.unidade_base_id) as string) ?? "—",
       }));
       mapped.sort((a, b) => a.razao_social.localeCompare(b.razao_social));
       setItems(mapped);
