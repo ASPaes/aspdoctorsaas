@@ -725,6 +725,7 @@ export default function NovoReajusteDialog({
                         <tr className="bg-muted">
                           <th className="px-3 py-2 w-10"></th>
                           <th className="px-3 py-2 text-left">Cliente / Contrato</th>
+                          <th className="px-3 py-2 text-left">Unidade</th>
                           <th className="px-3 py-2 text-left">Próx. reajuste</th>
                           <th className="px-3 py-2 text-right">MRR atual</th>
                           <th className="px-3 py-2 text-right">%</th>
