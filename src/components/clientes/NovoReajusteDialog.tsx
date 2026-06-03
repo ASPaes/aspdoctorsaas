@@ -162,6 +162,7 @@ export default function NovoReajusteDialog({
     debounceRef.current = {};
     setSearch("");
     setProdutoFilter("");
+    setUnidadeFilter("");
   }, []);
 
   useEffect(() => {
