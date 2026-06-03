@@ -135,8 +135,7 @@ export async function exportClientesXlsx({
         .eq("status", "ativo")
         .is("estornado_por", null)
         .is("estorno_de", null)
-        .neq("tipo", "venda_avulsa")
-        .neq("tipo", "reajuste");
+        .neq("tipo", "venda_avulsa");
       if (tenantId) q = q.eq("tenant_id", tenantId);
       return q;
     });

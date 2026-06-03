@@ -156,7 +156,7 @@ export default function FinanceiroCard({
     custo_operacao: custo_operacao ?? null,
     imposto_percentual: imposto_percentual ?? null,
     custo_fixo_percentual: custo_fixo_percentual ?? null,
-    deltaMrr: somaDeltaMrr,
+    deltaMrr: somaDeltaMrr + totalReajuste,
     deltaCusto: somaDeltaCusto,
   });
 
