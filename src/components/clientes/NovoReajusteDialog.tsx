@@ -519,22 +519,8 @@ export default function NovoReajusteDialog({
   };
 
   const selecionados = items.filter((i) => i.selecionado).length;
-  const allSelected = items.length > 0 && selecionados === items.length;
+  const allSelected = visibleItems.length > 0 && visibleItems.every((i) => i.selecionado);
 
-  const displayItems = showOnlySelected ? items.filter((i) => i.selecionado) : items;
-  const filteredItems = displayItems.filter((item) => {
-    if (produtoFilter && item.produto_nome !== produtoFilter) return false;
-    if (!search.trim()) return true;
-    const s = search.toLowerCase();
-    return (
-      item.razao_social.toLowerCase().includes(s) ||
-      item.nome_fantasia.toLowerCase().includes(s) ||
-      item.numero.toLowerCase().includes(s) ||
-      item.cnpj.toLowerCase().includes(s) ||
-      item.cliente_numero.toLowerCase().includes(s) ||
-      item.produto_nome.toLowerCase().includes(s)
-    );
-  });
 
   const title = isView ? `Reajuste — ${status}` : "Novo reajuste";
   const showIndice = !readOnly && (!isView || status === "pendente");
