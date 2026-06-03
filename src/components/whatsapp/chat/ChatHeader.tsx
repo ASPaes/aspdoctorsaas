@@ -873,12 +873,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           onCreated={handleAttendanceTicketCreated}
           fromClosure
           attendanceId={attendanceTicketTarget.id}
-          closureClienteId={attendanceTicketTarget.clientes?.id ?? null}
-          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? null}
-          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? null}
-          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? null}
-          closureDepartmentId={attendanceTicketTarget.department_id ?? null}
-          closureResponsavelId={attendanceTicketTarget.assigned_to ?? null}
+          closureClienteId={attendanceTicketTarget.clientes?.id ?? (linkedCliente as any)?.id ?? null}
+          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? linkedClienteName ?? null}
+          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? (linkedCliente as any)?.codigo_sequencial ?? null}
+          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? (linkedCliente as any)?.produto_id ?? null}
+          closureDepartmentId={attendanceTicketTarget.department_id ?? (conversation as any).department_id ?? null}
+          closureResponsavelId={attendanceTicketTarget.assigned_to ?? (conversation as any).assigned_to ?? null}
           closureContactName={contact?.name ?? null}
           closureHandleSeconds={attendanceTicketTarget.handle_seconds ?? null}
           closureAiSummary={attendanceTicketTarget.ai_summary ?? null}
