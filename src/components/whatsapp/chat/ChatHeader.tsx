@@ -88,6 +88,77 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
 
+  // Lazy query: atendimentos da conversa (apenas quando o picker abre)
+  const { data: attendanceTicketList = [], isLoading: isLoadingAttendanceList } = useQuery({
+    queryKey: ['attendance-ticket-list', conversation.id],
+    enabled: showAttendanceTicketPicker,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('support_attendances')
+        .select('id, attendance_code, status, closure_type, created_at, closed_at, ticket_id, assigned_to, department_id, cliente_id, handle_seconds, ai_summary, ai_problem, ai_solution, clientes:cliente_id(id, nome_fantasia, codigo_sequencial, produto_id)')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const canPickAttendance = useCallback((a: any) => {
+    if (a?.ticket_id) return false;
+    if (isAdmin) return true;
+    return !!user?.id && a?.assigned_to === user.id;
+  }, [isAdmin, user?.id]);
+
+  // Quando lista carrega: se 1 elegível → abrir direto; senão pré-selecionar o mais recente elegível
+  useEffect(() => {
+    if (!showAttendanceTicketPicker) return;
+    if (isLoadingAttendanceList) return;
+    if (!attendanceTicketList || attendanceTicketList.length === 0) return;
+
+    if (attendanceTicketList.length === 1) {
+      const only = attendanceTicketList[0] as any;
+      if (canPickAttendance(only)) {
+        setAttendanceTicketTarget(only);
+        setShowAttendanceTicketPicker(false);
+        setShowAttendanceTicketModal(true);
+      } else {
+        // Mantém picker aberto para mostrar motivo (ticket já criado / sem permissão)
+        setPickerSelectedId(only.id);
+      }
+      return;
+    }
+
+    // >1: pré-selecionar o mais recente elegível, ou o primeiro
+    const firstEligible = (attendanceTicketList as any[]).find(canPickAttendance);
+    setPickerSelectedId((firstEligible ?? attendanceTicketList[0])?.id ?? null);
+  }, [showAttendanceTicketPicker, isLoadingAttendanceList, attendanceTicketList, canPickAttendance]);
+
+  const handleOpenAttendanceTicket = useCallback(() => {
+    setPickerSelectedId(null);
+    setShowAttendanceTicketPicker(true);
+  }, []);
+
+  const handleConfirmPickerSelection = useCallback(() => {
+    const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
+    if (!target) return;
+    if (!canPickAttendance(target)) return;
+    setAttendanceTicketTarget(target);
+    setShowAttendanceTicketPicker(false);
+    setShowAttendanceTicketModal(true);
+  }, [attendanceTicketList, pickerSelectedId, canPickAttendance]);
+
+  const handleAttendanceTicketCreated = useCallback(() => {
+    setShowAttendanceTicketModal(false);
+    setAttendanceTicketTarget(null);
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-ticket-list', conversation.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+    toast.success('Ticket criado a partir do atendimento');
+  }, [queryClient, conversation.id]);
+
+  const canOpenAttendanceTicket = !isGroupConvFromMeta(conversation) && (isAdmin || (!!user?.id && attendance?.assigned_to === user.id));
+
   // Auto-abre o dialog de limpeza quando navegado com ?action=cleanup
   useEffect(() => {
     if (pendingAction === "cleanup" && conversation?.id) {
