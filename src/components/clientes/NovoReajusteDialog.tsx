@@ -528,8 +528,8 @@ export default function NovoReajusteDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] !flex !flex-col">
+          <DialogHeader className="shrink-0">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -558,7 +558,7 @@ export default function NovoReajusteDialog({
             </div>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto px-1">
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Parâmetros do reajuste
@@ -743,7 +743,7 @@ export default function NovoReajusteDialog({
                     <Skeleton className="h-10 w-full" />
                   </div>
                 ) : (
-                  <div className="max-h-[28rem] overflow-y-auto border rounded-lg">
+                  <div className="border rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 z-10 bg-background">
                         <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
@@ -856,7 +856,7 @@ export default function NovoReajusteDialog({
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             {status === "estornado" ? (
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Fechar
