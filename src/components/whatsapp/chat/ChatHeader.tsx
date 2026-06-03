@@ -6,7 +6,8 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search } from "lucide-react";
 import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
@@ -76,6 +77,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAttendanceTicketPicker, setShowAttendanceTicketPicker] = useState(false);
+  const [attendanceSearch, setAttendanceSearch] = useState("");
   const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
   const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
@@ -172,8 +174,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
   const handleOpenAttendanceTicket = useCallback(() => {
     setPickerSelectedId(null);
+    setAttendanceSearch("");
     setShowAttendanceTicketPicker(true);
   }, []);
+
+  const filteredAttendanceList = useMemo(() => {
+    const q = attendanceSearch.trim().toLowerCase();
+    if (!q) return attendanceTicketList as any[];
+    return (attendanceTicketList as any[]).filter((a) =>
+      (a.attendance_code || "").toLowerCase().includes(q)
+    );
+  }, [attendanceTicketList, attendanceSearch]);
 
   const handleConfirmPickerSelection = useCallback(async () => {
     const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
@@ -802,14 +813,28 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           <DialogHeader>
             <DialogTitle>Selecione o atendimento</DialogTitle>
           </DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={attendanceSearch}
+              onChange={(e) => setAttendanceSearch(e.target.value)}
+              placeholder="Pesquisar pelo número do atendimento…"
+              className="h-9 pl-8 text-sm"
+              autoFocus
+            />
+          </div>
           <div className="space-y-2 max-h-[60vh] overflow-auto py-2">
             {isLoadingAttendanceList && (
               <p className="text-sm text-muted-foreground">Carregando atendimentos…</p>
             )}
-            {!isLoadingAttendanceList && attendanceTicketList.length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum atendimento encontrado para esta conversa.</p>
+            {!isLoadingAttendanceList && filteredAttendanceList.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                {attendanceSearch.trim()
+                  ? "Nenhum atendimento corresponde à busca."
+                  : "Nenhum atendimento encontrado para esta conversa."}
+              </p>
             )}
-            {!isLoadingAttendanceList && (attendanceTicketList as any[]).map((a) => {
+            {!isLoadingAttendanceList && filteredAttendanceList.map((a) => {
               const hasTicket = !!a.ticket_id;
               const noPermission = !isAdmin && a.assigned_to !== user?.id;
               const isOpen = a.status !== 'closed' && a.status !== 'inactive_closed';
