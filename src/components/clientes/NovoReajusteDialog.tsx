@@ -214,7 +214,7 @@ export default function NovoReajusteDialog({
       const [{ data: clientes }, { data: contratos }, { data: citens }] = await Promise.all([
         clienteIds.length
           ? (supabase.from("clientes" as any) as any)
-              .select("id, razao_social, nome_fantasia, cnpj, numero")
+              .select("id, razao_social, nome_fantasia, cnpj, numero, unidade_base_id")
               .in("id", clienteIds)
           : Promise.resolve({ data: [] }),
         contratoIds.length
