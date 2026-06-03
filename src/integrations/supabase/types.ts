@@ -8115,6 +8115,7 @@ export type Database = {
           p_periodo_fim: string
           p_periodo_inicio: string
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }

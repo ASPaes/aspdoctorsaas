@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Loader2, FileText, Filter, FilterX, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -61,6 +61,7 @@ interface ItemRow {
   cliente_numero: string;
   numero: string;
   produto_nome: string;
+  unidade_nome: string;
 }
 
 interface Totais {
@@ -106,6 +107,7 @@ export default function NovoReajusteDialog({
   const [showOnlySelected, setShowOnlySelected] = useState(false);
   const [search, setSearch] = useState("");
   const [produtoFilter, setProdutoFilter] = useState("");
+  const [unidadeFilter, setUnidadeFilter] = useState<string>("");
 
   const { data: produtosList = [] } = useQuery({
     queryKey: ["produtos_tenant", tenantId],
@@ -114,6 +116,21 @@ export default function NovoReajusteDialog({
       const { data, error } = await (supabase.from("produtos" as any) as any)
         .select("id, nome")
         .eq("tenant_id", tenantId)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: number; nome: string }>;
+    },
+    enabled: !!tenantId && open,
+  });
+
+  const { data: unidadesList = [] } = useQuery({
+    queryKey: ["unidades_base_tenant", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return [];
+      const { data, error } = await (supabase.from("unidades_base" as any) as any)
+        .select("id, nome")
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
         .order("nome");
       if (error) throw error;
       return (data ?? []) as Array<{ id: number; nome: string }>;
@@ -145,6 +162,7 @@ export default function NovoReajusteDialog({
     debounceRef.current = {};
     setSearch("");
     setProdutoFilter("");
+    setUnidadeFilter("");
   }, []);
 
   useEffect(() => {
@@ -196,7 +214,7 @@ export default function NovoReajusteDialog({
       const [{ data: clientes }, { data: contratos }, { data: citens }] = await Promise.all([
         clienteIds.length
           ? (supabase.from("clientes" as any) as any)
-              .select("id, razao_social, nome_fantasia, cnpj, numero")
+              .select("id, razao_social, nome_fantasia, cnpj, numero, unidade_base_id")
               .in("id", clienteIds)
           : Promise.resolve({ data: [] }),
         contratoIds.length
@@ -219,6 +237,18 @@ export default function NovoReajusteDialog({
         }
       });
 
+      const uniIds = Array.from(
+        new Set(((clientes ?? []) as any[]).map((c) => c.unidade_base_id).filter((v) => v != null))
+      );
+      const uniMap = new Map<number, string>();
+      if (uniIds.length) {
+        const { data: unis } = await (supabase.from("unidades_base" as any) as any)
+          .select("id, nome")
+          .in("id", uniIds);
+        ((unis ?? []) as any[]).forEach((u) => uniMap.set(u.id, u.nome));
+      }
+
+
       const mapped: ItemRow[] = rows.map((r) => ({
         id: r.id,
         contrato_id: r.contrato_id,
@@ -236,6 +266,7 @@ export default function NovoReajusteDialog({
         cliente_numero: (cliMap.get(r.cliente_id) as any)?.numero ?? "",
         numero: (ctrMap.get(r.contrato_id) as any)?.numero ?? "—",
         produto_nome: prodMap.get(r.contrato_id) ?? "",
+        unidade_nome: (uniMap.get((cliMap.get(r.cliente_id) as any)?.unidade_base_id) as string) ?? "—",
       }));
       mapped.sort((a, b) => a.razao_social.localeCompare(b.razao_social));
       setItems(mapped);
@@ -303,6 +334,7 @@ export default function NovoReajusteDialog({
         p_periodo_inicio: format(periodo.from, "yyyy-MM-dd"),
         p_periodo_fim: format(periodo.to, "yyyy-MM-dd"),
         p_percentual: pct,
+        p_unidade_base_id: unidadeFilter ? Number(unidadeFilter) : null,
       });
       if (error) throw error;
       const rid = data.reajuste_id;
@@ -364,11 +396,31 @@ export default function NovoReajusteDialog({
     updateItemRpc(item.id, null, checked);
   };
 
+  const visibleItems = useMemo(() => {
+    const base = showOnlySelected ? items.filter((i) => i.selecionado) : items;
+    return base.filter((item) => {
+      if (produtoFilter && item.produto_nome !== produtoFilter) return false;
+      if (!search.trim()) return true;
+      const s = search.toLowerCase();
+      return (
+        item.razao_social.toLowerCase().includes(s) ||
+        item.nome_fantasia.toLowerCase().includes(s) ||
+        item.numero.toLowerCase().includes(s) ||
+        item.cnpj.toLowerCase().includes(s) ||
+        item.cliente_numero.toLowerCase().includes(s) ||
+        item.produto_nome.toLowerCase().includes(s)
+      );
+    });
+  }, [items, showOnlySelected, produtoFilter, search]);
+
   const handleToggleAll = async (checked: boolean) => {
-    setItems((prev) => prev.map((i) => ({ ...i, selecionado: checked })));
+    const ids = new Set(visibleItems.map((i) => i.id));
+    setItems((prev) =>
+      prev.map((i) => (ids.has(i.id) ? { ...i, selecionado: checked } : i))
+    );
     try {
       const results = await Promise.all(
-        items.map((i) =>
+        visibleItems.map((i) =>
           (supabase.rpc as any)("atualizar_reajuste_item", {
             p_item_id: i.id,
             p_percentual: null,
@@ -467,22 +519,8 @@ export default function NovoReajusteDialog({
   };
 
   const selecionados = items.filter((i) => i.selecionado).length;
-  const allSelected = items.length > 0 && selecionados === items.length;
+  const allSelected = visibleItems.length > 0 && visibleItems.every((i) => i.selecionado);
 
-  const displayItems = showOnlySelected ? items.filter((i) => i.selecionado) : items;
-  const filteredItems = displayItems.filter((item) => {
-    if (produtoFilter && item.produto_nome !== produtoFilter) return false;
-    if (!search.trim()) return true;
-    const s = search.toLowerCase();
-    return (
-      item.razao_social.toLowerCase().includes(s) ||
-      item.nome_fantasia.toLowerCase().includes(s) ||
-      item.numero.toLowerCase().includes(s) ||
-      item.cnpj.toLowerCase().includes(s) ||
-      item.cliente_numero.toLowerCase().includes(s) ||
-      item.produto_nome.toLowerCase().includes(s)
-    );
-  });
 
   const title = isView ? `Reajuste — ${status}` : "Novo reajuste";
   const showIndice = !readOnly && (!isView || status === "pendente");
@@ -525,6 +563,27 @@ export default function NovoReajusteDialog({
                     onChange={setPeriodo}
                   />
                 </div>
+                {!readOnly && (
+                  <div className="space-y-1 w-full sm:w-48">
+                    <label className="text-xs font-medium text-muted-foreground">Unidade</label>
+                    <Select
+                      value={unidadeFilter || "__all__"}
+                      onValueChange={(v) => setUnidadeFilter(v === "__all__" ? "" : v)}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Todas as unidades" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Todas as unidades</SelectItem>
+                        {unidadesList.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               <div className="flex items-end gap-3 justify-end">
                 {indiceLabel && (
@@ -666,6 +725,7 @@ export default function NovoReajusteDialog({
                         <tr className="bg-muted">
                           <th className="px-3 py-2 w-10"></th>
                           <th className="px-3 py-2 text-left">Cliente / Contrato</th>
+                          <th className="px-3 py-2 text-left">Unidade</th>
                           <th className="px-3 py-2 text-left">Próx. reajuste</th>
                           <th className="px-3 py-2 text-right">MRR atual</th>
                           <th className="px-3 py-2 text-right">%</th>
@@ -674,7 +734,7 @@ export default function NovoReajusteDialog({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredItems.map((item) => {
+                        {visibleItems.map((item) => {
                           const primary = item.nome_fantasia || item.razao_social;
                           const showRazao =
                             !!item.nome_fantasia &&
@@ -707,6 +767,7 @@ export default function NovoReajusteDialog({
                                 Contrato: {item.numero}
                               </div>
                             </td>
+                            <td className="px-3 py-2 text-sm">{item.unidade_nome}</td>
                             <td className="px-3 py-2">
                               {item.data_proximo_reajuste_antes
                                 ? format(parseISO(item.data_proximo_reajuste_antes), "dd/MM/yyyy")
