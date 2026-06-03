@@ -813,14 +813,28 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           <DialogHeader>
             <DialogTitle>Selecione o atendimento</DialogTitle>
           </DialogHeader>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={attendanceSearch}
+              onChange={(e) => setAttendanceSearch(e.target.value)}
+              placeholder="Pesquisar pelo número do atendimento…"
+              className="h-9 pl-8 text-sm"
+              autoFocus
+            />
+          </div>
           <div className="space-y-2 max-h-[60vh] overflow-auto py-2">
             {isLoadingAttendanceList && (
               <p className="text-sm text-muted-foreground">Carregando atendimentos…</p>
             )}
-            {!isLoadingAttendanceList && attendanceTicketList.length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum atendimento encontrado para esta conversa.</p>
+            {!isLoadingAttendanceList && filteredAttendanceList.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                {attendanceSearch.trim()
+                  ? "Nenhum atendimento corresponde à busca."
+                  : "Nenhum atendimento encontrado para esta conversa."}
+              </p>
             )}
-            {!isLoadingAttendanceList && (attendanceTicketList as any[]).map((a) => {
+            {!isLoadingAttendanceList && filteredAttendanceList.map((a) => {
               const hasTicket = !!a.ticket_id;
               const noPermission = !isAdmin && a.assigned_to !== user?.id;
               const isOpen = a.status !== 'closed' && a.status !== 'inactive_closed';
