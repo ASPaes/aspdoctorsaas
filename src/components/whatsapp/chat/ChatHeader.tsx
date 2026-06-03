@@ -113,6 +113,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   });
 
   const canPickAttendance = useCallback((a: any) => {
+    const isClosed = a?.status === 'closed' || a?.status === 'inactive_closed';
+    if (!isClosed) return false;
     if (a?.ticket_id) return false;
     if (isAdmin) return true;
     return !!user?.id && a?.assigned_to === user.id;
