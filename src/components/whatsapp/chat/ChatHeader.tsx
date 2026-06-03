@@ -200,13 +200,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [pendingAction, conversation?.id, onPendingActionConsumed]);
   
 
-  // Client link status
-  const metadata = (conversation.metadata || {}) as Record<string, unknown>;
-  const phoneNumber = conversation.contact?.phone_number || "";
-  const { linkedCliente, isLinked } = useClienteLinkSuggestion(conversation.id, phoneNumber, metadata, null, conversation.tenant_id);
-  const linkedClienteName = isLinked && linkedCliente
-    ? (linkedCliente.nome_fantasia || linkedCliente.razao_social || `#${linkedCliente.codigo_sequencial}`)
-    : null;
+  // Client link status (declarado acima, próximo aos handlers de ticket)
 
   const isAfterHours = useMemo(() => {
     const convAny = conversation as any;
