@@ -528,8 +528,8 @@ export default function NovoReajusteDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[90vh] !flex !flex-col">
+          <DialogHeader className="shrink-0">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
