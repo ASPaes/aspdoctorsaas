@@ -237,6 +237,18 @@ export default function NovoReajusteDialog({
         }
       });
 
+      const uniIds = Array.from(
+        new Set(((clientes ?? []) as any[]).map((c) => c.unidade_base_id).filter((v) => v != null))
+      );
+      const uniMap = new Map<number, string>();
+      if (uniIds.length) {
+        const { data: unis } = await (supabase.from("unidades_base" as any) as any)
+          .select("id, nome")
+          .in("id", uniIds);
+        ((unis ?? []) as any[]).forEach((u) => uniMap.set(u.id, u.nome));
+      }
+
+
       const mapped: ItemRow[] = rows.map((r) => ({
         id: r.id,
         contrato_id: r.contrato_id,
