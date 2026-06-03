@@ -397,10 +397,13 @@ export default function NovoReajusteDialog({
   };
 
   const handleToggleAll = async (checked: boolean) => {
-    setItems((prev) => prev.map((i) => ({ ...i, selecionado: checked })));
+    const ids = new Set(visibleItems.map((i) => i.id));
+    setItems((prev) =>
+      prev.map((i) => (ids.has(i.id) ? { ...i, selecionado: checked } : i))
+    );
     try {
       const results = await Promise.all(
-        items.map((i) =>
+        visibleItems.map((i) =>
           (supabase.rpc as any)("atualizar_reajuste_item", {
             p_item_id: i.id,
             p_percentual: null,
