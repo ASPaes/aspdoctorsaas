@@ -6,7 +6,8 @@ import ContactAvatar from "@/components/whatsapp/ContactAvatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText } from "lucide-react";
+import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
 import { ScheduleAttendanceDialog } from "./ScheduleAttendanceDialog";
 import GroupParticipantsSheet from "./GroupParticipantsSheet";
@@ -74,6 +75,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showInChatSearch, setShowInChatSearch] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showAttendanceTicketPicker, setShowAttendanceTicketPicker] = useState(false);
+  const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
+  const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
+  const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -82,6 +87,77 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || (profile as any)?.is_super_admin;
+
+  // Lazy query: atendimentos da conversa (apenas quando o picker abre)
+  const { data: attendanceTicketList = [], isLoading: isLoadingAttendanceList } = useQuery({
+    queryKey: ['attendance-ticket-list', conversation.id],
+    enabled: showAttendanceTicketPicker,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('support_attendances')
+        .select('id, attendance_code, status, closure_type, created_at, closed_at, ticket_id, assigned_to, department_id, cliente_id, handle_seconds, ai_summary, ai_problem, ai_solution, clientes:cliente_id(id, nome_fantasia, codigo_sequencial, produto_id)')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const canPickAttendance = useCallback((a: any) => {
+    if (a?.ticket_id) return false;
+    if (isAdmin) return true;
+    return !!user?.id && a?.assigned_to === user.id;
+  }, [isAdmin, user?.id]);
+
+  // Quando lista carrega: se 1 elegível → abrir direto; senão pré-selecionar o mais recente elegível
+  useEffect(() => {
+    if (!showAttendanceTicketPicker) return;
+    if (isLoadingAttendanceList) return;
+    if (!attendanceTicketList || attendanceTicketList.length === 0) return;
+
+    if (attendanceTicketList.length === 1) {
+      const only = attendanceTicketList[0] as any;
+      if (canPickAttendance(only)) {
+        setAttendanceTicketTarget(only);
+        setShowAttendanceTicketPicker(false);
+        setShowAttendanceTicketModal(true);
+      } else {
+        // Mantém picker aberto para mostrar motivo (ticket já criado / sem permissão)
+        setPickerSelectedId(only.id);
+      }
+      return;
+    }
+
+    // >1: pré-selecionar o mais recente elegível, ou o primeiro
+    const firstEligible = (attendanceTicketList as any[]).find(canPickAttendance);
+    setPickerSelectedId((firstEligible ?? attendanceTicketList[0])?.id ?? null);
+  }, [showAttendanceTicketPicker, isLoadingAttendanceList, attendanceTicketList, canPickAttendance]);
+
+  const handleOpenAttendanceTicket = useCallback(() => {
+    setPickerSelectedId(null);
+    setShowAttendanceTicketPicker(true);
+  }, []);
+
+  const handleConfirmPickerSelection = useCallback(() => {
+    const target = (attendanceTicketList as any[]).find((a) => a.id === pickerSelectedId);
+    if (!target) return;
+    if (!canPickAttendance(target)) return;
+    setAttendanceTicketTarget(target);
+    setShowAttendanceTicketPicker(false);
+    setShowAttendanceTicketModal(true);
+  }, [attendanceTicketList, pickerSelectedId, canPickAttendance]);
+
+  const handleAttendanceTicketCreated = useCallback(() => {
+    setShowAttendanceTicketModal(false);
+    setAttendanceTicketTarget(null);
+    queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-ticket-list', conversation.id] });
+    queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+    toast.success('Ticket criado a partir do atendimento');
+  }, [queryClient, conversation.id]);
+
+  
 
   // Auto-abre o dialog de limpeza quando navegado com ?action=cleanup
   useEffect(() => {
@@ -471,6 +547,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
                   <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
                 </DropdownMenuItem>
+                {!isGroupConv && (isAdmin || (!!user?.id && attendance?.assigned_to === user.id)) && (
+                  <DropdownMenuItem onClick={handleOpenAttendanceTicket}>
+                    <FileText className="h-4 w-4 mr-2" /> Abrir Ticket do Atendimento
+                  </DropdownMenuItem>
+                )}
                 {hasMultipleInstances && (
                   <DropdownMenuItem onClick={() => setIsChangeInstanceOpen(true)}>
                     <ArrowLeftRight className="h-4 w-4 mr-2" /> Trocar Instância
@@ -683,6 +764,109 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         closureSentimentConfidence={sentimentData?.confidence ?? null}
         closureSentimentSummary={sentimentData?.summary ?? null}
       />
+
+      {/* Picker de atendimento para "Abrir Ticket do Atendimento" */}
+      <Dialog
+        open={showAttendanceTicketPicker}
+        onOpenChange={(o) => { if (!o) setShowAttendanceTicketPicker(false); }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Selecione o atendimento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-auto py-2">
+            {isLoadingAttendanceList && (
+              <p className="text-sm text-muted-foreground">Carregando atendimentos…</p>
+            )}
+            {!isLoadingAttendanceList && attendanceTicketList.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum atendimento encontrado para esta conversa.</p>
+            )}
+            {!isLoadingAttendanceList && (attendanceTicketList as any[]).map((a) => {
+              const hasTicket = !!a.ticket_id;
+              const noPermission = !isAdmin && a.assigned_to !== user?.id;
+              const disabled = hasTicket || noPermission;
+              const selected = pickerSelectedId === a.id;
+              const row = (
+                <button
+                  key={a.id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => !disabled && setPickerSelectedId(a.id)}
+                  className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
+                    selected && !disabled ? 'border-primary bg-primary/5' : 'border-border'
+                  } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {a.attendance_code || a.id.slice(0, 8)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
+                      </p>
+                    </div>
+                    {hasTicket && (
+                      <Badge variant="secondary" className="text-[10px] shrink-0">Ticket já criado</Badge>
+                    )}
+                  </div>
+                </button>
+              );
+              if (noPermission && !hasTicket) {
+                return (
+                  <Tooltip key={a.id}>
+                    <TooltipTrigger asChild><div>{row}</div></TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Sem permissão</TooltipContent>
+                  </Tooltip>
+                );
+              }
+              return row;
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowAttendanceTicketPicker(false)}>Cancelar</Button>
+            <Button
+              onClick={handleConfirmPickerSelection}
+              disabled={!pickerSelectedId || !canPickAttendance((attendanceTicketList as any[]).find(a => a.id === pickerSelectedId))}
+            >
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de classificação para criar ticket do atendimento escolhido (sem encerrar conversa) */}
+      {attendanceTicketTarget && (
+        <CreateSupportTicketModal
+          open={showAttendanceTicketModal}
+          onOpenChange={(o) => {
+            if (!o) {
+              setShowAttendanceTicketModal(false);
+              setAttendanceTicketTarget(null);
+            }
+          }}
+          onCreated={handleAttendanceTicketCreated}
+          fromClosure
+          attendanceId={attendanceTicketTarget.id}
+          closureClienteId={attendanceTicketTarget.clientes?.id ?? null}
+          closureClienteNome={attendanceTicketTarget.clientes?.nome_fantasia ?? null}
+          closureClienteCodigo={attendanceTicketTarget.clientes?.codigo_sequencial ?? null}
+          closureProdutoId={attendanceTicketTarget.clientes?.produto_id ?? null}
+          closureDepartmentId={attendanceTicketTarget.department_id ?? null}
+          closureResponsavelId={attendanceTicketTarget.assigned_to ?? null}
+          closureContactName={contact?.name ?? null}
+          closureHandleSeconds={attendanceTicketTarget.handle_seconds ?? null}
+          closureAiSummary={attendanceTicketTarget.ai_summary ?? null}
+          closureAiTopics={null}
+          closureAiKeywords={null}
+          closureAiProblem={attendanceTicketTarget.ai_problem ?? null}
+          closureAiSolution={attendanceTicketTarget.ai_solution ?? null}
+          closureSentimentLabel={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.sentiment ?? null) : null}
+          closureSentimentConfidence={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.confidence ?? null) : null}
+          closureSentimentSummary={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.summary ?? null) : null}
+        />
+      )}
+
+
 
       {/* Modal de confirmação de encerramento */}
       <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
