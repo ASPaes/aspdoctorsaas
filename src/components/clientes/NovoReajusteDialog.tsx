@@ -712,7 +712,7 @@ export default function NovoReajusteDialog({
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredItems.map((item) => {
+                        {visibleItems.map((item) => {
                           const primary = item.nome_fantasia || item.razao_social;
                           const showRazao =
                             !!item.nome_fantasia &&
