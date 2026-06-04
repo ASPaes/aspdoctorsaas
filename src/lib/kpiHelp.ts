@@ -212,6 +212,34 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
       "Análise comparativa entre cohorts para identificar mudanças de fit"
     ],
   },
+  cohort_retencao_media: {
+    title: "Retenção Média (Cohort)",
+    definition: "Média de retenção de todas as coortes do período nos marcos M1, M3, M6 e M12.",
+    why_it_matters: "Indicador agregado que permite avaliar a retenção típica da base independente de qual coorte específica — útil pra comparar performance entre janelas de tempo e validar tendências.",
+    formula: "AVG(retenção em M_n) das coortes com dados em M_n · para n ∈ {1, 3, 6, 12}",
+    example: "Cohorts com retenção média 75% em M6 indicam que tipicamente 1 em cada 4 clientes cancela nos primeiros 6 meses.",
+  },
+  cohort_melhor: {
+    title: "Melhor Coorte",
+    definition: "Coorte com maior percentual de retenção no seu marco mais avançado disponível.",
+    why_it_matters: "Identifica o grupo de entrada que melhor reteve clientes. Investigar o que essa coorte teve de diferente (canal, momento, perfil de cliente, mudança de processo) e tentar replicar pode aumentar a retenção das próximas.",
+    formula: "Cohort com MAX(retenção no marco mais alto disponível) entre todas com pelo menos M1 de dados",
+    example: "Cohort de Jan/25 com 85% retidos em M9 vence Cohort de Mar/25 com 80% em M9.",
+  },
+  cohort_pior: {
+    title: "Pior Coorte",
+    definition: "Coorte com menor percentual de retenção entre as que têm pelo menos 3 meses de dados (M3).",
+    why_it_matters: "Identifica grupo problemático pra investigação de causa-raiz. Filtro de M3 evita falsos negativos de coortes recentes que naturalmente têm pouco histórico. Detecta também o mês de maior queda na curva.",
+    formula: "Cohort com MIN(retenção no marco mais alto) entre cohorts com M3+ de dados · Identifica também o mês de maior drop entre marcos consecutivos",
+    example: "Cohort de Mai/25 caindo 30 pontos entre M2 e M3 sinaliza problema de adoção no 3º mês.",
+  },
+  cohort_curva_retencao: {
+    title: "Curva de Retenção",
+    definition: "Comparação da curva de retenção (% de clientes ativos) das coortes selecionadas ao longo dos meses desde a ativação.",
+    why_it_matters: "Permite identificar onde as curvas divergem (mês de gargalo) e como coortes recentes vs antigas se comportam. Linha pontilhada do benchmark SaaS B2B (~70%) é referência visual de saúde.",
+    formula: "Por coorte selecionada: % retidos no mês N ÷ tamanho original do cohort × 100 · plotado contra o benchmark fixo de 70%",
+    example: "Cohort Jan/25 mantém 70% em M9 enquanto Jul/25 caiu pra 50% em M5 — investigar mudanças entre os períodos.",
+  },
   benchmark_cohort_70: {
     title: "Benchmark 70% (Cohort)",
     definition: "Linha de referência de 70% de retenção, considerada saudável para SaaS.",
