@@ -290,9 +290,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           {/* Card 1 — Retenção Média */}
           <Card className="bg-muted/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
+              <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
                 Retenção Média
-                <InfoTooltip text="Média de retenção de todas as coortes do período nos marcos M1, M3, M6 e M12." />
+                <KpiHelpPopover kpiKey="cohort_retencao_media" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
