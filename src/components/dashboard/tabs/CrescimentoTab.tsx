@@ -177,7 +177,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         {/* Linha 1 — 4 cards principais */}
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
           <KPICardEnhanced
-            label="MRR Atual (Snapshot)"
+            label="MRR ATUAL"
             value={fmt(metrics.mrr)}
             icon={<DollarSign className={`${iconLg} text-primary`} />}
             size={sLg}
