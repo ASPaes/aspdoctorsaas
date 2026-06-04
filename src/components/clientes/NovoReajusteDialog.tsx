@@ -770,6 +770,15 @@ export default function NovoReajusteDialog({
                         Mostrando todos
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportXlsx}
+                      disabled={visibleItems.length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Exportar XLS
+                    </Button>
                   </div>
                 </div>
 
