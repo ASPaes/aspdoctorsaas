@@ -313,9 +313,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           {/* Card 2 — Melhor Coorte */}
           <Card className="bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/50 dark:border-emerald-800/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
+              <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
                 Melhor Coorte
-                <InfoTooltip text="Coorte com maior retenção no seu marco mais avançado disponível." />
+                <KpiHelpPopover kpiKey="cohort_melhor" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
