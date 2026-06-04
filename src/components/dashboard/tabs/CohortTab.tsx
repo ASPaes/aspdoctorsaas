@@ -7,9 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
-import { HelpCircle, Plus, X } from 'lucide-react';
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { KpiHelpPopover } from '../KpiHelpPopover';
 import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCohortLogos } from '../hooks/useCohortLogos';
