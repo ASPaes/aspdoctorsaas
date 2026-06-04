@@ -16,6 +16,8 @@ export interface KpiHelpEntry {
   why_it_matters: string;
   formula: string;
   example?: string;
+  /** Texto livre com referência de mercado (ex: "NRR bom no mercado SaaS B2B é ≥ 110%") */
+  market_benchmark?: string;
   unit?: KpiUnit;
   benchmark?: BenchmarkZone[];
   how_to_improve?: string[];
