@@ -334,9 +334,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           {/* Card 3 — Pior Coorte */}
           <Card className="bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200/50 dark:border-yellow-800/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
+              <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
                 Pior Coorte
-                <InfoTooltip text="Coorte com menor retenção entre as que possuem pelo menos M3 de dados, para evitar distorções com coortes recentes." />
+                <KpiHelpPopover kpiKey="cohort_pior" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
