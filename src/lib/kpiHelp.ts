@@ -25,7 +25,7 @@ export interface KpiHelpEntry {
 
 const kpiHelp: Record<string, KpiHelpEntry> = {
   mrr_snapshot: {
-    title: "MRR ATUAL",
+    title: "MRR Atual",
     definition: "Receita mensal recorrente total dos clientes ativos neste momento.",
     why_it_matters: "É a principal métrica de receita de um SaaS. Se sobe, a empresa cresce; se desce, está perdendo receita.",
     formula: "Σ mensalidade de todos os clientes onde cancelado = false",

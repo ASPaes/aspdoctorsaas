@@ -70,15 +70,17 @@ export default function Dashboard() {
         </div>
       ) : (
         <Tabs defaultValue="visao-geral">
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-            <TabsTrigger value="crescimento">Crescimento</TabsTrigger>
-            <TabsTrigger value="cancelamentos">Cancelamentos</TabsTrigger>
-            <TabsTrigger value="vendas">Vendas</TabsTrigger>
-            <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
-            <TabsTrigger value="cs">Customer Success</TabsTrigger>
-            <TabsTrigger value="cohort">Cohort</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-1">
+            <TabsList>
+              <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+              <TabsTrigger value="crescimento">Crescimento</TabsTrigger>
+              <TabsTrigger value="cancelamentos">Cancelamentos</TabsTrigger>
+              <TabsTrigger value="vendas">Vendas</TabsTrigger>
+              <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
+              <TabsTrigger value="cs">Customer Success</TabsTrigger>
+              <TabsTrigger value="cohort">Cohort</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="visao-geral">
             <VisaoGeralTab metrics={metrics} timeSeries={timeSeries} tvMode={tvMode} mcData={mcData} periodoInicio={filters.periodoInicio} periodoFim={filters.periodoFim} filters={filters} />

@@ -45,7 +45,7 @@ export function KpiHelpPopover({ kpiKey, title, definition, why_it_matters, form
           >
             <span
               className={cn(
-                'font-medium uppercase tracking-wider text-muted-foreground border-b border-dashed border-muted-foreground/40 pb-[1px] group-hover:text-foreground group-hover:border-foreground/60 transition-colors',
+                'font-medium uppercase tracking-wider text-muted-foreground border-b border-dashed border-muted-foreground/40 pb-[1px] group-hover:text-primary group-hover:border-primary/60 transition-colors',
                 labelClassFromSize[labelSize],
               )}
             >
