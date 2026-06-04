@@ -411,9 +411,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       {/* ==================== RETENTION CURVE ==================== */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
+          <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
             Curva de Retenção
-            <InfoTooltip text="Comparação da curva de retenção (% de clientes ativos) das coortes selecionadas ao longo dos meses. Linha pontilhada = benchmark SaaS B2B ~70%." />
+            <KpiHelpPopover kpiKey="cohort_curva_retencao" />
           </CardTitle>
           {curveIsFallback && activeCohorts === defaultLabels && (
             <p className="text-xs text-muted-foreground mt-1">⚠ Não há 3 coortes com ≥3 meses e ≥10 clientes. Exibindo coortes recentes com ≥1 mês.</p>
