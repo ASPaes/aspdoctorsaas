@@ -542,6 +542,44 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "São os mais propensos a churn silencioso. Devem ser priorizados para contato proativo.",
     formula: "Clientes Ativos − Clientes Cobertos (com ticket nos últimos 90d)",
   },
+  // ── Certificados A1 ──
+  cert_vendas_periodo: {
+    title: "Vendas no Período (A1)",
+    definition: "Quantidade de certificados A1 vendidos no período (status 'ganho').",
+    why_it_matters: "Mede o volume de vendas de certificados — receita pontual recorrente anual com baixo CAC porque vende para a base existente.",
+    formula: "COUNT(certificados_a1) com status = 'ganho' e data_venda no período",
+  },
+  cert_perdido_terceiro: {
+    title: "Perdido para Terceiro",
+    definition: "Quantidade de renovações de certificado A1 perdidas para concorrentes no período.",
+    why_it_matters: "Cada perda é receita anual recorrente indo para outro fornecedor. Indicador de competitividade comercial e proatividade no contato pré-vencimento.",
+    formula: "COUNT(certificados_a1) com status = 'perdido_terceiro' e data no período",
+  },
+  cert_faturamento_a1: {
+    title: "Faturamento A1",
+    definition: "Soma dos valores de certificados A1 vendidos no período.",
+    why_it_matters: "Receita pontual de A1 contribui diretamente para o faturamento mensal e ajuda a cobrir CAC. Vendas A1 também são porta de entrada para upsell de outros produtos.",
+    formula: "Σ valor_venda dos certificados A1 com status = 'ganho' no período",
+  },
+  cert_oportunidades_janela: {
+    title: "Oportunidades (Janela)",
+    definition: "Clientes com certificado A1 vencendo entre -20 e +30 dias da data atual.",
+    why_it_matters: "Janela operacional do time comercial. Captura tanto renovações próximas (próximos 30 dias) quanto vencidos recentes ainda recuperáveis (20 dias atrás).",
+    formula: "COUNT(clientes) com cert_a1.vencimento entre (hoje - 20d) e (hoje + 30d)",
+  },
+  cert_vencendo_30d: {
+    title: "Vencendo em 30 dias",
+    definition: "Clientes ativos com certificado A1 vencendo nos próximos 30 dias.",
+    why_it_matters: "Pipeline imediato de renovação. Cada cliente aqui é uma oportunidade que precisa de contato proativo antes do vencimento para evitar perda para terceiro.",
+    formula: "COUNT(clientes) ativos com cert_a1.vencimento entre hoje e (hoje + 30d)",
+  },
+  cert_vencidos_20d: {
+    title: "Vencidos até 20 dias",
+    definition: "Clientes ativos com certificado A1 vencido nos últimos 20 dias.",
+    why_it_matters: "Janela curta de recuperação. Cliente ficou sem A1 mas ainda não fechou com outro fornecedor — ação imediata pode reverter a perda. Após 20 dias, geralmente já está com terceiro.",
+    formula: "COUNT(clientes) ativos com cert_a1.vencimento entre (hoje - 20d) e hoje",
+  },
+
   // ── Espelho Financeiro (cliente) ──
   ef_receita_mrr: {
     title: "Receita (MRR Atual)",
