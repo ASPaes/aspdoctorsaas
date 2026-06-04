@@ -316,7 +316,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "ARPA (mês)",
     definition: "Receita média por conta (cliente ativo), excluindo receita de ativação/setup.",
     why_it_matters: "Métrica estritamente recorrente. Usado no cálculo de LTV. Não inclui setup fees.",
-    formula: "MRR Snapshot ÷ Clientes Ativos",
+    formula: "MRR ATUAL ÷ Clientes Ativos",
   },
   cac_payback: {
     title: "CAC Payback (meses)",
