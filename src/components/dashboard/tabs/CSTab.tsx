@@ -20,6 +20,7 @@ import {
 } from '@/components/cs/types';
 import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List, ShieldCheck, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { KpiHelpPopover } from '../KpiHelpPopover';
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
