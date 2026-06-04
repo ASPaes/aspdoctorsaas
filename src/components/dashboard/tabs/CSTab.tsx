@@ -20,6 +20,7 @@ import {
 } from '@/components/cs/types';
 import { Clock, AlertTriangle, CheckCircle, Users, Target, DollarSign, BarChart3, List, ShieldCheck, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { KpiHelpPopover } from '../KpiHelpPopover';
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
@@ -46,10 +47,11 @@ function DeltaLine({ current, previous, inverted = false, unit = 'abs', label = 
   return <span className={cn('text-[11px] font-medium', color)}>{arrow} {formatted} {label}</span>;
 }
 
-function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = false, delta }: {
+function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = false, delta, helpKey }: {
   title: string; value: string | number; subtitle?: string; icon: React.ReactNode;
   variant?: 'default' | 'success' | 'warning' | 'danger'; tvMode?: boolean;
   delta?: React.ReactNode;
+  helpKey?: string;
 }) {
   const bg = { default: 'bg-card', success: 'bg-green-500/5 border-green-500/20', warning: 'bg-orange-500/5 border-orange-500/20', danger: 'bg-red-500/5 border-red-500/20' };
   return (
@@ -57,7 +59,11 @@ function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = f
       <CardContent className={cn('pt-4', tvMode && 'pt-6')}>
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className={cn('font-medium text-muted-foreground uppercase tracking-wider', tvMode ? 'text-sm' : 'text-xs')}>{title}</p>
+            {helpKey ? (
+              <KpiHelpPopover kpiKey={helpKey} wrapLabel={title} labelSize={tvMode ? 'lg' : 'md'} />
+            ) : (
+              <p className={cn('font-medium text-muted-foreground uppercase tracking-wider', tvMode ? 'text-sm' : 'text-xs')}>{title}</p>
+            )}
             <p className={cn('font-bold', tvMode ? 'text-4xl' : 'text-2xl')}>{value}</p>
             {delta}
             {subtitle && <p className={cn('text-muted-foreground', tvMode ? 'text-sm' : 'text-xs')}>{subtitle}</p>}
@@ -259,14 +265,16 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             title="Tickets Abertos" value={data.ticketsAbertos} subtitle="no período"
             icon={<BarChart3 className={cn(iconSize, 'text-primary')} />} tvMode={tvMode}
             delta={<DeltaLine current={data.ticketsAbertos} previous={prevData?.ticketsAbertos ?? null} inverted unit="abs" />}
+            helpKey="cs_tickets_abertos"
           />
           <KPICard
             title="Tickets Concluídos" value={data.ticketsFechados} subtitle="no período"
             icon={<CheckCircle className={cn(iconSize, 'text-green-500')} />} variant="success" tvMode={tvMode}
             delta={<DeltaLine current={data.ticketsFechados} previous={prevData?.ticketsFechados ?? null} unit="abs" />}
+            helpKey="cs_tickets_fechados"
           />
-          <KPICard title="Vencendo SLA" value={data.vencendoSlaAcao.length + data.vencendoSlaConclusao.length} subtitle="ação + conclusão" icon={<Clock className={cn(iconSize, 'text-orange-500')} />} variant="warning" tvMode={tvMode} />
-          <KPICard title="Vencidos SLA" value={data.vencidosSlaAcao.length + data.vencidosSlaConclusao.length} subtitle="ação + conclusão" icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode} />
+          <KPICard title="Vencendo SLA" value={data.vencendoSlaAcao.length + data.vencendoSlaConclusao.length} subtitle="ação + conclusão" icon={<Clock className={cn(iconSize, 'text-orange-500')} />} variant="warning" tvMode={tvMode} helpKey="cs_vencendo_sla" />
+          <KPICard title="Vencidos SLA" value={data.vencidosSlaAcao.length + data.vencidosSlaConclusao.length} subtitle="ação + conclusão" icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode} helpKey="cs_vencidos_sla" />
         </div>
       </div>
 
@@ -278,22 +286,26 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             title="Clientes em Risco" value={data.clientesEmRisco}
             icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode}
             delta={<DeltaLine current={data.clientesEmRisco} previous={prevData?.clientesEmRisco ?? null} inverted unit="abs" />}
+            helpKey="cs_clientes_em_risco"
           />
           <KPICard
             title="MRR em Risco" value={fmtCur(data.mrrEmRisco)}
             icon={<DollarSign className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode}
             delta={<DeltaLine current={data.mrrEmRisco} previous={prevData?.mrrEmRisco ?? null} inverted unit="currency" />}
+            helpKey="cs_mrr_em_risco"
           />
           <KPICard
             title="MRR Recuperado" value={fmtCur(data.mrrRecuperado)} subtitle="no período"
             icon={<DollarSign className={cn(iconSize, 'text-green-500')} />} variant="success" tvMode={tvMode}
             delta={<DeltaLine current={data.mrrRecuperado} previous={prevData?.mrrRecuperado ?? null} unit="currency" />}
+            helpKey="cs_mrr_recuperado"
           />
           <KPICard
             title="% Higiene" value={fmtPct(data.percentHigiene)}
             icon={<Target className={cn(iconSize, data.percentHigiene >= 80 ? 'text-green-500' : 'text-orange-500')} />}
             variant={data.percentHigiene >= 80 ? 'success' : 'warning'} tvMode={tvMode}
             delta={<DeltaLine current={data.percentHigiene} previous={prevData?.percentHigiene ?? null} unit="pp" />}
+            helpKey="cs_percent_higiene"
           />
         </div>
       </div>
@@ -406,6 +418,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
           <KPICard
             title="Clientes Ativos" value={cob.totalAtivos}
             icon={<Users className={cn(iconSize, 'text-primary')} />} tvMode={tvMode}
+            helpKey="clientes_ativos"
           />
           <KPICard
             title="% Cobertura 90D" value={fmtPct(cob.percentCoberto)}
@@ -413,6 +426,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             icon={<ShieldCheck className={cn(iconSize, 'text-green-500')} />}
             variant={cob.percentCoberto >= 80 ? 'success' : cob.percentCoberto >= 50 ? 'warning' : 'danger'}
             tvMode={tvMode}
+            helpKey="cs_cobertura_90d"
           />
           <KPICard
             title="Descobertos" value={cob.descobertos}
@@ -420,6 +434,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />}
             variant={cob.descobertos > 0 ? 'danger' : 'success'}
             tvMode={tvMode}
+            helpKey="cs_descobertos"
           />
         </div>
         {cob.clientesDescobertos.length > 0 && (
