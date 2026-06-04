@@ -407,6 +407,12 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "SLAs estourados indicam gargalos operacionais e risco de insatisfação do cliente.",
     formula: "COUNT(tickets) onde sla_primeira_acao_ate ou sla_conclusao_ate < agora e status aberto",
   },
+  cs_vencendo_sla: {
+    title: "Vencendo SLA",
+    definition: "Tickets com SLA de primeira ação ou conclusão prestes a vencer (janela curta antes do estouro).",
+    why_it_matters: "Momento ideal de prevenção — agir agora evita o ticket virar 'Vencidos SLA' e gerar insatisfação do cliente. Indicador de capacidade reativa do time.",
+    formula: "COUNT(tickets) onde sla_primeira_acao_ate ou sla_conclusao_ate está próximo de agora e status aberto",
+  },
   cs_reaberturas: {
     title: "Reaberturas",
     definition: "Tickets que foram reabertos após serem concluídos.",
