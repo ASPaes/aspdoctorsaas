@@ -22,20 +22,6 @@ interface CohortTabProps {
   unidadeBaseId?: number | null;
 }
 
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <TooltipProvider>
-      <UITooltip>
-        <TooltipTrigger asChild>
-          <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help inline ml-1" />
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs text-xs">
-          <p>{text}</p>
-        </TooltipContent>
-      </UITooltip>
-    </TooltipProvider>
-  );
-}
 
 function getRetentionColor(percent: number | null): string {
   if (percent == null) return '';
