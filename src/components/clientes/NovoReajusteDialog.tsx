@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Loader2, FileText, Filter, FilterX, Search, TrendingUp } from "lucide-react";
+import { Loader2, FileText, Filter, FilterX, Search, TrendingUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import * as XLSX from "xlsx";
 
 import { supabase } from "@/integrations/supabase/client";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
@@ -351,6 +352,42 @@ export default function NovoReajusteDialog({
     } finally {
       setBuscando(false);
     }
+  };
+
+  const handleExportXlsx = () => {
+    if (visibleItems.length === 0) {
+      toast.warning("Nenhum contrato para exportar");
+      return;
+    }
+    const r2 = (n: number) => Math.round((n || 0) * 100) / 100;
+    const header = [
+      "Nome Fantasia", "Razão Social", "Unidade", "CNPJ", "Contrato", "Produto",
+      "Próx. Reajuste", "MRR Atual", "%", "Delta", "MRR Novo",
+    ];
+    const rows = visibleItems.map((item) => [
+      item.nome_fantasia || "",
+      item.razao_social || "",
+      (item.unidade_nome && item.unidade_nome !== "—") ? item.unidade_nome : "",
+      formatCnpjCpf(item.cnpj || ""),
+      item.numero || "",
+      item.produto_nome || "",
+      item.data_proximo_reajuste_antes ? format(parseISO(item.data_proximo_reajuste_antes), "dd/MM/yyyy") : "",
+      r2(item.vlr_mensal_antes || 0),
+      r2(item.percentual_aplicado || 0),
+      item.selecionado ? r2(item.vlr_delta || 0) : 0,
+      r2(item.vlr_mensal_depois || 0),
+    ]);
+    const sumAntes = visibleItems.reduce((acc, i) => acc + (i.vlr_mensal_antes || 0), 0);
+    const sumDelta = visibleItems.reduce((acc, i) => acc + (i.selecionado ? (i.vlr_delta || 0) : 0), 0);
+    const sumDepois = visibleItems.reduce((acc, i) => acc + (i.vlr_mensal_depois || 0), 0);
+    const totalRow = ["TOTAL", "", "", "", "", "", "", r2(sumAntes), "", r2(sumDelta), r2(sumDepois)];
+    const aoa = [header, ...rows, totalRow];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 30 }, { wch: 34 }, { wch: 14 }, { wch: 20 }, { wch: 14 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 14 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reajuste");
+    const hoje = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `reajuste_${hoje}.xlsx`);
   };
 
   const applyTotaisFromRpc = (data: any) => {
@@ -733,6 +770,15 @@ export default function NovoReajusteDialog({
                         Mostrando todos
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportXlsx}
+                      disabled={visibleItems.length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Exportar XLS
+                    </Button>
                   </div>
                 </div>
 
