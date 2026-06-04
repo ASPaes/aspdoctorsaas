@@ -47,10 +47,11 @@ function DeltaLine({ current, previous, inverted = false, unit = 'abs', label = 
   return <span className={cn('text-[11px] font-medium', color)}>{arrow} {formatted} {label}</span>;
 }
 
-function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = false, delta }: {
+function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = false, delta, helpKey }: {
   title: string; value: string | number; subtitle?: string; icon: React.ReactNode;
   variant?: 'default' | 'success' | 'warning' | 'danger'; tvMode?: boolean;
   delta?: React.ReactNode;
+  helpKey?: string;
 }) {
   const bg = { default: 'bg-card', success: 'bg-green-500/5 border-green-500/20', warning: 'bg-orange-500/5 border-orange-500/20', danger: 'bg-red-500/5 border-red-500/20' };
   return (
@@ -58,7 +59,11 @@ function KPICard({ title, value, subtitle, icon, variant = 'default', tvMode = f
       <CardContent className={cn('pt-4', tvMode && 'pt-6')}>
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className={cn('font-medium text-muted-foreground uppercase tracking-wider', tvMode ? 'text-sm' : 'text-xs')}>{title}</p>
+            {helpKey ? (
+              <KpiHelpPopover kpiKey={helpKey} wrapLabel={title} labelSize={tvMode ? 'lg' : 'md'} />
+            ) : (
+              <p className={cn('font-medium text-muted-foreground uppercase tracking-wider', tvMode ? 'text-sm' : 'text-xs')}>{title}</p>
+            )}
             <p className={cn('font-bold', tvMode ? 'text-4xl' : 'text-2xl')}>{value}</p>
             {delta}
             {subtitle && <p className={cn('text-muted-foreground', tvMode ? 'text-sm' : 'text-xs')}>{subtitle}</p>}
