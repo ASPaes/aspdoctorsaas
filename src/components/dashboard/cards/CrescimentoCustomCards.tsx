@@ -91,10 +91,11 @@ export function ARPAComboCard({
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>
-            ARPA: novo vs base
-          </span>
-          <KpiHelpPopover kpiKey="arpa_novo_vs_base" />
+          <KpiHelpPopover
+            kpiKey="arpa_novo_vs_base"
+            wrapLabel="ARPA: novo vs base"
+            labelSize={size}
+          />
         </div>
         <div className={cn('p-2 rounded-lg', spatialVariant === 'dark' ? 'bg-primary/10' : 'bg-green-500/20')}>
           <DollarSign className={cn('h-4 w-4', spatialVariant === 'dark' ? 'text-primary' : 'text-green-600 dark:text-green-400')} />
@@ -178,10 +179,11 @@ export function ReativacoesCard({
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>
-            Reativações
-          </span>
-          <KpiHelpPopover kpiKey="reativacoes_periodo" />
+          <KpiHelpPopover
+            kpiKey="reativacoes_periodo"
+            wrapLabel="Reativações"
+            labelSize={size}
+          />
         </div>
         <div className={cn('p-2 rounded-lg', spatialVariant === 'dark' ? 'bg-primary/10' : 'bg-green-500/20')}>
           <RefreshCw className={cn('h-4 w-4', spatialVariant === 'dark' ? 'text-primary' : 'text-green-600 dark:text-green-400')} />
