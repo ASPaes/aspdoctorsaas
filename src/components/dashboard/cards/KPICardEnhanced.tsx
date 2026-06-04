@@ -78,9 +78,15 @@ export function KPICardEnhanced({
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>{label}</span>
-          {showHelp && (
-            <KpiHelpPopover kpiKey={helpKey} formula={!helpKey ? formula : undefined} />
+          {showHelp ? (
+            <KpiHelpPopover
+              kpiKey={helpKey}
+              formula={!helpKey ? formula : undefined}
+              wrapLabel={label}
+              labelSize={size}
+            />
+          ) : (
+            <span className={cn('font-medium uppercase tracking-wider text-muted-foreground', labelSizes[size])}>{label}</span>
           )}
         </div>
         {icon && <div className={cn('p-2 rounded-lg', variant === 'dark' ? 'bg-primary/10' : 'bg-accent')}>{icon}</div>}
