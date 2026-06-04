@@ -357,9 +357,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       {/* ==================== HEATMAP TABLE ==================== */}
       <Card className="overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
+          <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
             Retenção por Coorte (Logo Retention)
-            <InfoTooltip text="Percentual de clientes que permanecem ativos em cada mês após a ativação, agrupados pelo mês de entrada (coorte)." />
+            <KpiHelpPopover kpiKey="retencao_cohort" />
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
