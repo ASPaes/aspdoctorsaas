@@ -23,7 +23,7 @@ export interface KpiHelpEntry {
 
 const kpiHelp: Record<string, KpiHelpEntry> = {
   mrr_snapshot: {
-    title: "MRR Atual (Snapshot)",
+    title: "MRR ATUAL",
     definition: "Receita mensal recorrente total dos clientes ativos neste momento.",
     why_it_matters: "É a principal métrica de receita de um SaaS. Se sobe, a empresa cresce; se desce, está perdendo receita.",
     formula: "Σ mensalidade de todos os clientes onde cancelado = false",
@@ -316,7 +316,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "ARPA (mês)",
     definition: "Receita média por conta (cliente ativo), excluindo receita de ativação/setup.",
     why_it_matters: "Métrica estritamente recorrente. Usado no cálculo de LTV. Não inclui setup fees.",
-    formula: "MRR Snapshot ÷ Clientes Ativos",
+    formula: "MRR ATUAL ÷ Clientes Ativos",
   },
   cac_payback: {
     title: "CAC Payback (meses)",

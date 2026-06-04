@@ -1086,7 +1086,7 @@ export default function Clientes() {
                 ["razao_social", "Razão Social / Fantasia"],
                 ["cnpj", "CNPJ/CPF"],
                 ["produto_id", "Produto"],
-                ["mensalidade", "MRR Atual"],
+                ["mensalidade", "MRR ATUAL"],
                 ["data_ativacao", "Dt. Cadastro"],
                 ["data_reajuste", "Contratos"],
                 ["cancelado", "Status"],
