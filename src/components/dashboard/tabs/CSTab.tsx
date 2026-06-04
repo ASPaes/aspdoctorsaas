@@ -265,14 +265,16 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             title="Tickets Abertos" value={data.ticketsAbertos} subtitle="no período"
             icon={<BarChart3 className={cn(iconSize, 'text-primary')} />} tvMode={tvMode}
             delta={<DeltaLine current={data.ticketsAbertos} previous={prevData?.ticketsAbertos ?? null} inverted unit="abs" />}
+            helpKey="cs_tickets_abertos"
           />
           <KPICard
             title="Tickets Concluídos" value={data.ticketsFechados} subtitle="no período"
             icon={<CheckCircle className={cn(iconSize, 'text-green-500')} />} variant="success" tvMode={tvMode}
             delta={<DeltaLine current={data.ticketsFechados} previous={prevData?.ticketsFechados ?? null} unit="abs" />}
+            helpKey="cs_tickets_fechados"
           />
-          <KPICard title="Vencendo SLA" value={data.vencendoSlaAcao.length + data.vencendoSlaConclusao.length} subtitle="ação + conclusão" icon={<Clock className={cn(iconSize, 'text-orange-500')} />} variant="warning" tvMode={tvMode} />
-          <KPICard title="Vencidos SLA" value={data.vencidosSlaAcao.length + data.vencidosSlaConclusao.length} subtitle="ação + conclusão" icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode} />
+          <KPICard title="Vencendo SLA" value={data.vencendoSlaAcao.length + data.vencendoSlaConclusao.length} subtitle="ação + conclusão" icon={<Clock className={cn(iconSize, 'text-orange-500')} />} variant="warning" tvMode={tvMode} helpKey="cs_vencendo_sla" />
+          <KPICard title="Vencidos SLA" value={data.vencidosSlaAcao.length + data.vencidosSlaConclusao.length} subtitle="ação + conclusão" icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode} helpKey="cs_vencidos_sla" />
         </div>
       </div>
 
