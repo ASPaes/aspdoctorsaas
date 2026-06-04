@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Loader2, FileText, Filter, FilterX, Search, TrendingUp } from "lucide-react";
+import { Loader2, FileText, Filter, FilterX, Search, TrendingUp, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import * as XLSX from "xlsx";
 
 import { supabase } from "@/integrations/supabase/client";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
