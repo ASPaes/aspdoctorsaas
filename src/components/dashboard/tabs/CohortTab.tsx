@@ -7,9 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
-import { HelpCircle, Plus, X } from 'lucide-react';
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { KpiHelpPopover } from '../KpiHelpPopover';
 import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCohortLogos } from '../hooks/useCohortLogos';
@@ -22,20 +22,6 @@ interface CohortTabProps {
   unidadeBaseId?: number | null;
 }
 
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <TooltipProvider>
-      <UITooltip>
-        <TooltipTrigger asChild>
-          <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help inline ml-1" />
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs text-xs">
-          <p>{text}</p>
-        </TooltipContent>
-      </UITooltip>
-    </TooltipProvider>
-  );
-}
 
 function getRetentionColor(percent: number | null): string {
   if (percent == null) return '';
@@ -304,9 +290,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           {/* Card 1 — Retenção Média */}
           <Card className="bg-muted/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
+              <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
                 Retenção Média
-                <InfoTooltip text="Média de retenção de todas as coortes do período nos marcos M1, M3, M6 e M12." />
+                <KpiHelpPopover kpiKey="cohort_retencao_media" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -327,9 +313,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           {/* Card 2 — Melhor Coorte */}
           <Card className="bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/50 dark:border-emerald-800/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
+              <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
                 Melhor Coorte
-                <InfoTooltip text="Coorte com maior retenção no seu marco mais avançado disponível." />
+                <KpiHelpPopover kpiKey="cohort_melhor" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -348,9 +334,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           {/* Card 3 — Pior Coorte */}
           <Card className="bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200/50 dark:border-yellow-800/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
+              <CardTitle className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
                 Pior Coorte
-                <InfoTooltip text="Coorte com menor retenção entre as que possuem pelo menos M3 de dados, para evitar distorções com coortes recentes." />
+                <KpiHelpPopover kpiKey="cohort_pior" />
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -371,9 +357,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       {/* ==================== HEATMAP TABLE ==================== */}
       <Card className="overflow-hidden">
         <CardHeader className="pb-2">
-          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
+          <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
             Retenção por Coorte (Logo Retention)
-            <InfoTooltip text="Percentual de clientes que permanecem ativos em cada mês após a ativação, agrupados pelo mês de entrada (coorte)." />
+            <KpiHelpPopover kpiKey="retencao_cohort" />
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
@@ -425,9 +411,9 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       {/* ==================== RETENTION CURVE ==================== */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>
+          <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
             Curva de Retenção
-            <InfoTooltip text="Comparação da curva de retenção (% de clientes ativos) das coortes selecionadas ao longo dos meses. Linha pontilhada = benchmark SaaS B2B ~70%." />
+            <KpiHelpPopover kpiKey="cohort_curva_retencao" />
           </CardTitle>
           {curveIsFallback && activeCohorts === defaultLabels && (
             <p className="text-xs text-muted-foreground mt-1">⚠ Não há 3 coortes com ≥3 meses e ≥10 clientes. Exibindo coortes recentes com ≥1 mês.</p>
