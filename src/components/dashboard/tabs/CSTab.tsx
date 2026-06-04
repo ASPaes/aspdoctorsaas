@@ -286,22 +286,26 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             title="Clientes em Risco" value={data.clientesEmRisco}
             icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode}
             delta={<DeltaLine current={data.clientesEmRisco} previous={prevData?.clientesEmRisco ?? null} inverted unit="abs" />}
+            helpKey="cs_clientes_em_risco"
           />
           <KPICard
             title="MRR em Risco" value={fmtCur(data.mrrEmRisco)}
             icon={<DollarSign className={cn(iconSize, 'text-red-500')} />} variant="danger" tvMode={tvMode}
             delta={<DeltaLine current={data.mrrEmRisco} previous={prevData?.mrrEmRisco ?? null} inverted unit="currency" />}
+            helpKey="cs_mrr_em_risco"
           />
           <KPICard
             title="MRR Recuperado" value={fmtCur(data.mrrRecuperado)} subtitle="no período"
             icon={<DollarSign className={cn(iconSize, 'text-green-500')} />} variant="success" tvMode={tvMode}
             delta={<DeltaLine current={data.mrrRecuperado} previous={prevData?.mrrRecuperado ?? null} unit="currency" />}
+            helpKey="cs_mrr_recuperado"
           />
           <KPICard
             title="% Higiene" value={fmtPct(data.percentHigiene)}
             icon={<Target className={cn(iconSize, data.percentHigiene >= 80 ? 'text-green-500' : 'text-orange-500')} />}
             variant={data.percentHigiene >= 80 ? 'success' : 'warning'} tvMode={tvMode}
             delta={<DeltaLine current={data.percentHigiene} previous={prevData?.percentHigiene ?? null} unit="pp" />}
+            helpKey="cs_percent_higiene"
           />
         </div>
       </div>
