@@ -159,7 +159,7 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
       <section className="space-y-3">
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
           <KPICardEnhanced
-            label="MRR ATUAL"
+            label="MRR Atual"
             value={fmt(metrics.mrr)}
             icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />}
             size={s}
