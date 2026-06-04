@@ -1,6 +1,13 @@
+import { useRef } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import {
+  TrendingDown, TrendingUp, Minus,
+  UserPlus, ShoppingCart, RefreshCw, Percent, UserMinus,
+  type LucideIcon,
+} from 'lucide-react';
+import { useTilt3D } from '@/hooks/useTilt3D';
+import '../cards/kpi-card.css';
 
 interface NetNewMrrStackedChartProps {
   newMrr: number;
@@ -122,63 +129,70 @@ function HistoricoPill({ label, media, atual, windowMonths, tvMode }: HistoricoP
   );
 }
 
-interface Segment { name: string; value: number; color: string; textColor: string; }
+// ═══════════════════════════════════════════════════════════
+// BreakdownCard (Spatial)
+// ═══════════════════════════════════════════════════════════
 
-function StackedRow({
-  segments,
-  total,
-  escalaMax,
-  sign,
-  barHeightClass,
-  tvMode,
-}: {
-  segments: Segment[];
-  total: number;
-  escalaMax: number;
+type Tone = 'green' | 'blue' | 'orange' | 'red';
+
+interface BreakdownCardProps {
+  label: string;
+  value: number;
+  icon: LucideIcon;
   sign: '+' | '−';
-  barHeightClass: string;
+  tone: Tone;
   tvMode: boolean;
-}) {
-  const totalWidthPct = escalaMax > 0 ? (total / escalaMax) * 100 : 0;
+}
+
+function BreakdownCard({ label, value, icon: Icon, sign, tone, tvMode }: BreakdownCardProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useTilt3D(ref, { enabled: true });
+
+  const isZero = value === 0;
+
+  const spatialVariant = isZero
+    ? 'dark'
+    : tone === 'green' ? 'success'
+    : tone === 'blue' ? 'dark'
+    : tone === 'orange' ? 'warning'
+    : 'destructive';
+
+  const containerClass = isZero
+    ? 'bg-card border border-border'
+    : tone === 'green' ? 'bg-green-500/10 border border-green-500/20 dark:bg-green-900/20'
+    : tone === 'blue' ? 'bg-blue-500/10 border border-blue-500/20 dark:bg-blue-900/20'
+    : tone === 'orange' ? 'bg-orange-500/10 border border-orange-500/20 dark:bg-orange-900/20'
+    : 'bg-red-500/10 border border-red-500/20 dark:bg-red-900/20';
+
+  const valueClass = isZero
+    ? 'text-muted-foreground'
+    : tone === 'green' ? 'text-green-600 dark:text-green-400'
+    : tone === 'blue' ? 'text-blue-600 dark:text-blue-400'
+    : tone === 'orange' ? 'text-orange-600 dark:text-orange-400'
+    : 'text-red-600 dark:text-red-400';
+
   return (
-    <>
-      <div className={cn('relative w-full overflow-hidden rounded-md bg-muted/40', barHeightClass)}>
-        <div className="absolute inset-y-0 left-0 flex" style={{ width: `${totalWidthPct}%` }}>
-          {segments.map((seg) => {
-            if (seg.value <= 0) return null;
-            const segWidth = total > 0 ? (seg.value / total) * 100 : 0;
-            const absWidth = (seg.value / escalaMax) * 100;
-            const showLabel = absWidth >= 12;
-            return (
-              <div
-                key={seg.name}
-                className={cn('flex items-center justify-center px-2 font-medium tabular-nums', seg.color, seg.textColor)}
-                style={{ width: `${segWidth}%` }}
-              >
-                {showLabel && (
-                  <span className={cn('whitespace-nowrap', tvMode ? 'text-sm' : 'text-xs')}>
-                    {seg.name} {sign}{fmtShort(seg.value)}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+    <div
+      ref={ref}
+      className={cn(
+        'rounded-xl transition-all duration-200 kpi-spatial',
+        `kpi-spatial-${spatialVariant}`,
+        containerClass,
+        tvMode ? 'p-4' : 'p-3',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className={cn('uppercase tracking-wider text-muted-foreground font-medium', tvMode ? 'text-xs' : 'text-[10px]')}>
+          {label}
+        </span>
+        <div className="p-1.5 rounded-lg bg-primary/10">
+          <Icon className={cn('h-3.5 w-3.5', valueClass)} />
         </div>
       </div>
-
-      <div className={cn('mt-2 flex flex-wrap gap-x-3 gap-y-1', tvMode ? 'text-xs' : 'text-[11px]')}>
-        {segments.map((seg) => {
-          const absWidth = escalaMax > 0 ? (seg.value / escalaMax) * 100 : 0;
-          if (seg.value > 0 && absWidth >= 12) return null;
-          return (
-            <span key={seg.name} className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <span className={cn('inline-block h-2 w-2 rounded-sm', seg.value > 0 ? seg.color : 'bg-muted-foreground/30')} />
-              {seg.name} {seg.value > 0 ? `${sign}${fmtShort(seg.value)}` : 'R$ 0'}
-            </span>
-          );
-        })}
+      <div className={cn('mt-2 font-bold tabular-nums', valueClass, tvMode ? 'text-xl' : 'text-lg')}>
+        {isZero ? 'R$ 0' : `${sign}${fmt(value)}`}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -189,21 +203,8 @@ export function NetNewMrrStackedChart({
   tvMode = false, className,
 }: NetNewMrrStackedChartProps) {
 
-  const entradas: Segment[] = [
-    { name: 'New', value: newMrr, color: 'bg-green-500', textColor: 'text-green-950' },
-    { name: 'Upsell', value: upsellMrr, color: 'bg-green-600', textColor: 'text-green-950' },
-    { name: 'Cross', value: crossSellMrr, color: 'bg-green-700', textColor: 'text-white' },
-    { name: 'Reativ.', value: reativacaoMrr, color: 'bg-emerald-600', textColor: 'text-white' },
-    { name: 'Reajuste', value: reajusteMrr, color: 'bg-blue-500', textColor: 'text-blue-950' },
-  ];
-  const saidas: Segment[] = [
-    { name: 'Downsell', value: downsellMrr, color: 'bg-orange-500', textColor: 'text-orange-950' },
-    { name: 'Churn', value: mrrCancelado, color: 'bg-red-500', textColor: 'text-red-950' },
-  ];
-
-  const totalEntradas = entradas.reduce((s, x) => s + x.value, 0);
-  const totalSaidas = saidas.reduce((s, x) => s + x.value, 0);
-  const escalaMax = Math.max(totalEntradas, totalSaidas, 1);
+  const totalEntradas = newMrr + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr;
+  const totalSaidas = downsellMrr + mrrCancelado;
 
   const ratio = totalEntradas > 0 ? totalSaidas / totalEntradas : 0;
   const ratioMsg = totalEntradas === 0
@@ -220,9 +221,9 @@ export function NetNewMrrStackedChart({
     historico.atual, historico.media3m, historico.media6m, historico.media12m,
   ) : '';
 
-  const barHeight = tvMode ? 'h-10' : 'h-7';
   const headerSize = tvMode ? 'text-xl' : 'text-base';
   const valueSize = tvMode ? 'text-2xl' : 'text-lg';
+  const sectionLabel = tvMode ? 'text-sm' : 'text-xs';
 
   return (
     <Card className={cn('border-border/50', className)}>
@@ -249,20 +250,29 @@ export function NetNewMrrStackedChart({
       <CardContent className="space-y-5">
         {/* ENTRADAS */}
         <div>
-          <div className={cn('mb-1.5 flex items-center justify-between', tvMode ? 'text-sm' : 'text-xs')}>
+          <div className={cn('mb-2 flex items-center justify-between', sectionLabel)}>
             <span className="font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Entradas</span>
             <span className="font-bold text-green-600 dark:text-green-400 tabular-nums">+{fmt(totalEntradas)}</span>
           </div>
-          <StackedRow segments={entradas} total={totalEntradas} escalaMax={escalaMax} sign="+" barHeightClass={barHeight} tvMode={tvMode} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <BreakdownCard label="New" value={newMrr} icon={UserPlus} sign="+" tone="green" tvMode={tvMode} />
+            <BreakdownCard label="Upsell" value={upsellMrr} icon={TrendingUp} sign="+" tone="green" tvMode={tvMode} />
+            <BreakdownCard label="Cross" value={crossSellMrr} icon={ShoppingCart} sign="+" tone="green" tvMode={tvMode} />
+            <BreakdownCard label="Reativ." value={reativacaoMrr} icon={RefreshCw} sign="+" tone="green" tvMode={tvMode} />
+            <BreakdownCard label="Reajuste" value={reajusteMrr} icon={Percent} sign="+" tone="blue" tvMode={tvMode} />
+          </div>
         </div>
 
         {/* SAÍDAS */}
         <div>
-          <div className={cn('mb-1.5 flex items-center justify-between', tvMode ? 'text-sm' : 'text-xs')}>
+          <div className={cn('mb-2 flex items-center justify-between', sectionLabel)}>
             <span className="font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">Saídas</span>
             <span className="font-bold text-red-600 dark:text-red-400 tabular-nums">−{fmt(totalSaidas)}</span>
           </div>
-          <StackedRow segments={saidas} total={totalSaidas} escalaMax={escalaMax} sign="−" barHeightClass={barHeight} tvMode={tvMode} />
+          <div className="grid grid-cols-2 gap-3">
+            <BreakdownCard label="Downsell" value={downsellMrr} icon={TrendingDown} sign="−" tone="orange" tvMode={tvMode} />
+            <BreakdownCard label="Churn" value={mrrCancelado} icon={UserMinus} sign="−" tone="red" tvMode={tvMode} />
+          </div>
         </div>
 
         {/* BALANÇO */}
