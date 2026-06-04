@@ -418,6 +418,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
           <KPICard
             title="Clientes Ativos" value={cob.totalAtivos}
             icon={<Users className={cn(iconSize, 'text-primary')} />} tvMode={tvMode}
+            helpKey="clientes_ativos"
           />
           <KPICard
             title="% Cobertura 90D" value={fmtPct(cob.percentCoberto)}
@@ -425,6 +426,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             icon={<ShieldCheck className={cn(iconSize, 'text-green-500')} />}
             variant={cob.percentCoberto >= 80 ? 'success' : cob.percentCoberto >= 50 ? 'warning' : 'danger'}
             tvMode={tvMode}
+            helpKey="cs_cobertura_90d"
           />
           <KPICard
             title="Descobertos" value={cob.descobertos}
@@ -432,6 +434,7 @@ export function CSTab({ tvMode = false, periodoInicio, periodoFim }: CSTabProps)
             icon={<AlertTriangle className={cn(iconSize, 'text-red-500')} />}
             variant={cob.descobertos > 0 ? 'danger' : 'success'}
             tvMode={tvMode}
+            helpKey="cs_descobertos"
           />
         </div>
         {cob.clientesDescobertos.length > 0 && (
