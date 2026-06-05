@@ -274,7 +274,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Atualizações DS"
-              onClick={() => window.open("https://doctordev.lovable.app/releases", "_blank", "noopener,noreferrer")}
+              onClick={handleOpenReleases}
             >
               <Sparkles className="h-4 w-4" />
               <span>Atualizações DS</span>
