@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3, ChevronsUpDown, Sparkles } from "lucide-react";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles } from "lucide-react";
+import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
@@ -33,16 +34,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useReleasesNovidade } from "@/hooks/useReleasesNovidade";
 
-const ALL_NAV_ITEMS = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, resource: "nav.dashboard" },
-  { title: "Clientes", url: "/clientes", icon: Users, resource: "nav.clientes" },
-  { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
-  { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
-  { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "nav.chat" },
-  { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "nav.tickets" },
-  { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
-  { title: "Configurações", url: "/configuracoes", icon: Settings, resource: "nav.configuracoes" },
-];
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
@@ -67,7 +58,7 @@ export function AppSidebar() {
   const { temNovo, marcarVisto } = useReleasesNovidade();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
-  const navItems = ALL_NAV_ITEMS.filter(item => can(item.resource, "view"));
+  const navItems = NAV_ITEMS.filter(item => can(item.resource, "view"));
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
