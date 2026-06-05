@@ -60,7 +60,7 @@ export function ChatMessages({
   onHighlightShown,
   isGroup,
 }: Props) {
-  const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
+  const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useAppTimezone();
   const queryClient = useQueryClient();
