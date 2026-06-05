@@ -215,6 +215,7 @@ export function ChatMessages({
       setShowNewMessages(false);
       pendingNewCountRef.current = 0;
       isNearBottomRef.current = true;
+      prependAnchorRef.current = null;
       prevConversationId.current = conversationId;
     }
   }, [conversationId]);
