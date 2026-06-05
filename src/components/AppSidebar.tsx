@@ -293,7 +293,7 @@ export function AppSidebar() {
             >
               <span className="relative inline-flex">
                 <Sparkles className="h-4 w-4" />
-                {temNovo && (
+                {temNovo && collapsed && (
                   <span className="absolute -top-1 -right-1 flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
@@ -301,6 +301,12 @@ export function AppSidebar() {
                 )}
               </span>
               <span>Atualizações DS</span>
+              {temNovo && !collapsed && (
+                <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground animate-pulse">
+                  Novo
+                </span>
+              )}
+
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
