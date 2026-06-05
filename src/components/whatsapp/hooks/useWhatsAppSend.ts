@@ -62,23 +62,16 @@ export const useWhatsAppSend = () => {
         metadata: {},
       });
 
-      queryClient.setQueryData(
+      queryClient.setQueryData<MsgPages>(
         ['whatsapp', 'messages', newMessage.conversationId],
-        (old: Message[] = []) => [...old, optimisticMessage]
+        (old) => upsertInfinite(old, optimisticMessage)
       );
 
       // Timeout: se ainda 'sending' após 30s, marcar como falhou automaticamente
       setTimeout(() => {
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
-          (old: Message[] | undefined) => {
-            if (!old) return old;
-            return old.map(m =>
-              m.id === tempId && m.status === 'sending'
-                ? { ...m, status: 'failed' }
-                : m
-            );
-          }
+          (old) => patchInfinite(old, (m) => m.id === tempId && m.status === 'sending', { status: 'failed' })
         );
       }, 30_000);
 
