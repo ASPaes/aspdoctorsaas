@@ -18,7 +18,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -167,40 +174,57 @@ export function AppSidebar() {
                 </div>
               )}
             </div>
-          ) : collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex justify-center py-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-[10px] font-medium bg-sidebar-accent text-sidebar-accent-foreground">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p className="font-medium">{displayName}</p>
-                {roleLabel && <p className="text-xs text-muted-foreground">{roleLabel}</p>}
-              </TooltipContent>
-            </Tooltip>
           ) : (
-            <div className="flex items-center gap-2 px-1 py-2">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback className="text-[10px] font-medium bg-sidebar-accent text-sidebar-accent-foreground">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium leading-tight truncate text-sidebar-foreground">
-                  {displayName}
-                </p>
-                {roleLabel && (
-                  <p className="text-xs leading-tight truncate text-muted-foreground">
-                    {roleLabel}
-                  </p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                {collapsed ? (
+                  <button className="flex w-full justify-center py-2 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring rounded-md">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-[10px] font-medium bg-sidebar-accent text-sidebar-accent-foreground">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                ) : (
+                  <button className="flex w-full items-center gap-2 px-1 py-2 rounded-md hover:bg-sidebar-accent/50 outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring text-left">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarFallback className="text-[10px] font-medium bg-sidebar-accent text-sidebar-accent-foreground">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium leading-tight truncate text-sidebar-foreground">
+                        {displayName}
+                      </p>
+                      {roleLabel && (
+                        <p className="text-xs leading-tight truncate text-muted-foreground">
+                          {roleLabel}
+                        </p>
+                      )}
+                    </div>
+                  </button>
                 )}
-              </div>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="end" className="w-56">
+                <DropdownMenuLabel className="flex flex-col">
+                  <span className="font-medium truncate">{displayName}</span>
+                  {roleLabel && (
+                    <span className="text-xs text-muted-foreground font-normal truncate">
+                      {roleLabel}
+                    </span>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setPrefsOpen(true)}>
+                  <SlidersHorizontal className="h-4 w-4 mr-2" />
+                  Preferências
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/configuracoes/notificacoes")}>
+                  <Bell className="h-4 w-4 mr-2" />
+                  Notificações
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
 
@@ -227,20 +251,6 @@ export function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Preferências" onClick={() => setPrefsOpen(true)}>
-              <SlidersHorizontal className="h-4 w-4" />
-              <span>Preferências</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Notificações">
-              <NavLink to="/configuracoes/notificacoes" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                <Bell className="h-4 w-4" />
-                <span>Notificações</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Suporte DoctorSaaS" onClick={handleOpenDemandas}>
               <Ticket className="h-4 w-4" />
