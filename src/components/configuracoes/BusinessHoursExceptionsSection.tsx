@@ -195,13 +195,21 @@ export default function BusinessHoursExceptionsSection() {
     },
   });
 
-  const toggleTemplateMutation = useMutation({
-    mutationFn: async ({ id, useTemplate }: { id: string; useTemplate: boolean }) => {
-      if (useTemplate && !templateValido) {
-        throw new Error("Configure o horário em feriados primeiro (acima de Domingo).");
+  const setDayStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "closed" | "reduced" | "open" }) => {
+      let payload: { is_closed: boolean; use_template: boolean };
+      if (status === "closed") {
+        payload = { is_closed: true, use_template: false };
+      } else if (status === "reduced") {
+        if (!templateValido) {
+          throw new Error("Configure o horário em feriados primeiro (acima de Domingo).");
+        }
+        payload = { is_closed: false, use_template: true };
+      } else {
+        payload = { is_closed: false, use_template: false };
       }
       const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
-        .update({ use_template: useTemplate, is_closed: !useTemplate })
+        .update(payload)
         .eq("id", id);
       if (error) throw error;
     },
@@ -209,7 +217,7 @@ export default function BusinessHoursExceptionsSection() {
       qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
     },
     onError: (err: any) => {
-      toast({ title: "Não foi possível alternar", description: err.message, variant: "destructive" });
+      toast({ title: "Não foi possível alterar", description: err.message, variant: "destructive" });
     },
   });
 
@@ -321,7 +329,7 @@ export default function BusinessHoursExceptionsSection() {
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Horário reduzido</TableHead>
+                  <TableHead>Atendimento no dia</TableHead>
                   <TableHead className="w-24 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -334,16 +342,35 @@ export default function BusinessHoursExceptionsSection() {
                     <TableCell>{TYPE_LABELS[ex.type] || ex.type}</TableCell>
                     <TableCell className="text-muted-foreground">{ex.name || "—"}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={!!ex.use_template}
-                          onCheckedChange={(v) => toggleTemplateMutation.mutate({ id: ex.id, useTemplate: v })}
-                          disabled={toggleTemplateMutation.isPending}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {ex.use_template ? `Abre ${formatTemplateRange()}` : "Fechado o dia"}
-                        </span>
-                      </div>
+                      {(() => {
+                        const estadoAtual: "closed" | "reduced" | "open" = ex.use_template
+                          ? "reduced"
+                          : ex.is_closed
+                          ? "closed"
+                          : "open";
+                        return (
+                          <Select
+                            value={estadoAtual}
+                            onValueChange={(status) =>
+                              setDayStatusMutation.mutate({ id: ex.id, status: status as "closed" | "reduced" | "open" })
+                            }
+                            disabled={setDayStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-56">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="closed">Fechado o dia todo</SelectItem>
+                              <SelectItem value="reduced" disabled={!templateValido}>
+                                {templateValido
+                                  ? `Horário reduzido (${formatTemplateRange()})`
+                                  : "Horário reduzido"}
+                              </SelectItem>
+                              <SelectItem value="open">Aberto (atendimento normal)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
