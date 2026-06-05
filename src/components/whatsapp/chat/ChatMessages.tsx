@@ -77,6 +77,7 @@ export function ChatMessages({
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
   const pendingNewCountRef = useRef(0);
+  const prependAnchorRef = useRef<number | null>(null);
 
   // Track scroll position
   const handleScroll = useCallback(() => {
@@ -88,7 +89,22 @@ export function ChatMessages({
       setShowNewMessages(false);
       pendingNewCountRef.current = 0;
     }
-  }, []);
+    // Perto do topo: carregar mensagens anteriores (salva âncora antes de prepender)
+    if (viewport.scrollTop < TOP_LOAD_THRESHOLD && hasNextPage && !isFetchingNextPage) {
+      prependAnchorRef.current = viewport.scrollHeight;
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    if (prependAnchorRef.current != null) {
+      const delta = viewport.scrollHeight - prependAnchorRef.current;
+      if (delta > 0) viewport.scrollTop = viewport.scrollTop + delta;
+      prependAnchorRef.current = null;
+    }
+  }, [messages.length]);
 
   // Fallback driven by conversation updates that already refresh the sidebar
   useEffect(() => {
