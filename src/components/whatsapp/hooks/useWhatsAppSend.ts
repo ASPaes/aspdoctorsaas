@@ -114,13 +114,8 @@ export const useWhatsAppSend = () => {
           ['whatsapp', 'messages', variables.conversationId],
           (old) => upsertInfinite(old, realMessage)
         );
-    onSettled: (data, _error, variables) => {
-      if (data?.message) {
-        const realMessage = normalizeMessage(data.message);
-        queryClient.setQueryData(
-          ['whatsapp', 'messages', variables.conversationId],
-          (old: Message[] | undefined) => mergeMessage(old ?? [], realMessage)
-        );
+        return;
+      }
         return;
       }
       // Aguarda 15s para o Realtime entregar o INSERT antes de invalidar
