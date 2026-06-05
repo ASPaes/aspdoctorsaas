@@ -31,7 +31,7 @@ export const useWhatsAppSend = () => {
     onMutate: async (newMessage) => {
       const tempId = `temp-${Date.now()}-${++tempCounter}`;
 
-      const previousMessages = queryClient.getQueryData<Message[]>(['whatsapp', 'messages', newMessage.conversationId]);
+      const previousMessages = queryClient.getQueryData<MsgPages>(['whatsapp', 'messages', newMessage.conversationId]);
 
       let optimisticMediaUrl = newMessage.mediaUrl ?? null;
       if (!optimisticMediaUrl && newMessage.mediaBase64) {
