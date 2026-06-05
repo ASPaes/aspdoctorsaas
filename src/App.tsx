@@ -12,6 +12,7 @@ import { UnidadeFilterProvider } from "@/contexts/UnidadeFilterContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
+import LandingRedirect from "@/components/auth/LandingRedirect";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
 import Dashboard from "@/pages/Dashboard";
@@ -84,6 +85,7 @@ const App = () => (
 
             {/* Protected routes */}
             <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
+              <Route index element={<LandingRedirect />} />
               <Route path="/dashboard" element={<RequirePermission resource="nav.dashboard"><Dashboard /></RequirePermission>} />
               <Route path="/clientes" element={<RequirePermission resource="nav.clientes"><Clientes /></RequirePermission>} />
               <Route path="/clientes/novo" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
@@ -110,7 +112,6 @@ const App = () => (
               </Route>
             </Route>
 
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
           </Routes>
       </BrowserRouter>
