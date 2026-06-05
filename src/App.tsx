@@ -85,6 +85,7 @@ const App = () => (
 
             {/* Protected routes */}
             <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
+              <Route index element={<LandingRedirect />} />
               <Route path="/dashboard" element={<RequirePermission resource="nav.dashboard"><Dashboard /></RequirePermission>} />
               <Route path="/clientes" element={<RequirePermission resource="nav.clientes"><Clientes /></RequirePermission>} />
               <Route path="/clientes/novo" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
@@ -111,7 +112,6 @@ const App = () => (
               </Route>
             </Route>
 
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
           </Routes>
       </BrowserRouter>
