@@ -251,9 +251,9 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         const incoming = normalizeMessage(payload.new as any);
         if (import.meta.env.DEV) {
         }
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', conversationId],
-          (old: Message[] | undefined) => mergeMessage(old ?? [], incoming)
+          (old) => upsertInfinite(old, incoming)
         );
         newMessageCallbackRef.current?.(incoming);
         // Conversa está aberta — não incrementar unread, apenas atualizar preview
