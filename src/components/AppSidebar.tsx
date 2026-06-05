@@ -64,6 +64,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const { temNovo, marcarVisto } = useReleasesNovidade();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
   const navItems = ALL_NAV_ITEMS.filter(item => can(item.resource, "view"));
