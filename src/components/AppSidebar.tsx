@@ -291,7 +291,15 @@ export function AppSidebar() {
               tooltip="Atualizações DS"
               onClick={handleOpenReleases}
             >
-              <Sparkles className="h-4 w-4" />
+              <span className="relative inline-flex">
+                <Sparkles className="h-4 w-4" />
+                {temNovo && (
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                  </span>
+                )}
+              </span>
               <span>Atualizações DS</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
