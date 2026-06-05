@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeMessage, mergeMessage, type Message } from './useWhatsAppMessages';
+import { normalizeMessage, upsertInfinite, patchInfinite, type Message, type MsgPages } from './useWhatsAppMessages';
 
 interface SendMessageParams {
   conversationId: string;
