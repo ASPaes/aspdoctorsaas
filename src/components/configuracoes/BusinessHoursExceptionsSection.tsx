@@ -195,13 +195,21 @@ export default function BusinessHoursExceptionsSection() {
     },
   });
 
-  const toggleTemplateMutation = useMutation({
-    mutationFn: async ({ id, useTemplate }: { id: string; useTemplate: boolean }) => {
-      if (useTemplate && !templateValido) {
-        throw new Error("Configure o horário em feriados primeiro (acima de Domingo).");
+  const setDayStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "closed" | "reduced" | "open" }) => {
+      let payload: { is_closed: boolean; use_template: boolean };
+      if (status === "closed") {
+        payload = { is_closed: true, use_template: false };
+      } else if (status === "reduced") {
+        if (!templateValido) {
+          throw new Error("Configure o horário em feriados primeiro (acima de Domingo).");
+        }
+        payload = { is_closed: false, use_template: true };
+      } else {
+        payload = { is_closed: false, use_template: false };
       }
       const { error } = await (supabase.from("business_hours_exceptions" as any) as any)
-        .update({ use_template: useTemplate, is_closed: !useTemplate })
+        .update(payload)
         .eq("id", id);
       if (error) throw error;
     },
@@ -209,7 +217,7 @@ export default function BusinessHoursExceptionsSection() {
       qc.invalidateQueries({ queryKey: ["business-hours-exceptions", tid] });
     },
     onError: (err: any) => {
-      toast({ title: "Não foi possível alternar", description: err.message, variant: "destructive" });
+      toast({ title: "Não foi possível alterar", description: err.message, variant: "destructive" });
     },
   });
 
