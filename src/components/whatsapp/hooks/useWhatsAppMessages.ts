@@ -274,12 +274,9 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         filter: `conversation_id=eq.${conversationId}`,
       }, (payload) => {
         const updated = normalizeMessage(payload.new as any);
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', conversationId],
-          (old: Message[] | undefined) => {
-            if (!old) return old;
-            return old.map((m) => (m.id === updated.id ? updated : m));
-          }
+          (old) => upsertInfinite(old, updated)
         );
       })
       .subscribe((status) => {
