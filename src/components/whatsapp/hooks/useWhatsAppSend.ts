@@ -101,17 +101,19 @@ export const useWhatsAppSend = () => {
     onError: (_err, newMessage, context) => {
       // Não apaga a mensagem — marca como falhou para o técnico ver
       if (context?.tempId) {
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
-          (old: Message[] | undefined) => {
-            if (!old) return old;
-            return old.map(m =>
-              m.id === context.tempId ? { ...m, status: 'failed' } : m
-            );
-          }
+          (old) => patchInfinite(old, (m) => m.id === context.tempId, { status: 'failed' })
         );
       }
     },
+    onSettled: (data, _error, variables) => {
+      if (data?.message) {
+        const realMessage = normalizeMessage(data.message);
+        queryClient.setQueryData<MsgPages>(
+          ['whatsapp', 'messages', variables.conversationId],
+          (old) => upsertInfinite(old, realMessage)
+        );
     onSettled: (data, _error, variables) => {
       if (data?.message) {
         const realMessage = normalizeMessage(data.message);
