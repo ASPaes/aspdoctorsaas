@@ -409,6 +409,16 @@ export function ChatMessages({
         <div ref={bottomRef} />
       </ScrollArea>
 
+      {/* Loader overlay para carregamento de mensagens anteriores */}
+      {isFetchingNextPage && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs shadow">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Carregando mensagens anteriores...
+        </div>
+      )}
+
+
+
       {/* Floating "New messages" button */}
       {showNewMessages && (
         <button
