@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,7 +10,7 @@ import { useWhatsAppMessages, type Message } from "../hooks/useWhatsAppMessages"
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { formatDateLabel, formatTime } from "@/lib/formatDateWithTimezone";
 import { useConversationAssignmentHistory, type AssignmentEvent } from "../hooks/useConversationAssignmentHistory";
-import { ArrowRightLeft, ChevronDown } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, Loader2 } from "lucide-react";
 
 interface Props {
   conversationId: string;
@@ -38,6 +38,7 @@ type TimelineItem =
   | { type: 'transfer'; event: AssignmentEvent };
 
 const NEAR_BOTTOM_THRESHOLD = 150;
+const TOP_LOAD_THRESHOLD = 120;
 
 export function ChatMessages({
   conversationId,
@@ -59,7 +60,7 @@ export function ChatMessages({
   onHighlightShown,
   isGroup,
 }: Props) {
-  const { messages, isLoading, onNewMessage } = useWhatsAppMessages(conversationId);
+  const { messages, isLoading, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage } = useWhatsAppMessages(conversationId);
   const { data: assignments } = useConversationAssignmentHistory(conversationId);
   const { timezone } = useAppTimezone();
   const queryClient = useQueryClient();
@@ -76,6 +77,7 @@ export function ChatMessages({
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [internalHighlight, setInternalHighlight] = useState<string | null>(null);
   const pendingNewCountRef = useRef(0);
+  const prependAnchorRef = useRef<number | null>(null);
 
   // Track scroll position
   const handleScroll = useCallback(() => {
@@ -87,7 +89,22 @@ export function ChatMessages({
       setShowNewMessages(false);
       pendingNewCountRef.current = 0;
     }
-  }, []);
+    // Perto do topo: carregar mensagens anteriores (salva âncora antes de prepender)
+    if (viewport.scrollTop < TOP_LOAD_THRESHOLD && hasNextPage && !isFetchingNextPage) {
+      prependAnchorRef.current = viewport.scrollHeight;
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    if (prependAnchorRef.current != null) {
+      const delta = viewport.scrollHeight - prependAnchorRef.current;
+      if (delta > 0) viewport.scrollTop = viewport.scrollTop + delta;
+      prependAnchorRef.current = null;
+    }
+  }, [messages.length]);
 
   // Fallback driven by conversation updates that already refresh the sidebar
   useEffect(() => {
@@ -198,6 +215,7 @@ export function ChatMessages({
       setShowNewMessages(false);
       pendingNewCountRef.current = 0;
       isNearBottomRef.current = true;
+      prependAnchorRef.current = null;
       prevConversationId.current = conversationId;
     }
   }, [conversationId]);
@@ -244,7 +262,7 @@ export function ChatMessages({
       } else if (attempts < maxAttempts) {
         setTimeout(tryScroll, 300);
       } else {
-        // Mensagem não encontrada nos 500 carregados — limpa highlight
+        // Mensagem não encontrada nas páginas carregadas — limpa highlight
         onHighlightShown?.();
       }
     };
@@ -390,6 +408,16 @@ export function ChatMessages({
         )}
         <div ref={bottomRef} />
       </ScrollArea>
+
+      {/* Loader overlay para carregamento de mensagens anteriores */}
+      {isFetchingNextPage && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs shadow">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Carregando mensagens anteriores...
+        </div>
+      )}
+
+
 
       {/* Floating "New messages" button */}
       {showNewMessages && (
