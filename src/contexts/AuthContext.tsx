@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error("Error loading profile:", error);
         setProfile(null);
       } else {
-        setProfile(data);
+        setProfile(data as Profile);
       }
     } catch (err) {
       console.error("Error loading profile:", err);
