@@ -329,7 +329,7 @@ export default function BusinessHoursExceptionsSection() {
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Horário reduzido</TableHead>
+                  <TableHead>Atendimento no dia</TableHead>
                   <TableHead className="w-24 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
