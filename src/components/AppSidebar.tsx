@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3 } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3, ChevronsUpDown } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
@@ -202,6 +202,7 @@ export function AppSidebar() {
                         </p>
                       )}
                     </div>
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </button>
                 )}
               </DropdownMenuTrigger>
