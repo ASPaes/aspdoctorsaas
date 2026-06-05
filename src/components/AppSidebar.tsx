@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3, ChevronsUpDown } from "lucide-react";
+import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3, ChevronsUpDown, Sparkles } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
 import { useNavigate } from "react-router-dom";
@@ -256,6 +256,15 @@ export function AppSidebar() {
             <SidebarMenuButton tooltip="Suporte DoctorSaaS" onClick={handleOpenDemandas}>
               <Ticket className="h-4 w-4" />
               <span>Suporte DoctorSaaS</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Atualizações DS"
+              onClick={() => window.open("https://doctordev.lovable.app/releases", "_blank", "noopener,noreferrer")}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Atualizações DS</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
