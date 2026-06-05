@@ -145,11 +145,24 @@ export function AppSidebar() {
       const token = (data as { token?: string })?.token;
       if (!token) throw new Error('Token não recebido');
       window.open(`https://doctordev.lovable.app/sso?token=${encodeURIComponent(token)}&redirect=${encodeURIComponent('/releases')}`, '_blank', 'noopener,noreferrer');
+      void marcarVisto();
     } catch (err) {
       console.error('[Atualizações DS]', err);
       toast.error('Não foi possível abrir as Atualizações DS.');
     }
   };
+
+  useEffect(() => {
+    if (temNovo && !sessionStorage.getItem("ds_releases_toast_shown")) {
+      sessionStorage.setItem("ds_releases_toast_shown", "1");
+      toast("✨ Novidades no DoctorSaaS", {
+        description: "Tem atualização nova. Confira em Atualizações DS.",
+        action: { label: "Ver", onClick: () => handleOpenReleases() },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temNovo]);
+
 
   return (
     <Sidebar collapsible="icon">
