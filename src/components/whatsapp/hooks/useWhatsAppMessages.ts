@@ -151,25 +151,53 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
 
-  const { data: messages = [] as Message[], isLoading, error } = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['whatsapp', 'messages', conversationId],
-    queryFn: async () => {
-      if (!conversationId) return [];
-      const { data, error } = await supabase
-        .from('whatsapp_messages' as any)
+    enabled: !!conversationId,
+    initialPageParam: null as MsgCursor,
+    queryFn: async ({ pageParam }) => {
+      if (!conversationId) return [] as Message[];
+      let q = (supabase.from('whatsapp_messages' as any) as any)
         .select(MESSAGE_SELECT)
         .eq('conversation_id', conversationId)
-        .order('timestamp', { ascending: true });
+        .order('timestamp', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(PAGE_SIZE);
+      if (pageParam) {
+        q = q.or(`timestamp.lt.${pageParam.ts},and(timestamp.eq.${pageParam.ts},id.lt.${pageParam.id})`);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as Array<Partial<Message> & Record<string, any>>).map(normalizeMessage);
     },
-    enabled: !!conversationId,
+    getNextPageParam: (lastPage): MsgCursor | undefined => {
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      const oldest = lastPage[lastPage.length - 1];
+      return { ts: new Date(oldest.timestamp).toISOString(), id: oldest.id };
+    },
     staleTime: 10_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount: 'always',
-    refetchInterval: 120_000,
-    refetchIntervalInBackground: false,
   });
+
+  const messages = useMemo<Message[]>(() => {
+    const asc = (data?.pages ?? []).flat().reverse();
+    const seen = new Set<string>();
+    const out: Message[] = [];
+    for (const m of asc) {
+      if (m.id && seen.has(m.id)) continue;
+      if (m.id) seen.add(m.id);
+      out.push(m);
+    }
+    return out;
+  }, [data]);
 
   useEffect(() => {
     if (conversationId) {
