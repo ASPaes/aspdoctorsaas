@@ -136,6 +136,19 @@ export function AppSidebar() {
     }
   };
 
+  const handleOpenReleases = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-sso-token');
+      if (error) throw error;
+      const token = (data as { token?: string })?.token;
+      if (!token) throw new Error('Token não recebido');
+      window.open(`https://doctordev.lovable.app/sso?token=${encodeURIComponent(token)}&redirect=${encodeURIComponent('/releases')}`, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('[Atualizações DS]', err);
+      toast.error('Não foi possível abrir as Atualizações DS.');
+    }
+  };
+
   return (
     <Sidebar collapsible="icon">
       <div className="flex h-16 items-center justify-center border-b border-sidebar-border px-3">
@@ -261,7 +274,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Atualizações DS"
-              onClick={() => window.open("https://doctordev.lovable.app/releases", "_blank", "noopener,noreferrer")}
+              onClick={handleOpenReleases}
             >
               <Sparkles className="h-4 w-4" />
               <span>Atualizações DS</span>
