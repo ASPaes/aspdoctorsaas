@@ -38,6 +38,7 @@ type TimelineItem =
   | { type: 'transfer'; event: AssignmentEvent };
 
 const NEAR_BOTTOM_THRESHOLD = 150;
+const TOP_LOAD_THRESHOLD = 120;
 
 export function ChatMessages({
   conversationId,
