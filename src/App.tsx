@@ -11,6 +11,7 @@ import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
 import { UnidadeFilterProvider } from "@/contexts/UnidadeFilterContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Loader2 } from "lucide-react";
+import RequirePermission from "@/components/auth/RequirePermission";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
 import Dashboard from "@/pages/Dashboard";
@@ -83,22 +84,22 @@ const App = () => (
 
             {/* Protected routes */}
             <Route element={<AuthGuard><TenantFilterProvider><UnidadeFilterProvider><NotificationProvider><AppLayout /></NotificationProvider></UnidadeFilterProvider></TenantFilterProvider></AuthGuard>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/clientes/novo" element={<ClienteForm />} />
-              <Route path="/clientes/:id" element={<ClienteForm />} />
+              <Route path="/dashboard" element={<RequirePermission resource="nav.dashboard"><Dashboard /></RequirePermission>} />
+              <Route path="/clientes" element={<RequirePermission resource="nav.clientes"><Clientes /></RequirePermission>} />
+              <Route path="/clientes/novo" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
+              <Route path="/clientes/:id" element={<RequirePermission resource="nav.clientes"><ClienteForm /></RequirePermission>} />
               <Route path="/cadastros" element={<Navigate to="/configuracoes?tab=cadastros" replace />} />
-              <Route path="/certificados-a1" element={<CertificadosA1 />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
-              <Route path="/configuracoes/notificacoes" element={<ConfiguracoesNotificacoes />} />
+              <Route path="/certificados-a1" element={<RequirePermission resource="nav.certificados_a1"><CertificadosA1 /></RequirePermission>} />
+              <Route path="/configuracoes" element={<RequirePermission resource="nav.configuracoes"><Configuracoes /></RequirePermission>} />
+              <Route path="/configuracoes/notificacoes" element={<RequirePermission resource="nav.configuracoes"><ConfiguracoesNotificacoes /></RequirePermission>} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
-              <Route path="/customer-success" element={<CustomerSuccess />} />
-              <Route path="/whatsapp" element={<WhatsApp />} />
-              <Route path="/whatsapp/contatos" element={<WhatsAppContatos />} />
-              <Route path="/whatsapp/relatorio" element={<WhatsAppRelatorio />} />
-              <Route path="/tickets" element={<SupportTickets />} />
+              <Route path="/customer-success" element={<RequirePermission resource="nav.customer_success"><CustomerSuccess /></RequirePermission>} />
+              <Route path="/whatsapp" element={<RequirePermission resource="nav.chat"><WhatsApp /></RequirePermission>} />
+              <Route path="/whatsapp/contatos" element={<RequirePermission resource="nav.chat"><WhatsAppContatos /></RequirePermission>} />
+              <Route path="/whatsapp/relatorio" element={<RequirePermission resource="nav.chat"><WhatsAppRelatorio /></RequirePermission>} />
+              <Route path="/tickets" element={<RequirePermission resource="nav.tickets"><SupportTickets /></RequirePermission>} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
-              <Route path="/painel-uso" element={<PainelUso />} />
+              <Route path="/painel-uso" element={<RequirePermission resource="nav.painel_uso"><PainelUso /></RequirePermission>} />
               <Route path="/admin/limpeza-uras" element={<LimpezaUras />} />
 
               {/* Super Admin routes */}
