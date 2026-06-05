@@ -16,7 +16,7 @@ export function useProfile(userId: string | undefined) {
         .eq("user_id", userId!)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as Profile | null;
     },
   });
 }

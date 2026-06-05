@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3, ChevronsUpDown, Sparkles } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useReleasesNovidade } from "@/hooks/useReleasesNovidade";
 
 const ALL_NAV_ITEMS = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, resource: "nav.dashboard" },
@@ -63,6 +64,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const { temNovo, marcarVisto } = useReleasesNovidade();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
   const navItems = ALL_NAV_ITEMS.filter(item => can(item.resource, "view"));
@@ -143,11 +145,24 @@ export function AppSidebar() {
       const token = (data as { token?: string })?.token;
       if (!token) throw new Error('Token não recebido');
       window.open(`https://doctordev.lovable.app/sso?token=${encodeURIComponent(token)}&redirect=${encodeURIComponent('/releases')}`, '_blank', 'noopener,noreferrer');
+      void marcarVisto();
     } catch (err) {
       console.error('[Atualizações DS]', err);
       toast.error('Não foi possível abrir as Atualizações DS.');
     }
   };
+
+  useEffect(() => {
+    if (temNovo && !sessionStorage.getItem("ds_releases_toast_shown")) {
+      sessionStorage.setItem("ds_releases_toast_shown", "1");
+      toast("✨ Novidades no DoctorSaaS", {
+        description: "Tem atualização nova. Confira em Atualizações DS.",
+        action: { label: "Ver", onClick: () => handleOpenReleases() },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temNovo]);
+
 
   return (
     <Sidebar collapsible="icon">
@@ -276,7 +291,15 @@ export function AppSidebar() {
               tooltip="Atualizações DS"
               onClick={handleOpenReleases}
             >
-              <Sparkles className="h-4 w-4" />
+              <span className="relative inline-flex">
+                <Sparkles className="h-4 w-4" />
+                {temNovo && (
+                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                  </span>
+                )}
+              </span>
               <span>Atualizações DS</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
