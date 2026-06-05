@@ -1,5 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useCallback } from 'react';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export type MessageUiType = 'text' | 'media' | 'audio' | 'document' | 'image' | 'system' | string;
@@ -94,6 +94,40 @@ const MESSAGE_SELECT = [
   'delete_status', 'delete_scope', 'delete_error',
 ].join(',');
 
+const PAGE_SIZE = 100;
+type MsgCursor = { ts: string; id: string } | null;
+export type MsgPages = InfiniteData<Message[]>;
+
+// Insere/atualiza uma mensagem na estrutura de páginas (páginas em ordem DESC).
+export function upsertInfinite(data: MsgPages | undefined, msg: Message): MsgPages {
+  if (!data || !data.pages?.length) {
+    return { pages: [[msg]], pageParams: [null] };
+  }
+  const pages = data.pages.map((pg) => [...pg]);
+  for (let p = 0; p < pages.length; p++) {
+    const idx = pages[p].findIndex(
+      (m) => m.id === msg.id || (msg.message_id && m.message_id && m.message_id === msg.message_id)
+    );
+    if (idx !== -1) { pages[p][idx] = msg; return { ...data, pages }; }
+  }
+  const tempIdx = pages[0].findIndex(
+    (m) => m.id?.startsWith?.('temp-') && m.conversation_id === msg.conversation_id
+  );
+  if (tempIdx !== -1) { pages[0][tempIdx] = msg; return { ...data, pages }; }
+  pages[0] = [msg, ...pages[0]];
+  return { ...data, pages };
+}
+
+// Aplica um patch nas mensagens que casarem o predicado.
+export function patchInfinite(
+  data: MsgPages | undefined,
+  predicate: (m: Message) => boolean,
+  patch: Partial<Message>
+): MsgPages | undefined {
+  if (!data) return data;
+  return { ...data, pages: data.pages.map((pg) => pg.map((m) => (predicate(m) ? { ...m, ...patch } : m))) };
+}
+
 export function mergeMessage(old: Message[], incoming: Message): Message[] {
   const exactIdx = old.findIndex(
     (m) => m.id === incoming.id || (incoming.message_id && m.message_id === incoming.message_id)
@@ -117,25 +151,53 @@ export function mergeMessage(old: Message[], incoming: Message): Message[] {
 export const useWhatsAppMessages = (conversationId: string | null) => {
   const queryClient = useQueryClient();
 
-  const { data: messages = [] as Message[], isLoading, error } = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['whatsapp', 'messages', conversationId],
-    queryFn: async () => {
-      if (!conversationId) return [];
-      const { data, error } = await supabase
-        .from('whatsapp_messages' as any)
+    enabled: !!conversationId,
+    initialPageParam: null as MsgCursor,
+    queryFn: async ({ pageParam }) => {
+      if (!conversationId) return [] as Message[];
+      let q = (supabase.from('whatsapp_messages' as any) as any)
         .select(MESSAGE_SELECT)
         .eq('conversation_id', conversationId)
-        .order('timestamp', { ascending: true });
+        .order('timestamp', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(PAGE_SIZE);
+      if (pageParam) {
+        q = q.or(`timestamp.lt.${pageParam.ts},and(timestamp.eq.${pageParam.ts},id.lt.${pageParam.id})`);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as Array<Partial<Message> & Record<string, any>>).map(normalizeMessage);
     },
-    enabled: !!conversationId,
+    getNextPageParam: (lastPage): MsgCursor | undefined => {
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      const oldest = lastPage[lastPage.length - 1];
+      return { ts: new Date(oldest.timestamp).toISOString(), id: oldest.id };
+    },
     staleTime: 10_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount: 'always',
-    refetchInterval: 120_000,
-    refetchIntervalInBackground: false,
   });
+
+  const messages = useMemo<Message[]>(() => {
+    const asc = (data?.pages ?? []).flat().reverse();
+    const seen = new Set<string>();
+    const out: Message[] = [];
+    for (const m of asc) {
+      if (m.id && seen.has(m.id)) continue;
+      if (m.id) seen.add(m.id);
+      out.push(m);
+    }
+    return out;
+  }, [data]);
 
   useEffect(() => {
     if (conversationId) {
@@ -189,9 +251,9 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         const incoming = normalizeMessage(payload.new as any);
         if (import.meta.env.DEV) {
         }
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', conversationId],
-          (old: Message[] | undefined) => mergeMessage(old ?? [], incoming)
+          (old) => upsertInfinite(old, incoming)
         );
         newMessageCallbackRef.current?.(incoming);
         // Conversa está aberta — não incrementar unread, apenas atualizar preview
@@ -212,12 +274,9 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         filter: `conversation_id=eq.${conversationId}`,
       }, (payload) => {
         const updated = normalizeMessage(payload.new as any);
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', conversationId],
-          (old: Message[] | undefined) => {
-            if (!old) return old;
-            return old.map((m) => (m.id === updated.id ? updated : m));
-          }
+          (old) => upsertInfinite(old, updated)
         );
       })
       .subscribe((status) => {
@@ -248,7 +307,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     };
   }, [conversationId, queryClient]);
 
-  return { messages, isLoading, error, onNewMessage };
+  return { messages, isLoading, error, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage };
 };
 
 function patchConversationPreview(

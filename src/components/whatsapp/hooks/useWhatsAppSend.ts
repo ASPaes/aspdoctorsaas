@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeMessage, mergeMessage, type Message } from './useWhatsAppMessages';
+import { normalizeMessage, upsertInfinite, patchInfinite, type Message, type MsgPages } from './useWhatsAppMessages';
 
 interface SendMessageParams {
   conversationId: string;
@@ -31,7 +31,7 @@ export const useWhatsAppSend = () => {
     onMutate: async (newMessage) => {
       const tempId = `temp-${Date.now()}-${++tempCounter}`;
 
-      const previousMessages = queryClient.getQueryData<Message[]>(['whatsapp', 'messages', newMessage.conversationId]);
+      const previousMessages = queryClient.getQueryData<MsgPages>(['whatsapp', 'messages', newMessage.conversationId]);
 
       let optimisticMediaUrl = newMessage.mediaUrl ?? null;
       if (!optimisticMediaUrl && newMessage.mediaBase64) {
@@ -62,23 +62,16 @@ export const useWhatsAppSend = () => {
         metadata: {},
       });
 
-      queryClient.setQueryData(
+      queryClient.setQueryData<MsgPages>(
         ['whatsapp', 'messages', newMessage.conversationId],
-        (old: Message[] = []) => [...old, optimisticMessage]
+        (old) => upsertInfinite(old, optimisticMessage)
       );
 
       // Timeout: se ainda 'sending' após 30s, marcar como falhou automaticamente
       setTimeout(() => {
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
-          (old: Message[] | undefined) => {
-            if (!old) return old;
-            return old.map(m =>
-              m.id === tempId && m.status === 'sending'
-                ? { ...m, status: 'failed' }
-                : m
-            );
-          }
+          (old) => patchInfinite(old, (m) => m.id === tempId && m.status === 'sending', { status: 'failed' })
         );
       }, 30_000);
 
@@ -108,23 +101,18 @@ export const useWhatsAppSend = () => {
     onError: (_err, newMessage, context) => {
       // Não apaga a mensagem — marca como falhou para o técnico ver
       if (context?.tempId) {
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
-          (old: Message[] | undefined) => {
-            if (!old) return old;
-            return old.map(m =>
-              m.id === context.tempId ? { ...m, status: 'failed' } : m
-            );
-          }
+          (old) => patchInfinite(old, (m) => m.id === context.tempId, { status: 'failed' })
         );
       }
     },
     onSettled: (data, _error, variables) => {
       if (data?.message) {
         const realMessage = normalizeMessage(data.message);
-        queryClient.setQueryData(
+        queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', variables.conversationId],
-          (old: Message[] | undefined) => mergeMessage(old ?? [], realMessage)
+          (old) => upsertInfinite(old, realMessage)
         );
         return;
       }
