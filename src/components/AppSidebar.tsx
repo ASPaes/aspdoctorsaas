@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Users, Settings, LogOut, ShieldCheck, HeadphonesIcon, Crown, LayoutDashboard, MessageCircle, SlidersHorizontal, Activity, Ticket, TicketCheck, Bell, BarChart3, ChevronsUpDown, Sparkles } from "lucide-react";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useReleasesNovidade } from "@/hooks/useReleasesNovidade";
 
 const ALL_NAV_ITEMS = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, resource: "nav.dashboard" },
