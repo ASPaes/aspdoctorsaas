@@ -307,7 +307,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     };
   }, [conversationId, queryClient]);
 
-  return { messages, isLoading, error, onNewMessage };
+  return { messages, isLoading, error, onNewMessage, fetchNextPage, hasNextPage, isFetchingNextPage };
 };
 
 function patchConversationPreview(
