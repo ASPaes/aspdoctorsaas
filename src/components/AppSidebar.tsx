@@ -259,6 +259,15 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Atualizações DS"
+              onClick={() => window.open("https://doctordev.lovable.app/releases", "_blank", "noopener,noreferrer")}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Atualizações DS</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sair">
               <button onClick={handleLogout} className="flex w-full items-center gap-2">
                 <LogOut className="h-4 w-4" />
