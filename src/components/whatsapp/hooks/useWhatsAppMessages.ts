@@ -94,6 +94,40 @@ const MESSAGE_SELECT = [
   'delete_status', 'delete_scope', 'delete_error',
 ].join(',');
 
+const PAGE_SIZE = 100;
+type MsgCursor = { ts: string; id: string } | null;
+export type MsgPages = InfiniteData<Message[]>;
+
+// Insere/atualiza uma mensagem na estrutura de páginas (páginas em ordem DESC).
+export function upsertInfinite(data: MsgPages | undefined, msg: Message): MsgPages {
+  if (!data || !data.pages?.length) {
+    return { pages: [[msg]], pageParams: [null] };
+  }
+  const pages = data.pages.map((pg) => [...pg]);
+  for (let p = 0; p < pages.length; p++) {
+    const idx = pages[p].findIndex(
+      (m) => m.id === msg.id || (msg.message_id && m.message_id && m.message_id === msg.message_id)
+    );
+    if (idx !== -1) { pages[p][idx] = msg; return { ...data, pages }; }
+  }
+  const tempIdx = pages[0].findIndex(
+    (m) => m.id?.startsWith?.('temp-') && m.conversation_id === msg.conversation_id
+  );
+  if (tempIdx !== -1) { pages[0][tempIdx] = msg; return { ...data, pages }; }
+  pages[0] = [msg, ...pages[0]];
+  return { ...data, pages };
+}
+
+// Aplica um patch nas mensagens que casarem o predicado.
+export function patchInfinite(
+  data: MsgPages | undefined,
+  predicate: (m: Message) => boolean,
+  patch: Partial<Message>
+): MsgPages | undefined {
+  if (!data) return data;
+  return { ...data, pages: data.pages.map((pg) => pg.map((m) => (predicate(m) ? { ...m, ...patch } : m))) };
+}
+
 export function mergeMessage(old: Message[], incoming: Message): Message[] {
   const exactIdx = old.findIndex(
     (m) => m.id === incoming.id || (incoming.message_id && m.message_id === incoming.message_id)
