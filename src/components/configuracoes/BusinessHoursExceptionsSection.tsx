@@ -342,16 +342,35 @@ export default function BusinessHoursExceptionsSection() {
                     <TableCell>{TYPE_LABELS[ex.type] || ex.type}</TableCell>
                     <TableCell className="text-muted-foreground">{ex.name || "—"}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={!!ex.use_template}
-                          onCheckedChange={(v) => toggleTemplateMutation.mutate({ id: ex.id, useTemplate: v })}
-                          disabled={toggleTemplateMutation.isPending}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                          {ex.use_template ? `Abre ${formatTemplateRange()}` : "Fechado o dia"}
-                        </span>
-                      </div>
+                      {(() => {
+                        const estadoAtual: "closed" | "reduced" | "open" = ex.use_template
+                          ? "reduced"
+                          : ex.is_closed
+                          ? "closed"
+                          : "open";
+                        return (
+                          <Select
+                            value={estadoAtual}
+                            onValueChange={(status) =>
+                              setDayStatusMutation.mutate({ id: ex.id, status: status as "closed" | "reduced" | "open" })
+                            }
+                            disabled={setDayStatusMutation.isPending}
+                          >
+                            <SelectTrigger className="w-56">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="closed">Fechado o dia todo</SelectItem>
+                              <SelectItem value="reduced" disabled={!templateValido}>
+                                {templateValido
+                                  ? `Horário reduzido (${formatTemplateRange()})`
+                                  : "Horário reduzido"}
+                              </SelectItem>
+                              <SelectItem value="open">Aberto (atendimento normal)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
