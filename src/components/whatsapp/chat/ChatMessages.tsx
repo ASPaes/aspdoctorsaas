@@ -262,7 +262,7 @@ export function ChatMessages({
       } else if (attempts < maxAttempts) {
         setTimeout(tryScroll, 300);
       } else {
-        // Mensagem não encontrada nos 500 carregados — limpa highlight
+        // Mensagem não encontrada nas páginas carregadas — limpa highlight
         onHighlightShown?.();
       }
     };
