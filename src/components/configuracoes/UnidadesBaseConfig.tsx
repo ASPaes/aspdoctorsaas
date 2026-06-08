@@ -120,17 +120,17 @@ export default function UnidadesBaseConfig() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {!u.is_principal && u.is_active && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setPrincipal.mutate(u.id)}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setPrincipal.mutate(u.id); }}>
                     Definir principal
                   </Button>
                 )}
                 {!u.is_default_filter && u.is_active && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDefaultFilter.mutate(u.id)}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(u.id); }}>
                     Definir filtro padrão
                   </Button>
                 )}
                 {u.is_default_filter && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDefaultFilter.mutate(null)}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(null); }}>
                     Remover filtro padrão
                   </Button>
                 )}
