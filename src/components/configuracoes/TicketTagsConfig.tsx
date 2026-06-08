@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Department {
   id: string;
@@ -30,6 +31,11 @@ const GLOBAL_VALUE = "__global__";
 export default function TicketTagsConfig() {
   const { effectiveTenantId } = useTenantFilter();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.tickets_config", "insert")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.tickets_config", "update")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardDelete = () => { if (!can("cfg.tickets_config", "delete")) { toast.error(DENY_MSG); return false; } return true; };
 
   const [editTarget, setEditTarget] = useState<TicketTag | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -78,12 +84,14 @@ export default function TicketTagsConfig() {
     id ? departments.find((d) => d.id === id)?.name ?? "—" : "Global";
 
   const openNew = () => {
+    if (!guardInsert()) return;
     setIsNew(true);
     setEditTarget(null);
     setForm({ name: "", color: DEFAULT_COLOR, department_id: null });
   };
 
   const openEdit = (t: TicketTag) => {
+    if (!guardUpdate()) return;
     setIsNew(false);
     setEditTarget(t);
     setForm({
@@ -204,7 +212,7 @@ export default function TicketTagsConfig() {
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => setDeleteTarget(t)}
+                onClick={() => { if (guardDelete()) setDeleteTarget(t); }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
