@@ -313,7 +313,7 @@ export default function FinanceiroCard({
         )}
 
         {/* Seção 3: Espelho Financeiro (admin/super_admin only) */}
-        {isFinanceiroAdmin && (
+        {canVerCustos && (
           <>
             <Separator />
             <div className="space-y-3">
