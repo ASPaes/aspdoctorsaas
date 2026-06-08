@@ -222,7 +222,9 @@ export default function ProdutosModulosTab() {
       {/* Master: Produtos */}
       <div className="space-y-3">
         <div className="flex items-center justify-end">
-          <Button onClick={openNewProduto} size="sm"><Plus />Novo Produto</Button>
+          <ProtectedElement resource="cfg.produtos" action="insert" mode="notify">
+            <Button onClick={openNewProduto} size="sm"><Plus />Novo Produto</Button>
+          </ProtectedElement>
         </div>
 
         <div className="border border-border rounded-md overflow-x-auto">
