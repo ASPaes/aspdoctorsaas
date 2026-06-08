@@ -720,13 +720,15 @@ export default function ClienteForm() {
                       origensVenda={lookups.origensVenda?.data ?? []}
                       modelosContrato={lookups.modelosContrato.data ?? []}
                     />
-                    <FinanceiroTab
-                      form={form}
-                      formasPagamento={lookups.formasPagamento.data ?? []}
-                      clienteId={id}
-                      isEditing={isEditing}
-                      onOpenMrrModal={() => setMrrModalOpen(true)}
-                    />
+                    <ProtectedElement resource="clientes.custos" action="view" mode="hide">
+                      <FinanceiroTab
+                        form={form}
+                        formasPagamento={lookups.formasPagamento.data ?? []}
+                        clienteId={id}
+                        isEditing={isEditing}
+                        onOpenMrrModal={() => setMrrModalOpen(true)}
+                      />
+                    </ProtectedElement>
                   </fieldset>
                 </CardContent>
               </Card>

@@ -1,7 +1,7 @@
 import { UseFormReturn } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEspelhoFinanceiro } from "@/hooks/useEspelhoFinanceiro";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,8 +92,8 @@ export default function FinanceiroCard({
   const imposto_percentual = form.watch("imposto_percentual");
   const custo_fixo_percentual = form.watch("custo_fixo_percentual");
 
-  const { profile } = useAuth();
-  const isFinanceiroAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const { can } = usePermissions();
+  const canVerCustos = can("clientes.custos", "view");
 
   const { data: movimentos } = useQuery({
     queryKey: ["movimentos_mrr_totals", clienteId],
@@ -179,6 +179,8 @@ export default function FinanceiroCard({
     : mrrDown
       ? "text-orange-600 dark:text-orange-400"
       : "text-primary";
+
+  if (!canVerCustos) return null;
 
   return (
     <Card>
@@ -311,7 +313,7 @@ export default function FinanceiroCard({
         )}
 
         {/* Seção 3: Espelho Financeiro (admin/super_admin only) */}
-        {isFinanceiroAdmin && (
+        {canVerCustos && (
           <>
             <Separator />
             <div className="space-y-3">
