@@ -150,13 +150,13 @@ export default function UnidadesBaseConfig() {
             placeholder="Nome da nova unidade"
             className="h-9 text-sm"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && newName.trim()) addUnidade.mutate(newName.trim());
+              if (e.key === "Enter" && newName.trim() && guardInsert()) addUnidade.mutate(newName.trim());
             }}
           />
           <Button
             size="sm"
             disabled={!newName.trim() || addUnidade.isPending}
-            onClick={() => addUnidade.mutate(newName.trim())}
+            onClick={() => { if (guardInsert()) addUnidade.mutate(newName.trim()); }}
           >
             <Plus className="h-4 w-4 mr-1" /> Adicionar
           </Button>
