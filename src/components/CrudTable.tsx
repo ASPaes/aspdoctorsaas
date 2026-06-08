@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import type { PermissionAction } from "@/hooks/usePermissions";
 
 export interface ColumnDef {
   key: string;
