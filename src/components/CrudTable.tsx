@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import type { PermissionAction } from "@/hooks/usePermissions";
 
 export interface ColumnDef {
   key: string;
@@ -37,9 +39,19 @@ interface CrudTableProps {
   onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>;
   /** Extra action buttons rendered next to the "Novo" button */
   headerActions?: React.ReactNode;
+  /** If set, gates insert/update/delete buttons via ProtectedElement (mode="notify"). */
+  resource?: string;
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource }: CrudTableProps) {
+  const guard = (action: PermissionAction, btn: React.ReactNode) =>
+    resource ? (
+      <ProtectedElement resource={resource} action={action} mode="notify">
+        {btn}
+      </ProtectedElement>
+    ) : (
+      btn
+    );
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
@@ -203,9 +215,11 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
         {headerActions}
-        <Button size="sm" onClick={openNew}>
-          <Plus className="h-4 w-4" /> Novo
-        </Button>
+        {guard("insert", (
+          <Button size="sm" onClick={openNew}>
+            <Plus className="h-4 w-4" /> Novo
+          </Button>
+        ))}
       </div>
 
       {isLoading ? (
@@ -237,12 +251,16 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
                   ))}
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(row.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {guard("update", (
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      ))}
+                      {guard("delete", (
+                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(row.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      ))}
                     </div>
                   </TableCell>
                 </TableRow>
