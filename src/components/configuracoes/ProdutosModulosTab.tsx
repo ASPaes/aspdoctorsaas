@@ -286,7 +286,9 @@ export default function ProdutosModulosTab() {
                 <Badge variant="secondary">{(modulosQ.data ?? []).length} módulos</Badge>
               </div>
               <div className="flex items-center gap-2">
-                <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
+                <ProtectedElement resource="cfg.produtos" action="insert" mode="notify">
+                  <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
+                </ProtectedElement>
               </div>
             </div>
 
