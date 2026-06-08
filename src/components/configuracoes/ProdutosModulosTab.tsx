@@ -331,8 +331,12 @@ export default function ProdutosModulosTab() {
                         </TableCell>
                         <TableCell className="text-right align-top">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEditModulo(m)}><Pencil /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteModulo(m)}><Trash2 /></Button>
+                            <ProtectedElement resource="cfg.produtos" action="update" mode="notify">
+                              <Button variant="ghost" size="icon" onClick={() => openEditModulo(m)}><Pencil /></Button>
+                            </ProtectedElement>
+                            <ProtectedElement resource="cfg.produtos" action="delete" mode="notify">
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteModulo(m)}><Trash2 /></Button>
+                            </ProtectedElement>
                           </div>
                         </TableCell>
                       </TableRow>
