@@ -218,6 +218,7 @@ export default function TicketStatusesConfig() {
   };
 
   const handleToggleTerminal = async (s: TicketStatus) => {
+    if (!guardUpdate()) return;
     if (s.is_terminal) {
       const remaining = statuses.filter((x) => x.is_terminal && x.id !== s.id).length;
       if (remaining === 0) {
