@@ -215,9 +215,11 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
         {headerActions}
-        <Button size="sm" onClick={openNew}>
-          <Plus className="h-4 w-4" /> Novo
-        </Button>
+        {guard("insert", (
+          <Button size="sm" onClick={openNew}>
+            <Plus className="h-4 w-4" /> Novo
+          </Button>
+        ))}
       </div>
 
       {isLoading ? (
