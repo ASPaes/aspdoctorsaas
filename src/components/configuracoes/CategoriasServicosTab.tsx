@@ -217,6 +217,7 @@ export default function CategoriasServicosTab() {
   };
 
   const toggleCategoryActive = async (c: Category) => {
+    if (!guardUpdate()) return;
     const { error } = await (supabase.from("service_categories" as any) as any)
       .update({ ativo: !c.ativo })
       .eq("id", c.id);
