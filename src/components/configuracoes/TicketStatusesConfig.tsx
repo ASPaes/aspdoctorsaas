@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Plus, ArrowUp, ArrowDown, Trash2, Pencil } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Department {
   id: string;
@@ -45,6 +46,11 @@ const DEFAULT_COLOR = "#6366f1";
 export default function TicketStatusesConfig() {
   const { effectiveTenantId } = useTenantFilter();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.tickets_config", "insert")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.tickets_config", "update")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardDelete = () => { if (!can("cfg.tickets_config", "delete")) { toast.error(DENY_MSG); return false; } return true; };
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<TicketStatus | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -100,12 +106,14 @@ export default function TicketStatusesConfig() {
     queryClient.invalidateQueries({ queryKey: ["ticket_statuses_config"] });
 
   const openNew = () => {
+    if (!guardInsert()) return;
     setIsNew(true);
     setEditTarget(null);
     setForm({ name: "", color: DEFAULT_COLOR, is_initial: statuses.length === 0, is_terminal: false });
   };
 
   const openEdit = (s: TicketStatus) => {
+    if (!guardUpdate()) return;
     setIsNew(false);
     setEditTarget(s);
     setForm({
@@ -184,6 +192,7 @@ export default function TicketStatusesConfig() {
   };
 
   const handleToggleInitial = async (s: TicketStatus) => {
+    if (!guardUpdate()) return;
     if (!effectiveTenantId || !activeDeptId) return;
     try {
       if (!s.is_initial) {
@@ -209,6 +218,7 @@ export default function TicketStatusesConfig() {
   };
 
   const handleToggleTerminal = async (s: TicketStatus) => {
+    if (!guardUpdate()) return;
     if (s.is_terminal) {
       const remaining = statuses.filter((x) => x.is_terminal && x.id !== s.id).length;
       if (remaining === 0) {
@@ -229,6 +239,7 @@ export default function TicketStatusesConfig() {
   };
 
   const handleMove = async (idx: number, dir: -1 | 1) => {
+    if (!guardUpdate()) return;
     const target = statuses[idx];
     const swap = statuses[idx + dir];
     if (!target || !swap) return;
@@ -379,7 +390,7 @@ export default function TicketStatusesConfig() {
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => setDeleteTarget(s)}
+                onClick={() => { if (guardDelete()) setDeleteTarget(s); }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
