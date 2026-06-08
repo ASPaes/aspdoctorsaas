@@ -229,6 +229,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openNewSubcategory = (categoryId: string) => {
+    if (!guardInsert()) return;
     setEditingSub(null);
     setSubParentCatId(categoryId);
     setSubNome("");
