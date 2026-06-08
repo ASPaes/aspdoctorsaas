@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
 import { NumericInput } from "@/components/ui/numeric-input";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 
 
 interface Produto { id: number; nome: string; tenant_id: string; }
@@ -221,7 +222,9 @@ export default function ProdutosModulosTab() {
       {/* Master: Produtos */}
       <div className="space-y-3">
         <div className="flex items-center justify-end">
-          <Button onClick={openNewProduto} size="sm"><Plus />Novo Produto</Button>
+          <ProtectedElement resource="cfg.produtos" action="insert" mode="notify">
+            <Button onClick={openNewProduto} size="sm"><Plus />Novo Produto</Button>
+          </ProtectedElement>
         </div>
 
         <div className="border border-border rounded-md overflow-x-auto">
@@ -255,8 +258,12 @@ export default function ProdutosModulosTab() {
                         >
                           <Package />Módulos
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditProduto(p)}><Pencil /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteProduto(p)}><Trash2 /></Button>
+                        <ProtectedElement resource="cfg.produtos" action="update" mode="notify">
+                          <Button variant="ghost" size="icon" onClick={() => openEditProduto(p)}><Pencil /></Button>
+                        </ProtectedElement>
+                        <ProtectedElement resource="cfg.produtos" action="delete" mode="notify">
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteProduto(p)}><Trash2 /></Button>
+                        </ProtectedElement>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -279,7 +286,9 @@ export default function ProdutosModulosTab() {
                 <Badge variant="secondary">{(modulosQ.data ?? []).length} módulos</Badge>
               </div>
               <div className="flex items-center gap-2">
-                <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
+                <ProtectedElement resource="cfg.produtos" action="insert" mode="notify">
+                  <Button onClick={openNewModulo} size="sm"><Plus />Novo Módulo</Button>
+                </ProtectedElement>
               </div>
             </div>
 
@@ -322,8 +331,12 @@ export default function ProdutosModulosTab() {
                         </TableCell>
                         <TableCell className="text-right align-top">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEditModulo(m)}><Pencil /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => setDeleteModulo(m)}><Trash2 /></Button>
+                            <ProtectedElement resource="cfg.produtos" action="update" mode="notify">
+                              <Button variant="ghost" size="icon" onClick={() => openEditModulo(m)}><Pencil /></Button>
+                            </ProtectedElement>
+                            <ProtectedElement resource="cfg.produtos" action="delete" mode="notify">
+                              <Button variant="ghost" size="icon" onClick={() => setDeleteModulo(m)}><Trash2 /></Button>
+                            </ProtectedElement>
                           </div>
                         </TableCell>
                       </TableRow>
