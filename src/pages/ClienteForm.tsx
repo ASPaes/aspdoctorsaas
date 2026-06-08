@@ -41,6 +41,7 @@ import ClienteContratosSection from "@/components/clientes/ClienteContratosSecti
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useAuth } from "@/contexts/AuthContext";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
