@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "@/hooks/use-toast";
 import { NumericInput } from "@/components/ui/numeric-input";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 
 
 interface Produto { id: number; nome: string; tenant_id: string; }
