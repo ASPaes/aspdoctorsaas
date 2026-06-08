@@ -180,6 +180,8 @@ export default function FinanceiroCard({
       ? "text-orange-600 dark:text-orange-400"
       : "text-primary";
 
+  if (!canVerCustos) return null;
+
   return (
     <Card>
       <CardHeader>
