@@ -273,6 +273,7 @@ export default function CategoriasServicosTab() {
   };
 
   const toggleSubcategoryActive = async (s: Subcategory) => {
+    if (!guardUpdate()) return;
     const { error } = await (supabase.from("service_subcategories" as any) as any)
       .update({ ativo: !s.ativo })
       .eq("id", s.id);
