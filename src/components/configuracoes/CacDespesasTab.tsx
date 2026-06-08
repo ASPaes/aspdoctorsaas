@@ -281,7 +281,7 @@ export default function CacDespesasTab() {
                 <TableCell>
                   <Switch
                     checked={d.ativo}
-                    onCheckedChange={(v) => toggleAtivoMutation.mutate({ id: d.id, ativo: v })}
+                    onCheckedChange={(v) => { if (guardUpdate()) toggleAtivoMutation.mutate({ id: d.id, ativo: v }); }}
                   />
                 </TableCell>
                 <TableCell>
