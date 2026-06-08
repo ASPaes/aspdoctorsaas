@@ -402,53 +402,6 @@ export function CancelamentosTab({
         tvMode={tvMode}
       />
 
-      {/* ═══════ BLOCO 7 — EVOLUÇÃO TEMPORAL 12M (REUSO V1) ═══════ */}
-      <section className="space-y-3">
-        <SectionHeader
-          title="Evolução temporal · 12 meses"
-          description="Cancelamentos e MRR perdido mês a mês"
-          icon={<BarChart3 className={`${iconMd} text-primary`} />}
-          tvMode={tvMode}
-        />
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className={tvMode ? 'text-xl' : 'text-base'}>
-              Cancelamentos — Quantidade vs MRR Churn
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={tvMode ? 400 : 300}>
-              <ComposedChart data={combinedData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fontSize: 11 }}
-                  className="text-muted-foreground"
-                  allowDecimals={false}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 11 }}
-                  className="text-muted-foreground"
-                  tickFormatter={(v: number) => {
-                    if (v >= 1000) return `${(v / 1000).toFixed(0)}k`;
-                    return v.toString();
-                  }}
-                />
-                <RTooltip content={<CombinedTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-                  formatter={(value: string) => value === 'qtd' ? 'Qtde Cancelamentos' : 'MRR Churn (R$)'}
-                />
-                <Bar yAxisId="left" dataKey="qtd" fill="hsl(var(--destructive))" opacity={0.7} radius={[4, 4, 0, 0]} barSize={28} />
-                <Line yAxisId="right" dataKey="mrr" stroke="hsl(30, 90%, 55%)" strokeWidth={2.5} dot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </section>
 
       {/* ═══════ BLOCO 8 — TABELA COMPLETA (REUSO V1) ═══════ */}
       <section className="space-y-3">
