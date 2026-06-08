@@ -80,6 +80,11 @@ export default function CacDespesasTab() {
   const qc = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.despesas_cac", "insert")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.despesas_cac", "update")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
+  const guardDelete = () => { if (!can("cfg.despesas_cac", "delete")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
