@@ -18,6 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronRight, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Category {
   id: string;
@@ -44,6 +45,10 @@ interface Product {
 export default function CategoriasServicosTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.categorias_servico", "insert")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.categorias_servico", "update")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -145,6 +150,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openNewCategory = () => {
+    if (!guardInsert()) return;
     setEditingCat(null);
     setCatNome("");
     setCatLinkedProducts([]);
@@ -153,6 +159,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openEditCategory = (c: Category) => {
+    if (!guardUpdate()) return;
     setEditingCat(c);
     setCatNome(c.nome);
     setCatLinkedProducts(c.linkedProductIds.map(String));
@@ -210,6 +217,7 @@ export default function CategoriasServicosTab() {
   };
 
   const toggleCategoryActive = async (c: Category) => {
+    if (!guardUpdate()) return;
     const { error } = await (supabase.from("service_categories" as any) as any)
       .update({ ativo: !c.ativo })
       .eq("id", c.id);
@@ -221,6 +229,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openNewSubcategory = (categoryId: string) => {
+    if (!guardInsert()) return;
     setEditingSub(null);
     setSubParentCatId(categoryId);
     setSubNome("");
@@ -229,6 +238,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openEditSubcategory = (s: Subcategory) => {
+    if (!guardUpdate()) return;
     setEditingSub(s);
     setSubParentCatId(s.category_id);
     setSubNome(s.nome);
@@ -263,6 +273,7 @@ export default function CategoriasServicosTab() {
   };
 
   const toggleSubcategoryActive = async (s: Subcategory) => {
+    if (!guardUpdate()) return;
     const { error } = await (supabase.from("service_subcategories" as any) as any)
       .update({ ativo: !s.ativo })
       .eq("id", s.id);
