@@ -212,7 +212,7 @@ export default function TicketTagsConfig() {
                 size="icon"
                 variant="ghost"
                 className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => setDeleteTarget(t)}
+                onClick={() => { if (guardDelete()) setDeleteTarget(t); }}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
