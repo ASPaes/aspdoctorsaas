@@ -96,9 +96,9 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     }
   };
 
-  const tabs: { value: string; label: string; table: string; queryKey: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode }[] = [
+  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode }[] = [
     {
-      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", orderBy: "sort_order",
+      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", resource: "cfg.setores", orderBy: "sort_order",
       columns: [
         { key: "name", label: "Nome" },
         { key: "slug", label: "Slug" },
@@ -110,7 +110,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       ],
     },
     {
-      value: "funcionarios", label: "Funcionários", table: "funcionarios", queryKey: "crud_funcionarios", orderBy: "nome",
+      value: "funcionarios", label: "Funcionários", table: "funcionarios", queryKey: "crud_funcionarios", resource: "cfg.funcionarios", orderBy: "nome",
       selectQuery: "*, support_departments:department_id(name)",
       onBeforeSave: validateFuncionario,
       columns: [
@@ -122,42 +122,42 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       ],
     },
     {
-      value: "fornecedores", label: "Fornecedores", table: "fornecedores", queryKey: "crud_fornecedores", orderBy: "nome",
+      value: "fornecedores", label: "Fornecedores", table: "fornecedores", queryKey: "crud_fornecedores", resource: "cfg.fornecedores", orderBy: "nome",
       columns: [
         { key: "nome", label: "Nome" },
         { key: "site", label: "Site" },
       ],
     },
     {
-      value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", orderBy: "nome",
+      value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", resource: "cfg.segmentos", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", orderBy: "nome",
+      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", resource: "cfg.modelos_contrato", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "areas_atuacao", label: "Áreas de Atuação", table: "areas_atuacao", queryKey: "crud_areas_atuacao", orderBy: "nome",
+      value: "areas_atuacao", label: "Áreas de Atuação", table: "areas_atuacao", queryKey: "crud_areas_atuacao", resource: "cfg.areas_atuacao", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", orderBy: "descricao",
+      value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", resource: "cfg.motivos_cancelamento", orderBy: "descricao",
       columns: [{ key: "descricao", label: "Descrição" }],
     },
     {
-      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", orderBy: "nome",
+      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", resource: "cfg.origens_venda", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "formas_pagamento", label: "Formas Pgto", table: "formas_pagamento", queryKey: "crud_formas_pgto", orderBy: "nome",
+      value: "formas_pagamento", label: "Formas Pgto", table: "formas_pagamento", queryKey: "crud_formas_pgto", resource: "cfg.formas_pagamento", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "unidades_base", label: "Unidades Base", table: "unidades_base", queryKey: "crud_unidades_base", orderBy: "nome",
+      value: "unidades_base", label: "Unidades Base", table: "unidades_base", queryKey: "crud_unidades_base", resource: "cfg.unidades_base", orderBy: "nome",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", orderBy: "sort_order",
+      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", resource: "cfg.motivos_pausa", orderBy: "sort_order",
       columns: [
         { key: "name", label: "Nome" },
         { key: "average_minutes", label: "Tempo médio (min)" },
@@ -170,6 +170,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       label: "Categorias Serviço",
       table: "service_categories",
       queryKey: "crud_service_categories",
+      resource: "cfg.categorias_servico",
       orderBy: "nome",
       columns: [
         { key: "nome", label: "Nome" },
@@ -181,6 +182,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       label: "Subcategorias",
       table: "service_subcategories",
       queryKey: "crud_service_subcategories",
+      resource: "cfg.categorias_servico",
       orderBy: "nome",
       selectQuery: "*, service_categories:category_id(nome), produtos:produto_id(nome)",
       columns: [
@@ -195,6 +197,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       label: "Tipos Serviço",
       table: "service_types",
       queryKey: "crud_service_types",
+      resource: "cfg.tipos_servico",
       orderBy: "nome",
       columns: [
         { key: "codigo", label: "Código" },
