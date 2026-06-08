@@ -196,6 +196,7 @@ export default function CacDespesasTab() {
   };
 
   const openEdit = (d: Despesa) => {
+    if (!guardUpdate()) return;
     setEditingId(d.id);
     setForm({
       mes_inicial: d.mes_inicial,
