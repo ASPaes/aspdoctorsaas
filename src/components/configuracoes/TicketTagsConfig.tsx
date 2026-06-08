@@ -91,6 +91,7 @@ export default function TicketTagsConfig() {
   };
 
   const openEdit = (t: TicketTag) => {
+    if (!guardUpdate()) return;
     setIsNew(false);
     setEditTarget(t);
     setForm({
