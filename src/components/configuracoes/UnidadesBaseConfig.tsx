@@ -9,11 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Building2, Star, Filter, Plus } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function UnidadesBaseConfig() {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const [newName, setNewName] = useState("");
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.unidades_base", "insert")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.unidades_base", "update")) { toast.error(DENY_MSG); return false; } return true; };
 
   const { data: unidades = [], isLoading } = useQuery({
     queryKey: ["unidades_base_config", tid],
@@ -115,23 +120,23 @@ export default function UnidadesBaseConfig() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {!u.is_principal && u.is_active && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setPrincipal.mutate(u.id)}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setPrincipal.mutate(u.id); }}>
                     Definir principal
                   </Button>
                 )}
                 {!u.is_default_filter && u.is_active && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDefaultFilter.mutate(u.id)}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(u.id); }}>
                     Definir filtro padrão
                   </Button>
                 )}
                 {u.is_default_filter && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDefaultFilter.mutate(null)}>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(null); }}>
                     Remover filtro padrão
                   </Button>
                 )}
                 <Switch
                   checked={!!u.is_active}
-                  onCheckedChange={(v) => toggleActive.mutate({ id: u.id, active: v })}
+                  onCheckedChange={(v) => { if (guardUpdate()) toggleActive.mutate({ id: u.id, active: v }); }}
                 />
               </div>
             </div>
@@ -145,13 +150,13 @@ export default function UnidadesBaseConfig() {
             placeholder="Nome da nova unidade"
             className="h-9 text-sm"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && newName.trim()) addUnidade.mutate(newName.trim());
+              if (e.key === "Enter" && newName.trim() && guardInsert()) addUnidade.mutate(newName.trim());
             }}
           />
           <Button
             size="sm"
             disabled={!newName.trim() || addUnidade.isPending}
-            onClick={() => addUnidade.mutate(newName.trim())}
+            onClick={() => { if (guardInsert()) addUnidade.mutate(newName.trim()); }}
           >
             <Plus className="h-4 w-4 mr-1" /> Adicionar
           </Button>
