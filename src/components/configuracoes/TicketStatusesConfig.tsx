@@ -192,6 +192,7 @@ export default function TicketStatusesConfig() {
   };
 
   const handleToggleInitial = async (s: TicketStatus) => {
+    if (!guardUpdate()) return;
     if (!effectiveTenantId || !activeDeptId) return;
     try {
       if (!s.is_initial) {
