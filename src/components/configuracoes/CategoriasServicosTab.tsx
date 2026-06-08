@@ -159,6 +159,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openEditCategory = (c: Category) => {
+    if (!guardUpdate()) return;
     setEditingCat(c);
     setCatNome(c.nome);
     setCatLinkedProducts(c.linkedProductIds.map(String));
