@@ -239,6 +239,7 @@ export default function TicketStatusesConfig() {
   };
 
   const handleMove = async (idx: number, dir: -1 | 1) => {
+    if (!guardUpdate()) return;
     const target = statuses[idx];
     const swap = statuses[idx + dir];
     if (!target || !swap) return;
