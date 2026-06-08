@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Building2, Star, Filter, Plus } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function UnidadesBaseConfig() {
   const queryClient = useQueryClient();
