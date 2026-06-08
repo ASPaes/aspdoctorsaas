@@ -31,6 +31,11 @@ const GLOBAL_VALUE = "__global__";
 export default function TicketTagsConfig() {
   const { effectiveTenantId } = useTenantFilter();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.tickets_config", "insert")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.tickets_config", "update")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardDelete = () => { if (!can("cfg.tickets_config", "delete")) { toast.error(DENY_MSG); return false; } return true; };
 
   const [editTarget, setEditTarget] = useState<TicketTag | null>(null);
   const [isNew, setIsNew] = useState(false);
