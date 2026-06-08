@@ -189,6 +189,7 @@ export default function CacDespesasTab() {
   });
 
   const openNew = () => {
+    if (!guardInsert()) return;
     setEditingId(null);
     setForm(emptyForm);
     setDialogOpen(true);
