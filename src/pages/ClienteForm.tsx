@@ -837,10 +837,12 @@ export default function ClienteForm() {
             <Button type="button" variant="outline" onClick={() => guardedNavigate("/clientes")}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Salvar Cliente
-            </Button>
+            <ProtectedElement resource="clientes" action={isEditing ? "update" : "insert"} mode="notify">
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar Cliente
+              </Button>
+            </ProtectedElement>
           </div>
         </form>
       </Form>
