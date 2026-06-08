@@ -92,8 +92,8 @@ export default function FinanceiroCard({
   const imposto_percentual = form.watch("imposto_percentual");
   const custo_fixo_percentual = form.watch("custo_fixo_percentual");
 
-  const { profile } = useAuth();
-  const isFinanceiroAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  const { can } = usePermissions();
+  const canVerCustos = can("clientes.custos", "view");
 
   const { data: movimentos } = useQuery({
     queryKey: ["movimentos_mrr_totals", clienteId],
