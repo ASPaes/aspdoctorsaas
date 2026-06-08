@@ -41,6 +41,7 @@ import ClienteContratosSection from "@/components/clientes/ClienteContratosSecti
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import { useAuth } from "@/contexts/AuthContext";
+import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
@@ -836,10 +837,12 @@ export default function ClienteForm() {
             <Button type="button" variant="outline" onClick={() => guardedNavigate("/clientes")}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Salvar Cliente
-            </Button>
+            <ProtectedElement resource="clientes" action={isEditing ? "update" : "insert"} mode="notify">
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar Cliente
+              </Button>
+            </ProtectedElement>
           </div>
         </form>
       </Form>
