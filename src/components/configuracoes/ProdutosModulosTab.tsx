@@ -258,8 +258,12 @@ export default function ProdutosModulosTab() {
                         >
                           <Package />Módulos
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditProduto(p)}><Pencil /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteProduto(p)}><Trash2 /></Button>
+                        <ProtectedElement resource="cfg.produtos" action="update" mode="notify">
+                          <Button variant="ghost" size="icon" onClick={() => openEditProduto(p)}><Pencil /></Button>
+                        </ProtectedElement>
+                        <ProtectedElement resource="cfg.produtos" action="delete" mode="notify">
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteProduto(p)}><Trash2 /></Button>
+                        </ProtectedElement>
                       </div>
                     </TableCell>
                   </TableRow>
