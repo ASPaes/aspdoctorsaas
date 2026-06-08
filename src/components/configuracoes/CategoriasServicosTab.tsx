@@ -150,6 +150,7 @@ export default function CategoriasServicosTab() {
   };
 
   const openNewCategory = () => {
+    if (!guardInsert()) return;
     setEditingCat(null);
     setCatNome("");
     setCatLinkedProducts([]);
