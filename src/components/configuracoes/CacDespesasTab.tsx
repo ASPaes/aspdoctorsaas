@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const CATEGORIAS = [
   { value: "marketing", label: "Marketing" },
@@ -79,6 +80,11 @@ export default function CacDespesasTab() {
   const qc = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.despesas_cac", "insert")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.despesas_cac", "update")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
+  const guardDelete = () => { if (!can("cfg.despesas_cac", "delete")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -183,12 +189,14 @@ export default function CacDespesasTab() {
   });
 
   const openNew = () => {
+    if (!guardInsert()) return;
     setEditingId(null);
     setForm(emptyForm);
     setDialogOpen(true);
   };
 
   const openEdit = (d: Despesa) => {
+    if (!guardUpdate()) return;
     setEditingId(d.id);
     setForm({
       mes_inicial: d.mes_inicial,
@@ -273,7 +281,7 @@ export default function CacDespesasTab() {
                 <TableCell>
                   <Switch
                     checked={d.ativo}
-                    onCheckedChange={(v) => toggleAtivoMutation.mutate({ id: d.id, ativo: v })}
+                    onCheckedChange={(v) => { if (guardUpdate()) toggleAtivoMutation.mutate({ id: d.id, ativo: v }); }}
                   />
                 </TableCell>
                 <TableCell>
@@ -281,7 +289,7 @@ export default function CacDespesasTab() {
                     <Button variant="ghost" size="icon" onClick={() => openEdit(d)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteId(d.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => { if (guardDelete()) setDeleteId(d.id); }}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
