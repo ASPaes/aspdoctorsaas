@@ -106,6 +106,7 @@ export default function TicketStatusesConfig() {
     queryClient.invalidateQueries({ queryKey: ["ticket_statuses_config"] });
 
   const openNew = () => {
+    if (!guardInsert()) return;
     setIsNew(true);
     setEditTarget(null);
     setForm({ name: "", color: DEFAULT_COLOR, is_initial: statuses.length === 0, is_terminal: false });
