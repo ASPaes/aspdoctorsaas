@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Plus, ArrowUp, ArrowDown, Trash2, Pencil } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Department {
   id: string;
