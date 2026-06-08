@@ -289,7 +289,7 @@ export default function CacDespesasTab() {
                     <Button variant="ghost" size="icon" onClick={() => openEdit(d)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteId(d.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => { if (guardDelete()) setDeleteId(d.id); }}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
