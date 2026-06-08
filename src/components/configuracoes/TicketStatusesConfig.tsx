@@ -46,6 +46,11 @@ const DEFAULT_COLOR = "#6366f1";
 export default function TicketStatusesConfig() {
   const { effectiveTenantId } = useTenantFilter();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.tickets_config", "insert")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.tickets_config", "update")) { toast.error(DENY_MSG); return false; } return true; };
+  const guardDelete = () => { if (!can("cfg.tickets_config", "delete")) { toast.error(DENY_MSG); return false; } return true; };
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<TicketStatus | null>(null);
   const [isNew, setIsNew] = useState(false);
