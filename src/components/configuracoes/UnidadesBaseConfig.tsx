@@ -136,7 +136,7 @@ export default function UnidadesBaseConfig() {
                 )}
                 <Switch
                   checked={!!u.is_active}
-                  onCheckedChange={(v) => toggleActive.mutate({ id: u.id, active: v })}
+                  onCheckedChange={(v) => { if (guardUpdate()) toggleActive.mutate({ id: u.id, active: v }); }}
                 />
               </div>
             </div>
