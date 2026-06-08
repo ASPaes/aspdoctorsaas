@@ -84,6 +84,7 @@ export default function TicketTagsConfig() {
     id ? departments.find((d) => d.id === id)?.name ?? "—" : "Global";
 
   const openNew = () => {
+    if (!guardInsert()) return;
     setIsNew(true);
     setEditTarget(null);
     setForm({ name: "", color: DEFAULT_COLOR, department_id: null });
