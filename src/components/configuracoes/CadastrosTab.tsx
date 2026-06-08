@@ -239,6 +239,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         selectQuery={t.selectQuery}
         onBeforeSave={t.onBeforeSave}
         headerActions={t.headerActions}
+        resource={t.resource}
       />
     );
   }
