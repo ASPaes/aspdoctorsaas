@@ -113,6 +113,7 @@ export default function TicketStatusesConfig() {
   };
 
   const openEdit = (s: TicketStatus) => {
+    if (!guardUpdate()) return;
     setIsNew(false);
     setEditTarget(s);
     setForm({
