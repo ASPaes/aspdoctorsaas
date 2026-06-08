@@ -45,6 +45,10 @@ interface Product {
 export default function CategoriasServicosTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const qc = useQueryClient();
+  const { can } = usePermissions();
+  const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
+  const guardInsert = () => { if (!can("cfg.categorias_servico", "insert")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
+  const guardUpdate = () => { if (!can("cfg.categorias_servico", "update")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
