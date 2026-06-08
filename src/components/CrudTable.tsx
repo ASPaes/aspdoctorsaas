@@ -39,9 +39,19 @@ interface CrudTableProps {
   onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>;
   /** Extra action buttons rendered next to the "Novo" button */
   headerActions?: React.ReactNode;
+  /** If set, gates insert/update/delete buttons via ProtectedElement (mode="notify"). */
+  resource?: string;
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource }: CrudTableProps) {
+  const guard = (action: PermissionAction, btn: React.ReactNode) =>
+    resource ? (
+      <ProtectedElement resource={resource} action={action} mode="notify">
+        {btn}
+      </ProtectedElement>
+    ) : (
+      btn
+    );
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
