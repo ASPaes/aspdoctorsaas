@@ -218,7 +218,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     }
   }, [conversationId, queryClient]);
 
-  const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+  
   const newMessageCallbackRef = useRef<((msg: Message) => void) | null>(null);
   const retryCountRef = useRef(0);
   const mountedRef = useRef(true);
@@ -234,8 +234,7 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
     mountedRef.current = true;
     retryCountRef.current = 0;
 
-    const uid = channelIdRef.current;
-    const channelName = `msgs-${conversationId.slice(0, 8)}-${uid}`;
+    const channelName = `msgs-${conversationId}`;
 
     if (import.meta.env.DEV) {
     }
