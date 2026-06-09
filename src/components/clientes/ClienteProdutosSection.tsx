@@ -759,6 +759,7 @@ function ProdutoDialog({
           data_venda: dataVenda || null,
           data_ativacao: dataAt || null,
           data_fim: dataFim || null,
+          data_proximo_reajuste: dataProximoReajuste || null,
           prazo_meses: prazoMeses,
           dia_vencimento: diaVencimento,
           modelo_contrato_id: modeloContratoId ? Number(modeloContratoId) : null,
