@@ -166,45 +166,29 @@ export function useAttendanceStatus(
     [queryClient, tenantId]
   );
 
-  // Unique channel name per hook instance — prevents unmount of one consumer
-  // from killing the subscription of another (e.g. Header vs Sidebar).
-  const channelRef = useRef<string>(
-    `att-rt-${crypto.randomUUID().slice(0, 8)}`
-  );
+  // Channel compartilhado com refcount: Sidebar, Header e QueueIndicator reusam
+  // UM channel por tenant. O handler usa setQueriesData, que atualiza todos os
+  // caches attendance-status de uma vez.
+  const channelTopic = `att-rt-${tenantId ?? "global"}`;
 
   useEffect(() => {
-    const channelName = channelRef.current;
-
-    const channel = supabase
-      .channel(channelName)
-      .on(
+    return subscribeSharedChannel(channelTopic, (channel) => {
+      channel.on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "support_attendances",
-        },
+        { event: "*", schema: "public", table: "support_attendances" },
         (payload) => {
           const row = payload.new as any;
           if (row && row.conversation_id) {
             patchAllCaches(row);
           } else {
-            // DELETE or unexpected — just invalidate
-            queryClient.invalidateQueries({
-              queryKey: ["attendance-status"],
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["whatsapp", "conversations"],
-            });
+            queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+            queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
           }
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, patchAllCaches]);
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelTopic]);
 
   return {
     attendanceMap: data ?? new Map<string, AttendanceInfo>(),
