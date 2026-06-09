@@ -48,7 +48,7 @@ export function useConversationStates(conversationIds: string[]) {
 
   // Realtime: invalida quando estado muda. Filter por tenant_id reduz volume processado.
   // Debounce 800ms evita tempestade de invalidações quando múltiplos eventos chegam em rajada.
-  const channelRef = useRef(`conv-states-${crypto.randomUUID().slice(0, 8)}`);
+  
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export function useConversationStates(conversationIds: string[]) {
     };
 
     const channel = supabase
-      .channel(channelRef.current)
+      .channel(`conv-states-${tid ?? 'none'}`)
       .on("postgres_changes", {
         event: "*",
         schema: "public",
