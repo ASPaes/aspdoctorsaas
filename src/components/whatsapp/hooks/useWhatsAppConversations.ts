@@ -212,12 +212,12 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
   });
 
   // Realtime: unique channel per hook instance to avoid collision
-  const channelIdRef = useRef(Math.random().toString(36).slice(2, 10));
+  
   const invalidateThrottleRef = useRef<number>(0);
   const insertDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const channelName = `conversations-rt-${channelIdRef.current}`;
+    const channelName = `conversations-rt-${tid ?? 'none'}`;
     const channel = supabase
       .channel(channelName)
       .on('postgres_changes', {
