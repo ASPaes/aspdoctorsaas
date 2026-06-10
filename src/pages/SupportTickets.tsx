@@ -153,6 +153,8 @@ export default function SupportTickets() {
       if (error) throw error;
       toast.success("Status atualizado");
       queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
     } catch (err: any) {
       toast.error("Erro: " + (err.message ?? ""));
     }
