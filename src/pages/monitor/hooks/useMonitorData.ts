@@ -103,19 +103,8 @@ export function useMonitorData(filters: MonitorFilters) {
   const { data: maintenanceData, refetch: refetchMaintenance } = useQuery({
     queryKey: ['monitor-maintenance', refreshKey],
     queryFn: async () => {
-      const { data } = await supabase.rpc('exec_db_health_query', {
-        query_text: `
-          SELECT
-            (SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname = 'whatsapp_messages') as dead_messages,
-            (SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname = 'whatsapp_conversations') as dead_conversations,
-            (SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname = 'support_attendances') as dead_attendances,
-            (SELECT count(*) FROM cron.job_run_details) as cron_count,
-            (SELECT count(*) FROM public.db_metrics_snapshots WHERE captured_at > now() - interval '24h') as snapshots_today,
-            (SELECT max(captured_at) FROM public.db_metrics_snapshots) as last_snapshot,
-            (SELECT max(updated_at) FROM public.tenant_daily_metrics) as last_metrics
-        `
-      });
-      return (data as any)?.[0] ?? null;
+      const { data } = await supabase.rpc('get_monitor_maintenance_metrics' as any);
+      return (data as any) ?? null;
     },
     ...opts,
   });

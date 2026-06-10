@@ -7877,6 +7877,7 @@ export type Database = {
         }[]
       }
       get_messages_projection: { Args: never; Returns: Json }
+      get_monitor_maintenance_metrics: { Args: never; Returns: Json }
       get_mrr_monthly_snapshots: {
         Args: {
           p_data_referencia?: string
