@@ -1002,7 +1002,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Input
             type="datetime-local"
             className="h-9 text-xs"
-            defaultValue={ticket?.agendado_para ? new Date(ticket.agendado_para).toISOString().slice(0, 16) : ""}
+            defaultValue={toLocalInput(ticket?.agendado_para)}
             key={`agendado-${ticket?.agendado_para}`}
             onBlur={(e) => {
               const val = e.target.value;
