@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search } from "lucide-react";
 import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
@@ -81,6 +83,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
   const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
+  const [showAttachTicketModal, setShowAttachTicketModal] = useState(false);
+  const [attachNote, setAttachNote] = useState("");
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -265,8 +269,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const handleClienteConfirmed = useCallback(() => {
     setShowConfirmCliente(false);
 
-    // Regra: se attendance já tem ticket_id (conversa iniciada a partir de ticket), pular classificação
     const attTicketId = (attendance as any)?.ticket_id;
+    const wasReopened = !!(attendance as any)?.reopened_at;
+
+    // Reabertura de atendimento que já gerou ticket → modal "Atualizar ticket"
+    if (attTicketId && wasReopened) {
+      setAttachNote("");
+      setShowAttachTicketModal(true);
+      return;
+    }
+
+    // Conversa iniciada a partir de ticket (sem reabertura) → encerramento silencioso (comportamento atual)
     if (attTicketId) {
       if (!csatEnabled) {
         closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
@@ -299,6 +312,45 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       setShowCloseModal(true);
     }
   }, [csatEnabled, closeConversation, conversation.id]);
+
+  const { data: attachTicketCode } = useQuery({
+    queryKey: ["attach-ticket-code", (attendance as any)?.ticket_id],
+    enabled: showAttachTicketModal && !!(attendance as any)?.ticket_id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("support_tickets")
+        .select("ticket_code")
+        .eq("id", (attendance as any).ticket_id)
+        .maybeSingle();
+      return (data as any)?.ticket_code ?? null;
+    },
+  });
+
+  const proceedCloseAfterAttach = useCallback(() => {
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id]);
+
+  const handleAttachAndClose = useCallback(async () => {
+    const attId = (attendance as any)?.id;
+    if (!attId) return;
+    try {
+      const { error } = await supabase.rpc("attach_attendance_to_ticket" as any, {
+        p_attendance_id: attId,
+        p_nota: attachNote.trim() || null,
+      });
+      if (error) throw error;
+      setShowAttachTicketModal(false);
+      setAttachNote("");
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
+      proceedCloseAfterAttach();
+    } catch (err: any) {
+      toast.error("Erro ao anexar ao ticket: " + (err?.message ?? ""));
+    }
+  }, [attendance, attachNote, proceedCloseAfterAttach, queryClient]);
 
   const handleDeleteConversation = useCallback(async () => {
     setIsDeleting(true);
@@ -930,6 +982,35 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       )}
 
 
+
+      {/* Modal "Atualizar ticket" — atendimento reaberto já vinculado a ticket */}
+      <Dialog open={showAttachTicketModal} onOpenChange={(o) => { if (!o) setShowAttachTicketModal(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Este atendimento já possui ticket</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            O atendimento reaberto está vinculado ao ticket{" "}
+            <strong>{attachTicketCode ?? "…"}</strong>.
+            Você pode atualizar esse ticket e encerrar o atendimento.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="attach-note">Nota (opcional)</Label>
+            <Textarea
+              id="attach-note"
+              value={attachNote}
+              onChange={(e) => setAttachNote(e.target.value)}
+              rows={3}
+              placeholder="Observação que será registrada na timeline do ticket…"
+              className="resize-none text-sm"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setShowAttachTicketModal(false)}>Cancelar</Button>
+            <Button onClick={handleAttachAndClose}>Atualizar e encerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de confirmação de encerramento */}
       <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>

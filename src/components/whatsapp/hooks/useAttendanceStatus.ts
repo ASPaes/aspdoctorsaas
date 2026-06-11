@@ -13,6 +13,8 @@ export interface AttendanceInfo {
   department_id: string | null;
   created_from: string | null;
   scheduled_until: string | null;
+  ticket_id: string | null;
+  reopened_at: string | null;
 }
 
 /**
@@ -50,7 +52,7 @@ export function useAttendanceStatus(
       const { data: activeRows } = await supabase
         .from("support_attendances")
         .select(
-          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until"
+          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until, ticket_id, reopened_at"
         )
         .in("conversation_id", conversationIds)
         .in("status", ["waiting", "in_progress"])
@@ -71,6 +73,8 @@ export function useAttendanceStatus(
               department_id: row.department_id,
               created_from: row.created_from || null,
               scheduled_until: (row as any).scheduled_until ?? null,
+              ticket_id: (row as any).ticket_id ?? null,
+              reopened_at: (row as any).reopened_at ?? null,
             });
           }
         }
@@ -83,7 +87,7 @@ export function useAttendanceStatus(
           const { data: closedRows } = await supabase
             .from("support_attendances")
             .select(
-              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until"
+              "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until, ticket_id, reopened_at"
             )
             .in("conversation_id", missingIds)
             .in("status", ["closed", "inactive_closed"])
@@ -101,6 +105,8 @@ export function useAttendanceStatus(
                   department_id: row.department_id,
                   created_from: row.created_from || null,
                   scheduled_until: (row as any).scheduled_until ?? null,
+                  ticket_id: (row as any).ticket_id ?? null,
+                  reopened_at: (row as any).reopened_at ?? null,
                 });
               }
             }
@@ -133,6 +139,8 @@ export function useAttendanceStatus(
         department_id: row.department_id,
         created_from: row.created_from || null,
         scheduled_until: row.scheduled_until ?? null,
+        ticket_id: row.ticket_id ?? null,
+        reopened_at: row.reopened_at ?? null,
       };
 
       // setQueriesData updates ALL matching queries regardless of their specific key
