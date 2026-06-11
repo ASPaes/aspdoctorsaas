@@ -988,7 +988,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Input
             type="datetime-local"
             className="h-9 text-xs"
-            defaultValue={ticket?.previsao_encerramento ? new Date(ticket.previsao_encerramento).toISOString().slice(0, 16) : ""}
+            defaultValue={toLocalInput(ticket?.previsao_encerramento)}
             key={`previsao-${ticket?.previsao_encerramento}`}
             onBlur={(e) => {
               const val = e.target.value;
@@ -1002,7 +1002,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Input
             type="datetime-local"
             className="h-9 text-xs"
-            defaultValue={ticket?.agendado_para ? new Date(ticket.agendado_para).toISOString().slice(0, 16) : ""}
+            defaultValue={toLocalInput(ticket?.agendado_para)}
             key={`agendado-${ticket?.agendado_para}`}
             onBlur={(e) => {
               const val = e.target.value;
@@ -1057,7 +1057,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <Input
                 type="datetime-local"
                 className="h-9 text-xs"
-                defaultValue={ticket?.horario_inicio ? new Date(ticket.horario_inicio).toISOString().slice(0, 16) : ""}
+                defaultValue={toLocalInput(ticket?.horario_inicio)}
                 key={`horario-inicio-${ticket?.horario_inicio}`}
                 onBlur={(e) => {
                   const val = e.target.value;
@@ -1071,7 +1071,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <Input
                 type="datetime-local"
                 className="h-9 text-xs"
-                defaultValue={ticket?.horario_fim ? new Date(ticket.horario_fim).toISOString().slice(0, 16) : ""}
+                defaultValue={toLocalInput(ticket?.horario_fim)}
                 key={`horario-fim-${ticket?.horario_fim}`}
                 onBlur={(e) => {
                   const val = e.target.value;
