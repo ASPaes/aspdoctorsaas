@@ -988,7 +988,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Input
             type="datetime-local"
             className="h-9 text-xs"
-            defaultValue={ticket?.previsao_encerramento ? new Date(ticket.previsao_encerramento).toISOString().slice(0, 16) : ""}
+            defaultValue={toLocalInput(ticket?.previsao_encerramento)}
             key={`previsao-${ticket?.previsao_encerramento}`}
             onBlur={(e) => {
               const val = e.target.value;
