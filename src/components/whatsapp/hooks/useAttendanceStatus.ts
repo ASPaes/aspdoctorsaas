@@ -73,6 +73,8 @@ export function useAttendanceStatus(
               department_id: row.department_id,
               created_from: row.created_from || null,
               scheduled_until: (row as any).scheduled_until ?? null,
+              ticket_id: (row as any).ticket_id ?? null,
+              reopened_at: (row as any).reopened_at ?? null,
             });
           }
         }
