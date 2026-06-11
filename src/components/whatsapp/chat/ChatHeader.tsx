@@ -313,6 +313,45 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     }
   }, [csatEnabled, closeConversation, conversation.id]);
 
+  const { data: attachTicketCode } = useQuery({
+    queryKey: ["attach-ticket-code", (attendance as any)?.ticket_id],
+    enabled: showAttachTicketModal && !!(attendance as any)?.ticket_id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("support_tickets")
+        .select("ticket_code")
+        .eq("id", (attendance as any).ticket_id)
+        .maybeSingle();
+      return (data as any)?.ticket_code ?? null;
+    },
+  });
+
+  const proceedCloseAfterAttach = useCallback(() => {
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id]);
+
+  const handleAttachAndClose = useCallback(async () => {
+    const attId = (attendance as any)?.id;
+    if (!attId) return;
+    try {
+      const { error } = await supabase.rpc("attach_attendance_to_ticket" as any, {
+        p_attendance_id: attId,
+        p_nota: attachNote.trim() || null,
+      });
+      if (error) throw error;
+      setShowAttachTicketModal(false);
+      setAttachNote("");
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
+      proceedCloseAfterAttach();
+    } catch (err: any) {
+      toast.error("Erro ao anexar ao ticket: " + (err?.message ?? ""));
+    }
+  }, [attendance, attachNote, proceedCloseAfterAttach, queryClient]);
+
   const handleDeleteConversation = useCallback(async () => {
     setIsDeleting(true);
     try {
