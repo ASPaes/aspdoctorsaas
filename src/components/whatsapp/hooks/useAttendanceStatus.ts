@@ -13,6 +13,8 @@ export interface AttendanceInfo {
   department_id: string | null;
   created_from: string | null;
   scheduled_until: string | null;
+  ticket_id: string | null;
+  reopened_at: string | null;
 }
 
 /**
