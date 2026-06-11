@@ -7318,6 +7318,10 @@ export type Database = {
         Returns: undefined
       }
       aplicar_reajuste: { Args: { p_reajuste_id: string }; Returns: Json }
+      attach_attendance_to_ticket: {
+        Args: { p_attendance_id: string; p_nota?: string }
+        Returns: string
+      }
       atualizar_reajuste_item: {
         Args: {
           p_item_id: string
