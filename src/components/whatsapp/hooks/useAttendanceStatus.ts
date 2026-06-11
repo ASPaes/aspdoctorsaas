@@ -52,7 +52,7 @@ export function useAttendanceStatus(
       const { data: activeRows } = await supabase
         .from("support_attendances")
         .select(
-          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until"
+          "id, conversation_id, status, assigned_to, opened_at, closed_at, department_id, created_from, scheduled_until, ticket_id, reopened_at"
         )
         .in("conversation_id", conversationIds)
         .in("status", ["waiting", "in_progress"])
