@@ -983,6 +983,35 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
 
 
+      {/* Modal "Atualizar ticket" — atendimento reaberto já vinculado a ticket */}
+      <Dialog open={showAttachTicketModal} onOpenChange={(o) => { if (!o) setShowAttachTicketModal(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Este atendimento já possui ticket</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            O atendimento reaberto está vinculado ao ticket{" "}
+            <strong>{attachTicketCode ?? "…"}</strong>.
+            Você pode atualizar esse ticket e encerrar o atendimento.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="attach-note">Nota (opcional)</Label>
+            <Textarea
+              id="attach-note"
+              value={attachNote}
+              onChange={(e) => setAttachNote(e.target.value)}
+              rows={3}
+              placeholder="Observação que será registrada na timeline do ticket…"
+              className="resize-none text-sm"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setShowAttachTicketModal(false)}>Cancelar</Button>
+            <Button onClick={handleAttachAndClose}>Atualizar e encerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de confirmação de encerramento */}
       <Dialog open={showCloseModal} onOpenChange={setShowCloseModal}>
         <DialogContent className="sm:max-w-md">
