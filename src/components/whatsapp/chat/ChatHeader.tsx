@@ -269,8 +269,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const handleClienteConfirmed = useCallback(() => {
     setShowConfirmCliente(false);
 
-    // Regra: se attendance já tem ticket_id (conversa iniciada a partir de ticket), pular classificação
     const attTicketId = (attendance as any)?.ticket_id;
+    const wasReopened = !!(attendance as any)?.reopened_at;
+
+    // Reabertura de atendimento que já gerou ticket → modal "Atualizar ticket"
+    if (attTicketId && wasReopened) {
+      setAttachNote("");
+      setShowAttachTicketModal(true);
+      return;
+    }
+
+    // Conversa iniciada a partir de ticket (sem reabertura) → encerramento silencioso (comportamento atual)
     if (attTicketId) {
       if (!csatEnabled) {
         closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
