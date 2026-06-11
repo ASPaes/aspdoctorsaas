@@ -139,6 +139,8 @@ export function useAttendanceStatus(
         department_id: row.department_id,
         created_from: row.created_from || null,
         scheduled_until: row.scheduled_until ?? null,
+        ticket_id: row.ticket_id ?? null,
+        reopened_at: row.reopened_at ?? null,
       };
 
       // setQueriesData updates ALL matching queries regardless of their specific key
