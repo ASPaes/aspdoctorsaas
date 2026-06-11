@@ -83,6 +83,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [showAttendanceTicketModal, setShowAttendanceTicketModal] = useState(false);
   const [attendanceTicketTarget, setAttendanceTicketTarget] = useState<any | null>(null);
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
+  const [showAttachTicketModal, setShowAttachTicketModal] = useState(false);
+  const [attachNote, setAttachNote] = useState("");
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
