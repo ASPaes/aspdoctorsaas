@@ -110,6 +110,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
+          <TabsTrigger value="roteamento">Roteamento</TabsTrigger>
           <TabsTrigger value="grupos">Grupos</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="pausas">Pausas</TabsTrigger>
