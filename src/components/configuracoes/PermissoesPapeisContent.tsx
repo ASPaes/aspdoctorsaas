@@ -269,7 +269,7 @@ export default function PermissoesPapeisContent() {
 
   const enableMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("enable_rbac_for_tenant");
+      const { data, error } = await (supabase.rpc as any)("enable_rbac_for_tenant", { p_tenant_id: tenantId });
       if (error) throw error;
       return data;
     },
