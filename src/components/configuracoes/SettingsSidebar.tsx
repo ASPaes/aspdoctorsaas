@@ -32,14 +32,20 @@ export const SECTION_TO_RESOURCE: Record<string, string> = {
   // Equipe
   "acessos": "cfg.acessos",
   "permissoes": "cfg.permissoes",
+  // Sistema
+  "geral": "cfg.geral",
+  "setup": "cfg.setup",
   // Atendimento
-  "canais": "cfg.whatsapp",
-  "distribuicao": "cfg.whatsapp",
-  "operacao": "cfg.whatsapp",
+  "canais": "cfg.canais",
+  "distribuicao": "cfg.distribuicao",
+  "operacao": "cfg.operacao",
   "ia": "cfg.ia",
   "horario-plantao": "cfg.horario_plantao",
   "kb": "cfg.kb",
+  // Equipe
+  "seguranca": "cfg.seguranca",
   // Dados
+  "duplicidades": "cfg.duplicidades",
   "importacao": "cfg.importacao",
 };
 
