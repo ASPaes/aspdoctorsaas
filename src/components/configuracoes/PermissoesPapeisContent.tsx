@@ -475,7 +475,7 @@ export default function PermissoesPapeisContent() {
 // ---------- Matrix ----------
 
 interface MatrixTableProps {
-  grouped: { module: string; items: Resource[] }[];
+  grouped: { group: string; subgroups: { label: string; items: Resource[] }[] }[];
   getValue: (role: Role, resource_key: string, action: Action) => boolean;
   isPending: (role: Role, resource_key: string, action: Action) => boolean;
   onToggle: (role: Role, resource_key: string, action: Action) => void;
@@ -486,11 +486,11 @@ function MatrixTable({ grouped, getValue, isPending, onToggle, disabled }: Matri
   return (
     <div className={cn("space-y-8", disabled && "opacity-70")}>
       {grouped.map((g) => (
-        <section key={g.module} className="rounded-md border bg-background overflow-hidden">
+        <section key={g.group} className="rounded-md border bg-background overflow-hidden">
           <header className="bg-muted/40 px-4 py-3 border-b">
             <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
               <Shield className="h-4 w-4 text-muted-foreground" />
-              {g.module}
+              {g.group}
             </h3>
           </header>
 
@@ -515,15 +515,26 @@ function MatrixTable({ grouped, getValue, isPending, onToggle, disabled }: Matri
                 </tr>
               </thead>
               <tbody>
-                {g.items.map((res) => (
-                  <ResourceRow
-                    key={res.key}
-                    res={res}
-                    getValue={getValue}
-                    isPending={isPending}
-                    onToggle={onToggle}
-                    disabled={disabled}
-                  />
+                {g.subgroups.map((sg, i) => (
+                  <Fragment key={sg.label || i}>
+                    {sg.label && (
+                      <tr>
+                        <td colSpan={1 + ROLES.length} className="bg-muted/20 px-4 py-1.5 text-[11px] uppercase tracking-wider font-medium text-muted-foreground border-b">
+                          {sg.label}
+                        </td>
+                      </tr>
+                    )}
+                    {sg.items.map((res) => (
+                      <ResourceRow
+                        key={res.key}
+                        res={res}
+                        getValue={getValue}
+                        isPending={isPending}
+                        onToggle={onToggle}
+                        disabled={disabled}
+                      />
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
