@@ -162,22 +162,34 @@ export default function PermissoesPapeisContent() {
     return m;
   }, [defaults, overrides, isActive]);
 
-  // Group by module preserving order of first display_order
   const grouped = useMemo(() => {
     const visible = (resources ?? []).filter(
       (r) => !SCREEN_ONLY || r.key.startsWith("nav.") || r.key.startsWith("cfg.") || r.key === "clientes.custos"
     );
-    const list = visible;
-    const out: { module: string; items: Resource[] }[] = [];
-    const idx = new Map<string, number>();
-    for (const r of list) {
-      if (!idx.has(r.module)) {
-        idx.set(r.module, out.length);
-        out.push({ module: r.module, items: [] });
+    const groupOf = (r: Resource): { group: string; sub: string } => {
+      if (r.key === "clientes.custos") return { group: "Clientes", sub: "" };
+      if (r.module.startsWith("Configurações > "))
+        return { group: "Configurações", sub: r.module.slice("Configurações > ".length) };
+      return { group: r.module, sub: "" };
+    };
+    const out: { group: string; subgroups: { label: string; items: Resource[] }[] }[] = [];
+    const gIdx = new Map<string, number>();
+    for (const r of visible) {
+      const { group, sub } = groupOf(r);
+      if (!gIdx.has(group)) {
+        gIdx.set(group, out.length);
+        out.push({ group, subgroups: [] });
       }
-      out[idx.get(r.module)!].items.push(r);
+      const grp = out[gIdx.get(group)!];
+      let sg = grp.subgroups.find((s) => s.label === sub);
+      if (!sg) {
+        sg = { label: sub, items: [] };
+        grp.subgroups.push(sg);
+      }
+      sg.items.push(r);
     }
-    for (const g of out) g.items.sort((a, b) => a.display_order - b.display_order);
+    for (const g of out)
+      for (const s of g.subgroups) s.items.sort((a, b) => a.display_order - b.display_order);
     return out;
   }, [resources]);
 
@@ -463,7 +475,7 @@ export default function PermissoesPapeisContent() {
 // ---------- Matrix ----------
 
 interface MatrixTableProps {
-  grouped: { module: string; items: Resource[] }[];
+  grouped: { group: string; subgroups: { label: string; items: Resource[] }[] }[];
   getValue: (role: Role, resource_key: string, action: Action) => boolean;
   isPending: (role: Role, resource_key: string, action: Action) => boolean;
   onToggle: (role: Role, resource_key: string, action: Action) => void;
@@ -474,11 +486,11 @@ function MatrixTable({ grouped, getValue, isPending, onToggle, disabled }: Matri
   return (
     <div className={cn("space-y-8", disabled && "opacity-70")}>
       {grouped.map((g) => (
-        <section key={g.module} className="rounded-md border bg-background overflow-hidden">
+        <section key={g.group} className="rounded-md border bg-background overflow-hidden">
           <header className="bg-muted/40 px-4 py-3 border-b">
             <h3 className="text-sm font-semibold tracking-wide flex items-center gap-2">
               <Shield className="h-4 w-4 text-muted-foreground" />
-              {g.module}
+              {g.group}
             </h3>
           </header>
 
@@ -503,15 +515,26 @@ function MatrixTable({ grouped, getValue, isPending, onToggle, disabled }: Matri
                 </tr>
               </thead>
               <tbody>
-                {g.items.map((res) => (
-                  <ResourceRow
-                    key={res.key}
-                    res={res}
-                    getValue={getValue}
-                    isPending={isPending}
-                    onToggle={onToggle}
-                    disabled={disabled}
-                  />
+                {g.subgroups.map((sg, i) => (
+                  <Fragment key={sg.label || i}>
+                    {sg.label && (
+                      <tr>
+                        <td colSpan={1 + ROLES.length} className="bg-muted/20 px-4 py-1.5 text-[11px] uppercase tracking-wider font-medium text-muted-foreground border-b">
+                          {sg.label}
+                        </td>
+                      </tr>
+                    )}
+                    {sg.items.map((res) => (
+                      <ResourceRow
+                        key={res.key}
+                        res={res}
+                        getValue={getValue}
+                        isPending={isPending}
+                        onToggle={onToggle}
+                        disabled={disabled}
+                      />
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
