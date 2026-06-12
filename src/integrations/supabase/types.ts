@@ -7508,7 +7508,7 @@ export type Database = {
         Returns: undefined
       }
       email_domain: { Args: { email: string }; Returns: string }
-      enable_rbac_for_tenant: { Args: never; Returns: Json }
+      enable_rbac_for_tenant: { Args: { p_tenant_id?: string }; Returns: Json }
       encrypt_api_key: {
         Args: { p_encryption_key: string; p_key: string }
         Returns: string
@@ -8184,7 +8184,7 @@ export type Database = {
       }
       require_active_profile: { Args: never; Returns: boolean }
       reset_tenant_permissions_to_default: {
-        Args: { p_role?: string }
+        Args: { p_role?: string; p_tenant_id?: string }
         Returns: Json
       }
       resolve_group_contact_name: {
@@ -8400,6 +8400,7 @@ export type Database = {
           p_action: string
           p_resource_key: string
           p_role: string
+          p_tenant_id?: string
           p_value: boolean
         }
         Returns: Json
