@@ -80,7 +80,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
   const toggleGroup = (label: string) =>
     setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
   const [syncing, setSyncing] = useState(false);
-  const { can } = usePermissions();
+  const { can, rbacEnabled } = usePermissions();
 
   const handleSync = async () => {
     setSyncing(true);
@@ -98,7 +98,8 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
 
   const isItemVisible = (item: Item) => {
     const resource = SECTION_TO_RESOURCE[item.value];
-    if (!resource) return true;
+    if (!rbacEnabled) return isAdmin;
+    if (!resource) return isAdmin;
     return can(resource, "view");
   };
 
