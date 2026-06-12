@@ -242,6 +242,7 @@ export default function PermissoesPapeisContent() {
       const results = await Promise.all(
         changes.map((c) =>
           (supabase.rpc as any)("update_tenant_permission", {
+            p_tenant_id: tenantId,
             p_role: c.role,
             p_resource_key: c.resource_key,
             p_action: c.action,
