@@ -489,7 +489,7 @@ function MatrixTable({ grouped, getValue, isPending, onToggle, disabled }: Matri
                   <th className="text-left text-[11px] uppercase tracking-wider font-medium text-muted-foreground px-4 py-2.5 border-b min-w-[240px]">
                     Recurso
                     <span className="ml-2 text-[10px] normal-case font-normal text-muted-foreground/70">
-                      (V·ver  I·inserir  U·editar  D·excluir)
+                      {CRUD_ENABLED ? "(V·ver  I·inserir  U·editar  D·excluir)" : "(somente visualização da tela)"}
                     </span>
                   </th>
                   {ROLES.map((role) => (
@@ -583,7 +583,7 @@ function ResourceRow({ res, getValue, isPending, onToggle, disabled }: ResourceR
       {ROLES.map((role) => (
         <td key={role} className="px-4 py-3 border-b border-border/40 align-top">
           <div className="flex gap-1">
-            {ACTIONS.map((action) => {
+            {VISIBLE_ACTIONS.map((action) => {
               const value = getValue(role, res.key, action);
               const pending = isPending(role, res.key, action);
               const locked = isLocked(role, res.key, action);
