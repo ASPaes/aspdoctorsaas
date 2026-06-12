@@ -177,7 +177,9 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
       subgroups: [
         {
           items: [
-            { value: "whatsapp", label: "WhatsApp" },
+            { value: "canais", label: "Canais" },
+            { value: "distribuicao", label: "Distribuição" },
+            { value: "operacao", label: "Operação" },
             ...(isAdmin ? [{ value: "ia", label: "Inteligência artificial" }] : []),
             ...(isAdmin ? [{ value: "horario-plantao", label: "Horário & plantão" }] : []),
             { value: "kb", label: "Base de conhecimento" },
