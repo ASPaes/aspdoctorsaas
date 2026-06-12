@@ -49,6 +49,18 @@ export function usePermissions() {
     },
   });
 
+  const rbacQuery = useQuery<boolean>({
+    queryKey: ["tenant-rbac-enabled", profile?.tenant_id],
+    enabled: !!profile?.tenant_id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("tenants" as any) as any)
+        .select("rbac_enabled").eq("id", profile!.tenant_id).maybeSingle();
+      if (error) throw error;
+      return !!(data as any)?.rbac_enabled;
+    },
+  });
+
   const can = (resource: string, action: PermissionAction): boolean => {
     if (profile?.is_super_admin) return true;
     if (query.isLoading) return true;
@@ -60,5 +72,6 @@ export function usePermissions() {
     permissions: query.data,
     isLoading: query.isLoading,
     refetch: query.refetch,
+    rbacEnabled: rbacQuery.data ?? false,
   };
 }
