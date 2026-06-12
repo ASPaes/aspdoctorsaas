@@ -50,6 +50,7 @@ import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoC
 import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
 
 import SetoresInstanciasTab from "@/components/configuracoes/whatsapp/SetoresInstanciasTab";
+import RoteamentoInstanciasTab from "@/components/configuracoes/whatsapp/RoteamentoInstanciasTab";
 
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
@@ -109,6 +110,7 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="setup">Setup</TabsTrigger>
           <TabsTrigger value="instancias">Instâncias</TabsTrigger>
+          <TabsTrigger value="roteamento">Roteamento</TabsTrigger>
           <TabsTrigger value="grupos">Grupos</TabsTrigger>
           <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
           <TabsTrigger value="pausas">Pausas</TabsTrigger>
@@ -145,6 +147,11 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
           <InstancesList />
           <AddInstanceDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
         </TabsContent>
+
+        <TabsContent value="roteamento" className="mt-4">
+          <RoteamentoInstanciasTab />
+        </TabsContent>
+
 
         <TabsContent value="macros" className="mt-4">
           <MacrosManager />
