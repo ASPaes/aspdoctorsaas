@@ -192,7 +192,10 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
       icon: Upload,
       subgroups: [
         {
-          items: [{ value: "importacao", label: "Importação" }],
+          items: [
+            { value: "duplicidades", label: "Duplicidades" },
+            { value: "importacao", label: "Importação" },
+          ],
         },
       ],
     },
