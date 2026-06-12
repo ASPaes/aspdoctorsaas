@@ -148,6 +148,11 @@ function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
           <AddInstanceDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
         </TabsContent>
 
+        <TabsContent value="roteamento" className="mt-4">
+          <RoteamentoInstanciasTab />
+        </TabsContent>
+
+
         <TabsContent value="macros" className="mt-4">
           <MacrosManager />
         </TabsContent>
