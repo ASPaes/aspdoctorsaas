@@ -26,6 +26,9 @@ type Role = "admin" | "head" | "user";
 type Action = "view" | "insert" | "update" | "delete";
 const ROLES: Role[] = ["admin", "head", "user"];
 const ACTIONS: Action[] = ["view", "insert", "update", "delete"];
+const CRUD_ENABLED = false; // true reexibe Inserir/Editar/Excluir
+const VISIBLE_ACTIONS: Action[] = CRUD_ENABLED ? ACTIONS : ["view"];
+const SCREEN_ONLY = true; // mostra só telas (nav.*, cfg.*) + clientes.custos
 const ROLE_LABEL: Record<Role, string> = { admin: "Admin", head: "Head", user: "User" };
 
 interface Resource {
