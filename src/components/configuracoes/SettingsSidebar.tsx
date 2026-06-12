@@ -80,7 +80,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
   const toggleGroup = (label: string) =>
     setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
   const [syncing, setSyncing] = useState(false);
-  const { can } = usePermissions();
+  const { can, rbacEnabled } = usePermissions();
 
   const handleSync = async () => {
     setSyncing(true);
@@ -98,7 +98,8 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
 
   const isItemVisible = (item: Item) => {
     const resource = SECTION_TO_RESOURCE[item.value];
-    if (!resource) return true;
+    if (!rbacEnabled) return isAdmin;
+    if (!resource) return isAdmin;
     return can(resource, "view");
   };
 
@@ -173,18 +174,15 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
         },
       ],
     },
-    ...(isAdmin
-      ? [{
-          label: "Equipe",
-          icon: Users,
-          adminOnly: true,
-          subgroups: [{ items: [
-            { value: "acessos", label: "Acessos & permissões" },
-            { value: "permissoes", label: "Permissões e papéis" },
-            { value: "seguranca", label: "Segurança" },
-          ] }],
-        } as Group]
-      : []),
+    {
+      label: "Equipe",
+      icon: Users,
+      subgroups: [{ items: [
+        { value: "acessos", label: "Acessos & permissões" },
+        { value: "permissoes", label: "Permissões e papéis" },
+        { value: "seguranca", label: "Segurança" },
+      ] }],
+    },
 
     {
       label: "Atendimento",
@@ -195,8 +193,8 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
             { value: "canais", label: "Canais" },
             { value: "distribuicao", label: "Distribuição" },
             { value: "operacao", label: "Operação" },
-            ...(isAdmin ? [{ value: "ia", label: "Inteligência artificial" }] : []),
-            ...(isAdmin ? [{ value: "horario-plantao", label: "Horário & plantão" }] : []),
+            { value: "ia", label: "Inteligência artificial" },
+            { value: "horario-plantao", label: "Horário & plantão" },
             { value: "kb", label: "Base de conhecimento" },
           ],
         },
