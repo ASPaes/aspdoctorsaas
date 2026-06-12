@@ -283,16 +283,24 @@ export default function Configuracoes() {
   const [importTiposOpen, setImportTiposOpen] = useState(false);
   const navigate = useNavigate();
 
+  const isAdmin = !!(profile?.role === "admin" || profile?.is_super_admin);
+  const { can, rbacEnabled, rbacLoading } = usePermissions();
+  const canSeeSection = (section: string) => {
+    if (!rbacEnabled) return isAdmin;
+    const resource = SECTION_TO_RESOURCE[section];
+    if (!resource) return isAdmin;
+    return can(resource, "view");
+  };
+
   useEffect(() => {
-    if (profile && profile.role !== "admin" && !profile.is_super_admin) {
+    if (!profile || rbacLoading) return;
+    if (!rbacEnabled && !isAdmin) {
       navigate("/dashboard", { replace: true });
     }
-  }, [profile, navigate]);
-
-  const isAdmin = !!(profile?.role === "admin" || profile?.is_super_admin);
+  }, [profile, rbacEnabled, rbacLoading, isAdmin, navigate]);
 
   const rawSection = searchParams.get("section") || "percentuais";
-  const activeSection = (!isAdmin && ADMIN_ONLY_SECTIONS.includes(rawSection)) ? "percentuais" : rawSection;
+  const activeSection = rawSection;
 
   useEffect(() => {
     if (rawSection !== activeSection) {
