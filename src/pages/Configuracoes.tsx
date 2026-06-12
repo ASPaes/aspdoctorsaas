@@ -52,6 +52,9 @@ import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeisContent";
+import { usePermissions } from "@/hooks/usePermissions";
+import AccessDenied from "@/pages/AccessDenied";
+import { SECTION_TO_RESOURCE } from "@/components/configuracoes/SettingsSidebar";
 
 
 const schema = z.object({
