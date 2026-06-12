@@ -391,6 +391,7 @@ export default function Configuracoes() {
   const meta = SECTION_META[activeSection] ?? { breadcrumb: [activeSection], title: activeSection, description: "" };
 
   const renderContent = () => {
+    if (!canSeeSection(activeSection)) return <AccessDenied />;
     if (activeSection === "categorias-servico") {
       return <CategoriasServicosTab />;
     }
@@ -403,9 +404,9 @@ export default function Configuracoes() {
       case "despesas-cac":
         return <CacDespesasTab />;
       case "acessos":
-        return isAdmin ? <AcessosEquipeTab /> : null;
+        return <AcessosEquipeTab />;
       case "permissoes":
-        return isAdmin ? <PermissoesPapeisContent /> : null;
+        return <PermissoesPapeisContent />;
 
       case "canais":
         return <CanaisTab />;
@@ -414,13 +415,13 @@ export default function Configuracoes() {
       case "operacao":
         return <OperacaoTab />;
       case "seguranca":
-        return isAdmin ? <SecuritySettingsTab /> : null;
+        return <SecuritySettingsTab />;
       case "duplicidades":
-        return isAdmin ? <DuplicateContactsTab /> : null;
+        return <DuplicateContactsTab />;
       case "ia":
-        return isAdmin ? <AISettingsTab /> : null;
+        return <AISettingsTab />;
       case "horario-plantao":
-        return isAdmin ? <HorarioPlantaoTab /> : null;
+        return <HorarioPlantaoTab />;
       case "kb":
         return <KBTab />;
       case "importacao":
