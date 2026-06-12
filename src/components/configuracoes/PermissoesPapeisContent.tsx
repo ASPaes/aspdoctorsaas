@@ -242,6 +242,7 @@ export default function PermissoesPapeisContent() {
       const results = await Promise.all(
         changes.map((c) =>
           (supabase.rpc as any)("update_tenant_permission", {
+            p_tenant_id: tenantId,
             p_role: c.role,
             p_resource_key: c.resource_key,
             p_action: c.action,
@@ -268,7 +269,7 @@ export default function PermissoesPapeisContent() {
 
   const enableMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await (supabase.rpc as any)("enable_rbac_for_tenant");
+      const { data, error } = await (supabase.rpc as any)("enable_rbac_for_tenant", { p_tenant_id: tenantId });
       if (error) throw error;
       return data;
     },
@@ -284,6 +285,7 @@ export default function PermissoesPapeisContent() {
   const resetMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await (supabase.rpc as any)("reset_tenant_permissions_to_default", {
+        p_tenant_id: tenantId,
         p_role: null,
       });
       if (error) throw error;
