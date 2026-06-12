@@ -8073,6 +8073,7 @@ export type Database = {
         }[]
       }
       get_user_department_id: { Args: never; Returns: string }
+      import_clientes_produtos_batch: { Args: { p_rows: Json }; Returns: Json }
       is_admin_or_head: { Args: never; Returns: boolean }
       is_current_user_active: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
