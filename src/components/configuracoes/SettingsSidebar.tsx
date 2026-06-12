@@ -76,6 +76,9 @@ interface SettingsSidebarProps {
 
 export default function SettingsSidebar({ activeSection, onSectionChange, isAdmin }: SettingsSidebarProps) {
   const [openSubgroups, setOpenSubgroups] = useState<Record<string, boolean>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (label: string) =>
+    setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
   const [syncing, setSyncing] = useState(false);
   const { can } = usePermissions();
 
