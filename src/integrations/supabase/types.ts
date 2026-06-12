@@ -6283,6 +6283,7 @@ export type Database = {
           id: string
           ignore_group_messages: boolean
           inactivity_warning_before_minutes: number | null
+          inbound_department_id: string | null
           instance_id_external: string | null
           instance_name: string
           is_active: boolean
@@ -6304,6 +6305,7 @@ export type Database = {
           id?: string
           ignore_group_messages?: boolean
           inactivity_warning_before_minutes?: number | null
+          inbound_department_id?: string | null
           instance_id_external?: string | null
           instance_name: string
           is_active?: boolean
@@ -6325,6 +6327,7 @@ export type Database = {
           id?: string
           ignore_group_messages?: boolean
           inactivity_warning_before_minutes?: number | null
+          inbound_department_id?: string | null
           instance_id_external?: string | null
           instance_name?: string
           is_active?: boolean
@@ -6340,6 +6343,13 @@ export type Database = {
           webhook_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_inbound_department_id_fkey"
+            columns: ["inbound_department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_instances_tenant_id_fkey"
             columns: ["tenant_id"]
