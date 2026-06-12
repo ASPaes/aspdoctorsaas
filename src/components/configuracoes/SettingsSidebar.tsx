@@ -33,7 +33,9 @@ const SECTION_TO_RESOURCE: Record<string, string> = {
   "acessos": "cfg.acessos",
   "permissoes": "cfg.permissoes",
   // Atendimento
-  "whatsapp": "cfg.whatsapp",
+  "canais": "cfg.whatsapp",
+  "distribuicao": "cfg.whatsapp",
+  "operacao": "cfg.whatsapp",
   "ia": "cfg.ia",
   "horario-plantao": "cfg.horario_plantao",
   "kb": "cfg.kb",
@@ -164,6 +166,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           subgroups: [{ items: [
             { value: "acessos", label: "Acessos & permissões" },
             { value: "permissoes", label: "Permissões e papéis" },
+            { value: "seguranca", label: "Segurança" },
           ] }],
         } as Group]
       : []),
@@ -174,7 +177,9 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
       subgroups: [
         {
           items: [
-            { value: "whatsapp", label: "WhatsApp" },
+            { value: "canais", label: "Canais" },
+            { value: "distribuicao", label: "Distribuição" },
+            { value: "operacao", label: "Operação" },
             ...(isAdmin ? [{ value: "ia", label: "Inteligência artificial" }] : []),
             ...(isAdmin ? [{ value: "horario-plantao", label: "Horário & plantão" }] : []),
             { value: "kb", label: "Base de conhecimento" },
@@ -187,7 +192,10 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
       icon: Upload,
       subgroups: [
         {
-          items: [{ value: "importacao", label: "Importação" }],
+          items: [
+            { value: "duplicidades", label: "Duplicidades" },
+            { value: "importacao", label: "Importação" },
+          ],
         },
       ],
     },
