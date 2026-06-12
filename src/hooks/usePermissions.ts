@@ -73,5 +73,6 @@ export function usePermissions() {
     isLoading: query.isLoading,
     refetch: query.refetch,
     rbacEnabled: rbacQuery.data ?? false,
+    rbacLoading: rbacQuery.isLoading,
   };
 }

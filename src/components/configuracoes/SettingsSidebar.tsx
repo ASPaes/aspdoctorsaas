@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 
-const SECTION_TO_RESOURCE: Record<string, string> = {
+export const SECTION_TO_RESOURCE: Record<string, string> = {
   // Financeiro
   "percentuais": "cfg.percentuais",
   "despesas-cac": "cfg.despesas_cac",

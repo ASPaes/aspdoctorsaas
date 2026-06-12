@@ -52,6 +52,9 @@ import ClienteImportModal from "@/components/import/ClienteImportModal";
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import CategoriasServicosTab from "@/components/configuracoes/CategoriasServicosTab";
 import PermissoesPapeisContent from "@/components/configuracoes/PermissoesPapeisContent";
+import { usePermissions } from "@/hooks/usePermissions";
+import AccessDenied from "@/pages/AccessDenied";
+import { SECTION_TO_RESOURCE } from "@/components/configuracoes/SettingsSidebar";
 
 
 const schema = z.object({
@@ -61,7 +64,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const ADMIN_ONLY_SECTIONS = ["acessos", "permissoes", "ia", "horario-plantao"];
+
 
 const SECTION_META: Record<string, { breadcrumb: string[]; title: string; description: string }> = {
   percentuais: { breadcrumb: ["Financeiro", "Percentuais"], title: "Percentuais", description: "Valores padrão de imposto e custo fixo aplicados a novos clientes." },
@@ -280,16 +283,24 @@ export default function Configuracoes() {
   const [importTiposOpen, setImportTiposOpen] = useState(false);
   const navigate = useNavigate();
 
+  const isAdmin = !!(profile?.role === "admin" || profile?.is_super_admin);
+  const { can, rbacEnabled, rbacLoading } = usePermissions();
+  const canSeeSection = (section: string) => {
+    if (!rbacEnabled) return isAdmin;
+    const resource = SECTION_TO_RESOURCE[section];
+    if (!resource) return isAdmin;
+    return can(resource, "view");
+  };
+
   useEffect(() => {
-    if (profile && profile.role !== "admin" && !profile.is_super_admin) {
+    if (!profile || rbacLoading) return;
+    if (!rbacEnabled && !isAdmin) {
       navigate("/dashboard", { replace: true });
     }
-  }, [profile, navigate]);
-
-  const isAdmin = !!(profile?.role === "admin" || profile?.is_super_admin);
+  }, [profile, rbacEnabled, rbacLoading, isAdmin, navigate]);
 
   const rawSection = searchParams.get("section") || "percentuais";
-  const activeSection = (!isAdmin && ADMIN_ONLY_SECTIONS.includes(rawSection)) ? "percentuais" : rawSection;
+  const activeSection = rawSection;
 
   useEffect(() => {
     if (rawSection !== activeSection) {
@@ -380,6 +391,7 @@ export default function Configuracoes() {
   const meta = SECTION_META[activeSection] ?? { breadcrumb: [activeSection], title: activeSection, description: "" };
 
   const renderContent = () => {
+    if (!canSeeSection(activeSection)) return <AccessDenied />;
     if (activeSection === "categorias-servico") {
       return <CategoriasServicosTab />;
     }
@@ -392,9 +404,9 @@ export default function Configuracoes() {
       case "despesas-cac":
         return <CacDespesasTab />;
       case "acessos":
-        return isAdmin ? <AcessosEquipeTab /> : null;
+        return <AcessosEquipeTab />;
       case "permissoes":
-        return isAdmin ? <PermissoesPapeisContent /> : null;
+        return <PermissoesPapeisContent />;
 
       case "canais":
         return <CanaisTab />;
@@ -403,13 +415,13 @@ export default function Configuracoes() {
       case "operacao":
         return <OperacaoTab />;
       case "seguranca":
-        return isAdmin ? <SecuritySettingsTab /> : null;
+        return <SecuritySettingsTab />;
       case "duplicidades":
-        return isAdmin ? <DuplicateContactsTab /> : null;
+        return <DuplicateContactsTab />;
       case "ia":
-        return isAdmin ? <AISettingsTab /> : null;
+        return <AISettingsTab />;
       case "horario-plantao":
-        return isAdmin ? <HorarioPlantaoTab /> : null;
+        return <HorarioPlantaoTab />;
       case "kb":
         return <KBTab />;
       case "importacao":
