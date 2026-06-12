@@ -164,7 +164,10 @@ export default function PermissoesPapeisContent() {
 
   // Group by module preserving order of first display_order
   const grouped = useMemo(() => {
-    const list = resources ?? [];
+    const visible = (resources ?? []).filter(
+      (r) => !SCREEN_ONLY || r.key.startsWith("nav.") || r.key.startsWith("cfg.") || r.key === "clientes.custos"
+    );
+    const list = visible;
     const out: { module: string; items: Resource[] }[] = [];
     const idx = new Map<string, number>();
     for (const r of list) {
