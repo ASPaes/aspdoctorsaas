@@ -162,22 +162,34 @@ export default function PermissoesPapeisContent() {
     return m;
   }, [defaults, overrides, isActive]);
 
-  // Group by module preserving order of first display_order
   const grouped = useMemo(() => {
     const visible = (resources ?? []).filter(
       (r) => !SCREEN_ONLY || r.key.startsWith("nav.") || r.key.startsWith("cfg.") || r.key === "clientes.custos"
     );
-    const list = visible;
-    const out: { module: string; items: Resource[] }[] = [];
-    const idx = new Map<string, number>();
-    for (const r of list) {
-      if (!idx.has(r.module)) {
-        idx.set(r.module, out.length);
-        out.push({ module: r.module, items: [] });
+    const groupOf = (r: Resource): { group: string; sub: string } => {
+      if (r.key === "clientes.custos") return { group: "Clientes", sub: "" };
+      if (r.module.startsWith("Configurações > "))
+        return { group: "Configurações", sub: r.module.slice("Configurações > ".length) };
+      return { group: r.module, sub: "" };
+    };
+    const out: { group: string; subgroups: { label: string; items: Resource[] }[] }[] = [];
+    const gIdx = new Map<string, number>();
+    for (const r of visible) {
+      const { group, sub } = groupOf(r);
+      if (!gIdx.has(group)) {
+        gIdx.set(group, out.length);
+        out.push({ group, subgroups: [] });
       }
-      out[idx.get(r.module)!].items.push(r);
+      const grp = out[gIdx.get(group)!];
+      let sg = grp.subgroups.find((s) => s.label === sub);
+      if (!sg) {
+        sg = { label: sub, items: [] };
+        grp.subgroups.push(sg);
+      }
+      sg.items.push(r);
     }
-    for (const g of out) g.items.sort((a, b) => a.display_order - b.display_order);
+    for (const g of out)
+      for (const s of g.subgroups) s.items.sort((a, b) => a.display_order - b.display_order);
     return out;
   }, [resources]);
 
