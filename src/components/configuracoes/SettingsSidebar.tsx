@@ -228,6 +228,19 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection]);
 
+  // Initial collapse: all closed except "Atendimento" and group containing activeSection
+  useEffect(() => {
+    const initial: Record<string, boolean> = {};
+    for (const g of groups) {
+      const hasActive = g.subgroups.some((sg) =>
+        sg.items.some((it) => it.value === activeSection)
+      );
+      initial[g.label] = !(g.label === "Atendimento" || hasActive);
+    }
+    setCollapsedGroups(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const toggleSubgroup = (label: string) => {
     setOpenSubgroups((prev) => ({ ...prev, [label]: !prev[label] }));
   };
