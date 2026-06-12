@@ -166,6 +166,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
           subgroups: [{ items: [
             { value: "acessos", label: "Acessos & permissões" },
             { value: "permissoes", label: "Permissões e papéis" },
+            { value: "seguranca", label: "Segurança" },
           ] }],
         } as Group]
       : []),
