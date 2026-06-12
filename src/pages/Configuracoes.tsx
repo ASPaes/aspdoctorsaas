@@ -11,7 +11,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save, Loader2, Plus, Upload, Users, RefreshCw, ChevronRight, Layers, FolderOpen, Wrench } from "lucide-react";
+import { Save, Loader2, Upload, Users, RefreshCw, ChevronRight, Layers, FolderOpen, Wrench } from "lucide-react";
 import ImportModulosModal from "@/components/configuracoes/ImportModulosModal";
 import ImportCategoriasModal from "@/components/configuracoes/ImportCategoriasModal";
 import ImportTiposServicoModal from "@/components/configuracoes/ImportTiposServicoModal";
@@ -33,27 +33,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CacDespesasTab from "@/components/configuracoes/CacDespesasTab";
 import CadastrosTab from "@/components/configuracoes/CadastrosTab";
 import AcessosEquipeTab from "@/components/configuracoes/AcessosEquipeTab";
 import TicketSettingsTab from "@/components/configuracoes/TicketSettingsTab";
 import SettingsSidebar, { CADASTRO_SECTIONS } from "@/components/configuracoes/SettingsSidebar";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
-import { InstanceSetupCollapsible } from "@/components/configuracoes/whatsapp/InstanceSetupCollapsible";
-import { InstancesList } from "@/components/configuracoes/whatsapp/InstancesList";
-import { AddInstanceDialog } from "@/components/configuracoes/whatsapp/AddInstanceDialog";
-import { MacrosManager } from "@/components/configuracoes/whatsapp/MacrosManager";
-import { AssignmentRulesManager } from "@/components/configuracoes/whatsapp/AssignmentRulesManager";
-import AtendimentoCsatTab from "@/components/configuracoes/whatsapp/AtendimentoCsatTab";
-import WhatsAppGroupsTab from "@/components/configuracoes/whatsapp/WhatsAppGroupsTab";
-
-import SetoresInstanciasTab from "@/components/configuracoes/whatsapp/SetoresInstanciasTab";
-import RoteamentoInstanciasTab from "@/components/configuracoes/whatsapp/RoteamentoInstanciasTab";
-
+import CanaisTab from "@/components/configuracoes/whatsapp/CanaisTab";
+import DistribuicaoTab from "@/components/configuracoes/whatsapp/DistribuicaoTab";
+import OperacaoTab from "@/components/configuracoes/whatsapp/OperacaoTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
-import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import KBTab from "@/components/configuracoes/KBTab";
 import SecuritySettingsTab from "@/components/configuracoes/whatsapp/SecuritySettingsTab";
 import HorarioPlantaoTab from "@/components/configuracoes/HorarioPlantaoTab";
@@ -93,91 +82,17 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   acessos: { breadcrumb: ["Equipe", "Acessos & permissões"], title: "Acessos & permissões", description: "Gerencie usuários, papéis e permissões da equipe." },
   permissoes: { breadcrumb: ["Equipe", "Permissões e papéis"], title: "Permissões e papéis", description: "Configure o que cada papel pode fazer no seu tenant." },
 
-  whatsapp: { breadcrumb: ["Atendimento", "WhatsApp"], title: "WhatsApp", description: "Configurações de instâncias, atendimento, macros e segurança." },
+  canais: { breadcrumb: ["Atendimento", "Canais"], title: "Canais", description: "Conexão dos números WhatsApp (Evolution, Z-API, Meta)." },
+  distribuicao: { breadcrumb: ["Atendimento", "Distribuição"], title: "Distribuição", description: "Para qual setor e agente cada atendimento é encaminhado." },
+  operacao: { breadcrumb: ["Atendimento", "Operação"], title: "Operação", description: "CSAT, pausas, macros e grupos do atendimento." },
+  seguranca: { breadcrumb: ["Equipe", "Segurança"], title: "Segurança", description: "Aprovação de novas contas e restrição de domínio de email." },
+  duplicidades: { breadcrumb: ["Dados", "Duplicidades"], title: "Duplicidades", description: "Unificação de contatos duplicados." },
   ia: { breadcrumb: ["Atendimento", "Inteligência artificial"], title: "Inteligência artificial", description: "Modelos, prompts e comportamento da IA." },
   "horario-plantao": { breadcrumb: ["Atendimento", "Horário & plantão"], title: "Horário & plantão", description: "Horário de atendimento e plantões fora do expediente." },
   kb: { breadcrumb: ["Atendimento", "Base de conhecimento"], title: "Base de conhecimento", description: "Artigos e documentos para suporte ao atendimento." },
   importacao: { breadcrumb: ["Dados", "Importação"], title: "Importação de Dados", description: "Importe sua base de clientes a partir de um arquivo CSV ou planilha." },
 };
 
-function WhatsAppSettingsContent({ isAdmin }: { isAdmin?: boolean }) {
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [whatsappSubTab, setWhatsappSubTab] = useState("setup");
-
-  return (
-    <div className="space-y-4">
-      <Tabs value={whatsappSubTab} onValueChange={setWhatsappSubTab}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="setup">Setup</TabsTrigger>
-          <TabsTrigger value="instancias">Instâncias</TabsTrigger>
-          <TabsTrigger value="roteamento">Roteamento</TabsTrigger>
-          <TabsTrigger value="grupos">Grupos</TabsTrigger>
-          <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
-          <TabsTrigger value="pausas">Pausas</TabsTrigger>
-          <TabsTrigger value="macros">Macros</TabsTrigger>
-          <TabsTrigger value="atribuicao">Atribuição</TabsTrigger>
-          <TabsTrigger value="setores">Setores</TabsTrigger>
-          <TabsTrigger value="seguranca">Segurança</TabsTrigger>
-          {isAdmin && <TabsTrigger value="ferramentas">Duplicidades</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="setup" className="mt-4">
-          <SetupGuideCollapsible />
-        </TabsContent>
-
-        <TabsContent value="grupos" className="mt-4">
-          <WhatsAppGroupsTab />
-        </TabsContent>
-
-        <TabsContent value="atendimento" className="mt-4">
-          <AtendimentoCsatTab />
-        </TabsContent>
-
-        <TabsContent value="pausas" className="mt-4">
-          <AttendancePauseReasonsTab />
-        </TabsContent>
-
-        <TabsContent value="instancias" className="mt-4 space-y-4">
-          <InstanceSetupCollapsible onOpenAddDialog={() => setAddDialogOpen(true)} />
-          <div className="flex justify-end">
-            <Button onClick={() => setAddDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />Nova Instância
-            </Button>
-          </div>
-          <InstancesList />
-          <AddInstanceDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
-        </TabsContent>
-
-        <TabsContent value="roteamento" className="mt-4">
-          <RoteamentoInstanciasTab />
-        </TabsContent>
-
-
-        <TabsContent value="macros" className="mt-4">
-          <MacrosManager />
-        </TabsContent>
-
-        <TabsContent value="atribuicao" className="mt-4">
-          <AssignmentRulesManager />
-        </TabsContent>
-
-        <TabsContent value="setores" className="mt-4">
-          <SetoresInstanciasTab />
-        </TabsContent>
-
-        <TabsContent value="seguranca" className="mt-4">
-          <SecuritySettingsTab />
-        </TabsContent>
-
-        {isAdmin && (
-          <TabsContent value="ferramentas" className="mt-4">
-            <DuplicateContactsTab />
-          </TabsContent>
-        )}
-      </Tabs>
-    </div>
-  );
-}
 
 function PercentuaisCard({
   form,
@@ -477,8 +392,16 @@ export default function Configuracoes() {
       case "permissoes":
         return isAdmin ? <PermissoesPapeisContent /> : null;
 
-      case "whatsapp":
-        return <WhatsAppSettingsContent isAdmin={isAdmin} />;
+      case "canais":
+        return <CanaisTab />;
+      case "distribuicao":
+        return <DistribuicaoTab />;
+      case "operacao":
+        return <OperacaoTab />;
+      case "seguranca":
+        return isAdmin ? <SecuritySettingsTab /> : null;
+      case "duplicidades":
+        return isAdmin ? <DuplicateContactsTab /> : null;
       case "ia":
         return isAdmin ? <AISettingsTab /> : null;
       case "horario-plantao":
