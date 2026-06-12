@@ -33,7 +33,9 @@ const SECTION_TO_RESOURCE: Record<string, string> = {
   "acessos": "cfg.acessos",
   "permissoes": "cfg.permissoes",
   // Atendimento
-  "whatsapp": "cfg.whatsapp",
+  "canais": "cfg.whatsapp",
+  "distribuicao": "cfg.whatsapp",
+  "operacao": "cfg.whatsapp",
   "ia": "cfg.ia",
   "horario-plantao": "cfg.horario_plantao",
   "kb": "cfg.kb",
