@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw } from "lucide-react";
+import { DollarSign, Database, Users, Headset, Upload, ChevronRight, RefreshCw, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -100,6 +100,18 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
   };
 
   const groups: Group[] = [
+    {
+      label: "Sistema",
+      icon: Settings,
+      subgroups: [
+        {
+          items: [
+            { value: "geral", label: "Geral" },
+            { value: "setup", label: "Guia de configuração" },
+          ],
+        },
+      ],
+    },
     {
       label: "Financeiro",
       icon: DollarSign,
