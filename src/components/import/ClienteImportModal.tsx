@@ -1091,59 +1091,58 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
         return cnpjsDuplicadosNoBanco.has(cnpj);
       });
 
-      // Helpers para popular tabelas relacionadas (cliente_produtos, contratos)
-      const buildProdutoPayload = (clienteId: string, p: any) => ({
-        tenant_id: tenantId,
-        cliente_id: clienteId,
-        produto_id: p.produto_id,
+      // Helper: monta o objeto `dados` para o RPC import_clientes_produtos_batch,
+      // que executa o mesmo fluxo do cadastro manual (create_cliente_produto_with_contract).
+      const buildDadosImport = (p: any) => ({
         fornecedor_id: p.fornecedor_id,
         codigo_fornecedor: p.codigo_fornecedor,
         link_portal_fornecedor: p.link_portal_fornecedor,
         vlr_ativacao: p.valor_ativacao,
         vlr_mensal: p.mensalidade,
         vlr_custo: p.custo_operacao,
-        data_ativacao: p.data_ativacao,
-        ativo: true,
-      });
-      const buildContratoPayload = (clienteId: string, p: any) => ({
-        tenant_id: tenantId,
-        cliente_id: clienteId,
-        tipo: 'base',
         data_venda: p.data_venda,
-        data_inicio: p.data_ativacao,
+        data_ativacao: p.data_ativacao,
+        data_fim: null,
         data_proximo_reajuste: p.data_reajuste,
-        recorrencia: p.recorrencia,
+        prazo_meses: null,
+        dia_vencimento: p.dia_vencimento_mrr,
         modelo_contrato_id: p.modelo_contrato_id,
+        recorrencia: p.recorrencia,
         funcionario_id: p.funcionario_id,
         origem_venda_id: p.origem_venda_id,
         forma_pagamento_ativacao_id: p.forma_pagamento_ativacao_id,
-        vlr_total_mensal: p.mensalidade,
-        vlr_total_ativacao: p.valor_ativacao,
-        observacoes: p.observacao_negociacao,
-        status: p.cancelado ? 'cancelado' : 'ativo',
-        cancelado_em: p.cancelado ? p.data_cancelamento : null,
+        forma_pagamento_mensalidade_id: p.forma_pagamento_mensalidade_id,
+        observacoes_contratuais: p.observacao_negociacao,
       });
-      const isContratoRelevante = (p: any) =>
-        !!(p.data_venda || p.recorrencia || p.modelo_contrato_id || p.funcionario_id || p.origem_venda_id);
 
-      const insertRelacionados = async (clienteId: string, p: any) => {
-        if (p.produto_id) {
-          try {
-            const { error } = await (supabase.from("cliente_produtos" as any) as any)
-              .insert([buildProdutoPayload(clienteId, p)]);
-            if (error) console.warn('[import] cliente_produtos insert falhou:', error.message);
-          } catch (e: any) {
-            console.warn('[import] cliente_produtos insert exceção:', e?.message);
+      const callImportRpc = async (
+        rows: { cliente_id: string; produto_id: any; dados: any }[],
+        sourceLookup: Map<string, { razao_social: string; cnpj: string }>,
+      ) => {
+        if (rows.length === 0) return;
+        try {
+          const { data: rpcRes, error: rpcErr } = await (supabase.rpc as any)(
+            'import_clientes_produtos_batch',
+            { p_rows: rows },
+          );
+          if (rpcErr) {
+            console.warn('[import] import_clientes_produtos_batch falhou:', rpcErr.message);
+            return;
           }
-        }
-        if (isContratoRelevante(p)) {
-          try {
-            const { error } = await (supabase.from("contratos" as any) as any)
-              .insert([buildContratoPayload(clienteId, p)]);
-            if (error) console.warn('[import] contratos insert falhou:', error.message);
-          } catch (e: any) {
-            console.warn('[import] contratos insert exceção:', e?.message);
+          const detalhes: any[] = (rpcRes as any)?.detalhes ?? [];
+          for (const item of detalhes) {
+            if (!item?.erro) continue;
+            const src = sourceLookup.get(String(item.cliente_id));
+            failed += 1;
+            imported = Math.max(0, imported - 1);
+            failedRows.push({
+              razao_social: src?.razao_social ?? '—',
+              cnpj: src?.cnpj ?? '—',
+              motivo: String(item.erro),
+            });
           }
+        } catch (e: any) {
+          console.warn('[import] import_clientes_produtos_batch exceção:', e?.message);
         }
       };
 
@@ -1157,32 +1156,23 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
           // Lote inteiro sucesso
           imported += (insertedData?.length ?? payloadNovos.length);
 
-          // Inserir cliente_produtos e contratos em batch
+          // Chamar RPC para criar cliente_produtos + contrato (fluxo do cadastro manual)
           if (insertedData && insertedData.length === payloadNovos.length) {
-            const produtosPayload = payloadNovos
-              .map((p, idx) => p.produto_id ? buildProdutoPayload(insertedData[idx].id, p) : null)
-              .filter(Boolean);
-            if (produtosPayload.length > 0) {
-              try {
-                const { error } = await (supabase.from("cliente_produtos" as any) as any)
-                  .insert(produtosPayload);
-                if (error) console.warn('[import] cliente_produtos batch falhou:', error.message);
-              } catch (e: any) {
-                console.warn('[import] cliente_produtos batch exceção:', e?.message);
+            const rpcRows = payloadNovos
+              .map((p, idx) => p.produto_id
+                ? { cliente_id: insertedData[idx].id, produto_id: p.produto_id, dados: buildDadosImport(p) }
+                : null)
+              .filter(Boolean) as { cliente_id: string; produto_id: any; dados: any }[];
+            const lookup = new Map<string, { razao_social: string; cnpj: string }>();
+            payloadNovos.forEach((p, idx) => {
+              if (p.produto_id && insertedData[idx]?.id) {
+                lookup.set(String(insertedData[idx].id), {
+                  razao_social: p.razao_social || p.nome_fantasia || '—',
+                  cnpj: p.cnpj ?? '—',
+                });
               }
-            }
-            const contratosPayload = payloadNovos
-              .map((p, idx) => isContratoRelevante(p) ? buildContratoPayload(insertedData[idx].id, p) : null)
-              .filter(Boolean);
-            if (contratosPayload.length > 0) {
-              try {
-                const { error } = await (supabase.from("contratos" as any) as any)
-                  .insert(contratosPayload);
-                if (error) console.warn('[import] contratos batch falhou:', error.message);
-              } catch (e: any) {
-                console.warn('[import] contratos batch exceção:', e?.message);
-              }
-            }
+            });
+            await callImportRpc(rpcRows, lookup);
           }
         } else {
           // Lote falhou — retry linha a linha para identificar quais registros têm problema
@@ -1206,8 +1196,18 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
               });
             } else {
               imported += 1;
-              if (rowInserted?.id) {
-                await insertRelacionados(rowInserted.id, record);
+              if (rowInserted?.id && record.produto_id) {
+                const lookup = new Map<string, { razao_social: string; cnpj: string }>([[
+                  String(rowInserted.id),
+                  {
+                    razao_social: record.razao_social || record.nome_fantasia || '—',
+                    cnpj: record.cnpj ?? '—',
+                  },
+                ]]);
+                await callImportRpc(
+                  [{ cliente_id: rowInserted.id, produto_id: record.produto_id, dados: buildDadosImport(record) }],
+                  lookup,
+                );
               }
             }
           }
@@ -1231,7 +1231,7 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
             });
           } else {
             imported += 1;
-            // Upsert relacionados: buscar id do cliente, deletar existentes e inserir novos
+            // Upsert relacionados: buscar id do cliente, limpar existentes e recriar via RPC
             try {
               const { data: existing } = await supabase
                 .from('clientes')
@@ -1239,33 +1239,34 @@ export default function ClienteImportModal({ open, onOpenChange }: Props) {
                 .eq('cnpj', record.cnpj)
                 .eq('tenant_id', tenantId)
                 .single();
-              if (existing?.id) {
-                if (record.produto_id) {
-                  try {
-                    await (supabase.from("cliente_produtos" as any) as any)
-                      .delete()
-                      .eq('cliente_id', existing.id)
-                      .eq('produto_id', record.produto_id);
-                    const { error } = await (supabase.from("cliente_produtos" as any) as any)
-                      .insert([buildProdutoPayload(existing.id, record)]);
-                    if (error) console.warn('[import] cliente_produtos upsert falhou:', error.message);
-                  } catch (e: any) {
-                    console.warn('[import] cliente_produtos upsert exceção:', e?.message);
-                  }
+              if (existing?.id && record.produto_id) {
+                try {
+                  await (supabase.from("cliente_produtos" as any) as any)
+                    .delete()
+                    .eq('cliente_id', existing.id)
+                    .eq('produto_id', record.produto_id);
+                } catch (e: any) {
+                  console.warn('[import] cliente_produtos delete (upsert) exceção:', e?.message);
                 }
-                if (isContratoRelevante(record)) {
-                  try {
-                    await (supabase.from("contratos" as any) as any)
-                      .delete()
-                      .eq('cliente_id', existing.id)
-                      .eq('tipo', 'base');
-                    const { error } = await (supabase.from("contratos" as any) as any)
-                      .insert([buildContratoPayload(existing.id, record)]);
-                    if (error) console.warn('[import] contratos upsert falhou:', error.message);
-                  } catch (e: any) {
-                    console.warn('[import] contratos upsert exceção:', e?.message);
-                  }
+                try {
+                  await (supabase.from("contratos" as any) as any)
+                    .delete()
+                    .eq('cliente_id', existing.id)
+                    .eq('tipo', 'base');
+                } catch (e: any) {
+                  console.warn('[import] contratos delete (upsert) exceção:', e?.message);
                 }
+                const lookup = new Map<string, { razao_social: string; cnpj: string }>([[
+                  String(existing.id),
+                  {
+                    razao_social: record.razao_social || record.nome_fantasia || '—',
+                    cnpj: record.cnpj ?? '—',
+                  },
+                ]]);
+                await callImportRpc(
+                  [{ cliente_id: existing.id, produto_id: record.produto_id, dados: buildDadosImport(record) }],
+                  lookup,
+                );
               }
             } catch (e: any) {
               console.warn('[import] busca cliente para relacionados falhou:', e?.message);
