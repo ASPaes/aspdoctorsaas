@@ -285,6 +285,7 @@ export default function PermissoesPapeisContent() {
   const resetMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await (supabase.rpc as any)("reset_tenant_permissions_to_default", {
+        p_tenant_id: tenantId,
         p_role: null,
       });
       if (error) throw error;
