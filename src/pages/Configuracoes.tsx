@@ -40,6 +40,8 @@ import TicketSettingsTab from "@/components/configuracoes/TicketSettingsTab";
 import SettingsSidebar, { CADASTRO_SECTIONS } from "@/components/configuracoes/SettingsSidebar";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import CanaisTab from "@/components/configuracoes/whatsapp/CanaisTab";
+import { ChatTimezoneSelector } from "@/components/configuracoes/whatsapp/ChatTimezoneSelector";
+import { SetupGuideCollapsible } from "@/components/configuracoes/whatsapp/SetupGuideCollapsible";
 import DistribuicaoTab from "@/components/configuracoes/whatsapp/DistribuicaoTab";
 import OperacaoTab from "@/components/configuracoes/whatsapp/OperacaoTab";
 import AISettingsTab from "@/components/configuracoes/AISettingsTab";
@@ -91,6 +93,8 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   "horario-plantao": { breadcrumb: ["Atendimento", "Horário & plantão"], title: "Horário & plantão", description: "Horário de atendimento e plantões fora do expediente." },
   kb: { breadcrumb: ["Atendimento", "Base de conhecimento"], title: "Base de conhecimento", description: "Artigos e documentos para suporte ao atendimento." },
   importacao: { breadcrumb: ["Dados", "Importação"], title: "Importação de Dados", description: "Importe sua base de clientes a partir de um arquivo CSV ou planilha." },
+  geral: { breadcrumb: ["Sistema", "Geral"], title: "Geral", description: "Fuso horário e configurações globais do sistema." },
+  setup: { breadcrumb: ["Sistema", "Guia de configuração"], title: "Guia de configuração", description: "Passos recomendados para configurar a plataforma." },
 };
 
 
@@ -430,6 +434,10 @@ export default function Configuracoes() {
         );
       case "tickets-config":
         return <TicketSettingsTab />;
+      case "geral":
+        return <ChatTimezoneSelector />;
+      case "setup":
+        return <SetupGuideCollapsible />;
       default:
         return null;
     }
