@@ -267,40 +267,57 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
 
           return (
             <div key={group.label}>
-              <div className="flex items-center gap-1.5 px-5 mb-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.label)}
+                className="w-full flex items-center gap-1.5 px-5 mb-1.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium cursor-pointer hover:text-foreground transition"
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-3 w-3 transition-transform duration-200",
+                    !collapsedGroups[group.label] && "rotate-90",
+                  )}
+                />
                 <Icon className="h-[14px] w-[14px]" />
                 <span>{group.label}</span>
-              </div>
-              {visibleSubgroups.map((sg, i) => {
-                const isOpen = sg.label ? !!openSubgroups[sg.label] : true;
-                return (
-                  <div key={i}>
-                    {sg.label && (
-                      <button
-                        type="button"
-                        onClick={() => toggleSubgroup(sg.label!)}
-                        className="w-full flex items-center gap-1 pl-7 pr-3 mt-3 mb-1 text-xs text-muted-foreground/70 hover:text-foreground transition cursor-pointer"
-                      >
-                        <ChevronRight
-                          className={cn(
-                            "h-3 w-3 transition-transform duration-200",
-                            isOpen && "rotate-90",
-                          )}
-                        />
-                        <span>{sg.label}</span>
-                      </button>
-                    )}
-                    <div
-                      className={cn(
-                        "overflow-hidden transition-all duration-200",
-                        isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
+              </button>
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-200",
+                  collapsedGroups[group.label] ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100",
+                )}
+              >
+                {visibleSubgroups.map((sg, i) => {
+                  const isOpen = sg.label ? !!openSubgroups[sg.label] : true;
+                  return (
+                    <div key={i}>
+                      {sg.label && (
+                        <button
+                          type="button"
+                          onClick={() => toggleSubgroup(sg.label!)}
+                          className="w-full flex items-center gap-1 pl-7 pr-3 mt-3 mb-1 text-xs text-muted-foreground/70 hover:text-foreground transition cursor-pointer"
+                        >
+                          <ChevronRight
+                            className={cn(
+                              "h-3 w-3 transition-transform duration-200",
+                              isOpen && "rotate-90",
+                            )}
+                          />
+                          <span>{sg.label}</span>
+                        </button>
                       )}
-                    >
-                      {sg.visibleItems.map((item) => renderItem(item, isCadastros))}
+                      <div
+                        className={cn(
+                          "overflow-hidden transition-all duration-200",
+                          isOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0",
+                        )}
+                      >
+                        {sg.visibleItems.map((item) => renderItem(item, isCadastros))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           );
         })}
