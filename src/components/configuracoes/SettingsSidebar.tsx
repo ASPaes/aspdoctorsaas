@@ -101,6 +101,18 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
 
   const groups: Group[] = [
     {
+      label: "Sistema",
+      icon: Settings,
+      subgroups: [
+        {
+          items: [
+            { value: "geral", label: "Geral" },
+            { value: "setup", label: "Guia de configuração" },
+          ],
+        },
+      ],
+    },
+    {
       label: "Financeiro",
       icon: DollarSign,
       subgroups: [
