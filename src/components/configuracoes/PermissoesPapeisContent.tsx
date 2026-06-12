@@ -26,6 +26,9 @@ type Role = "admin" | "head" | "user";
 type Action = "view" | "insert" | "update" | "delete";
 const ROLES: Role[] = ["admin", "head", "user"];
 const ACTIONS: Action[] = ["view", "insert", "update", "delete"];
+const CRUD_ENABLED = false; // true reexibe Inserir/Editar/Excluir
+const VISIBLE_ACTIONS: Action[] = CRUD_ENABLED ? ACTIONS : ["view"];
+const SCREEN_ONLY = true; // mostra só telas (nav.*, cfg.*) + clientes.custos
 const ROLE_LABEL: Record<Role, string> = { admin: "Admin", head: "Head", user: "User" };
 
 interface Resource {
@@ -161,7 +164,10 @@ export default function PermissoesPapeisContent() {
 
   // Group by module preserving order of first display_order
   const grouped = useMemo(() => {
-    const list = resources ?? [];
+    const visible = (resources ?? []).filter(
+      (r) => !SCREEN_ONLY || r.key.startsWith("nav.") || r.key.startsWith("cfg.") || r.key === "clientes.custos"
+    );
+    const list = visible;
     const out: { module: string; items: Resource[] }[] = [];
     const idx = new Map<string, number>();
     for (const r of list) {
@@ -483,7 +489,7 @@ function MatrixTable({ grouped, getValue, isPending, onToggle, disabled }: Matri
                   <th className="text-left text-[11px] uppercase tracking-wider font-medium text-muted-foreground px-4 py-2.5 border-b min-w-[240px]">
                     Recurso
                     <span className="ml-2 text-[10px] normal-case font-normal text-muted-foreground/70">
-                      (V·ver  I·inserir  U·editar  D·excluir)
+                      {CRUD_ENABLED ? "(V·ver  I·inserir  U·editar  D·excluir)" : "(somente visualização da tela)"}
                     </span>
                   </th>
                   {ROLES.map((role) => (
@@ -577,7 +583,7 @@ function ResourceRow({ res, getValue, isPending, onToggle, disabled }: ResourceR
       {ROLES.map((role) => (
         <td key={role} className="px-4 py-3 border-b border-border/40 align-top">
           <div className="flex gap-1">
-            {ACTIONS.map((action) => {
+            {VISIBLE_ACTIONS.map((action) => {
               const value = getValue(role, res.key, action);
               const pending = isPending(role, res.key, action);
               const locked = isLocked(role, res.key, action);
