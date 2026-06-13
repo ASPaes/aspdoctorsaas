@@ -121,12 +121,16 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
 
   // Ranking, faixas de ticket e mix de produto
   const { data: rankVend = [] } = useVendasExplorer(filters, 'vendedor');
-  const { data: faixas = [] } = useVendasExplorer(filters, 'faixa_ticket');
+  const { data: faixas = [] } = useVendasExplorer(filters, faixaDet ? 'faixa_ticket_det' : 'faixa_ticket');
+  const { data: ticketStats } = useVendasTicketStats(filters);
   const { data: mixProd = [] } = useVendasProdutos(filters);
   const totalVendMrr = rankVend.reduce((a, r) => a + (r.new_mrr || 0), 0) || 1;
-  const FAIXA_ORDER = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
-  const faixasOrd = FAIXA_ORDER.map(l => faixas.find(f => f.label === l)).filter(Boolean) as typeof faixas;
-  const faixaMax = Math.max(1, ...faixasOrd.map(f => f.qtd));
+  const FAIXA_ORDER_PADRAO = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
+  const FAIXA_ORDER_DET = ['Até R$ 100','R$ 100–200','R$ 200–300','R$ 300–500','R$ 500–1k','R$ 1k–2k','Acima de R$ 2k'];
+  const faixaOrder = faixaDet ? FAIXA_ORDER_DET : FAIXA_ORDER_PADRAO;
+  const faixasOrd = faixaOrder.map(l => faixas.find(f => f.label === l)).filter(Boolean) as typeof faixas;
+  const ticketVal = (f: any) => ticketMetric === 'qtd' ? f.qtd : f.new_mrr;
+  const faixaMax = Math.max(1, ...faixasOrd.map(ticketVal));
   const mixTop = [...mixProd].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10);
   const mixMax = Math.max(1, ...mixTop.map(p => p.new_mrr));
   const margemCls = (p: number) => p >= 0.5 ? 'text-green-500' : p >= 0.3 ? 'text-amber-500' : 'text-red-500';
