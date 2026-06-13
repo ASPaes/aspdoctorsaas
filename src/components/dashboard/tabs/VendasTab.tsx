@@ -322,9 +322,51 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         </CardContent>
       </Card>
 
+      {/* Distribuição de ticket + Mix de produto */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader className={tvMode ? 'pb-2' : ''}>
+            <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Distribuição de ticket</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {faixasOrd.length === 0 ? (
+              <div className="flex items-center justify-center h-[180px] text-muted-foreground">Sem dados disponíveis</div>
+            ) : (
+              <div className="space-y-3">
+                {faixasOrd.map((f, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1"><span>{f.label}</span><span className="text-muted-foreground">{f.qtd} · {fmt(f.new_mrr)}</span></div>
+                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(f.qtd / faixaMax * 100)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader className={tvMode ? 'pb-2' : ''}>
+            <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Mix de produto (por item vendido)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mixTop.length === 0 ? (
+              <div className="flex items-center justify-center h-[180px] text-muted-foreground">Sem dados disponíveis</div>
+            ) : (
+              <div className="space-y-3">
+                {mixTop.map((p, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1"><span className="truncate">{p.label}</span><span className="text-muted-foreground">{p.qtd} · {fmt(p.new_mrr)} · <span className={margemCls(p.margem_pct)}>{Math.round(p.margem_pct * 100)}%</span></span></div>
+                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(p.new_mrr / mixMax * 100)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts */}
+
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
 
         {/* Donut — Top 5 + Outros */}
