@@ -54,12 +54,19 @@ function computeDelta(
   };
 }
 
-interface Props { metrics: KPIMetrics; distributions: DistributionData; tvMode: boolean; novosClientesList: NovoClienteListItem[]; }
+interface Props { metrics: KPIMetrics; distributions: DistributionData; tvMode: boolean; novosClientesList: NovoClienteListItem[]; filters: DashboardFilters; }
 
-export function VendasTab({ metrics, distributions, tvMode, novosClientesList }: Props) {
+export function VendasTab({ metrics, distributions, tvMode, novosClientesList, filters }: Props) {
   const s = tvMode ? 'tv' : 'lg';
   const [excludeHiper, setExcludeHiper] = useState(false);
   const [outrosExpanded, setOutrosExpanded] = useState(false);
+  const [expMetric, setExpMetric] = useState<'vendas'|'mrr'|'ticket'|'margem_rs'|'margem_pct'>('mrr');
+  const [expDim, setExpDim] = useState('vendedor');
+  const { data: breakdown = [] } = useVendasExplorer(filters, expDim);
+
+  const margemRsTotal = breakdown.reduce((a, r) => a + (r.margem_rs || 0), 0);
+  const newMrrTotal = breakdown.reduce((a, r) => a + (r.new_mrr || 0), 0);
+  const margemPctTotal = newMrrTotal > 0 ? margemRsTotal / newMrrTotal : 0;
 
   // Deltas
   const novosD = computeDelta(metrics.novosClientes, metrics.prevNovosClientes, false, 'abs');
