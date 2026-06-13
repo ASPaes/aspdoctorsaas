@@ -111,6 +111,12 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
     return filtered.map(d => ({ ...d, percent: d.value / total }));
   }, [distributions, excludeHiper]);
 
+  // Evolução e sazonalidade (12 meses)
+  const { data: serie = [] } = useVendasSerie(filters, 12);
+  const mesLabel = (m: string) => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][parseInt(m.slice(5,7),10)-1] || '';
+  const serieData = serie.map(r => ({ mes: mesLabel(r.mes), new_mrr: r.new_mrr, ticket: r.ticket, qtd: r.qtd }));
+  const qtdMax = Math.max(1, ...serie.map(r => r.qtd));
+
   return (
     <div className="space-y-6">
       {/* KPIs Row 1 */}
