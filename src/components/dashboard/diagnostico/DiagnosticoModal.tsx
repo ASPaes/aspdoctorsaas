@@ -161,7 +161,7 @@ export function DiagnosticoModal({
           )}
 
           {/* Conselho DS */}
-          {tenantId && tabKey && diagInput && isAdminOrHead && (
+          {tenantId && tabKey && diagInput && podeConselho && (
             <ConselhoDSSection
               tenantId={tenantId}
               tabKey={tabKey}
