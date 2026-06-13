@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Diagnostico, Severity, ActionPriority } from '@/lib/diagnostico';
 import { ConselhoDSSection } from './ConselhoDSSection';
+import { usePermissions } from '@/hooks/usePermissions';
 import './diagnostico.css';
 
 interface DiagnosticoModalProps {
