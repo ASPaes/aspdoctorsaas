@@ -122,13 +122,94 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
       </div>
 
       {/* KPIs Row 2 */}
-      <div className={`grid gap-4 ${tvMode ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
+      <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
         <KPICardEnhanced label="Ticket Médio (Novos)" value={metrics.novosClientes > 0 ? fmt(ticketMedioNovos) : 'N/A'} size={s} variant="primary" helpKey="ticket_medio_novos" trend={ticketD.trend} trendValue={ticketD.trendValue} />
         <KPICardEnhanced label="Setup Médio" value={metrics.novosClientes > 0 ? fmt(setupMedio) : 'N/A'} size={s} variant="primary" helpKey="setup_medio" trend={setupD.trend} trendValue={setupD.trendValue} />
+        <KPICardEnhanced label="Margem nova (R$)" value={fmt(margemRsTotal)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="margem_nova_rs" />
+        <KPICardEnhanced label="Margem % nova" value={`${Math.round(margemPctTotal * 100)}%`} icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="margem_pct_nova" />
       </div>
+
+      {/* Explorador — métrica × dimensão */}
+      {(() => {
+        const METRICS: { id: typeof expMetric; label: string }[] = [
+          { id: 'vendas', label: 'Nº de vendas' },
+          { id: 'mrr', label: 'New MRR' },
+          { id: 'ticket', label: 'Ticket médio' },
+          { id: 'margem_rs', label: 'Margem R$' },
+          { id: 'margem_pct', label: 'Margem %' },
+        ];
+        const DIMS = [
+          { id: 'vendedor', label: 'Vendedor' },
+          { id: 'canal', label: 'Canal' },
+          { id: 'fornecedor', label: 'Fornecedor' },
+          { id: 'segmento', label: 'Segmento' },
+          { id: 'area', label: 'Área' },
+          { id: 'uf', label: 'UF' },
+          { id: 'cidade', label: 'Cidade' },
+          { id: 'unidade', label: 'Unidade' },
+        ];
+        const expValue = (r: any) =>
+          expMetric === 'vendas' ? r.qtd
+          : expMetric === 'mrr' ? r.new_mrr
+          : expMetric === 'ticket' ? r.ticket
+          : expMetric === 'margem_rs' ? r.margem_rs
+          : Math.round((r.margem_pct || 0) * 100);
+        const expData = [...breakdown]
+          .sort((a, b) => expValue(b) - expValue(a))
+          .slice(0, 12)
+          .map(r => ({ label: r.label, value: expValue(r) }));
+        const formatVal = (v: number) =>
+          expMetric === 'margem_pct' ? `${v}%`
+          : expMetric === 'vendas' ? String(Math.round(v))
+          : fmt(v);
+        const chipCls = (active: boolean) => cn(
+          'px-3 py-1.5 rounded-full text-xs border transition-colors',
+          active
+            ? 'bg-primary/10 border-primary text-primary'
+            : 'bg-transparent border-border text-muted-foreground hover:text-foreground'
+        );
+        return (
+          <Card>
+            <CardHeader className={tvMode ? 'pb-2' : ''}>
+              <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Explorador — métrica × dimensão</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {METRICS.map(m => (
+                  <button key={m.id} onClick={() => setExpMetric(m.id)} className={chipCls(expMetric === m.id)}>{m.label}</button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {DIMS.map(d => (
+                  <button key={d.id} onClick={() => setExpDim(d.id)} className={chipCls(expDim === d.id)}>{d.label}</button>
+                ))}
+              </div>
+              {expData.length === 0 ? (
+                <div className="flex items-center justify-center h-[300px] text-muted-foreground">Sem dados disponíveis</div>
+              ) : (
+                <div style={{ height: tvMode ? 420 : 340 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={expData} layout="vertical" margin={{ top: 5, right: 30, bottom: 5, left: 110 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                      <XAxis type="number" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" tickFormatter={(v) => formatVal(Number(v))} />
+                      <YAxis type="category" dataKey="label" tick={{ fontSize: tvMode ? 14 : 11 }} width={110} className="fill-muted-foreground" />
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
+                        formatter={(value: number, _: string, props: any) => [formatVal(value), props.payload.label]}
+                      />
+                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} maxBarSize={tvMode ? 36 : 28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Charts */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+
         {/* Donut — Top 5 + Outros */}
         <Card>
           <CardHeader className={tvMode ? 'pb-2' : ''}>
