@@ -83,6 +83,36 @@ export function useVendasSerie(filters: DashboardFilters, meses = 12) {
   });
 }
 
+export interface VendasTicketStats {
+  n: number;
+  media: number;
+  mediana: number;
+  p25: number;
+  p75: number;
+  minimo: number;
+  maximo: number;
+}
+
+export function useVendasTicketStats(filters: DashboardFilters) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { iniStr, fimStr } = resolvePeriodo(filters);
+
+  return useQuery({
+    queryKey: ['vendas-ticket-stats', tid, iniStr, fimStr],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<VendasTicketStats | null> => {
+      const { data, error } = await (supabase.rpc as any)('get_vendas_ticket_stats', {
+        p_tenant: tid,
+        p_ini: iniStr,
+        p_fim: fimStr,
+      });
+      if (error) throw error;
+      return (data?.[0] ?? null) as VendasTicketStats | null;
+    },
+  });
+}
+
 export function useVendasProdutos(filters: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
