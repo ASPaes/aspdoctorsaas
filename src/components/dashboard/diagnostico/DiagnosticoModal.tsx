@@ -61,6 +61,8 @@ export function DiagnosticoModal({
 }: DiagnosticoModalProps) {
 
   const { severity, headline, causes, actions, generatedAt, alertCount } = diagnostico;
+  const { can, rbacEnabled } = usePermissions();
+  const podeConselho = rbacEnabled ? can('dashboard_conselho', 'view') : isAdmin;
   const color = severityColor(severity);
   const generatedDate = new Date(generatedAt).toLocaleString('pt-BR', {
     day: '2-digit',
