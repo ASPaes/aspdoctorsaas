@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
-import { useVendasExplorer, useVendasSerie } from '../hooks/useVendasExtras';
+import { useVendasExplorer, useVendasSerie, useVendasProdutos } from '../hooks/useVendasExtras';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
@@ -117,6 +117,19 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const serieData = serie.map(r => ({ mes: mesLabel(r.mes), new_mrr: r.new_mrr, ticket: r.ticket, qtd: r.qtd }));
   const qtdMax = Math.max(1, ...serie.map(r => r.qtd));
 
+  // Ranking, faixas de ticket e mix de produto
+  const { data: rankVend = [] } = useVendasExplorer(filters, 'vendedor');
+  const { data: faixas = [] } = useVendasExplorer(filters, 'faixa_ticket');
+  const { data: mixProd = [] } = useVendasProdutos(filters);
+  const totalVendMrr = rankVend.reduce((a, r) => a + (r.new_mrr || 0), 0) || 1;
+  const FAIXA_ORDER = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
+  const faixasOrd = FAIXA_ORDER.map(l => faixas.find(f => f.label === l)).filter(Boolean) as typeof faixas;
+  const faixaMax = Math.max(1, ...faixasOrd.map(f => f.qtd));
+  const mixTop = [...mixProd].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10);
+  const mixMax = Math.max(1, ...mixTop.map(p => p.new_mrr));
+  const margemCls = (p: number) => p >= 0.5 ? 'text-green-500' : p >= 0.3 ? 'text-amber-500' : 'text-red-500';
+
+
   return (
     <div className="space-y-6">
       {/* KPIs Row 1 */}
@@ -213,7 +226,38 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         );
       })()}
 
+      {/* Ranking de vendedores */}
+      <Card>
+        <CardHeader className={tvMode ? 'pb-2' : ''}>
+          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Ranking de vendedores</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {rankVend.length === 0 ? (
+            <div className="flex items-center justify-center h-[200px] text-muted-foreground">Sem dados disponíveis</div>
+          ) : (
+            <div className="space-y-2">
+              {[...rankVend].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10).map((r, i) => {
+                const pct = Math.round(r.new_mrr / totalVendMrr * 100);
+                return (
+                  <div key={i} className="flex items-center gap-3 py-1.5 border-t border-border first:border-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-sm">
+                        <span className="truncate">{r.label}</span>
+                        <span className="text-muted-foreground">{r.qtd} vendas · {fmt(r.new_mrr)} · <span className={margemCls(r.margem_pct)}>{Math.round(r.margem_pct * 100)}%</span></span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded mt-1 overflow-hidden"><div className="h-full bg-primary" style={{ width: `${pct}%` }} /></div>
+                    </div>
+                    <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Evolução de vendas — 12 meses */}
+
       <Card>
         <CardHeader className={tvMode ? 'pb-2' : ''}>
           <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Evolução de vendas — 12 meses</CardTitle>
@@ -278,9 +322,51 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         </CardContent>
       </Card>
 
+      {/* Distribuição de ticket + Mix de produto */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader className={tvMode ? 'pb-2' : ''}>
+            <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Distribuição de ticket</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {faixasOrd.length === 0 ? (
+              <div className="flex items-center justify-center h-[180px] text-muted-foreground">Sem dados disponíveis</div>
+            ) : (
+              <div className="space-y-3">
+                {faixasOrd.map((f, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1"><span>{f.label}</span><span className="text-muted-foreground">{f.qtd} · {fmt(f.new_mrr)}</span></div>
+                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(f.qtd / faixaMax * 100)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader className={tvMode ? 'pb-2' : ''}>
+            <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Mix de produto (por item vendido)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mixTop.length === 0 ? (
+              <div className="flex items-center justify-center h-[180px] text-muted-foreground">Sem dados disponíveis</div>
+            ) : (
+              <div className="space-y-3">
+                {mixTop.map((p, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1"><span className="truncate">{p.label}</span><span className="text-muted-foreground">{p.qtd} · {fmt(p.new_mrr)} · <span className={margemCls(p.margem_pct)}>{Math.round(p.margem_pct * 100)}%</span></span></div>
+                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(p.new_mrr / mixMax * 100)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Charts */}
+
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
 
         {/* Donut — Top 5 + Outros */}
