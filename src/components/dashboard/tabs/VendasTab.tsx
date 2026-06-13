@@ -117,6 +117,19 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const serieData = serie.map(r => ({ mes: mesLabel(r.mes), new_mrr: r.new_mrr, ticket: r.ticket, qtd: r.qtd }));
   const qtdMax = Math.max(1, ...serie.map(r => r.qtd));
 
+  // Ranking, faixas de ticket e mix de produto
+  const { data: rankVend = [] } = useVendasExplorer(filters, 'vendedor');
+  const { data: faixas = [] } = useVendasExplorer(filters, 'faixa_ticket');
+  const { data: mixProd = [] } = useVendasProdutos(filters);
+  const totalVendMrr = rankVend.reduce((a, r) => a + (r.new_mrr || 0), 0) || 1;
+  const FAIXA_ORDER = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
+  const faixasOrd = FAIXA_ORDER.map(l => faixas.find(f => f.label === l)).filter(Boolean) as typeof faixas;
+  const faixaMax = Math.max(1, ...faixasOrd.map(f => f.qtd));
+  const mixTop = [...mixProd].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10);
+  const mixMax = Math.max(1, ...mixTop.map(p => p.new_mrr));
+  const margemCls = (p: number) => p >= 0.5 ? 'text-green-500' : p >= 0.3 ? 'text-amber-500' : 'text-red-500';
+
+
   return (
     <div className="space-y-6">
       {/* KPIs Row 1 */}
