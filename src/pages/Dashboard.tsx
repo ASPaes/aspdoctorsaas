@@ -92,7 +92,7 @@ export default function Dashboard() {
             <CancelamentosTab metrics={metrics} timeSeries={timeSeries} distributions={distributions} tvMode={tvMode} canceladosList={canceladosList} filters={filters} />
           </TabsContent>
           <TabsContent value="vendas">
-            <VendasTab metrics={metrics} distributions={distributions} tvMode={tvMode} novosClientesList={novosClientesList} />
+            <VendasTab metrics={metrics} distributions={distributions} tvMode={tvMode} novosClientesList={novosClientesList} filters={filters} />
           </TabsContent>
           <TabsContent value="distribuicao">
             <DistribuicaoTab distributions={distributions} tvMode={tvMode} />
