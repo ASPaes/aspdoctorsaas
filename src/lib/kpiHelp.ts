@@ -402,6 +402,31 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Ajuda a entender se o pricing de setup está compatível com o custo de onboarding.",
     formula: "Receita de Ativação ÷ Novos Clientes",
   },
+  margem_nova_rs: {
+    title: "Margem nova (R$)",
+    definition: "Margem de contribuição, em reais, gerada pelas vendas novas do período (New MRR menos o custo dos produtos vendidos).",
+    why_it_matters: "Mostra o lucro bruto real que as novas vendas trazem. Vender muito com margem baixa pode não compensar.",
+    formula: "Σ (mensalidade − custo) das vendas com data de venda no período",
+    unit: 'R$',
+    how_to_improve: [
+      "Priorizar produtos e planos de maior margem",
+      "Revisar o custo dos produtos mais vendidos",
+      "Evitar descontos agressivos nas vendas de ticket alto",
+    ],
+  },
+  margem_pct_nova: {
+    title: "Margem % nova",
+    definition: "Percentual de margem de contribuição das vendas novas do período.",
+    why_it_matters: "Indica a qualidade (rentabilidade) das vendas, não apenas o volume. Uma margem saudável sustenta o crescimento.",
+    formula: "Margem nova (R$) ÷ New MRR do período",
+    unit: '%',
+    market_benchmark: "Em revenda/SaaS de software, a margem de contribuição saudável costuma ficar acima de 50%.",
+    how_to_improve: [
+      "Concentrar o mix em produtos de maior margem",
+      "Renegociar custos com fornecedores",
+      "Reduzir dependência de produtos de baixa margem",
+    ],
+  },
   ltv_cac_3m: {
     title: "LTV/CAC (Janela 3M)",
     definition: "Razão LTV/CAC calculada com médias dos últimos 3 meses de churn, ARPA e MC%.",
