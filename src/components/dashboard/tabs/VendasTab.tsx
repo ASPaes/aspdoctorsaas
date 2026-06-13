@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ComposedChart, Line,
 } from 'recharts';
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
-import { useVendasExplorer } from '../hooks/useVendasExtras';
+import { useVendasExplorer, useVendasSerie } from '../hooks/useVendasExtras';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
