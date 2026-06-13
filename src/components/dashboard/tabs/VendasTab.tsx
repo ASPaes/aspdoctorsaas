@@ -62,6 +62,8 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const [outrosExpanded, setOutrosExpanded] = useState(false);
   const [expMetric, setExpMetric] = useState<'vendas'|'mrr'|'ticket'|'margem_rs'|'margem_pct'>('mrr');
   const [expDim, setExpDim] = useState('vendedor');
+  const [faixaDet, setFaixaDet] = useState(false);
+  const [ticketMetric, setTicketMetric] = useState<'qtd'|'mrr'>('qtd');
   const { data: breakdown = [] } = useVendasExplorer(filters, expDim);
 
   const margemRsTotal = breakdown.reduce((a, r) => a + (r.margem_rs || 0), 0);
