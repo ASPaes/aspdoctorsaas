@@ -8104,6 +8104,18 @@ export type Database = {
           ticket: number
         }[]
       }
+      get_vendas_ticket_stats: {
+        Args: { p_fim: string; p_ini: string; p_tenant: string }
+        Returns: {
+          maximo: number
+          media: number
+          mediana: number
+          minimo: number
+          n: number
+          p25: number
+          p75: number
+        }[]
+      }
       import_clientes_produtos_batch: { Args: { p_rows: Json }; Returns: Json }
       is_admin_or_head: { Args: never; Returns: boolean }
       is_current_user_active: { Args: never; Returns: boolean }

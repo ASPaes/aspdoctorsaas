@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
-import { useVendasExplorer, useVendasSerie, useVendasProdutos } from '../hooks/useVendasExtras';
+import { useVendasExplorer, useVendasSerie, useVendasProdutos, useVendasTicketStats } from '../hooks/useVendasExtras';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
@@ -62,6 +62,8 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const [outrosExpanded, setOutrosExpanded] = useState(false);
   const [expMetric, setExpMetric] = useState<'vendas'|'mrr'|'ticket'|'margem_rs'|'margem_pct'>('mrr');
   const [expDim, setExpDim] = useState('vendedor');
+  const [faixaDet, setFaixaDet] = useState(false);
+  const [ticketMetric, setTicketMetric] = useState<'qtd'|'mrr'>('qtd');
   const { data: breakdown = [] } = useVendasExplorer(filters, expDim);
 
   const margemRsTotal = breakdown.reduce((a, r) => a + (r.margem_rs || 0), 0);
@@ -119,12 +121,16 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
 
   // Ranking, faixas de ticket e mix de produto
   const { data: rankVend = [] } = useVendasExplorer(filters, 'vendedor');
-  const { data: faixas = [] } = useVendasExplorer(filters, 'faixa_ticket');
+  const { data: faixas = [] } = useVendasExplorer(filters, faixaDet ? 'faixa_ticket_det' : 'faixa_ticket');
+  const { data: ticketStats } = useVendasTicketStats(filters);
   const { data: mixProd = [] } = useVendasProdutos(filters);
   const totalVendMrr = rankVend.reduce((a, r) => a + (r.new_mrr || 0), 0) || 1;
-  const FAIXA_ORDER = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
-  const faixasOrd = FAIXA_ORDER.map(l => faixas.find(f => f.label === l)).filter(Boolean) as typeof faixas;
-  const faixaMax = Math.max(1, ...faixasOrd.map(f => f.qtd));
+  const FAIXA_ORDER_PADRAO = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
+  const FAIXA_ORDER_DET = ['Até R$ 100','R$ 100–200','R$ 200–300','R$ 300–500','R$ 500–1k','R$ 1k–2k','Acima de R$ 2k'];
+  const faixaOrder = faixaDet ? FAIXA_ORDER_DET : FAIXA_ORDER_PADRAO;
+  const faixasOrd = faixaOrder.map(l => faixas.find(f => f.label === l)).filter(Boolean) as typeof faixas;
+  const ticketVal = (f: any) => ticketMetric === 'qtd' ? f.qtd : f.new_mrr;
+  const faixaMax = Math.max(1, ...faixasOrd.map(ticketVal));
   const mixTop = [...mixProd].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10);
   const mixMax = Math.max(1, ...mixTop.map(p => p.new_mrr));
   const margemCls = (p: number) => p >= 0.5 ? 'text-green-500' : p >= 0.3 ? 'text-amber-500' : 'text-red-500';
@@ -328,7 +334,47 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
           <CardHeader className={tvMode ? 'pb-2' : ''}>
             <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Distribuição de ticket</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <div className="flex gap-1">
+                {([['Padrão', false], ['Detalhado', true]] as const).map(([label, val]) => (
+                  <button
+                    key={label}
+                    onClick={() => setFaixaDet(val)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-xs border',
+                      faixaDet === val
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    )}
+                    style={{ borderWidth: '0.5px' }}
+                  >{label}</button>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {([['Qtd', 'qtd'], ['R$', 'mrr']] as const).map(([label, val]) => (
+                  <button
+                    key={val}
+                    onClick={() => setTicketMetric(val)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-xs border',
+                      ticketMetric === val
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    )}
+                    style={{ borderWidth: '0.5px' }}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {ticketStats && (
+              <div className="space-y-1">
+                <div className="text-sm"><span className="font-medium">Mediana {fmt(ticketStats.mediana)}</span> · típico {fmt(ticketStats.p25)}–{fmt(ticketStats.p75)} · faixa {fmt(ticketStats.minimo)}–{fmt(ticketStats.maximo)}</div>
+                <div className="text-xs text-muted-foreground">Média {fmt(ticketStats.media)} — puxada por vendas de ticket alto quando difere muito da mediana</div>
+              </div>
+            )}
+
             {faixasOrd.length === 0 ? (
               <div className="flex items-center justify-center h-[180px] text-muted-foreground">Sem dados disponíveis</div>
             ) : (
@@ -336,7 +382,7 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                 {faixasOrd.map((f, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-xs mb-1"><span>{f.label}</span><span className="text-muted-foreground">{f.qtd} · {fmt(f.new_mrr)}</span></div>
-                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(f.qtd / faixaMax * 100)}%` }} /></div>
+                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(ticketVal(f) / faixaMax * 100)}%` }} /></div>
                   </div>
                 ))}
               </div>
