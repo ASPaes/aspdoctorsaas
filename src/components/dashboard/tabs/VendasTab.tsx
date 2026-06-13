@@ -213,6 +213,73 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         );
       })()}
 
+      {/* Evolução de vendas — 12 meses */}
+      <Card>
+        <CardHeader className={tvMode ? 'pb-2' : ''}>
+          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Evolução de vendas — 12 meses</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {serieData.length === 0 ? (
+            <div className="flex items-center justify-center h-[280px] text-muted-foreground">Sem dados disponíveis</div>
+          ) : (
+            <div style={{ height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={serieData} margin={{ top: 10, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                  <XAxis dataKey="mes" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
+                  <YAxis yAxisId="l" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
+                  <YAxis yAxisId="r" orientation="right" tick={{ fontSize: tvMode ? 14 : 11 }} className="fill-muted-foreground" />
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
+                    formatter={(value: number, name: string) => [fmt(Number(value)), name]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: tvMode ? 14 : 11 }} />
+                  <Bar yAxisId="l" dataKey="new_mrr" name="New MRR" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="r" dataKey="ticket" name="Ticket médio" stroke="hsl(var(--chart-2, 199 89% 48%))" strokeWidth={2} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sazonalidade */}
+      <Card>
+        <CardHeader className={tvMode ? 'pb-2' : ''}>
+          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Sazonalidade — vendas por mês</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {serie.length === 0 ? (
+            <div className="flex items-center justify-center h-[120px] text-muted-foreground">Sem dados disponíveis</div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+                {serie.map((r, i) => {
+                  const t = r.qtd / qtdMax;
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        backgroundColor: `hsl(var(--primary) / ${(0.2 + 0.8 * t).toFixed(2)})`,
+                        borderRadius: 6,
+                        padding: '8px 4px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div className="text-[11px] text-foreground/80">{mesLabel(r.mes)}</div>
+                      <div className="text-sm font-medium text-foreground">{r.qtd}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">Intensidade = volume de vendas no mês.</div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+
+
       {/* Charts */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
 
