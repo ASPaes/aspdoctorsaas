@@ -334,7 +334,47 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
           <CardHeader className={tvMode ? 'pb-2' : ''}>
             <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Distribuição de ticket</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <div className="flex gap-1">
+                {([['Padrão', false], ['Detalhado', true]] as const).map(([label, val]) => (
+                  <button
+                    key={label}
+                    onClick={() => setFaixaDet(val)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-xs border',
+                      faixaDet === val
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    )}
+                    style={{ borderWidth: '0.5px' }}
+                  >{label}</button>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {([['Qtd', 'qtd'], ['R$', 'mrr']] as const).map(([label, val]) => (
+                  <button
+                    key={val}
+                    onClick={() => setTicketMetric(val)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-md text-xs border',
+                      ticketMetric === val
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                    )}
+                    style={{ borderWidth: '0.5px' }}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {ticketStats && (
+              <div className="space-y-1">
+                <div className="text-sm"><span className="font-medium">Mediana {fmt(ticketStats.mediana)}</span> · típico {fmt(ticketStats.p25)}–{fmt(ticketStats.p75)} · faixa {fmt(ticketStats.minimo)}–{fmt(ticketStats.maximo)}</div>
+                <div className="text-xs text-muted-foreground">Média {fmt(ticketStats.media)} — puxada por vendas de ticket alto quando difere muito da mediana</div>
+              </div>
+            )}
+
             {faixasOrd.length === 0 ? (
               <div className="flex items-center justify-center h-[180px] text-muted-foreground">Sem dados disponíveis</div>
             ) : (
@@ -342,7 +382,7 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
                 {faixasOrd.map((f, i) => (
                   <div key={i}>
                     <div className="flex justify-between text-xs mb-1"><span>{f.label}</span><span className="text-muted-foreground">{f.qtd} · {fmt(f.new_mrr)}</span></div>
-                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(f.qtd / faixaMax * 100)}%` }} /></div>
+                    <div className="h-2 bg-muted rounded overflow-hidden"><div className="h-full bg-primary" style={{ width: `${Math.round(ticketVal(f) / faixaMax * 100)}%` }} /></div>
                   </div>
                 ))}
               </div>
