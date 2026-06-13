@@ -8073,6 +8073,37 @@ export type Database = {
         }[]
       }
       get_user_department_id: { Args: never; Returns: string }
+      get_vendas_breakdown: {
+        Args: { p_dim: string; p_fim: string; p_ini: string; p_tenant: string }
+        Returns: {
+          custo: number
+          label: string
+          margem_pct: number
+          margem_rs: number
+          new_mrr: number
+          qtd: number
+          ticket: number
+        }[]
+      }
+      get_vendas_produtos: {
+        Args: { p_fim: string; p_ini: string; p_tenant: string }
+        Returns: {
+          label: string
+          margem_pct: number
+          margem_rs: number
+          new_mrr: number
+          qtd: number
+        }[]
+      }
+      get_vendas_serie_mensal: {
+        Args: { p_meses?: number; p_tenant: string }
+        Returns: {
+          mes: string
+          new_mrr: number
+          qtd: number
+          ticket: number
+        }[]
+      }
       import_clientes_produtos_batch: { Args: { p_rows: Json }; Returns: Json }
       is_admin_or_head: { Args: never; Returns: boolean }
       is_current_user_active: { Args: never; Returns: boolean }
