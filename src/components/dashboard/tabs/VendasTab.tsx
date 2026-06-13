@@ -226,7 +226,38 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         );
       })()}
 
+      {/* Ranking de vendedores */}
+      <Card>
+        <CardHeader className={tvMode ? 'pb-2' : ''}>
+          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Ranking de vendedores</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {rankVend.length === 0 ? (
+            <div className="flex items-center justify-center h-[200px] text-muted-foreground">Sem dados disponíveis</div>
+          ) : (
+            <div className="space-y-2">
+              {[...rankVend].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10).map((r, i) => {
+                const pct = Math.round(r.new_mrr / totalVendMrr * 100);
+                return (
+                  <div key={i} className="flex items-center gap-3 py-1.5 border-t border-border first:border-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-sm">
+                        <span className="truncate">{r.label}</span>
+                        <span className="text-muted-foreground">{r.qtd} vendas · {fmt(r.new_mrr)} · <span className={margemCls(r.margem_pct)}>{Math.round(r.margem_pct * 100)}%</span></span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded mt-1 overflow-hidden"><div className="h-full bg-primary" style={{ width: `${pct}%` }} /></div>
+                    </div>
+                    <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Evolução de vendas — 12 meses */}
+
       <Card>
         <CardHeader className={tvMode ? 'pb-2' : ''}>
           <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Evolução de vendas — 12 meses</CardTitle>
