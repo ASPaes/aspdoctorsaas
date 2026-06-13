@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { Diagnostico, Severity, ActionPriority } from '@/lib/diagnostico';
 import { ConselhoDSSection } from './ConselhoDSSection';
+import { usePermissions } from '@/hooks/usePermissions';
 import './diagnostico.css';
 
 interface DiagnosticoModalProps {
@@ -60,6 +61,8 @@ export function DiagnosticoModal({
 }: DiagnosticoModalProps) {
 
   const { severity, headline, causes, actions, generatedAt, alertCount } = diagnostico;
+  const { can, rbacEnabled } = usePermissions();
+  const podeConselho = rbacEnabled ? can('dashboard_conselho', 'view') : isAdmin;
   const color = severityColor(severity);
   const generatedDate = new Date(generatedAt).toLocaleString('pt-BR', {
     day: '2-digit',
@@ -158,7 +161,7 @@ export function DiagnosticoModal({
           )}
 
           {/* Conselho DS */}
-          {tenantId && tabKey && diagInput && isAdminOrHead && (
+          {tenantId && tabKey && diagInput && podeConselho && (
             <ConselhoDSSection
               tenantId={tenantId}
               tabKey={tabKey}
