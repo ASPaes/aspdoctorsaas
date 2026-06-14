@@ -82,6 +82,17 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const newMrrTotal = breakdown.reduce((a, r) => a + (r.new_mrr || 0), 0);
   const margemPctTotal = newMrrTotal > 0 ? margemRsTotal / newMrrTotal : 0;
 
+  // Série estendida (14m) + comparativo mensal p/ o diagnóstico de Vendas
+  const { data: serieDiag = [] } = useVendasSerie(filters, 14);
+  const vendasComp = useMemo(() => {
+    const hoje = new Date();
+    const { mesAlvoKey, tipo } = resolveMesAlvo(filters.periodoInicio, filters.periodoFim, filters.showAllData, hoje);
+    const cQtd = computeComparativoMensal(serieDiag.map((r) => ({ mes: r.mes, value: r.qtd })), mesAlvoKey, tipo, hoje);
+    const cMrr = computeComparativoMensal(serieDiag.map((r) => ({ mes: r.mes, value: r.new_mrr })), mesAlvoKey, tipo, hoje);
+    const cTicket = computeComparativoMensal(serieDiag.map((r) => ({ mes: r.mes, value: r.ticket })), mesAlvoKey, tipo, hoje);
+    return { cQtd, cMrr, cTicket };
+  }, [serieDiag, filters.periodoInicio, filters.periodoFim, filters.showAllData]);
+
   const diagInput: DiagnosticoInput = useMemo(() => ({
     newMrr: metrics.newMrr,
     upsellMrr: metrics.upsellMrr,
@@ -95,7 +106,21 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
     mrr_adicionado: metrics.newMrr + metrics.upsellMrr + metrics.crossSellMrr,
     margem_nova_rs: margemRsTotal,
     margem_nova_pct: margemPctTotal,
-  } as any), [metrics, margemRsTotal, margemPctTotal]);
+    // comparativo mensal (Passo 1)
+    vendasComparavel: vendasComp.cQtd.confiavel,
+    vendasEhMesCorrente: vendasComp.cQtd.ehMesCorrente,
+    comparativoIndeterminado: !vendasComp.cQtd.confiavel,
+    vendasQtdAtual: vendasComp.cQtd.atual ?? undefined,
+    vendasQtdProj: vendasComp.cQtd.projecao ?? undefined,
+    vendasQtdMedia3m: vendasComp.cQtd.media3m ?? undefined,
+    vendasQtdYoY: vendasComp.cQtd.yoy ?? undefined,
+    vendasMrrAtual: vendasComp.cMrr.atual ?? undefined,
+    vendasMrrProj: vendasComp.cMrr.projecao ?? undefined,
+    vendasMrrMedia3m: vendasComp.cMrr.media3m ?? undefined,
+    vendasMrrYoY: vendasComp.cMrr.yoy ?? undefined,
+    vendasTicketAtual: vendasComp.cTicket.atual ?? undefined,
+    vendasTicketMedia3m: vendasComp.cTicket.media3m ?? undefined,
+  } as any), [metrics, margemRsTotal, margemPctTotal, vendasComp]);
 
   const diagnostico = useMemo(() => computeDiagnostico(diagInput, 'vendas'), [diagInput]);
 
