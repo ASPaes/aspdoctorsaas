@@ -18,6 +18,15 @@ export function buildHeadline(
 
   // ─── Padrões específicos da aba Cancelamentos ───
   if (tab === 'cancelamentos') {
+    // Volume de MRR perdido muito acima da média (mês fechado) — magnitude crítica
+    if (
+      input.cancComparavel === true && input.cancEhMesCorrente === false &&
+      input.cancMrrMedia3m && input.cancMrrMedia3m > 0 &&
+      input.cancMrrAtual !== undefined && (input.cancMrrAtual / input.cancMrrMedia3m) >= 1.5
+    ) {
+      return `O MRR perdido no mês saltou bem acima da média recente — a sangria de receita acelerou e exige investigar a causa agora.`;
+    }
+
     // Concentração crítica de motivo (risco binário)
     if (input.motivoConcentradoPct !== undefined && input.motivoConcentradoPct > 0.25) {
       return `Cancelamento concentrado em um único motivo — risco binário. Resolver um problema resolve a maior parte da sangria.`;
