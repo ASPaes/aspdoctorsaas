@@ -152,3 +152,30 @@ export function useChurnDetalheUf(filters: DashboardFilters, uf: string | null) 
     },
   });
 }
+
+export interface CarteiraClienteCidadeRow {
+  cliente: string;
+  segmento: string;
+  mrr: number;
+}
+
+export function useCarteiraClientesCidade(filters: DashboardFilters, uf: string | null, cidade: string | null) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { fimStr } = resolvePeriodo(filters);
+
+  return useQuery({
+    queryKey: ['carteira-clientes-cidade', tid, uf, cidade, fimStr],
+    enabled: !!tid && !!uf && !!cidade,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<CarteiraClienteCidadeRow[]> => {
+      const { data, error } = await (supabase.rpc as any)('get_carteira_clientes_cidade', {
+        p_tenant: tid,
+        p_uf: uf,
+        p_cidade: cidade,
+        p_fim: fimStr,
+      });
+      if (error) throw error;
+      return (data || []) as CarteiraClienteCidadeRow[];
+    },
+  });
+}
