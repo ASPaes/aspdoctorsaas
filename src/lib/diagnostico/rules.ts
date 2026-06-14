@@ -247,6 +247,52 @@ export const RULES: DiagnosticoRule[] = [
 
   // ═══════════ CANCELAMENTOS ═══════════
 
+  // CAN-VOL crítico — MRR perdido do mês ≥ 1.5× média 3m (só mês fechado; projeção de churn é instável)
+  {
+    id: 'canc_volume_mrr_critico',
+    tab: 'cancelamentos',
+    severity: 'crit',
+    priority: 92,
+    match: (i) =>
+      i.cancComparavel === true && i.cancEhMesCorrente === false &&
+      i.cancMrrMedia3m !== undefined && i.cancMrrMedia3m > 0 &&
+      i.cancMrrAtual !== undefined && (i.cancMrrAtual / i.cancMrrMedia3m) >= 1.5,
+    buildCause: (i) => {
+      const at = i.cancMrrAtual ?? 0;
+      const media = i.cancMrrMedia3m ?? 0;
+      const alta = media > 0 ? Math.round((at / media - 1) * 100) : 0;
+      return `MRR perdido no mês ${fmtBRL(at)} — +${alta}% vs média 3m (${fmtBRL(media)}). Sangria de receita bem acima do normal.`;
+    },
+    actionIds: ['audit_cancellations', 'retention_playbook', 'health_score_immediate'],
+  },
+
+  // CAN-VOL atenção — MRR perdido (projetado se mês corrente) ≥ 1.25× média 3m
+  {
+    id: 'canc_volume_mrr_atencao',
+    tab: 'cancelamentos',
+    severity: 'warn',
+    priority: 78,
+    match: (i) => {
+      if (i.cancComparavel !== true) return false;
+      if (i.cancMrrMedia3m === undefined || i.cancMrrMedia3m <= 0) return false;
+      const ef = i.cancEhMesCorrente ? i.cancMrrProj : i.cancMrrAtual;
+      if (ef === undefined) return false;
+      const ratio = ef / i.cancMrrMedia3m;
+      if (ratio < 1.25) return false;
+      if (!i.cancEhMesCorrente && ratio >= 1.5) return false;
+      return true;
+    },
+    buildCause: (i) => {
+      const ef = (i.cancEhMesCorrente ? i.cancMrrProj : i.cancMrrAtual) ?? 0;
+      const media = i.cancMrrMedia3m ?? 0;
+      const alta = media > 0 ? Math.round((ef / media - 1) * 100) : 0;
+      return i.cancEhMesCorrente
+        ? `No ritmo atual o MRR perdido fecha ~${fmtBRL(ef)} — +${alta}% vs média 3m (${fmtBRL(media)}).`
+        : `MRR perdido no mês ${fmtBRL(ef)} — +${alta}% vs média 3m (${fmtBRL(media)}).`;
+    },
+    actionIds: ['audit_cancellations', 'retention_playbook'],
+  },
+
   // CAN1 — Motivo concentrado (1 motivo > 25% do MRR perdido)
   {
     id: 'canc_motivo_concentrado_crit',

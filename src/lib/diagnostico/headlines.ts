@@ -18,6 +18,15 @@ export function buildHeadline(
 
   // ─── Padrões específicos da aba Cancelamentos ───
   if (tab === 'cancelamentos') {
+    // Volume de MRR perdido muito acima da média (mês fechado) — magnitude crítica
+    if (
+      input.cancComparavel === true && input.cancEhMesCorrente === false &&
+      input.cancMrrMedia3m && input.cancMrrMedia3m > 0 &&
+      input.cancMrrAtual !== undefined && (input.cancMrrAtual / input.cancMrrMedia3m) >= 1.5
+    ) {
+      return `O MRR perdido no mês saltou bem acima da média recente — a sangria de receita acelerou e exige investigar a causa agora.`;
+    }
+
     // Concentração crítica de motivo (risco binário)
     if (input.motivoConcentradoPct !== undefined && input.motivoConcentradoPct > 0.25) {
       return `Cancelamento concentrado em um único motivo — risco binário. Resolver um problema resolve a maior parte da sangria.`;
@@ -54,6 +63,16 @@ export function buildHeadline(
     // Mortalidade alta (desuso)
     if (input.mortalidadeQtdPct !== undefined && input.mortalidadeQtdPct > 0.2) {
       return `Clientes morrem por desuso, não por preço — sinal forte de baixa adoção do produto.`;
+    }
+
+    // Volume de MRR perdido acima do normal (atenção)
+    if (input.cancComparavel === true && input.cancMrrMedia3m && input.cancMrrMedia3m > 0) {
+      const efCanc = input.cancEhMesCorrente ? input.cancMrrProj : input.cancMrrAtual;
+      if (efCanc !== undefined && (efCanc / input.cancMrrMedia3m) >= 1.25) {
+        return input.cancEhMesCorrente
+          ? `No ritmo atual o MRR perdido vai fechar acima da média recente — atenção, mês ainda em formação.`
+          : `O MRR perdido no mês ficou acima da média recente — vale entender o que mudou antes que vire tendência.`;
+      }
     }
   }
 
