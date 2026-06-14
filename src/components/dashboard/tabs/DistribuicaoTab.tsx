@@ -72,8 +72,8 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     if (varValid.length) {
       const queda = [...varValid].sort((a: any, b: any) => a.delta_pct! - b.delta_pct!)[0];
       const alta = [...varValid].sort((a: any, b: any) => b.delta_pct! - a.delta_pct!)[0];
-      if (queda && (queda.delta_pct ?? 0) < -0.03) out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} vs período anterior. Vale checar retenção na praça.` });
-      if (alta && (alta.delta_pct ?? 0) > 0.03) out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `${fmtPct(alta.delta_pct!)} no MRR vs período anterior. Praça aquecida.` });
+      if (queda && (queda.delta_pct ?? 0) < -0.03) out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} no período. Vale checar retenção na praça.` });
+      if (alta && (alta.delta_pct ?? 0) > 0.03) out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `MRR ${fmtPct(alta.delta_pct!)} no período. Praça aquecida.` });
     }
     const churnValid = ufChurn.filter((r: any) => r.label && r.label.length === 2 && r.base >= 10);
     if (churnValid.length) {
