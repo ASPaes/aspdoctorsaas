@@ -64,6 +64,42 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     return rows.filter(r => r.name && r.name !== '(sem informação)').map(r => ({ ...r, percent: r.value / total }));
   }, [mode, metric, ufBreak, ufChurn, ufVar]);
 
+  const insights = useMemo(() => {
+    const ufNome = (s: string) => SIGLA_TO_NAME[s] || s;
+    const fmtPct = (d: number) => (d > 0 ? '+' : '') + (d * 100).toFixed(1) + '%';
+    const out: { tone: 'down'|'up'|'warn'|'info'; title: string; text: string }[] = [];
+
+    const varValid = ufVar.filter(r => r.uf && r.uf.length === 2 && r.mrr_anterior > 0 && r.delta_pct != null);
+    if (varValid.length) {
+      const queda = [...varValid].sort((a, b) => (a.delta_pct! - b.delta_pct!))[0];
+      const alta = [...varValid].sort((a, b) => (b.delta_pct! - a.delta_pct!))[0];
+      if (queda && (queda.delta_pct ?? 0) < -0.02) {
+        out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} vs período anterior. Vale checar retenção na praça.` });
+      }
+      if (alta && (alta.delta_pct ?? 0) > 0.02) {
+        out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `${fmtPct(alta.delta_pct!)} no MRR vs período anterior. Praça aquecida.` });
+      }
+    }
+
+    const churnValid = ufChurn.filter(r => r.label && r.label.length === 2 && r.base >= 10);
+    if (churnValid.length) {
+      const pior = [...churnValid].sort((a, b) => b.churn_pct - a.churn_pct)[0];
+      if (pior && pior.churn_pct > 0) {
+        out.push({ tone: 'warn', title: `Pior churn: ${ufNome(pior.label)}`, text: `${(pior.churn_pct * 100).toFixed(0)}% da base cancelou no período (${pior.cancelados} de ${pior.base}).` });
+      }
+    }
+
+    const totalMrr = ufBreak.reduce((s, r) => s + (r.mrr || 0), 0);
+    if (totalMrr > 0) {
+      const top = [...ufBreak].filter(r => r.label && r.label.length === 2).sort((a, b) => b.mrr - a.mrr)[0];
+      if (top) {
+        const share = (top.mrr / totalMrr) * 100;
+        if (share >= 25) out.push({ tone: 'info', title: 'Concentração de receita', text: `${ufNome(top.label)} concentra ${share.toFixed(0)}% do MRR. Dependência de uma praça é risco estrutural.` });
+      }
+    }
+    return out;
+  }, [ufVar, ufChurn, ufBreak]);
+
   const metricOpts: { key: typeof metric; label: string }[] = [
     { key: 'qtd', label: 'Qtd clientes' },
     { key: 'mrr', label: 'MRR' },
