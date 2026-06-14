@@ -123,7 +123,7 @@ export function ConselhoDSSection({
       {!configLoading && !hasConfig && !result && !loading && (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Configure seus {3} conselheiros para receber análise estratégica via IA.
+            Configure até 4 conselheiros para receber análise estratégica via IA.
           </p>
           <Button onClick={() => setConfigOpen(true)} size="sm" disabled={!isAdmin}>
             <Settings className="h-4 w-4" />
