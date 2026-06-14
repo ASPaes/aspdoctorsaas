@@ -7729,6 +7729,17 @@ export type Database = {
           uf: string
         }[]
       }
+      get_churn_detalhe_uf: {
+        Args: { p_fim: string; p_ini: string; p_tenant: string; p_uf: string }
+        Returns: {
+          cidade: string
+          cliente: string
+          data_cancelamento: string
+          mrr_perdido: number
+          observacao: string
+          segmento: string
+        }[]
+      }
       get_client_alert_audit: {
         Args: { p_cliente_id?: string; p_contact_id?: string }
         Returns: {
