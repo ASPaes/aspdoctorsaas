@@ -11,7 +11,9 @@ export function buildHeadline(
 ): string {
   // Aba sem cobertura de diagnóstico — não assumir saúde nem risco
   if (severity === 'indeterminado') {
-    return 'Esta aba ainda não tem cobertura de diagnóstico — não dá pra afirmar saúde nem risco com os dados atuais.';
+    return input.comparativoIndeterminado === true
+      ? 'Dados insuficientes para avaliar este período com segurança (amostra pequena, início de mês ou intervalo fora de um mês fechado).'
+      : 'Esta aba ainda não tem cobertura de diagnóstico — não dá pra afirmar saúde nem risco com os dados atuais.';
   }
 
   // ─── Padrões específicos da aba Cancelamentos ───

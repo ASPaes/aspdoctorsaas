@@ -1,9 +1,13 @@
-import type { DiagnosticoRule } from './types';
+import type { DiagnosticoRule, DiagnosticoInput } from './types';
 
 const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
 const fmtPP = (v: number) => `${v.toFixed(2)}pp`;
 const fmtX = (v: number) => `${v.toFixed(2)}x`;
+
+// Vendas — valor efetivo do mês-alvo: projeção se mês corrente, senão o fechado
+const vQtd = (i: DiagnosticoInput) => (i.vendasEhMesCorrente ? i.vendasQtdProj : i.vendasQtdAtual);
+const vMrr = (i: DiagnosticoInput) => (i.vendasEhMesCorrente ? i.vendasMrrProj : i.vendasMrrAtual);
 
 export const RULES: DiagnosticoRule[] = [
   // ═══════════ VISÃO GERAL ═══════════
