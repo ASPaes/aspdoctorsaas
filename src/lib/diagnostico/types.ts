@@ -88,6 +88,13 @@ export interface DiagnosticoInput {
   vendasMrrYoY?: number;
   vendasTicketAtual?: number;
   vendasTicketMedia3m?: number;
+
+  // Cancelamentos — comparativo mensal de MRR perdido (Passo 2a: média 3m / projeção)
+  cancComparavel?: boolean;       // false → comparativo indeterminado (baseline insuf. ou início de mês)
+  cancEhMesCorrente?: boolean;
+  cancMrrAtual?: number;
+  cancMrrProj?: number;
+  cancMrrMedia3m?: number;
 }
 
 /**

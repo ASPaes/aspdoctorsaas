@@ -32,6 +32,7 @@ import { Top10CanceladosTable } from '../charts/Top10CanceladosTable';
 import { useCancelamentosExtras } from '../hooks/useCancelamentosExtras';
 
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
+import { resolveMesAlvo, computeComparativoMensal } from '@/lib/diagnostico/comparativos';
 
 import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem, DashboardFilters } from '../types';
 
@@ -107,6 +108,14 @@ export function CancelamentosTab({
   const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const { data: cancExtras } = useCancelamentosExtras({ filters, metrics });
+
+  // Comparativo mensal de MRR perdido (média 3m / projeção) p/ o diagnóstico
+  const cancComp = useMemo(() => {
+    const hoje = new Date();
+    const { mesAlvoKey, tipo } = resolveMesAlvo(filters.periodoInicio, filters.periodoFim, filters.showAllData, hoje);
+    const serie = (cancExtras?.evolucao12m ?? []).map((r) => ({ mes: r.mes, value: r.mrr }));
+    return computeComparativoMensal(serie, mesAlvoKey, tipo, hoje);
+  }, [cancExtras, filters.periodoInicio, filters.periodoFim, filters.showAllData]);
   
 
   // ─── Deltas dos 4 KPIs principais (preservado da V1) ────
@@ -148,7 +157,7 @@ export function CancelamentosTab({
 
   // ─── Diagnóstico ─────────────────────────────────────────
   const diagInput: DiagnosticoInput & Record<string, any> = useMemo(() => {
-    if (!cancExtras) return { clientesAtivos: metrics.clientesAtivos };
+    if (!cancExtras) return { clientesAtivos: metrics.clientesAtivos, comparativoIndeterminado: true };
 
     const motivoConcentradoPct = cancExtras.mrrCancelado > 0 && cancExtras.topMotivos.length > 0
       ? cancExtras.topMotivos[0].mrr_perdido / cancExtras.mrrCancelado
@@ -193,8 +202,15 @@ export function CancelamentosTab({
       mortalidadeQtdPct,
       origemMaxChurn,
       cancelamentosPorOrigem: cancExtras.cancelamentosPorOrigem,
+      // comparativo mensal de MRR perdido (Passo 2a)
+      cancComparavel: cancComp.confiavel,
+      cancEhMesCorrente: cancComp.ehMesCorrente,
+      comparativoIndeterminado: !cancComp.confiavel,
+      cancMrrAtual: cancComp.atual ?? undefined,
+      cancMrrProj: cancComp.projecao ?? undefined,
+      cancMrrMedia3m: cancComp.media3m ?? undefined,
     };
-  }, [cancExtras, metrics]);
+  }, [cancExtras, metrics, cancComp]);
 
   const diagnostico = useMemo(() => computeDiagnostico(diagInput, 'cancelamentos'), [diagInput]);
   const [diagOpen, setDiagOpen] = useState(false);
