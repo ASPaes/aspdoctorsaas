@@ -207,7 +207,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
             <MapPin className={cn('text-primary', tvMode ? 'h-6 w-6' : 'h-5 w-5')} />
             <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>{title}</CardTitle>
           </div>
-          <Badge variant="secondary">{totalClientes} clientes</Badge>
+          {metric === 'qtd' && <Badge variant="secondary">{totalClientes} clientes</Badge>}
         </div>
       </CardHeader>
       <CardContent className="p-0">
