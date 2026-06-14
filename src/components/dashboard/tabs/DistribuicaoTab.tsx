@@ -4,7 +4,9 @@ import { PieChartCard } from '../charts/PieChartCard';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
-import type { DistributionData, DistributionDataPoint } from '../types';
+import { cn } from '@/lib/utils';
+import type { DistributionData, DistributionDataPoint, DashboardFilters } from '../types';
+import { useCarteiraBreakdown, useCarteiraChurn } from '../hooks/useDistribuicaoExtras';
 
 const SIGLA_TO_NAME: Record<string, string> = {
   AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia', CE: 'Ceará',
@@ -15,7 +17,7 @@ const SIGLA_TO_NAME: Record<string, string> = {
   TO: 'Tocantins',
 };
 
-interface Props { distributions: DistributionData; tvMode: boolean; }
+interface Props { distributions: DistributionData; tvMode: boolean; filters: DashboardFilters; }
 
 /** Top N + group rest into "Outros" */
 function topN(data: DistributionDataPoint[], n: number): DistributionDataPoint[] {
@@ -35,8 +37,32 @@ function greenPalette(count: number): string[] {
   return Array.from({ length: count }, (_, i) => `hsl(145 53% ${l[Math.min(i, l.length - 1)]}%)`);
 }
 
-export function DistribuicaoTab({ distributions, tvMode }: Props) {
+export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [metric, setMetric] = useState<'qtd'|'mrr'|'ticket'|'margem'|'churn'>('qtd');
+
+  const { data: ufBreak = [] } = useCarteiraBreakdown(filters, 'estado');
+  const { data: ufChurn = [] } = useCarteiraChurn(filters, 'estado');
+
+  const mapData = useMemo(() => {
+    let rows: { name: string; value: number }[];
+    if (metric === 'churn') {
+      rows = ufChurn.filter(r => r.base >= 10).map(r => ({ name: r.label, value: Math.round(r.churn_pct * 1000) / 10 }));
+    } else {
+      const field = (r: any) => metric === 'qtd' ? r.qtd : metric === 'mrr' ? r.mrr : metric === 'ticket' ? r.ticket : Math.round(r.margem_pct * 1000) / 10;
+      rows = ufBreak.map(r => ({ name: r.label, value: field(r) }));
+    }
+    const total = rows.reduce((s, r) => s + (r.value || 0), 0) || 1;
+    return rows.filter(r => r.name && r.name !== '(sem informação)').map(r => ({ ...r, percent: r.value / total }));
+  }, [metric, ufBreak, ufChurn]);
+
+  const metricOpts: { key: typeof metric; label: string }[] = [
+    { key: 'qtd', label: 'Qtd clientes' },
+    { key: 'mrr', label: 'MRR' },
+    { key: 'ticket', label: 'Ticket médio' },
+    { key: 'margem', label: 'Margem %' },
+    { key: 'churn', label: 'Churn' },
+  ];
 
   // Cities filtered by state
   const filteredCidades = useMemo(() => {
@@ -89,16 +115,36 @@ export function DistribuicaoTab({ distributions, tvMode }: Props) {
         </div>
       )}
 
+      {/* Métrica do mapa */}
+      <div className="flex flex-wrap gap-2">
+        {metricOpts.map(o => (
+          <button
+            key={o.key}
+            onClick={() => setMetric(o.key)}
+            className={cn(
+              'px-3 py-1.5 rounded-full border text-sm transition-colors',
+              metric === o.key
+                ? 'bg-primary/10 border-primary text-primary'
+                : 'border-border text-muted-foreground hover:bg-muted',
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
       {/* Choropleth Map */}
       <BrazilChoroplethMap
         title="Distribuição Geográfica por Estado"
-        data={distributions.porEstado}
+        data={mapData}
+        metric={metric}
         tvMode={tvMode}
         topCidadesByEstado={distributions.topCidadesByEstado}
         citiesGeo={distributions.citiesGeo}
         selectedState={selectedState}
         onSelectState={setSelectedState}
       />
+
 
       {/* Top 10 Cidades */}
       <BarChartCard
