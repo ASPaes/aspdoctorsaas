@@ -166,14 +166,15 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const getColor = (sigla: string) => {
     const val = stateDataMap[sigla]?.value || 0;
     if (metric === 'variacao') {
-      const r = maxAbs > 0 ? val / maxAbs : 0;
-      if (r > 0.66) return 'hsl(145 64% 30%)';
-      if (r > 0.33) return 'hsl(145 60% 42%)';
-      if (r > 0.05) return 'hsl(145 53% 56%)';
-      if (r >= -0.05) return 'hsl(210 12% 85%)';
-      if (r >= -0.33) return 'hsl(8 72% 60%)';
-      if (r >= -0.66) return 'hsl(5 74% 50%)';
-      return 'hsl(2 76% 42%)';
+      const CAP = 15;
+      const r = Math.max(-1, Math.min(1, val / CAP));
+      if (r > 0.5) return 'hsl(145 64% 32%)';
+      if (r > 0.2) return 'hsl(145 58% 44%)';
+      if (r > 0.03) return 'hsl(145 50% 58%)';
+      if (r >= -0.03) return 'hsl(210 14% 40%)';
+      if (r >= -0.2) return 'hsl(8 70% 62%)';
+      if (r >= -0.5) return 'hsl(5 74% 52%)';
+      return 'hsl(2 76% 44%)';
     }
     if (val === 0 || maxValue === 0) return 'hsl(210 12% 90%)';
     const ratio = val / maxValue;
