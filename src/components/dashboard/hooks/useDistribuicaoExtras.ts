@@ -87,3 +87,38 @@ export function useCarteiraChurn(
     },
   });
 }
+
+export interface CarteiraVariacaoRow {
+  uf: string;
+  mrr_atual: number;
+  mrr_anterior: number;
+  delta_abs: number;
+  delta_pct: number | null;
+  qtd_atual: number;
+}
+
+export function useCarteiraVariacao(filters: DashboardFilters) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  const fimAtual = filters.showAllData ? new Date() : (filters.periodoFim || endOfMonth(new Date()));
+  const inicio = filters.showAllData ? new Date() : (filters.periodoInicio || startOfMonth(new Date()));
+  const fimAnterior = filters.showAllData ? subMonths(fimAtual, 1) : subDays(inicio, 1);
+
+  const fimAtualStr = format(fimAtual, 'yyyy-MM-dd');
+  const fimAntStr = format(fimAnterior, 'yyyy-MM-dd');
+
+  return useQuery({
+    queryKey: ['carteira-variacao', tid, fimAtualStr, fimAntStr],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<CarteiraVariacaoRow[]> => {
+      const { data, error } = await (supabase.rpc as any)('get_carteira_variacao', {
+        p_tenant: tid,
+        p_fim_atual: fimAtualStr,
+        p_fim_anterior: fimAntStr,
+      });
+      if (error) throw error;
+      return (data || []) as CarteiraVariacaoRow[];
+    },
+  });
+}
