@@ -17,7 +17,7 @@ const SIGLA_TO_NAME: Record<string, string> = {
   TO: 'Tocantins',
 };
 
-interface Props { distributions: DistributionData; tvMode: boolean; }
+interface Props { distributions: DistributionData; tvMode: boolean; filters: DashboardFilters; }
 
 /** Top N + group rest into "Outros" */
 function topN(data: DistributionDataPoint[], n: number): DistributionDataPoint[] {
