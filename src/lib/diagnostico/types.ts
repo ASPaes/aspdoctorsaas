@@ -71,6 +71,20 @@ export interface DiagnosticoInput {
   winbackTotal12m?: number;         // qtd reativações nos últimos 12 meses
   mortalidadeQtdPct?: number;       // decimal — % do volume de cancelamentos categorizados como mortality
   origemMaxChurn?: number;          // decimal — maior churn rate entre origens com ≥3 cancelamentos no período (0.07 = 7%)
+
+  // Vendas — comparativo mensal (Passo 1: média 3m / projeção / YoY)
+  vendasComparavel?: boolean;       // false → comparativo indeterminado (baseline insuf. ou início de mês)
+  vendasEhMesCorrente?: boolean;
+  vendasQtdAtual?: number;
+  vendasQtdProj?: number;
+  vendasQtdMedia3m?: number;
+  vendasQtdYoY?: number;
+  vendasMrrAtual?: number;
+  vendasMrrProj?: number;
+  vendasMrrMedia3m?: number;
+  vendasMrrYoY?: number;
+  vendasTicketAtual?: number;
+  vendasTicketMedia3m?: number;
 }
 
 /**
