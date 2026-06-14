@@ -62,7 +62,7 @@ interface Props {
   metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn';
 }
 
-export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
+export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd' }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
@@ -153,10 +153,26 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const maxValue = useMemo(() => Math.max(...data.map(d => d.value), 1), [data]);
   const totalClientes = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
+  const METRIC_LABEL: Record<string, string> = { qtd: 'Clientes', mrr: 'MRR', ticket: 'Ticket médio', margem: 'Margem %', churn: 'Churn' };
+  const fmtMetric = (v: number) => {
+    if (metric === 'mrr' || metric === 'ticket') return 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+    if (metric === 'margem') return Math.round(v) + '%';
+    if (metric === 'churn') return (Math.round(v * 10) / 10).toFixed(1) + '%';
+    return Math.round(v).toLocaleString('pt-BR');
+  };
   const getColor = (sigla: string) => {
     const val = stateDataMap[sigla]?.value || 0;
-    if (val === 0 || maxValue === 0) return 'hsl(210 12% 90%)'; // muted neutral
+    if (val === 0 || maxValue === 0) return 'hsl(210 12% 90%)';
     const ratio = val / maxValue;
+    if (metric === 'churn') {
+      if (ratio <= 0.05) return 'hsl(48 85% 82%)';
+      if (ratio <= 0.1) return 'hsl(45 85% 72%)';
+      if (ratio <= 0.2) return 'hsl(40 85% 62%)';
+      if (ratio <= 0.35) return 'hsl(30 85% 55%)';
+      if (ratio <= 0.55) return 'hsl(20 82% 50%)';
+      if (ratio <= 0.75) return 'hsl(10 78% 45%)';
+      return 'hsl(2 75% 38%)';
+    }
     if (ratio <= 0.05) return 'hsl(145 53% 85%)';
     if (ratio <= 0.1) return 'hsl(145 53% 75%)';
     if (ratio <= 0.2) return 'hsl(145 53% 65%)';
@@ -296,9 +312,11 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                   </button>
                 </div>
                 <div className="bg-background rounded-xl p-4 shadow-sm border">
-                  <p className="text-sm text-muted-foreground">Total de Clientes</p>
-                  <p className="font-bold font-mono text-primary text-3xl">{selectedStateData.value}</p>
-                  <p className="text-sm text-muted-foreground">{((selectedStateData.percent || 0) * 100).toFixed(1)}% do total</p>
+                  <p className="text-sm text-muted-foreground">{METRIC_LABEL[metric] || 'Clientes'}</p>
+                  <p className="font-bold font-mono text-primary text-3xl">{fmtMetric(selectedStateData.value)}</p>
+                  {(metric === 'qtd' || metric === 'mrr') && (
+                    <p className="text-sm text-muted-foreground">{((selectedStateData.percent || 0) * 100).toFixed(1)}% do total</p>
+                  )}
                 </div>
                 {selectedStateCities && selectedStateCities.length > 0 && (
                   <div className="space-y-2">
@@ -342,7 +360,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                           <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: getColor(sigla) }} />
                           <span className="truncate text-sm font-medium">{SIGLA_TO_NAME[sigla] || item.name}</span>
                         </div>
-                        <span className="font-mono font-bold text-base">{item.value}</span>
+                        <span className="font-mono font-bold text-base">{fmtMetric(item.value)}</span>
                       </div>
                     );
                   })}
