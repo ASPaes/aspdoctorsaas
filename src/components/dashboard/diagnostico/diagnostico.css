@@ -278,6 +278,22 @@
   color: hsl(38 92% 50%);
 }
 
+.diag-button-indeterminado {
+  border-color: hsl(215 16% 55% / 0.3);
+  background: linear-gradient(180deg, hsl(215 16% 55% / 0.16) 0%, hsl(215 16% 55% / 0.08) 100%);
+  color: hsl(215 16% 70%);
+}
+.diag-button-indeterminado:hover {
+  border-color: hsl(215 16% 55% / 0.5);
+  box-shadow:
+    inset 0 1px 0 hsl(215 16% 65% / 0.2),
+    0 8px 24px -8px hsl(215 16% 55% / 0.3);
+}
+.diag-button-indeterminado .diag-button-count {
+  background: hsl(215 16% 55% / 0.25);
+  color: hsl(215 16% 70%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .diag-card::after,
   .diag-pulse-dot,
