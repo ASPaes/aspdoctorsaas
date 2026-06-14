@@ -154,6 +154,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const maxValue = useMemo(() => Math.max(...data.map(d => d.value), 1), [data]);
   const maxAbs = useMemo(() => Math.max(...data.map(d => Math.abs(d.value)), 1), [data]);
   const totalClientes = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
+  const maxCityQtd = useMemo(() => Math.max(...citiesGeo.map(c => c.qtd || 0), 1), [citiesGeo]);
 
   const METRIC_LABEL: Record<string, string> = { qtd: 'Clientes', mrr: 'MRR', ticket: 'Ticket médio', margem: 'Margem %', churn: 'Churn', variacao: 'Δ MRR vs anterior' };
   const fmtMetric = (v: number) => {
@@ -272,7 +273,8 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                     }
                   </Geographies>
                   {citiesGeo.map((city) => {
-                    const screenRadius = Math.max(7, 8 / Math.sqrt(position.zoom));
+                    const cityScale = Math.sqrt(city.qtd || 1) / Math.sqrt(maxCityQtd);
+                    const screenRadius = Math.max(5, (5 + cityScale * 12) / Math.sqrt(position.zoom));
                     const r = screenRadius / position.zoom;
                     const hitRadius = Math.max(10, screenRadius * 1.5) / position.zoom;
                     const cityKey = `${city.uf}-${city.nome}`;
