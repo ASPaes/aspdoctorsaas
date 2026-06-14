@@ -243,9 +243,9 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                         const isSelected = selectedState === sigla;
                         const val = stateDataMap[sigla]?.value || 0;
                         const stateName = SIGLA_TO_NAME[sigla] || geoName;
-                        const tooltipText = val > 0
-                          ? `${stateName} — ${val} ${val === 1 ? 'cliente' : 'clientes'}`
-                          : `${stateName} — sem clientes`;
+                        const tooltipText = stateDataMap[sigla]
+                          ? `${stateName} — ${fmtMetric(val)}`
+                          : `${stateName} — sem dados`;
 
                         return (
                           <Geography
