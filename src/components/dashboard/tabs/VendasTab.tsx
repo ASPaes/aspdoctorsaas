@@ -568,8 +568,34 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         </div>
       </div>
 
+      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
+      <DiagnosticoSection
+        diagnostico={diagnostico}
+        onSeeMore={() => setDiagOpen(true)}
+        tvMode={tvMode}
+      />
+
       {/* Tabela de novos clientes */}
       <NovosClientesTable items={novosClientesList} tvMode={tvMode} />
+
+      {/* MODAL DIAGNÓSTICO */}
+      <DiagnosticoModal
+        diagnostico={diagnostico}
+        open={diagOpen}
+        onOpenChange={setDiagOpen}
+        tabLabel={tabLabel}
+        tenantId={effectiveTenantId || undefined}
+        tabKey="vendas"
+        diagInput={diagInput as Record<string, any>}
+        filtrosAplicados={{
+          unidadeBaseId: filters.unidadeBaseId,
+          fornecedorId: filters.fornecedorId,
+          periodoInicio: filters.periodoInicio,
+          periodoFim: filters.periodoFim,
+        }}
+        isAdmin={isAdmin}
+        isAdminOrHead={isAdminOrHead}
+      />
     </div>
   );
 }
