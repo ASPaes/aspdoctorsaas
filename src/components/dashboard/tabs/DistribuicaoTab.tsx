@@ -246,6 +246,11 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
                   </div>
                 </CardContent>
               </Card>
+              {mode === 'variacao' && (
+                <p className="text-xs text-muted-foreground leading-relaxed px-1">
+                  <span className="font-medium text-foreground">Como ler:</span> mostra quanto o MRR da carteira de cada estado cresceu ou encolheu <span className="font-medium text-foreground">durante o período selecionado</span> (carteira no fim vs. no início). <span className="text-emerald-500 font-medium">Verde</span> subiu, <span className="text-red-500 font-medium">vermelho</span> caiu. A lista traz quem mais se moveu. Atenção: estado com poucos clientes vira % grande com qualquer mudança — confira o tamanho da base antes de concluir.
+                </p>
+              )}
             </>
           ) : (
             <Card>
