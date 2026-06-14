@@ -452,6 +452,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
           )}
         </div>
       </div>
+      <CarteiraSerieChart filters={filters} />
     </div>
   );
 }
