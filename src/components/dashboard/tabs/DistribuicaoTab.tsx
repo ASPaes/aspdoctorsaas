@@ -122,22 +122,44 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
         </div>
       )}
 
-      {/* Métrica do mapa */}
-      <div className="flex flex-wrap gap-2">
-        {metricOpts.map(o => (
-          <button
-            key={o.key}
-            onClick={() => setMetric(o.key)}
-            className={cn(
-              'px-3 py-1.5 rounded-full border text-sm transition-colors',
-              metric === o.key
-                ? 'bg-primary/10 border-primary text-primary'
-                : 'border-border text-muted-foreground hover:bg-muted',
-            )}
-          >
-            {o.label}
-          </button>
-        ))}
+      {/* Modo + métrica do mapa */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-full border border-border overflow-hidden">
+          {(['nivel','variacao'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={cn(
+                'px-4 py-1.5 text-sm transition-colors',
+                mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+              )}
+            >
+              {m === 'nivel' ? 'Nível' : 'Variação'}
+            </button>
+          ))}
+        </div>
+        {mode === 'nivel' ? (
+          <div className="flex flex-wrap gap-2">
+            {metricOpts.map(o => (
+              <button
+                key={o.key}
+                onClick={() => setMetric(o.key)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                  metric === o.key
+                    ? 'bg-primary/10 border-primary text-primary'
+                    : 'border-border text-muted-foreground hover:bg-muted',
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            Δ MRR da carteira vs período anterior — <span className="text-foreground">verde cresceu · vermelho caiu</span>
+          </span>
+        )}
       </div>
 
       {/* Choropleth Map */}
