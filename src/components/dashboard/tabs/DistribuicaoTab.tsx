@@ -106,6 +106,21 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   }, [mapData, mode]);
   const maxRank = useMemo(() => Math.max(...mapData.map(d => Math.abs(d.value)), 1), [mapData]);
 
+  const regioes = useMemo(() => {
+    const breakBy: Record<string, any> = {};
+    ufBreak.forEach((r: any) => { breakBy[r.label] = r; });
+    const churnBy: Record<string, any> = {};
+    ufChurn.forEach((r: any) => { churnBy[r.label] = r; });
+    return Object.entries(REGIOES).map(([nome, ufs]) => {
+      let qtd = 0, mrr = 0, cancelados = 0, base = 0;
+      ufs.forEach(uf => {
+        const b = breakBy[uf]; if (b) { qtd += b.qtd || 0; mrr += b.mrr || 0; }
+        const c = churnBy[uf]; if (c) { cancelados += c.cancelados || 0; base += c.base || 0; }
+      });
+      return { nome, qtd, mrr, churn_pct: base > 0 ? cancelados / base : 0 };
+    });
+  }, [ufBreak, ufChurn]);
+
   const estadoRow: any = selectedState ? ufBreak.find((r: any) => r.label === selectedState) : null;
   const churnRow: any = selectedState ? ufChurn.find((r: any) => r.label === selectedState) : null;
   const cidadeRow: any = selectedCity ? cidades.find((r: any) => r.label === selectedCity) : null;
