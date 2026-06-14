@@ -62,7 +62,7 @@ interface Props {
   metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn';
 }
 
-export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
+export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd' }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
