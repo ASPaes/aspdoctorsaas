@@ -312,9 +312,11 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                   </button>
                 </div>
                 <div className="bg-background rounded-xl p-4 shadow-sm border">
-                  <p className="text-sm text-muted-foreground">Total de Clientes</p>
-                  <p className="font-bold font-mono text-primary text-3xl">{selectedStateData.value}</p>
-                  <p className="text-sm text-muted-foreground">{((selectedStateData.percent || 0) * 100).toFixed(1)}% do total</p>
+                  <p className="text-sm text-muted-foreground">{METRIC_LABEL[metric] || 'Clientes'}</p>
+                  <p className="font-bold font-mono text-primary text-3xl">{fmtMetric(selectedStateData.value)}</p>
+                  {(metric === 'qtd' || metric === 'mrr') && (
+                    <p className="text-sm text-muted-foreground">{((selectedStateData.percent || 0) * 100).toFixed(1)}% do total</p>
+                  )}
                 </div>
                 {selectedStateCities && selectedStateCities.length > 0 && (
                   <div className="space-y-2">
