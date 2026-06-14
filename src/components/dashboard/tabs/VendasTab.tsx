@@ -79,6 +79,29 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const newMrrTotal = breakdown.reduce((a, r) => a + (r.new_mrr || 0), 0);
   const margemPctTotal = newMrrTotal > 0 ? margemRsTotal / newMrrTotal : 0;
 
+  const diagInput: DiagnosticoInput = useMemo(() => ({
+    newMrr: metrics.newMrr,
+    upsellMrr: metrics.upsellMrr,
+    crossSellMrr: metrics.crossSellMrr,
+    clientesAtivos: metrics.clientesAtivos,
+    // extras de vendas (consumidos pelo Conselho DS via tabKey="vendas")
+    novos_clientes: metrics.novosClientes,
+    ticket_medio_novo: metrics.novosClientes > 0 ? metrics.newMrr / metrics.novosClientes : 0,
+    receita_ativacao: metrics.receitaAtivacao,
+    setup_medio: metrics.novosClientes > 0 ? metrics.totalImplantacao / metrics.novosClientes : 0,
+    mrr_adicionado: metrics.newMrr + metrics.upsellMrr + metrics.crossSellMrr,
+    margem_nova_rs: margemRsTotal,
+    margem_nova_pct: margemPctTotal,
+  } as any), [metrics, margemRsTotal, margemPctTotal]);
+
+  const diagnostico = useMemo(() => computeDiagnostico(diagInput, 'vendas'), [diagInput]);
+
+  const tabLabel = useMemo(() => {
+    const now = new Date();
+    const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    return `Vendas · ${meses[now.getMonth()]} ${now.getFullYear()}`;
+  }, []);
+
   // Deltas
   const novosD = computeDelta(metrics.novosClientes, metrics.prevNovosClientes, false, 'abs');
   const newMrrD = computeDelta(metrics.newMrr, metrics.prevNewMrr);
