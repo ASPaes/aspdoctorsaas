@@ -758,7 +758,7 @@ export function useDashboardData(filters: DashboardFilters) {
         porCidade, porEstado: porEstadoSigla, porFornecedor, porMotivoCancelamento,
         porOrigemVenda, porSegmento, porAreaAtuacao, topCidadesByEstado,
         segmentoByEstado, areaAtuacaoByEstado, fornecedorByEstado,
-        porOrigemVendaNovos, porFornecedorNovos, citiesGeo,
+        porOrigemVendaNovos, porFornecedorNovos, citiesGeo, citiesGeoChurn,
       });
 
       // === BUILD LIST ITEMS ===
