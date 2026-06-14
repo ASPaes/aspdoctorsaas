@@ -1,4 +1,4 @@
-export type Severity = 'ok' | 'warn' | 'crit';
+export type Severity = 'ok' | 'warn' | 'crit' | 'indeterminado';
 export type ActionPriority = 'critical' | 'high' | 'strategic';
 export type DiagnosticoTab = 'visao-geral' | 'crescimento' | 'cancelamentos' | 'vendas' | 'distribuicao' | 'cs' | 'cohort';
 
