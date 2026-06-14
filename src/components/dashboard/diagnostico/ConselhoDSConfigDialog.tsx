@@ -348,7 +348,7 @@ export function ConselhoDSConfigDialog({
               {isAdmin && diagInput && !focoMes && selectedIds.length > 0 && !focoLoading && (
                 <p className="text-[11px] text-muted-foreground leading-relaxed flex items-start gap-1.5">
                   <Sparkles className="h-3 w-3 text-primary shrink-0 mt-0.5" />
-                  Clique em "Sugerir foco" — o Conselho DS vai analisar seus indicadores e gerar um texto contextualizado (~R$ 0,15 de custo da IA, cache 24h).
+                  Clique em "Sugerir foco" — o Conselho DS vai analisar seus indicadores e gerar um texto contextualizado (~R$ 0,15 de custo da IA por geração).
                 </p>
               )}
               {isAdmin && selectedIds.length === 0 && (
