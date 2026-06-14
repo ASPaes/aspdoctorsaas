@@ -37,8 +37,32 @@ function greenPalette(count: number): string[] {
   return Array.from({ length: count }, (_, i) => `hsl(145 53% ${l[Math.min(i, l.length - 1)]}%)`);
 }
 
-export function DistribuicaoTab({ distributions, tvMode }: Props) {
+export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
+  const [metric, setMetric] = useState<'qtd'|'mrr'|'ticket'|'margem'|'churn'>('qtd');
+
+  const { data: ufBreak = [] } = useCarteiraBreakdown(filters, 'estado');
+  const { data: ufChurn = [] } = useCarteiraChurn(filters, 'estado');
+
+  const mapData = useMemo(() => {
+    let rows: { name: string; value: number }[];
+    if (metric === 'churn') {
+      rows = ufChurn.filter(r => r.base >= 10).map(r => ({ name: r.label, value: Math.round(r.churn_pct * 1000) / 10 }));
+    } else {
+      const field = (r: any) => metric === 'qtd' ? r.qtd : metric === 'mrr' ? r.mrr : metric === 'ticket' ? r.ticket : Math.round(r.margem_pct * 1000) / 10;
+      rows = ufBreak.map(r => ({ name: r.label, value: field(r) }));
+    }
+    const total = rows.reduce((s, r) => s + (r.value || 0), 0) || 1;
+    return rows.filter(r => r.name && r.name !== '(sem informação)').map(r => ({ ...r, percent: r.value / total }));
+  }, [metric, ufBreak, ufChurn]);
+
+  const metricOpts: { key: typeof metric; label: string }[] = [
+    { key: 'qtd', label: 'Qtd clientes' },
+    { key: 'mrr', label: 'MRR' },
+    { key: 'ticket', label: 'Ticket médio' },
+    { key: 'margem', label: 'Margem %' },
+    { key: 'churn', label: 'Churn' },
+  ];
 
   // Cities filtered by state
   const filteredCidades = useMemo(() => {
