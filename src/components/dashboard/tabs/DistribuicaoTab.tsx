@@ -26,6 +26,14 @@ interface Props { distributions: DistributionData; tvMode: boolean; filters: Das
 const CAP = 15;
 const fmtMoney = (v: number | undefined) => 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR');
 
+const REGIOES: Record<string, string[]> = {
+  'Norte': ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
+  'Nordeste': ['AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE'],
+  'Centro-Oeste': ['DF', 'GO', 'MT', 'MS'],
+  'Sudeste': ['ES', 'MG', 'RJ', 'SP'],
+  'Sul': ['PR', 'RS', 'SC'],
+};
+
 export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -97,6 +105,21 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     return rows.slice(0, 8);
   }, [mapData, mode]);
   const maxRank = useMemo(() => Math.max(...mapData.map(d => Math.abs(d.value)), 1), [mapData]);
+
+  const regioes = useMemo(() => {
+    const breakBy: Record<string, any> = {};
+    ufBreak.forEach((r: any) => { breakBy[r.label] = r; });
+    const churnBy: Record<string, any> = {};
+    ufChurn.forEach((r: any) => { churnBy[r.label] = r; });
+    return Object.entries(REGIOES).map(([nome, ufs]) => {
+      let qtd = 0, mrr = 0, cancelados = 0, base = 0;
+      ufs.forEach(uf => {
+        const b = breakBy[uf]; if (b) { qtd += b.qtd || 0; mrr += b.mrr || 0; }
+        const c = churnBy[uf]; if (c) { cancelados += c.cancelados || 0; base += c.base || 0; }
+      });
+      return { nome, qtd, mrr, churn_pct: base > 0 ? cancelados / base : 0 };
+    });
+  }, [ufBreak, ufChurn]);
 
   const estadoRow: any = selectedState ? ufBreak.find((r: any) => r.label === selectedState) : null;
   const churnRow: any = selectedState ? ufChurn.find((r: any) => r.label === selectedState) : null;
@@ -178,6 +201,26 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
             ))}
             <span>{legend.right}</span>
           </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Por região</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {regioes.map(r => (
+                  <div key={r.nome} className="rounded-lg border p-3">
+                    <p className="text-sm font-semibold">{r.nome}</p>
+                    <p className="text-xl font-bold mt-0.5">{r.qtd}</p>
+                    <p className="text-xs text-muted-foreground">clientes</p>
+                    <p className="text-sm font-mono mt-1">{fmtMoney(r.mrr)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      churn <span className={cn('font-medium', r.churn_pct >= 0.2 ? 'text-red-500' : 'text-foreground')}>{(r.churn_pct * 100).toFixed(0)}%</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Direita */}
