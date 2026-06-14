@@ -122,3 +122,33 @@ export function useCarteiraVariacao(filters: DashboardFilters) {
     },
   });
 }
+
+export interface ChurnDetalheRow {
+  cliente: string;
+  segmento: string;
+  cidade: string;
+  mrr_perdido: number;
+  data_cancelamento: string;
+  observacao: string | null;
+}
+
+export function useChurnDetalheUf(filters: DashboardFilters, uf: string | null) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { iniStr, fimStr } = resolvePeriodo(filters);
+
+  return useQuery({
+    queryKey: ['churn-detalhe-uf', tid, uf, iniStr, fimStr],
+    enabled: !!tid && !!uf,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<ChurnDetalheRow[]> => {
+      const { data, error } = await (supabase.rpc as any)('get_churn_detalhe_uf', {
+        p_tenant: tid,
+        p_uf: uf,
+        p_ini: iniStr,
+        p_fim: fimStr,
+      });
+      if (error) throw error;
+      return (data || []) as ChurnDetalheRow[];
+    },
+  });
+}
