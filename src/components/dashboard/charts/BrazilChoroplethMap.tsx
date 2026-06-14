@@ -60,9 +60,10 @@ interface Props {
   selectedState: string | null;
   onSelectState: (sigla: string | null) => void;
   metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn' | 'variacao';
+  hideSidebar?: boolean;
 }
 
-export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd' }: Props) {
+export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd', hideSidebar = false }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
@@ -165,14 +166,15 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const getColor = (sigla: string) => {
     const val = stateDataMap[sigla]?.value || 0;
     if (metric === 'variacao') {
-      const r = maxAbs > 0 ? val / maxAbs : 0;
-      if (r > 0.66) return 'hsl(145 64% 30%)';
-      if (r > 0.33) return 'hsl(145 60% 42%)';
-      if (r > 0.05) return 'hsl(145 53% 56%)';
-      if (r >= -0.05) return 'hsl(210 12% 85%)';
-      if (r >= -0.33) return 'hsl(8 72% 60%)';
-      if (r >= -0.66) return 'hsl(5 74% 50%)';
-      return 'hsl(2 76% 42%)';
+      const CAP = 15;
+      const r = Math.max(-1, Math.min(1, val / CAP));
+      if (r > 0.5) return 'hsl(145 64% 32%)';
+      if (r > 0.2) return 'hsl(145 58% 44%)';
+      if (r > 0.03) return 'hsl(145 50% 58%)';
+      if (r >= -0.03) return 'hsl(210 14% 40%)';
+      if (r >= -0.2) return 'hsl(8 70% 62%)';
+      if (r >= -0.5) return 'hsl(5 74% 52%)';
+      return 'hsl(2 76% 44%)';
     }
     if (val === 0 || maxValue === 0) return 'hsl(210 12% 90%)';
     const ratio = val / maxValue;
@@ -206,7 +208,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
             <MapPin className={cn('text-primary', tvMode ? 'h-6 w-6' : 'h-5 w-5')} />
             <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>{title}</CardTitle>
           </div>
-          <Badge variant="secondary">{totalClientes} clientes</Badge>
+          {metric === 'qtd' && <Badge variant="secondary">{totalClientes} clientes</Badge>}
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -314,7 +316,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
           </div>
 
           {/* Sidebar */}
-          <div className={cn('border-l bg-muted/30 p-4 space-y-4', tvMode ? 'lg:w-80' : 'lg:w-64')}>
+          <div className={cn('border-l bg-muted/30 p-4 space-y-4', hideSidebar && 'hidden', tvMode ? 'lg:w-80' : 'lg:w-64')}>
             {selectedState && selectedStateData ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
