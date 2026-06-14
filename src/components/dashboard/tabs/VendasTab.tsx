@@ -12,6 +12,10 @@ import {
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
 import { useVendasExplorer, useVendasSerie, useVendasProdutos, useVendasTicketStats } from '../hooks/useVendasExtras';
+import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
+import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
