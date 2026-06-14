@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DistributionData, DistributionDataPoint, DashboardFilters } from '../types';
-import { useCarteiraBreakdown, useCarteiraChurn } from '../hooks/useDistribuicaoExtras';
+import { useCarteiraBreakdown, useCarteiraChurn, useCarteiraVariacao } from '../hooks/useDistribuicaoExtras';
 
 const SIGLA_TO_NAME: Record<string, string> = {
   AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia', CE: 'Ceará',
