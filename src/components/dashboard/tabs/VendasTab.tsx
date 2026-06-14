@@ -62,6 +62,11 @@ interface Props { metrics: KPIMetrics; distributions: DistributionData; tvMode: 
 
 export function VendasTab({ metrics, distributions, tvMode, novosClientesList, filters }: Props) {
   const s = tvMode ? 'tv' : 'lg';
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+  const isAdminOrHead = isAdmin || profile?.role === 'head';
+  const [diagOpen, setDiagOpen] = useState(false);
   const [excludeHiper, setExcludeHiper] = useState(false);
   const [outrosExpanded, setOutrosExpanded] = useState(false);
   const [expMetric, setExpMetric] = useState<'vendas'|'mrr'|'ticket'|'margem_rs'|'margem_pct'>('mrr');
