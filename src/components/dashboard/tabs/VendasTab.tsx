@@ -12,6 +12,10 @@ import {
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
 import { useVendasExplorer, useVendasSerie, useVendasProdutos, useVendasTicketStats } from '../hooks/useVendasExtras';
+import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
+import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 
@@ -58,6 +62,11 @@ interface Props { metrics: KPIMetrics; distributions: DistributionData; tvMode: 
 
 export function VendasTab({ metrics, distributions, tvMode, novosClientesList, filters }: Props) {
   const s = tvMode ? 'tv' : 'lg';
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+  const isAdminOrHead = isAdmin || profile?.role === 'head';
+  const [diagOpen, setDiagOpen] = useState(false);
   const [excludeHiper, setExcludeHiper] = useState(false);
   const [outrosExpanded, setOutrosExpanded] = useState(false);
   const [expMetric, setExpMetric] = useState<'vendas'|'mrr'|'ticket'|'margem_rs'|'margem_pct'>('mrr');
@@ -69,6 +78,29 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const margemRsTotal = breakdown.reduce((a, r) => a + (r.margem_rs || 0), 0);
   const newMrrTotal = breakdown.reduce((a, r) => a + (r.new_mrr || 0), 0);
   const margemPctTotal = newMrrTotal > 0 ? margemRsTotal / newMrrTotal : 0;
+
+  const diagInput: DiagnosticoInput = useMemo(() => ({
+    newMrr: metrics.newMrr,
+    upsellMrr: metrics.upsellMrr,
+    crossSellMrr: metrics.crossSellMrr,
+    clientesAtivos: metrics.clientesAtivos,
+    // extras de vendas (consumidos pelo Conselho DS via tabKey="vendas")
+    novos_clientes: metrics.novosClientes,
+    ticket_medio_novo: metrics.novosClientes > 0 ? metrics.newMrr / metrics.novosClientes : 0,
+    receita_ativacao: metrics.receitaAtivacao,
+    setup_medio: metrics.novosClientes > 0 ? metrics.totalImplantacao / metrics.novosClientes : 0,
+    mrr_adicionado: metrics.newMrr + metrics.upsellMrr + metrics.crossSellMrr,
+    margem_nova_rs: margemRsTotal,
+    margem_nova_pct: margemPctTotal,
+  } as any), [metrics, margemRsTotal, margemPctTotal]);
+
+  const diagnostico = useMemo(() => computeDiagnostico(diagInput, 'vendas'), [diagInput]);
+
+  const tabLabel = useMemo(() => {
+    const now = new Date();
+    const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    return `Vendas · ${meses[now.getMonth()]} ${now.getFullYear()}`;
+  }, []);
 
   // Deltas
   const novosD = computeDelta(metrics.novosClientes, metrics.prevNovosClientes, false, 'abs');
@@ -536,8 +568,34 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         </div>
       </div>
 
+      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
+      <DiagnosticoSection
+        diagnostico={diagnostico}
+        onSeeMore={() => setDiagOpen(true)}
+        tvMode={tvMode}
+      />
+
       {/* Tabela de novos clientes */}
       <NovosClientesTable items={novosClientesList} tvMode={tvMode} />
+
+      {/* MODAL DIAGNÓSTICO */}
+      <DiagnosticoModal
+        diagnostico={diagnostico}
+        open={diagOpen}
+        onOpenChange={setDiagOpen}
+        tabLabel={tabLabel}
+        tenantId={effectiveTenantId || undefined}
+        tabKey="vendas"
+        diagInput={diagInput as Record<string, any>}
+        filtrosAplicados={{
+          unidadeBaseId: filters.unidadeBaseId,
+          fornecedorId: filters.fornecedorId,
+          periodoInicio: filters.periodoInicio,
+          periodoFim: filters.periodoFim,
+        }}
+        isAdmin={isAdmin}
+        isAdminOrHead={isAdminOrHead}
+      />
     </div>
   );
 }
