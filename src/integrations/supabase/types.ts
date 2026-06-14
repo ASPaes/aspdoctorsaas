@@ -7718,6 +7718,19 @@ export type Database = {
           mrr_perdido: number
         }[]
       }
+      get_carteira_clientes_cidade: {
+        Args: {
+          p_cidade: string
+          p_fim: string
+          p_tenant: string
+          p_uf: string
+        }
+        Returns: {
+          cliente: string
+          mrr: number
+          segmento: string
+        }[]
+      }
       get_carteira_variacao: {
         Args: { p_fim_anterior: string; p_fim_atual: string; p_tenant: string }
         Returns: {
