@@ -93,7 +93,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
 
   const rankRows = useMemo(() => {
     const rows = [...mapData];
-    rows.sort((a, b) => mode === 'variacao' ? a.value - b.value : b.value - a.value);
+    rows.sort((a, b) => mode === 'variacao' ? Math.abs(b.value) - Math.abs(a.value) : b.value - a.value);
     return rows.slice(0, 8);
   }, [mapData, mode]);
   const maxRank = useMemo(() => Math.max(...mapData.map(d => Math.abs(d.value)), 1), [mapData]);
