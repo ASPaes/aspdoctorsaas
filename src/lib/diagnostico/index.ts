@@ -32,8 +32,8 @@ export function computeDiagnostico(
   // Aba com regras mas nenhuma disparou → 'ok'. Senão, a maior severidade das causas.
   const severity: Severity = tabRules.length === 0
     ? 'indeterminado'
-    : causes.length === 0
-      ? 'ok'
+      : causes.length === 0
+      ? (input.comparativoIndeterminado === true ? 'indeterminado' : 'ok')
       : causes.reduce<Severity>((acc, c) => (severityRank[c.severity] > severityRank[acc] ? c.severity : acc), 'ok');
 
   const alertCount = matchedRules.filter((r) => r.severity === 'crit').length;

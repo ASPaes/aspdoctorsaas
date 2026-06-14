@@ -11,7 +11,9 @@ export function buildHeadline(
 ): string {
   // Aba sem cobertura de diagnóstico — não assumir saúde nem risco
   if (severity === 'indeterminado') {
-    return 'Esta aba ainda não tem cobertura de diagnóstico — não dá pra afirmar saúde nem risco com os dados atuais.';
+    return input.comparativoIndeterminado === true
+      ? 'Dados insuficientes para avaliar este período com segurança (amostra pequena, início de mês ou intervalo fora de um mês fechado).'
+      : 'Esta aba ainda não tem cobertura de diagnóstico — não dá pra afirmar saúde nem risco com os dados atuais.';
   }
 
   // ─── Padrões específicos da aba Cancelamentos ───
@@ -81,6 +83,23 @@ export function buildHeadline(
     // Crescimento acelerando (Growth Persistence alta)
     if (input.growthPersistence !== undefined && input.growthPersistence >= 1) {
       return `Crescimento acelerando. A taxa de crescimento deste ciclo supera a do ciclo anterior — momentum positivo.`;
+    }
+  }
+
+  // ─── Padrões específicos da aba Vendas ───
+  if (tab === 'vendas' && input.vendasComparavel === true) {
+    const efQtd = input.vendasEhMesCorrente ? input.vendasQtdProj : input.vendasQtdAtual;
+    const efMrr = input.vendasEhMesCorrente ? input.vendasMrrProj : input.vendasMrrAtual;
+    if (input.vendasQtdMedia3m && input.vendasQtdMedia3m > 0 && efQtd !== undefined && (efQtd / input.vendasQtdMedia3m) < 0.5) {
+      return input.vendasEhMesCorrente
+        ? `No ritmo atual o mês de vendas fecha bem abaixo da média recente — a máquina de aquisição desacelerou e precisa de atenção agora.`
+        : `O mês fechou com vendas bem abaixo da média recente — a máquina de aquisição perdeu tração.`;
+    }
+    if (input.vendasMrrYoY && input.vendasMrrYoY > 0 && efMrr !== undefined && (efMrr / input.vendasMrrYoY) < 0.7) {
+      return `Vendas abaixo do mesmo mês do ano passado — não é sazonalidade esperada, é queda real de aquisição.`;
+    }
+    if (input.vendasTicketMedia3m && input.vendasTicketMedia3m > 0 && input.vendasTicketAtual !== undefined && (input.vendasTicketAtual / input.vendasTicketMedia3m) < 0.85) {
+      return `O ticket médio das vendas novas caiu vs a média recente — perda de poder de pricing ou mix de produto pior.`;
     }
   }
 
