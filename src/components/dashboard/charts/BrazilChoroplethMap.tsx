@@ -59,7 +59,7 @@ interface Props {
   citiesGeo?: CityGeoPoint[];
   selectedState: string | null;
   onSelectState: (sigla: string | null) => void;
-  metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn';
+  metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn' | 'variacao';
 }
 
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd' }: Props) {
@@ -151,10 +151,12 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   }, [data]);
 
   const maxValue = useMemo(() => Math.max(...data.map(d => d.value), 1), [data]);
+  const maxAbs = useMemo(() => Math.max(...data.map(d => Math.abs(d.value)), 1), [data]);
   const totalClientes = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
 
-  const METRIC_LABEL: Record<string, string> = { qtd: 'Clientes', mrr: 'MRR', ticket: 'Ticket médio', margem: 'Margem %', churn: 'Churn' };
+  const METRIC_LABEL: Record<string, string> = { qtd: 'Clientes', mrr: 'MRR', ticket: 'Ticket médio', margem: 'Margem %', churn: 'Churn', variacao: 'Δ MRR vs anterior' };
   const fmtMetric = (v: number) => {
+    if (metric === 'variacao') { const x = Math.round(v * 10) / 10; return (x > 0 ? '+' : '') + x.toFixed(1) + '%'; }
     if (metric === 'mrr' || metric === 'ticket') return 'R$ ' + Math.round(v).toLocaleString('pt-BR');
     if (metric === 'margem') return Math.round(v) + '%';
     if (metric === 'churn') return (Math.round(v * 10) / 10).toFixed(1) + '%';
@@ -162,6 +164,16 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   };
   const getColor = (sigla: string) => {
     const val = stateDataMap[sigla]?.value || 0;
+    if (metric === 'variacao') {
+      const r = maxAbs > 0 ? val / maxAbs : 0;
+      if (r > 0.66) return 'hsl(145 64% 30%)';
+      if (r > 0.33) return 'hsl(145 60% 42%)';
+      if (r > 0.05) return 'hsl(145 53% 56%)';
+      if (r >= -0.05) return 'hsl(210 12% 85%)';
+      if (r >= -0.33) return 'hsl(8 72% 60%)';
+      if (r >= -0.66) return 'hsl(5 74% 50%)';
+      return 'hsl(2 76% 42%)';
+    }
     if (val === 0 || maxValue === 0) return 'hsl(210 12% 90%)';
     const ratio = val / maxValue;
     if (metric === 'churn') {
@@ -231,9 +243,9 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                         const isSelected = selectedState === sigla;
                         const val = stateDataMap[sigla]?.value || 0;
                         const stateName = SIGLA_TO_NAME[sigla] || geoName;
-                        const tooltipText = val > 0
-                          ? `${stateName} — ${val} ${val === 1 ? 'cliente' : 'clientes'}`
-                          : `${stateName} — sem clientes`;
+                        const tooltipText = stateDataMap[sigla]
+                          ? `${stateName} — ${fmtMetric(val)}`
+                          : `${stateName} — sem dados`;
 
                         return (
                           <Geography
