@@ -325,4 +325,84 @@ export const RULES: DiagnosticoRule[] = [
     buildCause: (i) => `Existe canal de aquisição com churn rate de ${fmtPct(i.origemMaxChurn!)} no período — cliente vem por essa origem e cancela muito acima da média`,
     actionIds: ['segment_drill_down', 'motivo_root_cause_analysis', 'audit_cancellations'],
   },
+  // ═══════════ VENDAS ═══════════
+  // V1 — Volume/ritmo de vendas muito abaixo da média 3m (crítico)
+  {
+    id: 'vd_ritmo_vendas_critico',
+    tab: 'vendas',
+    severity: 'crit',
+    priority: 100,
+    match: (i) => {
+      if (i.vendasComparavel !== true) return false;
+      const ef = vQtd(i);
+      return i.vendasQtdMedia3m !== undefined && i.vendasQtdMedia3m > 0 && ef !== undefined && (ef / i.vendasQtdMedia3m) < 0.5;
+    },
+    buildCause: (i) => {
+      const ef = vQtd(i) ?? 0;
+      const media = i.vendasQtdMedia3m ?? 0;
+      const queda = media > 0 ? Math.round((1 - ef / media) * 100) : 0;
+      return i.vendasEhMesCorrente
+        ? `No ritmo atual o mês fecha em ~${Math.round(ef)} vendas vs média de ${Math.round(media)}/mês (−${queda}%)`
+        : `Mês fechou com ${Math.round(ef)} vendas vs média de ${Math.round(media)}/mês (−${queda}%)`;
+    },
+    actionIds: ['sales_efficiency_audit', 'funnel_optimization', 'growth_strategy_review'],
+  },
+  // V2 — New MRR (projetado/fechado) abaixo da média 3m (atenção)
+  {
+    id: 'vd_new_mrr_abaixo_media',
+    tab: 'vendas',
+    severity: 'warn',
+    priority: 70,
+    match: (i) => {
+      if (i.vendasComparavel !== true) return false;
+      const ef = vMrr(i);
+      return i.vendasMrrMedia3m !== undefined && i.vendasMrrMedia3m > 0 && ef !== undefined && (ef / i.vendasMrrMedia3m) < 0.6;
+    },
+    buildCause: (i) => {
+      const ef = vMrr(i) ?? 0;
+      const media = i.vendasMrrMedia3m ?? 0;
+      const queda = media > 0 ? Math.round((1 - ef / media) * 100) : 0;
+      return i.vendasEhMesCorrente
+        ? `New MRR projetado ${fmtBRL(ef)} vs média de ${fmtBRL(media)}/mês (−${queda}%)`
+        : `New MRR do mês ${fmtBRL(ef)} vs média de ${fmtBRL(media)}/mês (−${queda}%)`;
+    },
+    actionIds: ['funnel_optimization', 'pricing_review', 'sales_efficiency_audit'],
+  },
+  // V3 — Queda forte vs mesmo mês do ano passado (atenção)
+  {
+    id: 'vd_queda_yoy',
+    tab: 'vendas',
+    severity: 'warn',
+    priority: 60,
+    match: (i) => {
+      if (i.vendasComparavel !== true) return false;
+      const ef = vMrr(i);
+      return i.vendasMrrYoY !== undefined && i.vendasMrrYoY > 0 && ef !== undefined && (ef / i.vendasMrrYoY) < 0.7;
+    },
+    buildCause: (i) => {
+      const ef = vMrr(i) ?? 0;
+      const yoy = i.vendasMrrYoY ?? 0;
+      const queda = yoy > 0 ? Math.round((1 - ef / yoy) * 100) : 0;
+      return `New MRR ${queda}% abaixo do mesmo mês do ano passado (${fmtBRL(ef)} vs ${fmtBRL(yoy)})`;
+    },
+    actionIds: ['growth_strategy_review', 'funnel_optimization', 'expansion_program_launch'],
+  },
+  // V4 — Ticket médio abaixo da média 3m (atenção)
+  {
+    id: 'vd_ticket_abaixo_media',
+    tab: 'vendas',
+    severity: 'warn',
+    priority: 50,
+    match: (i) => {
+      if (i.vendasComparavel !== true) return false;
+      return i.vendasTicketMedia3m !== undefined && i.vendasTicketMedia3m > 0 && i.vendasTicketAtual !== undefined && (i.vendasTicketAtual / i.vendasTicketMedia3m) < 0.85;
+    },
+    buildCause: (i) => {
+      const at = i.vendasTicketAtual ?? 0;
+      const media = i.vendasTicketMedia3m ?? 0;
+      const queda = media > 0 ? Math.round((1 - at / media) * 100) : 0;
+      return `Ticket médio ${fmtBRL(at)} vs média 3m ${fmtBRL(media)} (−${queda}%) — perda de pricing ou mix pior`;
+    },
+    actionIds: ['pricing_review', 'expansion_program_launch'],
+  },
 ];
