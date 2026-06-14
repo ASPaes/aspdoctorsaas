@@ -3,7 +3,8 @@ import { BarChartCard } from '../charts/BarChartCard';
 import { PieChartCard } from '../charts/PieChartCard';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { X, TrendingDown, TrendingUp, AlertTriangle, PieChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DistributionData, DistributionDataPoint, DashboardFilters } from '../types';
 import { useCarteiraBreakdown, useCarteiraChurn, useCarteiraVariacao } from '../hooks/useDistribuicaoExtras';
@@ -62,6 +63,42 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     const total = rows.reduce((s, r) => s + (r.value || 0), 0) || 1;
     return rows.filter(r => r.name && r.name !== '(sem informação)').map(r => ({ ...r, percent: r.value / total }));
   }, [mode, metric, ufBreak, ufChurn, ufVar]);
+
+  const insights = useMemo(() => {
+    const ufNome = (s: string) => SIGLA_TO_NAME[s] || s;
+    const fmtPct = (d: number) => (d > 0 ? '+' : '') + (d * 100).toFixed(1) + '%';
+    const out: { tone: 'down'|'up'|'warn'|'info'; title: string; text: string }[] = [];
+
+    const varValid = ufVar.filter(r => r.uf && r.uf.length === 2 && r.mrr_anterior > 0 && r.delta_pct != null);
+    if (varValid.length) {
+      const queda = [...varValid].sort((a, b) => (a.delta_pct! - b.delta_pct!))[0];
+      const alta = [...varValid].sort((a, b) => (b.delta_pct! - a.delta_pct!))[0];
+      if (queda && (queda.delta_pct ?? 0) < -0.02) {
+        out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} vs período anterior. Vale checar retenção na praça.` });
+      }
+      if (alta && (alta.delta_pct ?? 0) > 0.02) {
+        out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `${fmtPct(alta.delta_pct!)} no MRR vs período anterior. Praça aquecida.` });
+      }
+    }
+
+    const churnValid = ufChurn.filter(r => r.label && r.label.length === 2 && r.base >= 10);
+    if (churnValid.length) {
+      const pior = [...churnValid].sort((a, b) => b.churn_pct - a.churn_pct)[0];
+      if (pior && pior.churn_pct > 0) {
+        out.push({ tone: 'warn', title: `Pior churn: ${ufNome(pior.label)}`, text: `${(pior.churn_pct * 100).toFixed(0)}% da base cancelou no período (${pior.cancelados} de ${pior.base}).` });
+      }
+    }
+
+    const totalMrr = ufBreak.reduce((s, r) => s + (r.mrr || 0), 0);
+    if (totalMrr > 0) {
+      const top = [...ufBreak].filter(r => r.label && r.label.length === 2).sort((a, b) => b.mrr - a.mrr)[0];
+      if (top) {
+        const share = (top.mrr / totalMrr) * 100;
+        if (share >= 25) out.push({ tone: 'info', title: 'Concentração de receita', text: `${ufNome(top.label)} concentra ${share.toFixed(0)}% do MRR. Dependência de uma praça é risco estrutural.` });
+      }
+    }
+    return out;
+  }, [ufVar, ufChurn, ufBreak]);
 
   const metricOpts: { key: typeof metric; label: string }[] = [
     { key: 'qtd', label: 'Qtd clientes' },
@@ -161,6 +198,36 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
           </span>
         )}
       </div>
+
+      {insights.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Leitura do período</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+              {insights.map((ins, i) => {
+                const Icon = ins.tone === 'down' ? TrendingDown : ins.tone === 'up' ? TrendingUp : ins.tone === 'warn' ? AlertTriangle : PieChart;
+                const color = ins.tone === 'down' ? 'text-red-500 bg-red-500/10'
+                  : ins.tone === 'up' ? 'text-emerald-500 bg-emerald-500/10'
+                  : ins.tone === 'warn' ? 'text-amber-500 bg-amber-500/10'
+                  : 'text-sky-500 bg-sky-500/10';
+                return (
+                  <div key={i} className="flex items-start gap-3 rounded-md border border-border p-3">
+                    <div className={cn('shrink-0 rounded-md p-2', color)}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="text-sm leading-snug">
+                      <span className="font-semibold">{ins.title}.</span>{' '}
+                      <span className="text-muted-foreground">{ins.text}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Choropleth Map */}
       <BrazilChoroplethMap
