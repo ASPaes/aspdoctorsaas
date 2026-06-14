@@ -12,6 +12,7 @@ interface DiagnosticoInlineCardProps {
 function severityToCardClass(sev: Severity): string {
   if (sev === 'crit') return '';
   if (sev === 'warn') return 'diag-card-warn';
+  if (sev === 'indeterminado') return 'diag-card-indeterminado';
   return 'diag-card-ok';
 }
 
@@ -24,12 +25,14 @@ function severityToNumClass(sev: Severity): string {
 function severityToColor(sev: Severity): string {
   if (sev === 'crit') return 'hsl(0 84% 60%)';
   if (sev === 'warn') return 'hsl(38 92% 50%)';
+  if (sev === 'indeterminado') return 'hsl(215 16% 55%)';
   return 'hsl(142 71% 45%)';
 }
 
 function severityToLabel(sev: Severity): string {
   if (sev === 'crit') return 'Estado crítico';
   if (sev === 'warn') return 'Estado de atenção';
+  if (sev === 'indeterminado') return 'Estado indeterminado';
   return 'Estado saudável';
 }
 

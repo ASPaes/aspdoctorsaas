@@ -17,12 +17,13 @@ export function DiagnosticoButton({ diagnostico, onClick, className }: Diagnosti
   if (diagnostico.severity === 'ok') return null;
 
   const isWarn = diagnostico.severity === 'warn';
+  const isIndeterminado = diagnostico.severity === 'indeterminado';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn('diag-button', isWarn && 'diag-button-warn', className)}
+      className={cn('diag-button', isWarn && 'diag-button-warn', isIndeterminado && 'diag-button-indeterminado', className)}
       aria-label="Abrir diagnóstico executivo"
     >
       <AlertTriangle className="h-3.5 w-3.5" />

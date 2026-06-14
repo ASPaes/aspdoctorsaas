@@ -9,6 +9,11 @@ export function buildHeadline(
   severity: Severity,
   tab?: DiagnosticoTab,
 ): string {
+  // Aba sem cobertura de diagnóstico — não assumir saúde nem risco
+  if (severity === 'indeterminado') {
+    return 'Esta aba ainda não tem cobertura de diagnóstico — não dá pra afirmar saúde nem risco com os dados atuais.';
+  }
+
   // ─── Padrões específicos da aba Cancelamentos ───
   if (tab === 'cancelamentos') {
     // Concentração crítica de motivo (risco binário)

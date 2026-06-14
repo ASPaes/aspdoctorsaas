@@ -67,6 +67,24 @@
   background: radial-gradient(circle, hsl(142 71% 45% / 0.08) 0%, transparent 60%);
 }
 
+.diag-card-indeterminado {
+  background: linear-gradient(135deg, hsl(215 16% 55% / 0.06) 0%, hsl(222 47% 10%) 70%);
+  border-color: hsl(215 16% 55% / 0.3);
+  box-shadow:
+    inset 0 1px 0 hsl(215 16% 65% / 0.08),
+    0 4px 12px hsl(0 0% 0% / 0.2),
+    0 16px 40px -16px hsl(215 16% 55% / 0.15);
+}
+
+.diag-card-indeterminado::before {
+  background: linear-gradient(180deg, hsl(215 16% 55%) 0%, hsl(215 16% 55% / 0.3) 100%);
+  box-shadow: 0 0 16px hsl(215 16% 55% / 0.4);
+}
+
+.diag-card-indeterminado::after {
+  background: radial-gradient(circle, hsl(215 16% 55% / 0.08) 0%, transparent 60%);
+}
+
 @keyframes diag-breath {
   0%   { transform: scale(1) translate(0, 0); opacity: 0.7; }
   100% { transform: scale(1.15) translate(-5%, 5%); opacity: 1; }
@@ -258,6 +276,22 @@
 .diag-button-warn .diag-button-count {
   background: hsl(38 92% 50% / 0.25);
   color: hsl(38 92% 50%);
+}
+
+.diag-button-indeterminado {
+  border-color: hsl(215 16% 55% / 0.3);
+  background: linear-gradient(180deg, hsl(215 16% 55% / 0.16) 0%, hsl(215 16% 55% / 0.08) 100%);
+  color: hsl(215 16% 70%);
+}
+.diag-button-indeterminado:hover {
+  border-color: hsl(215 16% 55% / 0.5);
+  box-shadow:
+    inset 0 1px 0 hsl(215 16% 65% / 0.2),
+    0 8px 24px -8px hsl(215 16% 55% / 0.3);
+}
+.diag-button-indeterminado .diag-button-count {
+  background: hsl(215 16% 55% / 0.25);
+  color: hsl(215 16% 70%);
 }
 
 @media (prefers-reduced-motion: reduce) {
