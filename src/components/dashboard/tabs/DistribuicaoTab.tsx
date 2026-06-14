@@ -201,6 +201,26 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
             ))}
             <span>{legend.right}</span>
           </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Por região</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {regioes.map(r => (
+                  <div key={r.nome} className="rounded-lg border p-3">
+                    <p className="text-sm font-semibold">{r.nome}</p>
+                    <p className="text-xl font-bold mt-0.5">{r.qtd}</p>
+                    <p className="text-xs text-muted-foreground">clientes</p>
+                    <p className="text-sm font-mono mt-1">{fmtMoney(r.mrr)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      churn <span className={cn('font-medium', r.churn_pct >= 0.2 ? 'text-red-500' : 'text-foreground')}>{(r.churn_pct * 100).toFixed(0)}%</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Direita */}
