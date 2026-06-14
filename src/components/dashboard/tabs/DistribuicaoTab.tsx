@@ -1,11 +1,15 @@
 import { useState, useMemo } from 'react';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { X, TrendingDown, TrendingUp, AlertTriangle, PieChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DistributionData, DashboardFilters } from '../types';
-import { useCarteiraBreakdown, useCarteiraChurn, useCarteiraVariacao } from '../hooks/useDistribuicaoExtras';
+import {
+  useCarteiraBreakdown,
+  useCarteiraChurn,
+  useCarteiraVariacao,
+  useChurnDetalheUf,
+} from '../hooks/useDistribuicaoExtras';
 
 const SIGLA_TO_NAME: Record<string, string> = {
   AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia', CE: 'Ceará',
@@ -28,6 +32,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const { data: ufBreak = [] } = useCarteiraBreakdown(filters, 'estado');
   const { data: ufChurn = [] } = useCarteiraChurn(filters, 'estado');
   const { data: ufVar = [] } = useCarteiraVariacao(filters);
+  const { data: churnDet = [] } = useChurnDetalheUf(filters, selectedState);
 
   const mapData = useMemo(() => {
     if (mode === 'variacao') {
@@ -98,6 +103,10 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
 
   const maxRank = useMemo(() => Math.max(...mapData.map(d => Math.abs(d.value)), 1), [mapData]);
 
+  const detBreak: any = selectedState ? ufBreak.find((r: any) => r.label === selectedState) : null;
+  const detChurn: any = selectedState ? ufChurn.find((r: any) => r.label === selectedState) : null;
+  const detMrrPerdido = churnDet.reduce((s, c) => s + (c.mrr_perdido || 0), 0);
+
   const fmtVal = (v: number) => {
     if (mode === 'variacao') return (v > 0 ? '+' : '') + v.toFixed(1) + '%';
     if (metric === 'mrr' || metric === 'ticket') return 'R$ ' + Math.round(v).toLocaleString('pt-BR');
@@ -123,17 +132,6 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
 
   return (
     <div className="space-y-4">
-      {selectedState && (
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="gap-2">
-            Filtrando por: {SIGLA_TO_NAME[selectedState] || selectedState}
-            <button onClick={() => setSelectedState(null)} className="ml-1 hover:bg-muted rounded-full p-0.5">
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        </div>
-      )}
-
       {/* Modo + métrica */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border overflow-hidden">
@@ -167,7 +165,6 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
         )}
       </div>
 
-      {/* Layout 2 colunas: mapa+legenda | leitura+ranking */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
         {/* Esquerda */}
         <div className="space-y-3">
@@ -191,64 +188,134 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
 
         {/* Direita */}
         <div className="space-y-4">
-          {insights.length > 0 && (
+          {selectedState ? (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Leitura do período</CardTitle>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>{SIGLA_TO_NAME[selectedState] || selectedState}</span>
+                  <button
+                    onClick={() => setSelectedState(null)}
+                    className="p-1 hover:bg-muted rounded-full"
+                    aria-label="Fechar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {insights.map((ins, i) => {
-                    const Icon = ins.tone === 'down' ? TrendingDown : ins.tone === 'up' ? TrendingUp : ins.tone === 'warn' ? AlertTriangle : PieChart;
-                    const color = ins.tone === 'down' ? 'text-red-500 bg-red-500/10'
-                      : ins.tone === 'up' ? 'text-emerald-500 bg-emerald-500/10'
-                      : ins.tone === 'warn' ? 'text-amber-500 bg-amber-500/10'
-                      : 'text-sky-500 bg-sky-500/10';
-                    return (
-                      <li key={i} className="flex gap-3">
-                        <div className={cn('h-8 w-8 rounded-full flex items-center justify-center shrink-0', color)}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="text-sm leading-snug">
-                          <span className="font-semibold">{ins.title}.</span>{' '}
-                          <span className="text-muted-foreground">{ins.text}</span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Carteira</p>
+                    <p className="text-lg font-semibold">{detBreak?.qtd ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">R$ {Math.round(detBreak?.mrr ?? 0).toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Churn</p>
+                    <p className={cn('text-lg font-semibold', (detChurn?.churn_pct ?? 0) >= 0.2 ? 'text-red-500' : 'text-foreground')}>
+                      {(((detChurn?.churn_pct ?? 0)) * 100).toFixed(0)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground">{detChurn?.cancelados ?? 0} de {detChurn?.base ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">MRR perdido</p>
+                    <p className="text-lg font-semibold">R$ {Math.round(detMrrPerdido).toLocaleString('pt-BR')}</p>
+                    <p className="text-xs text-muted-foreground">no período</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">O que saiu no período</h4>
+                  {churnDet.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum cancelamento no período.</p>
+                  ) : (
+                    <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                      {churnDet.map((c, i) => (
+                        <li key={i} className="flex items-start justify-between gap-2 border-b pb-2 last:border-b-0">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{c.cliente}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {c.segmento}{c.cidade ? ' · ' + c.cidade : ''}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-mono">R$ {Math.round(c.mrr_perdido).toLocaleString('pt-BR')}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {c.data_cancelamento ? c.data_cancelamento.split('-').reverse().join('/') : ''}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          )}
+          ) : (
+            <>
+              {insights.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Leitura do período</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {insights.map((ins, i) => {
+                        const Icon = ins.tone === 'down' ? TrendingDown : ins.tone === 'up' ? TrendingUp : ins.tone === 'warn' ? AlertTriangle : PieChart;
+                        const color = ins.tone === 'down' ? 'text-red-500 bg-red-500/10'
+                          : ins.tone === 'up' ? 'text-emerald-500 bg-emerald-500/10'
+                          : ins.tone === 'warn' ? 'text-amber-500 bg-amber-500/10'
+                          : 'text-sky-500 bg-sky-500/10';
+                        return (
+                          <li key={i} className="flex gap-3">
+                            <div className={cn('h-8 w-8 rounded-full flex items-center justify-center shrink-0', color)}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="text-sm leading-snug">
+                              <span className="font-semibold">{ins.title}.</span>{' '}
+                              <span className="text-muted-foreground">{ins.text}</span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{rankTitle}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {rankRows.map((r) => {
-                  const up = r.value >= 0;
-                  const w = mode === 'variacao'
-                    ? Math.min(Math.abs(r.value), CAP) / CAP * 100
-                    : (Math.abs(r.value) / maxRank) * 100;
-                  const barColor = mode === 'variacao' ? (up ? 'hsl(145 64% 40%)' : 'hsl(2 76% 52%)') : 'hsl(145 53% 40%)';
-                  const txtColor = mode === 'variacao' ? (up ? 'text-emerald-500' : 'text-red-500') : 'text-foreground';
-                  return (
-                    <div key={r.name} className="grid grid-cols-[3rem_1fr_5rem] items-center gap-2 text-sm">
-                      <span className="font-medium">{r.name}</span>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${w}%`, backgroundColor: barColor }} />
-                      </div>
-                      <span className={cn('font-mono text-right text-xs', txtColor)}>
-                        {mode === 'variacao' ? (up ? '▲ ' : '▼ ') : ''}{fmtVal(r.value)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{rankTitle}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {rankRows.map((r) => {
+                      const up = r.value >= 0;
+                      const w = mode === 'variacao'
+                        ? Math.min(Math.abs(r.value), CAP) / CAP * 100
+                        : (Math.abs(r.value) / maxRank) * 100;
+                      const barColor = mode === 'variacao' ? (up ? 'hsl(145 64% 40%)' : 'hsl(2 76% 52%)') : 'hsl(145 53% 40%)';
+                      const txtColor = mode === 'variacao' ? (up ? 'text-emerald-500' : 'text-red-500') : 'text-foreground';
+                      return (
+                        <button
+                          key={r.name}
+                          onClick={() => setSelectedState(r.name)}
+                          className="w-full grid grid-cols-[3rem_1fr_5rem] items-center gap-2 text-sm hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+                        >
+                          <span className="font-medium text-left">{r.name}</span>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${w}%`, backgroundColor: barColor }} />
+                          </div>
+                          <span className={cn('font-mono text-right text-xs', txtColor)}>
+                            {mode === 'variacao' ? (up ? '▲ ' : '▼ ') : ''}{fmtVal(r.value)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
     </div>
