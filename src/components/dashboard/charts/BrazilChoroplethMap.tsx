@@ -272,6 +272,25 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                       })
                     }
                   </Geographies>
+                  <Geographies geography="/data/brazil-regions.geojson">
+                    {({ geographies }) =>
+                      geographies.map(geo => (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill="none"
+                          stroke="hsl(var(--foreground))"
+                          strokeOpacity={0.4}
+                          strokeWidth={1.6 / position.zoom}
+                          style={{
+                            default: { outline: 'none', pointerEvents: 'none' },
+                            hover: { outline: 'none', pointerEvents: 'none' },
+                            pressed: { outline: 'none', pointerEvents: 'none' },
+                          }}
+                        />
+                      ))
+                    }
+                  </Geographies>
                   {citiesGeo.map((city) => {
                     const cityScale = Math.sqrt(city.qtd || 1) / Math.sqrt(maxCityQtd);
                     const screenRadius = Math.max(5, (5 + cityScale * 12) / Math.sqrt(position.zoom));
