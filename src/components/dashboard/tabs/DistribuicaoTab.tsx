@@ -199,6 +199,36 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
         )}
       </div>
 
+      {insights.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Leitura do período</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+              {insights.map((ins, i) => {
+                const Icon = ins.tone === 'down' ? TrendingDown : ins.tone === 'up' ? TrendingUp : ins.tone === 'warn' ? AlertTriangle : PieChart;
+                const color = ins.tone === 'down' ? 'text-red-500 bg-red-500/10'
+                  : ins.tone === 'up' ? 'text-emerald-500 bg-emerald-500/10'
+                  : ins.tone === 'warn' ? 'text-amber-500 bg-amber-500/10'
+                  : 'text-sky-500 bg-sky-500/10';
+                return (
+                  <div key={i} className="flex items-start gap-3 rounded-md border border-border p-3">
+                    <div className={cn('shrink-0 rounded-md p-2', color)}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="text-sm leading-snug">
+                      <span className="font-semibold">{ins.title}.</span>{' '}
+                      <span className="text-muted-foreground">{ins.text}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Choropleth Map */}
       <BrazilChoroplethMap
         title="Distribuição Geográfica por Estado"
