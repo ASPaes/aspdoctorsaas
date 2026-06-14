@@ -154,6 +154,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
   const maxValue = useMemo(() => Math.max(...data.map(d => d.value), 1), [data]);
   const maxAbs = useMemo(() => Math.max(...data.map(d => Math.abs(d.value)), 1), [data]);
   const totalClientes = useMemo(() => data.reduce((s, d) => s + d.value, 0), [data]);
+  const maxCityQtd = useMemo(() => Math.max(...citiesGeo.map(c => c.qtd || 0), 1), [citiesGeo]);
 
   const METRIC_LABEL: Record<string, string> = { qtd: 'Clientes', mrr: 'MRR', ticket: 'Ticket médio', margem: 'Margem %', churn: 'Churn', variacao: 'Δ MRR vs anterior' };
   const fmtMetric = (v: number) => {
