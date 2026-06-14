@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DistributionData, DistributionDataPoint, DashboardFilters } from '../types';
-import { useCarteiraBreakdown, useCarteiraChurn } from '../hooks/useDistribuicaoExtras';
+import { useCarteiraBreakdown, useCarteiraChurn, useCarteiraVariacao } from '../hooks/useDistribuicaoExtras';
 
 const SIGLA_TO_NAME: Record<string, string> = {
   AC: 'Acre', AL: 'Alagoas', AM: 'Amazonas', AP: 'Amapá', BA: 'Bahia', CE: 'Ceará',
@@ -40,11 +40,18 @@ function greenPalette(count: number): string[] {
 export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [metric, setMetric] = useState<'qtd'|'mrr'|'ticket'|'margem'|'churn'>('qtd');
+  const [mode, setMode] = useState<'nivel'|'variacao'>('nivel');
 
   const { data: ufBreak = [] } = useCarteiraBreakdown(filters, 'estado');
   const { data: ufChurn = [] } = useCarteiraChurn(filters, 'estado');
+  const { data: ufVar = [] } = useCarteiraVariacao(filters);
 
   const mapData = useMemo(() => {
+    if (mode === 'variacao') {
+      return ufVar
+        .filter(r => r.uf && r.uf !== '(sem informação)' && r.mrr_anterior > 0)
+        .map(r => ({ name: r.uf, value: Math.round((r.delta_pct ?? 0) * 1000) / 10, percent: 0 }));
+    }
     let rows: { name: string; value: number }[];
     if (metric === 'churn') {
       rows = ufChurn.filter(r => r.base >= 10).map(r => ({ name: r.label, value: Math.round(r.churn_pct * 1000) / 10 }));
@@ -54,7 +61,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     }
     const total = rows.reduce((s, r) => s + (r.value || 0), 0) || 1;
     return rows.filter(r => r.name && r.name !== '(sem informação)').map(r => ({ ...r, percent: r.value / total }));
-  }, [metric, ufBreak, ufChurn]);
+  }, [mode, metric, ufBreak, ufChurn, ufVar]);
 
   const metricOpts: { key: typeof metric; label: string }[] = [
     { key: 'qtd', label: 'Qtd clientes' },
@@ -115,29 +122,51 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
         </div>
       )}
 
-      {/* Métrica do mapa */}
-      <div className="flex flex-wrap gap-2">
-        {metricOpts.map(o => (
-          <button
-            key={o.key}
-            onClick={() => setMetric(o.key)}
-            className={cn(
-              'px-3 py-1.5 rounded-full border text-sm transition-colors',
-              metric === o.key
-                ? 'bg-primary/10 border-primary text-primary'
-                : 'border-border text-muted-foreground hover:bg-muted',
-            )}
-          >
-            {o.label}
-          </button>
-        ))}
+      {/* Modo + métrica do mapa */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-full border border-border overflow-hidden">
+          {(['nivel','variacao'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={cn(
+                'px-4 py-1.5 text-sm transition-colors',
+                mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+              )}
+            >
+              {m === 'nivel' ? 'Nível' : 'Variação'}
+            </button>
+          ))}
+        </div>
+        {mode === 'nivel' ? (
+          <div className="flex flex-wrap gap-2">
+            {metricOpts.map(o => (
+              <button
+                key={o.key}
+                onClick={() => setMetric(o.key)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full border text-sm transition-colors',
+                  metric === o.key
+                    ? 'bg-primary/10 border-primary text-primary'
+                    : 'border-border text-muted-foreground hover:bg-muted',
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            Δ MRR da carteira vs período anterior — <span className="text-foreground">verde cresceu · vermelho caiu</span>
+          </span>
+        )}
       </div>
 
       {/* Choropleth Map */}
       <BrazilChoroplethMap
         title="Distribuição Geográfica por Estado"
         data={mapData}
-        metric={metric}
+        metric={mode === 'variacao' ? ('variacao' as any) : metric}
         tvMode={tvMode}
         topCidadesByEstado={distributions.topCidadesByEstado}
         citiesGeo={distributions.citiesGeo}
