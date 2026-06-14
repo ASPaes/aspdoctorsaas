@@ -60,6 +60,7 @@ interface Props {
   selectedState: string | null;
   onSelectState: (sigla: string | null) => void;
   metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn' | 'variacao';
+  hideSidebar?: boolean;
 }
 
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd' }: Props) {
