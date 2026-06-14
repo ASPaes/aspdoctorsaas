@@ -167,6 +167,8 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
             selectedState={selectedState}
             onSelectState={selectState}
             metric={mode === 'variacao' ? ('variacao' as any) : metric}
+            citiesGeo={mode === 'nivel' && metric === 'churn' ? (distributions.citiesGeoChurn ?? []) : (distributions.citiesGeo ?? [])}
+            markerColor={mode === 'nivel' && metric === 'churn' ? 'hsl(0 72% 50%)' : 'hsl(199 89% 45%)'}
             hideSidebar
           />
           <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
