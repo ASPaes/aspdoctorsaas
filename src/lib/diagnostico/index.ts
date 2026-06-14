@@ -3,7 +3,7 @@ import { RULES } from './rules';
 import { ACTIONS } from './actions';
 import { buildHeadline } from './headlines';
 
-const severityRank: Record<Severity, number> = { ok: 0, warn: 1, crit: 2 };
+const severityRank: Record<Severity, number> = { indeterminado: -1, ok: 0, warn: 1, crit: 2 };
 
 /**
  * Computa o diagnóstico executivo a partir das métricas + aba.
@@ -13,8 +13,9 @@ export function computeDiagnostico(
   input: DiagnosticoInput,
   tab: DiagnosticoTab = 'visao-geral',
 ): Diagnostico {
-  const matchedRules = RULES
-    .filter((r) => r.tab === tab && r.match(input))
+  const tabRules = RULES.filter((r) => r.tab === tab);
+  const matchedRules = tabRules
+    .filter((r) => r.match(input))
     .sort((a, b) => {
       const sev = severityRank[b.severity] - severityRank[a.severity];
       if (sev !== 0) return sev;
@@ -27,10 +28,13 @@ export function computeDiagnostico(
     severity: r.severity,
   }));
 
-  // Severidade geral = a maior das causas, ou 'ok' se nenhuma match
-  const severity: Severity = causes.length === 0
-    ? 'ok'
-    : causes.reduce<Severity>((acc, c) => (severityRank[c.severity] > severityRank[acc] ? c.severity : acc), 'ok');
+  // Aba SEM nenhuma regra cadastrada → 'indeterminado' (NÃO assumir saudável).
+  // Aba com regras mas nenhuma disparou → 'ok'. Senão, a maior severidade das causas.
+  const severity: Severity = tabRules.length === 0
+    ? 'indeterminado'
+    : causes.length === 0
+      ? 'ok'
+      : causes.reduce<Severity>((acc, c) => (severityRank[c.severity] > severityRank[acc] ? c.severity : acc), 'ok');
 
   const alertCount = matchedRules.filter((r) => r.severity === 'crit').length;
 
