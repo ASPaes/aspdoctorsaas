@@ -72,6 +72,9 @@ export interface DiagnosticoInput {
   mortalidadeQtdPct?: number;       // decimal — % do volume de cancelamentos categorizados como mortality
   origemMaxChurn?: number;          // decimal — maior churn rate entre origens com ≥3 cancelamentos no período (0.07 = 7%)
 
+  // Meta (genérico): força estado 'indeterminado' quando o comparativo da aba não é confiável
+  comparativoIndeterminado?: boolean;
+
   // Vendas — comparativo mensal (Passo 1: média 3m / projeção / YoY)
   vendasComparavel?: boolean;       // false → comparativo indeterminado (baseline insuf. ou início de mês)
   vendasEhMesCorrente?: boolean;
