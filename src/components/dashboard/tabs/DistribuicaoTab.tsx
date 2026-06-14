@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
+import { CarteiraSerieChart } from '../charts/CarteiraSerieChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingDown, TrendingUp, AlertTriangle, PieChart, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -451,6 +452,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
           )}
         </div>
       </div>
+      <CarteiraSerieChart filters={filters} />
     </div>
   );
 }
