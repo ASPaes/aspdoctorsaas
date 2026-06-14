@@ -703,6 +703,32 @@ export function useDashboardData(filters: DashboardFilters) {
         };
       });
 
+      // Cidades dos cancelados no período (para markers no modo churn)
+      const cancelCityCounts: Record<number, number> = {};
+      const cancelCityClientes: Record<number, string[]> = {};
+      (clientesRaw || []).forEach((c: any) => {
+        if (c.cancelado !== true || !c.data_cancelamento) return;
+        const dc = String(c.data_cancelamento).slice(0, 10);
+        if (dc < periodoInicioStr || dc > periodoFimStr) return;
+        if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return;
+        if (!c.cidade_id || !cidadeGeoMap[c.cidade_id]) return;
+        cancelCityCounts[c.cidade_id] = (cancelCityCounts[c.cidade_id] || 0) + 1;
+        if (!cancelCityClientes[c.cidade_id]) cancelCityClientes[c.cidade_id] = [];
+        const nome = (c.nome_fantasia?.trim()) || (c.razao_social?.trim()) || '(sem nome)';
+        cancelCityClientes[c.cidade_id].push(nome);
+      });
+      const citiesGeoChurn: import('../types').CityGeoPoint[] = Object.entries(cancelCityCounts).map(([cidadeId, qtd]) => {
+        const geo = cidadeGeoMap[Number(cidadeId)];
+        return {
+          nome: geo.nome,
+          uf: estadoSiglaMap[geo.estadoId] || '',
+          latitude: geo.lat,
+          longitude: geo.lng,
+          qtd,
+          clientes: (cancelCityClientes[Number(cidadeId)] || []).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+        };
+      });
+
       // Convert estado distribution to use sigla for map compatibility
       const porEstadoSigla = buildDistribution(activeClients, 'estado_id', estadoSiglaMap, null);
 
