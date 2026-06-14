@@ -148,3 +148,29 @@ export function useCarteiraClientesCidade(filters: DashboardFilters, uf: string 
     },
   });
 }
+
+export interface CarteiraSerieRow {
+  ym: string;
+  uf: string;
+  mrr: number;
+  qtd: number;
+}
+
+export function useCarteiraSerieUf(filters: DashboardFilters, meses: number) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery({
+    queryKey: ['carteira-serie-uf', tid, meses, filters.fornecedorId, filters.unidadeBaseId],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async (): Promise<CarteiraSerieRow[]> => {
+      const { data, error } = await (supabase.rpc as any)('get_carteira_serie_uf', {
+        p_tenant: tid,
+        p_meses: meses,
+        p_fornecedor: filters.fornecedorId ?? null,
+        p_unidade: filters.unidadeBaseId ?? null,
+      });
+      if (error) throw error;
+      return (data || []) as CarteiraSerieRow[];
+    },
+  });
+}
