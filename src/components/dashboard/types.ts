@@ -118,6 +118,7 @@ export interface DistributionData {
   areaAtuacaoByEstado?: Record<string, DistributionDataPoint[]>;
   fornecedorByEstado?: Record<string, DistributionDataPoint[]>;
   citiesGeo?: CityGeoPoint[];
+  citiesGeoChurn?: CityGeoPoint[];
   // Vendas: distribuições baseadas nos novos clientes do período
   porOrigemVendaNovos?: DistributionDataPoint[];
   porFornecedorNovos?: DistributionDataPoint[];
