@@ -273,7 +273,8 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                     }
                   </Geographies>
                   {citiesGeo.map((city) => {
-                    const screenRadius = Math.max(7, 8 / Math.sqrt(position.zoom));
+                    const cityScale = Math.sqrt(city.qtd || 1) / Math.sqrt(maxCityQtd);
+                    const screenRadius = Math.max(5, (5 + cityScale * 12) / Math.sqrt(position.zoom));
                     const r = screenRadius / position.zoom;
                     const hitRadius = Math.max(10, screenRadius * 1.5) / position.zoom;
                     const cityKey = `${city.uf}-${city.nome}`;
