@@ -26,6 +26,14 @@ interface Props { distributions: DistributionData; tvMode: boolean; filters: Das
 const CAP = 15;
 const fmtMoney = (v: number | undefined) => 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR');
 
+const REGIOES: Record<string, string[]> = {
+  'Norte': ['AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO'],
+  'Nordeste': ['AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE'],
+  'Centro-Oeste': ['DF', 'GO', 'MT', 'MS'],
+  'Sudeste': ['ES', 'MG', 'RJ', 'SP'],
+  'Sul': ['PR', 'RS', 'SC'],
+};
+
 export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
