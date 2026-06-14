@@ -570,12 +570,27 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         </div>
       </div>
 
-      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
-      <DiagnosticoSection
-        diagnostico={diagnostico}
-        onSeeMore={() => setDiagOpen(true)}
-        tvMode={tvMode}
-      />
+      {/* ═══════ CONSELHO DOCTOR SAAS ═══════ */}
+      <section>
+        <SectionHeader
+          title="Conselho DOCTOR SAAS"
+          description="Análise estratégica das suas vendas pelo Conselho DS"
+          icon={<Sparkles className="h-5 w-5 text-primary" />}
+          tvMode={tvMode}
+        />
+        <Card>
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Receba uma análise estratégica das suas vendas no período, feita pelo Conselho DS com base nos seus indicadores reais.
+            </p>
+            <Button onClick={() => setDiagOpen(true)} className="shrink-0">
+              <Sparkles className="h-4 w-4" />
+              Abrir Conselho DS
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
 
       {/* Tabela de novos clientes */}
       <NovosClientesTable items={novosClientesList} tvMode={tvMode} />
