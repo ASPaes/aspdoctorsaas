@@ -1,12 +1,10 @@
 import { useState, useMemo } from 'react';
-import { BarChartCard } from '../charts/BarChartCard';
-import { PieChartCard } from '../charts/PieChartCard';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { X, TrendingDown, TrendingUp, AlertTriangle, PieChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DistributionData, DistributionDataPoint, DashboardFilters } from '../types';
+import type { DistributionData, DashboardFilters } from '../types';
 import { useCarteiraBreakdown, useCarteiraChurn, useCarteiraVariacao } from '../hooks/useDistribuicaoExtras';
 
 const SIGLA_TO_NAME: Record<string, string> = {
@@ -20,28 +18,12 @@ const SIGLA_TO_NAME: Record<string, string> = {
 
 interface Props { distributions: DistributionData; tvMode: boolean; filters: DashboardFilters; }
 
-/** Top N + group rest into "Outros" */
-function topN(data: DistributionDataPoint[], n: number): DistributionDataPoint[] {
-  const sorted = [...data].sort((a, b) => b.value - a.value);
-  const top = sorted.slice(0, n);
-  const rest = sorted.slice(n);
-  if (rest.length > 0) {
-    const outrosValue = rest.reduce((s, d) => s + d.value, 0);
-    const outrosPercent = rest.reduce((s, d) => s + d.percent, 0);
-    top.push({ name: 'Outros', value: outrosValue, percent: outrosPercent });
-  }
-  return top;
-}
-
-function greenPalette(count: number): string[] {
-  const l = [34, 40, 48, 55, 62, 68, 74, 80, 85, 90];
-  return Array.from({ length: count }, (_, i) => `hsl(145 53% ${l[Math.min(i, l.length - 1)]}%)`);
-}
+const CAP = 15;
 
 export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const [selectedState, setSelectedState] = useState<string | null>(null);
-  const [metric, setMetric] = useState<'qtd'|'mrr'|'ticket'|'margem'|'churn'>('qtd');
-  const [mode, setMode] = useState<'nivel'|'variacao'>('nivel');
+  const [metric, setMetric] = useState<'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn'>('qtd');
+  const [mode, setMode] = useState<'nivel' | 'variacao'>('nivel');
 
   const { data: ufBreak = [] } = useCarteiraBreakdown(filters, 'estado');
   const { data: ufChurn = [] } = useCarteiraChurn(filters, 'estado');
@@ -50,55 +32,84 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
   const mapData = useMemo(() => {
     if (mode === 'variacao') {
       return ufVar
-        .filter(r => r.uf && r.uf !== '(sem informação)' && r.mrr_anterior > 0)
-        .map(r => ({ name: r.uf, value: Math.round((r.delta_pct ?? 0) * 1000) / 10, percent: 0 }));
+        .filter((r: any) => r.uf && r.uf !== '(sem informação)' && r.mrr_anterior > 0)
+        .map((r: any) => ({ name: r.uf, value: Math.round((r.delta_pct ?? 0) * 1000) / 10, percent: 0 }));
     }
     let rows: { name: string; value: number }[];
     if (metric === 'churn') {
-      rows = ufChurn.filter(r => r.base >= 10).map(r => ({ name: r.label, value: Math.round(r.churn_pct * 1000) / 10 }));
+      rows = ufChurn
+        .filter((r: any) => r.base >= 10)
+        .map((r: any) => ({ name: r.label, value: Math.round(r.churn_pct * 1000) / 10 }));
     } else {
-      const field = (r: any) => metric === 'qtd' ? r.qtd : metric === 'mrr' ? r.mrr : metric === 'ticket' ? r.ticket : Math.round(r.margem_pct * 1000) / 10;
-      rows = ufBreak.map(r => ({ name: r.label, value: field(r) }));
+      const field = (r: any) =>
+        metric === 'qtd' ? r.qtd
+        : metric === 'mrr' ? r.mrr
+        : metric === 'ticket' ? r.ticket
+        : Math.round(r.margem_pct * 1000) / 10;
+      rows = ufBreak.map((r: any) => ({ name: r.label, value: field(r) }));
     }
     const total = rows.reduce((s, r) => s + (r.value || 0), 0) || 1;
-    return rows.filter(r => r.name && r.name !== '(sem informação)').map(r => ({ ...r, percent: r.value / total }));
+    return rows
+      .filter(r => r.name && r.name !== '(sem informação)')
+      .map(r => ({ ...r, percent: r.value / total }));
   }, [mode, metric, ufBreak, ufChurn, ufVar]);
 
   const insights = useMemo(() => {
     const ufNome = (s: string) => SIGLA_TO_NAME[s] || s;
     const fmtPct = (d: number) => (d > 0 ? '+' : '') + (d * 100).toFixed(1) + '%';
-    const out: { tone: 'down'|'up'|'warn'|'info'; title: string; text: string }[] = [];
+    const out: { tone: 'down' | 'up' | 'warn' | 'info'; title: string; text: string }[] = [];
 
-    const varValid = ufVar.filter(r => r.uf && r.uf.length === 2 && r.mrr_anterior > 0 && r.delta_pct != null);
+    const varValid = ufVar.filter((r: any) => r.uf && r.uf.length === 2 && r.mrr_anterior >= 1500 && r.delta_pct != null);
     if (varValid.length) {
-      const queda = [...varValid].sort((a, b) => (a.delta_pct! - b.delta_pct!))[0];
-      const alta = [...varValid].sort((a, b) => (b.delta_pct! - a.delta_pct!))[0];
-      if (queda && (queda.delta_pct ?? 0) < -0.02) {
+      const queda = [...varValid].sort((a: any, b: any) => a.delta_pct! - b.delta_pct!)[0];
+      const alta = [...varValid].sort((a: any, b: any) => b.delta_pct! - a.delta_pct!)[0];
+      if (queda && (queda.delta_pct ?? 0) < -0.03) {
         out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} vs período anterior. Vale checar retenção na praça.` });
       }
-      if (alta && (alta.delta_pct ?? 0) > 0.02) {
+      if (alta && (alta.delta_pct ?? 0) > 0.03) {
         out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `${fmtPct(alta.delta_pct!)} no MRR vs período anterior. Praça aquecida.` });
       }
     }
 
-    const churnValid = ufChurn.filter(r => r.label && r.label.length === 2 && r.base >= 10);
+    const churnValid = ufChurn.filter((r: any) => r.label && r.label.length === 2 && r.base >= 10);
     if (churnValid.length) {
-      const pior = [...churnValid].sort((a, b) => b.churn_pct - a.churn_pct)[0];
+      const pior = [...churnValid].sort((a: any, b: any) => b.churn_pct - a.churn_pct)[0];
       if (pior && pior.churn_pct > 0) {
         out.push({ tone: 'warn', title: `Pior churn: ${ufNome(pior.label)}`, text: `${(pior.churn_pct * 100).toFixed(0)}% da base cancelou no período (${pior.cancelados} de ${pior.base}).` });
       }
     }
 
-    const totalMrr = ufBreak.reduce((s, r) => s + (r.mrr || 0), 0);
+    const totalMrr = ufBreak.reduce((s: number, r: any) => s + (r.mrr || 0), 0);
     if (totalMrr > 0) {
-      const top = [...ufBreak].filter(r => r.label && r.label.length === 2).sort((a, b) => b.mrr - a.mrr)[0];
+      const top = [...ufBreak].filter((r: any) => r.label && r.label.length === 2).sort((a: any, b: any) => b.mrr - a.mrr)[0];
       if (top) {
         const share = (top.mrr / totalMrr) * 100;
-        if (share >= 25) out.push({ tone: 'info', title: 'Concentração de receita', text: `${ufNome(top.label)} concentra ${share.toFixed(0)}% do MRR. Dependência de uma praça é risco estrutural.` });
+        if (share >= 40) out.push({ tone: 'info', title: 'Concentração de receita', text: `${ufNome(top.label)} concentra ${share.toFixed(0)}% do MRR. Dependência de uma praça é risco estrutural.` });
       }
     }
     return out;
   }, [ufVar, ufChurn, ufBreak]);
+
+  const rankRows = useMemo(() => {
+    const rows = [...mapData];
+    rows.sort((a, b) => mode === 'variacao' ? a.value - b.value : b.value - a.value);
+    return rows.slice(0, 8);
+  }, [mapData, mode]);
+
+  const maxRank = useMemo(() => Math.max(...mapData.map(d => Math.abs(d.value)), 1), [mapData]);
+
+  const fmtVal = (v: number) => {
+    if (mode === 'variacao') return (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+    if (metric === 'mrr' || metric === 'ticket') return 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+    if (metric === 'margem' || metric === 'churn') return v.toFixed(1) + '%';
+    return Math.round(v).toLocaleString('pt-BR');
+  };
+
+  const legend = mode === 'variacao'
+    ? { left: 'caiu', right: 'cresceu', colors: ['hsl(2 76% 44%)', 'hsl(5 74% 52%)', 'hsl(210 14% 40%)', 'hsl(145 58% 44%)', 'hsl(145 64% 32%)'] }
+    : metric === 'churn'
+      ? { left: 'menor', right: 'maior', colors: ['hsl(48 85% 72%)', 'hsl(40 85% 62%)', 'hsl(20 82% 50%)', 'hsl(2 75% 38%)'] }
+      : { left: 'menor', right: 'maior', colors: ['hsl(145 53% 75%)', 'hsl(145 53% 55%)', 'hsl(145 53% 44%)', 'hsl(145 53% 26%)'] };
 
   const metricOpts: { key: typeof metric; label: string }[] = [
     { key: 'qtd', label: 'Qtd clientes' },
@@ -108,176 +119,138 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     { key: 'churn', label: 'Churn' },
   ];
 
-  // Cities filtered by state
-  const filteredCidades = useMemo(() => {
-    if (!selectedState || !distributions.topCidadesByEstado) return distributions.porCidade;
-    const cities = distributions.topCidadesByEstado[selectedState];
-    if (!cities || cities.length === 0) return [];
-    const total = cities.reduce((s, c) => s + c.qtd, 0) || 1;
-    return cities.map(c => ({ name: c.nome, value: c.qtd, percent: c.qtd / total }));
-  }, [selectedState, distributions]);
-
-  // Segmento — top 5, filtered by state
-  const segmentoData = useMemo(() => {
-    const src = selectedState && distributions.segmentoByEstado?.[selectedState]
-      ? distributions.segmentoByEstado[selectedState]
-      : distributions.porSegmento;
-    return topN(src, 5);
-  }, [selectedState, distributions]);
-
-  // Área de atuação — top 5, filtered by state
-  const areaData = useMemo(() => {
-    const src = selectedState && distributions.areaAtuacaoByEstado?.[selectedState]
-      ? distributions.areaAtuacaoByEstado[selectedState]
-      : distributions.porAreaAtuacao;
-    return topN(src, 5);
-  }, [selectedState, distributions]);
-
-  // Fornecedores filtered by state, all included
-  const fornecedorData = useMemo(() => {
-    const src = selectedState && distributions.fornecedorByEstado?.[selectedState]
-      ? distributions.fornecedorByEstado[selectedState]
-      : distributions.porFornecedor;
-    return src;
-  }, [selectedState, distributions]);
-
-  const segmentoPalette = useMemo(() => greenPalette(segmentoData.length), [segmentoData.length]);
-  const areaPalette = useMemo(() => greenPalette(areaData.length), [areaData.length]);
+  const rankTitle = mode === 'variacao' ? 'Variação por estado' : `Ranking · ${metricOpts.find(o => o.key === metric)?.label}`;
 
   return (
-    <div className="space-y-6">
-      {/* State filter badge */}
+    <div className="space-y-4">
       {selectedState && (
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="gap-2 py-1.5 px-3 text-sm">
-            <span className="inline-block w-2 h-2 rounded-full bg-primary" />
-            Filtrando por: <span className="font-bold">{SIGLA_TO_NAME[selectedState] || selectedState}</span>
+          <Badge variant="outline" className="gap-2">
+            Filtrando por: {SIGLA_TO_NAME[selectedState] || selectedState}
             <button onClick={() => setSelectedState(null)} className="ml-1 hover:bg-muted rounded-full p-0.5">
-              <X className="h-3.5 w-3.5" />
+              <X className="h-3 w-3" />
             </button>
           </Badge>
         </div>
       )}
 
-      {/* Modo + métrica do mapa */}
+      {/* Modo + métrica */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-full border border-border overflow-hidden">
-          {(['nivel','variacao'] as const).map(m => (
+        <div className="inline-flex rounded-lg border overflow-hidden">
+          {(['nivel', 'variacao'] as const).map(m => (
             <button
               key={m}
               onClick={() => setMode(m)}
-              className={cn(
-                'px-4 py-1.5 text-sm transition-colors',
-                mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-              )}
+              className={cn('px-4 py-1.5 text-sm transition-colors', mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}
             >
               {m === 'nivel' ? 'Nível' : 'Variação'}
             </button>
           ))}
         </div>
+
         {mode === 'nivel' ? (
           <div className="flex flex-wrap gap-2">
             {metricOpts.map(o => (
               <button
                 key={o.key}
                 onClick={() => setMetric(o.key)}
-                className={cn(
-                  'px-3 py-1.5 rounded-full border text-sm transition-colors',
-                  metric === o.key
-                    ? 'bg-primary/10 border-primary text-primary'
-                    : 'border-border text-muted-foreground hover:bg-muted',
-                )}
+                className={cn('px-3 py-1.5 rounded-full border text-sm transition-colors', metric === o.key ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground hover:bg-muted')}
               >
                 {o.label}
               </button>
             ))}
           </div>
         ) : (
-          <span className="text-sm text-muted-foreground">
-            Δ MRR da carteira vs período anterior — <span className="text-foreground">verde cresceu · vermelho caiu</span>
+          <span className="text-xs text-muted-foreground">
+            Δ MRR da carteira vs período anterior — verde cresceu · vermelho caiu
           </span>
         )}
       </div>
 
-      {insights.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Leitura do período</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-              {insights.map((ins, i) => {
-                const Icon = ins.tone === 'down' ? TrendingDown : ins.tone === 'up' ? TrendingUp : ins.tone === 'warn' ? AlertTriangle : PieChart;
-                const color = ins.tone === 'down' ? 'text-red-500 bg-red-500/10'
-                  : ins.tone === 'up' ? 'text-emerald-500 bg-emerald-500/10'
-                  : ins.tone === 'warn' ? 'text-amber-500 bg-amber-500/10'
-                  : 'text-sky-500 bg-sky-500/10';
-                return (
-                  <div key={i} className="flex items-start gap-3 rounded-md border border-border p-3">
-                    <div className={cn('shrink-0 rounded-md p-2', color)}>
-                      <Icon className="h-4 w-4" />
+      {/* Layout 2 colunas: mapa+legenda | leitura+ranking */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+        {/* Esquerda */}
+        <div className="space-y-3">
+          <BrazilChoroplethMap
+            title="Distribuição geográfica"
+            data={mapData}
+            tvMode={tvMode}
+            selectedState={selectedState}
+            onSelectState={setSelectedState}
+            metric={mode === 'variacao' ? ('variacao' as any) : metric}
+            hideSidebar
+          />
+          <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
+            <span>{legend.left}</span>
+            {legend.colors.map((c, i) => (
+              <span key={i} className="h-3 w-8 rounded-sm" style={{ backgroundColor: c }} />
+            ))}
+            <span>{legend.right}</span>
+          </div>
+        </div>
+
+        {/* Direita */}
+        <div className="space-y-4">
+          {insights.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Leitura do período</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {insights.map((ins, i) => {
+                    const Icon = ins.tone === 'down' ? TrendingDown : ins.tone === 'up' ? TrendingUp : ins.tone === 'warn' ? AlertTriangle : PieChart;
+                    const color = ins.tone === 'down' ? 'text-red-500 bg-red-500/10'
+                      : ins.tone === 'up' ? 'text-emerald-500 bg-emerald-500/10'
+                      : ins.tone === 'warn' ? 'text-amber-500 bg-amber-500/10'
+                      : 'text-sky-500 bg-sky-500/10';
+                    return (
+                      <li key={i} className="flex gap-3">
+                        <div className={cn('h-8 w-8 rounded-full flex items-center justify-center shrink-0', color)}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="text-sm leading-snug">
+                          <span className="font-semibold">{ins.title}.</span>{' '}
+                          <span className="text-muted-foreground">{ins.text}</span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{rankTitle}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {rankRows.map((r) => {
+                  const up = r.value >= 0;
+                  const w = mode === 'variacao'
+                    ? Math.min(Math.abs(r.value), CAP) / CAP * 100
+                    : (Math.abs(r.value) / maxRank) * 100;
+                  const barColor = mode === 'variacao' ? (up ? 'hsl(145 64% 40%)' : 'hsl(2 76% 52%)') : 'hsl(145 53% 40%)';
+                  const txtColor = mode === 'variacao' ? (up ? 'text-emerald-500' : 'text-red-500') : 'text-foreground';
+                  return (
+                    <div key={r.name} className="grid grid-cols-[3rem_1fr_5rem] items-center gap-2 text-sm">
+                      <span className="font-medium">{r.name}</span>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${w}%`, backgroundColor: barColor }} />
+                      </div>
+                      <span className={cn('font-mono text-right text-xs', txtColor)}>
+                        {mode === 'variacao' ? (up ? '▲ ' : '▼ ') : ''}{fmtVal(r.value)}
+                      </span>
                     </div>
-                    <div className="text-sm leading-snug">
-                      <span className="font-semibold">{ins.title}.</span>{' '}
-                      <span className="text-muted-foreground">{ins.text}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Choropleth Map */}
-      <BrazilChoroplethMap
-        title="Distribuição Geográfica por Estado"
-        data={mapData}
-        metric={mode === 'variacao' ? ('variacao' as any) : metric}
-        tvMode={tvMode}
-        topCidadesByEstado={distributions.topCidadesByEstado}
-        citiesGeo={distributions.citiesGeo}
-        selectedState={selectedState}
-        onSelectState={setSelectedState}
-      />
-
-
-      {/* Top 10 Cidades */}
-      <BarChartCard
-        title={selectedState ? `Cidades — ${SIGLA_TO_NAME[selectedState] || selectedState}` : 'Cidades (Qtde Clientes)'}
-        data={filteredCidades}
-        tvMode={tvMode}
-        height={tvMode ? 450 : 350}
-        color="hsl(145 53% 34%)"
-      />
-
-      {/* Donuts — top 5 + Outros */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        <PieChartCard
-          title={selectedState ? `% Carteira por Segmento — ${SIGLA_TO_NAME[selectedState]}` : '% Carteira por Segmento'}
-          data={segmentoData}
-          tvMode={tvMode}
-          height={tvMode ? 450 : 350}
-          colors={segmentoPalette}
-        />
-        <PieChartCard
-          title={selectedState ? `% Carteira por Área de Atuação — ${SIGLA_TO_NAME[selectedState]}` : '% Carteira por Área de Atuação'}
-          data={areaData}
-          tvMode={tvMode}
-          height={tvMode ? 450 : 350}
-          colors={areaPalette}
-        />
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {/* Fornecedores — sem toggle, sempre todos */}
-      <BarChartCard
-        title={selectedState ? `Top 10 Fornecedores — ${SIGLA_TO_NAME[selectedState]}` : 'Top 10 Fornecedores (Qtde Clientes)'}
-        data={fornecedorData}
-        tvMode={tvMode}
-        height={tvMode ? 450 : 350}
-        horizontal={false}
-        color="hsl(145 53% 34%)"
-      />
     </div>
   );
 }
