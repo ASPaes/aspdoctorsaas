@@ -59,6 +59,7 @@ interface Props {
   citiesGeo?: CityGeoPoint[];
   selectedState: string | null;
   onSelectState: (sigla: string | null) => void;
+  metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn';
 }
 
 export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState }: Props) {
