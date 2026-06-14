@@ -202,8 +202,15 @@ export function CancelamentosTab({
       mortalidadeQtdPct,
       origemMaxChurn,
       cancelamentosPorOrigem: cancExtras.cancelamentosPorOrigem,
+      // comparativo mensal de MRR perdido (Passo 2a)
+      cancComparavel: cancComp.confiavel,
+      cancEhMesCorrente: cancComp.ehMesCorrente,
+      comparativoIndeterminado: !cancComp.confiavel,
+      cancMrrAtual: cancComp.atual ?? undefined,
+      cancMrrProj: cancComp.projecao ?? undefined,
+      cancMrrMedia3m: cancComp.media3m ?? undefined,
     };
-  }, [cancExtras, metrics]);
+  }, [cancExtras, metrics, cancComp]);
 
   const diagnostico = useMemo(() => computeDiagnostico(diagInput, 'cancelamentos'), [diagInput]);
   const [diagOpen, setDiagOpen] = useState(false);
