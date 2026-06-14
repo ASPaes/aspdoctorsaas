@@ -7691,7 +7691,14 @@ export type Database = {
         }[]
       }
       get_carteira_breakdown: {
-        Args: { p_dim: string; p_fim: string; p_tenant: string; p_uf?: string }
+        Args: {
+          p_dim: string
+          p_fim: string
+          p_fornecedor?: number
+          p_tenant: string
+          p_uf?: string
+          p_unidade?: number
+        }
         Returns: {
           custo: number
           label: string
@@ -7705,10 +7712,12 @@ export type Database = {
       get_carteira_churn: {
         Args: {
           p_fim: string
+          p_fornecedor?: number
           p_ini: string
           p_nivel: string
           p_tenant: string
           p_uf?: string
+          p_unidade?: number
         }
         Returns: {
           base: number
@@ -7722,8 +7731,10 @@ export type Database = {
         Args: {
           p_cidade: string
           p_fim: string
+          p_fornecedor?: number
           p_tenant: string
           p_uf: string
+          p_unidade?: number
         }
         Returns: {
           cliente: string
@@ -7732,7 +7743,13 @@ export type Database = {
         }[]
       }
       get_carteira_variacao: {
-        Args: { p_fim_anterior: string; p_fim_atual: string; p_tenant: string }
+        Args: {
+          p_fim_anterior: string
+          p_fim_atual: string
+          p_fornecedor?: number
+          p_tenant: string
+          p_unidade?: number
+        }
         Returns: {
           delta_abs: number
           delta_pct: number
@@ -7743,7 +7760,14 @@ export type Database = {
         }[]
       }
       get_churn_detalhe_uf: {
-        Args: { p_fim: string; p_ini: string; p_tenant: string; p_uf: string }
+        Args: {
+          p_fim: string
+          p_fornecedor?: number
+          p_ini: string
+          p_tenant: string
+          p_uf: string
+          p_unidade?: number
+        }
         Returns: {
           cidade: string
           cliente: string
