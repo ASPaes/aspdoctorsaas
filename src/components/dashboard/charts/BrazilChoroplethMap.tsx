@@ -360,7 +360,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                           <div className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: getColor(sigla) }} />
                           <span className="truncate text-sm font-medium">{SIGLA_TO_NAME[sigla] || item.name}</span>
                         </div>
-                        <span className="font-mono font-bold text-base">{item.value}</span>
+                        <span className="font-mono font-bold text-base">{fmtMetric(item.value)}</span>
                       </div>
                     );
                   })}
