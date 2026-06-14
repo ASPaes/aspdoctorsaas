@@ -323,10 +323,10 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                           <circle r={hitRadius} fill="transparent" />
                           <circle
                             r={r}
-                            fill="hsl(145 53% 34%)"
-                            fillOpacity={isActive ? 1 : 0.85}
+                            fill={markerColor}
+                            fillOpacity={isActive ? 1 : 0.9}
                             stroke="white"
-                            strokeWidth={isActive ? 2 : 1.2}
+                            strokeWidth={isActive ? 2.5 : 2}
                             vectorEffect="non-scaling-stroke"
                           />
                         </g>
