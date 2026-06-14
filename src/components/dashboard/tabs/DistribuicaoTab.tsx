@@ -152,7 +152,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">
-            Δ MRR da carteira vs período anterior — verde cresceu · vermelho caiu
+            Quanto a carteira de cada estado cresceu ou encolheu no período — verde subiu · vermelho caiu
           </span>
         )}
       </div>
