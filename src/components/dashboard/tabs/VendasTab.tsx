@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Users, DollarSign, Rocket, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, DollarSign, Rocket, TrendingUp, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { SectionHeader } from '../SectionHeader';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -12,7 +14,7 @@ import {
 import type { KPIMetrics, DistributionData, DistributionDataPoint, NovoClienteListItem, DashboardFilters } from '../types';
 import { NovosClientesTable } from '../tables/NovosClientesTable';
 import { useVendasExplorer, useVendasSerie, useVendasProdutos, useVendasTicketStats } from '../hooks/useVendasExtras';
-import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
+import { DiagnosticoModal } from '../diagnostico';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
@@ -568,12 +570,27 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
         </div>
       </div>
 
-      {/* ═══════ DIAGNÓSTICO DO CONSELHO DOCTOR SAAS ═══════ */}
-      <DiagnosticoSection
-        diagnostico={diagnostico}
-        onSeeMore={() => setDiagOpen(true)}
-        tvMode={tvMode}
-      />
+      {/* ═══════ CONSELHO DOCTOR SAAS ═══════ */}
+      <section>
+        <SectionHeader
+          title="Conselho DOCTOR SAAS"
+          description="Análise estratégica das suas vendas pelo Conselho DS"
+          icon={<Sparkles className="h-5 w-5 text-primary" />}
+          tvMode={tvMode}
+        />
+        <Card>
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Receba uma análise estratégica das suas vendas no período, feita pelo Conselho DS com base nos seus indicadores reais.
+            </p>
+            <Button onClick={() => setDiagOpen(true)} className="shrink-0">
+              <Sparkles className="h-4 w-4" />
+              Abrir Conselho DS
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
 
       {/* Tabela de novos clientes */}
       <NovosClientesTable items={novosClientesList} tvMode={tvMode} />
