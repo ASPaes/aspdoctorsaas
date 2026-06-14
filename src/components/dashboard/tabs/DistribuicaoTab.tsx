@@ -72,8 +72,8 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
     if (varValid.length) {
       const queda = [...varValid].sort((a: any, b: any) => a.delta_pct! - b.delta_pct!)[0];
       const alta = [...varValid].sort((a: any, b: any) => b.delta_pct! - a.delta_pct!)[0];
-      if (queda && (queda.delta_pct ?? 0) < -0.03) out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} vs período anterior. Vale checar retenção na praça.` });
-      if (alta && (alta.delta_pct ?? 0) > 0.03) out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `${fmtPct(alta.delta_pct!)} no MRR vs período anterior. Praça aquecida.` });
+      if (queda && (queda.delta_pct ?? 0) < -0.03) out.push({ tone: 'down', title: `${ufNome(queda.uf)} é a maior queda`, text: `MRR ${fmtPct(queda.delta_pct!)} no período. Vale checar retenção na praça.` });
+      if (alta && (alta.delta_pct ?? 0) > 0.03) out.push({ tone: 'up', title: `${ufNome(alta.uf)} é o destaque`, text: `MRR ${fmtPct(alta.delta_pct!)} no período. Praça aquecida.` });
     }
     const churnValid = ufChurn.filter((r: any) => r.label && r.label.length === 2 && r.base >= 10);
     if (churnValid.length) {
@@ -93,7 +93,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
 
   const rankRows = useMemo(() => {
     const rows = [...mapData];
-    rows.sort((a, b) => mode === 'variacao' ? a.value - b.value : b.value - a.value);
+    rows.sort((a, b) => mode === 'variacao' ? Math.abs(b.value) - Math.abs(a.value) : b.value - a.value);
     return rows.slice(0, 8);
   }, [mapData, mode]);
   const maxRank = useMemo(() => Math.max(...mapData.map(d => Math.abs(d.value)), 1), [mapData]);
@@ -152,7 +152,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">
-            Δ MRR da carteira vs período anterior — verde cresceu · vermelho caiu
+            Quanto a carteira de cada estado cresceu ou encolheu no período — verde subiu · vermelho caiu
           </span>
         )}
       </div>
@@ -246,6 +246,11 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
                   </div>
                 </CardContent>
               </Card>
+              {mode === 'variacao' && (
+                <p className="text-xs text-muted-foreground leading-relaxed px-1">
+                  <span className="font-medium text-foreground">Como ler:</span> mostra quanto o MRR da carteira de cada estado cresceu ou encolheu <span className="font-medium text-foreground">durante o período selecionado</span> (carteira no fim vs. no início). <span className="text-emerald-500 font-medium">Verde</span> subiu, <span className="text-red-500 font-medium">vermelho</span> caiu. A lista traz quem mais se moveu. Atenção: estado com poucos clientes vira % grande com qualquer mudança — confira o tamanho da base antes de concluir.
+                </p>
+              )}
             </>
           ) : (
             <Card>
