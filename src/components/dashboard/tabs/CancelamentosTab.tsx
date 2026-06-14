@@ -108,6 +108,14 @@ export function CancelamentosTab({
   const isAdminOrHead = isAdmin || profile?.role === 'head';
 
   const { data: cancExtras } = useCancelamentosExtras({ filters, metrics });
+
+  // Comparativo mensal de MRR perdido (média 3m / projeção) p/ o diagnóstico
+  const cancComp = useMemo(() => {
+    const hoje = new Date();
+    const { mesAlvoKey, tipo } = resolveMesAlvo(filters.periodoInicio, filters.periodoFim, filters.showAllData, hoje);
+    const serie = (cancExtras?.evolucao12m ?? []).map((r) => ({ mes: r.mes, value: r.mrr }));
+    return computeComparativoMensal(serie, mesAlvoKey, tipo, hoje);
+  }, [cancExtras, filters.periodoInicio, filters.periodoFim, filters.showAllData]);
   
 
   // ─── Deltas dos 4 KPIs principais (preservado da V1) ────
