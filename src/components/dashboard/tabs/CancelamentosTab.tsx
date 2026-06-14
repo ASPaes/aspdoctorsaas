@@ -157,7 +157,7 @@ export function CancelamentosTab({
 
   // ─── Diagnóstico ─────────────────────────────────────────
   const diagInput: DiagnosticoInput & Record<string, any> = useMemo(() => {
-    if (!cancExtras) return { clientesAtivos: metrics.clientesAtivos };
+    if (!cancExtras) return { clientesAtivos: metrics.clientesAtivos, comparativoIndeterminado: true };
 
     const motivoConcentradoPct = cancExtras.mrrCancelado > 0 && cancExtras.topMotivos.length > 0
       ? cancExtras.topMotivos[0].mrr_perdido / cancExtras.mrrCancelado
