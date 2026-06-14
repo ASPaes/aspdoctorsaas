@@ -316,7 +316,7 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
           </div>
 
           {/* Sidebar */}
-          <div className={cn('border-l bg-muted/30 p-4 space-y-4', tvMode ? 'lg:w-80' : 'lg:w-64')}>
+          <div className={cn('border-l bg-muted/30 p-4 space-y-4', hideSidebar && 'hidden', tvMode ? 'lg:w-80' : 'lg:w-64')}>
             {selectedState && selectedStateData ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
