@@ -7742,6 +7742,20 @@ export type Database = {
           segmento: string
         }[]
       }
+      get_carteira_serie_uf: {
+        Args: {
+          p_fornecedor?: number
+          p_meses?: number
+          p_tenant: string
+          p_unidade?: number
+        }
+        Returns: {
+          mrr: number
+          qtd: number
+          uf: string
+          ym: string
+        }[]
+      }
       get_carteira_variacao: {
         Args: {
           p_fim_anterior: string
