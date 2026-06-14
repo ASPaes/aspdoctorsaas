@@ -7690,6 +7690,34 @@ export type Database = {
           winback_rate_12m: number
         }[]
       }
+      get_carteira_breakdown: {
+        Args: { p_dim: string; p_fim: string; p_tenant: string; p_uf?: string }
+        Returns: {
+          custo: number
+          label: string
+          margem_pct: number
+          margem_rs: number
+          mrr: number
+          qtd: number
+          ticket: number
+        }[]
+      }
+      get_carteira_churn: {
+        Args: {
+          p_fim: string
+          p_ini: string
+          p_nivel: string
+          p_tenant: string
+          p_uf?: string
+        }
+        Returns: {
+          base: number
+          cancelados: number
+          churn_pct: number
+          label: string
+          mrr_perdido: number
+        }[]
+      }
       get_client_alert_audit: {
         Args: { p_cliente_id?: string; p_contact_id?: string }
         Returns: {
