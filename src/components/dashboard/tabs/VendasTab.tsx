@@ -16,6 +16,7 @@ import { NovosClientesTable } from '../tables/NovosClientesTable';
 import { useVendasExplorer, useVendasSerie, useVendasProdutos, useVendasTicketStats } from '../hooks/useVendasExtras';
 import { DiagnosticoModal } from '../diagnostico';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
+import { resolveMesAlvo, computeComparativoMensal } from '@/lib/diagnostico/comparativos';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
