@@ -61,9 +61,10 @@ interface Props {
   onSelectState: (sigla: string | null) => void;
   metric?: 'qtd' | 'mrr' | 'ticket' | 'margem' | 'churn' | 'variacao';
   hideSidebar?: boolean;
+  markerColor?: string;
 }
 
-export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd', hideSidebar = false }: Props) {
+export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByEstado = {}, citiesGeo = [], selectedState, onSelectState, metric = 'qtd', hideSidebar = false, markerColor = 'hsl(199 89% 45%)' }: Props) {
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   const [stateViewMap, setStateViewMap] = useState<Record<string, ViewConfig>>({});
   const [position, setPosition] = useState<{ coordinates: [number, number]; zoom: number }>({
@@ -322,10 +323,10 @@ export function BrazilChoroplethMap({ title, data, tvMode = false, topCidadesByE
                           <circle r={hitRadius} fill="transparent" />
                           <circle
                             r={r}
-                            fill="hsl(145 53% 34%)"
-                            fillOpacity={isActive ? 1 : 0.85}
+                            fill={markerColor}
+                            fillOpacity={isActive ? 1 : 0.9}
                             stroke="white"
-                            strokeWidth={isActive ? 2 : 1.2}
+                            strokeWidth={isActive ? 2.5 : 2}
                             vectorEffect="non-scaling-stroke"
                           />
                         </g>
