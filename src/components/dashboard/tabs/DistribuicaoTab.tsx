@@ -166,7 +166,7 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
       <BrazilChoroplethMap
         title="Distribuição Geográfica por Estado"
         data={mapData}
-        metric={metric}
+        metric={mode === 'variacao' ? ('variacao' as any) : metric}
         tvMode={tvMode}
         topCidadesByEstado={distributions.topCidadesByEstado}
         citiesGeo={distributions.citiesGeo}
