@@ -105,13 +105,14 @@ export const useWhatsAppSend = () => {
         (old) => upsertInfinite(old, optimisticMessage)
       );
 
-      // Timeout: se ainda 'sending' após 30s, marcar como falhou automaticamente
+      // Timeout: se ainda 'sending' após X, marca como falhou. Anexos (upload direto) levam mais tempo.
+      const failTimeoutMs = newMessage.file ? 180_000 : 30_000;
       setTimeout(() => {
         queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
           (old) => patchInfinite(old, (m) => m.id === tempId && m.status === 'sending', { status: 'failed' })
         );
-      }, 30_000);
+      }, failTimeoutMs);
 
       queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
         if (!old?.conversations) return old;
