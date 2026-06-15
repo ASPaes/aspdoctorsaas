@@ -126,9 +126,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (body.messageType !== 'text' && !body.mediaUrl && !body.mediaBase64) {
+    if (body.messageType !== 'text' && !body.mediaUrl && !body.mediaBase64 && !body.storagePath) {
       return new Response(
-        JSON.stringify({ success: false, error: 'mediaUrl or mediaBase64 is required for media messages' }),
+        JSON.stringify({ success: false, error: 'mediaUrl, mediaBase64 ou storagePath é obrigatório para mídia' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
