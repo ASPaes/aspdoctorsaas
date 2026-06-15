@@ -71,6 +71,14 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     unidadeBaseId,
   });
 
+  const { rows: dimRows } = useCohortRevenueDim(dim, {
+    fromCohortMonth: fromMonth,
+    toCohortMonth: toMonth,
+    maxAgeMonths: maxAge,
+    fornecedorId,
+    unidadeBaseId,
+  });
+
   const activeMatrix = metricMode === 'revenue' ? revenueMatrix : matrix;
 
   // Reset selected cohorts when filters change
