@@ -680,6 +680,44 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           )}
         </CardContent>
       </Card>
+
+      {/* ==================== PROJEÇÃO DE PERDA ==================== */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
+            Projeção de perda
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Curva de sobrevivência das safras do período aplicada à base ativa de hoje. Acompanha os filtros de período e janela acima.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {forecastRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Sem dados suficientes para projetar.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {forecastRows.map(row => {
+                const pctClientes = 100 - row.retencao_clientes_esp_pct;
+                const pctMrr = 100 - row.retencao_mrr_esp_pct;
+                return (
+                  <div key={row.horizonte_meses} className="rounded-lg border p-4 space-y-2">
+                    <p className="font-semibold">Próximos {row.horizonte_meses} meses</p>
+                    <div className="text-sm">
+                      <span className="font-medium text-amber-600">~{Math.round(row.perda_clientes_esp)} clientes</span>
+                      <span className="text-muted-foreground"> ({pctClientes.toFixed(0)}% da base)</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-medium text-amber-600">{'R$ ' + Math.round(row.perda_mrr_esp).toLocaleString('pt-BR')}</span>
+                      <span className="text-muted-foreground"> ({pctMrr.toFixed(0)}% do MRR)</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">em risco</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
