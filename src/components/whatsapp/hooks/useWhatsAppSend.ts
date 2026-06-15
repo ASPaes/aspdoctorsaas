@@ -8,6 +8,7 @@ interface SendMessageParams {
   messageType: 'text' | 'image' | 'audio' | 'video' | 'document';
   mediaUrl?: string;
   mediaBase64?: string;
+  file?: File; // anexo para upload direto ao Storage (evita base64 inline)
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
@@ -21,8 +22,43 @@ export const useWhatsAppSend = () => {
 
   const mutation = useMutation({
     mutationFn: async (params: SendMessageParams) => {
+      let storagePath: string | undefined;
+      let mediaSizeBytes: number | undefined;
+
+      // Upload direto ao Storage para anexos (não passa base64 pela Edge Function)
+      if (params.file && params.messageType !== 'text') {
+        const mime = params.file.type || 'application/octet-stream';
+        const { data: urlData, error: urlErr } = await supabase.functions.invoke('get-media-upload-url', {
+          body: { conversationId: params.conversationId, mediaMimetype: mime, fileName: params.file.name },
+        });
+        if (urlErr) throw new Error(urlErr.message || 'Falha ao preparar upload');
+        if (!urlData?.path || !urlData?.token) throw new Error(urlData?.error || 'Falha ao preparar upload');
+
+        const { error: upErr } = await supabase.storage
+          .from('whatsapp-media')
+          .uploadToSignedUrl(urlData.path, urlData.token, params.file, { contentType: mime });
+        if (upErr) throw new Error(upErr.message || 'Falha no upload do arquivo');
+
+        storagePath = urlData.path;
+        mediaSizeBytes = params.file.size;
+      }
+
+      const sendBody = {
+        conversationId: params.conversationId,
+        content: params.content,
+        messageType: params.messageType,
+        mediaUrl: params.mediaUrl,
+        mediaBase64: params.mediaBase64,
+        storagePath,
+        mediaMimetype: params.mediaMimetype || params.file?.type,
+        fileName: params.fileName || params.file?.name,
+        mediaSizeBytes,
+        quotedMessageId: params.quotedMessageId,
+        instanceId: params.instanceId,
+      };
+
       const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
-        body: params,
+        body: sendBody,
       });
       if (error) throw new Error(error.message || 'Erro ao enviar mensagem');
       if (data?.success === false) throw new Error(data.error || 'Erro ao enviar mensagem');
@@ -34,7 +70,9 @@ export const useWhatsAppSend = () => {
       const previousMessages = queryClient.getQueryData<MsgPages>(['whatsapp', 'messages', newMessage.conversationId]);
 
       let optimisticMediaUrl = newMessage.mediaUrl ?? null;
-      if (!optimisticMediaUrl && newMessage.mediaBase64) {
+      if (!optimisticMediaUrl && newMessage.file) {
+        optimisticMediaUrl = URL.createObjectURL(newMessage.file);
+      } else if (!optimisticMediaUrl && newMessage.mediaBase64) {
         const base64Data = newMessage.mediaBase64.startsWith('data:')
           ? newMessage.mediaBase64
           : `data:${newMessage.mediaMimetype || 'application/octet-stream'};base64,${newMessage.mediaBase64}`;
@@ -67,13 +105,14 @@ export const useWhatsAppSend = () => {
         (old) => upsertInfinite(old, optimisticMessage)
       );
 
-      // Timeout: se ainda 'sending' após 30s, marcar como falhou automaticamente
+      // Timeout: se ainda 'sending' após X, marca como falhou. Anexos (upload direto) levam mais tempo.
+      const failTimeoutMs = newMessage.file ? 180_000 : 30_000;
       setTimeout(() => {
         queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],
           (old) => patchInfinite(old, (m) => m.id === tempId && m.status === 'sending', { status: 'failed' })
         );
-      }, 30_000);
+      }, failTimeoutMs);
 
       queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
         if (!old?.conversations) return old;
