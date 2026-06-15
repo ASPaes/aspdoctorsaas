@@ -244,7 +244,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
                 <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: entry.stroke }} />
                 <span className="font-medium">{dynamicLabels[idx]} — {label}</span>
               </div>
-              <p>Retenção: <strong>{Number(entry.value).toFixed(1)}%</strong></p>
+              <p>{metricMode === 'revenue' ? 'Retenção de receita' : 'Retenção'}: <strong>{Number(entry.value).toFixed(1)}%</strong></p>
               {retained != null && size != null && (
                 <p>Clientes retidos: {retained}/{size}</p>
               )}
