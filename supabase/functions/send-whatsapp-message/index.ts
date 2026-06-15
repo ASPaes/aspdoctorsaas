@@ -571,6 +571,8 @@ Deno.serve(async (req) => {
           ? body.mediaBase64.split(',')[1] || ''
           : body.mediaBase64;
         try { mediaSizeBytes = Math.floor(raw.length * 3 / 4); } catch {}
+      } else if (typeof body.mediaSizeBytes === 'number' && body.mediaSizeBytes > 0) {
+        mediaSizeBytes = body.mediaSizeBytes;
       }
     }
 
