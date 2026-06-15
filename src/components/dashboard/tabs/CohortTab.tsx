@@ -285,6 +285,31 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Métrica</label>
+          <div className="inline-flex rounded-lg border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setMetricMode('logo')}
+              className={cn(
+                'px-3 py-2 text-xs font-medium transition-colors',
+                metricMode === 'logo' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'
+              )}
+            >
+              Clientes
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetricMode('revenue')}
+              className={cn(
+                'px-3 py-2 text-xs font-medium transition-colors border-l',
+                metricMode === 'revenue' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'
+              )}
+            >
+              Receita
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ==================== SUMMARY CARDS ==================== */}
