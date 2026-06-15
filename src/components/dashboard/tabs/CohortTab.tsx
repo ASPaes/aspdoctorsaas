@@ -531,6 +531,71 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           )}
         </CardContent>
       </Card>
+
+      {/* ==================== RETENÇÃO POR RECORTE ==================== */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
+            Retenção por recorte
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Compara retenção de clientes vs retenção de receita por recorte. Receita abaixo de clientes = saindo os grandes.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Recorte</label>
+            <Select value={dim} onValueChange={(v) => setDim(v as typeof dim)}>
+              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="uf">Estado (UF)</SelectItem>
+                <SelectItem value="segmento">Segmento</SelectItem>
+                <SelectItem value="canal">Canal de aquisição</SelectItem>
+                <SelectItem value="faixa_ticket">Faixa de ticket</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {dimRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Sem dados suficientes para este recorte.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="text-xs border-collapse w-full">
+                <thead>
+                  <tr>
+                    <th className="text-left p-2 font-medium text-muted-foreground border-b border-border/40">Grupo</th>
+                    <th className="text-center p-2 font-medium text-muted-foreground border-b border-border/40">Clientes</th>
+                    <th className="text-center p-2 font-medium text-muted-foreground border-b border-border/40">Logo M6</th>
+                    <th className="text-center p-2 font-medium text-muted-foreground border-b border-border/40">Receita M6</th>
+                    <th className="text-center p-2 font-medium text-muted-foreground border-b border-border/40">Logo M12</th>
+                    <th className="text-center p-2 font-medium text-muted-foreground border-b border-border/40">Receita M12</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dimRows.map(r => (
+                    <tr key={r.grupo} className="border-b border-border/20">
+                      <td className="p-2 font-medium">{r.grupo}</td>
+                      <td className="p-2 text-center font-semibold text-muted-foreground">{r.base}</td>
+                      <td className={cn('p-2 text-center font-medium', r.logoM6 != null ? getRetentionColor(r.logoM6) : 'text-muted-foreground/30')}>
+                        {r.logoM6 != null ? `${r.logoM6.toFixed(0)}%` : '—'}
+                      </td>
+                      <td className={cn('p-2 text-center font-medium', r.revM6 != null ? getRetentionColor(r.revM6) : 'text-muted-foreground/30')}>
+                        {r.revM6 != null ? `${r.revM6.toFixed(0)}%` : '—'}
+                      </td>
+                      <td className={cn('p-2 text-center font-medium', r.logoM12 != null ? getRetentionColor(r.logoM12) : 'text-muted-foreground/30')}>
+                        {r.logoM12 != null ? `${r.logoM12.toFixed(0)}%` : '—'}
+                      </td>
+                      <td className={cn('p-2 text-center font-medium', r.revM12 != null ? getRetentionColor(r.revM12) : 'text-muted-foreground/30')}>
+                        {r.revM12 != null ? `${r.revM12.toFixed(0)}%` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
