@@ -194,13 +194,6 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
     }
     if (sendMutation.isPending) return;
 
-    const reader = new FileReader();
-    const base64Data = await new Promise<string>((resolve, reject) => {
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
     const messageType = getMessageType(file.type || 'application/octet-stream');
 
     sendMutation.mutate(
@@ -208,7 +201,7 @@ export function ChatInput({ conversationId, replyTo, onCancelReply, initialMessa
         conversationId,
         content: caption || undefined,
         messageType,
-        mediaBase64: base64Data,
+        file,
         mediaMimetype: file.type || 'application/octet-stream',
         fileName: file.name,
         quotedMessageId: replyTo?.message_id || undefined,
