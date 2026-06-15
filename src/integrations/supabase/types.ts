@@ -7566,6 +7566,29 @@ export type Database = {
               tenant_id: string
             }[]
           }
+      fn_cohort_revenue: {
+        Args: {
+          p_dimensao?: string
+          p_fornecedor_id?: number
+          p_from_month?: string
+          p_max_age?: number
+          p_tenant_id?: string
+          p_to_month?: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          age_months: number
+          cohort_month: string
+          cohort_size: number
+          grupo: string
+          mrr_inicial: number
+          mrr_retido: number
+          retained: number
+          retention_percent: number
+          revenue_retention_percent: number
+          tenant_id: string
+        }[]
+      }
       fn_current_chat_count: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
