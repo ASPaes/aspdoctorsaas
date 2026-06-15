@@ -386,7 +386,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       <Card className="overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
-            Retenção por Coorte (Logo Retention)
+            Retenção por Coorte · {metricMode === 'revenue' ? 'Receita' : 'Clientes'}
             <KpiHelpPopover kpiKey="retencao_cohort" />
           </CardTitle>
         </CardHeader>
