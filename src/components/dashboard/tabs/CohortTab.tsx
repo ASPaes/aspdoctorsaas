@@ -14,6 +14,7 @@ import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useCohortRevenue } from '../hooks/useCohortRevenue';
 import { useCohortRevenueDim } from '../hooks/useCohortRevenueDim';
+import { useCohortForecast } from '../hooks/useCohortForecast';
 
 interface CohortTabProps {
   tvMode?: boolean;
