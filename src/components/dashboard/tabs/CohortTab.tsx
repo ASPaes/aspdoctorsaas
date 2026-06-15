@@ -720,36 +720,48 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
         </CardContent>
       </Card>
 
-      {/* ==================== PROJEÇÃO DE PERDA ==================== */}
+      {/* ==================== PROJEÇÃO DE SALDO ==================== */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
-            Projeção de perda
+            Projeção de saldo
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Curva de sobrevivência das safras do período aplicada à base ativa de hoje. Acompanha os filtros de período e janela acima.
+            Ritmo real dos últimos 12 meses (entradas e saídas) projetado sobre a base ativa de hoje.
           </p>
         </CardHeader>
         <CardContent>
           {forecastRows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">Sem dados suficientes para projetar.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {forecastRows.map(row => {
-                const pctClientes = 100 - row.retencao_clientes_esp_pct;
-                const pctMrr = 100 - row.retencao_mrr_esp_pct;
+                const netCli = row.saldo_clientes - row.base_clientes;
+                const netMrr = row.saldo_mrr - row.base_mrr;
                 return (
                   <div key={row.horizonte_meses} className="rounded-lg border p-4 space-y-2">
                     <p className="font-semibold">Próximos {row.horizonte_meses} meses</p>
-                    <div className="text-sm">
-                      <span className="font-medium text-amber-600">~{Math.round(row.perda_clientes_esp)} clientes</span>
-                      <span className="text-muted-foreground"> ({pctClientes.toFixed(0)}% da base)</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Entram</span>
+                      <span className="font-medium text-emerald-600">+{row.ganho_clientes} · {'R$ ' + Math.round(row.ganho_mrr).toLocaleString('pt-BR')}</span>
                     </div>
-                    <div className="text-sm">
-                      <span className="font-medium text-amber-600">{'R$ ' + Math.round(row.perda_mrr_esp).toLocaleString('pt-BR')}</span>
-                      <span className="text-muted-foreground"> ({pctMrr.toFixed(0)}% do MRR)</span>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Saem</span>
+                      <span className="font-medium text-amber-600">-{row.perda_clientes} · {'R$ ' + Math.round(row.perda_mrr).toLocaleString('pt-BR')}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">em risco</p>
+                    <div className="pt-2 border-t space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Saldo</span>
+                        <span className={cn('font-semibold', netCli >= 0 ? 'text-emerald-600' : 'text-destructive')}>
+                          {row.saldo_clientes} cli ({netCli >= 0 ? '+' : ''}{netCli})
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-end">
+                        <span className={cn('text-xs font-medium', netMrr >= 0 ? 'text-emerald-600' : 'text-destructive')}>
+                          {'R$ ' + Math.round(row.saldo_mrr).toLocaleString('pt-BR')} ({netMrr >= 0 ? '+' : ''}{'R$ ' + Math.round(netMrr).toLocaleString('pt-BR')})
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
