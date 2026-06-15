@@ -15,6 +15,9 @@ import { ptBR } from 'date-fns/locale';
 import { useCohortRevenue } from '../hooks/useCohortRevenue';
 import { useCohortRevenueDim } from '../hooks/useCohortRevenueDim';
 import { useCohortForecast } from '../hooks/useCohortForecast';
+import { ConselhoDSSection } from '../diagnostico/ConselhoDSSection';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 interface CohortTabProps {
   tvMode?: boolean;
@@ -208,6 +211,48 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     }
     return { halfLife, stabAge, trend, maxAgeObserved: ages[ages.length - 1] };
   }, [cohorts, activeMatrix, ageColumns]);
+
+  // ── Conselho DS ──
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+
+  const conselhoDiagInput = useMemo(() => {
+    const avgAt = (mx: Map<string, Map<number, number>>, m: number) => {
+      const vals: number[] = [];
+      cohorts.forEach(c => { const v = mx.get(c.month)?.get(m); if (v != null) vals.push(v); });
+      return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+    };
+    return {
+      janela_meses: maxAge,
+      periodo_safras_meses: Number(cohortRange),
+      total_safras: cohorts.length,
+      total_clientes_safras: cohorts.reduce((s, c) => s + c.size, 0),
+      retencao_clientes: { M3: avgAt(matrix, 3), M6: avgAt(matrix, 6), M12: avgAt(matrix, 12) },
+      retencao_receita: { M3: avgAt(revenueMatrix, 3), M6: avgAt(revenueMatrix, 6), M12: avgAt(revenueMatrix, 12) },
+      sinais_curva: curveSignals,
+      recorte: { dimensao: dim, grupos: dimRows.slice(0, 12) },
+      projecao_perda: forecastRows,
+    };
+  }, [cohorts, matrix, revenueMatrix, curveSignals, dim, dimRows, forecastRows, maxAge, cohortRange]);
+
+  const conselhoAlertas = useMemo(() => {
+    const out: { tipo: string; texto: string }[] = [];
+    const rc6 = conselhoDiagInput.retencao_clientes.M6;
+    const rr6 = conselhoDiagInput.retencao_receita.M6;
+    if (rc6 != null && rr6 != null) {
+      const gap = Math.round((rr6 - rc6) * 10) / 10;
+      if (gap <= -2) out.push({ tipo: 'risco', texto: `No M6, receita retida (${rr6}%) está ${Math.abs(gap)}pp abaixo da retenção de clientes (${rc6}%) — saindo os clientes maiores.` });
+      else if (gap >= 2) out.push({ tipo: 'ok', texto: `No M6, receita retida (${rr6}%) supera a de clientes (${rc6}%) em ${gap}pp — saem os menores, receita protegida.` });
+    }
+    if (curveSignals?.trend) {
+      const t = curveSignals.trend;
+      out.push({ tipo: t.dir === 'down' ? 'risco' : t.dir === 'up' ? 'ok' : 'info', texto: `Tendência safra-a-safra no M${t.anchor}: ${t.dir === 'up' ? 'melhorando' : t.dir === 'down' ? 'piorando' : 'estável'}${t.dir !== 'flat' ? ` (${t.delta > 0 ? '+' : ''}${t.delta.toFixed(1)}pp)` : ''}.` });
+    }
+    const f12 = forecastRows.find(r => r.horizonte_meses === 12);
+    if (f12) out.push({ tipo: 'info', texto: `Projeção 12m: perda esperada de ~${Math.round(f12.perda_clientes_esp)} clientes e R$ ${Math.round(f12.perda_mrr_esp).toLocaleString('pt-BR')} de MRR da base ativa.` });
+    return out;
+  }, [conselhoDiagInput, curveSignals, forecastRows]);
 
   // ========== CURVE DATA (dynamic cohorts) ==========
   const { dynamicCurveData, dynamicLabels } = useMemo(() => {
@@ -718,6 +763,18 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           )}
         </CardContent>
       </Card>
+
+      {/* ═══════ CONSELHO DOCTOR SAAS ═══════ */}
+      {effectiveTenantId && (
+        <ConselhoDSSection
+          tenantId={effectiveTenantId}
+          tabKey="cohort"
+          diagInput={conselhoDiagInput}
+          alertasFactuais={conselhoAlertas}
+          filtrosAplicados={{ fornecedorId, unidadeBaseId, janelaMeses: maxAge, periodoSafrasMeses: Number(cohortRange) }}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
