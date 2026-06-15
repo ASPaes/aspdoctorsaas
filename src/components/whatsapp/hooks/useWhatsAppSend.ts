@@ -22,8 +22,43 @@ export const useWhatsAppSend = () => {
 
   const mutation = useMutation({
     mutationFn: async (params: SendMessageParams) => {
+      let storagePath: string | undefined;
+      let mediaSizeBytes: number | undefined;
+
+      // Upload direto ao Storage para anexos (não passa base64 pela Edge Function)
+      if (params.file && params.messageType !== 'text') {
+        const mime = params.file.type || 'application/octet-stream';
+        const { data: urlData, error: urlErr } = await supabase.functions.invoke('get-media-upload-url', {
+          body: { conversationId: params.conversationId, mediaMimetype: mime, fileName: params.file.name },
+        });
+        if (urlErr) throw new Error(urlErr.message || 'Falha ao preparar upload');
+        if (!urlData?.path || !urlData?.token) throw new Error(urlData?.error || 'Falha ao preparar upload');
+
+        const { error: upErr } = await supabase.storage
+          .from('whatsapp-media')
+          .uploadToSignedUrl(urlData.path, urlData.token, params.file, { contentType: mime });
+        if (upErr) throw new Error(upErr.message || 'Falha no upload do arquivo');
+
+        storagePath = urlData.path;
+        mediaSizeBytes = params.file.size;
+      }
+
+      const sendBody = {
+        conversationId: params.conversationId,
+        content: params.content,
+        messageType: params.messageType,
+        mediaUrl: params.mediaUrl,
+        mediaBase64: params.mediaBase64,
+        storagePath,
+        mediaMimetype: params.mediaMimetype || params.file?.type,
+        fileName: params.fileName || params.file?.name,
+        mediaSizeBytes,
+        quotedMessageId: params.quotedMessageId,
+        instanceId: params.instanceId,
+      };
+
       const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
-        body: params,
+        body: sendBody,
       });
       if (error) throw new Error(error.message || 'Erro ao enviar mensagem');
       if (data?.success === false) throw new Error(data.error || 'Erro ao enviar mensagem');
