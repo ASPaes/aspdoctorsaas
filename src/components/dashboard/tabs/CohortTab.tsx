@@ -161,6 +161,45 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     return avgs;
   }, [cohorts, activeMatrix]);
 
+  // ========== CURVE SIGNALS (derivados) ==========
+  const curveSignals = useMemo(() => {
+    const valid = cohorts.filter(c => c.size >= 10);
+    if (valid.length === 0) return null;
+    const avgByAge = new Map<number, number>();
+    ageColumns.forEach(age => {
+      const vals: number[] = [];
+      valid.forEach(c => { const v = activeMatrix.get(c.month)?.get(age); if (v != null) vals.push(v); });
+      if (vals.length > 0) avgByAge.set(age, vals.reduce((a, b) => a + b, 0) / vals.length);
+    });
+    const ages = [...avgByAge.keys()].sort((a, b) => a - b);
+    if (ages.length === 0) return null;
+    let halfLife: number | null = null;
+    for (const age of ages) { if ((avgByAge.get(age) ?? 100) < 50) { halfLife = age; break; } }
+    let stabAge: number | null = null;
+    for (let i = 1; i < ages.length - 1; i++) {
+      const d1 = avgByAge.get(ages[i - 1])! - avgByAge.get(ages[i])!;
+      const d2 = avgByAge.get(ages[i])! - avgByAge.get(ages[i + 1])!;
+      if (d1 < 1 && d2 < 1) { stabAge = ages[i]; break; }
+    }
+    let anchor: number | null = null;
+    for (const m of [12, 6, 3]) {
+      if (valid.filter(c => activeMatrix.get(c.month)?.get(m) != null).length >= 3) { anchor = m; break; }
+    }
+    let trend: { anchor: number; delta: number; dir: 'up' | 'down' | 'flat' } | null = null;
+    if (anchor != null) {
+      const withData = valid
+        .filter(c => activeMatrix.get(c.month)?.get(anchor!) != null)
+        .sort((a, b) => a.month.localeCompare(b.month));
+      const half = Math.floor(withData.length / 2);
+      const olds = withData.slice(0, half);
+      const news = withData.slice(withData.length - half);
+      const avg = (arr: typeof withData) => arr.reduce((s, c) => s + activeMatrix.get(c.month)!.get(anchor!)!, 0) / arr.length;
+      const delta = avg(news) - avg(olds);
+      trend = { anchor, delta, dir: delta > 2 ? 'up' : delta < -2 ? 'down' : 'flat' };
+    }
+    return { halfLife, stabAge, trend, maxAgeObserved: ages[ages.length - 1] };
+  }, [cohorts, activeMatrix, ageColumns]);
+
   // ========== CURVE DATA (dynamic cohorts) ==========
   const { dynamicCurveData, dynamicLabels } = useMemo(() => {
     if (activeCohorts.length === 0) return { dynamicCurveData: [], dynamicLabels: [] };
