@@ -7589,6 +7589,26 @@ export type Database = {
           tenant_id: string
         }[]
       }
+      fn_cohort_saldo_forecast: {
+        Args: {
+          p_fornecedor_id?: number
+          p_horizontes?: number[]
+          p_janela_meses?: number
+          p_tenant_id?: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          base_clientes: number
+          base_mrr: number
+          ganho_clientes: number
+          ganho_mrr: number
+          horizonte_meses: number
+          perda_clientes: number
+          perda_mrr: number
+          saldo_clientes: number
+          saldo_mrr: number
+        }[]
+      }
       fn_cohort_survival_forecast: {
         Args: {
           p_fornecedor_id?: number
