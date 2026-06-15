@@ -226,7 +226,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       retencao_receita: { M3: avgAt(revenueMatrix, 3), M6: avgAt(revenueMatrix, 6), M12: avgAt(revenueMatrix, 12) },
       sinais_curva: curveSignals,
       recorte: { dimensao: dim, grupos: dimRows.slice(0, 12) },
-      projecao_perda: forecastRows,
+      projecao_saldo: forecastRows,
     };
   }, [cohorts, matrix, revenueMatrix, curveSignals, dim, dimRows, forecastRows, maxAge, cohortRange]);
 
