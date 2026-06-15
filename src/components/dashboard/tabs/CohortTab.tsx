@@ -88,7 +88,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     for (const m of milestones) {
       const vals: number[] = [];
       cohorts.forEach(c => {
-        const v = matrix.get(c.month)?.get(m);
+        const v = activeMatrix.get(c.month)?.get(m);
         if (v != null) vals.push(v);
       });
       if (vals.length > 0) {
@@ -99,7 +99,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     // Best cohort: highest retention at its most advanced age
     let best: { month: string; pct: number; age: number } | null = null;
     cohorts.forEach(c => {
-      const ages = matrix.get(c.month);
+      const ages = activeMatrix.get(c.month);
       if (!ages) return;
       let maxAge = 0;
       ages.forEach((_, a) => { if (a > maxAge) maxAge = a; });
@@ -114,7 +114,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     // Worst cohort: lowest retention among cohorts with at least M3
     let worst: { month: string; pct: number; age: number; dropAge: number } | null = null;
     cohorts.forEach(c => {
-      const ages = matrix.get(c.month);
+      const ages = activeMatrix.get(c.month);
       if (!ages) return;
       let maxAge = 0;
       ages.forEach((_, a) => { if (a > maxAge) maxAge = a; });
@@ -136,20 +136,20 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     });
 
     return { avgRetention, best, worst };
-  }, [cohorts, matrix]);
+  }, [cohorts, activeMatrix]);
 
   // ========== HEATMAP AVERAGES ==========
   const rowAverages = useMemo(() => {
     const avgs = new Map<string, number>();
     cohorts.forEach(c => {
-      const ages = matrix.get(c.month);
+      const ages = activeMatrix.get(c.month);
       if (!ages) return;
       const vals: number[] = [];
       ages.forEach(v => vals.push(v));
       if (vals.length > 0) avgs.set(c.month, vals.reduce((a, b) => a + b, 0) / vals.length);
     });
     return avgs;
-  }, [cohorts, matrix]);
+  }, [cohorts, activeMatrix]);
 
   // ========== CURVE DATA (dynamic cohorts) ==========
   const { dynamicCurveData, dynamicLabels } = useMemo(() => {
@@ -159,7 +159,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
 
     let maxAgeWithData = 0;
     activeCohorts.forEach(cm => {
-      const ages = matrix.get(cm);
+      const ages = activeMatrix.get(cm);
       if (ages) ages.forEach((_, age) => { if (age > maxAgeWithData) maxAgeWithData = age; });
     });
     // Respect the age window selection
@@ -169,7 +169,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     const data = curveAges.map(age => {
       const point: Record<string, any> = { age: `M${age}`, ageNum: age };
       activeCohorts.forEach((cm, i) => {
-        const val = matrix.get(cm)?.get(age);
+        const val = activeMatrix.get(cm)?.get(age);
         point[`cohort_${i}`] = val !== undefined ? val : null;
         // Also store retained and size for tooltip
         const ret = retainedMatrix.get(cm)?.get(age);
@@ -181,7 +181,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     });
 
     return { dynamicCurveData: data, dynamicLabels: labels };
-  }, [activeCohorts, matrix, retainedMatrix, ageColumns, cohorts, maxAge]);
+  }, [activeCohorts, activeMatrix, retainedMatrix, ageColumns, cohorts, maxAge]);
 
   // Toggle cohort selection
   const toggleCohort = (month: string) => {
@@ -393,7 +393,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
                     <td className="p-2 font-medium whitespace-nowrap sticky left-0 bg-card z-[2] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">{formatCohortLabel(cohort.month)}</td>
                     <td className="p-2 text-center font-semibold text-muted-foreground">{cohort.size}</td>
                     {ageColumns.map(age => {
-                      const val = matrix.get(cohort.month)?.get(age);
+                      const val = activeMatrix.get(cohort.month)?.get(age);
                       return (
                         <td key={age} className={cn('p-2 text-center font-medium transition-colors', val != null ? getRetentionColor(val) : 'text-muted-foreground/30')}>
                           {val != null ? `${Number(val).toFixed(0)}%` : '—'}
