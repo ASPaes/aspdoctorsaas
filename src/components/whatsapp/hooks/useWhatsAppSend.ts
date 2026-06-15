@@ -70,7 +70,9 @@ export const useWhatsAppSend = () => {
       const previousMessages = queryClient.getQueryData<MsgPages>(['whatsapp', 'messages', newMessage.conversationId]);
 
       let optimisticMediaUrl = newMessage.mediaUrl ?? null;
-      if (!optimisticMediaUrl && newMessage.mediaBase64) {
+      if (!optimisticMediaUrl && newMessage.file) {
+        optimisticMediaUrl = URL.createObjectURL(newMessage.file);
+      } else if (!optimisticMediaUrl && newMessage.mediaBase64) {
         const base64Data = newMessage.mediaBase64.startsWith('data:')
           ? newMessage.mediaBase64
           : `data:${newMessage.mediaMimetype || 'application/octet-stream'};base64,${newMessage.mediaBase64}`;
