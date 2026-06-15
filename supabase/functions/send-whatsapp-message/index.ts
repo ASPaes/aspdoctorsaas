@@ -12,8 +12,10 @@ interface SendMessageRequest {
   messageType: 'text' | 'image' | 'audio' | 'video' | 'document';
   mediaUrl?: string;
   mediaBase64?: string;
+  storagePath?: string; // arquivo já no Storage (upload direto) — evita base64 inline
   mediaMimetype?: string;
   fileName?: string;
+  mediaSizeBytes?: number; // tamanho informado pelo cliente quando vem storagePath
   quotedMessageId?: string;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
@@ -124,9 +126,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (body.messageType !== 'text' && !body.mediaUrl && !body.mediaBase64) {
+    if (body.messageType !== 'text' && !body.mediaUrl && !body.mediaBase64 && !body.storagePath) {
       return new Response(
-        JSON.stringify({ success: false, error: 'mediaUrl or mediaBase64 is required for media messages' }),
+        JSON.stringify({ success: false, error: 'mediaUrl, mediaBase64 ou storagePath é obrigatório para mídia' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -300,7 +302,17 @@ Deno.serve(async (req) => {
     // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
     let storageSignedUrl: string | null = null;
-    if (body.mediaBase64 && body.messageType !== 'text') {
+    if (body.storagePath && body.messageType !== 'text') {
+      // Arquivo já enviado direto ao Storage pelo cliente (signed upload URL) — não processa base64
+      persistentMediaPath = body.storagePath;
+      const { data: signedData } = await supabase.storage
+        .from('whatsapp-media')
+        .createSignedUrl(body.storagePath, 300);
+      if (signedData?.signedUrl) {
+        storageSignedUrl = signedData.signedUrl;
+      }
+      console.log('[send-whatsapp-message] Using pre-uploaded storagePath:', body.storagePath, 'signedUrl:', !!storageSignedUrl);
+    } else if (body.mediaBase64 && body.messageType !== 'text') {
       try {
         const raw = body.mediaBase64.startsWith('data:')
           ? body.mediaBase64.split(',')[1] || ''
@@ -559,6 +571,8 @@ Deno.serve(async (req) => {
           ? body.mediaBase64.split(',')[1] || ''
           : body.mediaBase64;
         try { mediaSizeBytes = Math.floor(raw.length * 3 / 4); } catch {}
+      } else if (typeof body.mediaSizeBytes === 'number' && body.mediaSizeBytes > 0) {
+        mediaSizeBytes = body.mediaSizeBytes;
       }
     }
 
