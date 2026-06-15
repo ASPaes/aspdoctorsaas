@@ -15,6 +15,9 @@ import { ptBR } from 'date-fns/locale';
 import { useCohortRevenue } from '../hooks/useCohortRevenue';
 import { useCohortRevenueDim } from '../hooks/useCohortRevenueDim';
 import { useCohortForecast } from '../hooks/useCohortForecast';
+import { ConselhoDSSection } from '../diagnostico/ConselhoDSSection';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 interface CohortTabProps {
   tvMode?: boolean;
