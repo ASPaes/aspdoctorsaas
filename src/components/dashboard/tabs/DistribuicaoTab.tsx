@@ -477,6 +477,23 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
         </div>
       </div>
       <CarteiraSerieChart filters={filters} />
+
+      {/* ═══════ CONSELHO DOCTOR SAAS ═══════ */}
+      {effectiveTenantId && (
+        <ConselhoDSSection
+          tenantId={effectiveTenantId}
+          tabKey="distribuicao"
+          diagInput={conselhoDiagInput}
+          alertasFactuais={insights}
+          filtrosAplicados={{
+            unidadeBaseId: filters.unidadeBaseId,
+            fornecedorId: filters.fornecedorId,
+            periodoInicio: filters.periodoInicio,
+            periodoFim: filters.periodoFim,
+          }}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
