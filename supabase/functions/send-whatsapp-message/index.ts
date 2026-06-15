@@ -12,8 +12,10 @@ interface SendMessageRequest {
   messageType: 'text' | 'image' | 'audio' | 'video' | 'document';
   mediaUrl?: string;
   mediaBase64?: string;
+  storagePath?: string; // arquivo já no Storage (upload direto) — evita base64 inline
   mediaMimetype?: string;
   fileName?: string;
+  mediaSizeBytes?: number; // tamanho informado pelo cliente quando vem storagePath
   quotedMessageId?: string;
   instanceId?: string; // NEW: optional instance override for cross-instance conversations
   systemMessage?: boolean; // Skip attendance logic (used for closure/system notifications)
