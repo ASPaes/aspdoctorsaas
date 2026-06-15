@@ -83,13 +83,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
     unidadeBaseId,
   });
 
-  const { rows: forecastRows } = useCohortForecast({
-    fromCohortMonth: fromMonth,
-    toCohortMonth: toMonth,
-    maxAgeMonths: maxAge,
-    fornecedorId,
-    unidadeBaseId,
-  });
+  const { rows: forecastRows } = useCohortForecast({ fornecedorId, unidadeBaseId });
 
   const activeMatrix = metricMode === 'revenue' ? revenueMatrix : matrix;
 
