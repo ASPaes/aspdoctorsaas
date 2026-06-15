@@ -8,6 +8,7 @@ interface SendMessageParams {
   messageType: 'text' | 'image' | 'audio' | 'video' | 'document';
   mediaUrl?: string;
   mediaBase64?: string;
+  file?: File; // anexo para upload direto ao Storage (evita base64 inline)
   mediaMimetype?: string;
   fileName?: string;
   quotedMessageId?: string;
