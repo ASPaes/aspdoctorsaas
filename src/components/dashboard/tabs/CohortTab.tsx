@@ -54,19 +54,22 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
   const [ageWindow, setAgeWindow] = useState<string>('12');
   const [cohortRange, setCohortRange] = useState<string>('12');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+  const [metricMode, setMetricMode] = useState<'logo' | 'revenue'>('logo');
 
   const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
   const toMonth = format(new Date(), 'yyyy-MM');
 
   const maxAge = Number(ageWindow);
 
-  const { isLoading, cohorts, ageColumns, matrix, retainedMatrix, curveData: _cd, curveLabels: defaultLabels, curveIsFallback } = useCohortLogos({
+  const { isLoading, cohorts, ageColumns, matrix, revenueMatrix, retainedMatrix, curveData: _cd, curveLabels: defaultLabels, curveIsFallback } = useCohortRevenue({
     fromCohortMonth: fromMonth,
     toCohortMonth: toMonth,
     maxAgeMonths: maxAge,
     fornecedorId,
     unidadeBaseId,
   });
+
+  const activeMatrix = metricMode === 'revenue' ? revenueMatrix : matrix;
 
   // Reset selected cohorts when filters change
   const [selectedCohorts, setSelectedCohorts] = useState<string[] | null>(null);
