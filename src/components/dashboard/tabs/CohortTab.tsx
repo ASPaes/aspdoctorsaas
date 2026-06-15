@@ -244,7 +244,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
       out.push({ tipo: t.dir === 'down' ? 'risco' : t.dir === 'up' ? 'ok' : 'info', texto: `Tendência safra-a-safra no M${t.anchor}: ${t.dir === 'up' ? 'melhorando' : t.dir === 'down' ? 'piorando' : 'estável'}${t.dir !== 'flat' ? ` (${t.delta > 0 ? '+' : ''}${t.delta.toFixed(1)}pp)` : ''}.` });
     }
     const f12 = forecastRows.find(r => r.horizonte_meses === 12);
-    if (f12) out.push({ tipo: 'info', texto: `Projeção 12m: perda esperada de ~${Math.round(f12.perda_clientes_esp)} clientes e R$ ${Math.round(f12.perda_mrr_esp).toLocaleString('pt-BR')} de MRR da base ativa.` });
+    if (f12) { const net = f12.saldo_clientes - f12.base_clientes; out.push({ tipo: net >= 0 ? 'ok' : 'risco', texto: `Projeção 12m (ritmo do último ano): +${f12.ganho_clientes} entradas, -${f12.perda_clientes} saídas → saldo ${net >= 0 ? '+' : ''}${net} clientes e R$ ${Math.round(f12.saldo_mrr).toLocaleString('pt-BR')} de MRR.` }); }
     return out;
   }, [conselhoDiagInput, curveSignals, forecastRows]);
 
