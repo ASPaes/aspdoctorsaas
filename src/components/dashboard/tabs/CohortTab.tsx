@@ -431,6 +431,42 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
         </div>
       )}
 
+      {curveSignals && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className={cn('flex items-center gap-1.5', tvMode ? 'text-2xl' : 'text-lg')}>
+              Sinais da curva · {metricMode === 'revenue' ? 'Receita' : 'Clientes'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Meia-vida</p>
+                <p className="text-lg font-semibold">{curveSignals.halfLife != null ? `M${curveSignals.halfLife}` : `> ${curveSignals.maxAgeObserved}m`}</p>
+                <p className="text-xs text-muted-foreground">{curveSignals.halfLife != null ? 'metade da base já saiu' : 'metade da base ainda ativa — retenção forte'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Estabiliza em</p>
+                <p className="text-lg font-semibold">{curveSignals.stabAge != null ? `M${curveSignals.stabAge}` : 'ainda caindo'}</p>
+                <p className="text-xs text-muted-foreground">{curveSignals.stabAge != null ? 'queda < 1pp/mês a partir daqui' : 'não estabilizou na janela'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Tendência {curveSignals.trend ? `(M${curveSignals.trend.anchor})` : ''}</p>
+                {curveSignals.trend ? (
+                  <>
+                    <p className={cn('text-lg font-semibold', curveSignals.trend.dir === 'up' ? 'text-emerald-600' : curveSignals.trend.dir === 'down' ? 'text-destructive' : '')}>
+                      {curveSignals.trend.dir === 'up' ? 'Melhorando' : curveSignals.trend.dir === 'down' ? 'Piorando' : 'Estável'}
+                      {curveSignals.trend.dir !== 'flat' ? ` (${curveSignals.trend.delta > 0 ? '+' : ''}${curveSignals.trend.delta.toFixed(1)}pp)` : ''}
+                    </p>
+                    <p className="text-xs text-muted-foreground">safras recentes vs antigas</p>
+                  </>
+                ) : <p className="text-lg font-semibold">—</p>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ==================== HEATMAP TABLE ==================== */}
       <Card className="overflow-hidden">
         <CardHeader className="pb-2">
