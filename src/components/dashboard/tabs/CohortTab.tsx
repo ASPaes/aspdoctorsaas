@@ -56,6 +56,7 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
   const [cohortRange, setCohortRange] = useState<string>('12');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [metricMode, setMetricMode] = useState<'logo' | 'revenue'>('logo');
+  const [dim, setDim] = useState<'uf' | 'segmento' | 'canal' | 'faixa_ticket'>('uf');
 
   const fromMonth = format(subMonths(new Date(), Number(cohortRange)), 'yyyy-MM');
   const toMonth = format(new Date(), 'yyyy-MM');
