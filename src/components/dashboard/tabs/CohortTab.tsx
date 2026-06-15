@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { KpiHelpPopover } from '../KpiHelpPopover';
 import { format, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useCohortLogos } from '../hooks/useCohortLogos';
+import { useCohortRevenue } from '../hooks/useCohortRevenue';
 
 interface CohortTabProps {
   tvMode?: boolean;
