@@ -7589,6 +7589,26 @@ export type Database = {
           tenant_id: string
         }[]
       }
+      fn_cohort_survival_forecast: {
+        Args: {
+          p_fornecedor_id?: number
+          p_from_month?: string
+          p_horizontes?: number[]
+          p_max_age?: number
+          p_tenant_id?: string
+          p_to_month?: string
+          p_unidade_base_id?: number
+        }
+        Returns: {
+          base_clientes: number
+          base_mrr: number
+          horizonte_meses: number
+          perda_clientes_esp: number
+          perda_mrr_esp: number
+          retencao_clientes_esp_pct: number
+          retencao_mrr_esp_pct: number
+        }[]
+      }
       fn_current_chat_count: {
         Args: { p_tenant_id: string; p_user_id: string }
         Returns: number
