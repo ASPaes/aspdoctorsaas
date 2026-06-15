@@ -302,7 +302,17 @@ Deno.serve(async (req) => {
     // Upload base64 media to Supabase Storage for persistence + signed URL for Evolution
     let persistentMediaPath: string | null = null;
     let storageSignedUrl: string | null = null;
-    if (body.mediaBase64 && body.messageType !== 'text') {
+    if (body.storagePath && body.messageType !== 'text') {
+      // Arquivo já enviado direto ao Storage pelo cliente (signed upload URL) — não processa base64
+      persistentMediaPath = body.storagePath;
+      const { data: signedData } = await supabase.storage
+        .from('whatsapp-media')
+        .createSignedUrl(body.storagePath, 300);
+      if (signedData?.signedUrl) {
+        storageSignedUrl = signedData.signedUrl;
+      }
+      console.log('[send-whatsapp-message] Using pre-uploaded storagePath:', body.storagePath, 'signedUrl:', !!storageSignedUrl);
+    } else if (body.mediaBase64 && body.messageType !== 'text') {
       try {
         const raw = body.mediaBase64.startsWith('data:')
           ? body.mediaBase64.split(',')[1] || ''
