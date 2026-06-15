@@ -1,6 +1,9 @@
 import { useState, useMemo } from 'react';
 import { BrazilChoroplethMap } from '../charts/BrazilChoroplethMap';
 import { CarteiraSerieChart } from '../charts/CarteiraSerieChart';
+import { ConselhoDSSection } from '../diagnostico/ConselhoDSSection';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingDown, TrendingUp, AlertTriangle, PieChart, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -121,6 +124,27 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
       return { nome, qtd, mrr, churn_pct: base > 0 ? cancelados / base : 0 };
     });
   }, [ufBreak, ufChurn]);
+
+  // ── Conselho DS ──
+  const { profile } = useAuth();
+  const { effectiveTenantId } = useTenantFilter();
+  const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
+
+  const conselhoDiagInput = useMemo(() => {
+    const ufs = ufBreak.filter((r: any) => r.label && r.label.length === 2);
+    const totalMrr = ufs.reduce((s: number, r: any) => s + (r.mrr || 0), 0);
+    const totalClientes = ufs.reduce((s: number, r: any) => s + (r.qtd || 0), 0);
+    const topUf = [...ufs].sort((a: any, b: any) => b.mrr - a.mrr)[0];
+    return {
+      total_clientes: totalClientes,
+      total_mrr: totalMrr,
+      concentracao_top_uf: topUf ? { uf: topUf.label, mrr: topUf.mrr, share_mrr: totalMrr > 0 ? topUf.mrr / totalMrr : 0, clientes: topUf.qtd } : null,
+      distribuicao_por_uf: ufs.map((r: any) => ({ uf: r.label, clientes: r.qtd, mrr: r.mrr, ticket: r.ticket, margem_pct: r.margem_pct })),
+      churn_por_uf: ufChurn.filter((r: any) => r.label && r.label.length === 2 && r.base >= 5).map((r: any) => ({ uf: r.label, base: r.base, cancelados: r.cancelados, churn_pct: r.churn_pct, mrr_perdido: r.mrr_perdido })),
+      variacao_por_uf: ufVar.filter((r: any) => r.uf && r.uf.length === 2 && r.mrr_anterior >= 1500).map((r: any) => ({ uf: r.uf, mrr_anterior: r.mrr_anterior, delta_pct: r.delta_pct })),
+      por_regiao: regioes.map((r) => ({ regiao: r.nome, clientes: r.qtd, mrr: r.mrr, churn_pct: r.churn_pct })),
+    };
+  }, [ufBreak, ufChurn, ufVar, regioes]);
 
   const estadoRow: any = selectedState ? ufBreak.find((r: any) => r.label === selectedState) : null;
   const churnRow: any = selectedState ? ufChurn.find((r: any) => r.label === selectedState) : null;
@@ -453,6 +477,23 @@ export function DistribuicaoTab({ distributions, tvMode, filters }: Props) {
         </div>
       </div>
       <CarteiraSerieChart filters={filters} />
+
+      {/* ═══════ CONSELHO DOCTOR SAAS ═══════ */}
+      {effectiveTenantId && (
+        <ConselhoDSSection
+          tenantId={effectiveTenantId}
+          tabKey="distribuicao"
+          diagInput={conselhoDiagInput}
+          alertasFactuais={insights}
+          filtrosAplicados={{
+            unidadeBaseId: filters.unidadeBaseId,
+            fornecedorId: filters.fornecedorId,
+            periodoInicio: filters.periodoInicio,
+            periodoFim: filters.periodoFim,
+          }}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
