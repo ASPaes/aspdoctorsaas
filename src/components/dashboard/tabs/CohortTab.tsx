@@ -763,6 +763,18 @@ export function CohortTab({ tvMode = false, fornecedorId, unidadeBaseId }: Cohor
           )}
         </CardContent>
       </Card>
+
+      {/* ═══════ CONSELHO DOCTOR SAAS ═══════ */}
+      {effectiveTenantId && (
+        <ConselhoDSSection
+          tenantId={effectiveTenantId}
+          tabKey="cohort"
+          diagInput={conselhoDiagInput}
+          alertasFactuais={conselhoAlertas}
+          filtrosAplicados={{ fornecedorId, unidadeBaseId, janelaMeses: maxAge, periodoSafrasMeses: Number(cohortRange) }}
+          isAdmin={isAdmin}
+        />
+      )}
     </div>
   );
 }
