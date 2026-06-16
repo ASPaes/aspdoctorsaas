@@ -500,40 +500,43 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     // Para o "editor" também tentamos as mesmas variantes (é o mesmo cliente em 1-to-1)
     const editorCandidates = senderCandidates;
 
+    const useCaseCandidates = ['Event Edit', 'Message Edit'];
     let plaintext: Uint8Array | null = null;
-    let usedSender = ''; let usedEditor = '';
+    let usedSender = ''; let usedEditor = ''; let usedUseCase = '';
 
     outer:
-    for (const sender of senderCandidates) {
-      for (const editor of editorCandidates) {
-        const info = concatU8(
-          enc.encode(env.targetId),
-          enc.encode(sender),
-          enc.encode(editor),
-          enc.encode('Message Edit'),
-        );
-        try {
-          const aesKey = await hkdfSha256(secret, info, 32);
-          plaintext = await aesGcmDecrypt(aesKey, env.encIv, env.encPayload);
-          usedSender = sender; usedEditor = editor;
-          break outer;
-        } catch { /* tenta próxima combinação */ }
+    for (const useCase of useCaseCandidates) {
+      for (const sender of senderCandidates) {
+        for (const editor of editorCandidates) {
+          const info = concatU8(
+            enc.encode(env.targetId),
+            enc.encode(sender),
+            enc.encode(editor),
+            enc.encode(useCase),
+          );
+          try {
+            const aesKey = await hkdfSha256(secret, info, 32);
+            plaintext = await aesGcmDecrypt(aesKey, env.encIv, env.encPayload);
+            usedSender = sender; usedEditor = editor; usedUseCase = useCase;
+            break outer;
+          } catch { /* tenta próxima combinação */ }
+        }
       }
     }
 
     if (!plaintext) {
-      console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações de JID para ${env.targetId}. Candidatos: ${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
+      console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, JIDs=${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
       return;
     }
 
     // 6) Extrair texto do proto.Message decifrado
     const newContent = extractEditedTextFromMessage(plaintext);
     if (!newContent) {
-      console.warn(`${LOG} SecretEdit: decifrou (sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+      console.warn(`${LOG} SecretEdit: decifrou (useCase=${usedUseCase}, sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
       return;
     }
 
-    console.log(`${LOG} SecretEdit decifrado (sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
+    console.log(`${LOG} SecretEdit decifrado (useCase=${usedUseCase}, sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
 
 
     // 7) Aplicar edição via mesmo fluxo do processMessageEdit
