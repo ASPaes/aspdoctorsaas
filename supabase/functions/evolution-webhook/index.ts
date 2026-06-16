@@ -968,12 +968,15 @@ async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<v
     case 'messages.upsert':
       if (isRevokeMessage(payload.data?.message)) {
         await processMessageRevoke(payload, supabase);
+      } else if (getSecretEncryptedEdit(payload.data?.message)) {
+        await processSecretEncryptedEdit(payload, supabase);
       } else if (isEditedMessage(payload.data?.message) || extractEditPayload(payload.data)) {
         await processMessageEdit(payload, supabase);
       } else {
         await processMessageUpsert(payload, supabase);
       }
       break;
+
     case 'messages.update': {
       // Edicoes do WhatsApp chegam frequentemente como messages.update
       const updateData = Array.isArray(payload.data) ? payload.data[0] : payload.data;
