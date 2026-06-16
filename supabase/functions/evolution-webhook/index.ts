@@ -49,7 +49,7 @@ function isRevokeMessage(message: any): boolean {
 
 function isEditedMessage(message: any): boolean {
   if (!message) return false;
-  return !!(
+  if (
     message.editedMessage ||
     message.protocolMessage?.editedMessage ||
     message.editedMessage?.message?.protocolMessage?.editedMessage ||
@@ -57,7 +57,13 @@ function isEditedMessage(message: any): boolean {
       message.protocolMessage.type === 14 ||
       message.protocolMessage.type === 'MESSAGE_EDIT'
     ))
-  );
+  ) return true;
+  // Fallback permissivo: procurar "editedMessage" em qualquer profundidade do objeto
+  try {
+    const s = JSON.stringify(message);
+    if (s.includes('"editedMessage"') || s.includes('"MESSAGE_EDIT"')) return true;
+  } catch { /* ignore */ }
+  return false;
 }
 
 // Extrai { messageId, newContent } de qualquer formato conhecido de edicao do Evolution
