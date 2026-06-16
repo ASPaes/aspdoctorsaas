@@ -107,6 +107,7 @@ export function TempoRealTab() {
               ? `+${data.fila_fora_hora} fora do horário`
               : "dentro do horário"
           }
+          onVerChats={data.fila > 0 ? () => setVerBucket({ bucket: "fila", title: "Fila Agora" }) : undefined}
         />
         <KpiCard
           kpiKey="atendimento_espera_mais_antigo"
@@ -119,6 +120,7 @@ export function TempoRealTab() {
           label="Em Atendimento"
           value={data.em_atendimento}
           subtitle="conversas ativas com agente"
+          onVerChats={data.em_atendimento > 0 ? () => setVerBucket({ bucket: "em_atendimento", title: "Em Atendimento" }) : undefined}
         />
         <KpiCard
           kpiKey="atendimento_sla_estourando"
@@ -126,6 +128,7 @@ export function TempoRealTab() {
           value={data.sla_estourando}
           subtitle="acima do limite de 1ª resposta"
           tone={data.sla_estourando > 0 ? "danger" : "default"}
+          onVerChats={data.sla_estourando > 0 ? () => setVerBucket({ bucket: "sla_estourando", title: "Estourando SLA" }) : undefined}
         />
         <KpiCard
           kpiKey="atendimento_parados_24h"
@@ -133,6 +136,7 @@ export function TempoRealTab() {
           value={data.parados_24h}
           subtitle="precisam de ação imediata"
           tone={data.parados_24h > 0 ? "warning" : "default"}
+          onVerChats={data.parados_24h > 0 ? () => setVerBucket({ bucket: "parados_24h", title: "Parados > 24h" }) : undefined}
         />
       </div>
 
