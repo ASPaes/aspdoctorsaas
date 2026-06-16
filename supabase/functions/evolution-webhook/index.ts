@@ -636,19 +636,21 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
       }
     }
 
+    let newContent: string | null = null;
     if (!plaintext) {
       console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, JIDs=${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
-      return;
+      newContent = await fetchEditedTextFromEvolution(supabase, resolved.instanceId, payload.instance, env.targetId, originalRow.remote_jid);
+      if (!newContent || newContent === originalRow.content) return;
+      console.log(`${LOG} SecretEdit aplicado via fallback Evolution: ${env.targetId} -> "${newContent.substring(0, 80)}"`);
+    } else {
+      // 6) Extrair texto do proto.Message decifrado
+      newContent = extractEditedTextFromMessage(plaintext);
+      if (!newContent) {
+        console.warn(`${LOG} SecretEdit: decifrou (useCase=${usedUseCase}, sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+        return;
+      }
+      console.log(`${LOG} SecretEdit decifrado (useCase=${usedUseCase}, sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
     }
-
-    // 6) Extrair texto do proto.Message decifrado
-    const newContent = extractEditedTextFromMessage(plaintext);
-    if (!newContent) {
-      console.warn(`${LOG} SecretEdit: decifrou (useCase=${usedUseCase}, sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-      return;
-    }
-
-    console.log(`${LOG} SecretEdit decifrado (useCase=${usedUseCase}, sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
 
 
     // 7) Aplicar edição via mesmo fluxo do processMessageEdit
