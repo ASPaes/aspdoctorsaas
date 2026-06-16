@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles } from "lucide-react";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
