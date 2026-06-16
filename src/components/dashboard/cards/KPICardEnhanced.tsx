@@ -34,7 +34,7 @@ interface KPICardEnhancedProps {
 export function KPICardEnhanced({
   label, value, trend, trendValue, icon, variant = 'dark',
   size = 'md', className, formula, helpKey, subtitle,
-  enableTilt = true, showBenchmark = true, currentValue,
+  enableTilt = true, showBenchmark = true, currentValue, footer,
 }: KPICardEnhancedProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   useTilt3D(cardRef, { enabled: enableTilt !== false });
