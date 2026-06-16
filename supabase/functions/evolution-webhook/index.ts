@@ -99,6 +99,33 @@ function extractEditPayload(data: any): { editedId: string; newContent: string }
       direct?.extendedTextMessage?.text;
     if (editedId && newContent) return { editedId, newContent };
   }
+
+  // Fallback recursivo: vasculha o objeto inteiro procurando um nó com editedMessage
+  try {
+    const stack: any[] = [data];
+    const seen = new Set<any>();
+    while (stack.length) {
+      const node = stack.pop();
+      if (!node || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
+      if (node.editedMessage) {
+        const edited = node.editedMessage;
+        const newContent =
+          edited?.conversation ||
+          edited?.extendedTextMessage?.text ||
+          edited?.message?.conversation ||
+          edited?.message?.extendedTextMessage?.text;
+        const editedId =
+          node?.key?.id ||
+          edited?.key?.id ||
+          edited?.message?.key?.id ||
+          data?.key?.id ||
+          data?.message?.key?.id;
+        if (editedId && newContent) return { editedId, newContent };
+      }
+      for (const k of Object.keys(node)) stack.push(node[k]);
+    }
+  } catch { /* ignore */ }
   return null;
 }
 
