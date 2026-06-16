@@ -447,6 +447,48 @@ function getSecretEncryptedEdit(message: any): { encPayload: Uint8Array; encIv: 
   return { encPayload, encIv, targetId, targetRemoteJid };
 }
 
+async function fetchLidCandidatesForPhone(supabase: any, instanceId: string, fallbackInstance: string, phone: string): Promise<string[]> {
+  if (!phone) return [];
+  try {
+    const { data: instanceRow } = await supabase.from('whatsapp_instances')
+      .select('instance_name, provider_type, instance_id_external')
+      .eq('id', instanceId)
+      .maybeSingle();
+    const secrets = await getInstanceSecrets(supabase, instanceId);
+    const base = (secrets?.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+    const instanceName = instanceRow?.provider_type === 'cloud' && instanceRow?.instance_id_external
+      ? instanceRow.instance_id_external
+      : (instanceRow?.instance_name || fallbackInstance);
+    if (!base || !instanceName || !secrets?.api_key) return [];
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (instanceRow?.provider_type === 'cloud') headers.Authorization = `Bearer ${secrets.api_key}`;
+    else headers.apikey = secrets.api_key;
+
+    const response = await fetch(`${base}/chat/fetchLid/${instanceName}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ number: phone }),
+    });
+    if (!response.ok) return [];
+    const body = await response.json().catch(() => null);
+    const found: string[] = [];
+    const collect = (value: any) => {
+      if (!value) return;
+      if (typeof value === 'string') {
+        if (value.includes('@lid')) found.push(value);
+        else if (/^\d{8,}$/.test(value)) found.push(`${value}@lid`);
+      } else if (Array.isArray(value)) value.forEach(collect);
+      else if (typeof value === 'object') Object.values(value).forEach(collect);
+    };
+    collect(body?.lid ?? body?.data?.lid ?? body);
+    return found.filter((v, i, a) => v && a.indexOf(v) === i);
+  } catch (err) {
+    console.warn(`${LOG} SecretEdit: não consegui buscar LID para ${phone}: ${String(err).substring(0, 160)}`);
+    return [];
+  }
+}
+
 async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
     const data = payload.data;
