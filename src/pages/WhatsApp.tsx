@@ -298,9 +298,5 @@ function WhatsAppContent() {
 }
 
 export default function WhatsApp() {
-  return (
-    <DepartmentFilterProvider>
-      <WhatsAppContent />
-    </DepartmentFilterProvider>
-  );
+  return <WhatsAppContent />;
 }
