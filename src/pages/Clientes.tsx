@@ -48,6 +48,33 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
   );
 }
 
+/**
+ * Constrói a cláusula OR de busca. Quando o termo for numérico, também
+ * tenta casar pelo CNPJ/CPF mascarado (que é como o valor é gravado no DB),
+ * permitindo digitar apenas os dígitos.
+ */
+function buildSearchOr(term: string): string {
+  const trimmed = term.trim();
+  const s = `%${escapeLike(trimmed)}%`;
+  const parts = [
+    `razao_social.ilike.${s}`,
+    `nome_fantasia.ilike.${s}`,
+    `cnpj.ilike.${s}`,
+  ];
+  const isNumeric = /^\d+$/.test(trimmed);
+  if (isNumeric) {
+    const digits = trimmed.replace(/\D/g, "");
+    if (digits.length >= 3) {
+      const masked = digits.length === 11 ? maskCPF(digits) : maskCNPJ(digits);
+      if (masked && masked !== digits) {
+        parts.push(`cnpj.ilike.%${escapeLike(masked)}%`);
+      }
+    }
+    parts.push(`codigo_sequencial.eq.${trimmed}`);
+  }
+  return parts.join(",");
+}
+
 export default function Clientes() {
   const navigate = useNavigate();
   const { filters, updateFilter, clearAdvancedFilters } = useClientesFilters();
