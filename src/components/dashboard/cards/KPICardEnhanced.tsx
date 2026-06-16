@@ -143,6 +143,7 @@ export function KPICardEnhanced({
           </div>
         )}
       </div>
+      {footer && <div className="mt-2">{footer}</div>}
     </div>
   );
 }
