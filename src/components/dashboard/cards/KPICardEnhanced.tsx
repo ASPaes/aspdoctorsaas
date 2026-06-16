@@ -27,12 +27,14 @@ interface KPICardEnhancedProps {
   showBenchmark?: boolean;
   /** Valor numérico raw (não formatado) — usado para posicionar marker na range bar */
   currentValue?: number;
+  /** Conteúdo opcional no rodapé do card (ex: botão "Ver chats"). */
+  footer?: ReactNode;
 }
 
 export function KPICardEnhanced({
   label, value, trend, trendValue, icon, variant = 'dark',
   size = 'md', className, formula, helpKey, subtitle,
-  enableTilt = true, showBenchmark = true, currentValue,
+  enableTilt = true, showBenchmark = true, currentValue, footer,
 }: KPICardEnhancedProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   useTilt3D(cardRef, { enabled: enableTilt !== false });
@@ -141,6 +143,7 @@ export function KPICardEnhanced({
           </div>
         )}
       </div>
+      {footer && <div className="mt-2">{footer}</div>}
     </div>
   );
 }
