@@ -1374,6 +1374,27 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     sender_name: !fromMe ? (pushName || null) : null,
     metadata: (() => {
       const base: Record<string, any> = { source: providerType };
+      // Persistir messageSecret (necessário para decifrar edições E2E do tipo secretEncryptedMessage)
+      try {
+        const raw = (msg.rawPayload as any) || {};
+        const secret = raw?.message?.messageContextInfo?.messageSecret;
+        if (secret) {
+          let b64: string | null = null;
+          if (typeof secret === 'string') b64 = secret;
+          else if (Array.isArray(secret)) {
+            const u8 = new Uint8Array(secret);
+            let s = ''; for (const b of u8) s += String.fromCharCode(b);
+            b64 = btoa(s);
+          } else if (typeof secret === 'object') {
+            const arr = Object.keys(secret).sort((a, b) => Number(a) - Number(b)).map((k) => (secret as any)[k]);
+            const u8 = new Uint8Array(arr);
+            let s = ''; for (const b of u8) s += String.fromCharCode(b);
+            b64 = btoa(s);
+          }
+          if (b64) base.messageSecret = b64;
+        }
+      } catch { /* ignore */ }
+
       if ((messageType === 'contact' || messageType === 'contacts') && msg.rawPayload) {
         const raw = msg.rawPayload as any;
         const evoSingle = raw?.message?.contactMessage;
