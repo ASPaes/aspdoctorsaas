@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DuplicateContactsTab } from "@/components/whatsapp/settings/DuplicateContactsTab";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
 
 export default function AppLayout() {
   const location = useLocation();
