@@ -7665,6 +7665,23 @@ export type Database = {
         Returns: Json
       }
       get_ai_projection: { Args: never; Returns: Json }
+      get_atendimento_realtime: {
+        Args: {
+          p_department_id?: string
+          p_sla_threshold_min?: number
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      get_atendimento_realtime_chats: {
+        Args: {
+          p_bucket: string
+          p_department_id?: string
+          p_sla_threshold_min?: number
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       get_attendance_metrics: {
         Args: {
           p_agent_id?: string

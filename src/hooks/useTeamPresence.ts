@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+
 
 export interface TeamMemberPresence {
   user_id: string;
@@ -15,17 +17,21 @@ export interface TeamMemberPresence {
   agent_email: string | null;
   max_concurrent_chats: number | null;
   active_chat_count: number;
+  department_id: string | null;
 }
+
 
 export function useTeamPresence() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const { selectedDepartmentId } = useDepartmentFilter();
 
   const { data: members = [], isLoading, refetch } = useQuery({
-    queryKey: ["team_presence", tid],
+    queryKey: ["team_presence", tid, selectedDepartmentId],
     enabled: !!tid && !!isAdmin,
+
     refetchInterval: 10_000,
     queryFn: async () => {
       const { data: presenceRows, error: pErr } = await supabase
@@ -90,14 +96,14 @@ export function useTeamPresence() {
         .map((p) => p.funcionario_id)
         .filter(Boolean) as number[];
 
-      let funcMap: Record<number, { nome: string; email: string | null }> = {};
+      let funcMap: Record<number, { nome: string; email: string | null; department_id: string | null }> = {};
       if (funcIds.length > 0) {
         const { data: funcs } = await supabase
           .from("funcionarios")
-          .select("id, nome, email")
+          .select("id, nome, email, department_id")
           .in("id", funcIds);
         if (funcs) {
-          funcMap = Object.fromEntries(funcs.map((f) => [f.id, { nome: f.nome, email: f.email }]));
+          funcMap = Object.fromEntries(funcs.map((f) => [f.id, { nome: f.nome, email: f.email, department_id: f.department_id ?? null }]));
         }
       }
 
@@ -119,15 +125,21 @@ export function useTeamPresence() {
           agent_email: func?.email || null,
           max_concurrent_chats: chatLimitMap[row.user_id] ?? null,
           active_chat_count: chatCountMap[row.user_id] ?? 0,
+          department_id: func?.department_id ?? null,
         };
       });
 
-      const statusOrder: Record<string, number> = { paused: 0, active: 1, offline: 2 };
-      result.sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
+      const filtered = selectedDepartmentId
+        ? result.filter((m) => m.department_id === selectedDepartmentId)
+        : result;
 
-      return result;
+      const statusOrder: Record<string, number> = { paused: 0, active: 1, offline: 2 };
+      filtered.sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
+
+      return filtered;
     },
   });
+
 
   // Realtime subscription for instant updates across browsers
   useEffect(() => {
