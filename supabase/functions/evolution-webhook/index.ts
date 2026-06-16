@@ -48,7 +48,52 @@ function isRevokeMessage(message: any): boolean {
 }
 
 function isEditedMessage(message: any): boolean {
-  return !!(message?.editedMessage || message?.protocolMessage?.editedMessage);
+  if (!message) return false;
+  return !!(
+    message.editedMessage ||
+    message.protocolMessage?.editedMessage ||
+    message.editedMessage?.message?.protocolMessage?.editedMessage ||
+    (message.protocolMessage && (
+      message.protocolMessage.type === 14 ||
+      message.protocolMessage.type === 'MESSAGE_EDIT'
+    ))
+  );
+}
+
+// Extrai { messageId, newContent } de qualquer formato conhecido de edicao do Evolution
+function extractEditPayload(data: any): { editedId: string; newContent: string } | null {
+  if (!data) return null;
+  const message = data.message;
+  // Caminhos possíveis para o protocolMessage que contem a edicao
+  const candidates = [
+    message?.protocolMessage,
+    message?.editedMessage?.message?.protocolMessage,
+    message?.editedMessage?.protocolMessage,
+  ].filter(Boolean);
+
+  for (const pm of candidates) {
+    const editedId = pm?.key?.id || data?.key?.id;
+    const edited = pm?.editedMessage;
+    const newContent =
+      edited?.conversation ||
+      edited?.extendedTextMessage?.text ||
+      edited?.message?.conversation ||
+      edited?.message?.extendedTextMessage?.text;
+    if (editedId && newContent) return { editedId, newContent };
+  }
+
+  // Fallback: data.message.editedMessage direto (sem protocolMessage)
+  const direct = message?.editedMessage;
+  if (direct) {
+    const editedId = direct?.key?.id || data?.key?.id;
+    const newContent =
+      direct?.message?.conversation ||
+      direct?.message?.extendedTextMessage?.text ||
+      direct?.conversation ||
+      direct?.extendedTextMessage?.text;
+    if (editedId && newContent) return { editedId, newContent };
+  }
+  return null;
 }
 
 function getPayloadIsFromMe(data: any): boolean {
@@ -185,18 +230,37 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
 
 async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
-    const { data } = payload;
-    const editedMsg = data?.message?.editedMessage || data?.message?.protocolMessage?.editedMessage;
-    const editedId = editedMsg?.key?.id || data?.key?.id;
-    const newContent = editedMsg?.message?.conversation || editedMsg?.message?.extendedTextMessage?.text;
-    if (!editedId || !newContent) { console.warn(`${LOG} Edit: missing id or content`); return; }
+    const extracted = extractEditPayload(payload.data);
+    if (!extracted) { console.warn(`${LOG} Edit: nao consegui extrair id/conteudo`); return; }
+    const { editedId, newContent } = extracted;
 
     const resolved = await resolveInstanceTenant(supabase, payload.instance);
     if (!resolved) return;
 
-    await supabase.from('whatsapp_messages').update({
+    const { data: updated, error } = await supabase.from('whatsapp_messages').update({
       content: newContent, is_edited: true, edited_at: new Date().toISOString(),
-    }).eq('tenant_id', resolved.tenantId).eq('message_id', editedId);
+    }).eq('tenant_id', resolved.tenantId).eq('message_id', editedId)
+      .select('id, conversation_id, content, timestamp, is_from_me');
+
+    if (error) { console.error(`${LOG} Edit update error:`, error); return; }
+    if (!updated?.length) { console.warn(`${LOG} Edit: mensagem ${editedId} nao encontrada`); return; }
+
+    // Atualizar preview da conversa se a mensagem editada for a ultima
+    const row = updated[0];
+    const { data: lastMsg } = await supabase.from('whatsapp_messages')
+      .select('id, content, timestamp, is_from_me')
+      .eq('conversation_id', row.conversation_id)
+      .is('deleted_at', null)
+      .order('timestamp', { ascending: false })
+      .limit(1).maybeSingle();
+    if (lastMsg?.id === row.id) {
+      await supabase.from('whatsapp_conversations').update({
+        last_message_preview: (newContent || '').substring(0, 200),
+        last_message_at: row.timestamp,
+        is_last_message_from_me: row.is_from_me,
+      }).eq('id', row.conversation_id);
+    }
+    console.log(`${LOG} Edit aplicado: msg ${editedId} -> "${newContent.substring(0, 60)}"`);
   } catch (err) { console.error(`${LOG} Error in processMessageEdit:`, err); }
 }
 
@@ -612,9 +676,16 @@ async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<v
         await processMessageUpsert(payload, supabase);
       }
       break;
-    case 'messages.update':
-      await processMessageUpdate(payload, supabase);
+    case 'messages.update': {
+      // Edicoes do WhatsApp chegam frequentemente como messages.update
+      const updateData = Array.isArray(payload.data) ? payload.data[0] : payload.data;
+      if (isEditedMessage(updateData?.message) || extractEditPayload(updateData)) {
+        await processMessageEdit({ ...payload, data: updateData }, supabase);
+      } else {
+        await processMessageUpdate(payload, supabase);
+      }
       break;
+    }
     case 'messages.delete': {
       const deleteData = payload.data;
       const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
