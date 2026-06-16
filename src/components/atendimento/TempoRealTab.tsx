@@ -1,9 +1,11 @@
+import { useState, type ReactNode } from "react";
 import { useAtendimentoRealtime } from "./useAtendimentoRealtime";
+import { VerChatsDialog } from "./VerChatsDialog";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
 import { Loader2, Users, AlertTriangle } from "lucide-react";
 
-function fmtEspera(seg: number): string {
+export function fmtEspera(seg: number): string {
   if (!seg || seg <= 0) return "—";
   if (seg > 86400) {
     const d = Math.floor(seg / 86400);
@@ -22,12 +24,13 @@ function fmtEspera(seg: number): string {
 interface KpiCardProps {
   kpiKey: string;
   label: string;
-  value: React.ReactNode;
-  subtitle?: React.ReactNode;
+  value: ReactNode;
+  subtitle?: ReactNode;
   tone?: "default" | "danger" | "warning";
+  onVerChats?: () => void;
 }
 
-function KpiCard({ kpiKey, label, value, subtitle, tone = "default" }: KpiCardProps) {
+function KpiCard({ kpiKey, label, value, subtitle, tone = "default", onVerChats }: KpiCardProps) {
   return (
     <div
       className={cn(
@@ -54,12 +57,22 @@ function KpiCard({ kpiKey, label, value, subtitle, tone = "default" }: KpiCardPr
       {subtitle && (
         <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>
       )}
+      {onVerChats && (
+        <button
+          type="button"
+          onClick={onVerChats}
+          className="mt-2 text-xs font-medium text-primary hover:underline focus:outline-none"
+        >
+          Ver chats →
+        </button>
+      )}
     </div>
   );
 }
 
 export function TempoRealTab() {
   const { data, isLoading, isError, error } = useAtendimentoRealtime();
+  const [verBucket, setVerBucket] = useState<{ bucket: string; title: string } | null>(null);
 
   if (isLoading) {
     return (
@@ -94,6 +107,7 @@ export function TempoRealTab() {
               ? `+${data.fila_fora_hora} fora do horário`
               : "dentro do horário"
           }
+          onVerChats={data.fila > 0 ? () => setVerBucket({ bucket: "fila", title: "Fila Agora" }) : undefined}
         />
         <KpiCard
           kpiKey="atendimento_espera_mais_antigo"
@@ -106,6 +120,7 @@ export function TempoRealTab() {
           label="Em Atendimento"
           value={data.em_atendimento}
           subtitle="conversas ativas com agente"
+          onVerChats={data.em_atendimento > 0 ? () => setVerBucket({ bucket: "em_atendimento", title: "Em Atendimento" }) : undefined}
         />
         <KpiCard
           kpiKey="atendimento_sla_estourando"
@@ -113,6 +128,7 @@ export function TempoRealTab() {
           value={data.sla_estourando}
           subtitle="acima do limite de 1ª resposta"
           tone={data.sla_estourando > 0 ? "danger" : "default"}
+          onVerChats={data.sla_estourando > 0 ? () => setVerBucket({ bucket: "sla_estourando", title: "Estourando SLA" }) : undefined}
         />
         <KpiCard
           kpiKey="atendimento_parados_24h"
@@ -120,6 +136,7 @@ export function TempoRealTab() {
           value={data.parados_24h}
           subtitle="precisam de ação imediata"
           tone={data.parados_24h > 0 ? "warning" : "default"}
+          onVerChats={data.parados_24h > 0 ? () => setVerBucket({ bucket: "parados_24h", title: "Parados > 24h" }) : undefined}
         />
       </div>
 
@@ -193,6 +210,13 @@ export function TempoRealTab() {
           </div>
         </div>
       </div>
+
+      <VerChatsDialog
+        bucket={verBucket?.bucket ?? null}
+        title={verBucket?.title ?? ""}
+        open={!!verBucket}
+        onOpenChange={(o) => { if (!o) setVerBucket(null); }}
+      />
     </div>
   );
 }
