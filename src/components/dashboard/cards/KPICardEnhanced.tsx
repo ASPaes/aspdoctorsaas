@@ -27,6 +27,8 @@ interface KPICardEnhancedProps {
   showBenchmark?: boolean;
   /** Valor numérico raw (não formatado) — usado para posicionar marker na range bar */
   currentValue?: number;
+  /** Conteúdo opcional no rodapé do card (ex: botão "Ver chats"). */
+  footer?: ReactNode;
 }
 
 export function KPICardEnhanced({
