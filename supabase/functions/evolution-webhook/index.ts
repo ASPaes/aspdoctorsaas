@@ -48,7 +48,52 @@ function isRevokeMessage(message: any): boolean {
 }
 
 function isEditedMessage(message: any): boolean {
-  return !!(message?.editedMessage || message?.protocolMessage?.editedMessage);
+  if (!message) return false;
+  return !!(
+    message.editedMessage ||
+    message.protocolMessage?.editedMessage ||
+    message.editedMessage?.message?.protocolMessage?.editedMessage ||
+    (message.protocolMessage && (
+      message.protocolMessage.type === 14 ||
+      message.protocolMessage.type === 'MESSAGE_EDIT'
+    ))
+  );
+}
+
+// Extrai { messageId, newContent } de qualquer formato conhecido de edicao do Evolution
+function extractEditPayload(data: any): { editedId: string; newContent: string } | null {
+  if (!data) return null;
+  const message = data.message;
+  // Caminhos possíveis para o protocolMessage que contem a edicao
+  const candidates = [
+    message?.protocolMessage,
+    message?.editedMessage?.message?.protocolMessage,
+    message?.editedMessage?.protocolMessage,
+  ].filter(Boolean);
+
+  for (const pm of candidates) {
+    const editedId = pm?.key?.id || data?.key?.id;
+    const edited = pm?.editedMessage;
+    const newContent =
+      edited?.conversation ||
+      edited?.extendedTextMessage?.text ||
+      edited?.message?.conversation ||
+      edited?.message?.extendedTextMessage?.text;
+    if (editedId && newContent) return { editedId, newContent };
+  }
+
+  // Fallback: data.message.editedMessage direto (sem protocolMessage)
+  const direct = message?.editedMessage;
+  if (direct) {
+    const editedId = direct?.key?.id || data?.key?.id;
+    const newContent =
+      direct?.message?.conversation ||
+      direct?.message?.extendedTextMessage?.text ||
+      direct?.conversation ||
+      direct?.extendedTextMessage?.text;
+    if (editedId && newContent) return { editedId, newContent };
+  }
+  return null;
 }
 
 function getPayloadIsFromMe(data: any): boolean {
