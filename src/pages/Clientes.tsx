@@ -430,13 +430,7 @@ export default function Clientes() {
       if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
 
       if (debouncedSearch) {
-        const s = `%${escapeLike(debouncedSearch)}%`;
-        const isNumeric = /^\d+$/.test(debouncedSearch.trim());
-        if (isNumeric) {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
-        } else {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
-        }
+        q = q.or(buildSearchOr(debouncedSearch));
       }
       if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
       else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
