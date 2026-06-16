@@ -65,9 +65,15 @@ function buildSearchOr(term: string): string {
   if (isNumeric) {
     const digits = trimmed.replace(/\D/g, "");
     if (digits.length >= 3) {
-      const masked = digits.length === 11 ? maskCPF(digits) : maskCNPJ(digits);
-      if (masked && masked !== digits) {
-        parts.push(`cnpj.ilike.%${escapeLike(masked)}%`);
+      // Tenta as duas máscaras possíveis (CPF e CNPJ parcial), pois
+      // dígitos intermediários (ex.: 11) são ambíguos entre CPF e CNPJ.
+      const candidatos = new Set<string>();
+      candidatos.add(maskCNPJ(digits));
+      if (digits.length === 11) candidatos.add(maskCPF(digits));
+      for (const masked of candidatos) {
+        if (masked && masked !== digits) {
+          parts.push(`cnpj.ilike.%${escapeLike(masked)}%`);
+        }
       }
     }
     parts.push(`codigo_sequencial.eq.${trimmed}`);
