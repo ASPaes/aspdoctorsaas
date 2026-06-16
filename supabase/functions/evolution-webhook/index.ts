@@ -230,18 +230,37 @@ async function processMessageRevoke(payload: EvolutionWebhookPayload, supabase: 
 
 async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
-    const { data } = payload;
-    const editedMsg = data?.message?.editedMessage || data?.message?.protocolMessage?.editedMessage;
-    const editedId = editedMsg?.key?.id || data?.key?.id;
-    const newContent = editedMsg?.message?.conversation || editedMsg?.message?.extendedTextMessage?.text;
-    if (!editedId || !newContent) { console.warn(`${LOG} Edit: missing id or content`); return; }
+    const extracted = extractEditPayload(payload.data);
+    if (!extracted) { console.warn(`${LOG} Edit: nao consegui extrair id/conteudo`); return; }
+    const { editedId, newContent } = extracted;
 
     const resolved = await resolveInstanceTenant(supabase, payload.instance);
     if (!resolved) return;
 
-    await supabase.from('whatsapp_messages').update({
+    const { data: updated, error } = await supabase.from('whatsapp_messages').update({
       content: newContent, is_edited: true, edited_at: new Date().toISOString(),
-    }).eq('tenant_id', resolved.tenantId).eq('message_id', editedId);
+    }).eq('tenant_id', resolved.tenantId).eq('message_id', editedId)
+      .select('id, conversation_id, content, timestamp, is_from_me');
+
+    if (error) { console.error(`${LOG} Edit update error:`, error); return; }
+    if (!updated?.length) { console.warn(`${LOG} Edit: mensagem ${editedId} nao encontrada`); return; }
+
+    // Atualizar preview da conversa se a mensagem editada for a ultima
+    const row = updated[0];
+    const { data: lastMsg } = await supabase.from('whatsapp_messages')
+      .select('id, content, timestamp, is_from_me')
+      .eq('conversation_id', row.conversation_id)
+      .is('deleted_at', null)
+      .order('timestamp', { ascending: false })
+      .limit(1).maybeSingle();
+    if (lastMsg?.id === row.id) {
+      await supabase.from('whatsapp_conversations').update({
+        last_message_preview: (newContent || '').substring(0, 200),
+        last_message_at: row.timestamp,
+        is_last_message_from_me: row.is_from_me,
+      }).eq('id', row.conversation_id);
+    }
+    console.log(`${LOG} Edit aplicado: msg ${editedId} -> "${newContent.substring(0, 60)}"`);
   } catch (err) { console.error(`${LOG} Error in processMessageEdit:`, err); }
 }
 
