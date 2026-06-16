@@ -96,14 +96,14 @@ export function useTeamPresence() {
         .map((p) => p.funcionario_id)
         .filter(Boolean) as number[];
 
-      let funcMap: Record<number, { nome: string; email: string | null }> = {};
+      let funcMap: Record<number, { nome: string; email: string | null; department_id: string | null }> = {};
       if (funcIds.length > 0) {
         const { data: funcs } = await supabase
           .from("funcionarios")
-          .select("id, nome, email")
+          .select("id, nome, email, department_id")
           .in("id", funcIds);
         if (funcs) {
-          funcMap = Object.fromEntries(funcs.map((f) => [f.id, { nome: f.nome, email: f.email }]));
+          funcMap = Object.fromEntries(funcs.map((f) => [f.id, { nome: f.nome, email: f.email, department_id: f.department_id ?? null }]));
         }
       }
 
@@ -125,15 +125,21 @@ export function useTeamPresence() {
           agent_email: func?.email || null,
           max_concurrent_chats: chatLimitMap[row.user_id] ?? null,
           active_chat_count: chatCountMap[row.user_id] ?? 0,
+          department_id: func?.department_id ?? null,
         };
       });
 
-      const statusOrder: Record<string, number> = { paused: 0, active: 1, offline: 2 };
-      result.sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
+      const filtered = selectedDepartmentId
+        ? result.filter((m) => m.department_id === selectedDepartmentId)
+        : result;
 
-      return result;
+      const statusOrder: Record<string, number> = { paused: 0, active: 1, offline: 2 };
+      filtered.sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
+
+      return filtered;
     },
   });
+
 
   // Realtime subscription for instant updates across browsers
   useEffect(() => {
