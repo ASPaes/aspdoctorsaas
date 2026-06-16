@@ -527,12 +527,14 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     const targetJid = env.targetRemoteJid || ''; // ex.: 267542740381868@lid (nosso LID, perspectiva do cliente)
     const clientPN = stripDevice(data?.key?.remoteJid || originalRow.remote_jid || ''); // 553196366034@s.whatsapp.net
     const clientNumber = phoneOnly(clientPN); // 553196366034
+    const lidFromEvolution = await fetchLidCandidatesForPhone(supabase, resolved.instanceId, payload.instance, clientNumber);
 
     // Candidatos para o "originalSender" (quem ENVIOU a mensagem original)
     // targetMessageKey.fromMe=true significa "fui eu (cliente) que enviei" → cliente
     // targetMessageKey.fromMe=false significa "foi o outro lado" → o bot (nós)
     const originalIsClient = env.targetRemoteJid?.endsWith('@s.whatsapp.net') ? true : true; // cliente editou a própria msg
     const senderCandidates = [
+      ...lidFromEvolution,
       clientPN,
       clientNumber,
       stripDevice(targetJid),
