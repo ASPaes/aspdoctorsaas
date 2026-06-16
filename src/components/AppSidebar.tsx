@@ -62,7 +62,14 @@ export function AppSidebar() {
   const { temNovo, marcarVisto } = useReleasesNovidade();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
-  const navItems = NAV_ITEMS.filter(item => can(item.resource, "view"));
+
+  const getGroupOpen = (title: string) => {
+    const v = localStorage.getItem(`sidebar.group.${title}`);
+    return v === null ? true : v === "true";
+  };
+  const setGroupOpen = (title: string, open: boolean) => {
+    localStorage.setItem(`sidebar.group.${title}`, String(open));
+  };
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
