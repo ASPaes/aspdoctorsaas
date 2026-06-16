@@ -510,14 +510,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
               </TooltipTrigger>
               <TooltipContent>Contatos</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/whatsapp/relatorio")}>
-                  <BarChart3 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Relatórios</TooltipContent>
-            </Tooltip>
             <ConversationFiltersPopover filters={filters} onChange={setFilters} />
             
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>

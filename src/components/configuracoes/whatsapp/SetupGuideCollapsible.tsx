@@ -38,7 +38,6 @@ export const SetupGuideCollapsible = () => {
         break;
       case 'visit-reports':
         toggleManualCompletion('visit-reports');
-        navigate('/whatsapp/relatorio');
         break;
       case 'visit-contacts':
         toggleManualCompletion('visit-contacts');

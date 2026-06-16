@@ -6,8 +6,6 @@ export { useWhatsAppSend } from './useWhatsAppSend';
 export { useWhatsAppInstances } from './useWhatsAppInstances';
 export { useWhatsAppContacts } from './useWhatsAppContacts';
 export type { ContactSortOption, ContactWithMetrics, ContactsResult } from './useWhatsAppContacts';
-export { useWhatsAppMetrics } from './useWhatsAppMetrics';
-export type { WhatsAppMetrics, WhatsAppMetricsFilters } from './useWhatsAppMetrics';
 export { useWhatsAppMacros } from './useWhatsAppMacros';
 export type { WhatsAppMacro } from './useWhatsAppMacros';
 export { useWhatsAppSentiment } from './useWhatsAppSentiment';
