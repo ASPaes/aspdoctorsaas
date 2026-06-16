@@ -17,7 +17,9 @@ export interface TeamMemberPresence {
   agent_email: string | null;
   max_concurrent_chats: number | null;
   active_chat_count: number;
+  department_id: string | null;
 }
+
 
 export function useTeamPresence() {
   const { effectiveTenantId: tid } = useTenantFilter();
