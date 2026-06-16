@@ -1,9 +1,11 @@
+import { useState, type ReactNode } from "react";
 import { useAtendimentoRealtime } from "./useAtendimentoRealtime";
+import { VerChatsDialog } from "./VerChatsDialog";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
 import { Loader2, Users, AlertTriangle } from "lucide-react";
 
-function fmtEspera(seg: number): string {
+export function fmtEspera(seg: number): string {
   if (!seg || seg <= 0) return "—";
   if (seg > 86400) {
     const d = Math.floor(seg / 86400);
