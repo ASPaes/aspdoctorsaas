@@ -475,39 +475,66 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     }
     const secret = b64ToU8(secretB64);
 
-    // 2) JIDs (remetente da original e o editor — em 1-to-1 são iguais)
-    const originalSender = originalRow.remote_jid || env.targetRemoteJid || '';
-    const editor = data?.key?.remoteJid || originalSender;
-
-    // 3) info = id || originalSender || editor || "Message Edit"
+    // 2) Construir lista de candidatos de JIDs para tentar decifrar
+    //    O WhatsApp pode usar PN (@s.whatsapp.net), LID (@lid), ou número puro
+    //    dependendo do addressingMode da conversa. Tentamos várias combinações.
     const enc = new TextEncoder();
-    const info = concatU8(
-      enc.encode(env.targetId),
-      enc.encode(originalSender),
-      enc.encode(editor),
-      enc.encode('Message Edit'),
-    );
+    const stripDevice = (j: string) => j.replace(/:\d+(?=@|$)/, '');
+    const phoneOnly = (j: string) => j.replace(/[@:].*/, '');
 
-    // 4) HKDF-SHA256 (salt=zeros32) → 32 bytes de chave AES-GCM
-    const aesKey = await hkdfSha256(secret, info, 32);
+    const targetJid = env.targetRemoteJid || ''; // ex.: 267542740381868@lid (nosso LID, perspectiva do cliente)
+    const clientPN = stripDevice(data?.key?.remoteJid || originalRow.remote_jid || ''); // 553196366034@s.whatsapp.net
+    const clientNumber = phoneOnly(clientPN); // 553196366034
 
-    // 5) Decifrar AES-256-GCM (IV 12 bytes, AAD vazio, tag concatenada ao ciphertext)
-    let plaintext: Uint8Array;
-    try {
-      plaintext = await aesGcmDecrypt(aesKey, env.encIv, env.encPayload);
-    } catch (cryptoErr) {
-      console.error(`${LOG} SecretEdit: falha AES-GCM para ${env.targetId}:`, cryptoErr);
+    // Candidatos para o "originalSender" (quem ENVIOU a mensagem original)
+    // targetMessageKey.fromMe=true significa "fui eu (cliente) que enviei" → cliente
+    // targetMessageKey.fromMe=false significa "foi o outro lado" → o bot (nós)
+    const originalIsClient = env.targetRemoteJid?.endsWith('@s.whatsapp.net') ? true : true; // cliente editou a própria msg
+    const senderCandidates = [
+      clientPN,
+      clientNumber,
+      stripDevice(targetJid),
+      targetJid,
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+    // Para o "editor" também tentamos as mesmas variantes (é o mesmo cliente em 1-to-1)
+    const editorCandidates = senderCandidates;
+
+    let plaintext: Uint8Array | null = null;
+    let usedSender = ''; let usedEditor = '';
+
+    outer:
+    for (const sender of senderCandidates) {
+      for (const editor of editorCandidates) {
+        const info = concatU8(
+          enc.encode(env.targetId),
+          enc.encode(sender),
+          enc.encode(editor),
+          enc.encode('Message Edit'),
+        );
+        try {
+          const aesKey = await hkdfSha256(secret, info, 32);
+          plaintext = await aesGcmDecrypt(aesKey, env.encIv, env.encPayload);
+          usedSender = sender; usedEditor = editor;
+          break outer;
+        } catch { /* tenta próxima combinação */ }
+      }
+    }
+
+    if (!plaintext) {
+      console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações de JID para ${env.targetId}. Candidatos: ${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
       return;
     }
 
     // 6) Extrair texto do proto.Message decifrado
     const newContent = extractEditedTextFromMessage(plaintext);
     if (!newContent) {
-      console.warn(`${LOG} SecretEdit: decifrou mas não achou texto editado em ${env.targetId}`);
+      console.warn(`${LOG} SecretEdit: decifrou (sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
       return;
     }
 
-    console.log(`${LOG} SecretEdit decifrado: ${env.targetId} -> "${newContent.substring(0, 80)}"`);
+    console.log(`${LOG} SecretEdit decifrado (sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
+
 
     // 7) Aplicar edição via mesmo fluxo do processMessageEdit
     const nowIso = new Date().toISOString();
