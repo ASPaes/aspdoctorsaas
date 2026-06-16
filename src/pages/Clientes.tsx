@@ -56,6 +56,7 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
 function buildSearchOr(term: string): string {
   const trimmed = term.trim();
   const s = `%${escapeLike(trimmed)}%`;
+  const POSTGRES_INT_MAX = 2147483647;
   const parts = [
     `razao_social.ilike.${s}`,
     `nome_fantasia.ilike.${s}`,
@@ -76,7 +77,10 @@ function buildSearchOr(term: string): string {
         }
       }
     }
-    parts.push(`codigo_sequencial.eq.${trimmed}`);
+    const codigoSequencial = Number(trimmed);
+    if (Number.isInteger(codigoSequencial) && codigoSequencial <= POSTGRES_INT_MAX) {
+      parts.push(`codigo_sequencial.eq.${codigoSequencial}`);
+    }
   }
   return parts.join(",");
 }
