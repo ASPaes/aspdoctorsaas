@@ -41,7 +41,7 @@ const PainelUso = lazy(() => import("@/pages/painel-uso/PainelUso"));
 const LimpezaUras = lazy(() => import("@/pages/admin/LimpezaUras"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
 
-const WhatsAppRelatorio = lazy(() => import("@/pages/WhatsAppRelatorio"));
+
 const SupportTickets = lazy(() => import("@/pages/SupportTickets"));
 const ConfiguracoesNotificacoes = lazy(() => import("@/pages/ConfiguracoesNotificacoes"));
 
@@ -98,7 +98,7 @@ const App = () => (
               <Route path="/customer-success" element={<RequirePermission resource="nav.customer_success"><CustomerSuccess /></RequirePermission>} />
               <Route path="/whatsapp" element={<RequirePermission resource="nav.chat"><WhatsApp /></RequirePermission>} />
               <Route path="/whatsapp/contatos" element={<RequirePermission resource="nav.chat"><WhatsAppContatos /></RequirePermission>} />
-              <Route path="/whatsapp/relatorio" element={<RequirePermission resource="nav.chat"><WhatsAppRelatorio /></RequirePermission>} />
+              
               <Route path="/tickets" element={<RequirePermission resource="nav.tickets"><SupportTickets /></RequirePermission>} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
               <Route path="/painel-uso" element={<RequirePermission resource="nav.painel_uso"><PainelUso /></RequirePermission>} />
