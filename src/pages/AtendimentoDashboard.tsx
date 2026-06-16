@@ -1,15 +1,53 @@
+import { useEffect, useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TempoRealTab } from "@/components/atendimento/TempoRealTab";
+import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
+
+function formatSecondsAgo(seg: number): string {
+  if (seg < 5) return "agora";
+  if (seg < 60) return `há ${seg}s`;
+  const m = Math.floor(seg / 60);
+  if (m < 60) return `há ${m}min`;
+  const h = Math.floor(m / 60);
+  return `há ${h}h`;
+}
+
 export default function AtendimentoDashboard() {
+  const { dataUpdatedAt } = useAtendimentoRealtime();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const ageSec = dataUpdatedAt ? Math.max(0, Math.floor((now - dataUpdatedAt) / 1000)) : null;
+
   return (
     <div className="container mx-auto p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Indicadores de atendimento — em construção.
-        </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Indicadores de atendimento.</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+          </span>
+          <span className="font-medium text-foreground">ao vivo</span>
+          {ageSec !== null && <span>· atualizado {formatSecondsAgo(ageSec)}</span>}
+        </div>
       </div>
-      <div className="rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
-        Em breve: tempo real, performance do agente e SLA.
-      </div>
+
+      <Tabs defaultValue="tempo-real" className="w-full">
+        <TabsList>
+          <TabsTrigger value="tempo-real">Tempo Real</TabsTrigger>
+        </TabsList>
+        <TabsContent value="tempo-real" className="mt-4">
+          <TempoRealTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

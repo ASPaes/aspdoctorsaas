@@ -952,6 +952,52 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     example: "Série [120k, 125k, 132k, ..., 156k] → projeção 162k, 168k, 174k com R² = 0.94",
   },
 
+  // ── Atendimento — Tempo Real ──
+  atendimento_fila: {
+    title: "Fila Agora",
+    definition: "Conversas aguardando atendimento neste momento, dentro do horário comercial e ainda sem agente.",
+    why_it_matters: "É o que o cliente sente agora. Fila crescendo = gente esperando = risco de insatisfação e abandono.",
+    formula: "COUNT das conversas ativas com atendimento 'aguardando', em horário, na view de estado ao vivo",
+  },
+  atendimento_espera_mais_antigo: {
+    title: "Espera Mais Antiga",
+    definition: "Há quanto tempo aguarda o cliente que está esperando há mais tempo na fila.",
+    why_it_matters: "O pior caso da fila. Se o mais antigo espera horas ou dias, alguém foi esquecido — negligência direta.",
+    formula: "agora − abertura da conversa aguardando mais antiga (em horário)",
+    market_benchmark: "Em chat, o padrão de mercado é 1ª resposta em ~1–2 min. Acima de poucos minutos já é fila ruim.",
+  },
+  atendimento_em_atendimento: {
+    title: "Em Atendimento",
+    definition: "Conversas sendo atendidas agora por um agente.",
+    why_it_matters: "Carga ativa da equipe neste instante. Cruzada com agentes, mostra quem está sobrecarregado.",
+    formula: "COUNT das conversas ativas com atendimento 'em andamento'",
+  },
+  atendimento_sla_estourando: {
+    title: "Estourando SLA",
+    definition: "Conversas na fila (em horário) esperando há mais que o limite de SLA de 1ª resposta.",
+    why_it_matters: "Ação imediata: cada uma já passou do prazo aceitável e precisa ser puxada agora.",
+    formula: "COUNT da fila onde espera > limite de SLA (padrão 15 min, configurável)",
+    market_benchmark: "Boa prática mede SLA como '% atendido dentro do alvo'; alvo típico de 1ª resposta em chat = 1–2 min.",
+  },
+  atendimento_parados_24h: {
+    title: "Parados > 24h",
+    definition: "Conversas na fila aguardando há mais de 24 horas sem atendimento.",
+    why_it_matters: "Negligência grave ou conversa abandonada não encerrada. Devem ser resolvidas ou encerradas.",
+    formula: "COUNT da fila onde espera > 24 horas",
+  },
+  atendimento_ativos_depto: {
+    title: "Ativos por Departamento",
+    definition: "Distribuição das conversas em atendimento agora, por departamento.",
+    why_it_matters: "Mostra onde a carga está concentrada neste momento e ajuda a remanejar gente.",
+    formula: "COUNT de 'em andamento' agrupado por departamento",
+  },
+  atendimento_atendendo_agente: {
+    title: "Atendendo por Agente",
+    definition: "Quantas conversas cada agente está atendendo simultaneamente agora.",
+    why_it_matters: "Revela sobrecarga: um agente com muitos chats ao mesmo tempo perde qualidade e velocidade.",
+    formula: "COUNT de 'em andamento' agrupado por agente",
+  },
+
 };
 
 export default kpiHelp;
