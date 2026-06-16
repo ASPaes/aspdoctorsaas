@@ -318,6 +318,237 @@ async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: an
   } catch (err) { console.error(`${LOG} Error in processMessageEdit:`, err); }
 }
 
+// ── Decifragem de secretEncryptedMessage (edições E2E novas do WhatsApp) ─────
+
+function toU8(input: any): Uint8Array | null {
+  if (!input) return null;
+  if (input instanceof Uint8Array) return input;
+  if (Array.isArray(input)) return new Uint8Array(input);
+  if (typeof input === 'object') {
+    const arr = Object.keys(input).sort((a, b) => Number(a) - Number(b)).map((k) => (input as any)[k]);
+    if (arr.every((v) => typeof v === 'number')) return new Uint8Array(arr);
+  }
+  if (typeof input === 'string') {
+    try { const bin = atob(input); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; } catch { return null; }
+  }
+  return null;
+}
+
+function b64ToU8(b64: string): Uint8Array {
+  const bin = atob(b64); const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+
+function concatU8(...arrs: Uint8Array[]): Uint8Array {
+  const total = arrs.reduce((s, a) => s + a.length, 0);
+  const out = new Uint8Array(total); let off = 0;
+  for (const a of arrs) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+async function hkdfSha256(ikm: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
+  const baseKey = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info },
+    baseKey,
+    length * 8,
+  );
+  return new Uint8Array(bits);
+}
+
+async function aesGcmDecrypt(key: Uint8Array, iv: Uint8Array, ciphertext: Uint8Array): Promise<Uint8Array> {
+  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, additionalData: new Uint8Array(0), tagLength: 128 },
+    cryptoKey,
+    ciphertext,
+  );
+  return new Uint8Array(pt);
+}
+
+// Parser protobuf mínimo (wire format) — extrai todos os campos length-delimited
+function readVarint(buf: Uint8Array, pos: number): [number, number] {
+  let result = 0; let shift = 0; let p = pos;
+  while (p < buf.length) {
+    const b = buf[p++];
+    result |= (b & 0x7f) << shift;
+    if ((b & 0x80) === 0) return [result >>> 0, p];
+    shift += 7;
+    if (shift > 35) break;
+  }
+  return [result >>> 0, p];
+}
+
+function parseProtobuf(buf: Uint8Array): Record<number, Uint8Array[]> {
+  const out: Record<number, Uint8Array[]> = {};
+  let pos = 0;
+  while (pos < buf.length) {
+    const [tag, p1] = readVarint(buf, pos); pos = p1;
+    const fieldNum = tag >>> 3;
+    const wire = tag & 7;
+    if (wire === 0) { const [, p] = readVarint(buf, pos); pos = p; }
+    else if (wire === 2) {
+      const [len, p] = readVarint(buf, pos); pos = p;
+      const data = buf.subarray(pos, pos + len); pos += len;
+      (out[fieldNum] ||= []).push(data);
+    }
+    else if (wire === 1) { pos += 8; }
+    else if (wire === 5) { pos += 4; }
+    else break;
+  }
+  return out;
+}
+
+// Tenta extrair o texto editado de um proto.Message decifrado.
+// Estruturas possíveis (campos do proto Message do WhatsApp):
+//   field 1  = conversation (string)
+//   field 14 = extendedTextMessage { field 1 = text }
+//   field 12 = protocolMessage { field 14 = editedMessage (Message) }
+function extractEditedTextFromMessage(buf: Uint8Array): string | null {
+  const td = new TextDecoder('utf-8', { fatal: false });
+  const root = parseProtobuf(buf);
+
+  // 1) conversation direto
+  if (root[1]?.[0]) {
+    const s = td.decode(root[1][0]);
+    if (s) return s;
+  }
+  // 2) extendedTextMessage.text
+  if (root[14]?.[0]) {
+    const ext = parseProtobuf(root[14][0]);
+    if (ext[1]?.[0]) { const s = td.decode(ext[1][0]); if (s) return s; }
+  }
+  // 3) protocolMessage.editedMessage (recursivo)
+  if (root[12]?.[0]) {
+    const proto = parseProtobuf(root[12][0]);
+    if (proto[14]?.[0]) {
+      const inner = extractEditedTextFromMessage(proto[14][0]);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+// Detecta secretEncryptedMessage com edição
+function getSecretEncryptedEdit(message: any): { encPayload: Uint8Array; encIv: Uint8Array; targetId: string; targetRemoteJid: string } | null {
+  const sec = message?.secretEncryptedMessage;
+  if (!sec) return null;
+  const secType = sec.secretEncType;
+  // 2 = MESSAGE_EDIT (também aceitamos sem checar para cobrir variações)
+  if (secType !== undefined && secType !== 2 && secType !== 'MESSAGE_EDIT') {
+    // ainda assim tenta — pode ser EVENT_EDIT também aplicável
+  }
+  const encPayload = toU8(sec.encPayload);
+  const encIv = toU8(sec.encIv);
+  const targetId = sec.targetMessageKey?.id;
+  const targetRemoteJid = sec.targetMessageKey?.remoteJid;
+  if (!encPayload || !encIv || !targetId) return null;
+  return { encPayload, encIv, targetId, targetRemoteJid };
+}
+
+async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
+  try {
+    const data = payload.data;
+    const message = data?.message;
+    const env = getSecretEncryptedEdit(message);
+    if (!env) return;
+
+    const resolved = await resolveInstanceTenant(supabase, payload.instance);
+    if (!resolved) { console.warn(`${LOG} SecretEdit: instance ${payload.instance} not found`); return; }
+
+    // 1) Buscar mensagem original (precisa do messageSecret salvo no metadata)
+    const { data: originalRow } = await supabase
+      .from('whatsapp_messages')
+      .select('id, conversation_id, content, metadata, remote_jid')
+      .eq('tenant_id', resolved.tenantId)
+      .eq('message_id', env.targetId)
+      .maybeSingle();
+
+    if (!originalRow) { console.warn(`${LOG} SecretEdit: original ${env.targetId} não encontrada`); return; }
+
+    const meta = typeof originalRow.metadata === 'string' ? JSON.parse(originalRow.metadata) : (originalRow.metadata || {});
+    const secretB64: string | undefined = meta?.messageSecret;
+    if (!secretB64) {
+      console.warn(`${LOG} SecretEdit: messageSecret ausente para ${env.targetId} — não dá pra decifrar`);
+      return;
+    }
+    const secret = b64ToU8(secretB64);
+
+    // 2) JIDs (remetente da original e o editor — em 1-to-1 são iguais)
+    const originalSender = originalRow.remote_jid || env.targetRemoteJid || '';
+    const editor = data?.key?.remoteJid || originalSender;
+
+    // 3) info = id || originalSender || editor || "Message Edit"
+    const enc = new TextEncoder();
+    const info = concatU8(
+      enc.encode(env.targetId),
+      enc.encode(originalSender),
+      enc.encode(editor),
+      enc.encode('Message Edit'),
+    );
+
+    // 4) HKDF-SHA256 (salt=zeros32) → 32 bytes de chave AES-GCM
+    const aesKey = await hkdfSha256(secret, info, 32);
+
+    // 5) Decifrar AES-256-GCM (IV 12 bytes, AAD vazio, tag concatenada ao ciphertext)
+    let plaintext: Uint8Array;
+    try {
+      plaintext = await aesGcmDecrypt(aesKey, env.encIv, env.encPayload);
+    } catch (cryptoErr) {
+      console.error(`${LOG} SecretEdit: falha AES-GCM para ${env.targetId}:`, cryptoErr);
+      return;
+    }
+
+    // 6) Extrair texto do proto.Message decifrado
+    const newContent = extractEditedTextFromMessage(plaintext);
+    if (!newContent) {
+      console.warn(`${LOG} SecretEdit: decifrou mas não achou texto editado em ${env.targetId}`);
+      return;
+    }
+
+    console.log(`${LOG} SecretEdit decifrado: ${env.targetId} -> "${newContent.substring(0, 80)}"`);
+
+    // 7) Aplicar edição via mesmo fluxo do processMessageEdit
+    const nowIso = new Date().toISOString();
+    await supabase.from('whatsapp_message_edit_history').insert({
+      tenant_id: resolved.tenantId,
+      conversation_id: originalRow.conversation_id,
+      message_id: env.targetId,
+      previous_content: originalRow.content,
+      edited_at: nowIso,
+    });
+
+    const { data: updated, error } = await supabase.from('whatsapp_messages').update({
+      content: newContent,
+      original_content: originalRow.content,
+      edited_at: nowIso,
+    }).eq('id', originalRow.id)
+      .select('id, conversation_id, content, timestamp, is_from_me');
+
+    if (error) { console.error(`${LOG} SecretEdit update error:`, error); return; }
+    if (!updated?.length) return;
+
+    const row = updated[0];
+    const { data: lastMsg } = await supabase.from('whatsapp_messages')
+      .select('id, content, timestamp, is_from_me')
+      .eq('conversation_id', row.conversation_id)
+      .is('deleted_at', null)
+      .order('timestamp', { ascending: false })
+      .limit(1).maybeSingle();
+    if (lastMsg?.id === row.id) {
+      await supabase.from('whatsapp_conversations').update({
+        last_message_preview: (newContent || '').substring(0, 200),
+        last_message_at: row.timestamp,
+        is_last_message_from_me: row.is_from_me,
+      }).eq('id', row.conversation_id);
+    }
+  } catch (err) {
+    console.error(`${LOG} Error in processSecretEncryptedEdit:`, err);
+  }
+}
+
+
 async function processMessageUpdate(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
     const updates = Array.isArray(payload.data) ? payload.data : [payload.data];
@@ -737,12 +968,15 @@ async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<v
     case 'messages.upsert':
       if (isRevokeMessage(payload.data?.message)) {
         await processMessageRevoke(payload, supabase);
+      } else if (getSecretEncryptedEdit(payload.data?.message)) {
+        await processSecretEncryptedEdit(payload, supabase);
       } else if (isEditedMessage(payload.data?.message) || extractEditPayload(payload.data)) {
         await processMessageEdit(payload, supabase);
       } else {
         await processMessageUpsert(payload, supabase);
       }
       break;
+
     case 'messages.update': {
       // Edicoes do WhatsApp chegam frequentemente como messages.update
       const updateData = Array.isArray(payload.data) ? payload.data[0] : payload.data;
