@@ -489,6 +489,74 @@ async function fetchLidCandidatesForPhone(supabase: any, instanceId: string, fal
   }
 }
 
+function extractPlainTextFromAnyPayload(input: any): string | null {
+  const seen = new Set<any>();
+  const stack = [input];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object' || seen.has(node)) continue;
+    seen.add(node);
+    const text = node?.conversation
+      || node?.extendedTextMessage?.text
+      || node?.editedMessage?.conversation
+      || node?.editedMessage?.extendedTextMessage?.text
+      || node?.message?.conversation
+      || node?.message?.extendedTextMessage?.text
+      || node?.message?.editedMessage?.conversation
+      || node?.message?.editedMessage?.extendedTextMessage?.text;
+    if (typeof text === 'string' && text.trim()) return text;
+    for (const value of Object.values(node)) stack.push(value);
+  }
+  return null;
+}
+
+async function fetchEditedTextFromEvolution(supabase: any, instanceId: string, fallbackInstance: string, messageId: string, remoteJid: string): Promise<string | null> {
+  try {
+    const { data: instanceRow } = await supabase.from('whatsapp_instances')
+      .select('instance_name, provider_type, instance_id_external')
+      .eq('id', instanceId)
+      .maybeSingle();
+    const secrets = await getInstanceSecrets(supabase, instanceId);
+    const base = (secrets?.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+    const instanceName = instanceRow?.provider_type === 'cloud' && instanceRow?.instance_id_external
+      ? instanceRow.instance_id_external
+      : (instanceRow?.instance_name || fallbackInstance);
+    if (!base || !instanceName || !secrets?.api_key) return null;
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (instanceRow?.provider_type === 'cloud') headers.Authorization = `Bearer ${secrets.api_key}`;
+    else headers.apikey = secrets.api_key;
+
+    const bodies = [
+      { where: { key: { id: messageId } }, take: 1 },
+      { where: { key: { id: messageId, remoteJid } }, take: 1 },
+    ];
+    for (const body of bodies) {
+      const response = await fetch(`${base}/chat/findMessages/${instanceName}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) continue;
+      const payload = await response.json().catch(() => null);
+      const rows = Array.isArray(payload) ? payload
+        : Array.isArray(payload?.messages) ? payload.messages
+          : Array.isArray(payload?.data) ? payload.data
+            : Array.isArray(payload?.data?.messages) ? payload.data.messages
+              : payload ? [payload] : [];
+      for (const row of rows) {
+        const rowId = row?.key?.id || row?.messageId || row?.id;
+        if (rowId && rowId !== messageId) continue;
+        const text = extractPlainTextFromAnyPayload(row);
+        if (text) return text;
+      }
+    }
+  } catch (err) {
+    console.warn(`${LOG} SecretEdit: fallback Evolution falhou para ${messageId}: ${String(err).substring(0, 160)}`);
+  }
+  return null;
+}
+
 async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
     const data = payload.data;
@@ -568,19 +636,21 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
       }
     }
 
+    let newContent: string | null = null;
     if (!plaintext) {
       console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, JIDs=${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
-      return;
+      newContent = await fetchEditedTextFromEvolution(supabase, resolved.instanceId, payload.instance, env.targetId, originalRow.remote_jid);
+      if (!newContent || newContent === originalRow.content) return;
+      console.log(`${LOG} SecretEdit aplicado via fallback Evolution: ${env.targetId} -> "${newContent.substring(0, 80)}"`);
+    } else {
+      // 6) Extrair texto do proto.Message decifrado
+      newContent = extractEditedTextFromMessage(plaintext);
+      if (!newContent) {
+        console.warn(`${LOG} SecretEdit: decifrou (useCase=${usedUseCase}, sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+        return;
+      }
+      console.log(`${LOG} SecretEdit decifrado (useCase=${usedUseCase}, sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
     }
-
-    // 6) Extrair texto do proto.Message decifrado
-    const newContent = extractEditedTextFromMessage(plaintext);
-    if (!newContent) {
-      console.warn(`${LOG} SecretEdit: decifrou (useCase=${usedUseCase}, sender=${usedSender}, editor=${usedEditor}) mas não achou texto editado em ${env.targetId}. Plaintext hex: ${Array.from(plaintext).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-      return;
-    }
-
-    console.log(`${LOG} SecretEdit decifrado (useCase=${usedUseCase}, sender=${usedSender}): ${env.targetId} -> "${newContent.substring(0, 80)}"`);
 
 
     // 7) Aplicar edição via mesmo fluxo do processMessageEdit

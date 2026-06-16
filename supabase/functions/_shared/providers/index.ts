@@ -146,8 +146,9 @@ class EvolutionAdapter implements ProviderAdapter {
     const id = this.getIdentifier(secrets, instance);
     const headers = { ...this.getHeaders(secrets), 'Content-Type': 'application/json' };
     const requiredEvents = [
-      'APPLICATION_STARTUP', 'MESSAGES_UPSERT', 'MESSAGES_UPDATE',
-      'MESSAGES_DELETE', 'SEND_MESSAGE', 'CONNECTION_UPDATE',
+      'APPLICATION_STARTUP', 'MESSAGES_UPSERT', 'MESSAGES_EDITED',
+      'MESSAGES_UPDATE', 'MESSAGES_DELETE', 'SEND_MESSAGE',
+      'SEND_MESSAGE_UPDATE', 'CONNECTION_UPDATE',
     ];
 
     // Check current
