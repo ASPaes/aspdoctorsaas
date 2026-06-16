@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, BarChart3, Users, X, FileSearch } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 
 import { useWhatsAppConversations, type ConversationWithContact } from "../hooks/useWhatsAppConversations";
