@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { DepartmentFilterProvider, useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShieldAlert } from "lucide-react";
@@ -298,9 +298,5 @@ function WhatsAppContent() {
 }
 
 export default function WhatsApp() {
-  return (
-    <DepartmentFilterProvider>
-      <WhatsAppContent />
-    </DepartmentFilterProvider>
-  );
+  return <WhatsAppContent />;
 }
