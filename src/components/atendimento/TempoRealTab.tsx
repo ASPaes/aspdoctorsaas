@@ -24,12 +24,13 @@ export function fmtEspera(seg: number): string {
 interface KpiCardProps {
   kpiKey: string;
   label: string;
-  value: React.ReactNode;
-  subtitle?: React.ReactNode;
+  value: ReactNode;
+  subtitle?: ReactNode;
   tone?: "default" | "danger" | "warning";
+  onVerChats?: () => void;
 }
 
-function KpiCard({ kpiKey, label, value, subtitle, tone = "default" }: KpiCardProps) {
+function KpiCard({ kpiKey, label, value, subtitle, tone = "default", onVerChats }: KpiCardProps) {
   return (
     <div
       className={cn(
@@ -56,12 +57,22 @@ function KpiCard({ kpiKey, label, value, subtitle, tone = "default" }: KpiCardPr
       {subtitle && (
         <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>
       )}
+      {onVerChats && (
+        <button
+          type="button"
+          onClick={onVerChats}
+          className="mt-2 text-xs font-medium text-primary hover:underline focus:outline-none"
+        >
+          Ver chats →
+        </button>
+      )}
     </div>
   );
 }
 
 export function TempoRealTab() {
   const { data, isLoading, isError, error } = useAtendimentoRealtime();
+  const [verBucket, setVerBucket] = useState<{ bucket: string; title: string } | null>(null);
 
   if (isLoading) {
     return (
