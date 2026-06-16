@@ -676,9 +676,16 @@ async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<v
         await processMessageUpsert(payload, supabase);
       }
       break;
-    case 'messages.update':
-      await processMessageUpdate(payload, supabase);
+    case 'messages.update': {
+      // Edicoes do WhatsApp chegam frequentemente como messages.update
+      const updateData = Array.isArray(payload.data) ? payload.data[0] : payload.data;
+      if (isEditedMessage(updateData?.message) || extractEditPayload(updateData)) {
+        await processMessageEdit({ ...payload, data: updateData }, supabase);
+      } else {
+        await processMessageUpdate(payload, supabase);
+      }
       break;
+    }
     case 'messages.delete': {
       const deleteData = payload.data;
       const deletedKeyId = deleteData?.key?.id || deleteData?.keyId || deleteData?.id;
