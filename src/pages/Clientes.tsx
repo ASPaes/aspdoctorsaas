@@ -48,6 +48,33 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
   );
 }
 
+/**
+ * Constrói a cláusula OR de busca. Quando o termo for numérico, também
+ * tenta casar pelo CNPJ/CPF mascarado (que é como o valor é gravado no DB),
+ * permitindo digitar apenas os dígitos.
+ */
+function buildSearchOr(term: string): string {
+  const trimmed = term.trim();
+  const s = `%${escapeLike(trimmed)}%`;
+  const parts = [
+    `razao_social.ilike.${s}`,
+    `nome_fantasia.ilike.${s}`,
+    `cnpj.ilike.${s}`,
+  ];
+  const isNumeric = /^\d+$/.test(trimmed);
+  if (isNumeric) {
+    const digits = trimmed.replace(/\D/g, "");
+    if (digits.length >= 3) {
+      const masked = digits.length === 11 ? maskCPF(digits) : maskCNPJ(digits);
+      if (masked && masked !== digits) {
+        parts.push(`cnpj.ilike.%${escapeLike(masked)}%`);
+      }
+    }
+    parts.push(`codigo_sequencial.eq.${trimmed}`);
+  }
+  return parts.join(",");
+}
+
 export default function Clientes() {
   const navigate = useNavigate();
   const { filters, updateFilter, clearAdvancedFilters } = useClientesFilters();
@@ -275,13 +302,7 @@ export default function Clientes() {
 
 
     if (debouncedSearch) {
-      const s = `%${escapeLike(debouncedSearch)}%`;
-      const isNumeric = /^\d+$/.test(debouncedSearch.trim());
-      if (isNumeric) {
-        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
-      } else {
-        q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
-      }
+      q = q.or(buildSearchOr(debouncedSearch));
     }
 
     if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
@@ -409,13 +430,7 @@ export default function Clientes() {
       if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
 
       if (debouncedSearch) {
-        const s = `%${escapeLike(debouncedSearch)}%`;
-        const isNumeric = /^\d+$/.test(debouncedSearch.trim());
-        if (isNumeric) {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
-        } else {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
-        }
+        q = q.or(buildSearchOr(debouncedSearch));
       }
       if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
       else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
@@ -467,13 +482,7 @@ export default function Clientes() {
 
 
       if (debouncedSearch) {
-        const s = `%${escapeLike(debouncedSearch)}%`;
-        const isNumeric = /^\d+$/.test(debouncedSearch.trim());
-        if (isNumeric) {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
-        } else {
-          q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
-        }
+        q = q.or(buildSearchOr(debouncedSearch));
       }
 
       if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
@@ -568,13 +577,7 @@ export default function Clientes() {
           if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
 
           if (debouncedSearch) {
-            const s = `%${escapeLike(debouncedSearch)}%`;
-            const isNumeric = /^\d+$/.test(debouncedSearch.trim());
-            if (isNumeric) {
-              q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s},codigo_sequencial.eq.${debouncedSearch.trim()}`);
-            } else {
-              q = q.or(`razao_social.ilike.${s},nome_fantasia.ilike.${s},cnpj.ilike.${s}`);
-            }
+            q = q.or(buildSearchOr(debouncedSearch));
           }
           if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
           else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
