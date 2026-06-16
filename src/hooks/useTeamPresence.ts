@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+
 
 export interface TeamMemberPresence {
   user_id: string;
