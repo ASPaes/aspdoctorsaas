@@ -210,6 +210,13 @@ export function TempoRealTab() {
           </div>
         </div>
       </div>
+
+      <VerChatsDialog
+        bucket={verBucket?.bucket ?? null}
+        title={verBucket?.title ?? ""}
+        open={!!verBucket}
+        onOpenChange={(o) => { if (!o) setVerBucket(null); }}
+      />
     </div>
   );
 }
