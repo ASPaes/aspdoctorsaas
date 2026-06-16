@@ -26,10 +26,12 @@ export function useTeamPresence() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  const { selectedDepartmentId } = useDepartmentFilter();
 
   const { data: members = [], isLoading, refetch } = useQuery({
-    queryKey: ["team_presence", tid],
+    queryKey: ["team_presence", tid, selectedDepartmentId],
     enabled: !!tid && !!isAdmin,
+
     refetchInterval: 10_000,
     queryFn: async () => {
       const { data: presenceRows, error: pErr } = await supabase
