@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles } from "lucide-react";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
@@ -15,9 +15,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -58,7 +62,14 @@ export function AppSidebar() {
   const { temNovo, marcarVisto } = useReleasesNovidade();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
-  const navItems = NAV_ITEMS.filter(item => can(item.resource, "view"));
+
+  const getGroupOpen = (title: string) => {
+    const v = localStorage.getItem(`sidebar.group.${title}`);
+    return v === null ? true : v === "true";
+  };
+  const setGroupOpen = (title: string, open: boolean) => {
+    localStorage.setItem(`sidebar.group.${title}`, String(open));
+  };
 
   // Fetch funcionario name, cargo and department
   const { data: funcionarioData } = useQuery({
@@ -165,16 +176,55 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink to={item.url} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {NAV_ITEMS.map((item) => {
+                if (item.children) {
+                  const visibleChildren = item.children.filter((c) => can(c.resource!, "view"));
+                  if (visibleChildren.length === 0) return null;
+                  return (
+                    <Collapsible
+                      key={item.title}
+                      defaultOpen={getGroupOpen(item.title)}
+                      onOpenChange={(open) => setGroupOpen(item.title, open)}
+                      className="group/collapsible"
+                    >
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton tooltip={item.title}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                            <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            {visibleChildren.map((child) => (
+                              <SidebarMenuSubItem key={child.title}>
+                                <SidebarMenuSubButton asChild>
+                                  <NavLink to={child.url!} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                                    <child.icon className="h-4 w-4" />
+                                    <span>{child.title}</span>
+                                  </NavLink>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  );
+                }
+                if (!can(item.resource!, "view")) return null;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild tooltip={item.title}>
+                      <NavLink to={item.url!} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
