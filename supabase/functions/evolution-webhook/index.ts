@@ -720,11 +720,19 @@ async function handleEvolutionEvent(payload: EvolutionWebhookPayload): Promise<v
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   console.log(`${LOG} Event: ${payload.event} Instance: ${payload.instance}`);
 
+  // Diagnostico: registra payload bruto sempre que houver indicio de edicao
+  try {
+    const raw = JSON.stringify(payload?.data ?? {});
+    if (raw.includes('editedMessage') || raw.includes('MESSAGE_EDIT') || raw.includes('"type":14')) {
+      console.log(`${LOG} [DIAG-EDIT] event=${payload.event} raw=${raw.slice(0, 4000)}`);
+    }
+  } catch { /* ignore */ }
+
   switch (payload.event) {
     case 'messages.upsert':
       if (isRevokeMessage(payload.data?.message)) {
         await processMessageRevoke(payload, supabase);
-      } else if (isEditedMessage(payload.data?.message)) {
+      } else if (isEditedMessage(payload.data?.message) || extractEditPayload(payload.data)) {
         await processMessageEdit(payload, supabase);
       } else {
         await processMessageUpsert(payload, supabase);
