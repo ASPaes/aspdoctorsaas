@@ -31,68 +31,73 @@ export default function AppLayout() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <header className="flex h-14 items-center justify-between border-b border-border px-4">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              {isWhatsApp && <AgentPresenceButton />}
-              {isWhatsApp && <TeamPresencePopover />}
-              {isWhatsApp && canSeeDuplicates && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => setDupOpen(true)}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Duplicidades
-                  </Button>
-                  <Dialog open={dupOpen} onOpenChange={setDupOpen}>
-                    <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle>Contatos Duplicados</DialogTitle>
-                      </DialogHeader>
-                      <DuplicateContactsTab />
-                    </DialogContent>
-                  </Dialog>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => setNewTicketOpen(true)}
-                  >
-                    <TicketPlus className="h-3.5 w-3.5" />
-                    Novo Ticket
-                  </Button>
-                  <CreateSupportTicketModal
-                    open={newTicketOpen}
-                    onOpenChange={setNewTicketOpen}
-                    onCreated={() => setNewTicketOpen(false)}
-                  />
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <NotificationPermissionBanner />
-              <UnidadeSelector />
-              <NotificationBell />
-              <TenantSelector />
-              <ThemeToggle />
-            </div>
-          </header>
-          <main className="flex-1 p-4 sm:p-6 overflow-auto min-w-0">
-            <ErrorBoundary>
-              <Suspense fallback={
-                <div className="flex min-h-[50vh] items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {(() => {
+          const content = (
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              <header className="flex h-14 items-center justify-between border-b border-border px-4">
+                <div className="flex items-center gap-2">
+                  <SidebarTrigger />
+                  {isWhatsApp && <AgentPresenceButton />}
+                  {isWhatsApp && <TeamPresencePopover />}
+                  {isWhatsApp && canSeeDuplicates && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setDupOpen(true)}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Duplicidades
+                      </Button>
+                      <Dialog open={dupOpen} onOpenChange={setDupOpen}>
+                        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Contatos Duplicados</DialogTitle>
+                          </DialogHeader>
+                          <DuplicateContactsTab />
+                        </DialogContent>
+                      </Dialog>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setNewTicketOpen(true)}
+                      >
+                        <TicketPlus className="h-3.5 w-3.5" />
+                        Novo Ticket
+                      </Button>
+                      <CreateSupportTicketModal
+                        open={newTicketOpen}
+                        onOpenChange={setNewTicketOpen}
+                        onCreated={() => setNewTicketOpen(false)}
+                      />
+                    </>
+                  )}
                 </div>
-              }>
-                <Outlet />
-              </Suspense>
-            </ErrorBoundary>
-          </main>
-        </div>
+                <div className="flex items-center gap-3">
+                  <NotificationPermissionBanner />
+                  <UnidadeSelector />
+                  <NotificationBell />
+                  <TenantSelector />
+                  <ThemeToggle />
+                </div>
+              </header>
+              <main className="flex-1 p-4 sm:p-6 overflow-auto min-w-0">
+                <ErrorBoundary>
+                  <Suspense fallback={
+                    <div className="flex min-h-[50vh] items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  }>
+                    <Outlet />
+                  </Suspense>
+                </ErrorBoundary>
+              </main>
+            </div>
+          );
+          return isWhatsApp ? <DepartmentFilterProvider>{content}</DepartmentFilterProvider> : content;
+        })()}
       </div>
     </SidebarProvider>
   );
