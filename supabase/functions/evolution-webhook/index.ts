@@ -237,13 +237,34 @@ async function processMessageEdit(payload: EvolutionWebhookPayload, supabase: an
     const resolved = await resolveInstanceTenant(supabase, payload.instance);
     if (!resolved) return;
 
+    // Buscar mensagem original para salvar historico
+    const { data: originalRow } = await supabase
+      .from('whatsapp_messages')
+      .select('id, conversation_id, content')
+      .eq('tenant_id', resolved.tenantId)
+      .eq('message_id', editedId)
+      .maybeSingle();
+
+    if (!originalRow) { console.warn(`${LOG} Edit: mensagem ${editedId} nao encontrada`); return; }
+
+    const nowIso = new Date().toISOString();
+    await supabase.from('whatsapp_message_edit_history').insert({
+      tenant_id: resolved.tenantId,
+      conversation_id: originalRow.conversation_id,
+      message_id: editedId,
+      previous_content: originalRow.content,
+      edited_at: nowIso,
+    });
+
     const { data: updated, error } = await supabase.from('whatsapp_messages').update({
-      content: newContent, is_edited: true, edited_at: new Date().toISOString(),
-    }).eq('tenant_id', resolved.tenantId).eq('message_id', editedId)
+      content: newContent,
+      original_content: originalRow.content,
+      edited_at: nowIso,
+    }).eq('id', originalRow.id)
       .select('id, conversation_id, content, timestamp, is_from_me');
 
     if (error) { console.error(`${LOG} Edit update error:`, error); return; }
-    if (!updated?.length) { console.warn(`${LOG} Edit: mensagem ${editedId} nao encontrada`); return; }
+    if (!updated?.length) { console.warn(`${LOG} Edit: update vazio para ${editedId}`); return; }
 
     // Atualizar preview da conversa se a mensagem editada for a ultima
     const row = updated[0];
