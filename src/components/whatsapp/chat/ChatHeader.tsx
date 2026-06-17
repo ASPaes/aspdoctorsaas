@@ -88,6 +88,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
   const [showAttachTicketModal, setShowAttachTicketModal] = useState(false);
   const [attachNote, setAttachNote] = useState("");
+  // Reopen flow (attendance.ticket_id IS NOT NULL no encerramento que exige ticket)
+  const [showReopenChoice, setShowReopenChoice] = useState(false);
+  const [showUpdateExisting, setShowUpdateExisting] = useState(false);
+  const [showCreateAdditional, setShowCreateAdditional] = useState(false);
+  // Read-only view de ticket vinculado (a partir do picker)
+  const [readOnlyTicketId, setReadOnlyTicketId] = useState<string | null>(null);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
