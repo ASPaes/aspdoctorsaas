@@ -582,6 +582,44 @@ async function markEditedWithoutContent(
   }
 }
 
+async function fetchOriginalMessageJids(supabase: any, instanceId: string, fallbackInstance: string, messageId: string): Promise<string[]> {
+  try {
+    const { data: instanceRow } = await supabase.from('whatsapp_instances')
+      .select('instance_name, provider_type, instance_id_external')
+      .eq('id', instanceId)
+      .maybeSingle();
+    const secrets = await getInstanceSecrets(supabase, instanceId);
+    const base = (secrets?.api_url || '').replace(/\/$/, '').replace(/\/manager$/, '');
+    const instanceName = instanceRow?.provider_type === 'cloud' && instanceRow?.instance_id_external
+      ? instanceRow.instance_id_external
+      : (instanceRow?.instance_name || fallbackInstance);
+    if (!base || !instanceName || !secrets?.api_key) return [];
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (instanceRow?.provider_type === 'cloud') headers.Authorization = `Bearer ${secrets.api_key}`;
+    else headers.apikey = secrets.api_key;
+
+    const response = await fetch(`${base}/chat/findMessages/${instanceName}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ where: { key: { id: messageId } }, take: 1 }),
+    });
+    if (!response.ok) return [];
+    const body = await response.json().catch(() => null);
+    const records = Array.isArray(body?.messages?.records) ? body.messages.records
+      : Array.isArray(body?.messages) ? body.messages
+        : Array.isArray(body?.data) ? body.data
+          : [];
+    const row = records[0];
+    const key = row?.key || {};
+    return [key.remoteJid, key.remoteJidAlt, key.participant, key.participantAlt]
+      .filter((v, i, a) => typeof v === 'string' && v && a.indexOf(v) === i);
+  } catch (err) {
+    console.warn(`${LOG} SecretEdit: não consegui buscar JIDs da mensagem original ${messageId} via findMessages: ${String(err).substring(0, 160)}`);
+    return [];
+  }
+}
+
 async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
     const data = payload.data;
@@ -622,12 +660,15 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     const clientPN = stripDevice(data?.key?.remoteJid || originalRow.remote_jid || ''); // 553196366034@s.whatsapp.net
     const clientNumber = phoneOnly(clientPN); // 553196366034
     const lidFromEvolution = await fetchLidCandidatesForPhone(supabase, resolved.instanceId, payload.instance, clientNumber);
+    const jidsFromOriginalMessage = await fetchOriginalMessageJids(supabase, resolved.instanceId, payload.instance, env.targetId);
 
     // Candidatos para o "originalSender" (quem ENVIOU a mensagem original)
     // targetMessageKey.fromMe=true significa "fui eu (cliente) que enviei" → cliente
     // targetMessageKey.fromMe=false significa "foi o outro lado" → o bot (nós)
     const originalIsClient = env.targetRemoteJid?.endsWith('@s.whatsapp.net') ? true : true; // cliente editou a própria msg
     const senderCandidates = [
+      ...jidsFromOriginalMessage,
+      ...jidsFromOriginalMessage.map(stripDevice),
       ...lidFromEvolution,
       clientPN,
       clientNumber,
@@ -664,7 +705,7 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
 
     let newContent: string | null = null;
     if (!plaintext) {
-      console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, JIDs=${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
+      console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, sendersTentados=${JSON.stringify(senderCandidates)}, jidsFindMessages=${JSON.stringify(jidsFromOriginalMessage)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}, originalRemoteJid=${originalRow.remote_jid}`);
       newContent = await fetchEditedTextFromEvolution(supabase, resolved.instanceId, payload.instance, env.targetId, originalRow.remote_jid);
       if (!newContent || newContent === originalRow.content) {
         console.log(`${LOG} SecretEdit: edição detectada para ${env.targetId} mas conteúdo não disponível/inalterado; marcando edited_at`);
