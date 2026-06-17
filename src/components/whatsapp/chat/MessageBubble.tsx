@@ -9,6 +9,12 @@ import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
