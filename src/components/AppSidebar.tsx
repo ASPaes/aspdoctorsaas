@@ -178,7 +178,10 @@ export function AppSidebar() {
             <SidebarMenu>
               {NAV_ITEMS.map((item) => {
                 if (item.children) {
-                  const visibleChildren = item.children.filter((c) => can(c.resource!, "view"));
+                  const visibleChildren = item.children.filter((c) => {
+                    if (c.superAdminOnly && !isSuperAdmin) return false;
+                    return can(c.resource!, "view");
+                  });
                   if (visibleChildren.length === 0) return null;
                   return (
                     <Collapsible

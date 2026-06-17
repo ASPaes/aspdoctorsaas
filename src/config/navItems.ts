@@ -8,6 +8,7 @@ export interface NavItem {
   url?: string;
   icon: LucideIcon;
   resource?: string;
+  superAdminOnly?: boolean;
   children?: NavItem[];
 }
 
@@ -19,7 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: "Atendimento",
     icon: Headset,
     children: [
-      { title: "Dashboard", url: "/atendimento/dashboard", icon: Gauge, resource: "nav.atendimento_dashboard" },
+      { title: "Dashboard", url: "/atendimento/dashboard", icon: Gauge, resource: "nav.atendimento_dashboard", superAdminOnly: true },
       { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "nav.chat" },
       { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "nav.tickets" },
       { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
