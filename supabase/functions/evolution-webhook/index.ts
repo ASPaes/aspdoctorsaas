@@ -557,6 +557,31 @@ async function fetchEditedTextFromEvolution(supabase: any, instanceId: string, f
   return null;
 }
 
+async function markEditedWithoutContent(
+  supabase: any,
+  messageDbId: string,
+  messageId: string,
+  conversationId: string,
+  tenantId: string,
+  previousContent: string,
+): Promise<void> {
+  try {
+    const nowIso = new Date().toISOString();
+    await supabase.from('whatsapp_message_edit_history').insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      message_id: messageId,
+      previous_content: previousContent,
+      edited_at: nowIso,
+    });
+    await supabase.from('whatsapp_messages').update({
+      edited_at: nowIso,
+    }).eq('id', messageDbId);
+  } catch (err) {
+    console.error(`${LOG} markEditedWithoutContent error:`, err);
+  }
+}
+
 async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
     const data = payload.data;
@@ -581,6 +606,7 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     const secretB64: string | undefined = meta?.messageSecret;
     if (!secretB64) {
       console.warn(`${LOG} SecretEdit: messageSecret ausente para ${env.targetId} — não dá pra decifrar`);
+      await markEditedWithoutContent(supabase, originalRow.id, env.targetId, originalRow.conversation_id, resolved.tenantId, originalRow.content);
       return;
     }
     const secret = b64ToU8(secretB64);
@@ -640,7 +666,11 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     if (!plaintext) {
       console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, JIDs=${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
       newContent = await fetchEditedTextFromEvolution(supabase, resolved.instanceId, payload.instance, env.targetId, originalRow.remote_jid);
-      if (!newContent || newContent === originalRow.content) return;
+      if (!newContent || newContent === originalRow.content) {
+        console.log(`${LOG} SecretEdit: edição detectada para ${env.targetId} mas conteúdo não disponível/inalterado; marcando edited_at`);
+        await markEditedWithoutContent(supabase, originalRow.id, env.targetId, originalRow.conversation_id, resolved.tenantId, originalRow.content);
+        return;
+      }
       console.log(`${LOG} SecretEdit aplicado via fallback Evolution: ${env.targetId} -> "${newContent.substring(0, 80)}"`);
     } else {
       // 6) Extrair texto do proto.Message decifrado
