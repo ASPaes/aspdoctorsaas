@@ -54,7 +54,7 @@ export function TicketUpdateExistingDialog({
       console.log("[TicketUpdateExistingDialog] Buscando ticket id =", existingTicketId);
       const res = await (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, observacao_agente, observacao_ia, closed_at, created_at, responsavel_user_id, deleted_at,
+          id, ticket_code, observacao_agente, observacao_ia, concluido_em, aberto_em, responsavel_user_id, deleted_at,
           status:ticket_statuses(name, color),
           category:service_categories(nome),
           subcategory:service_subcategories(nome),
