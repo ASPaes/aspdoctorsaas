@@ -23,6 +23,7 @@ export interface Message {
   isFromMe?: boolean;
   fromMe?: boolean;
   timestamp: string;
+  edited_at: string | null;
   quoted_message_id: string | null;
   metadata: Record<string, any> | null;
   audio_transcription: string | null;
