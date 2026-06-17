@@ -35,6 +35,9 @@ import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import { TicketReopenChoiceDialog } from "./TicketReopenChoiceDialog";
+import { TicketUpdateExistingDialog } from "./TicketUpdateExistingDialog";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
