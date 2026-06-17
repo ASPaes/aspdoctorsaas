@@ -606,6 +606,7 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     const secretB64: string | undefined = meta?.messageSecret;
     if (!secretB64) {
       console.warn(`${LOG} SecretEdit: messageSecret ausente para ${env.targetId} — não dá pra decifrar`);
+      await markEditedWithoutContent(supabase, originalRow.id, env.targetId, originalRow.conversation_id, resolved.tenantId, originalRow.content);
       return;
     }
     const secret = b64ToU8(secretB64);
