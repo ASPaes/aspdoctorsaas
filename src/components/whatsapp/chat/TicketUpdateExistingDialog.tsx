@@ -53,17 +53,24 @@ export function TicketUpdateExistingDialog({
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, observacao_agente, observacao_ia, closed_at, created_at,
+          id, ticket_code, observacao_agente, observacao_ia, closed_at, created_at, responsavel_user_id,
           status:ticket_statuses(name, color),
           category:service_categories(nome),
           subcategory:service_subcategories(nome),
-          produto:produtos(nome),
-          responsavel:profiles!support_tickets_assignee_id_fkey(full_name, email)
+          produto:produtos(nome)
         `)
         .eq("id", existingTicketId)
         .maybeSingle();
       if (error) throw error;
-      return data as any;
+      let responsavel: { full_name: string | null; email: string | null } | null = null;
+      if (data?.responsavel_user_id) {
+        const { data: prof } = await (supabase.from("profiles" as any) as any)
+          .select("full_name, email")
+          .eq("id", data.responsavel_user_id)
+          .maybeSingle();
+        responsavel = (prof as any) ?? null;
+      }
+      return { ...(data as any), responsavel };
     },
   });
 
