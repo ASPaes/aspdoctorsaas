@@ -300,6 +300,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
     // CASO REOPEN: atendimento já tem ticket vinculado → escolher atualizar ou criar novo
     if (attTicketId) {
+      console.log("[ChatHeader] Reopen flow detectado, ticket_id =", attTicketId);
+      setReopenTicketId(attTicketId);
       setShowReopenChoice(true);
       return;
     }
