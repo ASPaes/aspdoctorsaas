@@ -327,9 +327,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     }
   }, [csatEnabled, closeConversation, conversation.id]);
 
+  // Código do ticket vinculado (usado por TicketReopenChoiceDialog e legacy attach modal)
   const { data: attachTicketCode } = useQuery({
     queryKey: ["attach-ticket-code", (attendance as any)?.ticket_id],
-    enabled: showAttachTicketModal && !!(attendance as any)?.ticket_id,
+    enabled:
+      (showAttachTicketModal || showReopenChoice) && !!(attendance as any)?.ticket_id,
     queryFn: async () => {
       const { data } = await supabase
         .from("support_tickets")
@@ -339,6 +341,31 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       return (data as any)?.ticket_code ?? null;
     },
   });
+
+  // Handlers do fluxo reopen
+  const handleReopenChoose = useCallback((choice: "update" | "create") => {
+    setShowReopenChoice(false);
+    if (choice === "update") setShowUpdateExisting(true);
+    else setShowCreateAdditional(true);
+  }, []);
+
+  const handleUpdateExistingCompleted = useCallback(() => {
+    setShowUpdateExisting(false);
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
+    queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+  }, [queryClient]);
+
+  const handleAdditionalTicketCreated = useCallback(() => {
+    setShowCreateAdditional(false);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+    queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+  }, [csatEnabled, closeConversation, conversation.id, queryClient]);
 
   const proceedCloseAfterAttach = useCallback(() => {
     if (!csatEnabled) {
