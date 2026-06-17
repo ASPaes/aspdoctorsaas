@@ -211,8 +211,8 @@ export function TicketUpdateExistingDialog({
                   <div className="col-span-2">
                     <p className="uppercase tracking-wide text-muted-foreground">Fechado em</p>
                     <p className="text-foreground">
-                      {ticket.closed_at
-                        ? new Date(ticket.closed_at).toLocaleString("pt-BR")
+                      {ticket.concluido_em
+                        ? new Date(ticket.concluido_em).toLocaleString("pt-BR")
                         : "Em aberto"}
                     </p>
                   </div>
