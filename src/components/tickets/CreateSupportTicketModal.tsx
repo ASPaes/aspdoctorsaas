@@ -72,6 +72,7 @@ export function CreateSupportTicketModal({
   onCreated,
   defaultDepartmentId,
   fromClosure = false,
+  mode = "initial",
   attendanceId = null,
   closureClienteId = null,
   closureClienteNome = null,
