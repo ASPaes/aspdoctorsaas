@@ -523,7 +523,11 @@ export function CreateSupportTicketModal({
       let ticketId: string | null = null;
 
       if (fromClosure && attendanceId) {
-        const { data: rpcData, error } = await (supabase.rpc as any)("create_ticket_from_closure", {
+        const closureRpcName =
+          mode === "additional"
+            ? "create_additional_ticket_from_attendance"
+            : "create_ticket_from_closure";
+        const { data: rpcData, error } = await (supabase.rpc as any)(closureRpcName, {
           p_attendance_id: attendanceId,
           p_produto_id: Number(produtoId),
           p_category_id: categoryId,
