@@ -331,15 +331,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [csatEnabled, closeConversation, conversation.id]);
 
   // Código do ticket vinculado (usado por TicketReopenChoiceDialog e legacy attach modal)
+  const effectiveTicketId = reopenTicketId ?? ((attendance as any)?.ticket_id ?? null);
   const { data: attachTicketCode } = useQuery({
-    queryKey: ["attach-ticket-code", (attendance as any)?.ticket_id],
+    queryKey: ["attach-ticket-code", effectiveTicketId],
     enabled:
-      (showAttachTicketModal || showReopenChoice) && !!(attendance as any)?.ticket_id,
+      (showAttachTicketModal || showReopenChoice) && !!effectiveTicketId,
     queryFn: async () => {
       const { data } = await supabase
         .from("support_tickets")
         .select("ticket_code")
-        .eq("id", (attendance as any).ticket_id)
+        .eq("id", effectiveTicketId as string)
         .maybeSingle();
       return (data as any)?.ticket_code ?? null;
     },
