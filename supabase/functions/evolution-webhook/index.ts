@@ -557,6 +557,31 @@ async function fetchEditedTextFromEvolution(supabase: any, instanceId: string, f
   return null;
 }
 
+async function markEditedWithoutContent(
+  supabase: any,
+  messageDbId: string,
+  messageId: string,
+  conversationId: string,
+  tenantId: string,
+  previousContent: string,
+): Promise<void> {
+  try {
+    const nowIso = new Date().toISOString();
+    await supabase.from('whatsapp_message_edit_history').insert({
+      tenant_id: tenantId,
+      conversation_id: conversationId,
+      message_id: messageId,
+      previous_content: previousContent,
+      edited_at: nowIso,
+    });
+    await supabase.from('whatsapp_messages').update({
+      edited_at: nowIso,
+    }).eq('id', messageDbId);
+  } catch (err) {
+    console.error(`${LOG} markEditedWithoutContent error:`, err);
+  }
+}
+
 async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supabase: any): Promise<void> {
   try {
     const data = payload.data;
