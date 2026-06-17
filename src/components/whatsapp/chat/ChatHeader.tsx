@@ -275,30 +275,35 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
 
-  const handleClienteConfirmed = useCallback(() => {
+  const handleClienteConfirmed = useCallback(async () => {
     setShowConfirmCliente(false);
 
-    const attTicketId = (attendance as any)?.ticket_id;
-    const wasReopened = !!(attendance as any)?.reopened_at;
+    const attId = (attendance as any)?.id ?? null;
 
-    // Reabertura de atendimento que já gerou ticket → modal "Atualizar ticket"
-    if (attTicketId && wasReopened) {
-      setAttachNote("");
-      setShowAttachTicketModal(true);
-      return;
-    }
-
-    // Conversa iniciada a partir de ticket (sem reabertura) → encerramento silencioso (comportamento atual)
-    if (attTicketId) {
-      if (!csatEnabled) {
-        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
-      } else {
-        setShowCloseModal(true);
+    // Sempre conferir a fonte da verdade no banco antes de decidir o fluxo
+    let attTicketId: string | null = (attendance as any)?.ticket_id ?? null;
+    if (attId) {
+      try {
+        const { data } = await supabase
+          .from("support_attendances")
+          .select("ticket_id")
+          .eq("id", attId)
+          .maybeSingle();
+        if (data && Object.prototype.hasOwnProperty.call(data, "ticket_id")) {
+          attTicketId = (data as any).ticket_id ?? null;
+        }
+      } catch {
+        /* fallback ao valor em memória */
       }
+    }
+
+    // CASO REOPEN: atendimento já tem ticket vinculado → escolher atualizar ou criar novo
+    if (attTicketId) {
+      setShowReopenChoice(true);
       return;
     }
 
-    // Regra: se setor exige ticket ao encerrar, mostrar modal de classificação
+    // Regra: se setor exige ticket ao encerrar, mostrar modal de classificação (fluxo inicial)
     const requiresTicket = (convDepartment as any)?.requires_ticket_on_close === true;
     if (requiresTicket) {
       setShowClassifyModal(true);
