@@ -174,7 +174,10 @@ export function TicketUpdateExistingDialog({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando ticket…
               </div>
             ) : !ticket ? (
-              <p className="text-xs text-destructive">Ticket não encontrado.</p>
+              <p className="text-xs text-destructive">
+                Ticket #{existingTicketId ? existingTicketId.slice(0, 8) : "?"} não pôde ser carregado
+                {ticketError ? ` (${(ticketError as any)?.message ?? "erro desconhecido"})` : !existingTicketId ? " (ID ausente)" : " (não retornou resultado)"}.
+              </p>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
