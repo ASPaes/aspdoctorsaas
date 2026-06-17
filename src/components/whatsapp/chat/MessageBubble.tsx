@@ -346,6 +346,16 @@ export function MessageBubble({
 
       <div className={cn("flex items-center gap-1 mt-0.5", isFromMe ? "justify-end" : "justify-start")}>
         <span className="text-[10px] opacity-60">{time}</span>
+        {msg.edited_at && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[10px] italic text-muted-foreground cursor-help">(editada)</span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[260px] text-xs">
+              <p>Esta mensagem foi editada pelo cliente após o envio. O conteúdo exibido pode ser a versão original — verifique no WhatsApp se for crítico.</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
         {statusIcon}
       </div>
     </div>
