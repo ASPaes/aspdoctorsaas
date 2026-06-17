@@ -91,6 +91,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   // Reopen flow (attendance.ticket_id IS NOT NULL no encerramento que exige ticket)
   const [showReopenChoice, setShowReopenChoice] = useState(false);
   const [showUpdateExisting, setShowUpdateExisting] = useState(false);
+  const [reopenTicketId, setReopenTicketId] = useState<string | null>(null);
   const [showCreateAdditional, setShowCreateAdditional] = useState(false);
   // Read-only view de ticket vinculado (a partir do picker)
   const [readOnlyTicketId, setReadOnlyTicketId] = useState<string | null>(null);
