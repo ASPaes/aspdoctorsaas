@@ -35,6 +35,9 @@ import { useClienteLinkSuggestion } from "../hooks/useClienteLinkSuggestion";
 import { ConversationMuteButton } from "./ConversationMuteButton";
 import { ConfirmClienteModal } from "./ConfirmClienteModal";
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
+import { TicketReopenChoiceDialog } from "./TicketReopenChoiceDialog";
+import { TicketUpdateExistingDialog } from "./TicketUpdateExistingDialog";
 import { InterruptAutoReplyDialog } from "./InterruptAutoReplyDialog";
 import { CleanupConversationDialog } from "./CleanupConversationDialog";
 
@@ -85,6 +88,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [pickerSelectedId, setPickerSelectedId] = useState<string | null>(null);
   const [showAttachTicketModal, setShowAttachTicketModal] = useState(false);
   const [attachNote, setAttachNote] = useState("");
+  // Reopen flow (attendance.ticket_id IS NOT NULL no encerramento que exige ticket)
+  const [showReopenChoice, setShowReopenChoice] = useState(false);
+  const [showUpdateExisting, setShowUpdateExisting] = useState(false);
+  const [showCreateAdditional, setShowCreateAdditional] = useState(false);
+  // Read-only view de ticket vinculado (a partir do picker)
+  const [readOnlyTicketId, setReadOnlyTicketId] = useState<string | null>(null);
   const { data: supportConfig } = useSupportConfig();
   const csatEnabled = supportConfig?.support_csat_enabled === true;
   const { instances } = useWhatsAppInstances();
@@ -266,30 +275,35 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const { attendanceMap } = useAttendanceStatus([conversation.id], true);
   const attendance = attendanceMap.get(conversation.id);
 
-  const handleClienteConfirmed = useCallback(() => {
+  const handleClienteConfirmed = useCallback(async () => {
     setShowConfirmCliente(false);
 
-    const attTicketId = (attendance as any)?.ticket_id;
-    const wasReopened = !!(attendance as any)?.reopened_at;
+    const attId = (attendance as any)?.id ?? null;
 
-    // Reabertura de atendimento que já gerou ticket → modal "Atualizar ticket"
-    if (attTicketId && wasReopened) {
-      setAttachNote("");
-      setShowAttachTicketModal(true);
-      return;
-    }
-
-    // Conversa iniciada a partir de ticket (sem reabertura) → encerramento silencioso (comportamento atual)
-    if (attTicketId) {
-      if (!csatEnabled) {
-        closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
-      } else {
-        setShowCloseModal(true);
+    // Sempre conferir a fonte da verdade no banco antes de decidir o fluxo
+    let attTicketId: string | null = (attendance as any)?.ticket_id ?? null;
+    if (attId) {
+      try {
+        const { data } = await supabase
+          .from("support_attendances")
+          .select("ticket_id")
+          .eq("id", attId)
+          .maybeSingle();
+        if (data && Object.prototype.hasOwnProperty.call(data, "ticket_id")) {
+          attTicketId = (data as any).ticket_id ?? null;
+        }
+      } catch {
+        /* fallback ao valor em memória */
       }
+    }
+
+    // CASO REOPEN: atendimento já tem ticket vinculado → escolher atualizar ou criar novo
+    if (attTicketId) {
+      setShowReopenChoice(true);
       return;
     }
 
-    // Regra: se setor exige ticket ao encerrar, mostrar modal de classificação
+    // Regra: se setor exige ticket ao encerrar, mostrar modal de classificação (fluxo inicial)
     const requiresTicket = (convDepartment as any)?.requires_ticket_on_close === true;
     if (requiresTicket) {
       setShowClassifyModal(true);
@@ -313,9 +327,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     }
   }, [csatEnabled, closeConversation, conversation.id]);
 
+  // Código do ticket vinculado (usado por TicketReopenChoiceDialog e legacy attach modal)
   const { data: attachTicketCode } = useQuery({
     queryKey: ["attach-ticket-code", (attendance as any)?.ticket_id],
-    enabled: showAttachTicketModal && !!(attendance as any)?.ticket_id,
+    enabled:
+      (showAttachTicketModal || showReopenChoice) && !!(attendance as any)?.ticket_id,
     queryFn: async () => {
       const { data } = await supabase
         .from("support_tickets")
@@ -325,6 +341,31 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
       return (data as any)?.ticket_code ?? null;
     },
   });
+
+  // Handlers do fluxo reopen
+  const handleReopenChoose = useCallback((choice: "update" | "create") => {
+    setShowReopenChoice(false);
+    if (choice === "update") setShowUpdateExisting(true);
+    else setShowCreateAdditional(true);
+  }, []);
+
+  const handleUpdateExistingCompleted = useCallback(() => {
+    setShowUpdateExisting(false);
+    queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
+    queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+  }, [queryClient]);
+
+  const handleAdditionalTicketCreated = useCallback(() => {
+    setShowCreateAdditional(false);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true });
+    } else {
+      setShowCloseModal(true);
+    }
+    queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
+  }, [csatEnabled, closeConversation, conversation.id, queryClient]);
 
   const proceedCloseAfterAttach = useCallback(() => {
     if (!csatEnabled) {
@@ -890,17 +931,34 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               const hasTicket = !!a.ticket_id;
               const noPermission = !isAdmin && a.assigned_to !== user?.id;
               const isOpen = a.status !== 'closed' && a.status !== 'inactive_closed';
-              const disabled = hasTicket || noPermission || isOpen;
+              // Atendimento em andamento bloqueia somente quando NÃO há ticket vinculado.
+              // Quando há ticket vinculado, o item é clicável para abrir o ticket em modo leitura.
+              const isOpenWithoutTicket = isOpen && !hasTicket;
+              const isOpenWithTicket = isOpen && hasTicket;
+              const disabled = isOpenWithoutTicket || noPermission || (hasTicket && !isOpenWithTicket);
               const selected = pickerSelectedId === a.id;
+
+              const handleClick = () => {
+                if (isOpenWithTicket) {
+                  // Apenas visualização read-only do ticket vinculado
+                  setShowAttendanceTicketPicker(false);
+                  setReadOnlyTicketId(a.ticket_id);
+                  return;
+                }
+                if (!disabled) setPickerSelectedId(a.id);
+              };
+
+              const clickable = isOpenWithTicket || !disabled;
+
               const row = (
                 <button
                   key={a.id}
                   type="button"
-                  disabled={disabled}
-                  onClick={() => !disabled && setPickerSelectedId(a.id)}
+                  disabled={!clickable}
+                  onClick={handleClick}
                   className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
                     selected && !disabled ? 'border-primary bg-primary/5' : 'border-border'
-                  } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
+                  } ${!clickable ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -910,13 +968,22 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                       <p className="text-[11px] text-muted-foreground">
                         {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
                       </p>
-                      {isOpen && (
+                      {isOpenWithoutTicket && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
                           Encerre o atendimento para gerar o ticket.
                         </p>
                       )}
+                      {isOpenWithTicket && (
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Clique para abrir o ticket vinculado (somente leitura).
+                        </p>
+                      )}
                     </div>
-                    {isOpen ? (
+                    {isOpenWithTicket ? (
+                      <Badge variant="secondary" className="text-[10px] shrink-0 whitespace-nowrap">
+                        Ticket vinculado
+                      </Badge>
+                    ) : isOpen ? (
                       <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-400 whitespace-nowrap">
                         Em atendimento
                       </Badge>
@@ -980,6 +1047,58 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           closureSentimentSummary={attendanceTicketTarget.id === attendance?.id ? (sentimentData?.summary ?? null) : null}
         />
       )}
+
+      {/* Fluxo REOPEN: atendimento já tem ticket vinculado ao encerrar */}
+      <TicketReopenChoiceDialog
+        open={showReopenChoice}
+        onOpenChange={(o) => { if (!o) setShowReopenChoice(false); }}
+        existingTicketCode={attachTicketCode ?? null}
+        onUpdateExisting={() => handleReopenChoose("update")}
+        onCreateNew={() => handleReopenChoose("create")}
+      />
+
+      <TicketUpdateExistingDialog
+        open={showUpdateExisting}
+        onOpenChange={(o) => { if (!o) setShowUpdateExisting(false); }}
+        attendanceId={attendance?.id ?? null}
+        existingTicketId={(attendance as any)?.ticket_id ?? null}
+        onCompleted={handleUpdateExistingCompleted}
+      />
+
+      {/* Criar ticket adicional (atendimento reaberto) — usa o MESMO formulário */}
+      <CreateSupportTicketModal
+        open={showCreateAdditional}
+        onOpenChange={(o) => { if (!o) setShowCreateAdditional(false); }}
+        onCreated={handleAdditionalTicketCreated}
+        fromClosure
+        mode="additional"
+        attendanceId={attendance?.id ?? null}
+        closureClienteId={(linkedCliente as any)?.id ?? null}
+        closureClienteNome={linkedClienteName ?? null}
+        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
+        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureDepartmentId={(conversation as any).department_id ?? null}
+        closureResponsavelId={attendance?.assigned_to ?? null}
+        closureContactName={contact?.name ?? null}
+        closureHandleSeconds={(attendance as any)?.handle_seconds ?? null}
+        closureAiSummary={(attendance as any)?.ai_summary ?? null}
+        closureAiTopics={(attendance as any)?.ai_topics ?? null}
+        closureAiKeywords={(attendance as any)?.ai_keywords ?? null}
+        closureAiProblem={(attendance as any)?.ai_problem ?? null}
+        closureAiSolution={(attendance as any)?.ai_solution ?? null}
+        closureSentimentLabel={sentimentData?.sentiment ?? null}
+        closureSentimentConfidence={sentimentData?.confidence ?? null}
+        closureSentimentSummary={sentimentData?.summary ?? null}
+      />
+
+      {/* Visualização read-only de ticket vinculado (Mudança D) */}
+      <SupportTicketDetailDialog
+        ticketId={readOnlyTicketId}
+        open={!!readOnlyTicketId}
+        onOpenChange={(o) => { if (!o) setReadOnlyTicketId(null); }}
+      />
+
+
 
 
 
