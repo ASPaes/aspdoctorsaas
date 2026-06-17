@@ -907,7 +907,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             ) : (
               <Select
                 value={ticket?.cliente_contato_id ?? "none"}
-                onValueChange={(v) => handleFieldUpdate({ cliente_contato_id: v === "none" ? null : v })}
+                onValueChange={handleSelectContato}
                 disabled={updating}
               >
                 <SelectTrigger className="h-9 text-xs flex-1">
