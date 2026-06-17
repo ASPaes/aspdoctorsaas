@@ -91,6 +91,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   // Reopen flow (attendance.ticket_id IS NOT NULL no encerramento que exige ticket)
   const [showReopenChoice, setShowReopenChoice] = useState(false);
   const [showUpdateExisting, setShowUpdateExisting] = useState(false);
+  const [reopenTicketId, setReopenTicketId] = useState<string | null>(null);
   const [showCreateAdditional, setShowCreateAdditional] = useState(false);
   // Read-only view de ticket vinculado (a partir do picker)
   const [readOnlyTicketId, setReadOnlyTicketId] = useState<string | null>(null);
@@ -299,6 +300,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
     // CASO REOPEN: atendimento já tem ticket vinculado → escolher atualizar ou criar novo
     if (attTicketId) {
+      console.log("[ChatHeader] Reopen flow detectado, ticket_id =", attTicketId);
+      setReopenTicketId(attTicketId);
       setShowReopenChoice(true);
       return;
     }
@@ -328,15 +331,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   }, [csatEnabled, closeConversation, conversation.id]);
 
   // Código do ticket vinculado (usado por TicketReopenChoiceDialog e legacy attach modal)
+  const effectiveTicketId = reopenTicketId ?? ((attendance as any)?.ticket_id ?? null);
   const { data: attachTicketCode } = useQuery({
-    queryKey: ["attach-ticket-code", (attendance as any)?.ticket_id],
+    queryKey: ["attach-ticket-code", effectiveTicketId],
     enabled:
-      (showAttachTicketModal || showReopenChoice) && !!(attendance as any)?.ticket_id,
+      (showAttachTicketModal || showReopenChoice) && !!effectiveTicketId,
     queryFn: async () => {
       const { data } = await supabase
         .from("support_tickets")
         .select("ticket_code")
-        .eq("id", (attendance as any).ticket_id)
+        .eq("id", effectiveTicketId as string)
         .maybeSingle();
       return (data as any)?.ticket_code ?? null;
     },
@@ -1061,7 +1065,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={showUpdateExisting}
         onOpenChange={(o) => { if (!o) setShowUpdateExisting(false); }}
         attendanceId={attendance?.id ?? null}
-        existingTicketId={(attendance as any)?.ticket_id ?? null}
+        existingTicketId={effectiveTicketId}
         onCompleted={handleUpdateExistingCompleted}
       />
 

@@ -47,21 +47,26 @@ export function TicketUpdateExistingDialog({
     }
   }, [open]);
 
-  const { data: ticket, isLoading: ticketLoading } = useQuery({
+  const { data: ticket, isLoading: ticketLoading, error: ticketError } = useQuery({
     queryKey: ["ticket-update-existing", existingTicketId],
     enabled: open && !!existingTicketId,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("support_tickets" as any) as any)
+      console.log("[TicketUpdateExistingDialog] Buscando ticket id =", existingTicketId);
+      const res = await (supabase.from("support_tickets" as any) as any)
         .select(`
-          id, ticket_code, observacao_agente, observacao_ia, closed_at, created_at, responsavel_user_id,
+          id, ticket_code, observacao_agente, observacao_ia, closed_at, created_at, responsavel_user_id, deleted_at,
           status:ticket_statuses(name, color),
           category:service_categories(nome),
           subcategory:service_subcategories(nome),
           produto:produtos(nome)
         `)
         .eq("id", existingTicketId)
+        .is("deleted_at", null)
         .maybeSingle();
+      console.log("[TicketUpdateExistingDialog] Resposta Supabase:", res);
+      const { data, error } = res;
       if (error) throw error;
+      if (!data) return null;
       let responsavel: { full_name: string | null; email: string | null } | null = null;
       if (data?.responsavel_user_id) {
         const { data: prof } = await (supabase.from("profiles" as any) as any)
@@ -169,7 +174,10 @@ export function TicketUpdateExistingDialog({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando ticket…
               </div>
             ) : !ticket ? (
-              <p className="text-xs text-destructive">Ticket não encontrado.</p>
+              <p className="text-xs text-destructive">
+                Ticket #{existingTicketId ? existingTicketId.slice(0, 8) : "?"} não pôde ser carregado
+                {ticketError ? ` (${(ticketError as any)?.message ?? "erro desconhecido"})` : !existingTicketId ? " (ID ausente)" : " (não retornou resultado)"}.
+              </p>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
