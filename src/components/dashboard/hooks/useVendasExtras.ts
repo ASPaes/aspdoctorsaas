@@ -140,6 +140,8 @@ export function useVendasProdutos(filters: DashboardFilters) {
         p_tenant: tid,
         p_ini: iniStr,
         p_fim: fimStr,
+        p_fornecedor_id: forn,
+        p_unidade_base_id: unid,
       });
       if (error) throw error;
       return (data || []) as VendasProdutoRow[];
