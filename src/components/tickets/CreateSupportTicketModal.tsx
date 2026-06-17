@@ -21,6 +21,11 @@ interface Props {
   defaultDepartmentId?: string;
   // Closure mode props
   fromClosure?: boolean;
+  /**
+   * 'initial'    → create_ticket_from_closure (atendimento sem ticket vinculado)
+   * 'additional' → create_additional_ticket_from_attendance (atendimento reaberto, novo ticket adicional)
+   */
+  mode?: "initial" | "additional";
   attendanceId?: string | null;
   closureClienteId?: string | null;
   closureClienteNome?: string | null;
