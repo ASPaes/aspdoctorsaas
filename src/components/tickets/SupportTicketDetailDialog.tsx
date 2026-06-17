@@ -546,6 +546,47 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     }
   };
 
+  const handleSelectContato = async (v: string) => {
+    if (v === "none") {
+      handleFieldUpdate({ cliente_contato_id: null });
+      return;
+    }
+    if (v !== "principal") {
+      handleFieldUpdate({ cliente_contato_id: v });
+      return;
+    }
+    // "Principal" não é um contato real (sem uuid). Materializa idempotente
+    // em cliente_contatos a partir do nome/fone do cliente e grava o uuid.
+    const principal = clienteContatos.find((c: any) => c.id === "principal") as any;
+    if (!ticketClienteId || !principal) return;
+    try {
+      const { data: existing } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id")
+        .eq("cliente_id", ticketClienteId)
+        .eq("nome", principal.nome)
+        .limit(1)
+        .maybeSingle();
+      let contatoId = existing?.id as string | undefined;
+      if (!contatoId) {
+        const { data: inserted, error } = await (supabase.from("cliente_contatos" as any) as any)
+          .insert({
+            cliente_id: ticketClienteId,
+            tenant_id: tid,
+            nome: principal.nome,
+            fone: principal.fone ?? null,
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        contatoId = inserted.id;
+      }
+      await refetchContatos();
+      handleFieldUpdate({ cliente_contato_id: contatoId });
+    } catch (err: any) {
+      toast.error("Erro ao definir contato: " + (err.message ?? ""));
+    }
+  };
+
   const currentContactName = useMemo(() => {
     if (ticket?.cliente_contato_id) {
       const found = clienteContatos.find(c => c.id === ticket.cliente_contato_id);
