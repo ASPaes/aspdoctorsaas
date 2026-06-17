@@ -104,9 +104,11 @@ export interface VendasTicketStats {
 export function useVendasTicketStats(filters: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
+  const forn = filters.fornecedorId ?? null;
+  const unid = filters.unidadeBaseId ?? null;
 
   return useQuery({
-    queryKey: ['vendas-ticket-stats', tid, iniStr, fimStr],
+    queryKey: ['vendas-ticket-stats', tid, iniStr, fimStr, forn, unid],
     enabled: !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<VendasTicketStats | null> => {
@@ -114,6 +116,8 @@ export function useVendasTicketStats(filters: DashboardFilters) {
         p_tenant: tid,
         p_ini: iniStr,
         p_fim: fimStr,
+        p_fornecedor_id: forn,
+        p_unidade_base_id: unid,
       });
       if (error) throw error;
       return (data?.[0] ?? null) as VendasTicketStats | null;
@@ -124,9 +128,11 @@ export function useVendasTicketStats(filters: DashboardFilters) {
 export function useVendasProdutos(filters: DashboardFilters) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { iniStr, fimStr } = resolvePeriodo(filters);
+  const forn = filters.fornecedorId ?? null;
+  const unid = filters.unidadeBaseId ?? null;
 
   return useQuery({
-    queryKey: ['vendas-produtos', tid, iniStr, fimStr],
+    queryKey: ['vendas-produtos', tid, iniStr, fimStr, forn, unid],
     enabled: !!tid,
     staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<VendasProdutoRow[]> => {
