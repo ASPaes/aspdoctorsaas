@@ -1065,7 +1065,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={showUpdateExisting}
         onOpenChange={(o) => { if (!o) setShowUpdateExisting(false); }}
         attendanceId={attendance?.id ?? null}
-        existingTicketId={(attendance as any)?.ticket_id ?? null}
+        existingTicketId={effectiveTicketId}
         onCompleted={handleUpdateExistingCompleted}
       />
 
