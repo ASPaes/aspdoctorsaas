@@ -1048,6 +1048,58 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         />
       )}
 
+      {/* Fluxo REOPEN: atendimento já tem ticket vinculado ao encerrar */}
+      <TicketReopenChoiceDialog
+        open={showReopenChoice}
+        onOpenChange={(o) => { if (!o) setShowReopenChoice(false); }}
+        existingTicketCode={attachTicketCode ?? null}
+        onUpdateExisting={() => handleReopenChoose("update")}
+        onCreateNew={() => handleReopenChoose("create")}
+      />
+
+      <TicketUpdateExistingDialog
+        open={showUpdateExisting}
+        onOpenChange={(o) => { if (!o) setShowUpdateExisting(false); }}
+        attendanceId={attendance?.id ?? null}
+        existingTicketId={(attendance as any)?.ticket_id ?? null}
+        onCompleted={handleUpdateExistingCompleted}
+      />
+
+      {/* Criar ticket adicional (atendimento reaberto) — usa o MESMO formulário */}
+      <CreateSupportTicketModal
+        open={showCreateAdditional}
+        onOpenChange={(o) => { if (!o) setShowCreateAdditional(false); }}
+        onCreated={handleAdditionalTicketCreated}
+        fromClosure
+        mode="additional"
+        attendanceId={attendance?.id ?? null}
+        closureClienteId={(linkedCliente as any)?.id ?? null}
+        closureClienteNome={linkedClienteName ?? null}
+        closureClienteCodigo={(linkedCliente as any)?.codigo_sequencial ?? null}
+        closureProdutoId={(linkedCliente as any)?.produto_id ?? null}
+        closureDepartmentId={(conversation as any).department_id ?? null}
+        closureResponsavelId={attendance?.assigned_to ?? null}
+        closureContactName={contact?.name ?? null}
+        closureHandleSeconds={(attendance as any)?.handle_seconds ?? null}
+        closureAiSummary={(attendance as any)?.ai_summary ?? null}
+        closureAiTopics={(attendance as any)?.ai_topics ?? null}
+        closureAiKeywords={(attendance as any)?.ai_keywords ?? null}
+        closureAiProblem={(attendance as any)?.ai_problem ?? null}
+        closureAiSolution={(attendance as any)?.ai_solution ?? null}
+        closureSentimentLabel={sentimentData?.sentiment ?? null}
+        closureSentimentConfidence={sentimentData?.confidence ?? null}
+        closureSentimentSummary={sentimentData?.summary ?? null}
+      />
+
+      {/* Visualização read-only de ticket vinculado (Mudança D) */}
+      <SupportTicketDetailDialog
+        ticketId={readOnlyTicketId}
+        open={!!readOnlyTicketId}
+        onOpenChange={(o) => { if (!o) setReadOnlyTicketId(null); }}
+      />
+
+
+
 
 
       {/* Modal "Atualizar ticket" — atendimento reaberto já vinculado a ticket */}
