@@ -493,12 +493,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         .select("id, nome, fone, email, cargo")
         .eq("cliente_id", ticketClienteId)
         .order("nome");
-      const result: Array<{ id: string; nome: string; detalhe: string }> = [];
+      const result: Array<{ id: string; nome: string; detalhe: string; fone?: string | null }> = [];
       if (cli?.contato_nome) {
         result.push({
           id: "principal",
           nome: cli.contato_nome,
           detalhe: cli.contato_fone ? `${cli.contato_fone} · Principal` : "Principal",
+          fone: cli.contato_fone ?? null,
         });
       }
       (contatos ?? []).forEach((c: any) => {
