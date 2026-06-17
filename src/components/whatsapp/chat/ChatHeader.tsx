@@ -931,17 +931,34 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               const hasTicket = !!a.ticket_id;
               const noPermission = !isAdmin && a.assigned_to !== user?.id;
               const isOpen = a.status !== 'closed' && a.status !== 'inactive_closed';
-              const disabled = hasTicket || noPermission || isOpen;
+              // Atendimento em andamento bloqueia somente quando NÃO há ticket vinculado.
+              // Quando há ticket vinculado, o item é clicável para abrir o ticket em modo leitura.
+              const isOpenWithoutTicket = isOpen && !hasTicket;
+              const isOpenWithTicket = isOpen && hasTicket;
+              const disabled = isOpenWithoutTicket || noPermission || (hasTicket && !isOpenWithTicket);
               const selected = pickerSelectedId === a.id;
+
+              const handleClick = () => {
+                if (isOpenWithTicket) {
+                  // Apenas visualização read-only do ticket vinculado
+                  setShowAttendanceTicketPicker(false);
+                  setReadOnlyTicketId(a.ticket_id);
+                  return;
+                }
+                if (!disabled) setPickerSelectedId(a.id);
+              };
+
+              const clickable = isOpenWithTicket || !disabled;
+
               const row = (
                 <button
                   key={a.id}
                   type="button"
-                  disabled={disabled}
-                  onClick={() => !disabled && setPickerSelectedId(a.id)}
+                  disabled={!clickable}
+                  onClick={handleClick}
                   className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
                     selected && !disabled ? 'border-primary bg-primary/5' : 'border-border'
-                  } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
+                  } ${!clickable ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted/50'}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
@@ -951,13 +968,22 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                       <p className="text-[11px] text-muted-foreground">
                         {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')} · {a.status}
                       </p>
-                      {isOpen && (
+                      {isOpenWithoutTicket && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
                           Encerre o atendimento para gerar o ticket.
                         </p>
                       )}
+                      {isOpenWithTicket && (
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Clique para abrir o ticket vinculado (somente leitura).
+                        </p>
+                      )}
                     </div>
-                    {isOpen ? (
+                    {isOpenWithTicket ? (
+                      <Badge variant="secondary" className="text-[10px] shrink-0 whitespace-nowrap">
+                        Ticket vinculado
+                      </Badge>
+                    ) : isOpen ? (
                       <Badge variant="outline" className="text-[10px] shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-400 whitespace-nowrap">
                         Em atendimento
                       </Badge>
