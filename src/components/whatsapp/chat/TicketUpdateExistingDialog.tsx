@@ -139,11 +139,11 @@ export function TicketUpdateExistingDialog({
         }
       }
 
-      // 3) Encerrar atendimento
+      // 3) Encerrar atendimento (reaberto: sem CSAT, motivo manual)
       const { error: closeErr } = await (supabase.rpc as any)("fn_close_attendance_atomic", {
         p_attendance_id: attendanceId,
-        p_closed_reason: "resolved",
-        p_closure_type: "agent_close",
+        p_closed_reason: "manual",
+        p_closure_type: "silent",
       });
       if (closeErr) throw new Error(`Erro ao encerrar atendimento: ${closeErr.message}`);
 
