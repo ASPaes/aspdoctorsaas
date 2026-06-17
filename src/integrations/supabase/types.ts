@@ -8271,7 +8271,14 @@ export type Database = {
       }
       get_user_department_id: { Args: never; Returns: string }
       get_vendas_breakdown: {
-        Args: { p_dim: string; p_fim: string; p_ini: string; p_tenant: string }
+        Args: {
+          p_dim: string
+          p_fim: string
+          p_fornecedor_id?: number
+          p_ini: string
+          p_tenant: string
+          p_unidade_base_id?: number
+        }
         Returns: {
           custo: number
           label: string
@@ -8283,7 +8290,13 @@ export type Database = {
         }[]
       }
       get_vendas_produtos: {
-        Args: { p_fim: string; p_ini: string; p_tenant: string }
+        Args: {
+          p_fim: string
+          p_fornecedor_id?: number
+          p_ini: string
+          p_tenant: string
+          p_unidade_base_id?: number
+        }
         Returns: {
           label: string
           margem_pct: number
@@ -8293,7 +8306,12 @@ export type Database = {
         }[]
       }
       get_vendas_serie_mensal: {
-        Args: { p_meses?: number; p_tenant: string }
+        Args: {
+          p_fornecedor_id?: number
+          p_meses?: number
+          p_tenant: string
+          p_unidade_base_id?: number
+        }
         Returns: {
           mes: string
           new_mrr: number
@@ -8302,7 +8320,13 @@ export type Database = {
         }[]
       }
       get_vendas_ticket_stats: {
-        Args: { p_fim: string; p_ini: string; p_tenant: string }
+        Args: {
+          p_fim: string
+          p_fornecedor_id?: number
+          p_ini: string
+          p_tenant: string
+          p_unidade_base_id?: number
+        }
         Returns: {
           maximo: number
           media: number
