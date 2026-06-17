@@ -571,6 +571,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
         p_email: email,
         p_role: "user",
         p_access_status: "ativo",
+        p_tenant_id: tenantId ?? null,
       });
       if (error) throw error;
       return data;

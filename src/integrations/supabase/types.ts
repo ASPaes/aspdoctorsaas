@@ -7393,6 +7393,7 @@ export type Database = {
           p_email: string
           p_funcionario_id: number
           p_role?: string
+          p_tenant_id?: string
         }
         Returns: string
       }
