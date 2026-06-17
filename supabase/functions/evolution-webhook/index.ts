@@ -666,7 +666,11 @@ async function processSecretEncryptedEdit(payload: EvolutionWebhookPayload, supa
     if (!plaintext) {
       console.error(`${LOG} SecretEdit: AES-GCM falhou em todas as combinações para ${env.targetId}. useCases=${JSON.stringify(useCaseCandidates)}, JIDs=${JSON.stringify(senderCandidates)}, targetJid=${targetJid}, addressingMode=${data?.key?.addressingMode}`);
       newContent = await fetchEditedTextFromEvolution(supabase, resolved.instanceId, payload.instance, env.targetId, originalRow.remote_jid);
-      if (!newContent || newContent === originalRow.content) return;
+      if (!newContent || newContent === originalRow.content) {
+        console.log(`${LOG} SecretEdit: edição detectada para ${env.targetId} mas conteúdo não disponível/inalterado; marcando edited_at`);
+        await markEditedWithoutContent(supabase, originalRow.id, env.targetId, originalRow.conversation_id, resolved.tenantId, originalRow.content);
+        return;
+      }
       console.log(`${LOG} SecretEdit aplicado via fallback Evolution: ${env.targetId} -> "${newContent.substring(0, 80)}"`);
     } else {
       // 6) Extrair texto do proto.Message decifrado
