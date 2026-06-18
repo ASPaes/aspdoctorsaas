@@ -320,6 +320,23 @@ export function useDashboardData(filters: DashboardFilters) {
         else if (m.tipo === 'downsell') downsellMrr += Math.abs(Number(m.valor_delta) || 0);
       });
 
+      // Lista de downsell do período (auditoria) — mesma fonte do downsellMrr (bate com o card)
+      const nomePorClienteDownsell: Record<string, string> = {};
+      [...(clientesAtivos || []), ...(cancelamentosFilt || []), ...(novosClientesFilt || [])].forEach((c: any) => {
+        if (c && c.id) nomePorClienteDownsell[c.id] = c.razao_social || c.nome_fantasia || '—';
+      });
+      const downsellListItems: DownsellListItem[] = (movimentosPeriodo || [])
+        .filter((m: any) => m.tipo === 'downsell' && (!needsClientFilter || allClientesFiltered.has(m.cliente_id)))
+        .map((m: any) => ({
+          clienteId: m.cliente_id,
+          cliente: nomePorClienteDownsell[m.cliente_id] || '—',
+          valor: Math.abs(Number(m.valor_delta) || 0),
+          data: m.data_movimento,
+          descricao: m.descricao || '—',
+        }))
+        .sort((a, b) => b.valor - a.valor);
+      setDownsellList(downsellListItems);
+
       // (Removido) churn por reversão — o MRR de churn agora usa o MRR Atual do cliente (base + movimentos ativos).
 
 
