@@ -205,7 +205,7 @@ export function MotivoSegmentoHeatmap({
           </div>
           {totalMrr > 0 && (
             <span className="ml-auto font-medium text-foreground">
-              Total: {fmtBRL(totalMrr)}
+              Soma do recorte ({motivos.length}×{segmentos.length}): {fmtBRL(totalMrr)}
             </span>
           )}
         </div>

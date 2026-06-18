@@ -112,7 +112,7 @@ export function Top10CanceladosTable({
             </p>
           </div>
           <div className="text-right">
-            <p className={cn('text-muted-foreground', metaSize)}>Acumulado</p>
+            <p className={cn('text-muted-foreground', metaSize)}>Soma do Top 10</p>
             <p className={cn('font-bold text-red-600', headerSize)}>
               {fmt(totalAcumulado)}
             </p>
