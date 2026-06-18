@@ -1474,6 +1474,7 @@ export default function SupportTickets() {
       )}
 
       {/* Conteúdo por view */}
+      {ticketsView === "lista" && !isLoading && <Paginador />}
       {ticketsView === "lista" && (
         isLoading ? (
           <div className="space-y-2">
