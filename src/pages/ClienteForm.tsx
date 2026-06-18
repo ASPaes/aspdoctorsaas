@@ -883,6 +883,15 @@ export default function ClienteForm() {
         />
       )}
 
+      {isEditing && id && canDelete && (
+        <DeleteClienteDialog
+          clienteId={id}
+          clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+        />
+      )}
+
     </div>
   );
 }
