@@ -129,11 +129,14 @@ export function CancelamentosTab({
 
   const currChurnQtd = metrics.cancelamentosQtd;
   const currMrrCancelado = metrics.mrrCancelado;
+  const downsellMrr = metrics.downsellMrr || 0;
+  const currMrrPerdidoTotal = currMrrCancelado + downsellMrr;
   const currChurnCarteira = metrics.clientesInicioCount > 0
     ? metrics.cancelamentosQtd / metrics.clientesInicioCount
     : 0;
+  // Churn rate de receita = perda total (cancelamento + downsell)
   const currChurnReceita = metrics.mrrInicio > 0
-    ? metrics.mrrCancelado / metrics.mrrInicio
+    ? currMrrPerdidoTotal / metrics.mrrInicio
     : 0;
 
   const mrrEvo = timeSeries.mrrEvolution;
@@ -255,11 +258,17 @@ export function CancelamentosTab({
             helpKey="cancelamentos_qtd"
           />
           <KPICardEnhanced
-            label="MRR Cancelado" value={fmt(currMrrCancelado)}
+            label="MRR Perdido (bruto)" value={fmt(currMrrPerdidoTotal)}
             icon={<DollarSign className={`${iconLg} text-red-500`} />}
             size={s} variant="destructive"
             trend={deltaMrr.trend} trendValue={deltaMrr.trendValue}
             helpKey="mrr_cancelado"
+            footer={
+              <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+                <span>Cancelamento: <span className="font-medium text-foreground">{fmt(currMrrCancelado)}</span></span>
+                <span>Downsell: <span className="font-medium text-foreground">{fmt(downsellMrr)}</span></span>
+              </div>
+            }
           />
           <KPICardEnhanced
             label="Churn Rate (Carteira)" value={fmtPct(currChurnCarteira)}
