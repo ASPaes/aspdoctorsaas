@@ -24,6 +24,7 @@ export function useDashboardData(filters: DashboardFilters) {
   const [metrics, setMetrics] = useState<KPIMetrics>(defaultMetrics);
   const [canceladosList, setCanceladosList] = useState<CanceladoListItem[]>([]);
   const [novosClientesList, setNovosClientesList] = useState<NovoClienteListItem[]>([]);
+  const [downsellList, setDownsellList] = useState<DownsellListItem[]>([]);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesData>({
     mrrEvolution: [], faturamentoEvolution: [], churnQtdEvolution: [], churnMrrEvolution: [],
     ltvMesesEvolution: [], ltvCacEvolution: [],
