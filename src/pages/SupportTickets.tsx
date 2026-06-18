@@ -131,6 +131,7 @@ export default function SupportTickets() {
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
   const [ticketStateFilter, setTicketStateFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("recent");
   const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>("all");
   const [attCsatFilter, setAttCsatFilter] = useState<string>("all");
   const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
