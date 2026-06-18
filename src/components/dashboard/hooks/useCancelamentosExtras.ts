@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import type { DashboardFilters, KPIMetrics } from '../types';
@@ -130,10 +131,10 @@ export function useCancelamentosExtras(params: {
   const unidadeBaseId = filters.unidadeBaseId ?? null;
   const fornecedorId = filters.fornecedorId ?? null;
   const periodoInicio = filters.periodoInicio
-    ? new Date(filters.periodoInicio).toISOString().slice(0, 10)
+    ? format(new Date(filters.periodoInicio), 'yyyy-MM-dd')
     : null;
   const periodoFim = filters.periodoFim
-    ? new Date(filters.periodoFim).toISOString().slice(0, 10)
+    ? format(new Date(filters.periodoFim), 'yyyy-MM-dd')
     : null;
 
   return useQuery({
