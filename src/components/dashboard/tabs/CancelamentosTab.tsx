@@ -216,14 +216,17 @@ export function CancelamentosTab({
   const [diagOpen, setDiagOpen] = useState(false);
 
   // ─── Dados do gráfico combinado (preservado V1) ──────────
-  const combinedData = useMemo(() =>
-    churnQtdArr.map((item, i) => ({
-      month: item.monthFull || item.month,
-      qtd: item.value,
-      mrr: churnMrrArr[i]?.value || 0,
-    })),
-    [churnQtdArr, churnMrrArr]
-  );
+  const combinedData = useMemo(() => {
+    const mesesAbrev = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    return (cancExtras?.evolucao12m ?? []).map((item) => {
+      const [ano, mes] = item.mes.split('-');
+      return {
+        month: `${mesesAbrev[parseInt(mes, 10) - 1]} ${ano}`,
+        qtd: item.qtd,
+        mrr: item.mrr,
+      };
+    });
+  }, [cancExtras]);
 
   const tabLabel = useMemo(() => {
     const now = new Date();
