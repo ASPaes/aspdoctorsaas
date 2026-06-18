@@ -393,10 +393,11 @@ export function CreateSupportTicketModal({
       setContatoSolicitante("");
       return;
     }
-    (supabase.from("whatsapp_contacts" as any) as any)
-      .select("name, phone_number")
-      .eq("client_id", clienteId)
-      .eq("is_primary", true)
+    (supabase.from("cliente_contatos" as any) as any)
+      .select("name:nome, phone_number:fone")
+      .eq("cliente_id", clienteId)
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle()
       .then(({ data }: any) => {
         if (data?.name) setContatoSolicitante(data.name);
@@ -414,10 +415,10 @@ export function CreateSupportTicketModal({
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const { data } = await (supabase.from("whatsapp_contacts" as any) as any)
-        .select("id, name, phone_number, email, role")
-        .eq("client_id", clienteId)
-        .ilike("name", `%${term}%`)
+      const { data } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id, name:nome, phone_number:fone, email, role:cargo")
+        .eq("cliente_id", clienteId)
+        .ilike("nome", `%${term}%`)
         .limit(8);
       if (!cancelled) {
         setContatoResults((data as any) ?? []);
@@ -610,17 +611,16 @@ export function CreateSupportTicketModal({
     }
     setSavingNewContact(true);
     try {
-      const { data, error } = await (supabase.from("whatsapp_contacts" as any) as any)
+      const { data, error } = await (supabase.from("cliente_contatos" as any) as any)
         .insert({
           tenant_id: tid,
-          client_id: selectedCliente.id,
-          name: newContactName.trim(),
-          phone_number: newContactPhone.trim() || null,
+          cliente_id: selectedCliente.id,
+          nome: newContactName.trim(),
+          fone: newContactPhone.trim() || null,
           email: newContactEmail.trim() || null,
-          role: newContactRole.trim() || null,
-          is_primary: false,
+          cargo: newContactRole.trim() || null,
         })
-        .select("id, name")
+        .select("id, name:nome")
         .single();
       if (error) throw error;
       toast.success("Contato cadastrado");
