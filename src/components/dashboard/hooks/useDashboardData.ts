@@ -128,12 +128,6 @@ export function useDashboardData(filters: DashboardFilters) {
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)));
-      const movimentosInativadosPromise = fetchAllRows<any>(() => tf(supabase
-        .from('movimentos_mrr')
-        .select('tipo, valor_delta, cliente_id')
-        .eq('status', 'inativo')
-        .gte('inativado_em', periodoInicioStr)
-        .lte('inativado_em', periodoFimStr + 'T23:59:59')));
       const reativacoesPeriodoPromise = fetchAllRows<any>(() => {
         let q = (supabase.from('contrato_eventos' as any) as any)
           .select('cliente_id, mensalidade_contrato_snapshot, data_acao')
@@ -145,7 +139,7 @@ export function useDashboardData(filters: DashboardFilters) {
       });
       const todosMovimentosAtivosPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('cliente_id, valor_delta, data_movimento')
+        .select('cliente_id, valor_delta, data_movimento, tipo')
         .in('tipo', ['upsell','cross_sell','downsell','churn','reactivation','reajuste'])
         .eq('status', 'ativo')
         .is('estornado_por', null)
@@ -208,13 +202,24 @@ export function useDashboardData(filters: DashboardFilters) {
       const newMrr = novosClientesFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
       const totalImplantacao = novosClientesFilt.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
 
+      // MRR Atual por cliente = base + Σ movimentos recorrentes (upsell, cross, downsell, reajuste).
+      // Exclui churn/reactivation/venda_avulsa — MESMA fórmula da ficha do cliente.
+      const __movAtivosParaChurn = await todosMovimentosAtivosPromise;
+      const ajustesRecorrentesPorCliente: Record<string, number> = {};
+      __movAtivosParaChurn?.forEach((m: any) => {
+        if (['upsell','cross_sell','downsell','reajuste'].includes(m.tipo)) {
+          ajustesRecorrentesPorCliente[m.cliente_id] = (ajustesRecorrentesPorCliente[m.cliente_id] || 0) + (Number(m.valor_delta) || 0);
+        }
+      });
+      const mrrAtualDe = (c: any) => (Number(c.mensalidade) || 0) + (ajustesRecorrentesPorCliente[c.id] || 0);
+
       // 3. Cancelamentos no período — requer flag cancelado=true E data_cancelamento na janela
       const cancelamentos = await cancelamentosPromise;
       const cancelamentosFilt = fornecedorClientIds
         ? (cancelamentos || []).filter(c => fornecedorClientIds!.has(c.id))
         : (cancelamentos || []);
       const cancelamentosQtd = cancelamentosFilt.length;
-      const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+      const mrrCancelado = cancelamentosFilt.reduce((sum, c) => sum + mrrAtualDe(c), 0);
 
       // Early churn (≤90 dias)
       const earlyChurn = cancelamentosFilt.filter(c => {
@@ -222,7 +227,7 @@ export function useDashboardData(filters: DashboardFilters) {
         return differenceInDays(new Date(c.data_cancelamento), new Date(c.data_cadastro)) <= 90;
       });
       const cancelamentosEarly = earlyChurn.length;
-      const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + (Number(c.mensalidade) || 0), 0);
+      const mrrCanceladoEarly = earlyChurn.reduce((sum, c) => sum + mrrAtualDe(c), 0);
 
       // Enriquecer cancelados com dados de contrato/produto via contrato_eventos
       const eventosCancel = await eventosCancelPromise;
@@ -314,16 +319,7 @@ export function useDashboardData(filters: DashboardFilters) {
         else if (m.tipo === 'downsell') downsellMrr += Math.abs(Number(m.valor_delta) || 0);
       });
 
-      // Movimentos inativados no período (churn por reversão)
-      const movimentosInativados = await movimentosInativadosPromise;
-
-      let churnReversao = 0;
-      movimentosInativados?.forEach(m => {
-        if (needsClientFilter && !allClientesFiltered.has(m.cliente_id)) return;
-        if (m.tipo === 'upsell' || m.tipo === 'cross_sell') {
-          churnReversao += Math.abs(Number(m.valor_delta) || 0);
-        }
-      });
+      // (Removido) churn por reversão — o MRR de churn agora usa o MRR Atual do cliente (base + movimentos ativos).
 
 
       // === REATIVAÇÕES NO PERÍODO (fonte: contrato_eventos) ===
@@ -387,7 +383,7 @@ export function useDashboardData(filters: DashboardFilters) {
       const crescimentoPercent = mrrInicio > 0 ? crescimentoReais / mrrInicio : 0;
       const ltvReais = ticketMedioAjustado * ltvMeses;
       const ltvCac = cac > 0 ? ltvReais / cac : 0;
-      const churnMrrTotal = mrrCancelado + churnReversao;
+      const churnMrrTotal = mrrCancelado;
       const netNewMrr = newMrr + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr - downsellMrr - churnMrrTotal;
       const grr = mrrInicio > 0 ? Math.max(0, (mrrInicio - churnMrrTotal - downsellMrr) / mrrInicio) : 1;
       const nrr = mrrInicio > 0 ? (mrrInicio + upsellMrr + crossSellMrr + reativacaoMrr + reajusteMrr - downsellMrr - churnMrrTotal) / mrrInicio : 1;
@@ -558,7 +554,7 @@ export function useDashboardData(filters: DashboardFilters) {
           return true;
         });
         churnQtdEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.length });
-        churnMrrEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.reduce((s, c) => s + (Number(c.mensalidade) || 0), 0) });
+        churnMrrEvolution.push({ month: m.month, monthFull: m.monthFull, value: canceladosNoMes.reduce((s, c) => s + mrrAtualDe(c), 0) });
 
         // LTV per month: rolling 3-month churn rate → 1/churnRate
         const churnRateMes = activosInicioMes.length > 0 ? canceladosNoMes.length / activosInicioMes.length : 0;
@@ -780,7 +776,7 @@ export function useDashboardData(filters: DashboardFilters) {
             diasAtivo,
             dataCancelamento: c.data_cancelamento!,
             motivo: c.motivo_cancelamento_id ? (motivoMap[c.motivo_cancelamento_id] || '—') : '—',
-            mensalidade: Number(c.mensalidade) || 0,
+            mensalidade: mrrAtualDe(c),
             contratoNumero: cancelEnrichMap[c.id]?.contratoNumero || '—',
             produto: cancelEnrichMap[c.id]?.produto || '—',
             earlyChurn: diasAtivo !== null && diasAtivo <= 90,
