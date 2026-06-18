@@ -137,6 +137,14 @@ export interface CanceladoListItem {
   earlyChurn: boolean;
 }
 
+export interface DownsellListItem {
+  clienteId: string;
+  cliente: string;
+  valor: number;
+  data: string;
+  descricao: string;
+}
+
 export interface NovoClienteListItem {
   id: string;
   razaoSocial: string;
