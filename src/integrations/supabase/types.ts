@@ -7277,6 +7277,16 @@ export type Database = {
         }
         Returns: string
       }
+      admin_delete_cliente: {
+        Args: {
+          p_cliente_id: string
+          p_confirm?: boolean
+          p_incluir_chat?: boolean
+          p_mode: string
+          p_target_id?: string
+        }
+        Returns: Json
+      }
       admin_list_conselho_personas: {
         Args: never
         Returns: {
@@ -8404,6 +8414,10 @@ export type Database = {
           p_tenant_id: string
           p_unidade_base_id?: number
         }
+        Returns: Json
+      }
+      preview_delete_cliente: {
+        Args: { p_cliente_id: string; p_target_id?: string }
         Returns: Json
       }
       process_maintenance_queue: { Args: never; Returns: undefined }
