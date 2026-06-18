@@ -393,10 +393,11 @@ export function CreateSupportTicketModal({
       setContatoSolicitante("");
       return;
     }
-    (supabase.from("whatsapp_contacts" as any) as any)
-      .select("name, phone_number")
-      .eq("client_id", clienteId)
-      .eq("is_primary", true)
+    (supabase.from("cliente_contatos" as any) as any)
+      .select("name:nome, phone_number:fone")
+      .eq("cliente_id", clienteId)
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle()
       .then(({ data }: any) => {
         if (data?.name) setContatoSolicitante(data.name);
