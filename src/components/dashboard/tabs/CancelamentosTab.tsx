@@ -35,7 +35,7 @@ import { useCancelamentosExtras } from '../hooks/useCancelamentosExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { resolveMesAlvo, computeComparativoMensal } from '@/lib/diagnostico/comparativos';
 
-import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem, DashboardFilters } from '../types';
+import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem, DownsellListItem, DashboardFilters } from '../types';
 
 // ─── Formatters ──────────────────────────────────────────────
 const fmt = (v: number) =>
