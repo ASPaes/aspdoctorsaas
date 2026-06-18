@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem } from '../types';
+import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem, DownsellListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { fetchAllRows } from '@/lib/supabasePaginate';
 
