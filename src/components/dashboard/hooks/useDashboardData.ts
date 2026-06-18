@@ -123,7 +123,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .eq('ativo', true)));
       const movimentosPeriodoPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('tipo, valor_delta, cliente_id')
+        .select('tipo, valor_delta, cliente_id, data_movimento, descricao')
         .gte('data_movimento', periodoInicioStr)
         .lte('data_movimento', periodoFimStr)
         .eq('status', 'ativo')
