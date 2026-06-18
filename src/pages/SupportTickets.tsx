@@ -623,6 +623,65 @@ export default function SupportTickets() {
     },
   });
 
+  const { data: counts = { total: 0, ativos: 0, finalizados: 0 } } = useQuery({
+    queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, ticketStatuses.map((s) => s.id).join(",")],
+    enabled: !!tid,
+    queryFn: async () => {
+      const fromISO = dateRange.from.toISOString();
+      const toDate = new Date(dateRange.to);
+      toDate.setHours(23, 59, 59, 999);
+      const toISO = toDate.toISOString();
+
+      const terminalIds = ticketStatuses.filter((s: any) => s.is_terminal).map((s: any) => s.id);
+
+      let taggedTicketIds: string[] | null = null;
+      if (tagFilters.length > 0) {
+        const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
+          .select("ticket_id").in("tag_id", tagFilters);
+        if (!taggedIds || taggedIds.length === 0) {
+          return { total: 0, finalizados: 0, ativos: 0 };
+        }
+        taggedTicketIds = taggedIds.map((t: any) => t.ticket_id);
+      }
+
+      const applyFilters = (q: any) => {
+        q = q.eq("tenant_id", tid)
+          .is("deleted_at", null)
+          .gte("aberto_em", fromISO)
+          .lte("aberto_em", toISO);
+        if (!isAdminOrHead && userId) q = q.eq("responsavel_user_id", userId);
+        if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
+        if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
+        if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
+        if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
+        if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
+        if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
+        if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
+        if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
+        if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
+        if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
+        if (taggedTicketIds) q = q.in("id", taggedTicketIds);
+        return q;
+      };
+
+      const totalQ = applyFilters((supabase.from("support_tickets" as any) as any))
+        .select("id", { count: "exact", head: true });
+      const { count: countTotal } = await totalQ;
+
+      let countFinalizados = 0;
+      if (terminalIds.length > 0) {
+        const finQ = applyFilters((supabase.from("support_tickets" as any) as any))
+          .in("status_id", terminalIds)
+          .select("id", { count: "exact", head: true });
+        const { count } = await finQ;
+        countFinalizados = count ?? 0;
+      }
+
+      const total = countTotal ?? 0;
+      return { total, finalizados: countFinalizados, ativos: total - countFinalizados };
+    },
+  });
+
   const filteredTickets = useMemo(() => {
     let result = tickets;
     if (ticketStateFilter === "open") {
@@ -1184,15 +1243,15 @@ export default function SupportTickets() {
         <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{counts.total}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Ativos</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.ativos}</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{counts.ativos}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{counts.finalizados}</p>
           </div>
           <button
             onClick={() => setCsatModalOpen(true)}
