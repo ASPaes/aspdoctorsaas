@@ -1295,11 +1295,11 @@ export default function SupportTickets() {
           variant="outline"
           size="sm"
           className="h-9 gap-1"
-          disabled={filteredTickets.length === 0}
-          onClick={() => exportTicketsXlsx(filteredTickets)}
+          disabled={exporting || counts.total === 0}
+          onClick={handleExport}
         >
           <Download className="h-4 w-4" />
-          Exportar
+          {exporting ? "Exportando..." : "Exportar"}
         </Button>
         <div className="flex-1" />
         {/* View switcher */}
