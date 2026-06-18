@@ -88,6 +88,7 @@ interface Props {
   distributions: DistributionData;
   tvMode: boolean;
   canceladosList: CanceladoListItem[];
+  downsellList: DownsellListItem[];
   filters: DashboardFilters;
 }
 
