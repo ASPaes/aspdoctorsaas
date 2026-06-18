@@ -494,6 +494,17 @@ export function CancelamentosTab({
         <CanceladosTable items={canceladosList} tvMode={tvMode} />
       </section>
 
+      {/* ═══════ BLOCO 9 — LISTA DE DOWNSELL (CONTRAÇÃO) ═══════ */}
+      <section className="space-y-3">
+        <SectionHeader
+          title="Lista de downsells"
+          description="Reduções de MRR no período filtrado"
+          icon={<TrendingDown className={`${iconMd} text-primary`} />}
+          tvMode={tvMode}
+        />
+        <DownsellTable items={downsellList} tvMode={tvMode} />
+      </section>
+
 
       {/* MODAL DIAGNÓSTICO */}
       <DiagnosticoModal
