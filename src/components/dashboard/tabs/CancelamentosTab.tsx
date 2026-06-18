@@ -129,11 +129,14 @@ export function CancelamentosTab({
 
   const currChurnQtd = metrics.cancelamentosQtd;
   const currMrrCancelado = metrics.mrrCancelado;
+  const downsellMrr = (metrics as any).downsellMrr || 0;
+  const currMrrPerdidoTotal = currMrrCancelado + downsellMrr;
   const currChurnCarteira = metrics.clientesInicioCount > 0
     ? metrics.cancelamentosQtd / metrics.clientesInicioCount
     : 0;
+  // Churn rate de receita = perda total (cancelamento + downsell)
   const currChurnReceita = metrics.mrrInicio > 0
-    ? metrics.mrrCancelado / metrics.mrrInicio
+    ? currMrrPerdidoTotal / metrics.mrrInicio
     : 0;
 
   const mrrEvo = timeSeries.mrrEvolution;
