@@ -580,14 +580,27 @@ export default function SupportTickets() {
     }
   };
 
-  const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId],
+  const { data: listData = { rows: [] as TicketRow[], total: 0 }, isLoading } = useQuery({
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
       const toDate = new Date(dateRange.to);
       toDate.setHours(23, 59, 59, 999);
       const toISO = toDate.toISOString();
+
+      const terminalIds = ticketStatuses.filter((s: any) => s.is_terminal).map((s: any) => s.id);
+      const openIds = ticketStatuses.filter((s: any) => !s.is_terminal).map((s: any) => s.id);
+
+      let taggedTicketIds: string[] | null = null;
+      if (tagFilters.length > 0) {
+        const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
+          .select("ticket_id").in("tag_id", tagFilters);
+        if (!taggedIds || taggedIds.length === 0) {
+          return { rows: [] as TicketRow[], total: 0 };
+        }
+        taggedTicketIds = taggedIds.map((t: any) => t.ticket_id);
+      }
 
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
@@ -600,19 +613,13 @@ export default function SupportTickets() {
           service_subcategories:subcategory_id(nome),
           service_types:service_type_id(nome),
           ticket_tag_assignments(tag:tag_id(id, name, color))
-        `)
+        `, { count: "exact" })
         .eq("tenant_id", tid)
         .is("deleted_at", null)
         .gte("aberto_em", fromISO)
-        .lte("aberto_em", toISO)
-        .order("aberto_em", { ascending: false })
-        .limit(100);
+        .lte("aberto_em", toISO);
 
-      // Agente vê apenas seus tickets
-      if (!isAdminOrHead && userId) {
-        q = q.eq("responsavel_user_id", userId);
-      }
-
+      if (!isAdminOrHead && userId) q = q.eq("responsavel_user_id", userId);
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status_id", statusFilter);
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
@@ -624,22 +631,36 @@ export default function SupportTickets() {
       if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
       if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
       if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
+      if (taggedTicketIds) q = q.in("id", taggedTicketIds);
 
-      if (tagFilters.length > 0) {
-        const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
-          .select("ticket_id").in("tag_id", tagFilters);
-        if (taggedIds && taggedIds.length > 0) {
-          q = q.in("id", taggedIds.map((t: any) => t.ticket_id));
-        } else {
-          return [];
-        }
+      if (ticketStateFilter === "closed" && terminalIds.length > 0) {
+        q = q.in("status_id", terminalIds);
+      } else if (ticketStateFilter === "open" && openIds.length > 0) {
+        q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
       }
 
-      const { data, error } = await q;
+      const s = debouncedSearch.trim().replace(/,/g, "");
+      if (s) {
+        q = q.or(`ticket_code.ilike.%${s}%,assunto.ilike.%${s}%`);
+      }
+
+      if (sortBy === "cliente") {
+        q = q.order("nome_fantasia", { ascending: true, referencedTable: "clientes" });
+      } else if (sortBy === "agenda") {
+        q = q.order("agendado_para", { ascending: true, nullsFirst: false });
+      } else {
+        q = q.order("aberto_em", { ascending: false });
+      }
+
+      q = q.range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
+
+      const { data, error, count } = await q;
       if (error) throw error;
-      return (data ?? []) as TicketRow[];
+      return { rows: (data ?? []) as TicketRow[], total: count ?? 0 };
     },
   });
+
+  const tickets = listData.rows;
 
   const { data: counts = { total: 0, ativos: 0, finalizados: 0 } } = useQuery({
     queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, ticketStatuses.map((s) => s.id).join(",")],
