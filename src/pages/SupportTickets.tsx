@@ -602,12 +602,15 @@ export default function SupportTickets() {
         taggedTicketIds = taggedIds.map((t: any) => t.ticket_id);
       }
 
+      const s = debouncedSearch.trim().replace(/,/g, "");
+      const clienteJoin = s ? "clientes:cliente_id!inner(nome_fantasia)" : "clientes:cliente_id(nome_fantasia)";
+
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
           id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
-          clientes:cliente_id(nome_fantasia),
+          ${clienteJoin},
           produtos:produto_id(nome),
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
@@ -639,9 +642,8 @@ export default function SupportTickets() {
         q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
       }
 
-      const s = debouncedSearch.trim().replace(/,/g, "");
       if (s) {
-        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*`);
+        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*,clientes.nome_fantasia.ilike.*${s}*`);
       }
 
       if (sortBy === "cliente") {
@@ -751,12 +753,15 @@ export default function SupportTickets() {
     }
 
     const builder = () => {
+      const s = search.trim().replace(/,/g, "");
+      const clienteJoin = s ? "clientes:cliente_id!inner(nome_fantasia)" : "clientes:cliente_id(nome_fantasia)";
+
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
           id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
-          clientes:cliente_id(nome_fantasia),
+          ${clienteJoin},
           produtos:produto_id(nome),
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
@@ -787,9 +792,8 @@ export default function SupportTickets() {
         q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
       }
 
-      const s = search.trim().replace(/,/g, "");
       if (s) {
-        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*`);
+        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*,clientes.nome_fantasia.ilike.*${s}*`);
       }
 
       q = q.order("aberto_em", { ascending: false });
