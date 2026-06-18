@@ -15,6 +15,7 @@ import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { CanceladosTable } from '../tables/CanceladosTable';
+import { DownsellTable } from '../tables/DownsellTable';
 import { SectionHeader } from '../SectionHeader';
 
 import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
@@ -34,7 +35,7 @@ import { useCancelamentosExtras } from '../hooks/useCancelamentosExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { resolveMesAlvo, computeComparativoMensal } from '@/lib/diagnostico/comparativos';
 
-import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem, DashboardFilters } from '../types';
+import type { KPIMetrics, TimeSeriesData, DistributionData, CanceladoListItem, DownsellListItem, DashboardFilters } from '../types';
 
 // ─── Formatters ──────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -87,6 +88,7 @@ interface Props {
   distributions: DistributionData;
   tvMode: boolean;
   canceladosList: CanceladoListItem[];
+  downsellList: DownsellListItem[];
   filters: DashboardFilters;
 }
 
@@ -96,6 +98,7 @@ export function CancelamentosTab({
   distributions: _distributions,
   tvMode,
   canceladosList,
+  downsellList,
   filters,
 }: Props) {
   const s = tvMode ? 'tv' : 'lg';
@@ -489,6 +492,17 @@ export function CancelamentosTab({
           tvMode={tvMode}
         />
         <CanceladosTable items={canceladosList} tvMode={tvMode} />
+      </section>
+
+      {/* ═══════ BLOCO 9 — LISTA DE DOWNSELL (CONTRAÇÃO) ═══════ */}
+      <section className="space-y-3">
+        <SectionHeader
+          title="Lista de downsells"
+          description="Reduções de MRR no período filtrado"
+          icon={<TrendingDown className={`${iconMd} text-primary`} />}
+          tvMode={tvMode}
+        />
+        <DownsellTable items={downsellList} tvMode={tvMode} />
       </section>
 
 
