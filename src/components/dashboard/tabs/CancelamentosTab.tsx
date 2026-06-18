@@ -120,11 +120,12 @@ export function CancelamentosTab({
 
   // ─── Deltas dos 4 KPIs principais (preservado da V1) ────
   const churnQtdArr = timeSeries.churnQtdEvolution;
-  const churnMrrArr = timeSeries.churnMrrEvolution;
-  const prevIdx = churnQtdArr.length >= 2 ? churnQtdArr.length - 2 : null;
 
-  const prevChurnQtd = prevIdx !== null ? churnQtdArr[prevIdx].value : null;
-  const prevChurnMrr = prevIdx !== null ? churnMrrArr[prevIdx].value : null;
+  // Mês anterior vem da RPC (evolucao12m) — mesma fonte do gráfico; evita a view que zera cancelados
+  const evoRpcSerie = cancExtras?.evolucao12m ?? [];
+  const prevEvoIdx = evoRpcSerie.length >= 2 ? evoRpcSerie.length - 2 : null;
+  const prevChurnQtd = prevEvoIdx !== null ? evoRpcSerie[prevEvoIdx].qtd : null;
+  const prevChurnMrr = prevEvoIdx !== null ? evoRpcSerie[prevEvoIdx].mrr : null;
 
   const currChurnQtd = metrics.cancelamentosQtd;
   const currMrrCancelado = metrics.mrrCancelado;
