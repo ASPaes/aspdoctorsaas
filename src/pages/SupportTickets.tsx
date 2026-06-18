@@ -143,6 +143,23 @@ export default function SupportTickets() {
   const [clienteFilterName, setClienteFilterName] = useState<string>("");
   const [clienteSearchTerm, setClienteSearchTerm] = useState<string>("");
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
+  const PAGE_SIZE = 100;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    dateRange.from, dateRange.to,
+    produtoFilter, statusFilter, atendenteFilter, categoriaFilter, subcategoriaFilter,
+    canalFilter, tipoHorarioFilter, serviceTypeFilters, departmentFilter, tagFilters,
+    clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch,
+  ]);
   const { results: clienteSearchResults, isLoading: clienteSearchLoading } = useClienteSearch(clienteSearchTerm);
   const queryClient = useQueryClient();
 
