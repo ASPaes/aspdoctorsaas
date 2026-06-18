@@ -860,6 +860,23 @@ export default function SupportTickets() {
     XLSX.writeFile(wb, `${prefix}_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
+  const Paginador = () => {
+    if (!(listData.total > 0)) return null;
+    const totalPages = Math.max(1, Math.ceil(listData.total / PAGE_SIZE));
+    const x = (currentPage - 1) * PAGE_SIZE + 1;
+    const y = Math.min(currentPage * PAGE_SIZE, listData.total);
+    return (
+      <div className="flex items-center justify-between py-2">
+        <span className="text-sm text-muted-foreground">{x}–{y} de {listData.total}</span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Anterior</Button>
+          <span className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>Próxima</Button>
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <div className="space-y-4 p-4 md:p-6">
