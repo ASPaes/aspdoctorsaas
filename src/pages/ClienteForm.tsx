@@ -40,6 +40,7 @@ import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection
 import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
+import DeleteClienteDialog from "@/components/clientes/DeleteClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
@@ -245,6 +246,7 @@ export default function ClienteForm() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
   const [mrrModalOpen, setMrrModalOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [showLegacy, setShowLegacy] = useState(false);
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
@@ -310,6 +312,7 @@ export default function ClienteForm() {
   });
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
+  const canDelete = profile?.role === 'admin' || profile?.is_super_admin;
   const lookups = useLookups(estadoId);
 
   // Draft persistence
@@ -834,6 +837,25 @@ export default function ClienteForm() {
             </Card>
           )}
 
+          {isEditing && id && canDelete && (
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-base text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Zona de Perigo
+                </CardTitle>
+                <CardDescription>
+                  Exclusão é irreversível. Você poderá transferir vínculos para outro cliente ou apagar tudo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
+                  Excluir cliente
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Botões de ação */}
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={() => guardedNavigate("/clientes")}>
@@ -858,6 +880,15 @@ export default function ClienteForm() {
           mensalidadeBase={form.watch("mensalidade") ?? 0}
           custoBase={form.watch("custo_operacao") ?? 0}
           funcionarios={(lookups.funcionarios.data ?? []).map((f: any) => ({ id: f.id, nome: f.nome }))}
+        />
+      )}
+
+      {isEditing && id && canDelete && (
+        <DeleteClienteDialog
+          clienteId={id}
+          clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
         />
       )}
 
