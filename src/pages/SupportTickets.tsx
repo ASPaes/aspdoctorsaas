@@ -637,8 +637,21 @@ export default function SupportTickets() {
           (t.assunto ?? "").toLowerCase().includes(s)
       );
     }
+    if (sortBy === "cliente") {
+      result = [...result].sort((a, b) => {
+        const na = a.clientes?.nome_fantasia ?? "\uffff";
+        const nb = b.clientes?.nome_fantasia ?? "\uffff";
+        return na.localeCompare(nb, "pt-BR");
+      });
+    } else if (sortBy === "agenda") {
+      result = [...result].sort((a, b) => {
+        const ta = a.agendado_para ? new Date(a.agendado_para).getTime() : Infinity;
+        const tb = b.agendado_para ? new Date(b.agendado_para).getTime() : Infinity;
+        return ta - tb;
+      });
+    }
     return result;
-  }, [tickets, search, ticketStateFilter, ticketStatuses]);
+  }, [tickets, search, ticketStateFilter, ticketStatuses, sortBy]);
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
