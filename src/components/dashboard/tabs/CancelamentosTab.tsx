@@ -98,6 +98,7 @@ export function CancelamentosTab({
   distributions: _distributions,
   tvMode,
   canceladosList,
+  downsellList,
   filters,
 }: Props) {
   const s = tvMode ? 'tv' : 'lg';
