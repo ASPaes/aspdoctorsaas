@@ -15,6 +15,7 @@ import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
 import { CanceladosTable } from '../tables/CanceladosTable';
+import { DownsellTable } from '../tables/DownsellTable';
 import { SectionHeader } from '../SectionHeader';
 
 import { DiagnosticoSection, DiagnosticoModal } from '../diagnostico';
