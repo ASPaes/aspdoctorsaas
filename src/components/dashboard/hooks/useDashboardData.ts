@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem } from '../types';
+import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem, DownsellListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { fetchAllRows } from '@/lib/supabasePaginate';
 
@@ -24,6 +24,7 @@ export function useDashboardData(filters: DashboardFilters) {
   const [metrics, setMetrics] = useState<KPIMetrics>(defaultMetrics);
   const [canceladosList, setCanceladosList] = useState<CanceladoListItem[]>([]);
   const [novosClientesList, setNovosClientesList] = useState<NovoClienteListItem[]>([]);
+  const [downsellList, setDownsellList] = useState<DownsellListItem[]>([]);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesData>({
     mrrEvolution: [], faturamentoEvolution: [], churnQtdEvolution: [], churnMrrEvolution: [],
     ltvMesesEvolution: [], ltvCacEvolution: [],
@@ -122,7 +123,7 @@ export function useDashboardData(filters: DashboardFilters) {
         .eq('ativo', true)));
       const movimentosPeriodoPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('tipo, valor_delta, cliente_id')
+        .select('tipo, valor_delta, cliente_id, data_movimento, descricao')
         .gte('data_movimento', periodoInicioStr)
         .lte('data_movimento', periodoFimStr)
         .eq('status', 'ativo')
@@ -318,6 +319,23 @@ export function useDashboardData(filters: DashboardFilters) {
         else if (m.tipo === 'reajuste') reajusteMrr += Number(m.valor_delta) || 0;
         else if (m.tipo === 'downsell') downsellMrr += Math.abs(Number(m.valor_delta) || 0);
       });
+
+      // Lista de downsell do período (auditoria) — mesma fonte do downsellMrr (bate com o card)
+      const nomePorClienteDownsell: Record<string, string> = {};
+      [...(clientesAtivos || []), ...(cancelamentosFilt || []), ...(novosClientesFilt || [])].forEach((c: any) => {
+        if (c && c.id) nomePorClienteDownsell[c.id] = c.razao_social || c.nome_fantasia || '—';
+      });
+      const downsellListItems: DownsellListItem[] = (movimentosPeriodo || [])
+        .filter((m: any) => m.tipo === 'downsell' && (!needsClientFilter || allClientesFiltered.has(m.cliente_id)))
+        .map((m: any) => ({
+          clienteId: m.cliente_id,
+          cliente: nomePorClienteDownsell[m.cliente_id] || '—',
+          valor: Math.abs(Number(m.valor_delta) || 0),
+          data: m.data_movimento,
+          descricao: m.descricao || '—',
+        }))
+        .sort((a, b) => b.valor - a.valor);
+      setDownsellList(downsellListItems);
 
       // (Removido) churn por reversão — o MRR de churn agora usa o MRR Atual do cliente (base + movimentos ativos).
 
@@ -808,5 +826,5 @@ export function useDashboardData(filters: DashboardFilters) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, refetch: fetchData };
+  return { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch: fetchData };
 }
