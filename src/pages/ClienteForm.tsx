@@ -312,6 +312,7 @@ export default function ClienteForm() {
   });
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
+  const canDelete = profile?.role === 'admin' || profile?.is_super_admin;
   const lookups = useLookups(estadoId);
 
   // Draft persistence
