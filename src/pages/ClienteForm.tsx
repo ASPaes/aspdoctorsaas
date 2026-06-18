@@ -837,6 +837,25 @@ export default function ClienteForm() {
             </Card>
           )}
 
+          {isEditing && id && canDelete && (
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-base text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Zona de Perigo
+                </CardTitle>
+                <CardDescription>
+                  Exclusão é irreversível. Você poderá transferir vínculos para outro cliente ou apagar tudo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
+                  Excluir cliente
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Botões de ação */}
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={() => guardedNavigate("/clientes")}>
