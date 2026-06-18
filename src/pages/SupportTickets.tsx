@@ -1550,6 +1550,37 @@ export default function SupportTickets() {
         )
       )}
 
+      {ticketsView === "lista" && listData.total > 0 && (() => {
+        const totalPages = Math.max(1, Math.ceil(listData.total / PAGE_SIZE));
+        const x = (currentPage - 1) * PAGE_SIZE + 1;
+        const y = Math.min(currentPage * PAGE_SIZE, listData.total);
+        return (
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-sm text-muted-foreground">{x}–{y} de {listData.total}</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">Página {currentPage} de {totalPages}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
+
       {ticketsView === "kanban" && (
         isLoading ? (
           <div className="flex gap-3 overflow-x-auto">
