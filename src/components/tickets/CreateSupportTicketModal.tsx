@@ -611,17 +611,16 @@ export function CreateSupportTicketModal({
     }
     setSavingNewContact(true);
     try {
-      const { data, error } = await (supabase.from("whatsapp_contacts" as any) as any)
+      const { data, error } = await (supabase.from("cliente_contatos" as any) as any)
         .insert({
           tenant_id: tid,
-          client_id: selectedCliente.id,
-          name: newContactName.trim(),
-          phone_number: newContactPhone.trim() || null,
+          cliente_id: selectedCliente.id,
+          nome: newContactName.trim(),
+          fone: newContactPhone.trim() || null,
           email: newContactEmail.trim() || null,
-          role: newContactRole.trim() || null,
-          is_primary: false,
+          cargo: newContactRole.trim() || null,
         })
-        .select("id, name")
+        .select("id, name:nome")
         .single();
       if (error) throw error;
       toast.success("Contato cadastrado");
