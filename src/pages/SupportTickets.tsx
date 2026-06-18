@@ -721,6 +721,90 @@ export default function SupportTickets() {
     return { total, terminais, ativos };
   }, [filteredTickets, ticketStatuses]);
 
+  const [exporting, setExporting] = useState(false);
+
+  const fetchAllTicketsForExport = async (): Promise<TicketRow[]> => {
+    const fromISO = dateRange.from.toISOString();
+    const toDate = new Date(dateRange.to);
+    toDate.setHours(23, 59, 59, 999);
+    const toISO = toDate.toISOString();
+
+    const terminalIds = ticketStatuses.filter((s: any) => s.is_terminal).map((s: any) => s.id);
+    const openIds = ticketStatuses.filter((s: any) => !s.is_terminal).map((s: any) => s.id);
+
+    let taggedTicketIds: string[] | null = null;
+    if (tagFilters.length > 0) {
+      const { data: taggedIds } = await (supabase.from("ticket_tag_assignments" as any) as any)
+        .select("ticket_id").in("tag_id", tagFilters);
+      if (!taggedIds || taggedIds.length === 0) return [];
+      taggedTicketIds = taggedIds.map((t: any) => t.ticket_id);
+    }
+
+    const builder = () => {
+      let q = (supabase.from("support_tickets" as any) as any)
+        .select(`
+          id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
+          aberto_em, concluido_em, agendado_para, parent_ticket_id,
+          horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
+          clientes:cliente_id(nome_fantasia),
+          produtos:produto_id(nome),
+          service_categories:category_id(nome),
+          service_subcategories:subcategory_id(nome),
+          service_types:service_type_id(nome),
+          ticket_tag_assignments(tag:tag_id(id, name, color))
+        `)
+        .eq("tenant_id", tid)
+        .is("deleted_at", null)
+        .gte("aberto_em", fromISO)
+        .lte("aberto_em", toISO);
+
+      if (!isAdminOrHead && userId) q = q.eq("responsavel_user_id", userId);
+      if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
+      if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
+      if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
+      if (subcategoriaFilter !== "all") q = q.eq("subcategory_id", subcategoriaFilter);
+      if (canalFilter !== "all") q = q.eq("canal_origem", canalFilter);
+      if (tipoHorarioFilter !== "all") q = q.eq("tipo_horario", tipoHorarioFilter);
+      if (serviceTypeFilters.length > 0) q = q.in("service_type_id", serviceTypeFilters);
+      if (departmentFilter !== "all") q = q.eq("department_id", departmentFilter);
+      if (clienteFilterId) q = q.eq("cliente_id", clienteFilterId);
+      if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
+      if (taggedTicketIds) q = q.in("id", taggedTicketIds);
+
+      if (ticketStateFilter === "closed" && terminalIds.length > 0) {
+        q = q.in("status_id", terminalIds);
+      } else if (ticketStateFilter === "open" && openIds.length > 0) {
+        q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
+      }
+
+      const s = search.trim().replace(/,/g, "");
+      if (s) {
+        q = q.or(`ticket_code.ilike.%${s}%,assunto.ilike.%${s}%`);
+      }
+
+      q = q.order("aberto_em", { ascending: false });
+      return q;
+    };
+
+    return await fetchAllRows<TicketRow>(builder);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const rows = await fetchAllTicketsForExport();
+      if (rows.length === 0) {
+        toast.info("Nenhum ticket para exportar");
+        return;
+      }
+      await exportTicketsXlsx(rows);
+    } catch (e: any) {
+      toast.error("Erro ao exportar: " + (e?.message ?? ""));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const exportTicketsXlsx = async (rows: TicketRow[]) => {
     const XLSX = await import("xlsx");
     const getAgentName = (uid: string | null) => uid ? agentes.find(a => a.user_id === uid)?.nome ?? "" : "";
