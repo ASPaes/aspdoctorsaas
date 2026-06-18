@@ -246,6 +246,7 @@ export default function ClienteForm() {
   const queryClient = useQueryClient();
   const isEditing = !!id;
   const [mrrModalOpen, setMrrModalOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [showLegacy, setShowLegacy] = useState(false);
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
