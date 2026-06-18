@@ -131,6 +131,7 @@ export default function SupportTickets() {
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [csatModalOpen, setCsatModalOpen] = useState(false);
   const [ticketStateFilter, setTicketStateFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("recent");
   const [attClosureTypeFilter, setAttClosureTypeFilter] = useState<string>("all");
   const [attCsatFilter, setAttCsatFilter] = useState<string>("all");
   const [attCsatScoreFilter, setAttCsatScoreFilter] = useState<string>("all");
@@ -637,8 +638,21 @@ export default function SupportTickets() {
           (t.assunto ?? "").toLowerCase().includes(s)
       );
     }
+    if (sortBy === "cliente") {
+      result = [...result].sort((a, b) => {
+        const na = a.clientes?.nome_fantasia ?? "\uffff";
+        const nb = b.clientes?.nome_fantasia ?? "\uffff";
+        return na.localeCompare(nb, "pt-BR");
+      });
+    } else if (sortBy === "agenda") {
+      result = [...result].sort((a, b) => {
+        const ta = a.agendado_para ? new Date(a.agendado_para).getTime() : Infinity;
+        const tb = b.agendado_para ? new Date(b.agendado_para).getTime() : Infinity;
+        return ta - tb;
+      });
+    }
     return result;
-  }, [tickets, search, ticketStateFilter, ticketStatuses]);
+  }, [tickets, search, ticketStateFilter, ticketStatuses, sortBy]);
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
@@ -791,6 +805,16 @@ export default function SupportTickets() {
             <SelectItem value="closed">Encerrados</SelectItem>
           </SelectContent>
         </Select>
+        {ticketsView === "lista" && (
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Mais recentes</SelectItem>
+              <SelectItem value="cliente">Cliente (A–Z)</SelectItem>
+              <SelectItem value="agenda">Agenda (mais próxima)</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
           <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Agente" /></SelectTrigger>
           <SelectContent>
