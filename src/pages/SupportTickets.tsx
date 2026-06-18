@@ -805,6 +805,16 @@ export default function SupportTickets() {
             <SelectItem value="closed">Encerrados</SelectItem>
           </SelectContent>
         </Select>
+        {ticketsView === "lista" && (
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Mais recentes</SelectItem>
+              <SelectItem value="cliente">Cliente (A–Z)</SelectItem>
+              <SelectItem value="agenda">Agenda (mais próxima)</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Select value={atendenteFilter} onValueChange={setAtendenteFilter}>
           <SelectTrigger className="h-9 w-[170px] text-sm"><SelectValue placeholder="Agente" /></SelectTrigger>
           <SelectContent>
