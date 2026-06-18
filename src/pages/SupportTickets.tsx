@@ -703,15 +703,16 @@ export default function SupportTickets() {
         return q;
       };
 
-      const totalQ = applyFilters((supabase.from("support_tickets" as any) as any))
-        .select("id", { count: "exact", head: true });
+      const totalQ = applyFilters(
+        (supabase.from("support_tickets" as any) as any).select("id", { count: "exact", head: true })
+      );
       const { count: countTotal } = await totalQ;
 
       let countFinalizados = 0;
       if (terminalIds.length > 0) {
-        const finQ = applyFilters((supabase.from("support_tickets" as any) as any))
-          .in("status_id", terminalIds)
-          .select("id", { count: "exact", head: true });
+        const finQ = applyFilters(
+          (supabase.from("support_tickets" as any) as any).select("id", { count: "exact", head: true })
+        ).in("status_id", terminalIds);
         const { count } = await finQ;
         countFinalizados = count ?? 0;
       }
