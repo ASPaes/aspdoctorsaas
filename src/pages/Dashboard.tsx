@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [tvMode, setTvMode] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(0);
 
-  const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, refetch } = useDashboardData(filters);
+  const { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch } = useDashboardData(filters);
   const { data: mcData } = useMargemContribuicaoDashboard(filters);
   const { fornecedores, unidadesBase } = useLookups();
 
