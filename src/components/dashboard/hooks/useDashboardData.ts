@@ -765,7 +765,7 @@ export function useDashboardData(filters: DashboardFilters) {
       // Cancelados list
       const canceladosListItems: CanceladoListItem[] = (cancelamentosFilt || [])
         .map(c => {
-          const dataRef = c.data_ativacao || c.data_venda || c.data_cadastro;
+          const dataRef = c.data_cadastro;
           const diasAtivo = dataRef && c.data_cancelamento
             ? differenceInDays(new Date(c.data_cancelamento), new Date(dataRef))
             : null;
