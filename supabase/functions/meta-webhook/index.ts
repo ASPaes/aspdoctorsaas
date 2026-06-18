@@ -107,8 +107,32 @@ async function processStatus(supabase: any, tenantId: string, status: any): Prom
   const { id: messageId, status: statusValue } = status;
   if (!messageId || !statusValue) return;
   const statusMap: Record<string, string> = { sent: 'sent', delivered: 'delivered', read: 'read', failed: 'failed' };
+  const mappedStatus = statusMap[statusValue] || statusValue;
+
+  const updatePayload: Record<string, any> = { status: mappedStatus };
+
+  // Persistir o motivo da falha reportado pela Meta (errors[]) para diagnóstico
+  if (mappedStatus === 'failed' && Array.isArray(status.errors) && status.errors.length > 0) {
+    const e = status.errors[0];
+    const sendError = {
+      code: e?.code ?? null,
+      title: e?.title ?? null,
+      message: e?.message ?? null,
+      details: e?.error_data?.details ?? null,
+      href: e?.href ?? null,
+      at: new Date().toISOString(),
+    };
+    const { data: existing } = await supabase
+      .from('whatsapp_messages')
+      .select('metadata')
+      .eq('tenant_id', tenantId).eq('message_id', messageId)
+      .maybeSingle();
+    updatePayload.metadata = { ...(existing?.metadata || {}), send_error: sendError };
+    console.error(`${LOG} Send FAILED ${messageId}: code=${sendError.code} title=${sendError.title} details=${sendError.details}`);
+  }
+
   await supabase.from('whatsapp_messages')
-    .update({ status: statusMap[statusValue] || statusValue })
+    .update(updatePayload)
     .eq('tenant_id', tenantId).eq('message_id', messageId);
   console.log(`${LOG} Status updated: ${messageId} -> ${statusValue}`);
 }
