@@ -129,7 +129,7 @@ export function CancelamentosTab({
 
   const currChurnQtd = metrics.cancelamentosQtd;
   const currMrrCancelado = metrics.mrrCancelado;
-  const downsellMrr = (metrics as any).downsellMrr || 0;
+  const downsellMrr = metrics.downsellMrr || 0;
   const currMrrPerdidoTotal = currMrrCancelado + downsellMrr;
   const currChurnCarteira = metrics.clientesInicioCount > 0
     ? metrics.cancelamentosQtd / metrics.clientesInicioCount
