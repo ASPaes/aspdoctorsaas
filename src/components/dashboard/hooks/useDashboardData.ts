@@ -826,5 +826,5 @@ export function useDashboardData(filters: DashboardFilters) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  return { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, refetch: fetchData };
+  return { loading, metrics, timeSeries, distributions, canceladosList, novosClientesList, downsellList, refetch: fetchData };
 }
