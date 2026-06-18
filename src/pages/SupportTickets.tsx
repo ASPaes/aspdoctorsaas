@@ -641,7 +641,7 @@ export default function SupportTickets() {
 
       const s = debouncedSearch.trim().replace(/,/g, "");
       if (s) {
-        q = q.or(`ticket_code.ilike.%${s}%,assunto.ilike.%${s}%`);
+        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*`);
       }
 
       if (sortBy === "cliente") {
@@ -789,7 +789,7 @@ export default function SupportTickets() {
 
       const s = search.trim().replace(/,/g, "");
       if (s) {
-        q = q.or(`ticket_code.ilike.%${s}%,assunto.ilike.%${s}%`);
+        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*`);
       }
 
       q = q.order("aberto_em", { ascending: false });
