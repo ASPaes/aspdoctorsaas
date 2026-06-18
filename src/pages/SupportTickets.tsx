@@ -764,16 +764,24 @@ export default function SupportTickets() {
       taggedTicketIds = taggedIds.map((t: any) => t.ticket_id);
     }
 
-    const builder = () => {
-      const s = search.trim().replace(/,/g, "");
-      const clienteJoin = s ? "clientes:cliente_id!inner(nome_fantasia)" : "clientes:cliente_id(nome_fantasia)";
+    const s = search.trim().replace(/,/g, "");
+    let clienteIds: string[] = [];
+    if (s) {
+      const { data: matchedClientes } = await (supabase.from("clientes" as any) as any)
+        .select("id")
+        .eq("tenant_id", tid)
+        .ilike("nome_fantasia", `%${s}%`)
+        .limit(500);
+      clienteIds = (matchedClientes ?? []).map((c: any) => c.id);
+    }
 
+    const builder = () => {
       let q = (supabase.from("support_tickets" as any) as any)
         .select(`
           id, ticket_code, assunto, status_id, prioridade, canal_origem, tipo_horario,
           aberto_em, concluido_em, agendado_para, parent_ticket_id,
           horario_inicio, horario_fim, duracao_minutos, responsavel_user_id,
-          ${clienteJoin},
+          clientes:cliente_id(nome_fantasia),
           produtos:produto_id(nome),
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
@@ -805,7 +813,11 @@ export default function SupportTickets() {
       }
 
       if (s) {
-        q = q.or(`ticket_code.ilike.*${s}*,assunto.ilike.*${s}*,clientes.nome_fantasia.ilike.*${s}*`);
+        const orParts = [`ticket_code.ilike.*${s}*`, `assunto.ilike.*${s}*`];
+        if (clienteIds.length > 0) {
+          orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
+        }
+        q = q.or(orParts.join(","));
       }
 
       q = q.order("aberto_em", { ascending: false });
