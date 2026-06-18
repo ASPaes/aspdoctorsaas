@@ -1243,15 +1243,15 @@ export default function SupportTickets() {
         <div className={`grid gap-2 ${selectedDeptSlug === "implantacao" ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-2 sm:grid-cols-4"}`}>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5">{ticketMetrics.total}</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5">{counts.total}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Ativos</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{ticketMetrics.ativos}</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-blue-400">{counts.ativos}</p>
           </div>
           <div className="bg-card border border-border rounded-lg p-3">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Finalizados</p>
-            <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{ticketMetrics.terminais}</p>
+            <p className="text-2xl font-semibold font-mono mt-0.5 text-green-400">{counts.finalizados}</p>
           </div>
           <button
             onClick={() => setCsatModalOpen(true)}
