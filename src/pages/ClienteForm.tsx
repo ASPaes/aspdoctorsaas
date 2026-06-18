@@ -40,6 +40,7 @@ import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection
 import ClienteContratosSection from "@/components/clientes/ClienteContratosSection";
 import { ClienteTicketsSection } from "@/components/cs/ClienteTicketsSection";
 import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
+import DeleteClienteDialog from "@/components/clientes/DeleteClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
