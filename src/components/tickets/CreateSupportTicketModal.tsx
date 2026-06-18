@@ -415,10 +415,10 @@ export function CreateSupportTicketModal({
     }
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const { data } = await (supabase.from("whatsapp_contacts" as any) as any)
-        .select("id, name, phone_number, email, role")
-        .eq("client_id", clienteId)
-        .ilike("name", `%${term}%`)
+      const { data } = await (supabase.from("cliente_contatos" as any) as any)
+        .select("id, name:nome, phone_number:fone, email, role:cargo")
+        .eq("cliente_id", clienteId)
+        .ilike("nome", `%${term}%`)
         .limit(8);
       if (!cancelled) {
         setContatoResults((data as any) ?? []);
