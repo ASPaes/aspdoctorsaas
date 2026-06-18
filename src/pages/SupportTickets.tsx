@@ -721,36 +721,7 @@ export default function SupportTickets() {
     },
   });
 
-  const filteredTickets = useMemo(() => {
-    let result = tickets;
-    if (ticketStateFilter === "open") {
-      result = result.filter((t) => !getStatusInfo(t.status_id).isTerminal);
-    } else if (ticketStateFilter === "closed") {
-      result = result.filter((t) => getStatusInfo(t.status_id).isTerminal);
-    }
-    const s = search.trim().toLowerCase();
-    if (s) {
-      result = result.filter(
-        (t) =>
-          (t.ticket_code ?? "").toLowerCase().includes(s) ||
-          (t.assunto ?? "").toLowerCase().includes(s)
-      );
-    }
-    if (sortBy === "cliente") {
-      result = [...result].sort((a, b) => {
-        const na = a.clientes?.nome_fantasia ?? "\uffff";
-        const nb = b.clientes?.nome_fantasia ?? "\uffff";
-        return na.localeCompare(nb, "pt-BR");
-      });
-    } else if (sortBy === "agenda") {
-      result = [...result].sort((a, b) => {
-        const ta = a.agendado_para ? new Date(a.agendado_para).getTime() : Infinity;
-        const tb = b.agendado_para ? new Date(b.agendado_para).getTime() : Infinity;
-        return ta - tb;
-      });
-    }
-    return result;
-  }, [tickets, search, ticketStateFilter, ticketStatuses, sortBy]);
+  const filteredTickets = useMemo(() => tickets, [tickets]);
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
