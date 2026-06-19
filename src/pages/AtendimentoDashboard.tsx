@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TempoRealTab } from "@/components/atendimento/TempoRealTab";
+import { VelocidadeTab } from "@/components/atendimento/VelocidadeTab";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
 function formatSecondsAgo(seg: number): string {
@@ -15,6 +16,7 @@ function formatSecondsAgo(seg: number): string {
 export default function AtendimentoDashboard() {
   const { dataUpdatedAt } = useAtendimentoRealtime();
   const [now, setNow] = useState(() => Date.now());
+  const [tab, setTab] = useState("tempo-real");
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -30,22 +32,28 @@ export default function AtendimentoDashboard() {
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Indicadores de atendimento.</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
-          </span>
-          <span className="font-medium text-foreground">ao vivo</span>
-          {ageSec !== null && <span>· atualizado {formatSecondsAgo(ageSec)}</span>}
-        </div>
+        {tab === "tempo-real" && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+            </span>
+            <span className="font-medium text-foreground">ao vivo</span>
+            {ageSec !== null && <span>· atualizado {formatSecondsAgo(ageSec)}</span>}
+          </div>
+        )}
       </div>
 
-      <Tabs defaultValue="tempo-real" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
           <TabsTrigger value="tempo-real">Tempo Real</TabsTrigger>
+          <TabsTrigger value="velocidade">Velocidade / SLA</TabsTrigger>
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
           <TempoRealTab />
+        </TabsContent>
+        <TabsContent value="velocidade" className="mt-4">
+          <VelocidadeTab />
         </TabsContent>
       </Tabs>
     </div>
