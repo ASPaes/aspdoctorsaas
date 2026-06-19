@@ -25,6 +25,8 @@ import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDet
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
+
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 
