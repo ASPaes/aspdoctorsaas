@@ -203,6 +203,10 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, ge
                           {[t.produtos?.nome, t.service_categories?.nome].filter(Boolean).join(" › ")}
                         </p>
                       )}
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground/90 truncate mt-1">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{getAgentName?.(t.responsavel_user_id) || "Sem responsável"}</span>
+                      </div>
                       {t.agendado_para && (
                         <div className="inline-flex items-center gap-1 text-[10px] text-yellow-400 mt-1.5">
                           <Calendar className="h-3 w-3" />
