@@ -1290,7 +1290,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
         });
         await supabase
           .from('whatsapp_messages')
-          .update({ content: newContent, edited_at: nowIso })
+          .update({ content: newContent, original_content: originalRow.content, edited_at: nowIso })
           .eq('id', originalRow.id);
         return;
       }
