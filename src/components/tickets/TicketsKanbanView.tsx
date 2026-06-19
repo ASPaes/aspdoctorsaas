@@ -46,6 +46,18 @@ function ChannelIcon({ canal }: { canal: string | null }) {
   }
 }
 
+function getReadableTextColor(hex: string | null | undefined): string {
+  if (!hex) return "#ffffff";
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  if (h.length !== 6) return "#ffffff";
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#1a1a1a" : "#ffffff";
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -125,11 +137,11 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, ge
                 <span className="text-xs font-medium truncate">{col.name}</span>
                 <Badge
                   variant="outline"
-                  className="ml-auto text-[10px] border"
+                  className="ml-auto text-[10px] border font-semibold"
                   style={{
-                    background: col.color + "1A",
-                    color: col.color,
-                    borderColor: col.color + "33",
+                    background: col.color,
+                    color: getReadableTextColor(col.color),
+                    borderColor: col.color,
                   }}
                 >
                   {columnTickets.length}
