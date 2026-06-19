@@ -20,6 +20,7 @@ interface TicketRow {
   aberto_em: string | null;
   agendado_para: string | null;
   parent_ticket_id: string | null;
+  responsavel_user_id: string | null;
   clientes: { nome_fantasia: string } | null;
   produtos: { nome: string } | null;
   service_categories: { nome: string } | null;
@@ -31,6 +32,7 @@ interface Props {
   columns: KanbanColumn[];
   onTicketClick: (ticketId: string) => void;
   onStatusChange: (ticketId: string, newStatusId: string) => void;
+  getAgentName?: (uid: string | null) => string;
 }
 
 function ChannelIcon({ canal }: { canal: string | null }) {
