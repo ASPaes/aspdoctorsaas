@@ -1601,7 +1601,7 @@ export default function SupportTickets() {
                           {t.clientes?.nome_fantasia ?? "Cliente não vinculado"}
                         </p>
                         {(() => { const si = getStatusInfo(t.status_id); return (
-                          <Badge className="text-[10px] border" style={{ background: si.color + "1A", color: si.color, borderColor: si.color + "33" }}>{si.name}</Badge>
+                          <Badge className="text-[10px] border font-semibold" style={{ background: si.color, color: getReadableTextColor(si.color), borderColor: si.color }}>{si.name}</Badge>
                         ); })()}
                         {(() => {
                           const tags = (t.ticket_tag_assignments ?? [])
