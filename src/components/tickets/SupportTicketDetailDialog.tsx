@@ -104,6 +104,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [closeTargetStatusId, setCloseTargetStatusId] = useState<string | null>(null);
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
