@@ -1640,10 +1640,14 @@ export default function SupportTickets() {
                       )}
                     </div>
 
-                    <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-0 max-w-[180px]">
                       <div className="flex items-center gap-1.5">
                         <ChannelIcon canal={t.canal_origem} />
                         <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-full">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{getAgentName(t.responsavel_user_id) || "Sem responsável"}</span>
                       </div>
                     </div>
                   </div>
