@@ -2170,6 +2170,50 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Encerrar ticket</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Este ticket está atribuído a{" "}
+            <span className="font-semibold text-foreground">
+              {agentesDisponiveis.find(a => a.user_id === ticket?.responsavel_user_id)?.nome ?? "outro responsável"}
+            </span>
+            . Deseja assumir o ticket e encerrá-lo, ou encerrar mantendo o responsável atual?
+          </p>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setCloseConfirmOpen(false)} disabled={updating}>
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!closeTargetStatusId) return;
+                await handleFieldUpdate({ status_id: closeTargetStatusId });
+                setCloseConfirmOpen(false);
+              }}
+              disabled={updating}
+            >
+              Encerrar mantendo responsável
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!closeTargetStatusId || !currentUserId) return;
+                await handleFieldUpdate({
+                  responsavel_user_id: currentUserId,
+                  status_id: closeTargetStatusId,
+                });
+                setCloseConfirmOpen(false);
+              }}
+              disabled={updating || !currentUserId}
+            >
+              Assumir e encerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
