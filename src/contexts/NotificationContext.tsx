@@ -433,7 +433,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [uid, navigate, queryClient, playSound, refreshUnreadCount]);
+  }, [uid, queryClient, refreshUnreadCount, handleNotificationArrival]);
 
   // Favicon badge
   useEffect(() => {
