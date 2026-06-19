@@ -340,6 +340,14 @@ export default function SupportTickets() {
     },
   });
 
+  const getAgentName = (uid: string | null) => uid ? (agentes.find(a => a.user_id === uid)?.nome ?? "") : "";
+
+  const matchedAgentIds = useMemo(() => {
+    const s = debouncedSearch.trim().toLowerCase();
+    if (!s || s.length < 2) return [] as string[];
+    return agentes.filter(a => a.nome.toLowerCase().includes(s)).map(a => a.user_id);
+  }, [debouncedSearch, agentes]);
+
   const { data: categories = [] } = useQuery({
     queryKey: ["support_tickets_categories", tid],
     enabled: !!tid,
@@ -595,7 +603,7 @@ export default function SupportTickets() {
   };
 
   const { data: listData = { rows: [] as TicketRow[], total: 0 }, isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(",")],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -672,16 +680,23 @@ export default function SupportTickets() {
       if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (taggedTicketIds) q = q.in("id", taggedTicketIds);
 
-      if (ticketStateFilter === "closed" && terminalIds.length > 0) {
-        q = q.in("status_id", terminalIds);
-      } else if (ticketStateFilter === "open" && openIds.length > 0) {
-        q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
+      const hasAgentMatch = !!s && matchedAgentIds.length > 0;
+
+      if (!hasAgentMatch) {
+        if (ticketStateFilter === "closed" && terminalIds.length > 0) {
+          q = q.in("status_id", terminalIds);
+        } else if (ticketStateFilter === "open" && openIds.length > 0) {
+          q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
+        }
       }
 
       if (s) {
         const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
+        }
+        if (matchedAgentIds.length > 0) {
+          orParts.push(`responsavel_user_id.in.(${matchedAgentIds.join(",")})`);
         }
         q = q.or(orParts.join(","));
       }
@@ -888,7 +903,6 @@ export default function SupportTickets() {
 
   const exportTicketsXlsx = async (rows: TicketRow[]) => {
     const XLSX = await import("xlsx");
-    const getAgentName = (uid: string | null) => uid ? agentes.find(a => a.user_id === uid)?.nome ?? "" : "";
     const getStatusName = (sid: string | null) => sid ? getStatusInfo(sid).name ?? "" : "";
     const fmtDate = (d: string | null) => d ? new Date(d).toLocaleString("pt-BR") : "";
     const fmtDuration = (min: number | null) => {
@@ -1626,10 +1640,14 @@ export default function SupportTickets() {
                       )}
                     </div>
 
-                    <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-0 max-w-[180px]">
                       <div className="flex items-center gap-1.5">
                         <ChannelIcon canal={t.canal_origem} />
                         <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-full">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{getAgentName(t.responsavel_user_id) || "Sem responsável"}</span>
                       </div>
                     </div>
                   </div>
@@ -1654,7 +1672,9 @@ export default function SupportTickets() {
             columns={filteredStatuses.map(s => ({ id: s.id, name: s.name, color: s.color, position: s.position, is_terminal: s.is_terminal }))}
             onTicketClick={(id) => { setSelectedTicketId(id); setDetailOpen(true); }}
             onStatusChange={handleKanbanStatusChange}
+            getAgentName={getAgentName}
           />
+
         )
       )}
 

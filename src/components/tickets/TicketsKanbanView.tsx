@@ -20,6 +20,7 @@ interface TicketRow {
   aberto_em: string | null;
   agendado_para: string | null;
   parent_ticket_id: string | null;
+  responsavel_user_id: string | null;
   clientes: { nome_fantasia: string } | null;
   produtos: { nome: string } | null;
   service_categories: { nome: string } | null;
@@ -31,6 +32,7 @@ interface Props {
   columns: KanbanColumn[];
   onTicketClick: (ticketId: string) => void;
   onStatusChange: (ticketId: string, newStatusId: string) => void;
+  getAgentName?: (uid: string | null) => string;
 }
 
 function ChannelIcon({ canal }: { canal: string | null }) {
@@ -50,7 +52,7 @@ function formatDate(iso: string | null): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: Props) {
+function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, getAgentName }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -201,6 +203,10 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange }: 
                           {[t.produtos?.nome, t.service_categories?.nome].filter(Boolean).join(" › ")}
                         </p>
                       )}
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground/90 truncate mt-1">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{getAgentName?.(t.responsavel_user_id) || "Sem responsável"}</span>
+                      </div>
                       {t.agendado_para && (
                         <div className="inline-flex items-center gap-1 text-[10px] text-yellow-400 mt-1.5">
                           <Calendar className="h-3 w-3" />
