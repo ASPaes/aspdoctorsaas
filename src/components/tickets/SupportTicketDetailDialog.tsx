@@ -167,6 +167,40 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     }
   }, [open]);
 
+  // Realtime: sincroniza mudanças feitas por outros usuários no mesmo ticket
+  useEffect(() => {
+    if (!open || !ticketId) return;
+    const channel = supabase
+      .channel(`ticket-detail-rt-${ticketId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "support_tickets", filter: `id=eq.${ticketId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", ticketId] });
+          queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "support_ticket_events", filter: `ticket_id=eq.${ticketId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["support_ticket_events", ticketId] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ticket_mentions", filter: `ticket_id=eq.${ticketId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["ticket_mentions", ticketId] });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, ticketId, queryClient]);
+
+
   const { data: ticket, isLoading } = useQuery({
     queryKey: ["support_ticket_detail", ticketId],
     enabled: !!ticketId && open,
