@@ -903,7 +903,6 @@ export default function SupportTickets() {
 
   const exportTicketsXlsx = async (rows: TicketRow[]) => {
     const XLSX = await import("xlsx");
-    const getAgentName = (uid: string | null) => uid ? agentes.find(a => a.user_id === uid)?.nome ?? "" : "";
     const getStatusName = (sid: string | null) => sid ? getStatusInfo(sid).name ?? "" : "";
     const fmtDate = (d: string | null) => d ? new Date(d).toLocaleString("pt-BR") : "";
     const fmtDuration = (min: number | null) => {
