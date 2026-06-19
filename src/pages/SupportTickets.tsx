@@ -340,6 +340,14 @@ export default function SupportTickets() {
     },
   });
 
+  const getAgentName = (uid: string | null) => uid ? (agentes.find(a => a.user_id === uid)?.nome ?? "") : "";
+
+  const matchedAgentIds = useMemo(() => {
+    const s = debouncedSearch.trim().toLowerCase();
+    if (!s || s.length < 2) return [] as string[];
+    return agentes.filter(a => a.nome.toLowerCase().includes(s)).map(a => a.user_id);
+  }, [debouncedSearch, agentes]);
+
   const { data: categories = [] } = useQuery({
     queryKey: ["support_tickets_categories", tid],
     enabled: !!tid,
