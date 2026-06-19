@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_instances ADD COLUMN IF NOT EXISTS disconnected_alert_at TIMESTAMPTZ NULL;

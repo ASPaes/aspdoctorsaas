@@ -6279,6 +6279,7 @@ export type Database = {
         Row: {
           auto_close_inactivity_minutes: number | null
           created_at: string
+          disconnected_alert_at: string | null
           display_name: string | null
           id: string
           ignore_group_messages: boolean
@@ -6301,6 +6302,7 @@ export type Database = {
         Insert: {
           auto_close_inactivity_minutes?: number | null
           created_at?: string
+          disconnected_alert_at?: string | null
           display_name?: string | null
           id?: string
           ignore_group_messages?: boolean
@@ -6323,6 +6325,7 @@ export type Database = {
         Update: {
           auto_close_inactivity_minutes?: number | null
           created_at?: string
+          disconnected_alert_at?: string | null
           display_name?: string | null
           id?: string
           ignore_group_messages?: boolean
