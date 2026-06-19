@@ -1031,6 +1031,39 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     formula: "1ªs respostas ≤ alvo ÷ total de 1ªs respostas no período (sem cap — breach conta)",
     market_benchmark: "Boas operações miram 90%+ de aderência ao alvo de 1ª resposta.",
   },
+  // ── Atendimento — Agentes ──
+  atendimento_encerrados_periodo: {
+    title: "Encerrados no Período",
+    definition: "Total de atendimentos encerrados pela equipe no período selecionado.",
+    why_it_matters: "Volume de saída da operação — base para produtividade e dimensionamento.",
+    formula: "COUNT de atendimentos encerrados no período",
+  },
+  atendimento_csat_equipe: {
+    title: "CSAT da Equipe",
+    definition: "Nota média de satisfação dos atendimentos avaliados no período.",
+    why_it_matters: "Qualidade percebida pelo cliente. Olhe junto com o nº de respostas — CSAT com poucas respostas é frágil.",
+    formula: "média de csat_score onde houve resposta",
+    market_benchmark: "Escala 1–5; acima de 4,5 é forte.",
+  },
+  atendimento_reabertura: {
+    title: "Taxa de Reabertura",
+    definition: "% dos atendimentos encerrados que foram reabertos (o problema voltou).",
+    why_it_matters: "É o inverso do FCR (resolução no 1º contato). Reabertura alta = problema mal resolvido.",
+    formula: "encerrados reabertos ÷ encerrados, no período",
+    market_benchmark: "Quanto menor, melhor — reabertura baixa indica boa resolução.",
+  },
+  atendimento_agentes_ativos: {
+    title: "Agentes Ativos",
+    definition: "Número de agentes que atenderam ao menos um chat no período.",
+    why_it_matters: "Tamanho efetivo da operação no período — base para carga por agente.",
+    formula: "agentes distintos com atendimento no período",
+  },
+  atendimento_scorecard: {
+    title: "Scorecard por Agente",
+    definition: "Desempenho de cada agente: volume, tempos (mediana), CSAT, reabertura e mensagens por atendimento.",
+    why_it_matters: "Compara agentes de forma justa. A mediana não distorce por outlier; olhe o nº de respostas do CSAT antes de concluir.",
+    formula: "por agente no período: atendimentos, encerrados, TMA e 1ª resposta (mediana), CSAT médio, reabertura %, msgs/atend",
+  },
 };
 
 
