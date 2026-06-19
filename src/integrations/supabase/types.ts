@@ -7720,6 +7720,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_atendimento_satisfacao: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       get_atendimento_velocidade: {
         Args: {
           p_date_from: string
