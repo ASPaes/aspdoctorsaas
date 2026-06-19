@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Building2, Star, Filter, Plus } from "lucide-react";
+import { Building2, Star, Filter, Plus, Pencil, Check, X } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 
 export default function UnidadesBaseConfig() {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
   const { can } = usePermissions();
   const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
   const guardInsert = () => { if (!can("cfg.unidades_base", "insert")) { toast.error(DENY_MSG); return false; } return true; };
@@ -71,6 +73,18 @@ export default function UnidadesBaseConfig() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const renameUnidade = useMutation({
+    mutationFn: async ({ id, nome }: { id: number; nome: string }) => {
+      const { error } = await (supabase.from("unidades_base" as any) as any)
+        .update({ nome })
+        .eq("id", id)
+        .eq("tenant_id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); setEditingId(null); setEditingName(""); toast.success("Unidade renomeada"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const toggleActive = useMutation({
     mutationFn: async ({ id, active }: { id: number; active: boolean }) => {
       const { error } = await (supabase.from("unidades_base" as any) as any)
@@ -81,6 +95,10 @@ export default function UnidadesBaseConfig() {
     onSuccess: () => invalidate(),
     onError: (e: any) => toast.error(e.message),
   });
+
+  const startEdit = (u: any) => { if (!guardUpdate()) return; setEditingId(u.id); setEditingName(u.nome); };
+  const saveEdit = () => { const n = editingName.trim(); if (!n || editingId == null) return; if (guardUpdate()) renameUnidade.mutate({ id: editingId, nome: n }); };
+  const cancelEdit = () => { setEditingId(null); setEditingName(""); };
 
   return (
     <Card>
@@ -104,41 +122,69 @@ export default function UnidadesBaseConfig() {
               key={u.id}
               className="flex items-center justify-between gap-2 rounded-md border border-border p-3"
             >
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <span className="text-sm font-medium truncate">{u.nome}</span>
-                {u.is_principal && (
-                  <Badge variant="secondary" className="gap-1">
-                    <Star className="h-3 w-3" /> Principal
-                  </Badge>
-                )}
-                {u.is_default_filter && (
-                  <Badge className="gap-1 bg-primary/10 text-primary border-primary/30" variant="outline">
-                    <Filter className="h-3 w-3" /> Filtro padrão
-                  </Badge>
-                )}
-                {!u.is_active && <Badge variant="outline">Inativa</Badge>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {!u.is_principal && u.is_active && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setPrincipal.mutate(u.id); }}>
-                    Definir principal
-                  </Button>
-                )}
-                {!u.is_default_filter && u.is_active && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(u.id); }}>
-                    Definir filtro padrão
-                  </Button>
-                )}
-                {u.is_default_filter && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(null); }}>
-                    Remover filtro padrão
-                  </Button>
-                )}
-                <Switch
-                  checked={!!u.is_active}
-                  onCheckedChange={(v) => { if (guardUpdate()) toggleActive.mutate({ id: u.id, active: v }); }}
-                />
-              </div>
+              {editingId === u.id ? (
+                <>
+                  <Input
+                    autoFocus
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    className="h-8 text-sm flex-1 min-w-0"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveEdit();
+                      if (e.key === "Escape") cancelEdit();
+                    }}
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" className="h-8 px-2" disabled={!editingName.trim() || renameUnidade.isPending} onClick={saveEdit}>
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 px-2" onClick={cancelEdit}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-sm font-medium truncate">{u.nome}</span>
+                    {u.is_principal && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Star className="h-3 w-3" /> Principal
+                      </Badge>
+                    )}
+                    {u.is_default_filter && (
+                      <Badge className="gap-1 bg-primary/10 text-primary border-primary/30" variant="outline">
+                        <Filter className="h-3 w-3" /> Filtro padrão
+                      </Badge>
+                    )}
+                    {!u.is_active && <Badge variant="outline">Inativa</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => startEdit(u)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    {!u.is_principal && u.is_active && (
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setPrincipal.mutate(u.id); }}>
+                        Definir principal
+                      </Button>
+                    )}
+                    {!u.is_default_filter && u.is_active && (
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(u.id); }}>
+                        Definir filtro padrão
+                      </Button>
+                    )}
+                    {u.is_default_filter && (
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { if (guardUpdate()) setDefaultFilter.mutate(null); }}>
+                        Remover filtro padrão
+                      </Button>
+                    )}
+                    <Switch
+                      checked={!!u.is_active}
+                      onCheckedChange={(v) => { if (guardUpdate()) toggleActive.mutate({ id: u.id, active: v }); }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
