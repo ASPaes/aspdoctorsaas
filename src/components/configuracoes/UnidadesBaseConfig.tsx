@@ -96,6 +96,10 @@ export default function UnidadesBaseConfig() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const startEdit = (u: any) => { if (!guardUpdate()) return; setEditingId(u.id); setEditingName(u.nome); };
+  const saveEdit = () => { const n = editingName.trim(); if (!n || editingId == null) return; if (guardUpdate()) renameUnidade.mutate({ id: editingId, nome: n }); };
+  const cancelEdit = () => { setEditingId(null); setEditingName(""); };
+
   return (
     <Card>
       <CardHeader>
