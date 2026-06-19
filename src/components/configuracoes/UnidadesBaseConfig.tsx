@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Building2, Star, Filter, Plus } from "lucide-react";
+import { Building2, Star, Filter, Plus, Pencil, Check, X } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 
 export default function UnidadesBaseConfig() {
