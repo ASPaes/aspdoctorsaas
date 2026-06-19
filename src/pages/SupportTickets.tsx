@@ -200,11 +200,10 @@ export default function SupportTickets() {
   useEffect(() => {
     if (didInitDeptRef.current) return;
     if (!userDepartmentId) return;
-    // Garante que o setor existe na lista carregada antes de selecionar
-    if (!supportDepartments?.some((d) => d.id === userDepartmentId)) return;
     setDepartmentFilter(userDepartmentId);
     didInitDeptRef.current = true;
-  }, [userDepartmentId, supportDepartments]);
+  }, [userDepartmentId]);
+
 
 
   useEffect(() => {
