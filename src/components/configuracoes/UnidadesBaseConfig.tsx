@@ -15,6 +15,8 @@ export default function UnidadesBaseConfig() {
   const queryClient = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
   const { can } = usePermissions();
   const DENY_MSG = "Você não tem acesso a esta ação. Entre em contato com o administrador.";
   const guardInsert = () => { if (!can("cfg.unidades_base", "insert")) { toast.error(DENY_MSG); return false; } return true; };
