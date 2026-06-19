@@ -1064,6 +1064,45 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Compara agentes de forma justa. A mediana não distorce por outlier; olhe o nº de respostas do CSAT antes de concluir.",
     formula: "por agente no período: atendimentos, encerrados, TMA e 1ª resposta (mediana), CSAT médio, reabertura %, msgs/atend",
   },
+  // ── Atendimento — Satisfação ──
+  atendimento_csat_media: {
+    title: "CSAT Médio",
+    definition: "Nota média de satisfação das avaliações respondidas no período (escala 0–5).",
+    why_it_matters: "Termômetro da satisfação. Veja junto com o nº de respostas e a distribuição — média alta com poucas respostas engana.",
+    formula: "média das notas respondidas",
+    market_benchmark: "Escala 1–5; acima de 4,5 é forte.",
+  },
+  atendimento_response_rate: {
+    title: "Taxa de Resposta",
+    definition: "% das pesquisas de CSAT enviadas que foram respondidas.",
+    why_it_matters: "Mede a representatividade do CSAT. Taxa baixa = a nota representa poucos clientes e pode mascarar insatisfação.",
+    formula: "respondidas ÷ enviadas no período",
+    market_benchmark: "Em chat, 15–40% é comum.",
+  },
+  atendimento_divergencia: {
+    title: "Divergência CSAT × Sentimento",
+    definition: "Atendimentos com sentimento negativo que mesmo assim receberam nota alta (≥4).",
+    why_it_matters: "Falso positivo de CSAT: cliente frustrado que avalia bem só para encerrar. Esconde insatisfação real.",
+    formula: "negativos com nota ≥4 ÷ negativos que responderam",
+  },
+  atendimento_atendeu_na_hora: {
+    title: "Atendeu na Hora",
+    definition: "% de atendimentos encerrados resolvidos sem reabertura e sem virar ticket.",
+    why_it_matters: "Proxy de resolução no primeiro contato (FCR): resolvido ali, sem escalar nem voltar.",
+    formula: "encerrados sem reabertura e sem ticket ÷ encerrados",
+  },
+  atendimento_csat_distribuicao: {
+    title: "Distribuição de Notas",
+    definition: "Quantidade de avaliações em cada nota (0 a 5).",
+    why_it_matters: "Revela o que a média esconde — um punhado de notas baixas pode importar mais que a média alta.",
+    formula: "contagem de respostas por nota",
+  },
+  atendimento_resol_csat: {
+    title: "Resolução por Nota",
+    definition: "Tempo mediano de resolução dos atendimentos em cada nota de CSAT.",
+    why_it_matters: "Mostra se atendimentos mais rápidos ganham notas melhores — relação tempo × satisfação.",
+    formula: "mediana de (encerrado − aberto) agrupada pela nota",
+  },
 };
 
 
