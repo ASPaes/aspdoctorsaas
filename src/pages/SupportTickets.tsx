@@ -680,16 +680,23 @@ export default function SupportTickets() {
       if (selectedUnidadeId) q = q.eq("unidade_base_id", selectedUnidadeId);
       if (taggedTicketIds) q = q.in("id", taggedTicketIds);
 
-      if (ticketStateFilter === "closed" && terminalIds.length > 0) {
-        q = q.in("status_id", terminalIds);
-      } else if (ticketStateFilter === "open" && openIds.length > 0) {
-        q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
+      const hasAgentMatch = !!s && matchedAgentIds.length > 0;
+
+      if (!hasAgentMatch) {
+        if (ticketStateFilter === "closed" && terminalIds.length > 0) {
+          q = q.in("status_id", terminalIds);
+        } else if (ticketStateFilter === "open" && openIds.length > 0) {
+          q = q.or(`status_id.in.(${openIds.join(",")}),status_id.is.null`);
+        }
       }
 
       if (s) {
         const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
+        }
+        if (matchedAgentIds.length > 0) {
+          orParts.push(`responsavel_user_id.in.(${matchedAgentIds.join(",")})`);
         }
         q = q.or(orParts.join(","));
       }
