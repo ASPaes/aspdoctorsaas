@@ -2172,7 +2172,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       </Dialog>
 
       <Dialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Encerrar ticket</DialogTitle>
           </DialogHeader>
@@ -2183,12 +2183,13 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             </span>
             . Deseja assumir o ticket e encerrá-lo, ou encerrar mantendo o responsável atual?
           </p>
-          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setCloseConfirmOpen(false)} disabled={updating}>
+          <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:justify-end">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setCloseConfirmOpen(false)} disabled={updating}>
               Cancelar
             </Button>
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={async () => {
                 if (!closeTargetStatusId) return;
                 await handleFieldUpdate({ status_id: closeTargetStatusId });
@@ -2199,6 +2200,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               Encerrar mantendo responsável
             </Button>
             <Button
+              className="w-full sm:w-auto"
               onClick={async () => {
                 if (!closeTargetStatusId || !currentUserId) return;
                 await handleFieldUpdate({
@@ -2213,6 +2215,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             </Button>
           </div>
         </DialogContent>
+
       </Dialog>
     </>
   );
