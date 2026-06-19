@@ -1771,7 +1771,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                         </div>
                         {terminalStatus && (
                           <button
-                            onClick={() => handleFieldUpdate({ status_id: terminalStatus.id })}
+                            onClick={() => {
+                              const respUid = ticket?.responsavel_user_id ?? null;
+                              if (!isAdminOrHead && respUid && respUid !== currentUserId) {
+                                setCloseTargetStatusId(terminalStatus.id);
+                                setCloseConfirmOpen(true);
+                              } else {
+                                handleFieldUpdate({ status_id: terminalStatus.id });
+                              }
+                            }}
                             disabled={updating}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
                           >
