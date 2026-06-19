@@ -780,15 +780,28 @@ export default function SupportTickets() {
     }
 
     const s = search.trim().replace(/,/g, "");
+    const sStripped = s.replace(/[^A-Za-z0-9]/g, "");
+    const ticketCodePatterns: string[] = [];
+    if (s) {
+      ticketCodePatterns.push(`ticket_code.ilike.*${s}*`);
+      if (sStripped && sStripped !== s) {
+        ticketCodePatterns.push(`ticket_code.ilike.*${sStripped}*`);
+      }
+      if (/^\d+$/.test(sStripped) && sStripped.length >= 5 && sStripped.length <= 12) {
+        const dashed = `${sStripped.slice(0, 4)}-${sStripped.slice(4)}`;
+        ticketCodePatterns.push(`ticket_code.ilike.*${dashed}*`);
+      }
+    }
     let clienteIds: string[] = [];
     if (s) {
       const { data: matchedClientes } = await (supabase.from("clientes" as any) as any)
         .select("id")
         .eq("tenant_id", tid)
-        .ilike("nome_fantasia", `%${s}%`)
+        .or(`nome_fantasia.ilike.*${s}*,razao_social.ilike.*${s}*`)
         .limit(500);
       clienteIds = (matchedClientes ?? []).map((c: any) => c.id);
     }
+
 
     const builder = () => {
       let q = (supabase.from("support_tickets" as any) as any)
