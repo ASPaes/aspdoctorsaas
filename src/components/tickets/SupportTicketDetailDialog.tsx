@@ -104,6 +104,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [closeTargetStatusId, setCloseTargetStatusId] = useState<string | null>(null);
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1769,7 +1771,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                         </div>
                         {terminalStatus && (
                           <button
-                            onClick={() => handleFieldUpdate({ status_id: terminalStatus.id })}
+                            onClick={() => {
+                              const respUid = ticket?.responsavel_user_id ?? null;
+                              if (!isAdminOrHead && respUid && respUid !== currentUserId) {
+                                setCloseTargetStatusId(terminalStatus.id);
+                                setCloseConfirmOpen(true);
+                              } else {
+                                handleFieldUpdate({ status_id: terminalStatus.id });
+                              }
+                            }}
                             disabled={updating}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
                           >
@@ -2156,6 +2166,50 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             <Button variant="destructive" onClick={handleSoftDelete} disabled={deleting}>
               {deleting && <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />}
               Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Encerrar ticket</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Este ticket está atribuído a{" "}
+            <span className="font-semibold text-foreground">
+              {agentesDisponiveis.find(a => a.user_id === ticket?.responsavel_user_id)?.nome ?? "outro responsável"}
+            </span>
+            . Deseja assumir o ticket e encerrá-lo, ou encerrar mantendo o responsável atual?
+          </p>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setCloseConfirmOpen(false)} disabled={updating}>
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!closeTargetStatusId) return;
+                await handleFieldUpdate({ status_id: closeTargetStatusId });
+                setCloseConfirmOpen(false);
+              }}
+              disabled={updating}
+            >
+              Encerrar mantendo responsável
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!closeTargetStatusId || !currentUserId) return;
+                await handleFieldUpdate({
+                  responsavel_user_id: currentUserId,
+                  status_id: closeTargetStatusId,
+                });
+                setCloseConfirmOpen(false);
+              }}
+              disabled={updating || !currentUserId}
+            >
+              Assumir e encerrar
             </Button>
           </div>
         </DialogContent>
