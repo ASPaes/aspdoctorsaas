@@ -73,6 +73,18 @@ export default function UnidadesBaseConfig() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const renameUnidade = useMutation({
+    mutationFn: async ({ id, nome }: { id: number; nome: string }) => {
+      const { error } = await (supabase.from("unidades_base" as any) as any)
+        .update({ nome })
+        .eq("id", id)
+        .eq("tenant_id", tid);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); setEditingId(null); setEditingName(""); toast.success("Unidade renomeada"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const toggleActive = useMutation({
     mutationFn: async ({ id, active }: { id: number; active: boolean }) => {
       const { error } = await (supabase.from("unidades_base" as any) as any)
