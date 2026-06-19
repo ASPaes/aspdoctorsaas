@@ -7694,6 +7694,15 @@ export type Database = {
         Returns: Json
       }
       get_ai_projection: { Args: never; Returns: Json }
+      get_atendimento_agentes: {
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       get_atendimento_realtime: {
         Args: {
           p_department_id?: string
