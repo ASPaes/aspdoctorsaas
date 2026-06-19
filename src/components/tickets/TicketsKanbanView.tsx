@@ -125,11 +125,11 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, ge
                 <span className="text-xs font-medium truncate">{col.name}</span>
                 <Badge
                   variant="outline"
-                  className="ml-auto text-[10px] border"
+                  className="ml-auto text-[10px] border font-semibold"
                   style={{
-                    background: col.color + "1A",
-                    color: col.color,
-                    borderColor: col.color + "33",
+                    background: col.color,
+                    color: getReadableTextColor(col.color),
+                    borderColor: col.color,
                   }}
                 >
                   {columnTickets.length}
