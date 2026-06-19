@@ -206,6 +206,131 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  // Handler de chegada de notificação (extraído para reuso entre INSERT e UPDATE coalescido)
+  const handleNotificationArrival = useCallback(
+    async (recipient: {
+      id: string;
+      notification_id: string;
+      tenant_id: string;
+      delivered_at: string;
+      silent_mode: boolean;
+    }) => {
+      // Fetch notification body for side-effects
+      const { data: notif, error } = await supabase
+        .from("notifications")
+        .select("id, type, severity, title, body, action_url, metadata")
+        .eq("id", recipient.notification_id)
+        .maybeSingle();
+      if (error || !notif) return;
+
+      const s = settingsRef.current;
+      if (!s.master_enabled) return;
+
+      // Determine state
+      const loc = locationRef.current;
+      const currentConvId = extractConversationId(loc.pathname, loc.search);
+      const isOnChatModule = loc.pathname.startsWith("/whatsapp");
+      const isVisible = document.visibilityState === "visible";
+      const notifConvId = (notif.metadata as any)?.conversation_id ?? null;
+
+      // CASO ESPECIAL: se a conversa já está aberta, marca como lido imediatamente
+      // e não dispara som/toast (o user já está vendo)
+      if (notifConvId && notifConvId === currentConvId) {
+        await supabase.rpc("mark_notification_read" as any, {
+          p_recipient_id: recipient.id,
+        });
+        setUnreadCount((c) => Math.max(0, c - 1));
+        queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+        return;
+      }
+
+      // CASO MONITOR: admin/head que está vendo notification de outro setor
+      // (silent_mode=true) - aparece no sino mas sem som/toast/native
+      if (recipient.silent_mode) {
+        return;
+      }
+
+      let mode: AlertMode;
+      if (!isVisible) {
+        mode = s.alert_background;
+      } else if (notifConvId && notifConvId === currentConvId) {
+        mode = s.alert_in_conversation;
+      } else if (isOnChatModule) {
+        mode = s.alert_other_conversation;
+      } else {
+        mode = s.alert_other_module;
+      }
+
+      if (mode === "off") return;
+
+      const dnd = isInDoNotDisturbWindow(s);
+
+      const wantsSound =
+        s.sound_enabled && !dnd && (mode === "tick" || mode === "full");
+      const wantsToast =
+        s.visual_enabled && (mode === "silent" || mode === "full");
+      const wantsNative =
+        s.visual_enabled && mode === "native" && !isVisible;
+
+      if (wantsSound) {
+        const vol = mode === "tick" ? 0.3 : undefined;
+        playSound(vol);
+      }
+
+      if (wantsToast) {
+        sonnerToast(notif.title, {
+          description: notif.body || undefined,
+          duration: 5000,
+          action: notif.action_url
+            ? {
+                label: "Abrir",
+                onClick: () => {
+                  if (notif.action_url) navigate(notif.action_url);
+                  supabase
+                    .rpc("mark_notification_read" as any, {
+                      p_recipient_id: recipient.id,
+                    })
+                    .then(() => {
+                      setUnreadCount((c) => Math.max(0, c - 1));
+                      queryClient.invalidateQueries({
+                        queryKey: ["notifications-list"],
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: ["notifications-unread-count"],
+                      });
+                    });
+                },
+              }
+            : undefined,
+        });
+      }
+
+      if (
+        wantsNative &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          const n = new Notification(notif.title, {
+            body: notif.body || "",
+            icon: "/favicon.png",
+            tag: notifConvId ? `chat-${notifConvId}` : `notif-${notif.id}`,
+            requireInteraction: false,
+          });
+          n.onclick = () => {
+            window.focus();
+            if (notif.action_url) navigate(notif.action_url);
+            n.close();
+          };
+        } catch (err) {
+          console.warn("[notifications] native notify failed", err);
+        }
+      }
+    },
+    [navigate, queryClient, playSound]
+  );
+
   // Realtime subscription (side-effects only — list/badge query is invalidated separately)
   useEffect(() => {
     if (!uid) return;
@@ -232,127 +357,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           // Update badge optimistically
           setUnreadCount((c) => c + 1);
 
-          // Invalidate the bell list query (existing useNotifications hook)
+          // Invalidate the bell list query
           queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
           queryClient.invalidateQueries({
             queryKey: ["notifications-unread-count"],
           });
 
-          // Fetch notification body for side-effects
-          const { data: notif, error } = await supabase
-            .from("notifications")
-            .select("id, type, severity, title, body, action_url, metadata")
-            .eq("id", recipient.notification_id)
-            .maybeSingle();
-          if (error || !notif) return;
-
-          const s = settingsRef.current;
-          if (!s.master_enabled) return;
-
-          // Determine state
-          const loc = locationRef.current;
-          const currentConvId = extractConversationId(loc.pathname, loc.search);
-          const isOnChatModule = loc.pathname.startsWith("/whatsapp");
-          const isVisible = document.visibilityState === "visible";
-          const notifConvId =
-            (notif.metadata as any)?.conversation_id ?? null;
-
-          // CASO ESPECIAL: se a conversa já está aberta, marca como lido imediatamente
-          // e não dispara som/toast (o user já está vendo)
-          if (notifConvId && notifConvId === currentConvId) {
-            await supabase.rpc("mark_notification_read" as any, {
-              p_recipient_id: recipient.id,
-            });
-            setUnreadCount((c) => Math.max(0, c - 1));
-            queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
-            queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-            return;
-          }
-
-          // CASO MONITOR: admin/head que está vendo notification de outro setor
-          // (silent_mode=true) - aparece no sino mas sem som/toast/native
-          if (recipient.silent_mode) {
-            return; // já incrementou unreadCount lá em cima e invalidou queries
-          }
-
-          let mode: AlertMode;
-          if (!isVisible) {
-            mode = s.alert_background;
-          } else if (notifConvId && notifConvId === currentConvId) {
-            mode = s.alert_in_conversation;
-          } else if (isOnChatModule) {
-            mode = s.alert_other_conversation;
-          } else {
-            mode = s.alert_other_module;
-          }
-
-          if (mode === "off") return;
-
-          const dnd = isInDoNotDisturbWindow(s);
-
-          const wantsSound =
-            s.sound_enabled && !dnd && (mode === "tick" || mode === "full");
-          const wantsToast =
-            s.visual_enabled &&
-            (mode === "silent" || mode === "full");
-          const wantsNative =
-            s.visual_enabled && mode === "native" && !isVisible;
-
-          if (wantsSound) {
-            const vol = mode === "tick" ? 0.3 : undefined;
-            playSound(vol);
-          }
-
-          if (wantsToast) {
-            sonnerToast(notif.title, {
-              description: notif.body || undefined,
-              duration: 5000,
-              
-              action: notif.action_url
-                ? {
-                    label: "Abrir",
-                    onClick: () => {
-                      if (notif.action_url) navigate(notif.action_url);
-                      supabase
-                        .rpc("mark_notification_read" as any, {
-                          p_recipient_id: recipient.id,
-                        })
-                        .then(() => {
-                          setUnreadCount((c) => Math.max(0, c - 1));
-                          queryClient.invalidateQueries({
-                            queryKey: ["notifications-list"],
-                          });
-                          queryClient.invalidateQueries({
-                            queryKey: ["notifications-unread-count"],
-                          });
-                        });
-                    },
-                  }
-                : undefined,
-            });
-          }
-
-          if (
-            wantsNative &&
-            "Notification" in window &&
-            Notification.permission === "granted"
-          ) {
-            try {
-              const n = new Notification(notif.title, {
-                body: notif.body || "",
-                icon: "/favicon.png",
-                tag: notifConvId ? `chat-${notifConvId}` : `notif-${notif.id}`,
-                requireInteraction: false,
-              });
-              n.onclick = () => {
-                window.focus();
-                if (notif.action_url) navigate(notif.action_url);
-                n.close();
-              };
-            } catch (err) {
-              console.warn("[notifications] native notify failed", err);
-            }
-          }
+          await handleNotificationArrival(recipient);
         }
       )
       .on(
@@ -363,7 +374,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           table: "notification_recipients",
           filter: `user_id=eq.${uid}`,
         },
-        () => {
+        async (payload) => {
+          const newRow = payload.new as {
+            id: string;
+            notification_id: string;
+            tenant_id: string;
+            delivered_at: string;
+            silent_mode: boolean;
+            read_at: string | null;
+            dismissed_at: string | null;
+          };
+          const oldRow = payload.old as {
+            delivered_at?: string;
+            read_at?: string | null;
+          };
+
+          // Mensagem coalescida: dispatcher atualizou delivered_at em recipient
+          // existente ainda não lido. Tratar como nova chegada (som/toast).
+          const deliveredChanged =
+            !!newRow.delivered_at &&
+            newRow.delivered_at !== oldRow?.delivered_at;
+          const stillUnread = !newRow.read_at && !newRow.dismissed_at;
+
+          if (deliveredChanged && stillUnread) {
+            queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
+            queryClient.invalidateQueries({
+              queryKey: ["notifications-unread-count"],
+            });
+            await handleNotificationArrival(newRow);
+            return;
+          }
+
           // read_at / dismissed_at changed elsewhere — refresh counter
           refreshUnreadCount();
           queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
@@ -387,6 +428,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       )
       .subscribe();
+
 
     return () => {
       supabase.removeChannel(channel);
