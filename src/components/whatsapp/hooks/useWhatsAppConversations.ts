@@ -227,6 +227,12 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
       }, (payload) => {
         const updated = payload.new as any;
+        // Grupos têm seu próprio badge na pill "Grupos" (query separada).
+        // Invalidar group-counts em tempo real ao receber atualização de grupo
+        // (unread_count, last_message_at, etc.).
+        if (updated?.is_group === true) {
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
+        }
         queryClient.setQueriesData({ queryKey: ['whatsapp', 'conversations'] }, (old: any) => {
           if (!old?.conversations) return old;
           const existing = old.conversations.find((c: any) => c.id === updated.id);
@@ -276,7 +282,11 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
         schema: 'public',
         table: 'whatsapp_conversations',
         filter: tid ? `tenant_id=eq.${tid}` : undefined,
-      }, () => {
+      }, (payload) => {
+        const inserted = payload.new as any;
+        if (inserted?.is_group === true) {
+          queryClient.invalidateQueries({ queryKey: ['whatsapp', 'group-counts'] });
+        }
         if (insertDebounceRef.current) clearTimeout(insertDebounceRef.current);
         insertDebounceRef.current = setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
