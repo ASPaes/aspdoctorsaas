@@ -194,6 +194,19 @@ export default function SupportTickets() {
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
   const [attSearchOverride, setAttSearchOverride] = useState<string | undefined>(undefined);
 
+  // Ao abrir a tela, pré-seleciona o setor do usuário (sempre, a cada mount).
+  const { data: userDepartmentId } = useUserDepartment();
+  const didInitDeptRef = useRef(false);
+  useEffect(() => {
+    if (didInitDeptRef.current) return;
+    if (!userDepartmentId) return;
+    // Garante que o setor existe na lista carregada antes de selecionar
+    if (!supportDepartments?.some((d) => d.id === userDepartmentId)) return;
+    setDepartmentFilter(userDepartmentId);
+    didInitDeptRef.current = true;
+  }, [userDepartmentId, supportDepartments]);
+
+
   useEffect(() => {
     if (departmentFilter === "all" && ticketsView === "kanban") {
       setTicketsView("lista");
