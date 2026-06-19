@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -25,6 +25,8 @@ import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDet
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
+
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 
@@ -191,6 +193,18 @@ export default function SupportTickets() {
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
   const [attSearchOverride, setAttSearchOverride] = useState<string | undefined>(undefined);
+
+  // Ao abrir a tela, pré-seleciona o setor do usuário (sempre, a cada mount).
+  const { data: userDepartmentId } = useUserDepartment();
+  const didInitDeptRef = useRef(false);
+  useEffect(() => {
+    if (didInitDeptRef.current) return;
+    if (!userDepartmentId) return;
+    setDepartmentFilter(userDepartmentId);
+    didInitDeptRef.current = true;
+  }, [userDepartmentId]);
+
+
 
   useEffect(() => {
     if (departmentFilter === "all" && ticketsView === "kanban") {
