@@ -998,7 +998,41 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     formula: "COUNT de 'em andamento' agrupado por agente",
   },
 
+  // ── Atendimento — Velocidade / SLA ──
+  atendimento_tme: {
+    title: "Tempo de Espera (TME)",
+    definition: "Quanto tempo o cliente fica na fila até um agente assumir. Mostramos a mediana (p50) e a cauda (p90).",
+    why_it_matters: "Fila longa frustra e gera abandono. A mediana mostra o típico; o p90 mostra o pior caso recorrente.",
+    formula: "mediana e p90 de (assumido − aberto), excluindo zeros e outliers acima de 1h",
+  },
+  atendimento_frt: {
+    title: "1ª Resposta",
+    definition: "Tempo até a primeira resposta de um agente ao cliente. Mediana (p50) e cauda (p90).",
+    why_it_matters: "É a métrica de SLA que o cliente mais percebe — o silêncio inicial define a impressão do atendimento.",
+    formula: "mediana e p90 de first_response_time_seconds, excluindo zeros e outliers acima de 30min",
+    market_benchmark: "Em chat, 1–2 min é o ideal de mercado; em suporte técnico B2B, alguns minutos é realista.",
+  },
+  atendimento_tma: {
+    title: "Tempo de Atendimento (TMA)",
+    definition: "Tempo ativo do atendimento, de quando o agente assume até encerrar. Mediana (p50) e p90.",
+    why_it_matters: "Mede o esforço por atendimento. Cruzado com volume, ajuda a dimensionar equipe.",
+    formula: "mediana e p90 de (encerrado − assumido), excluindo zeros e outliers acima de 2h",
+  },
+  atendimento_tmr: {
+    title: "Tempo de Resolução (TMR)",
+    definition: "Tempo total da abertura ao encerramento da conversa. Mediana (p50) e p90.",
+    why_it_matters: "É o tempo que o cliente espera até o problema acabar — resolução ponta a ponta.",
+    formula: "mediana e p90 de (encerrado − aberto), excluindo outliers acima de 8h (conversa largada)",
+  },
+  atendimento_sla_frt: {
+    title: "% dentro do SLA",
+    definition: "Percentual de 1ªs respostas dentro do alvo de tempo configurado.",
+    why_it_matters: "É como o mercado mede SLA: não pela média, mas por '% atendido dentro do alvo'. É o número que o head cobra.",
+    formula: "1ªs respostas ≤ alvo ÷ total de 1ªs respostas no período (sem cap — breach conta)",
+    market_benchmark: "Boas operações miram 90%+ de aderência ao alvo de 1ª resposta.",
+  },
 };
+
 
 export default kpiHelp;
 
