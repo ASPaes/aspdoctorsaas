@@ -841,12 +841,13 @@ export default function SupportTickets() {
       }
 
       if (s) {
-        const orParts = [`ticket_code.ilike.*${s}*`, `assunto.ilike.*${s}*`];
+        const orParts = [...ticketCodePatterns, `assunto.ilike.*${s}*`];
         if (clienteIds.length > 0) {
           orParts.push(`cliente_id.in.(${clienteIds.join(",")})`);
         }
         q = q.or(orParts.join(","));
       }
+
 
       q = q.order("aberto_em", { ascending: false });
       return q;
