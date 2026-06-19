@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
     const { data: instances, error: instancesError } = await supabaseAdmin
       .from('whatsapp_instances')
-      .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id');
+      .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id, disconnected_alert_at');
 
     if (instancesError) {
       return new Response(JSON.stringify({ error: 'Failed to fetch instances' }), {
