@@ -91,6 +91,7 @@ export function AgentesTab() {
                       <th className="py-2 px-3 text-right font-medium">Pico</th>
                       <th className="py-2 px-3 text-right font-medium">TMA</th>
                       <th className="py-2 px-3 text-right font-medium">1ª resp</th>
+                      <th className="py-2 px-3 text-right font-medium">Latência</th>
                       <th className="py-2 px-3 text-right font-medium">CSAT</th>
                       <th className="py-2 px-3 text-right font-medium">Reabert.</th>
                       <th className="py-2 pl-3 text-right font-medium">Msgs/at.</th>
@@ -105,6 +106,7 @@ export function AgentesTab() {
                         <td className="py-2 px-3 text-right tabular-nums">{a.pico_simultaneos}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.frt_p50)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{dur(a.latencia_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">
                           {a.csat !== null ? (
                             <span>
