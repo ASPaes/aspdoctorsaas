@@ -59,7 +59,7 @@ export function TempoRealTab() {
   return (
     <div className="space-y-6">
       {/* KPI cards — mesmo componente do dashboard financeiro */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KPICardEnhanced
           helpKey="atendimento_fila"
           label="Fila Agora"
@@ -82,6 +82,13 @@ export function TempoRealTab() {
           subtitle="conversas ativas com agente"
           icon={<MessageSquare className="h-4 w-4" />}
           footer={data.em_atendimento > 0 ? verChats("em_atendimento", "Em Atendimento") : undefined}
+        />
+        <KPICardEnhanced
+          helpKey="atendimento_agentes_online"
+          label="Agentes Online"
+          value={data.agentes_online}
+          subtitle={data.agentes_pausa > 0 ? `${data.agentes_pausa} em pausa` : "ativos agora"}
+          icon={<Users className="h-4 w-4" />}
         />
         <KPICardEnhanced
           helpKey="atendimento_sla_estourando"
@@ -165,9 +172,6 @@ export function TempoRealTab() {
               })}
             </ul>
           )}
-          <div className="mt-3 text-xs text-muted-foreground italic">
-            Presença (online/ocioso) em breve.
-          </div>
         </div>
       </div>
 
