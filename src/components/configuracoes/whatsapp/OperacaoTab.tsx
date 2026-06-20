@@ -3,6 +3,7 @@ import AtendimentoCsatTab from "./AtendimentoCsatTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import { MacrosManager } from "./MacrosManager";
 import WhatsAppGroupsTab from "./WhatsAppGroupsTab";
+import RiscoChurnSettings from "./RiscoChurnSettings";
 
 export default function OperacaoTab() {
   return (
@@ -12,6 +13,7 @@ export default function OperacaoTab() {
         <TabsTrigger value="pausas">Pausas</TabsTrigger>
         <TabsTrigger value="macros">Macros</TabsTrigger>
         <TabsTrigger value="grupos">Grupos</TabsTrigger>
+        <TabsTrigger value="risco">Risco de churn</TabsTrigger>
       </TabsList>
       <TabsContent value="atendimento" className="mt-4">
         <AtendimentoCsatTab />
@@ -24,6 +26,9 @@ export default function OperacaoTab() {
       </TabsContent>
       <TabsContent value="grupos" className="mt-4">
         <WhatsAppGroupsTab />
+      </TabsContent>
+      <TabsContent value="risco" className="mt-4">
+        <RiscoChurnSettings />
       </TabsContent>
     </Tabs>
   );
