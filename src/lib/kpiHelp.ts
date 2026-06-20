@@ -1103,6 +1103,12 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Mostra se atendimentos mais rápidos ganham notas melhores — relação tempo × satisfação.",
     formula: "mediana de (encerrado − aberto) agrupada pela nota",
   },
+  atendimento_nao_atendido: {
+    title: "Não Atendido",
+    definition: "% de atendimentos encerrados que nunca foram assumidos por um agente.",
+    why_it_matters: "Cliente chamou e ninguém pegou — encerrado no vácuo (auto-close por inatividade ou abandono). Quanto maior, pior a cobertura.",
+    formula: "encerrados sem assumed_at ÷ encerrados, no período",
+  },
 };
 
 
