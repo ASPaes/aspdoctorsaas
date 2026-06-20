@@ -1183,6 +1183,32 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Mostra para onde vai quem entra no menu — eficácia geral da triagem.",
     formula: "distribuição de ura_state entre as URAs enviadas",
   },
+
+  // ── Atendimento — Taxonomia (Tickets) ──
+  atendimento_tax_total: {
+    title: "Total de Tickets",
+    definition: "Tickets abertos no período (mundo de tickets, não chats).",
+    why_it_matters: "Base do explorador — volume formal de chamados classificados.",
+    formula: "COUNT de support_tickets por aberto_em no período",
+  },
+  atendimento_tax_produto: {
+    title: "Tickets por Produto",
+    definition: "Distribuição dos tickets pelo produto associado.",
+    why_it_matters: "Mostra qual produto concentra a demanda — onde focar engenharia e documentação.",
+    formula: "contagem de tickets agrupada por produto",
+  },
+  atendimento_tax_categoria: {
+    title: "Peso da Categoria",
+    definition: "Distribuição dos tickets por categoria de serviço, com peso (%) no total.",
+    why_it_matters: "Revela os grandes blocos de demanda (ex.: Fiscal, Hardware) para priorizar.",
+    formula: "contagem de tickets por categoria ÷ total",
+  },
+  atendimento_tax_densidade: {
+    title: "Densidade por Produto",
+    definition: "Tickets por cliente ativo de cada produto (tickets ÷ clientes que têm o produto).",
+    why_it_matters: "Corrige o volume bruto: produto pequeno com densidade alta dá mais trabalho por cliente que um grande. Aponta o que é problemático de verdade.",
+    formula: "tickets do produto ÷ clientes ativos com aquele produto (cliente_produtos)",
+  },
 };
 
 
