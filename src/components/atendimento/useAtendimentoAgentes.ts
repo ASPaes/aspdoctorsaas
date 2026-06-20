@@ -13,6 +13,7 @@ export interface AgenteRow {
   csat_n: number;
   reabertura_pct: number | null;
   pico_simultaneos: number;
+  latencia_p50: number | null;
   msgs_atend: number | null;
 }
 
