@@ -4,6 +4,7 @@ import { TempoRealTab } from "@/components/atendimento/TempoRealTab";
 import { VelocidadeTab } from "@/components/atendimento/VelocidadeTab";
 import { AgentesTab } from "@/components/atendimento/AgentesTab";
 import { SatisfacaoTab } from "@/components/atendimento/SatisfacaoTab";
+import { VolumeTab } from "@/components/atendimento/VolumeTab";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
 function formatSecondsAgo(seg: number): string {
@@ -52,6 +53,7 @@ export default function AtendimentoDashboard() {
           <TabsTrigger value="velocidade">Velocidade / SLA</TabsTrigger>
           <TabsTrigger value="agentes">Agentes</TabsTrigger>
           <TabsTrigger value="satisfacao">Satisfação</TabsTrigger>
+          <TabsTrigger value="volume">Volume</TabsTrigger>
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
           <TempoRealTab />
@@ -64,6 +66,9 @@ export default function AtendimentoDashboard() {
         </TabsContent>
         <TabsContent value="satisfacao" className="mt-4">
           <SatisfacaoTab />
+        </TabsContent>
+        <TabsContent value="volume" className="mt-4">
+          <VolumeTab />
         </TabsContent>
       </Tabs>
     </div>
