@@ -27,6 +27,9 @@ export default function OperacaoTab() {
       <TabsContent value="grupos" className="mt-4">
         <WhatsAppGroupsTab />
       </TabsContent>
+      <TabsContent value="risco" className="mt-4">
+        <RiscoChurnSettings />
+      </TabsContent>
     </Tabs>
   );
 }
