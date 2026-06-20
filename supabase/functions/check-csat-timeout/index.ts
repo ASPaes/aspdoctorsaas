@@ -107,18 +107,6 @@ Deno.serve(async (req) => {
 
         if (!att) continue;
 
-        // PRIMEIRA resposta do cliente após o CSAT (regra: a 1ª resposta é a avaliação)
-        const { data: firstReply } = await supabase
-          .from('whatsapp_messages')
-          .select('content, created_at')
-          .eq('conversation_id', att.conversation_id)
-          .eq('tenant_id', csat.tenant_id)
-          .eq('is_from_me', false)
-          .gt('created_at', csat.asked_at)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
         const parseScore = (txt: string | null | undefined): number | null => {
           const t = (txt ?? '').trim();
           if (t.length > 4) return null;
@@ -128,48 +116,53 @@ Deno.serve(async (req) => {
           return (n >= config.scoreMin && n <= config.scoreMax) ? n : null;
         };
 
-        if (firstReply) {
-          const replyAt = new Date(firstReply.created_at);
-          const score = parseScore(firstReply.content);
+        // Procura a PRIMEIRA resposta que é NOTA VÁLIDA dentro da janela do timeout.
+        // Regra: cortesia/texto antes da nota NÃO expira o CSAT — o cliente pode mandar
+        // a nota em mensagens seguintes. O message-processor re-pede a nota em tempo real;
+        // aqui é só rede de segurança (captura) + fechamento por timeout (silêncio).
+        const { data: replies } = await supabase
+          .from('whatsapp_messages')
+          .select('content, created_at')
+          .eq('conversation_id', att.conversation_id)
+          .eq('tenant_id', csat.tenant_id)
+          .eq('is_from_me', false)
+          .gt('created_at', csat.asked_at)
+          .order('created_at', { ascending: true });
 
-          // 1ª resposta é nota válida e veio dentro do timeout -> CAPTURA
-          if (score !== null && replyAt <= expiresAt) {
-            const needsReason = score <= config.reasonThreshold;
-            await supabase.from('support_csat').update({
-              score,
-              responded_at: firstReply.created_at,
-              status: needsReason ? 'awaiting_reason' : 'completed',
-            }).eq('id', csat.id);
+        let captured: { score: number; at: string } | null = null;
+        for (const r of (replies || [])) {
+          if (new Date(r.created_at) > expiresAt) break;
+          const s = parseScore(r.content);
+          if (s !== null) { captured = { score: s, at: r.created_at }; break; }
+        }
 
-            if (!needsReason) {
-              await supabase.rpc('fn_close_attendance_atomic', {
-                p_attendance_id: att.id,
-                p_closed_reason: 'csat_completed',
-                p_closure_type: 'csat_completed',
-              });
-            }
+        if (captured) {
+          const needsReason = captured.score <= config.reasonThreshold;
+          await supabase.from('support_csat').update({
+            score: captured.score,
+            responded_at: captured.at,
+            status: needsReason ? 'awaiting_reason' : 'completed',
+          }).eq('id', csat.id);
 
-            const ctx = await buildInstanceCtx(supabase, att);
-            if (ctx) {
-              if (needsReason) {
-                await sendAndPersistAutoMessage(supabase, ctx, att.conversation_id, att.tenant_id, config.reasonPrompt, { csat: true });
-              } else {
-                await sendAndPersistAutoMessage(supabase, ctx, att.conversation_id, att.tenant_id, config.thanks, { csat: true });
-                await sendDeferredClosureMessage(supabase, ctx, att.conversation_id, att.tenant_id, att.id, att.attendance_code);
-              }
-            }
-            processed++;
-            continue;
+          if (!needsReason) {
+            await supabase.rpc('fn_close_attendance_atomic', {
+              p_attendance_id: att.id,
+              p_closed_reason: 'csat_completed',
+              p_closure_type: 'csat_completed',
+            });
           }
 
-          // 1ª resposta NÃO é nota (cliente tem outra demanda) -> expira silencioso, NÃO encerra
-          if (score === null && replyAt <= expiresAt) {
-            await supabase.from('support_csat')
-              .update({ status: 'expired', responded_at: now.toISOString() })
-              .eq('id', csat.id);
-            processed++;
-            continue;
+          const ctx = await buildInstanceCtx(supabase, att);
+          if (ctx) {
+            if (needsReason) {
+              await sendAndPersistAutoMessage(supabase, ctx, att.conversation_id, att.tenant_id, config.reasonPrompt, { csat: true });
+            } else {
+              await sendAndPersistAutoMessage(supabase, ctx, att.conversation_id, att.tenant_id, config.thanks, { csat: true });
+              await sendDeferredClosureMessage(supabase, ctx, att.conversation_id, att.tenant_id, att.id, att.attendance_code);
+            }
           }
+          processed++;
+          continue;
         }
 
         // Sem resposta válida ainda dentro do timeout -> aguarda
