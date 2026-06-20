@@ -88,6 +88,7 @@ export function AgentesTab() {
                       <th className="py-2 pr-3 font-medium">Agente</th>
                       <th className="py-2 px-3 text-right font-medium">Atend.</th>
                       <th className="py-2 px-3 text-right font-medium">Encerr.</th>
+                      <th className="py-2 px-3 text-right font-medium">Pico</th>
                       <th className="py-2 px-3 text-right font-medium">TMA</th>
                       <th className="py-2 px-3 text-right font-medium">1ª resp</th>
                       <th className="py-2 px-3 text-right font-medium">CSAT</th>
