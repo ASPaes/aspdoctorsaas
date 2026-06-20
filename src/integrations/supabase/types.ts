@@ -7729,6 +7729,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_atendimento_taxonomia: {
+        Args: { p_date_from: string; p_date_to: string; p_tenant_id: string }
+        Returns: Json
+      }
       get_atendimento_ura: {
         Args: {
           p_date_from: string
