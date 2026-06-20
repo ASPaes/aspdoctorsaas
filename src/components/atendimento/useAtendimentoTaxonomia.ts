@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 
 export interface TaxProdRow { produto_id: number | null; nome: string; qtd: number; pct: number; }
 export interface TaxCatRow { category_id: string | null; nome: string; qtd: number; pct: number; }
@@ -11,8 +12,9 @@ export interface AtendimentoTaxonomia {
 
 export function useAtendimentoTaxonomia(dateRange: { from: Date; to: Date }) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   return useQuery<AtendimentoTaxonomia>({
-    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -20,6 +22,7 @@ export function useAtendimentoTaxonomia(dateRange: { from: Date; to: Date }) {
         p_tenant_id: tid,
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
+        p_unidade_base_id: selectedUnidadeId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
