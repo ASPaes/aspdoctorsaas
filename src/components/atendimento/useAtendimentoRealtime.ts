@@ -6,6 +6,8 @@ export interface AtendimentoRealtime {
   fila: number;
   fila_fora_hora: number;
   em_atendimento: number;
+  agentes_online: number;
+  agentes_pausa: number;
   espera_mais_antigo_seg: number;
   parados_24h: number;
   sla_estourando: number;
@@ -33,6 +35,8 @@ export function useAtendimentoRealtime() {
         fila: Number(raw.fila ?? 0),
         fila_fora_hora: Number(raw.fila_fora_hora ?? 0),
         em_atendimento: Number(raw.em_atendimento ?? 0),
+        agentes_online: Number(raw.agentes_online ?? 0),
+        agentes_pausa: Number(raw.agentes_pausa ?? 0),
         espera_mais_antigo_seg: Number(raw.espera_mais_antigo_seg ?? 0),
         parados_24h: Number(raw.parados_24h ?? 0),
         sla_estourando: Number(raw.sla_estourando ?? 0),
