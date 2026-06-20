@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, MessageSquare, Repeat, ArrowDownLeft, Tag } from "lucide-react";
 import { useAtendimentoVolume } from "./useAtendimentoVolume";
@@ -112,8 +112,8 @@ export function VolumeTab() {
                         </div>
                       ))}
                       {DOW.map((label, d) => (
-                        <>
-                          <div key={`l-${d}`} className="text-[10px] text-muted-foreground pr-1 text-right">
+                        <Fragment key={`row-${d}`}>
+                          <div className="text-[10px] text-muted-foreground pr-1 text-right">
                             {label}
                           </div>
                           {Array.from({ length: 24 }).map((_, h) => {
@@ -131,7 +131,7 @@ export function VolumeTab() {
                               />
                             );
                           })}
-                        </>
+                        </Fragment>
                       ))}
                     </div>
                   </div>
