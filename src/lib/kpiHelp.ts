@@ -1152,6 +1152,37 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Diz POR QUE o cliente procura suporte — prioriza FAQ, automação e treino.",
     formula: "contagem das ai_tags no período (cobertura parcial — nem todo atendimento tem tag)",
   },
+  // ── Atendimento — URA ──
+  atendimento_ura_enviadas: {
+    title: "URAs Enviadas",
+    definition: "Atendimentos em que o menu automático (URA) foi enviado ao cliente.",
+    why_it_matters: "Alcance da triagem automática — quanto da demanda passa pelo menu antes do humano.",
+    formula: "atendimentos com ura_sent_at no período",
+  },
+  atendimento_ura_completadas: {
+    title: "URA Concluída",
+    definition: "% das URAs enviadas em que o cliente navegou o menu e foi roteado.",
+    why_it_matters: "Taxa de sucesso da triagem automática. Baixa = menu confuso ou mal posicionado.",
+    formula: "ura_state 'completed' ÷ URAs enviadas",
+  },
+  atendimento_ura_timeout: {
+    title: "Timeout / Fallback",
+    definition: "% das URAs enviadas em que o cliente não respondeu e caiu direto para o humano.",
+    why_it_matters: "Automação que não pegou — cliente ignorou ou desistiu do menu.",
+    formula: "ura_state 'timeout_fallback' ÷ URAs enviadas",
+  },
+  atendimento_ura_confusa: {
+    title: "URA Confusa",
+    definition: "% das URAs enviadas em que o cliente digitou ao menos uma opção inválida.",
+    why_it_matters: "Sinal direto de menu mal desenhado — opções pouco claras geram fricção.",
+    formula: "atendimentos com ura_invalid_count > 0 ÷ URAs enviadas",
+  },
+  atendimento_ura_funil: {
+    title: "Funil da URA",
+    definition: "Desfecho das URAs enviadas: concluída (navegou), timeout (caiu pro humano) ou pendente.",
+    why_it_matters: "Mostra para onde vai quem entra no menu — eficácia geral da triagem.",
+    formula: "distribuição de ura_state entre as URAs enviadas",
+  },
 };
 
 
