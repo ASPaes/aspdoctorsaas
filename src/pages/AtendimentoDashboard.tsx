@@ -77,6 +77,9 @@ export default function AtendimentoDashboard() {
         <TabsContent value="ura" className="mt-4">
           <UraTab />
         </TabsContent>
+        <TabsContent value="taxonomia" className="mt-4">
+          <TaxonomiaTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
