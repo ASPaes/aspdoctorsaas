@@ -13,6 +13,7 @@ export default function OperacaoTab() {
         <TabsTrigger value="pausas">Pausas</TabsTrigger>
         <TabsTrigger value="macros">Macros</TabsTrigger>
         <TabsTrigger value="grupos">Grupos</TabsTrigger>
+        <TabsTrigger value="risco">Risco de churn</TabsTrigger>
       </TabsList>
       <TabsContent value="atendimento" className="mt-4">
         <AtendimentoCsatTab />
