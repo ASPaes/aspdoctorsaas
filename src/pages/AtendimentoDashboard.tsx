@@ -57,6 +57,7 @@ export default function AtendimentoDashboard() {
           <TabsTrigger value="satisfacao">Satisfação</TabsTrigger>
           <TabsTrigger value="volume">Volume</TabsTrigger>
           <TabsTrigger value="ura">URA</TabsTrigger>
+          <TabsTrigger value="taxonomia">Taxonomia</TabsTrigger>
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
           <TempoRealTab />
