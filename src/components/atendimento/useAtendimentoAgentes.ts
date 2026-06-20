@@ -12,6 +12,7 @@ export interface AgenteRow {
   csat: number | null;
   csat_n: number;
   reabertura_pct: number | null;
+  pico_simultaneos: number;
   msgs_atend: number | null;
 }
 
