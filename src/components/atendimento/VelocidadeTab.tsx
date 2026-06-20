@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { startOfDay, endOfDay, subDays } from "date-fns";
-import { Loader2, Gauge } from "lucide-react";
+import { Loader2, Gauge, UserX } from "lucide-react";
 import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
@@ -66,7 +66,7 @@ export function VelocidadeTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <KPICardEnhanced
               label="TME"
               helpKey="atendimento_tme"
@@ -101,6 +101,14 @@ export function VelocidadeTab() {
               value={data.sla_pct !== null ? `${data.sla_pct}%` : "—"}
               subtitle={`${data.sla_dentro}/${data.sla_total} · alvo ${Math.round(data.sla_frt_seconds / 60)}min`}
               icon={<Gauge className="h-4 w-4" />}
+            />
+            <KPICardEnhanced
+              label="Não Atendido"
+              helpKey="atendimento_nao_atendido"
+              value={data.nao_atendido_pct !== null ? `${data.nao_atendido_pct}%` : "—"}
+              subtitle={`${data.nao_atendido}/${data.total_encerrados} sem assumir`}
+              variant={data.nao_atendido_pct !== null && data.nao_atendido_pct > 5 ? "warning" : "dark"}
+              icon={<UserX className="h-4 w-4" />}
             />
           </div>
 
