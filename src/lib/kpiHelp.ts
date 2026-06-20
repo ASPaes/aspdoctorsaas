@@ -1115,6 +1115,43 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Capacidade real agora. Comparado à fila e ao SLA, mostra se há gente suficiente para o volume atual.",
     formula: "presença com status 'active' e último heartbeat ≤ 5 min; pausa contada à parte",
   },
+  // ── Atendimento — Volume ──
+  atendimento_volume_total: {
+    title: "Total no Período",
+    definition: "Total de atendimentos abertos no período selecionado.",
+    why_it_matters: "Volume bruto de demanda — base para dimensionar equipe e ler o heatmap.",
+    formula: "COUNT de atendimentos abertos no período",
+  },
+  atendimento_heatmap: {
+    title: "Mapa de Calor (hora × dia)",
+    definition: "Volume de aberturas por hora do dia e dia da semana (horário de Brasília).",
+    why_it_matters: "Mostra os picos de demanda — onde escalar gente e onde há folga.",
+    formula: "contagem de aberturas agrupada por dia da semana e hora local",
+  },
+  atendimento_novos_recorrentes: {
+    title: "Novos vs Recorrentes",
+    definition: "Atendimentos de contatos que falam pela primeira vez (novos) vs que já tinham contato anterior (recorrentes).",
+    why_it_matters: "Recorrência alta pode indicar problema mal resolvido ou base fiel — leia junto com reabertura e CSAT.",
+    formula: "por contato: primeiro atendimento de todos = novo; demais = recorrente",
+  },
+  atendimento_proativo_reativo: {
+    title: "Proativo vs Reativo",
+    definition: "Quem iniciou: a empresa (agente, operador, automação, ticket = proativo) ou o cliente (customer, fora do horário = reativo).",
+    why_it_matters: "Mede quanto da operação é resposta a demanda vs iniciativa própria (cobrança, campanhas).",
+    formula: "classificação por created_from do atendimento",
+  },
+  atendimento_canais: {
+    title: "Canais de Abertura",
+    definition: "Distribuição dos atendimentos pela origem de abertura (created_from).",
+    why_it_matters: "Mostra de onde a demanda entra — cliente, agente, automação de cobrança, ticket, etc.",
+    formula: "contagem por created_from no período",
+  },
+  atendimento_top_motivos: {
+    title: "Top Motivos",
+    definition: "Tags de assunto mais frequentes (geradas por IA a partir do conteúdo do atendimento).",
+    why_it_matters: "Diz POR QUE o cliente procura suporte — prioriza FAQ, automação e treino.",
+    formula: "contagem das ai_tags no período (cobertura parcial — nem todo atendimento tem tag)",
+  },
 };
 
 
