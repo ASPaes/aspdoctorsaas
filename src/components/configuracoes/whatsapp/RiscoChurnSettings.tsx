@@ -97,7 +97,7 @@ export default function RiscoChurnSettings() {
       }
       const { error: updErr } = await supabase
         .from("configuracoes")
-        .update({ support_config: base })
+        .update({ support_config: base as any })
         .eq("tenant_id", tid as string);
       if (updErr) throw updErr;
       return mode;
