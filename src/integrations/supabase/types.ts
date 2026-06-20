@@ -7031,6 +7031,7 @@ export type Database = {
           attendance_id: string | null
           attendance_opened_at: string | null
           attendance_status: string | null
+          attendance_unidade_base_id: number | null
           conversation_assigned_to: string | null
           conversation_id: string | null
           conversation_status: string | null
@@ -7050,6 +7051,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "support_attendances_unidade_base_id_fkey"
+            columns: ["attendance_unidade_base_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_base"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "whatsapp_conversations_department_id_fkey"
@@ -7700,15 +7708,26 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
       get_atendimento_backlog: {
-        Args: { p_date_from: string; p_date_to: string; p_tenant_id: string }
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
         Returns: Json
       }
       get_atendimento_clientes: {
-        Args: { p_date_from: string; p_date_to: string; p_tenant_id: string }
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
         Returns: Json
       }
       get_atendimento_cobertura: {
@@ -7720,6 +7739,7 @@ export type Database = {
           p_department_id?: string
           p_sla_threshold_min?: number
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
@@ -7729,6 +7749,7 @@ export type Database = {
           p_department_id?: string
           p_sla_threshold_min?: number
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
@@ -7738,11 +7759,17 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
       get_atendimento_taxonomia: {
-        Args: { p_date_from: string; p_date_to: string; p_tenant_id: string }
+        Args: {
+          p_date_from: string
+          p_date_to: string
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
         Returns: Json
       }
       get_atendimento_ura: {
@@ -7751,6 +7778,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
@@ -7761,6 +7789,7 @@ export type Database = {
           p_department_id?: string
           p_sla_frt_seconds?: number
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
@@ -7770,6 +7799,7 @@ export type Database = {
           p_date_to: string
           p_department_id?: string
           p_tenant_id: string
+          p_unidade_base_id?: number
         }
         Returns: Json
       }
