@@ -9,6 +9,7 @@ import { UraTab } from "@/components/atendimento/UraTab";
 import { TaxonomiaTab } from "@/components/atendimento/TaxonomiaTab";
 import { BacklogTab } from "@/components/atendimento/BacklogTab";
 import { CoberturaTab } from "@/components/atendimento/CoberturaTab";
+import { ClientesTab } from "@/components/atendimento/ClientesTab";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
@@ -63,6 +64,7 @@ export default function AtendimentoDashboard() {
           <TabsTrigger value="ura">URA</TabsTrigger>
           <TabsTrigger value="taxonomia">Taxonomia</TabsTrigger>
           <TabsTrigger value="backlog">Backlog</TabsTrigger>
+          <TabsTrigger value="clientes">Clientes</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="cobertura">Cobertura</TabsTrigger>}
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
@@ -88,6 +90,9 @@ export default function AtendimentoDashboard() {
         </TabsContent>
         <TabsContent value="backlog" className="mt-4">
           <BacklogTab />
+        </TabsContent>
+        <TabsContent value="clientes" className="mt-4">
+          <ClientesTab />
         </TabsContent>
         {isSuperAdmin && (
           <TabsContent value="cobertura" className="mt-4">
