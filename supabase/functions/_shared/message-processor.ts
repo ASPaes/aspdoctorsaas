@@ -35,6 +35,13 @@ const HUMAN_INTENT_AFTER_RETRIES_MESSAGES = [
   'Tudo bem! Vou direcionar você para um atendente que pode te ajudar melhor. Aguarde!',
 ];
 
+const CSAT_NUDGE_MESSAGES = [
+  'Sua avaliação é muito importante pra nós! \u{1F64F} Pra concluir, responda apenas com uma nota de 0 a 5. Caso queira reabrir o atendimento, digite *Reabrir* que um agente irá te atender.',
+  'Faltou só a sua nota! \u{1F60A} De 0 a 5, como você avalia o atendimento? Sua opinião nos ajuda muito. Se preferir voltar a falar com um atendente, digite *Reabrir*.',
+  'Quase lá! Pra registrar sua avaliação, envie um número de 0 a 5. Sua resposta é muito importante pra nós! Caso queira reabrir o atendimento, é só digitar *Reabrir*.',
+  'Adoraríamos saber como foi seu atendimento! \u{2B50} Responda com uma nota de 0 a 5. Se ainda precisar de ajuda, digite *Reabrir* e um agente te atende.',
+];
+
 const AUTO_REPLY_PATTERNS = [
   /mensagem\s+autom[aá]tica/i,
   /resposta\s+autom[aá]tica/i,
@@ -523,11 +530,19 @@ export async function handleCsatResponse(supabase: any, ctx: SendContext, conver
       const digits = trimmed.replace(/[^0-9]/g, '');
       const scoreNum = (trimmed.length <= 4 && /^[0-9]+$/.test(digits)) ? parseInt(digits, 10) : NaN;
 
-      // Não é nota -> cliente tem outra demanda. Expira o CSAT (consome a 1ª resposta) e
-      // deixa seguir o fluxo normal (retorna false). NÃO insiste em pedir número.
+      // Não é nota. Dois caminhos:
       if (isNaN(scoreNum) || scoreNum < supportConfig.support_csat_score_min || scoreNum > supportConfig.support_csat_score_max) {
-        await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
-        return false;
+        // (a) Cliente pediu pra reabrir: expira o CSAT e deixa o fluxo seguir →
+        //     ensureAttendanceForIncomingMessage reabre o atendimento.
+        if (/\breabrir\b/i.test(trimmed)) {
+          await supabase.from('support_csat').update({ status: 'expired', responded_at: new Date().toISOString() }).eq('id', csat.id);
+          return false;
+        }
+        // (b) Qualquer outra coisa (cortesia, texto solto): re-pede a nota com mensagem
+        //     variada, informando a opção de reabrir. Mantém o CSAT pending; o cron
+        //     check-csat-timeout encerra como csat_timeout quando estourar o prazo.
+        await sendAndPersistAutoMessage(supabase, ctx, conversationId, pickRandom(CSAT_NUDGE_MESSAGES), { csat: true, csat_nudge: true });
+        return true;
       }
 
       const needsReason = scoreNum <= supportConfig.support_csat_reason_threshold;
