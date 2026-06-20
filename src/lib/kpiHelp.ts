@@ -1109,6 +1109,12 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Cliente chamou e ninguém pegou — encerrado no vácuo (auto-close por inatividade ou abandono). Quanto maior, pior a cobertura.",
     formula: "encerrados sem assumed_at ÷ encerrados, no período",
   },
+  atendimento_agentes_online: {
+    title: "Agentes Online",
+    definition: "Agentes com status ativo e heartbeat recente — conectados de fato neste momento.",
+    why_it_matters: "Capacidade real agora. Comparado à fila e ao SLA, mostra se há gente suficiente para o volume atual.",
+    formula: "presença com status 'active' e último heartbeat ≤ 5 min; pausa contada à parte",
+  },
 };
 
 
