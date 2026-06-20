@@ -6,6 +6,7 @@ import { AgentesTab } from "@/components/atendimento/AgentesTab";
 import { SatisfacaoTab } from "@/components/atendimento/SatisfacaoTab";
 import { VolumeTab } from "@/components/atendimento/VolumeTab";
 import { UraTab } from "@/components/atendimento/UraTab";
+import { TaxonomiaTab } from "@/components/atendimento/TaxonomiaTab";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
 function formatSecondsAgo(seg: number): string {
