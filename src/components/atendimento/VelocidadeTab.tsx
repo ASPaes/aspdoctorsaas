@@ -102,6 +102,14 @@ export function VelocidadeTab() {
               subtitle={`${data.sla_dentro}/${data.sla_total} · alvo ${Math.round(data.sla_frt_seconds / 60)}min`}
               icon={<Gauge className="h-4 w-4" />}
             />
+            <KPICardEnhanced
+              label="Não Atendido"
+              helpKey="atendimento_nao_atendido"
+              value={data.nao_atendido_pct !== null ? `${data.nao_atendido_pct}%` : "—"}
+              subtitle={`${data.nao_atendido}/${data.total_encerrados} sem assumir`}
+              variant={data.nao_atendido_pct !== null && data.nao_atendido_pct > 5 ? "warning" : "dark"}
+              icon={<UserX className="h-4 w-4" />}
+            />
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4">
