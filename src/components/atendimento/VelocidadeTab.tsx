@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { startOfDay, endOfDay, subDays } from "date-fns";
-import { Loader2, Gauge } from "lucide-react";
+import { Loader2, Gauge, UserX } from "lucide-react";
 import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
