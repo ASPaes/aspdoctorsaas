@@ -12,6 +12,7 @@ export interface AgenteRow {
   csat: number | null;
   csat_n: number;
   reabertura_pct: number | null;
+  pico_simultaneos: number;
   msgs_atend: number | null;
 }
 
@@ -55,6 +56,7 @@ export function useAtendimentoAgentes(dateRange: { from: Date; to: Date }) {
           csat: num(r.csat),
           csat_n: Number(r.csat_n ?? 0),
           reabertura_pct: num(r.reabertura_pct),
+          pico_simultaneos: Number(r.pico_simultaneos ?? 0),
           msgs_atend: num(r.msgs_atend),
         })),
       } as AtendimentoAgentes;

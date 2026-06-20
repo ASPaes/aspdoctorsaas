@@ -88,6 +88,7 @@ export function AgentesTab() {
                       <th className="py-2 pr-3 font-medium">Agente</th>
                       <th className="py-2 px-3 text-right font-medium">Atend.</th>
                       <th className="py-2 px-3 text-right font-medium">Encerr.</th>
+                      <th className="py-2 px-3 text-right font-medium">Pico</th>
                       <th className="py-2 px-3 text-right font-medium">TMA</th>
                       <th className="py-2 px-3 text-right font-medium">1ª resp</th>
                       <th className="py-2 px-3 text-right font-medium">CSAT</th>
@@ -101,6 +102,7 @@ export function AgentesTab() {
                         <td className="py-2 pr-3 truncate max-w-[14rem]">{a.nome}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.total}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.encerrados}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{a.pico_simultaneos}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.frt_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">

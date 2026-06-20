@@ -1060,9 +1060,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_scorecard: {
     title: "Scorecard por Agente",
-    definition: "Desempenho de cada agente: volume, tempos (mediana), CSAT, reabertura e mensagens por atendimento.",
-    why_it_matters: "Compara agentes de forma justa. A mediana não distorce por outlier; olhe o nº de respostas do CSAT antes de concluir.",
-    formula: "por agente no período: atendimentos, encerrados, TMA e 1ª resposta (mediana), CSAT médio, reabertura %, msgs/atend",
+    definition: "Desempenho de cada agente: volume, pico de atendimentos simultâneos, tempos (mediana), CSAT, reabertura e mensagens por atendimento.",
+    why_it_matters: "Compara agentes de forma justa. O pico simultâneo mostra a carga concorrente real; a mediana não distorce por outlier; olhe o nº de respostas do CSAT antes de concluir.",
+    formula: "por agente no período: atendimentos, encerrados, pico simultâneo (overlap assumido→encerrado), TMA e 1ª resposta (mediana), CSAT, reabertura %, msgs/atend",
   },
   // ── Atendimento — Satisfação ──
   atendimento_csat_media: {
