@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 
 export interface BacklogPrioRow { prioridade: string; qtd: number; vencidos: number; }
 export interface BacklogStatusRow { status: string; color: string | null; qtd: number; }
@@ -16,8 +17,9 @@ export interface AtendimentoBacklog {
 
 export function useAtendimentoBacklog(dateRange: { from: Date; to: Date }) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   return useQuery<AtendimentoBacklog>({
-    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -25,6 +27,7 @@ export function useAtendimentoBacklog(dateRange: { from: Date; to: Date }) {
         p_tenant_id: tid,
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
+        p_unidade_base_id: selectedUnidadeId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;

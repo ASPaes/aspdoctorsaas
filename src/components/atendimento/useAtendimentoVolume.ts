@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 
 export interface CanalRow { canal: string; qtd: number; }
 export interface HeatCell { dow: number; hora: number; qtd: number; }
@@ -14,8 +15,9 @@ export interface AtendimentoVolume {
 
 export function useAtendimentoVolume(dateRange: { from: Date; to: Date }) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
   return useQuery<AtendimentoVolume>({
-    queryKey: ["atendimento-volume", tid, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryKey: ["atendimento-volume", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -23,6 +25,7 @@ export function useAtendimentoVolume(dateRange: { from: Date; to: Date }) {
         p_tenant_id: tid,
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
+        p_unidade_base_id: selectedUnidadeId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;

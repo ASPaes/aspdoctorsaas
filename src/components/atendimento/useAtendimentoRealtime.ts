@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 
 export interface AtendimentoRealtime {
   fila: number;
@@ -17,9 +18,10 @@ export interface AtendimentoRealtime {
 
 export function useAtendimentoRealtime() {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
 
   const query = useQuery<AtendimentoRealtime>({
-    queryKey: ["atendimento-realtime", tid],
+    queryKey: ["atendimento-realtime", tid, selectedUnidadeId],
     enabled: !!tid,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
@@ -27,7 +29,7 @@ export function useAtendimentoRealtime() {
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)(
         "get_atendimento_realtime",
-        { p_tenant_id: tid }
+        { p_tenant_id: tid, p_unidade_base_id: selectedUnidadeId ?? null }
       );
       if (error) throw error;
       const raw = (data ?? {}) as any;
