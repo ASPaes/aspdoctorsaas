@@ -8,6 +8,8 @@ import { VolumeTab } from "@/components/atendimento/VolumeTab";
 import { UraTab } from "@/components/atendimento/UraTab";
 import { TaxonomiaTab } from "@/components/atendimento/TaxonomiaTab";
 import { BacklogTab } from "@/components/atendimento/BacklogTab";
+import { CoberturaTab } from "@/components/atendimento/CoberturaTab";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
 function formatSecondsAgo(seg: number): string {
@@ -20,6 +22,7 @@ function formatSecondsAgo(seg: number): string {
 }
 
 export default function AtendimentoDashboard() {
+  const { isSuperAdmin } = useTenantFilter();
   const { dataUpdatedAt } = useAtendimentoRealtime();
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState("tempo-real");
@@ -60,6 +63,7 @@ export default function AtendimentoDashboard() {
           <TabsTrigger value="ura">URA</TabsTrigger>
           <TabsTrigger value="taxonomia">Taxonomia</TabsTrigger>
           <TabsTrigger value="backlog">Backlog</TabsTrigger>
+          {isSuperAdmin && <TabsTrigger value="cobertura">Cobertura</TabsTrigger>}
         </TabsList>
         <TabsContent value="tempo-real" className="mt-4">
           <TempoRealTab />
@@ -85,6 +89,11 @@ export default function AtendimentoDashboard() {
         <TabsContent value="backlog" className="mt-4">
           <BacklogTab />
         </TabsContent>
+        {isSuperAdmin && (
+          <TabsContent value="cobertura" className="mt-4">
+            <CoberturaTab />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
