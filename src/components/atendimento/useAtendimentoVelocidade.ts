@@ -19,6 +19,8 @@ export interface AtendimentoVelocidade {
   sla_total: number;
   sla_dentro: number;
   sla_pct: number | null;
+  nao_atendido: number;
+  nao_atendido_pct: number | null;
   por_departamento: VelocidadeDeptRow[];
 }
 
