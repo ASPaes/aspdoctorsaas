@@ -3,6 +3,7 @@ import AtendimentoCsatTab from "./AtendimentoCsatTab";
 import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePauseReasonsTab";
 import { MacrosManager } from "./MacrosManager";
 import WhatsAppGroupsTab from "./WhatsAppGroupsTab";
+import RiscoChurnSettings from "./RiscoChurnSettings";
 
 export default function OperacaoTab() {
   return (
