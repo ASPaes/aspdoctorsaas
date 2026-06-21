@@ -72,7 +72,7 @@ export function VolumeTab() {
             <KPICardEnhanced
               label="Proativo vs Reativo"
               value={`${data.proativo.toLocaleString("pt-BR")} / ${data.reativo.toLocaleString("pt-BR")}`}
-              subtitle={`${pct(data.proativo, data.total)} proativo`}
+              subtitle={`${pct(data.proativo, data.proativo + data.reativo)} proativo`}
               helpKey="atendimento_proativo_reativo"
               icon={<ArrowDownLeft className="h-4 w-4" />}
               variant="dark"
