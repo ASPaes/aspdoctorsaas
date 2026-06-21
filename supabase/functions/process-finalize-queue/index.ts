@@ -22,15 +22,8 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Auth: só aceita chamada interna com service_role
-  const authHeader = req.headers.get("Authorization") || "";
-  if (authHeader.replace("Bearer ", "") !== serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
+  // Sem auth de entrada: a proteção real está na fila (RLS: só trigger/service_role inserem)
+  // e no finalize-attendance (que exige service_role). Este processador só drena itens legítimos.
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // limit opcional via body
