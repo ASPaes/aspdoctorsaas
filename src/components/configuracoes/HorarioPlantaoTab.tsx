@@ -448,6 +448,29 @@ export default function HorarioPlantaoTab() {
               </div>
             )}
 
+            {selectedContext !== "global" && (
+              <div className="space-y-1.5 rounded-lg border p-3">
+                <Label>Alvo de SLA de 1ª resposta (minutos)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={deptSlaMin}
+                    onChange={(e) => setDeptSlaMin(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="herda global"
+                    className="w-36"
+                  />
+                  <Button onClick={handleSaveDeptSla} disabled={savingSla} size="sm" variant="outline">
+                    {savingSla ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    Salvar alvo
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Deixe vazio para herdar o alvo global do dashboard. Afeta a tabela "% dentro do SLA por departamento".
+                </p>
+              </div>
+            )}
+
             {/* Toggle */}
             <div className="flex items-center gap-3">
               <Switch checked={bhEnabled} onCheckedChange={setBhEnabled} id="bh-enabled" />
