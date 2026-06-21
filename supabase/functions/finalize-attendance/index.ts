@@ -60,7 +60,7 @@ serve(async (req) => {
     // 1. Fetch attendance
     const { data: att, error: attErr } = await supabase
       .from("support_attendances")
-      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary")
+      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type")
       .eq("id", attendanceId)
       .single();
 
@@ -84,6 +84,31 @@ serve(async (req) => {
       console.log(`[${FUNCTION_NAME}][${requestId}] KB já existe, skip`);
       return new Response(
         JSON.stringify({ success: true, skipped: true, reason: "kb_already_exists" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 2.5 Regra determinística: cliente ficou sem resposta de humano
+    const semRespostaAgente =
+      att.first_human_response_at == null &&
+      (att.msg_customer_count ?? 0) > 0 &&
+      (att.closure_type === "inactivity_auto" || att.closure_type === "silent");
+
+    if (semRespostaAgente) {
+      console.log(`[${FUNCTION_NAME}][${requestId}] Deterministico: sem_resposta_agente, pulando IA e KB`);
+      await supabase
+        .from("support_attendances")
+        .update({
+          sentiment_score: -60,
+          sentiment_final: "negative",
+          resolucao: "sem_resposta_agente",
+          sentiment_at: new Date().toISOString(),
+          sentiment_model: "deterministic",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", attendanceId);
+      return new Response(
+        JSON.stringify({ success: true, ai: false, resolucao: "sem_resposta_agente" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -168,7 +193,9 @@ serve(async (req) => {
     // 7. Single consolidated AI call
     console.log(`[${FUNCTION_NAME}][${requestId}] Chamando IA consolidada (${messages.length} msgs)`);
 
-    const prompt = `Analise este atendimento de suporte técnico e retorne um JSON com análise completa.
+    const prompt = `Você avalia o DESFECHO de um atendimento de suporte, não o tom das mensagens. O cliente quase sempre chega com um problema ou dúvida — isso é normal e NÃO é negativo. O que importa é como o atendimento TERMINOU: o problema foi resolvido? o cliente saiu satisfeito? ficou pendência?
+
+Avalie o atendimento INTEIRO e sua trajetória: um cliente que chega irritado e sai com o problema resolvido é um desfecho POSITIVO.
 
 Mensagens do atendimento:
 ${messagesText}
@@ -177,8 +204,8 @@ ${areaNames ? `Áreas disponíveis: ${areaNames}` : ""}
 
 Retorne APENAS JSON válido sem markdown:
 {
-  "sentiment": "positive|neutral|negative",
-  "confidence": 0.0-1.0,
+  "sentiment_score": -100 a 100,
+  "resolucao": "resolvido|parcial|nao_resolvido",
   "topics": ["topico1"],
   "summary": "Resumo curto (máx 80 palavras)",
   "title": "Título curto para KB (máx 80 chars)",
@@ -189,7 +216,8 @@ Retorne APENAS JSON válido sem markdown:
 }
 
 REGRAS:
-- Seja conciso e objetivo
+- "sentiment_score": desfecho numa escala contínua. Perto de +100 = saiu satisfeito/resolvido; perto de -100 = saiu insatisfeito/sem solução; perto de 0 = neutro/indefinido. Baseie no DESFECHO e na trajetória, nunca em palavras isoladas como "problema" ou "erro".
+- "resolucao": "resolvido" = solucionado e/ou cliente confirmou; "parcial" = avançou mas ficou pendência; "nao_resolvido" = encerrou sem solução.
 - "problem": apenas o relato inicial do cliente
 - "solution": orientação do técnico, forma instrucional
 - "tags": máximo 5, palavras curtas (1-2 termos)
@@ -240,9 +268,18 @@ REGRAS:
       }
     }
 
-    console.log(`[${FUNCTION_NAME}][${requestId}] IA retornou: sentiment=${result.sentiment}, topics=${result.topics?.length || 0}`);
+    // 8. Derivar veredito de desfecho a partir do score
+    let score = typeof result.sentiment_score === "number" ? Math.round(result.sentiment_score) : 0;
+    score = Math.min(100, Math.max(-100, score));
+    const sentimentValue = score >= 30 ? "positive" : score <= -30 ? "negative" : "neutral";
+    const resolucao = ["resolvido", "parcial", "nao_resolvido"].includes(result.resolucao)
+      ? result.resolucao
+      : "parcial";
+    const confidence = 0.7;
 
-    // 8. Save AI fields to support_attendances
+    console.log(`[${FUNCTION_NAME}][${requestId}] IA retornou: score=${score}, final=${sentimentValue}, resolucao=${resolucao}`);
+
+    // 8.1 Salvar campos de IA + veredito no atendimento
     await supabase
       .from("support_attendances")
       .update({
@@ -250,15 +287,16 @@ REGRAS:
         ai_problem: (result.problem || "").substring(0, 1000),
         ai_solution: (result.solution || "").substring(0, 1000),
         ai_tags: (result.tags || []).slice(0, 5),
+        sentiment_score: score,
+        sentiment_final: sentimentValue,
+        resolucao,
+        sentiment_at: new Date().toISOString(),
+        sentiment_model: aiConfig.model || "ai",
         updated_at: new Date().toISOString(),
       })
       .eq("id", attendanceId);
 
-    // 9. Upsert sentiment
-    const sentimentValue = ["positive", "negative", "neutral"].includes(result.sentiment)
-      ? result.sentiment
-      : "neutral";
-    const confidence = typeof result.confidence === "number" ? Math.min(1, Math.max(0, result.confidence)) : 0.7;
+    // 9. Upsert sentiment (legado — mantém last_sentiment via trigger)
 
     const { data: convData } = await supabase
       .from("whatsapp_conversations")
