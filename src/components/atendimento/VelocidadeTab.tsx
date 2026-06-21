@@ -103,6 +103,13 @@ export function VelocidadeTab() {
               icon={<Gauge className="h-4 w-4" />}
             />
             <KPICardEnhanced
+              label="% SLA (horário útil)"
+              helpKey="atendimento_sla_util"
+              value={data.sla_util_pct !== null ? `${data.sla_util_pct}%` : "—"}
+              subtitle={`${data.sla_util_dentro}/${data.sla_util_total} · só expediente`}
+              icon={<Gauge className="h-4 w-4" />}
+            />
+            <KPICardEnhanced
               label="Não Atendido"
               helpKey="atendimento_nao_atendido"
               value={data.nao_atendido_pct !== null ? `${data.nao_atendido_pct}%` : "—"}
