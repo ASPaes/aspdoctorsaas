@@ -150,6 +150,8 @@ export default function HorarioPlantaoTab() {
   });
   const [bhMessage, setBhMessage] = useState("");
   const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
+  const [deptSlaMin, setDeptSlaMin] = useState<number | "">("");
+  const [savingSla, setSavingSla] = useState(false);
 
   // ── Contexto: Global vs Setor ──
   const [selectedContext, setSelectedContext] = useState<string>("global");
