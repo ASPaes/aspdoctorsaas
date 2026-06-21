@@ -4140,10 +4140,15 @@ export type Database = {
           reopen_count: number | null
           reopened_at: string | null
           reopened_from: string | null
+          resolucao: string | null
           schedule_notified_at: string | null
           scheduled_at: string | null
           scheduled_by: string | null
           scheduled_until: string | null
+          sentiment_at: string | null
+          sentiment_final: string | null
+          sentiment_model: string | null
+          sentiment_score: number | null
           seq_number: number
           status: string
           tenant_id: string
@@ -4210,10 +4215,15 @@ export type Database = {
           reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
+          resolucao?: string | null
           schedule_notified_at?: string | null
           scheduled_at?: string | null
           scheduled_by?: string | null
           scheduled_until?: string | null
+          sentiment_at?: string | null
+          sentiment_final?: string | null
+          sentiment_model?: string | null
+          sentiment_score?: number | null
           seq_number?: number
           status?: string
           tenant_id: string
@@ -4280,10 +4290,15 @@ export type Database = {
           reopen_count?: number | null
           reopened_at?: string | null
           reopened_from?: string | null
+          resolucao?: string | null
           schedule_notified_at?: string | null
           scheduled_at?: string | null
           scheduled_by?: string | null
           scheduled_until?: string | null
+          sentiment_at?: string | null
+          sentiment_final?: string | null
+          sentiment_model?: string | null
+          sentiment_score?: number | null
           seq_number?: number
           status?: string
           tenant_id?: string
