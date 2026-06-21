@@ -7088,6 +7088,7 @@ export type Database = {
       v_whatsapp_conversations_state: {
         Row: {
           attendance_assigned_to: string | null
+          attendance_has_customer_msg: boolean | null
           attendance_id: string | null
           attendance_opened_at: string | null
           attendance_status: string | null
