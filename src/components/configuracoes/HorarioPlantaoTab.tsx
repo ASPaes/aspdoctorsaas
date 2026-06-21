@@ -224,6 +224,7 @@ export default function HorarioPlantaoTab() {
       }
       setBhMessage((dept.business_hours_message as string) || "");
       setBhOutsidePrompt("");
+      setDeptSlaMin(dept.sla_frt_seconds ? Math.round(dept.sla_frt_seconds / 60) : "");
     }
   }, [selectedContext, config, deptRows]);
 
