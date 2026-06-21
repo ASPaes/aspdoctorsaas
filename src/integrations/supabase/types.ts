@@ -7854,6 +7854,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_atendimento_velocidade_timeline: {
+        Args: {
+          p_bucket?: string
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_sla_frt_seconds?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: Json
+      }
       get_atendimento_volume: {
         Args: {
           p_date_from: string
