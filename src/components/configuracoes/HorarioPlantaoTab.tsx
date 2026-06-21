@@ -163,7 +163,7 @@ export default function HorarioPlantaoTab() {
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sort_order")
+        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sla_frt_seconds, sort_order")
         .eq("tenant_id", deptTid!)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
