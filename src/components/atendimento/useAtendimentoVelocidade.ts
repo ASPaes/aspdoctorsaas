@@ -20,6 +20,10 @@ export interface AtendimentoVelocidade {
   sla_total: number;
   sla_dentro: number;
   sla_pct: number | null;
+  sla_util_total: number;
+  sla_util_dentro: number;
+  sla_util_pct: number | null;
+  fora_horario: number;
   nao_atendido: number;
   nao_atendido_pct: number | null;
   por_departamento: VelocidadeDeptRow[];
