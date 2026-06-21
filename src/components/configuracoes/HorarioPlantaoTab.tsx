@@ -358,6 +358,25 @@ export default function HorarioPlantaoTab() {
     }
   };
 
+  const handleSaveDeptSla = async () => {
+    if (selectedContext === "global") return;
+    setSavingSla(true);
+    try {
+      const secs = deptSlaMin === "" ? null : Math.round(Number(deptSlaMin) * 60);
+      const { error } = await (supabase.from("support_departments" as any) as any)
+        .update({ sla_frt_seconds: secs })
+        .eq("id", selectedContext);
+      if (error) throw error;
+      qcDept.invalidateQueries({ queryKey: ["dept-business-hours", deptTid] });
+      const deptName = deptRows.find((d) => d.id === selectedContext)?.name || "Setor";
+      toast({ title: `Alvo de SLA do setor ${deptName} salvo!` });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingSla(false);
+    }
+  };
+
   const handleSaveAI = () => {
     saveAI.mutate({
       business_hours_ai_enabled: aiEnabled,
