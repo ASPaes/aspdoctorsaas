@@ -268,9 +268,18 @@ REGRAS:
       }
     }
 
-    console.log(`[${FUNCTION_NAME}][${requestId}] IA retornou: sentiment=${result.sentiment}, topics=${result.topics?.length || 0}`);
+    // 8. Derivar veredito de desfecho a partir do score
+    let score = typeof result.sentiment_score === "number" ? Math.round(result.sentiment_score) : 0;
+    score = Math.min(100, Math.max(-100, score));
+    const sentimentValue = score >= 30 ? "positive" : score <= -30 ? "negative" : "neutral";
+    const resolucao = ["resolvido", "parcial", "nao_resolvido"].includes(result.resolucao)
+      ? result.resolucao
+      : "parcial";
+    const confidence = 0.7;
 
-    // 8. Save AI fields to support_attendances
+    console.log(`[${FUNCTION_NAME}][${requestId}] IA retornou: score=${score}, final=${sentimentValue}, resolucao=${resolucao}`);
+
+    // 8.1 Salvar campos de IA + veredito no atendimento
     await supabase
       .from("support_attendances")
       .update({
@@ -278,15 +287,16 @@ REGRAS:
         ai_problem: (result.problem || "").substring(0, 1000),
         ai_solution: (result.solution || "").substring(0, 1000),
         ai_tags: (result.tags || []).slice(0, 5),
+        sentiment_score: score,
+        sentiment_final: sentimentValue,
+        resolucao,
+        sentiment_at: new Date().toISOString(),
+        sentiment_model: aiConfig.model || "ai",
         updated_at: new Date().toISOString(),
       })
       .eq("id", attendanceId);
 
-    // 9. Upsert sentiment
-    const sentimentValue = ["positive", "negative", "neutral"].includes(result.sentiment)
-      ? result.sentiment
-      : "neutral";
-    const confidence = typeof result.confidence === "number" ? Math.min(1, Math.max(0, result.confidence)) : 0.7;
+    // 9. Upsert sentiment (legado — mantém last_sentiment via trigger)
 
     const { data: convData } = await supabase
       .from("whatsapp_conversations")
