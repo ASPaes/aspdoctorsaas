@@ -3,6 +3,7 @@ import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Gauge, UserX } from "lucide-react";
 import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
+import { VelocidadeTimeline } from "./VelocidadeTimeline";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
@@ -118,6 +119,8 @@ export function VelocidadeTab() {
               icon={<UserX className="h-4 w-4" />}
             />
           </div>
+
+          <VelocidadeTimeline dateRange={dateRange} slaSeconds={slaSeconds} />
 
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="mb-3 flex items-center gap-2">
