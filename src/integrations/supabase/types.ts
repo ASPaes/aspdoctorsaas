@@ -4625,6 +4625,7 @@ export type Database = {
           name: string
           requires_ticket_on_close: boolean
           show_in_ura: boolean
+          sla_frt_seconds: number | null
           slug: string
           sort_order: number
           tenant_id: string
@@ -4649,6 +4650,7 @@ export type Database = {
           name: string
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
+          sla_frt_seconds?: number | null
           slug: string
           sort_order?: number
           tenant_id: string
@@ -4673,6 +4675,7 @@ export type Database = {
           name?: string
           requires_ticket_on_close?: boolean
           show_in_ura?: boolean
+          sla_frt_seconds?: number | null
           slug?: string
           sort_order?: number
           tenant_id?: string
