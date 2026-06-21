@@ -1031,6 +1031,13 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     formula: "1ªs respostas ≤ alvo ÷ total de 1ªs respostas no período (sem cap — breach conta)",
     market_benchmark: "Boas operações miram 90%+ de aderência ao alvo de 1ª resposta.",
   },
+  atendimento_sla_util: {
+    title: "% SLA (horário útil)",
+    definition: "Mesmo cálculo do SLA de 1ª resposta, mas considerando apenas os atendimentos abertos dentro do horário de expediente.",
+    why_it_matters: "Separa a falha real de SLA daquela que ocorreu fora do horário, quando não havia equipe escalada. É a leitura mais justa para cobrar a operação.",
+    formula: "1ªs respostas ≤ alvo ÷ total de 1ªs respostas, somente onde a conversa foi aberta dentro do expediente (opened_out_of_hours = false)",
+    market_benchmark: "Boas operações miram 90%+ de aderência ao alvo de 1ª resposta.",
+  },
   // ── Atendimento — Agentes ──
   atendimento_encerrados_periodo: {
     title: "Encerrados no Período",

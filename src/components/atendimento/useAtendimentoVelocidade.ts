@@ -20,6 +20,10 @@ export interface AtendimentoVelocidade {
   sla_total: number;
   sla_dentro: number;
   sla_pct: number | null;
+  sla_util_total: number;
+  sla_util_dentro: number;
+  sla_util_pct: number | null;
+  fora_horario: number;
   nao_atendido: number;
   nao_atendido_pct: number | null;
   por_departamento: VelocidadeDeptRow[];
@@ -63,6 +67,10 @@ export function useAtendimentoVelocidade(
         sla_total: Number(d.sla_total ?? 0),
         sla_dentro: Number(d.sla_dentro ?? 0),
         sla_pct: num(d.sla_pct),
+        sla_util_total: Number(d.sla_util_total ?? 0),
+        sla_util_dentro: Number(d.sla_util_dentro ?? 0),
+        sla_util_pct: num(d.sla_util_pct),
+        fora_horario: Number(d.fora_horario ?? 0),
         nao_atendido: Number(d.nao_atendido ?? 0),
         nao_atendido_pct: num(d.nao_atendido_pct),
         por_departamento: ((d.por_departamento ?? []) as any[]).map((r) => ({
