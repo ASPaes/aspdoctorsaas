@@ -30,20 +30,26 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userErr } = await anonClient.auth.getUser(token);
-    if (userErr || !user) {
-      console.error(`[${FUNCTION_NAME}][${requestId}] Auth error:`, userErr?.message);
-      return new Response(
-        JSON.stringify({ type: "about:blank", title: "Unauthorized", status: 401, detail: "Token inválido" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/problem+json" } }
-      );
+    const isInternalCall = token === serviceRoleKey;
+
+    if (isInternalCall) {
+      console.log(`[${FUNCTION_NAME}][${requestId}] Chamada interna (service_role)`);
+    } else {
+      const anonClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userErr } = await anonClient.auth.getUser(token);
+      if (userErr || !user) {
+        console.error(`[${FUNCTION_NAME}][${requestId}] Auth error:`, userErr?.message);
+        return new Response(
+          JSON.stringify({ type: "about:blank", title: "Unauthorized", status: 401, detail: "Token inválido" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/problem+json" } }
+        );
+      }
+      console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${user.id}`);
     }
-    console.log(`[${FUNCTION_NAME}][${requestId}] Authenticated user: ${user.id}`);
 
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
