@@ -173,6 +173,7 @@ export default function HorarioPlantaoTab() {
         business_hours_enabled: boolean | null;
         business_hours: unknown;
         business_hours_message: string | null;
+        sla_frt_seconds: number | null;
         sort_order: number | null;
       }>;
     },
