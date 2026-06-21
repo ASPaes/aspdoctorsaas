@@ -193,7 +193,9 @@ serve(async (req) => {
     // 7. Single consolidated AI call
     console.log(`[${FUNCTION_NAME}][${requestId}] Chamando IA consolidada (${messages.length} msgs)`);
 
-    const prompt = `Analise este atendimento de suporte técnico e retorne um JSON com análise completa.
+    const prompt = `Você avalia o DESFECHO de um atendimento de suporte, não o tom das mensagens. O cliente quase sempre chega com um problema ou dúvida — isso é normal e NÃO é negativo. O que importa é como o atendimento TERMINOU: o problema foi resolvido? o cliente saiu satisfeito? ficou pendência?
+
+Avalie o atendimento INTEIRO e sua trajetória: um cliente que chega irritado e sai com o problema resolvido é um desfecho POSITIVO.
 
 Mensagens do atendimento:
 ${messagesText}
@@ -202,8 +204,8 @@ ${areaNames ? `Áreas disponíveis: ${areaNames}` : ""}
 
 Retorne APENAS JSON válido sem markdown:
 {
-  "sentiment": "positive|neutral|negative",
-  "confidence": 0.0-1.0,
+  "sentiment_score": -100 a 100,
+  "resolucao": "resolvido|parcial|nao_resolvido",
   "topics": ["topico1"],
   "summary": "Resumo curto (máx 80 palavras)",
   "title": "Título curto para KB (máx 80 chars)",
@@ -214,7 +216,8 @@ Retorne APENAS JSON válido sem markdown:
 }
 
 REGRAS:
-- Seja conciso e objetivo
+- "sentiment_score": desfecho numa escala contínua. Perto de +100 = saiu satisfeito/resolvido; perto de -100 = saiu insatisfeito/sem solução; perto de 0 = neutro/indefinido. Baseie no DESFECHO e na trajetória, nunca em palavras isoladas como "problema" ou "erro".
+- "resolucao": "resolvido" = solucionado e/ou cliente confirmou; "parcial" = avançou mas ficou pendência; "nao_resolvido" = encerrou sem solução.
 - "problem": apenas o relato inicial do cliente
 - "solution": orientação do técnico, forma instrucional
 - "tags": máximo 5, palavras curtas (1-2 termos)
