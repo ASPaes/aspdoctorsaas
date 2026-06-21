@@ -60,7 +60,7 @@ serve(async (req) => {
     // 1. Fetch attendance
     const { data: att, error: attErr } = await supabase
       .from("support_attendances")
-      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary")
+      .select("id, tenant_id, conversation_id, opened_at, closed_at, area_id, ai_summary, first_human_response_at, msg_customer_count, closure_type")
       .eq("id", attendanceId)
       .single();
 
