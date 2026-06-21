@@ -361,6 +361,51 @@ export type Database = {
           },
         ]
       }
+      attendance_analysis_queue: {
+        Row: {
+          attempts: number
+          attendance_id: string
+          enqueued_at: string
+          last_error: string | null
+          processed_at: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attempts?: number
+          attendance_id: string
+          enqueued_at?: string
+          last_error?: string | null
+          processed_at?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          attempts?: number
+          attendance_id?: string
+          enqueued_at?: string
+          last_error?: string | null
+          processed_at?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_analysis_queue_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "support_attendances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_analysis_queue_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "v_whatsapp_conversations_state"
+            referencedColumns: ["attendance_id"]
+          },
+        ]
+      }
       audit_events: {
         Row: {
           actor_user_id: string | null
