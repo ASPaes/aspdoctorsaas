@@ -150,6 +150,8 @@ export default function HorarioPlantaoTab() {
   });
   const [bhMessage, setBhMessage] = useState("");
   const [bhOutsidePrompt, setBhOutsidePrompt] = useState("");
+  const [deptSlaMin, setDeptSlaMin] = useState<number | "">("");
+  const [savingSla, setSavingSla] = useState(false);
 
   // ── Contexto: Global vs Setor ──
   const [selectedContext, setSelectedContext] = useState<string>("global");
@@ -163,7 +165,7 @@ export default function HorarioPlantaoTab() {
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_departments" as any) as any)
-        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sort_order")
+        .select("id, name, business_hours_enabled, business_hours, business_hours_message, sla_frt_seconds, sort_order")
         .eq("tenant_id", deptTid!)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
@@ -173,6 +175,7 @@ export default function HorarioPlantaoTab() {
         business_hours_enabled: boolean | null;
         business_hours: unknown;
         business_hours_message: string | null;
+        sla_frt_seconds: number | null;
         sort_order: number | null;
       }>;
     },
@@ -221,6 +224,7 @@ export default function HorarioPlantaoTab() {
       }
       setBhMessage((dept.business_hours_message as string) || "");
       setBhOutsidePrompt("");
+      setDeptSlaMin(dept.sla_frt_seconds ? Math.round(dept.sla_frt_seconds / 60) : "");
     }
   }, [selectedContext, config, deptRows]);
 
@@ -354,6 +358,25 @@ export default function HorarioPlantaoTab() {
     }
   };
 
+  const handleSaveDeptSla = async () => {
+    if (selectedContext === "global") return;
+    setSavingSla(true);
+    try {
+      const secs = deptSlaMin === "" ? null : Math.round(Number(deptSlaMin) * 60);
+      const { error } = await (supabase.from("support_departments" as any) as any)
+        .update({ sla_frt_seconds: secs })
+        .eq("id", selectedContext);
+      if (error) throw error;
+      qcDept.invalidateQueries({ queryKey: ["dept-business-hours", deptTid] });
+      const deptName = deptRows.find((d) => d.id === selectedContext)?.name || "Setor";
+      toast({ title: `Alvo de SLA do setor ${deptName} salvo!` });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingSla(false);
+    }
+  };
+
   const handleSaveAI = () => {
     saveAI.mutate({
       business_hours_ai_enabled: aiEnabled,
@@ -421,6 +444,29 @@ export default function HorarioPlantaoTab() {
                   {selectedContext === "global"
                     ? "Horário padrão usado por setores sem configuração própria."
                     : `Horário específico para o setor ${deptRows.find((d) => d.id === selectedContext)?.name || ""}.`}
+                </p>
+              </div>
+            )}
+
+            {selectedContext !== "global" && (
+              <div className="space-y-1.5 rounded-lg border p-3">
+                <Label>Alvo de SLA de 1ª resposta (minutos)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={deptSlaMin}
+                    onChange={(e) => setDeptSlaMin(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="herda global"
+                    className="w-36"
+                  />
+                  <Button onClick={handleSaveDeptSla} disabled={savingSla} size="sm" variant="outline">
+                    {savingSla ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+                    Salvar alvo
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Deixe vazio para herdar o alvo global do dashboard. Afeta a tabela "% dentro do SLA por departamento".
                 </p>
               </div>
             )}
