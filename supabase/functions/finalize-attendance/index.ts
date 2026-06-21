@@ -88,6 +88,31 @@ serve(async (req) => {
       );
     }
 
+    // 2.5 Regra determinística: cliente ficou sem resposta de humano
+    const semRespostaAgente =
+      att.first_human_response_at == null &&
+      (att.msg_customer_count ?? 0) > 0 &&
+      (att.closure_type === "inactivity_auto" || att.closure_type === "silent");
+
+    if (semRespostaAgente) {
+      console.log(`[${FUNCTION_NAME}][${requestId}] Deterministico: sem_resposta_agente, pulando IA e KB`);
+      await supabase
+        .from("support_attendances")
+        .update({
+          sentiment_score: -60,
+          sentiment_final: "negative",
+          resolucao: "sem_resposta_agente",
+          sentiment_at: new Date().toISOString(),
+          sentiment_model: "deterministic",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", attendanceId);
+      return new Response(
+        JSON.stringify({ success: true, ai: false, resolucao: "sem_resposta_agente" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // 3. Check AI config
     const aiConfig = await getAIConfig(att.tenant_id, supabase);
     if (!aiConfig) {
