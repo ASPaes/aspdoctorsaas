@@ -243,6 +243,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         headerActions={t.headerActions}
         resource={t.resource}
         invalidateKeys={t.invalidateKeys}
+        templateKind={t.templateKind}
       />
     );
   }
