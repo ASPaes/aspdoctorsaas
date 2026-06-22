@@ -52,9 +52,11 @@ export function useAtendimentoVelocidade(slaSeconds: number) {
         p_tenant_id: tid,
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
-        p_sla_frt_seconds: slaSeconds,
-        p_unidade_base_id: selectedUnidadeId ?? null,
-      });
+          p_sla_frt_seconds: slaSeconds,
+          p_unidade_base_id: selectedUnidadeId ?? null,
+          p_department_id: departmentId ?? null,
+          p_agent_id: agentId ?? null,
+        });
       if (error) throw error;
       const d = (data ?? {}) as any;
       const num = (v: any) => (v === null || v === undefined ? null : Number(v));
