@@ -11,8 +11,9 @@ export interface ChatCsat { enviados: number; respondidos: number; response_rate
 export interface ChatAtendenteRow { nome: string; qtd: number; }
 export interface ChatHeatRow { dow: number; hora: number; qtd: number; }
 export interface ChatOfensorRow { cliente_id: string | null; nome: string; qtd: number; }
-export interface ChatCustoRow { cliente_id: string | null; nome: string; atendimentos: number; mrr: number; atend_por_mil: number; }
+export interface ChatCustoRow { cliente_id: string | null; nome: string; atendimentos: number; mrr: number; atend_por_mil: number; receita_por_atend: number; }
 export interface ChatConcentracao { clientes_com_chat: number; chats_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
+export interface ChatMrrAgente { mrr_total: number; agentes_ativos: number; valor: number | null; }
 export interface ChatMediaCliente { clientes_ativos: number; total_atendimentos: number; media: number | null; }
 export interface AtendimentoChats {
   total: number;
@@ -24,6 +25,7 @@ export interface AtendimentoChats {
   ofensores: ChatOfensorRow[];
   custo_receita: ChatCustoRow[];
   concentracao: ChatConcentracao;
+  mrr_por_agente: ChatMrrAgente;
   media_atend_cliente: ChatMediaCliente;
 }
 
@@ -64,13 +66,18 @@ export function useAtendimentoChats() {
         por_atendente: ((d.por_atendente ?? []) as any[]).map((r) => ({ nome: r.nome ?? "(não atribuído)", qtd: Number(r.qtd ?? 0) })),
         heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow ?? 0), hora: Number(r.hora ?? 0), qtd: Number(r.qtd ?? 0) })),
         ofensores: ((d.ofensores ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", qtd: Number(r.qtd ?? 0) })),
-        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", atendimentos: Number(r.atendimentos ?? 0), mrr: Number(r.mrr ?? 0), atend_por_mil: Number(r.atend_por_mil ?? 0) })),
+        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", atendimentos: Number(r.atendimentos ?? 0), mrr: Number(r.mrr ?? 0), atend_por_mil: Number(r.atend_por_mil ?? 0), receita_por_atend: Number(r.receita_por_atend ?? 0) })),
         concentracao: {
           clientes_com_chat: Number(d.concentracao?.clientes_com_chat ?? 0),
           chats_com_cliente: Number(d.concentracao?.chats_com_cliente ?? 0),
           top1_qtd: Number(d.concentracao?.top1_qtd ?? 0),
           top1_pct: Number(d.concentracao?.top1_pct ?? 0),
           top10_pct: Number(d.concentracao?.top10_pct ?? 0),
+        },
+        mrr_por_agente: {
+          mrr_total: Number(d.mrr_por_agente?.mrr_total ?? 0),
+          agentes_ativos: Number(d.mrr_por_agente?.agentes_ativos ?? 0),
+          valor: num(d.mrr_por_agente?.valor),
         },
         media_atend_cliente: {
           clientes_ativos: Number(d.media_atend_cliente?.clientes_ativos ?? 0),
