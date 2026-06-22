@@ -3,7 +3,7 @@ import { useAtendimentoTaxonomia } from "./useAtendimentoTaxonomia";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 
-type BarRow = { key: string; nome: string; qtd: number; pct: number };
+type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
 function Barras({ rows }: { rows: BarRow[] }) {
   const max = Math.max(1, ...rows.map((r) => r.qtd));
