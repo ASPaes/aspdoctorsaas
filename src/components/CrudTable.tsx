@@ -390,6 +390,16 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {templateKind && (
+        <ImportSimpleTemplateModal
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          kind={templateKind}
+          tenantId={tid}
+          onImported={() => queryClient.invalidateQueries({ queryKey: [queryKey, tid] })}
+        />
+      )}
     </div>
   );
 }
