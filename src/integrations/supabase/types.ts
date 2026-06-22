@@ -7796,6 +7796,23 @@ export type Database = {
         }
         Returns: Json
       }
+      get_atendimento_chats: {
+        Args: {
+          p_agent_id?: string
+          p_area_ids?: number[]
+          p_cidade_ids?: number[]
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_estado_ids?: number[]
+          p_fornecedor_ids?: number[]
+          p_produto_ids?: number[]
+          p_segmento_ids?: number[]
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: Json
+      }
       get_atendimento_clientes: {
         Args: {
           p_area_ids?: number[]

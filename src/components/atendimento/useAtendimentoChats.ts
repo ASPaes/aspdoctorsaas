@@ -1,0 +1,83 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+
+export interface ChatStatusRow { status: string; qtd: number; pct: number; }
+export interface ChatSentRow { sentimento: string; qtd: number; pct: number; }
+export interface ChatCsatDistRow { nota: number; qtd: number; }
+export interface ChatCsat { enviados: number; respondidos: number; response_rate: number; media: number | null; distribuicao: ChatCsatDistRow[]; }
+export interface ChatAtendenteRow { nome: string; qtd: number; }
+export interface ChatHeatRow { dow: number; hora: number; qtd: number; }
+export interface ChatOfensorRow { cliente_id: string | null; nome: string; qtd: number; }
+export interface ChatCustoRow { cliente_id: string | null; nome: string; atendimentos: number; mrr: number; atend_por_mil: number; }
+export interface ChatConcentracao { clientes_com_chat: number; chats_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
+export interface ChatMediaCliente { clientes_ativos: number; total_atendimentos: number; media: number | null; }
+export interface AtendimentoChats {
+  total: number;
+  por_status: ChatStatusRow[];
+  por_sentimento: ChatSentRow[];
+  csat: ChatCsat;
+  por_atendente: ChatAtendenteRow[];
+  heatmap: ChatHeatRow[];
+  ofensores: ChatOfensorRow[];
+  custo_receita: ChatCustoRow[];
+  concentracao: ChatConcentracao;
+  media_atend_cliente: ChatMediaCliente;
+}
+
+export function useAtendimentoChats() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
+  return useQuery<AtendimentoChats>({
+    queryKey: ["atendimento-chats", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
+    enabled: !!tid,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const orNull = (a: number[]) => (a.length ? a : null);
+      const { data, error } = await (supabase.rpc as any)("get_atendimento_chats", {
+        p_tenant_id: tid,
+        p_date_from: dateRange.from.toISOString(),
+        p_date_to: dateRange.to.toISOString(),
+        p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
+        p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
+        p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
+      });
+      if (error) throw error;
+      const d = (data ?? {}) as any;
+      const num = (v: any) => (v === null || v === undefined ? null : Number(v));
+      return {
+        total: Number(d.total ?? 0),
+        por_status: ((d.por_status ?? []) as any[]).map((r) => ({ status: r.status ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
+        por_sentimento: ((d.por_sentimento ?? []) as any[]).map((r) => ({ sentimento: r.sentimento ?? "(sem)", qtd: Number(r.qtd ?? 0), pct: Number(r.pct ?? 0) })),
+        csat: {
+          enviados: Number(d.csat?.enviados ?? 0),
+          respondidos: Number(d.csat?.respondidos ?? 0),
+          response_rate: Number(d.csat?.response_rate ?? 0),
+          media: num(d.csat?.media),
+          distribuicao: ((d.csat?.distribuicao ?? []) as any[]).map((r) => ({ nota: Number(r.nota ?? 0), qtd: Number(r.qtd ?? 0) })),
+        },
+        por_atendente: ((d.por_atendente ?? []) as any[]).map((r) => ({ nome: r.nome ?? "(não atribuído)", qtd: Number(r.qtd ?? 0) })),
+        heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow ?? 0), hora: Number(r.hora ?? 0), qtd: Number(r.qtd ?? 0) })),
+        ofensores: ((d.ofensores ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", qtd: Number(r.qtd ?? 0) })),
+        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", atendimentos: Number(r.atendimentos ?? 0), mrr: Number(r.mrr ?? 0), atend_por_mil: Number(r.atend_por_mil ?? 0) })),
+        concentracao: {
+          clientes_com_chat: Number(d.concentracao?.clientes_com_chat ?? 0),
+          chats_com_cliente: Number(d.concentracao?.chats_com_cliente ?? 0),
+          top1_qtd: Number(d.concentracao?.top1_qtd ?? 0),
+          top1_pct: Number(d.concentracao?.top1_pct ?? 0),
+          top10_pct: Number(d.concentracao?.top10_pct ?? 0),
+        },
+        media_atend_cliente: {
+          clientes_ativos: Number(d.media_atend_cliente?.clientes_ativos ?? 0),
+          total_atendimentos: Number(d.media_atend_cliente?.total_atendimentos ?? 0),
+          media: num(d.media_atend_cliente?.media),
+        },
+      } as AtendimentoChats;
+    },
+  });
+}
