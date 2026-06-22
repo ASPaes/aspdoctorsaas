@@ -14,6 +14,7 @@ export interface TaxHorarioRow { tipo: string; qtd: number; pct: number; }
 export interface TaxAtendenteRow { nome: string; qtd: number; }
 export interface TaxHeatRow { dow: number; hora: number; qtd: number; }
 export interface TaxOfensorRow { cliente_id: string | null; nome: string; qtd: number; }
+export interface TaxCustoRow { cliente_id: string | null; nome: string; tickets: number; mrr: number; tickets_por_mil: number; }
 export interface TaxConcentracao { clientes_com_ticket: number; tickets_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
 export interface TaxMediaCliente { clientes_ativos: number; total_tickets: number; media: number | null; }
 export interface TaxDensRow { produto_id: number | null; nome: string; tickets: number; clientes: number; ratio: number | null; }
