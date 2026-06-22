@@ -18,14 +18,17 @@ export interface AtendimentoClientes {
 export function useAtendimentoClientes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
-  const { dateRange } = useAtendimentoFilter();
+  const { dateRange, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
   return useQuery<AtendimentoClientes>({
-    queryKey: ["atendimento-clientes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
+    queryKey: ["atendimento-clientes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      const orNull = (a: number[]) => (a.length ? a : null);
       const { data, error } = await (supabase.rpc as any)("get_atendimento_clientes", {
         p_tenant_id: tid, p_date_from: dateRange.from.toISOString(), p_date_to: dateRange.to.toISOString(), p_unidade_base_id: selectedUnidadeId ?? null,
+        p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
+        p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
