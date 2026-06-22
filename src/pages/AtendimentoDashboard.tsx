@@ -9,6 +9,7 @@ import { SatisfacaoTab } from "@/components/atendimento/SatisfacaoTab";
 import { VolumeTab } from "@/components/atendimento/VolumeTab";
 import { UraTab } from "@/components/atendimento/UraTab";
 import { TaxonomiaTab } from "@/components/atendimento/TaxonomiaTab";
+import { ChatsTab } from "@/components/atendimento/ChatsTab";
 import { BacklogTab } from "@/components/atendimento/BacklogTab";
 import { CoberturaTab } from "@/components/atendimento/CoberturaTab";
 import { ClientesTab } from "@/components/atendimento/ClientesTab";
