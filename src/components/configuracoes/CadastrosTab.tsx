@@ -96,7 +96,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     }
   };
 
-  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode; invalidateKeys?: string[] }[] = [
+  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode; invalidateKeys?: string[]; templateKind?: string }[] = [
     {
       value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", resource: "cfg.setores", orderBy: "sort_order", invalidateKeys: ["departments_for_crud"],
       columns: [
