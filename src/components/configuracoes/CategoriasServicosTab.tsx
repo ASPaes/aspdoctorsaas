@@ -297,9 +297,14 @@ export default function CategoriasServicosTab() {
         <h3 className="text-sm font-medium text-muted-foreground">
           Categorias e subcategorias de serviço
         </h3>
-        <Button size="sm" onClick={openNewCategory}>
-          <Plus className="h-4 w-4" /> Nova categoria
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openImport}>
+            <Upload className="h-4 w-4" /> Importar de template
+          </Button>
+          <Button size="sm" onClick={openNewCategory}>
+            <Plus className="h-4 w-4" /> Nova categoria
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
