@@ -20,8 +20,8 @@ export function VelocidadeTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <div className="flex flex-wrap items-center justify-end gap-3">
+
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Alvo SLA 1ª resposta:</span>
           <div className="inline-flex overflow-hidden rounded-md border border-border">
