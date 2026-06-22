@@ -133,7 +133,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", resource: "cfg.modelos_contrato", orderBy: "nome",
+      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", resource: "cfg.modelos_contrato", orderBy: "nome", templateKind: "modelos_contrato",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
