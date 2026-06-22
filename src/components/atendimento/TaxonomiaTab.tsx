@@ -41,21 +41,10 @@ function Barras({ rows }: { rows: BarRow[] }) {
 }
 
 export function TaxonomiaTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 89)),
-    to: endOfDay(new Date()),
-  }));
-  const { data, isLoading, isError, error } = useAtendimentoTaxonomia(dateRange);
+  const { data, isLoading, isError, error } = useAtendimentoTaxonomia();
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <DateRangePicker
-          dateRange={dateRange}
-          onDateRangeChange={(r) => r?.from && r?.to && setDateRange({ from: r.from, to: r.to })}
-        />
-      </div>
-
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
