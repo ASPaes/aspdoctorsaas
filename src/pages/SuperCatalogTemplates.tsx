@@ -186,6 +186,12 @@ export default function SuperCatalogTemplates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NewCatalogTemplateModal
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        onCreated={() => queryClient.invalidateQueries({ queryKey: ["super_catalog_templates"] })}
+      />
     </div>
   );
 }
