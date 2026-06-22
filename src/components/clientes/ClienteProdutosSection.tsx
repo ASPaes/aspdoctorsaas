@@ -349,8 +349,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Módulo</TableHead>
-                                <TableHead className="text-right">Vlr Mensal</TableHead>
-                                <TableHead className="text-right">Vlr Custo</TableHead>
+                                <TableHead className="text-center w-16">Qtd</TableHead>
+                                <TableHead className="text-right">Vlr Mensal (unit.)</TableHead>
+                                <TableHead className="text-right">Vlr Custo (unit.)</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="w-24 text-right">Ações</TableHead>
                               </TableRow>
