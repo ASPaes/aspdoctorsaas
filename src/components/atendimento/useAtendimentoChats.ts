@@ -15,6 +15,7 @@ export interface ChatCustoRow { cliente_id: string | null; nome: string; atendim
 export interface ChatConcentracao { clientes_com_chat: number; chats_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
 export interface ChatMrrAgente { mrr_total: number; agentes_ativos: number; valor: number | null; }
 export interface ChatMediaCliente { clientes_ativos: number; total_atendimentos: number; media: number | null; }
+export interface ChatTimelineRow { mes: string; atendimentos: number; mrr: number; ticket_medio: number | null; }
 export interface AtendimentoChats {
   total: number;
   por_status: ChatStatusRow[];
