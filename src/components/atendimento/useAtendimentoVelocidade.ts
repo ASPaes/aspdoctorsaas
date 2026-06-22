@@ -30,12 +30,10 @@ export interface AtendimentoVelocidade {
   por_departamento: VelocidadeDeptRow[];
 }
 
-export function useAtendimentoVelocidade(
-  dateRange: { from: Date; to: Date },
-  slaSeconds: number,
-) {
+export function useAtendimentoVelocidade(slaSeconds: number) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoVelocidade>({
     queryKey: [
       "atendimento-velocidade",
@@ -44,6 +42,8 @@ export function useAtendimentoVelocidade(
       dateRange.to.toISOString(),
       slaSeconds,
       selectedUnidadeId,
+      departmentId,
+      agentId,
     ],
     enabled: !!tid,
     refetchOnWindowFocus: false,
