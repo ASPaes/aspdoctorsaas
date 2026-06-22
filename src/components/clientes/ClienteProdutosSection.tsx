@@ -191,6 +191,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     },
   });
 
+  const deleteModuloMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase.from("cliente_produto_modulos" as any) as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Módulo excluído" });
+      invalidateAll();
+    },
+    onError: (err: any) => toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" }),
+  });
+
   const toggleModuloMut = useMutation({
     mutationFn: async (m: ClienteProdutoModulo) => {
       const novoAtivo = !m.ativo;
