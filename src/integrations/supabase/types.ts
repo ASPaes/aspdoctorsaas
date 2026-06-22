@@ -992,6 +992,7 @@ export type Database = {
           data_inativacao: string | null
           id: string
           modulo_id: string
+          quantidade: number
           tenant_id: string
           updated_at: string
           vlr_ativacao: number | null
@@ -1006,6 +1007,7 @@ export type Database = {
           data_inativacao?: string | null
           id?: string
           modulo_id: string
+          quantidade?: number
           tenant_id: string
           updated_at?: string
           vlr_ativacao?: number | null
@@ -1020,6 +1022,7 @@ export type Database = {
           data_inativacao?: string | null
           id?: string
           modulo_id?: string
+          quantidade?: number
           tenant_id?: string
           updated_at?: string
           vlr_ativacao?: number | null
