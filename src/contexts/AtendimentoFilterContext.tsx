@@ -64,12 +64,20 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
   const [dateRange, setDateRange] = useState<AtendimentoDateRange>(defaultRange);
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [segmentoIds, setSegmentoIds] = useState<number[]>([]);
+  const [areaIds, setAreaIds] = useState<number[]>([]);
+  const [estadoIds, setEstadoIds] = useState<number[]>([]);
+  const [cidadeIds, setCidadeIds] = useState<number[]>([]);
+  const [fornecedorIds, setFornecedorIds] = useState<number[]>([]);
+  const [produtoIds, setProdutoIds] = useState<number[]>([]);
 
   // reseta filtros ao trocar de tenant (super admin simulando)
   useEffect(() => {
     setDepartmentId(null);
     setAgentId(null);
     setDateRange(defaultRange());
+    setSegmentoIds([]); setAreaIds([]); setEstadoIds([]);
+    setCidadeIds([]); setFornecedorIds([]); setProdutoIds([]);
   }, [tid]);
 
   const { data: setores = [], isLoading: loadingSet } = useQuery({
