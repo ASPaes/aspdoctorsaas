@@ -317,6 +317,16 @@ export function AppSidebar() {
           )}
           {isSuperAdmin && (
             <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Templates">
+                <NavLink to="/super/templates" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                  <Library className="h-4 w-4" />
+                  <span>Templates</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {isSuperAdmin && (
+            <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Monitor">
                 <NavLink to="/super/monitor" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                   <Activity className="h-4 w-4" />
