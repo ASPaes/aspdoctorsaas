@@ -209,8 +209,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         setMrrDialog({
           open: true,
           tipo: "downsell",
-          valorDelta: -(Number(m.vlr_mensal) || 0),
-          custoDelta: -(Number(m.vlr_custo) || 0),
+          valorDelta: -((Number(m.vlr_mensal) || 0) * (Number(m.quantidade) || 1)),
+          custoDelta: -((Number(m.vlr_custo) || 0) * (Number(m.quantidade) || 1)),
           descricao: `Módulo ${m.produto_modulos?.nome ?? ""} inativado`,
           moduloId: m.id,
         });
