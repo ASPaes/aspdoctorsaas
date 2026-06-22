@@ -536,6 +536,85 @@ export type Database = {
           },
         ]
       }
+      catalog_template_items: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload: Json
+          sort_order?: number
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          id: string
+          is_published: boolean
+          kind: string
+          nome: string
+          origem: string
+          source_tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          id?: string
+          is_published?: boolean
+          kind: string
+          nome: string
+          origem?: string
+          source_tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          id?: string
+          is_published?: boolean
+          kind?: string
+          nome?: string
+          origem?: string
+          source_tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_templates_source_tenant_id_fkey"
+            columns: ["source_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificado_a1_vendas: {
         Row: {
           cliente_id: string
@@ -7500,6 +7579,14 @@ export type Database = {
         }
         Returns: string
       }
+      create_catalog_template_from_tenant: {
+        Args: {
+          p_descricao?: string
+          p_nome: string
+          p_source_tenant_id: string
+        }
+        Returns: string
+      }
       create_child_ticket: {
         Args: {
           p_agendado_para?: string
@@ -8587,6 +8674,14 @@ export type Database = {
         }[]
       }
       import_clientes_produtos_batch: { Args: { p_rows: Json }; Returns: Json }
+      import_service_catalog_template: {
+        Args: {
+          p_produto_mapping?: Json
+          p_target_tenant_id?: string
+          p_template_id: string
+        }
+        Returns: Json
+      }
       is_admin_or_head: { Args: never; Returns: boolean }
       is_current_user_active: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
@@ -8596,6 +8691,20 @@ export type Database = {
       link_cliente_to_attendance: {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
+      }
+      list_catalog_templates: {
+        Args: never
+        Returns: {
+          created_at: string
+          descricao: string
+          id: string
+          is_published: boolean
+          item_count: number
+          kind: string
+          nome: string
+          origem: string
+          source_tenant_id: string
+        }[]
       }
       list_conselho_analises: {
         Args: {
