@@ -4163,6 +4163,7 @@ export type Database = {
           department_id: string | null
           first_human_response_at: string | null
           first_response_at: string | null
+          first_response_business_seconds: number | null
           first_response_time_seconds: number | null
           handle_seconds: number
           handoffs_count: number
@@ -4238,6 +4239,7 @@ export type Database = {
           department_id?: string | null
           first_human_response_at?: string | null
           first_response_at?: string | null
+          first_response_business_seconds?: number | null
           first_response_time_seconds?: number | null
           handle_seconds?: number
           handoffs_count?: number
@@ -4313,6 +4315,7 @@ export type Database = {
           department_id?: string | null
           first_human_response_at?: string | null
           first_response_at?: string | null
+          first_response_business_seconds?: number | null
           first_response_time_seconds?: number | null
           handle_seconds?: number
           handoffs_count?: number
@@ -8780,6 +8783,15 @@ export type Database = {
               message_timestamp: string
             }[]
           }
+      segundos_uteis: {
+        Args: {
+          p_department_id?: string
+          p_end: string
+          p_start: string
+          p_tenant_id: string
+        }
+        Returns: number
+      }
       set_attendance_cliente: {
         Args: { p_attendance_id: string; p_cliente_id: string }
         Returns: undefined
