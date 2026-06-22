@@ -275,6 +275,37 @@ export function TaxonomiaTab() {
               <Barras rows={data.resolvidos_por_atendente.slice(0, 15).map((r) => ({ key: r.nome, nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0 }))} />
             </div>
           </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold mb-3">Custo de Suporte × Receita — tickets por R$ 1.000 de MRR</h3>
+            {data.custo_receita.length === 0 ? (
+              <div className="text-xs text-muted-foreground italic py-6 text-center">
+                Sem clientes pagantes com ticket no período.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground">
+                      <th className="text-left py-2 px-3 font-medium">Cliente</th>
+                      <th className="text-right py-2 px-3 font-medium">Tickets</th>
+                      <th className="text-right py-2 px-3 font-medium">MRR</th>
+                      <th className="text-right py-2 px-3 font-medium">Tickets / R$ 1.000</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.custo_receita.slice(0, 15).map((r) => (
+                      <tr key={String(r.cliente_id ?? r.nome)} className="border-b border-border/50 last:border-0">
+                        <td className="py-2 px-3">{r.nome}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{r.tickets.toLocaleString("pt-BR")}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{r.mrr.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-medium">{r.tickets_por_mil.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Tickets por Hora do Dia</h3>
