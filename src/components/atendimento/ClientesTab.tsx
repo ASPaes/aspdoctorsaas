@@ -1,8 +1,6 @@
 import { useState, useMemo } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Users, DollarSign, AlertTriangle, ShieldAlert } from "lucide-react";
 import { useAtendimentoClientes } from "./useAtendimentoClientes";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 
@@ -24,12 +22,8 @@ function densClass(v: number | null, media: number | null): string {
 }
 
 export function ClientesTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 89)),
-    to: endOfDay(new Date()),
-  }));
   const [soAlto, setSoAlto] = useState(false);
-  const { data, isLoading, isError, error } = useAtendimentoClientes(dateRange);
+  const { data, isLoading, isError, error } = useAtendimentoClientes();
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -66,10 +60,6 @@ export function ClientesTab() {
             </span>
           )}
         </div>
-        <DateRangePicker
-          dateRange={dateRange}
-          onDateRangeChange={(r) => r?.from && r?.to && setDateRange({ from: r.from, to: r.to })}
-        />
       </div>
 
       {isLoading ? (

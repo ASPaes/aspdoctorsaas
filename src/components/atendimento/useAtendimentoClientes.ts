@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface ClienteRow {
   cliente_id: string; nome: string; chats: number; tickets: number; interacoes: number;
@@ -14,9 +15,10 @@ export interface AtendimentoClientes {
   clientes: ClienteRow[];
 }
 
-export function useAtendimentoClientes(dateRange: { from: Date; to: Date }) {
+export function useAtendimentoClientes() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange } = useAtendimentoFilter();
   return useQuery<AtendimentoClientes>({
     queryKey: ["atendimento-clientes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
     enabled: !!tid,
