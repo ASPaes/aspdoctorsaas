@@ -66,7 +66,7 @@ export function useAtendimentoChats() {
         por_atendente: ((d.por_atendente ?? []) as any[]).map((r) => ({ nome: r.nome ?? "(não atribuído)", qtd: Number(r.qtd ?? 0) })),
         heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow ?? 0), hora: Number(r.hora ?? 0), qtd: Number(r.qtd ?? 0) })),
         ofensores: ((d.ofensores ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", qtd: Number(r.qtd ?? 0) })),
-        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", atendimentos: Number(r.atendimentos ?? 0), mrr: Number(r.mrr ?? 0), atend_por_mil: Number(r.atend_por_mil ?? 0) })),
+        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", atendimentos: Number(r.atendimentos ?? 0), mrr: Number(r.mrr ?? 0), atend_por_mil: Number(r.atend_por_mil ?? 0), receita_por_atend: Number(r.receita_por_atend ?? 0) })),
         concentracao: {
           clientes_com_chat: Number(d.concentracao?.clientes_com_chat ?? 0),
           chats_com_cliente: Number(d.concentracao?.chats_com_cliente ?? 0),
