@@ -1187,11 +1187,21 @@ function ModuloDialog({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Valor Mensal</Label>
+            <Label>Quantidade</Label>
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={quantidade}
+              onChange={(e) => setQuantidade(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Valor Mensal (unit.)</Label>
             <NumericInput value={vlrMensal} onChange={setVlrMensal} suffix="R$" />
           </div>
           <div className="space-y-1">
-            <Label>Valor Custo</Label>
+            <Label>Valor Custo (unit.)</Label>
             <NumericInput value={vlrCusto} onChange={setVlrCusto} suffix="R$" />
           </div>
           <div className="space-y-1">
@@ -1201,6 +1211,14 @@ function ModuloDialog({
           <div className="space-y-1">
             <Label>Data Ativação</Label>
             <Input type="date" value={dataAt} onChange={(e) => setDataAt(e.target.value)} />
+          </div>
+          <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">Total do módulo ({quantidade}×)</span>
+            <span className="font-semibold">
+              Mensal: <span className="text-primary">R$ {fmtBRL((Number(vlrMensal) || 0) * (quantidade || 1))}</span>
+              {"  ·  "}
+              Custo: <span className="text-muted-foreground">R$ {fmtBRL((Number(vlrCusto) || 0) * (quantidade || 1))}</span>
+            </span>
           </div>
         </div>
         <DialogFooter>
