@@ -130,6 +130,8 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   // Assumir button: only when in queue (waiting + no assigned_to)
   const canClaim = isInQueue && !isAssignedToMe && isInUserDepartment;
+  // Assumir de outro operador do mesmo setor (chat já tem dono que não sou eu)
+  const canTakeOver = !!effectiveAssignedTo && !isAssignedToMe && isInUserDepartment;
 
   return (
     <div className="flex items-center gap-1.5">
