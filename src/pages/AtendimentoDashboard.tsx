@@ -15,9 +15,10 @@ import { ClientesTab } from "@/components/atendimento/ClientesTab";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { AtendimentoFilterProvider, useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
+import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
 const ALL = "__all__";
-type FiltroConfig = { date: boolean; setor: boolean; agente: boolean };
+type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean };
 const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   velocidade: { date: true, setor: true, agente: true },
   agentes:    { date: true, setor: true, agente: true },
@@ -26,7 +27,7 @@ const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   ura:        { date: true, setor: true, agente: false },
   taxonomia:  { date: true, setor: true, agente: true },
   backlog:    { date: true, setor: true, agente: true },
-  clientes:   { date: true, setor: false, agente: false },
+  clientes:   { date: true, setor: false, agente: false, cliente: true },
 };
 
 function formatSecondsAgo(seg: number): string {
@@ -48,6 +49,13 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
     setAgentId,
     setores,
     agentes,
+    opcoes,
+    segmentoIds, setSegmentoIds,
+    areaIds, setAreaIds,
+    estadoIds, setEstadoIds,
+    cidadeIds, setCidadeIds,
+    fornecedorIds, setFornecedorIds,
+    produtoIds, setProdutoIds,
   } = useAtendimentoFilter();
 
   return (
@@ -90,6 +98,16 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
             ))}
           </SelectContent>
         </Select>
+      )}
+      {cfg.cliente && (
+        <>
+          <MultiSelectFilter label="Segmento" options={opcoes.segmentos} selected={segmentoIds} onChange={setSegmentoIds} />
+          <MultiSelectFilter label="Área" options={opcoes.areas} selected={areaIds} onChange={setAreaIds} />
+          <MultiSelectFilter label="Estado" options={opcoes.estados} selected={estadoIds} onChange={setEstadoIds} />
+          <MultiSelectFilter label="Cidade" options={opcoes.cidades} selected={cidadeIds} onChange={setCidadeIds} />
+          <MultiSelectFilter label="Fornecedor" options={opcoes.fornecedores} selected={fornecedorIds} onChange={setFornecedorIds} />
+          <MultiSelectFilter label="Produto" options={opcoes.produtos} selected={produtoIds} onChange={setProdutoIds} />
+        </>
       )}
     </div>
   );
