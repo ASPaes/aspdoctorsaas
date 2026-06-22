@@ -93,11 +93,17 @@ export default function SuperCatalogTemplates() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Super Admin — Templates de catálogo</h1>
-        <p className="mt-1 text-muted-foreground">
-          Biblioteca de catálogos prontos para novos tenants importarem.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Super Admin — Templates de catálogo</h1>
+          <p className="mt-1 text-muted-foreground">
+            Biblioteca de catálogos prontos para novos tenants importarem.
+          </p>
+        </div>
+        <Button onClick={() => setNewOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Novo template
+        </Button>
       </div>
 
       <Card>
