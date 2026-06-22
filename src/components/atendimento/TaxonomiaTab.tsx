@@ -40,6 +40,54 @@ function Barras({ rows }: { rows: BarRow[] }) {
   );
 }
 
+function Heatmap({ rows }: { rows: { dow: number; hora: number; qtd: number }[] }) {
+  if (rows.length === 0) {
+    return <div className="text-xs text-muted-foreground italic py-6 text-center">Sem dados no período.</div>;
+  }
+  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const horas = Array.from(new Set(rows.map((r) => r.hora))).sort((a, b) => a - b);
+  const map = new Map<string, number>();
+  let max = 1;
+  rows.forEach((r) => {
+    map.set(`${r.dow}-${r.hora}`, r.qtd);
+    if (r.qtd > max) max = r.qtd;
+  });
+  return (
+    <div className="overflow-x-auto">
+      <table className="border-separate" style={{ borderSpacing: 2 }}>
+        <thead>
+          <tr>
+            <th />
+            {horas.map((h) => (
+              <th key={h} className="text-[10px] font-normal text-muted-foreground px-0.5">{h}h</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {[0, 1, 2, 3, 4, 5, 6].map((d) => (
+            <tr key={d}>
+              <td className="text-[10px] text-muted-foreground pr-2 text-right whitespace-nowrap">{dias[d]}</td>
+              {horas.map((h) => {
+                const q = map.get(`${d}-${h}`) ?? 0;
+                const op = q === 0 ? 0 : 0.15 + 0.85 * (q / max);
+                return (
+                  <td key={h}>
+                    <div
+                      className="w-5 h-5 rounded-sm"
+                      style={{ backgroundColor: q === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` }}
+                      title={`${dias[d]} ${h}h: ${q.toLocaleString("pt-BR")} tickets`}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function TaxonomiaTab() {
   const { data, isLoading, isError, error } = useAtendimentoTaxonomia();
 
