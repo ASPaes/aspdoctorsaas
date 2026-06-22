@@ -15,6 +15,7 @@ import { ClientesTab } from "@/components/atendimento/ClientesTab";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { AtendimentoFilterProvider, useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
+import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
 const ALL = "__all__";
 type FiltroConfig = { date: boolean; setor: boolean; agente: boolean };
