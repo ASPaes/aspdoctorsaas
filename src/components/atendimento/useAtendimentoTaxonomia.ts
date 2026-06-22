@@ -14,12 +14,11 @@ export interface AtendimentoTaxonomia {
 export function useAtendimentoTaxonomia() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
-  return useQuery<AtendimentoTaxonomia>({
-    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId],
-    enabled: !!tid,
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
+  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
+...
+    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
+...
+      const orNull = (a: number[]) => (a.length ? a : null);
       const { data, error } = await (supabase.rpc as any)("get_atendimento_taxonomia", {
         p_tenant_id: tid,
         p_date_from: dateRange.from.toISOString(),
@@ -27,6 +26,8 @@ export function useAtendimentoTaxonomia() {
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
+        p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
+        p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
