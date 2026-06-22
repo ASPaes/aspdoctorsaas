@@ -27,7 +27,7 @@ function Barras({ rows }: { rows: BarRow[] }) {
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full"
-                style={{ width: `${w}%`, backgroundColor: "hsl(var(--primary))" }}
+                style={{ width: `${w}%`, backgroundColor: r.color ?? "hsl(var(--primary))" }}
               />
             </div>
             <span className="text-right tabular-nums text-muted-foreground">
