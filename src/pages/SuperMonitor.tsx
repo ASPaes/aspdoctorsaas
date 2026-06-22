@@ -134,7 +134,6 @@ export default function SuperMonitor() {
     0,
     Math.round(
       100 -
-        disconnectedInstances.length * 10 -
         (latestSnap?.top_slow_query_ms > 3000 ? 8 : latestSnap?.top_slow_query_ms > 1000 ? 4 : 0) -
         (latestSnap?.dead_tuples_whatsapp_messages > 2000
           ? 5
@@ -377,18 +376,17 @@ export default function SuperMonitor() {
         <div style={{ ...panelStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ ...labelStyle, marginBottom: 0 }}>saúde do sistema</div>
-            <HelpTooltip text="Nota de 0 a 100 que resume o estado geral da plataforma. Considera instâncias offline, lentidão, alertas pendentes e uso do banco de dados." />
+            <HelpTooltip text="Nota de 0 a 100 que resume a saúde técnica da plataforma: lentidão de queries, alertas pendentes e uso do banco de dados. As instâncias de WhatsApp têm card próprio." />
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <ScoreRing score={score} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {[
-              { ok: !latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000, label: 'Performance ok' },
-              { ok: connectedInstances === filteredInstances.length, label: `${connectedInstances}/${filteredInstances.length} instâncias` },
+              { ok: !latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000, label: (!latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000) ? 'Performance ok' : 'Query lenta' },
               { ok: pendingAlerts === 0, label: pendingAlerts === 0 ? 'Sem alertas' : `${pendingAlerts} alertas` },
-              { ok: !latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500, label: 'Banco limpo' },
-              { ok: (latestSnap?.active_connections || 0) < 25, label: 'Conexões ok' },
+              { ok: !latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500, label: (!latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500) ? 'Banco limpo' : 'Banco sujo' },
+              { ok: (latestSnap?.active_connections || 0) < 25, label: (latestSnap?.active_connections || 0) < 25 ? 'Conexões ok' : 'Conexões altas' },
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.ok ? '#22c55e' : '#ef4444' }} />
