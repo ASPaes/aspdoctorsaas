@@ -155,7 +155,7 @@ function AtendimentoDashboardInner() {
           <TabsTrigger value="satisfacao">Satisfação</TabsTrigger>
           <TabsTrigger value="volume">Volume</TabsTrigger>
           <TabsTrigger value="ura">URA</TabsTrigger>
-          <TabsTrigger value="taxonomia">Taxonomia</TabsTrigger>
+          <TabsTrigger value="taxonomia">Tickets</TabsTrigger>
           <TabsTrigger value="backlog">Backlog</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="cobertura">Cobertura</TabsTrigger>}
