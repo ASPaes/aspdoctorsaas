@@ -292,12 +292,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
         return true;
       });
     }
-    if (activePill === "all" && !isAdmin && user?.id) {
-      result = result.filter(c => {
-        if (!(c as any).assigned_to) return true;
-        return (c as any).assigned_to === user.id;
-      });
-    }
 
     if (filters.autoReplyDisabledOnly) {
       result = result.filter((c) => c.auto_reply_disabled === true);
