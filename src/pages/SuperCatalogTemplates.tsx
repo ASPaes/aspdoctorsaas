@@ -45,6 +45,7 @@ interface CatalogTemplate {
 export default function SuperCatalogTemplates() {
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["super_catalog_templates"],
