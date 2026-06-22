@@ -277,16 +277,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
     // Pill filters com visibilidade por papel
     if (activePill === "in_progress") {
-      result = result.filter(c => {
-        if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
-        if (!isAdmin && user?.id) {
-          const isMyConv = (c as any).assigned_to === user.id;
-          const att = attendanceMap.get(c.id);
-          const isMyAtt = att?.assigned_to === user.id;
-          if (!isMyConv && !isMyAtt) return false;
-        }
-        return true;
-      });
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "in_progress");
     } else if (activePill === "waiting") {
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
