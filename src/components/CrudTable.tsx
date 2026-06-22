@@ -41,9 +41,11 @@ interface CrudTableProps {
   headerActions?: React.ReactNode;
   /** If set, gates insert/update/delete buttons via ProtectedElement (mode="notify"). */
   resource?: string;
+  /** Extra React Query keys (by prefix) to invalidate after save/delete — ex.: selects de relação em outras telas. */
+  invalidateKeys?: string[];
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource, invalidateKeys }: CrudTableProps) {
   const guard = (action: PermissionAction, btn: React.ReactNode) =>
     resource ? (
       <ProtectedElement resource={resource} action={action} mode="notify">
@@ -63,6 +65,12 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
 
   const refreshDependentQueries = async () => {
     const tasks: Promise<unknown>[] = [queryClient.invalidateQueries({ queryKey: [queryKey] })];
+
+    if (invalidateKeys?.length) {
+      invalidateKeys.forEach((k) => {
+        tasks.push(queryClient.invalidateQueries({ queryKey: [k] }));
+      });
+    }
 
     if (table === "funcionarios") {
       queryClient.removeQueries({ queryKey: ["funcionarios-for-invite", tid] });
