@@ -547,6 +547,30 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         onRegistrado={invalidateAll}
       />
 
+      <AlertDialog open={!!confirmDeleteModulo} onOpenChange={(o) => !o && setConfirmDeleteModulo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir módulo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Use apenas para corrigir lançamentos errados. Para um módulo que o cliente deixou de usar (downsell), prefira "Inativar". Os valores do produto são recalculados automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (confirmDeleteModulo) deleteModuloMut.mutate(confirmDeleteModulo.id);
+                setConfirmDeleteModulo(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
