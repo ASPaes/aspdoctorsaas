@@ -163,15 +163,29 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           Assumir
         </Button>
       ) : (
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-7 w-7 rounded-full"
-          onClick={onTransferClick}
-          aria-label="Transferir"
-        >
-          <ArrowRightLeft className="h-3 w-3" />
-        </Button>
+        <>
+          {canTakeOver && (
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs gap-1.5 rounded-full"
+              onClick={() => setTakeoverDialogOpen(true)}
+              disabled={isAssigning || isBlocked}
+            >
+              {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+              Assumir
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 rounded-full"
+            onClick={onTransferClick}
+            aria-label="Transferir"
+          >
+            <ArrowRightLeft className="h-3 w-3" />
+          </Button>
+        </>
       )}
 
 
