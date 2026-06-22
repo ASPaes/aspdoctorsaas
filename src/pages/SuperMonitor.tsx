@@ -383,11 +383,10 @@ export default function SuperMonitor() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {[
-              { ok: !latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000, label: 'Performance ok' },
-              { ok: connectedInstances === filteredInstances.length, label: `${connectedInstances}/${filteredInstances.length} instâncias` },
+              { ok: !latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000, label: (!latestSnap || (latestSnap.top_slow_query_ms || 0) < 1000) ? 'Performance ok' : 'Query lenta' },
               { ok: pendingAlerts === 0, label: pendingAlerts === 0 ? 'Sem alertas' : `${pendingAlerts} alertas` },
-              { ok: !latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500, label: 'Banco limpo' },
-              { ok: (latestSnap?.active_connections || 0) < 25, label: 'Conexões ok' },
+              { ok: !latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500, label: (!latestSnap || (latestSnap.dead_tuples_whatsapp_messages || 0) < 500) ? 'Banco limpo' : 'Banco sujo' },
+              { ok: (latestSnap?.active_connections || 0) < 25, label: (latestSnap?.active_connections || 0) < 25 ? 'Conexões ok' : 'Conexões altas' },
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.ok ? '#22c55e' : '#ef4444' }} />
