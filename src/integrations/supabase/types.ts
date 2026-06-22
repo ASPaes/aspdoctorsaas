@@ -7803,6 +7803,10 @@ export type Database = {
         Args: { p_date_from: string; p_date_to: string }
         Returns: Json
       }
+      get_atendimento_filtro_opcoes: {
+        Args: { p_tenant_id?: string }
+        Returns: Json
+      }
       get_atendimento_latencia_histograma: {
         Args: {
           p_agent_id?: string
