@@ -15,6 +15,7 @@ import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import { useAtendimentoVelocidadeTimeline } from "./useAtendimentoVelocidadeTimeline";
 import { fmtEspera } from "./TempoRealTab";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { cn } from "@/lib/utils";
 
 type MetricKey = "sla_pct" | "tme_p50" | "frt_p50" | "tmr_p50";
