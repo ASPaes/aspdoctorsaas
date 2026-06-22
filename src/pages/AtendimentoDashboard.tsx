@@ -26,6 +26,7 @@ const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   ura:        { date: true, setor: true, agente: false },
   taxonomia:  { date: true, setor: true, agente: true },
   backlog:    { date: true, setor: true, agente: true },
+  clientes:   { date: true, setor: false, agente: false },
 };
 
 function formatSecondsAgo(seg: number): string {
