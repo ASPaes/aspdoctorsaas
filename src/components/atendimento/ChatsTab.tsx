@@ -84,6 +84,47 @@ function agregarPorDiaSemana(heat: { dow: number; hora: number; qtd: number }[])
 const SENT_LABEL: Record<string, string> = { positive: "Positivo", neutral: "Neutro", negative: "Negativo" };
 const sentColor = (s: string) => (s === "positive" ? "hsl(142 71% 45%)" : s === "negative" ? "hsl(0 72% 51%)" : "hsl(var(--muted-foreground))");
 
+function LinhaTemporal({ rows }: { rows: { mes: string; atendimentos: number; mrr: number; ticket_medio: number | null }[] }) {
+  const pts = rows.filter((r) => r.ticket_medio !== null);
+  if (pts.length === 0) {
+    return <div className="text-xs text-muted-foreground italic py-6 text-center">Sem atendimentos suficientes para a série ainda.</div>;
+  }
+  const W = 700, H = 220, padL = 50, padR = 20, padT = 30, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const maxV = (Math.max(...pts.map((p) => p.ticket_medio as number)) * 1.1) || 1;
+  const n = pts.length;
+  const x = (i: number) => (n === 1 ? padL + plotW / 2 : padL + (i / (n - 1)) * plotW);
+  const y = (v: number) => padT + plotH - (v / maxV) * plotH;
+  const fmtMes = (s: string) => { const d = new Date(s + "T00:00:00"); return d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }).replace(".", ""); };
+  const fmtR = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+  const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(p.ticket_medio as number).toFixed(1)}`).join(" ");
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 480 }}>
+        {[0, 0.5, 1].map((f) => {
+          const yy = padT + plotH - f * plotH;
+          return (
+            <g key={f}>
+              <line x1={padL} y1={yy} x2={W - padR} y2={yy} stroke="hsl(var(--border))" strokeWidth={1} strokeDasharray="3 3" />
+              <text x={padL - 8} y={yy + 3} textAnchor="end" className="fill-muted-foreground" style={{ fontSize: 10 }}>{fmtR(maxV * f)}</text>
+            </g>
+          );
+        })}
+        <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth={2} />
+        {pts.map((p, i) => (
+          <g key={p.mes}>
+            <circle cx={x(i)} cy={y(p.ticket_medio as number)} r={3.5} fill="hsl(var(--primary))">
+              <title>{`${fmtMes(p.mes)} · R$ ${fmtR(p.ticket_medio as number)}/atend · ${p.atendimentos.toLocaleString("pt-BR")} atend · MRR R$ ${fmtR(p.mrr)}`}</title>
+            </circle>
+            <text x={x(i)} y={y(p.ticket_medio as number) - 8} textAnchor="middle" className="fill-foreground" style={{ fontSize: 10, fontWeight: 600 }}>{fmtR(p.ticket_medio as number)}</text>
+            <text x={x(i)} y={H - 14} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 10 }}>{fmtMes(p.mes)}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 export function ChatsTab() {
   const { data, isLoading, isError, error } = useAtendimentoChats();
   return (
