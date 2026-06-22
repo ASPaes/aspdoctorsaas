@@ -16,9 +16,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Plus, Pencil } from "lucide-react";
+import { ChevronRight, Plus, Pencil, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
+import ImportCatalogTemplateModal from "./ImportCatalogTemplateModal";
 
 interface Category {
   id: string;
