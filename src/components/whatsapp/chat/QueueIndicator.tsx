@@ -61,6 +61,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
     .filter((a) => a.kind === "bloqueio");
   const hasHardBlock = clientBlocks.some((b) => b.block_behavior === "hard");
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [takeoverDialogOpen, setTakeoverDialogOpen] = useState(false);
 
   const doClaim = () => {
     if (!user?.id) return;
@@ -106,6 +107,14 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
     doClaim();
   };
 
+  // Takeover: assumir chat de outro operador do setor, após confirmação.
+  // Reusa handleClaim para manter guards de presença e bloqueio de cliente.
+  const handleConfirmTakeover = () => {
+    setTakeoverDialogOpen(false);
+    handleClaim();
+  };
+
+
   // Chip display
   const chipConfig = isInQueue
     ? { icon: Users, label: "Na fila", className: "bg-warning/10 text-warning border-warning/20" }
@@ -121,6 +130,8 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   // Assumir button: only when in queue (waiting + no assigned_to)
   const canClaim = isInQueue && !isAssignedToMe && isInUserDepartment;
+  // Assumir de outro operador do mesmo setor (chat já tem dono que não sou eu)
+  const canTakeOver = !!effectiveAssignedTo && !isAssignedToMe && isInUserDepartment;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -152,17 +163,52 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           Assumir
         </Button>
       ) : (
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-7 w-7 rounded-full"
-          onClick={onTransferClick}
-          aria-label="Transferir"
-        >
-          <ArrowRightLeft className="h-3 w-3" />
-        </Button>
+        <>
+          {canTakeOver && (
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs gap-1.5 rounded-full"
+              onClick={() => setTakeoverDialogOpen(true)}
+              disabled={isAssigning || isBlocked}
+            >
+              {isAssigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+              Assumir
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 rounded-full"
+            onClick={onTransferClick}
+            aria-label="Transferir"
+          >
+            <ArrowRightLeft className="h-3 w-3" />
+          </Button>
+        </>
       )}
 
+
+      <AlertDialog open={takeoverDialogOpen} onOpenChange={setTakeoverDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-primary" />
+              Assumir atendimento
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {assignedOperatorName
+                ? `${assignedOperatorName} está atendendo este chat.`
+                : "Outro operador está atendendo este chat."}{" "}
+              Deseja assumir e continuar o atendimento?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmTakeover}>Assumir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
         <AlertDialogContent>
