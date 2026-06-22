@@ -7887,6 +7887,7 @@ export type Database = {
       }
       get_atendimento_volume: {
         Args: {
+          p_agent_id?: string
           p_date_from: string
           p_date_to: string
           p_department_id?: string
