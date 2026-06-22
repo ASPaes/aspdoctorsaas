@@ -96,9 +96,9 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     }
   };
 
-  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode }[] = [
+  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode; invalidateKeys?: string[] }[] = [
     {
-      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", resource: "cfg.setores", orderBy: "sort_order",
+      value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", resource: "cfg.setores", orderBy: "sort_order", invalidateKeys: ["departments_for_crud"],
       columns: [
         { key: "name", label: "Nome" },
         { key: "slug", label: "Slug" },
@@ -172,6 +172,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       queryKey: "crud_service_categories",
       resource: "cfg.categorias_servico",
       orderBy: "nome",
+      invalidateKeys: ["service_categories_for_crud"],
       columns: [
         { key: "nome", label: "Nome" },
         { key: "ativo", label: "Ativo", type: "boolean" },
@@ -240,6 +241,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         onBeforeSave={t.onBeforeSave}
         headerActions={t.headerActions}
         resource={t.resource}
+        invalidateKeys={t.invalidateKeys}
       />
     );
   }
@@ -279,6 +281,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
                 onBeforeSave={t.onBeforeSave}
                 headerActions={t.headerActions}
                 resource={t.resource}
+                invalidateKeys={t.invalidateKeys}
               />
             )}
           </TabsContent>
