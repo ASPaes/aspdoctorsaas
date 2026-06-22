@@ -1086,6 +1086,7 @@ function ModuloDialog({
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
+  const [quantidade, setQuantidade] = useState<number>(1);
   const [vlrMensal, setVlrMensal] = useState<number | null>(0);
   const [vlrCusto, setVlrCusto] = useState<number | null>(0);
   const [vlrAtivacao, setVlrAtivacao] = useState<number | null>(0);
