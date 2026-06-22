@@ -113,6 +113,7 @@ const App = () => (
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
                 <Route path="/super/monitor" element={<SuperMonitor />} />
+                <Route path="/super/templates" element={<Suspense fallback={<PageLoader />}><SuperCatalogTemplates /></Suspense>} />
               </Route>
             </Route>
 
