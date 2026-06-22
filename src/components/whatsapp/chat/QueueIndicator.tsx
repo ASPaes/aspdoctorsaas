@@ -107,6 +107,14 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
     doClaim();
   };
 
+  // Takeover: assumir chat de outro operador do setor, após confirmação.
+  // Reusa handleClaim para manter guards de presença e bloqueio de cliente.
+  const handleConfirmTakeover = () => {
+    setTakeoverDialogOpen(false);
+    handleClaim();
+  };
+
+
   // Chip display
   const chipConfig = isInQueue
     ? { icon: Users, label: "Na fila", className: "bg-warning/10 text-warning border-warning/20" }
