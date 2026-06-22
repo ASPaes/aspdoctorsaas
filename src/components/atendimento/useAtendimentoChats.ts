@@ -25,6 +25,7 @@ export interface AtendimentoChats {
   ofensores: ChatOfensorRow[];
   custo_receita: ChatCustoRow[];
   concentracao: ChatConcentracao;
+  mrr_por_agente: ChatMrrAgente;
   media_atend_cliente: ChatMediaCliente;
 }
 
