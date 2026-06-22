@@ -14,6 +14,7 @@ export interface TaxHorarioRow { tipo: string; qtd: number; pct: number; }
 export interface TaxAtendenteRow { nome: string; qtd: number; }
 export interface TaxHeatRow { dow: number; hora: number; qtd: number; }
 export interface TaxOfensorRow { cliente_id: string | null; nome: string; qtd: number; }
+export interface TaxCustoRow { cliente_id: string | null; nome: string; tickets: number; mrr: number; tickets_por_mil: number; }
 export interface TaxConcentracao { clientes_com_ticket: number; tickets_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
 export interface TaxMediaCliente { clientes_ativos: number; total_tickets: number; media: number | null; }
 export interface TaxDensRow { produto_id: number | null; nome: string; tickets: number; clientes: number; ratio: number | null; }
@@ -29,6 +30,7 @@ export interface AtendimentoTaxonomia {
   resolvidos_por_atendente: TaxAtendenteRow[];
   heatmap: TaxHeatRow[];
   ofensores: TaxOfensorRow[];
+  custo_receita: TaxCustoRow[];
   concentracao: TaxConcentracao;
   media_tickets_cliente: TaxMediaCliente;
   densidade: TaxDensRow[];
@@ -69,6 +71,7 @@ export function useAtendimentoTaxonomia() {
         resolvidos_por_atendente: ((d.resolvidos_por_atendente ?? []) as any[]).map((r) => ({ nome: r.nome ?? "(desconhecido)", qtd: Number(r.qtd ?? 0) })),
         heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow ?? 0), hora: Number(r.hora ?? 0), qtd: Number(r.qtd ?? 0) })),
         ofensores: ((d.ofensores ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", qtd: Number(r.qtd ?? 0) })),
+        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", tickets: Number(r.tickets ?? 0), mrr: Number(r.mrr ?? 0), tickets_por_mil: Number(r.tickets_por_mil ?? 0) })),
         concentracao: {
           clientes_com_ticket: Number(d.concentracao?.clientes_com_ticket ?? 0),
           tickets_com_cliente: Number(d.concentracao?.tickets_com_cliente ?? 0),
