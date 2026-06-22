@@ -8530,6 +8530,12 @@ export type Database = {
           msg_customer_count: number
         }[]
       }
+      get_simple_template_preview: {
+        Args: { p_template_id: string }
+        Returns: {
+          label: string
+        }[]
+      }
       get_storage_metrics: { Args: never; Returns: Json }
       get_storage_projection: { Args: never; Returns: Json }
       get_tenant_access_users: {
@@ -8758,6 +8764,16 @@ export type Database = {
       }
       list_published_catalog_templates: {
         Args: never
+        Returns: {
+          descricao: string
+          id: string
+          item_count: number
+          nome: string
+          origem: string
+        }[]
+      }
+      list_published_templates: {
+        Args: { p_kind: string }
         Returns: {
           descricao: string
           id: string
