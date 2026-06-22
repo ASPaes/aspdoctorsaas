@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Gauge, UserX } from "lucide-react";
 import { useAtendimentoVelocidade } from "./useAtendimentoVelocidade";
 import { fmtEspera } from "./TempoRealTab";
 import { VelocidadeTimeline } from "./VelocidadeTimeline";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
