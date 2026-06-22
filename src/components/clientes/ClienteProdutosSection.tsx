@@ -91,6 +91,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     open: boolean; clienteProdutoId?: string; produtoId?: number; edit?: ClienteProdutoModulo | null;
   }>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<ClienteProduto | null>(null);
+  const [confirmDeleteModulo, setConfirmDeleteModulo] = useState<ClienteProdutoModulo | null>(null);
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
@@ -188,6 +189,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
       }
     },
+  });
+
+  const deleteModuloMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase.from("cliente_produto_modulos" as any) as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Módulo excluído" });
+      invalidateAll();
+    },
+    onError: (err: any) => toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" }),
   });
 
   const toggleModuloMut = useMutation({
@@ -353,7 +366,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                 <TableHead className="text-right">Vlr Mensal (unit.)</TableHead>
                                 <TableHead className="text-right">Vlr Custo (unit.)</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead className="w-24 text-right">Ações</TableHead>
+                                <TableHead className="w-40 text-right">Ações</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -381,12 +394,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     <Badge variant={m.ativo ? "default" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => toggleModuloMut.mutate(m)} disabled={toggleModuloMut.isPending}>
-                                      {m.ativo ? "Inativar" : "Reativar"}
-                                    </Button>
+                                    <div className="flex items-center justify-end gap-0.5">
+                                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => toggleModuloMut.mutate(m)} disabled={toggleModuloMut.isPending}>
+                                        {m.ativo ? "Inativar" : "Reativar"}
+                                      </Button>
+                                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteModulo(m)} disabled={deleteModuloMut.isPending}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -528,6 +546,30 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         moduloId={mrrDialog.moduloId}
         onRegistrado={invalidateAll}
       />
+
+      <AlertDialog open={!!confirmDeleteModulo} onOpenChange={(o) => !o && setConfirmDeleteModulo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir módulo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Use apenas para corrigir lançamentos errados. Para um módulo que o cliente deixou de usar (downsell), prefira "Inativar". Os valores do produto são recalculados automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (confirmDeleteModulo) deleteModuloMut.mutate(confirmDeleteModulo.id);
+                setConfirmDeleteModulo(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
         <AlertDialogContent>
