@@ -1153,9 +1153,9 @@ function ModuloDialog({
         const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
         onMRRSuggest?.({
           tipo: "upsell",
-          valorDelta: vlrMensal || 0,
-          custoDelta: vlrCusto || 0,
-          descricao: `Módulo ${nomeModulo} adicionado`,
+          valorDelta: (vlrMensal || 0) * (quantidade || 1),
+          custoDelta: (vlrCusto || 0) * (quantidade || 1),
+          descricao: `Módulo ${nomeModulo} adicionado${(quantidade || 1) > 1 ? ` (${quantidade}×)` : ""}`,
           moduloId: null,
         });
       }
