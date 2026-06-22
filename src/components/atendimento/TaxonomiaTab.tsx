@@ -3,7 +3,7 @@ import { useAtendimentoTaxonomia } from "./useAtendimentoTaxonomia";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 
-type BarRow = { key: string; nome: string; qtd: number; pct: number };
+type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
 function Barras({ rows }: { rows: BarRow[] }) {
   const max = Math.max(1, ...rows.map((r) => r.qtd));
@@ -27,7 +27,7 @@ function Barras({ rows }: { rows: BarRow[] }) {
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full"
-                style={{ width: `${w}%`, backgroundColor: "hsl(var(--primary))" }}
+                style={{ width: `${w}%`, backgroundColor: r.color ?? "hsl(var(--primary))" }}
               />
             </div>
             <span className="text-right tabular-nums text-muted-foreground">
@@ -159,6 +159,28 @@ export function TaxonomiaTab() {
                 </table>
               </div>
             )}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Tickets por Subcategoria</h3>
+              <Barras rows={data.por_subcategoria.slice(0, 12).map((r) => ({ key: String(r.subcategory_id ?? r.nome), nome: r.nome, qtd: r.qtd, pct: r.pct }))} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Tickets por Tipo de Serviço</h3>
+              <Barras rows={data.por_tipo_servico.slice(0, 12).map((r) => ({ key: String(r.service_type_id ?? r.nome), nome: r.nome, qtd: r.qtd, pct: r.pct }))} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Tickets por Status</h3>
+              <Barras rows={data.por_status.slice(0, 12).map((r) => ({ key: r.slug, nome: r.nome, qtd: r.qtd, pct: r.pct, color: r.color ?? undefined }))} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Tickets por Canal de Abertura</h3>
+              <Barras rows={data.por_canal.slice(0, 12).map((r) => ({ key: r.canal, nome: r.canal, qtd: r.qtd, pct: r.pct }))} />
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold mb-3">Comercial × Plantão</h3>
+            <Barras rows={data.por_horario.map((r) => ({ key: r.tipo, nome: r.tipo, qtd: r.qtd, pct: r.pct }))} />
           </div>
         </>
       )}
