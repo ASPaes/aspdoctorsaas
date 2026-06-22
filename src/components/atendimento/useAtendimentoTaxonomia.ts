@@ -30,6 +30,7 @@ export interface AtendimentoTaxonomia {
   resolvidos_por_atendente: TaxAtendenteRow[];
   heatmap: TaxHeatRow[];
   ofensores: TaxOfensorRow[];
+  custo_receita: TaxCustoRow[];
   concentracao: TaxConcentracao;
   media_tickets_cliente: TaxMediaCliente;
   densidade: TaxDensRow[];
