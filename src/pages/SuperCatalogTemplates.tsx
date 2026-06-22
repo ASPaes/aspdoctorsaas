@@ -17,8 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import NewCatalogTemplateModal from "@/components/super/NewCatalogTemplateModal";
 
 const KIND_LABELS: Record<string, string> = {
   service_catalog: "Catálogo de serviços",
