@@ -127,6 +127,7 @@ function LinhaTemporal({ rows }: { rows: { mes: string; atendimentos: number; mr
 
 export function ChatsTab() {
   const { data, isLoading, isError, error } = useAtendimentoChats();
+  const { data: timeline } = useAtendimentoChatsTimeline();
   return (
     <div className="space-y-4">
       {isLoading ? (
