@@ -30,8 +30,9 @@ export function OverviewTab({ queryDateFrom, queryDateTo, selectedTenant, refres
   const storagePct = Number(storageMetrics?.usage_pct ?? 0);
   const latestSnapshot = snapshots[snapshots.length - 1] as any;
   const activeQueries = latestSnapshot?.active_connections ?? 0;
-  const slowQueryMs = latestSnapshot?.longest_query_duration_ms ?? 0;
-  const score = Math.max(0, Math.min(100, 100 - (totalInst - connectedInst) * 10 - Math.max(0, storagePct - 50)));
+  const slowQueryMs = latestSnapshot?.top_slow_query_ms ?? 0;
+  const pendingAlerts = (alertsData as any[]).filter((a: any) => a.status === 'sent' || a.status === 'snoozed').length;
+  const score = computeHealthScore(latestSnapshot, pendingAlerts);
   interface Alert {
     severity: 'critical' | 'warning' | 'info';
     icon: string;
