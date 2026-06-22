@@ -273,6 +273,6 @@ export function useAgentPresence() {
     fetchActiveAttendances,
     releaseToQueueAndEndShift,
     keepAssignmentsAndEndShift,
-    isBlocked: !isAdmin && status !== "active",
+    isBlocked: !isAdmin && status === "offline",
   };
 }
