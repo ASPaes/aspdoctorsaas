@@ -99,6 +99,16 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
           </SelectContent>
         </Select>
       )}
+      {cfg.cliente && (
+        <>
+          <MultiSelectFilter label="Segmento" options={opcoes.segmentos} selected={segmentoIds} onChange={setSegmentoIds} />
+          <MultiSelectFilter label="Área" options={opcoes.areas} selected={areaIds} onChange={setAreaIds} />
+          <MultiSelectFilter label="Estado" options={opcoes.estados} selected={estadoIds} onChange={setEstadoIds} />
+          <MultiSelectFilter label="Cidade" options={opcoes.cidades} selected={cidadeIds} onChange={setCidadeIds} />
+          <MultiSelectFilter label="Fornecedor" options={opcoes.fornecedores} selected={fornecedorIds} onChange={setFornecedorIds} />
+          <MultiSelectFilter label="Produto" options={opcoes.produtos} selected={produtoIds} onChange={setProdutoIds} />
+        </>
+      )}
     </div>
   );
 }
