@@ -18,7 +18,7 @@ import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoR
 import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
 const ALL = "__all__";
-type FiltroConfig = { date: boolean; setor: boolean; agente: boolean };
+type FiltroConfig = { date: boolean; setor: boolean; agente: boolean; cliente?: boolean };
 const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   velocidade: { date: true, setor: true, agente: true },
   agentes:    { date: true, setor: true, agente: true },
@@ -27,7 +27,7 @@ const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   ura:        { date: true, setor: true, agente: false },
   taxonomia:  { date: true, setor: true, agente: true },
   backlog:    { date: true, setor: true, agente: true },
-  clientes:   { date: true, setor: false, agente: false },
+  clientes:   { date: true, setor: false, agente: false, cliente: true },
 };
 
 function formatSecondsAgo(seg: number): string {
