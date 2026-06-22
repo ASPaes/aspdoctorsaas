@@ -1,9 +1,6 @@
-import { useState } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Star, Reply, AlertTriangle, Zap } from "lucide-react";
 import { useAtendimentoSatisfacao } from "./useAtendimentoSatisfacao";
 import { fmtEspera } from "./TempoRealTab";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
