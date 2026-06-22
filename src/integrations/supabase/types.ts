@@ -7861,6 +7861,7 @@ export type Database = {
       }
       get_atendimento_velocidade: {
         Args: {
+          p_agent_id?: string
           p_date_from: string
           p_date_to: string
           p_department_id?: string
@@ -7872,6 +7873,7 @@ export type Database = {
       }
       get_atendimento_velocidade_timeline: {
         Args: {
+          p_agent_id?: string
           p_bucket?: string
           p_date_from: string
           p_date_to: string
