@@ -23,6 +23,7 @@ const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   agentes:    { date: true, setor: true, agente: true },
   satisfacao: { date: true, setor: true, agente: true },
   volume:     { date: true, setor: true, agente: true },
+  ura:        { date: true, setor: true, agente: false },
 };
 
 function formatSecondsAgo(seg: number): string {
