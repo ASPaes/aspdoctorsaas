@@ -8,6 +8,12 @@ export interface AtendimentoDateRange { from: Date; to: Date; }
 export interface SetorOpt { id: string; name: string; }
 export interface AgenteOpt { user_id: string; nome: string; }
 
+export interface FiltroOpt { id: number; nome: string; }
+export interface FiltroOpcoes {
+  segmentos: FiltroOpt[]; areas: FiltroOpt[]; estados: FiltroOpt[];
+  cidades: FiltroOpt[]; fornecedores: FiltroOpt[]; produtos: FiltroOpt[];
+}
+
 interface AtendimentoFilterContextType {
   dateRange: AtendimentoDateRange;
   setDateRange: (r: AtendimentoDateRange) => void;
@@ -15,8 +21,15 @@ interface AtendimentoFilterContextType {
   setDepartmentId: (id: string | null) => void;
   agentId: string | null;
   setAgentId: (id: string | null) => void;
+  segmentoIds: number[]; setSegmentoIds: (ids: number[]) => void;
+  areaIds: number[]; setAreaIds: (ids: number[]) => void;
+  estadoIds: number[]; setEstadoIds: (ids: number[]) => void;
+  cidadeIds: number[]; setCidadeIds: (ids: number[]) => void;
+  fornecedorIds: number[]; setFornecedorIds: (ids: number[]) => void;
+  produtoIds: number[]; setProdutoIds: (ids: number[]) => void;
   setores: SetorOpt[];
   agentes: AgenteOpt[];
+  opcoes: FiltroOpcoes;
   isLoading: boolean;
 }
 
