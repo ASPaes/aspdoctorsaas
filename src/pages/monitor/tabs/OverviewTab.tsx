@@ -1,6 +1,7 @@
 import { useMonitorData } from '../hooks/useMonitorData';
 import { ScoreRing } from '../shared/ScoreRing';
 import { Sparkline } from '../shared/Sparkline';
+import { computeHealthScore } from '../shared/healthScore';
 
 interface OverviewTabProps {
   queryDateFrom: string;
