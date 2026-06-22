@@ -19,12 +19,13 @@ export interface AtendimentoBacklog {
 export function useAtendimentoBacklog() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
-  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
+  const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
   return useQuery<AtendimentoBacklog>({
-    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId],
+    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      const orNull = (a: number[]) => (a.length ? a : null);
       const { data, error } = await (supabase.rpc as any)("get_atendimento_backlog", {
         p_tenant_id: tid,
         p_date_from: dateRange.from.toISOString(),
@@ -32,6 +33,8 @@ export function useAtendimentoBacklog() {
         p_unidade_base_id: selectedUnidadeId ?? null,
         p_department_id: departmentId ?? null,
         p_agent_id: agentId ?? null,
+        p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
+        p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
