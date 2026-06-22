@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useAtendimentoChats } from "./useAtendimentoChats";
+import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
 
 type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string };
 
