@@ -306,34 +306,49 @@ export function AppSidebar() {
 
         <SidebarMenu>
           {isSuperAdmin && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Super Admin">
-                <NavLink to="/super/tenants" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                  <Crown className="h-4 w-4" />
-                  <span>Super Admin</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {isSuperAdmin && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Templates">
-                <NavLink to="/super/templates" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                  <Library className="h-4 w-4" />
-                  <span>Templates</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {isSuperAdmin && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Monitor">
-                <NavLink to="/super/monitor" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                  <Activity className="h-4 w-4" />
-                  <span>Monitor</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <Collapsible
+              defaultOpen={getGroupOpen("Super Admin")}
+              onOpenChange={(open) => setGroupOpen("Super Admin", open)}
+              className="group/collapsible"
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Super Admin">
+                    <Crown className="h-4 w-4" />
+                    <span>Super Admin</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/super/tenants" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <Building2 className="h-4 w-4" />
+                          <span>Tenants</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/super/templates" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <Library className="h-4 w-4" />
+                          <span>Templates</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild>
+                        <NavLink to="/super/monitor" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                          <Activity className="h-4 w-4" />
+                          <span>Monitor</span>
+                        </NavLink>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
           )}
           <SidebarMenuItem>
             <SidebarMenuButton tooltip="Suporte DoctorSaaS" onClick={handleOpenDemandas}>
