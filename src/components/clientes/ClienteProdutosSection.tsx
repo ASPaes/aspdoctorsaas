@@ -394,12 +394,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                     <Badge variant={m.ativo ? "default" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => toggleModuloMut.mutate(m)} disabled={toggleModuloMut.isPending}>
-                                      {m.ativo ? "Inativar" : "Reativar"}
-                                    </Button>
+                                    <div className="flex items-center justify-end gap-0.5">
+                                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModuloDialog({ open: true, clienteProdutoId: p.id, produtoId: p.produto_id, edit: m })}>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => toggleModuloMut.mutate(m)} disabled={toggleModuloMut.isPending}>
+                                        {m.ativo ? "Inativar" : "Reativar"}
+                                      </Button>
+                                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteModulo(m)} disabled={deleteModuloMut.isPending}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
