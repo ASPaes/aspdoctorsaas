@@ -107,7 +107,7 @@ export function VelocidadeTab() {
               label="% SLA (horário útil)"
               helpKey="atendimento_sla_util"
               value={data.sla_util_pct !== null ? `${data.sla_util_pct}%` : "—"}
-              subtitle={`${data.sla_util_dentro}/${data.sla_util_total} · só expediente`}
+              subtitle={`${data.sla_util_dentro}/${data.sla_util_total} · tempo útil`}
               icon={<Gauge className="h-4 w-4" />}
             />
             <KPICardEnhanced
