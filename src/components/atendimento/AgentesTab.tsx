@@ -128,6 +128,13 @@ export function AgentesTab() {
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.frt_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.latencia_p50)}</td>
+                        <td className="py-2 px-3 text-right">
+                          {a.latencia_faixa ? (
+                            <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs">{a.latencia_faixa}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="py-2 px-3 text-right tabular-nums">
                           {a.csat !== null ? (
                             <span>
