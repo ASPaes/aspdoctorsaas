@@ -34,7 +34,7 @@ export function AgentesTab() {
     to: endOfDay(new Date()),
   }));
   const { data, isLoading, isError, error } = useAtendimentoAgentes(dateRange);
-  const dur = (s: number | null | undefined) => (s && s > 0 ? fmtEspera(s) : "—");
+  const dur = (s: number | null | undefined) => fmtDur(s);
 
   return (
     <div className="space-y-4">
