@@ -61,6 +61,7 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
     .filter((a) => a.kind === "bloqueio");
   const hasHardBlock = clientBlocks.some((b) => b.block_behavior === "hard");
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [takeoverDialogOpen, setTakeoverDialogOpen] = useState(false);
 
   const doClaim = () => {
     if (!user?.id) return;
