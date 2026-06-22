@@ -11,11 +11,12 @@ export interface AtendimentoTaxonomia {
   total: number; por_produto: TaxProdRow[]; por_categoria: TaxCatRow[]; densidade: TaxDensRow[];
 }
 
-export function useAtendimentoTaxonomia(dateRange: { from: Date; to: Date }) {
+export function useAtendimentoTaxonomia() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoTaxonomia>({
-    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
+    queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -24,6 +25,8 @@ export function useAtendimentoTaxonomia(dateRange: { from: Date; to: Date }) {
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
