@@ -200,6 +200,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       queryKey: "crud_service_types",
       resource: "cfg.tipos_servico",
       orderBy: "nome",
+      templateKind: "service_types",
       columns: [
         { key: "codigo", label: "Código" },
         { key: "nome", label: "Nome" },
