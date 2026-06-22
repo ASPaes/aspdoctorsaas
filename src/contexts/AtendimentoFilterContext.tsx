@@ -38,6 +38,8 @@ const defaultRange = (): AtendimentoDateRange => ({
   to: endOfDay(new Date()),
 });
 
+const emptyOpcoes: FiltroOpcoes = { segmentos: [], areas: [], estados: [], cidades: [], fornecedores: [], produtos: [] };
+
 const AtendimentoFilterContext = createContext<AtendimentoFilterContextType>({
   dateRange: defaultRange(),
   setDateRange: () => {},
@@ -45,8 +47,15 @@ const AtendimentoFilterContext = createContext<AtendimentoFilterContextType>({
   setDepartmentId: () => {},
   agentId: null,
   setAgentId: () => {},
+  segmentoIds: [], setSegmentoIds: () => {},
+  areaIds: [], setAreaIds: () => {},
+  estadoIds: [], setEstadoIds: () => {},
+  cidadeIds: [], setCidadeIds: () => {},
+  fornecedorIds: [], setFornecedorIds: () => {},
+  produtoIds: [], setProdutoIds: () => {},
   setores: [],
   agentes: [],
+  opcoes: emptyOpcoes,
   isLoading: false,
 });
 
