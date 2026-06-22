@@ -49,6 +49,13 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
     setAgentId,
     setores,
     agentes,
+    opcoes,
+    segmentoIds, setSegmentoIds,
+    areaIds, setAreaIds,
+    estadoIds, setEstadoIds,
+    cidadeIds, setCidadeIds,
+    fornecedorIds, setFornecedorIds,
+    produtoIds, setProdutoIds,
   } = useAtendimentoFilter();
 
   return (
