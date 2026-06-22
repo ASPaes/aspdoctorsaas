@@ -1,8 +1,6 @@
-import { useState, Fragment } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
+import { Fragment } from "react";
 import { Loader2, MessageSquare, Repeat, ArrowDownLeft, Tag } from "lucide-react";
 import { useAtendimentoVolume } from "./useAtendimentoVolume";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 
@@ -18,24 +16,13 @@ const CANAL_LABEL: Record<string, string> = {
 };
 
 export function VolumeTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 29)),
-    to: endOfDay(new Date()),
-  }));
-  const { data, isLoading, isError, error } = useAtendimentoVolume(dateRange);
+  const { data, isLoading, isError, error } = useAtendimentoVolume();
 
   const pct = (n: number, base: number) =>
     base > 0 ? `${Math.round((100 * n) / base)}%` : "—";
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <DateRangePicker
-          dateRange={dateRange}
-          onDateRangeChange={(r) => r?.from && r?.to && setDateRange({ from: r.from, to: r.to })}
-        />
-      </div>
-
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
