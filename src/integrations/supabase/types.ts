@@ -7629,6 +7629,15 @@ export type Database = {
         }
         Returns: string
       }
+      create_simple_template_from_tenant: {
+        Args: {
+          p_descricao?: string
+          p_kind: string
+          p_nome: string
+          p_source_tenant_id: string
+        }
+        Returns: string
+      }
       create_tenant_for_new_user:
         | { Args: { p_nome: string }; Returns: string }
         | {
@@ -8694,6 +8703,10 @@ export type Database = {
           p_target_tenant_id?: string
           p_template_id: string
         }
+        Returns: Json
+      }
+      import_simple_template: {
+        Args: { p_target_tenant_id?: string; p_template_id: string }
         Returns: Json
       }
       is_admin_or_head: { Args: never; Returns: boolean }
