@@ -17,7 +17,7 @@ import { AtendimentoFilterProvider, useAtendimentoFilter } from "@/contexts/Aten
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
 const ALL = "__all__";
-const MIGRADAS = ["agentes", "velocidade"]; // abas que já leem os filtros globais
+const MIGRADAS = ["agentes", "velocidade", "satisfacao"]; // abas que já leem os filtros globais
 
 function formatSecondsAgo(seg: number): string {
   if (seg < 5) return "agora";

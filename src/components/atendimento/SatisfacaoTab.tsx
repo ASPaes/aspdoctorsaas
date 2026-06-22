@@ -1,9 +1,6 @@
-import { useState } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Star, Reply, AlertTriangle, Zap } from "lucide-react";
 import { useAtendimentoSatisfacao } from "./useAtendimentoSatisfacao";
 import { fmtEspera } from "./TempoRealTab";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
@@ -18,11 +15,7 @@ const SCORE_COLOR: Record<number, string> = {
 };
 
 export function SatisfacaoTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 29)),
-    to: endOfDay(new Date()),
-  }));
-  const { data, isLoading, isError, error } = useAtendimentoSatisfacao(dateRange);
+  const { data, isLoading, isError, error } = useAtendimentoSatisfacao();
 
   const divPct =
     data && data.div_neg_total > 0
@@ -31,10 +24,6 @@ export function SatisfacaoTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-      </div>
-
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

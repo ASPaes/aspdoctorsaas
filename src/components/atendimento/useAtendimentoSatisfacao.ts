@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
+import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
 export interface CsatSetorRow {
   department_id: string | null;
@@ -33,9 +34,10 @@ export interface AtendimentoSatisfacao {
   atendeu_na_hora_pct: number | null;
 }
 
-export function useAtendimentoSatisfacao(dateRange: { from: Date; to: Date }) {
+export function useAtendimentoSatisfacao() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoSatisfacao>({
     queryKey: [
       "atendimento-satisfacao",
@@ -43,6 +45,8 @@ export function useAtendimentoSatisfacao(dateRange: { from: Date; to: Date }) {
       dateRange.from.toISOString(),
       dateRange.to.toISOString(),
       selectedUnidadeId,
+      departmentId,
+      agentId,
     ],
     enabled: !!tid,
     refetchOnWindowFocus: false,
@@ -52,6 +56,8 @@ export function useAtendimentoSatisfacao(dateRange: { from: Date; to: Date }) {
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
