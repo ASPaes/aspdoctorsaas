@@ -349,8 +349,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Módulo</TableHead>
-                                <TableHead className="text-right">Vlr Mensal</TableHead>
-                                <TableHead className="text-right">Vlr Custo</TableHead>
+                                <TableHead className="text-center w-16">Qtd</TableHead>
+                                <TableHead className="text-right">Vlr Mensal (unit.)</TableHead>
+                                <TableHead className="text-right">Vlr Custo (unit.)</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="w-24 text-right">Ações</TableHead>
                               </TableRow>
@@ -359,8 +360,23 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                               {mods.map(m => (
                                 <TableRow key={m.id}>
                                   <TableCell className="font-medium">{m.produto_modulos?.nome ?? "—"}</TableCell>
-                                  <TableCell className="text-right">R$ {fmtBRL(m.vlr_mensal)}</TableCell>
-                                  <TableCell className="text-right">R$ {fmtBRL(m.vlr_custo)}</TableCell>
+                                  <TableCell className="text-center">{Number(m.quantidade) || 1}</TableCell>
+                                  <TableCell className="text-right">
+                                    R$ {fmtBRL(m.vlr_mensal)}
+                                    {(Number(m.quantidade) || 1) > 1 && (
+                                      <span className="block text-xs text-muted-foreground">
+                                        = R$ {fmtBRL((Number(m.vlr_mensal) || 0) * (Number(m.quantidade) || 1))}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    R$ {fmtBRL(m.vlr_custo)}
+                                    {(Number(m.quantidade) || 1) > 1 && (
+                                      <span className="block text-xs text-muted-foreground">
+                                        = R$ {fmtBRL((Number(m.vlr_custo) || 0) * (Number(m.quantidade) || 1))}
+                                      </span>
+                                    )}
+                                  </TableCell>
                                   <TableCell>
                                     <Badge variant={m.ativo ? "default" : "secondary"}>{m.ativo ? "Ativo" : "Inativo"}</Badge>
                                   </TableCell>
