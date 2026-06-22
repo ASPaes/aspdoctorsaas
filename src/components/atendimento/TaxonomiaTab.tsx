@@ -88,6 +88,24 @@ function Heatmap({ rows }: { rows: { dow: number; hora: number; qtd: number }[] 
   );
 }
 
+function agregarPorHora(heat: { dow: number; hora: number; qtd: number }[]): BarRow[] {
+  const m = new Map<number, number>();
+  heat.forEach((r) => m.set(r.hora, (m.get(r.hora) ?? 0) + r.qtd));
+  const tot = Array.from(m.values()).reduce((a, b) => a + b, 0);
+  return Array.from(m.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([hora, qtd]) => ({ key: `h${hora}`, nome: `${hora}h`, qtd, pct: tot > 0 ? (100 * qtd) / tot : 0 }));
+}
+
+function agregarPorDiaSemana(heat: { dow: number; hora: number; qtd: number }[]): BarRow[] {
+  const m = new Map<number, number>();
+  heat.forEach((r) => m.set(r.dow, (m.get(r.dow) ?? 0) + r.qtd));
+  const ordem = [1, 2, 3, 4, 5, 6, 0];
+  const labels: Record<number, string> = { 0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
+  const tot = Array.from(m.values()).reduce((a, b) => a + b, 0);
+  return ordem.map((d) => ({ key: `d${d}`, nome: labels[d], qtd: m.get(d) ?? 0, pct: tot > 0 ? (100 * (m.get(d) ?? 0)) / tot : 0 }));
+}
+
 export function TaxonomiaTab() {
   const { data, isLoading, isError, error } = useAtendimentoTaxonomia();
 
@@ -255,6 +273,16 @@ export function TaxonomiaTab() {
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Resolvidos por Atendente</h3>
               <Barras rows={data.resolvidos_por_atendente.slice(0, 15).map((r) => ({ key: r.nome, nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0 }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Tickets por Hora do Dia</h3>
+              <Barras rows={agregarPorHora(data.heatmap)} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Tickets por Dia da Semana</h3>
+              <Barras rows={agregarPorDiaSemana(data.heatmap)} />
             </div>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
