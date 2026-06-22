@@ -26,19 +26,11 @@ function fmtDur(s: number | null | undefined): string {
 }
 
 export function AgentesTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 29)),
-    to: endOfDay(new Date()),
-  }));
-  const { data, isLoading, isError, error } = useAtendimentoAgentes(dateRange);
+  const { data, isLoading, isError, error } = useAtendimentoAgentes();
   const dur = (s: number | null | undefined) => fmtDur(s);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-      </div>
-
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
