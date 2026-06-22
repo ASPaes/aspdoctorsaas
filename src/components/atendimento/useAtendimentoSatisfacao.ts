@@ -34,9 +34,10 @@ export interface AtendimentoSatisfacao {
   atendeu_na_hora_pct: number | null;
 }
 
-export function useAtendimentoSatisfacao(dateRange: { from: Date; to: Date }) {
+export function useAtendimentoSatisfacao() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoSatisfacao>({
     queryKey: [
       "atendimento-satisfacao",
@@ -44,6 +45,8 @@ export function useAtendimentoSatisfacao(dateRange: { from: Date; to: Date }) {
       dateRange.from.toISOString(),
       dateRange.to.toISOString(),
       selectedUnidadeId,
+      departmentId,
+      agentId,
     ],
     enabled: !!tid,
     refetchOnWindowFocus: false,
