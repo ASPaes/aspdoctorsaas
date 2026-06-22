@@ -17,8 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import NewCatalogTemplateModal from "@/components/super/NewCatalogTemplateModal";
 
 const KIND_LABELS: Record<string, string> = {
   service_catalog: "Catálogo de serviços",
@@ -44,6 +45,7 @@ interface CatalogTemplate {
 export default function SuperCatalogTemplates() {
   const queryClient = useQueryClient();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["super_catalog_templates"],
@@ -91,11 +93,17 @@ export default function SuperCatalogTemplates() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Super Admin — Templates de catálogo</h1>
-        <p className="mt-1 text-muted-foreground">
-          Biblioteca de catálogos prontos para novos tenants importarem.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Super Admin — Templates de catálogo</h1>
+          <p className="mt-1 text-muted-foreground">
+            Biblioteca de catálogos prontos para novos tenants importarem.
+          </p>
+        </div>
+        <Button onClick={() => setNewOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Novo template
+        </Button>
       </div>
 
       <Card>
@@ -178,6 +186,12 @@ export default function SuperCatalogTemplates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <NewCatalogTemplateModal
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        onCreated={() => queryClient.invalidateQueries({ queryKey: ["super_catalog_templates"] })}
+      />
     </div>
   );
 }
