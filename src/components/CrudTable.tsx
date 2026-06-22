@@ -44,9 +44,10 @@ interface CrudTableProps {
   resource?: string;
   /** Extra React Query keys (by prefix) to invalidate after save/delete — ex.: selects de relação em outras telas. */
   invalidateKeys?: string[];
+  templateKind?: string;
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource, invalidateKeys }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource, invalidateKeys, templateKind }: CrudTableProps) {
   const guard = (action: PermissionAction, btn: React.ReactNode) =>
     resource ? (
       <ProtectedElement resource={resource} action={action} mode="notify">
