@@ -1126,6 +1126,7 @@ function ModuloDialog({
     setSaving(true);
     try {
       const payload: any = {
+        quantidade: quantidade || 1,
         vlr_mensal: vlrMensal || 0,
         vlr_custo: vlrCusto || 0,
         vlr_ativacao: vlrAtivacao || 0,
