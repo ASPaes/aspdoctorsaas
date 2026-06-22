@@ -7813,6 +7813,14 @@ export type Database = {
         }
         Returns: Json
       }
+      get_atendimento_chats_timeline: {
+        Args: {
+          p_meses?: number
+          p_tenant_id: string
+          p_unidade_base_id?: number
+        }
+        Returns: Json
+      }
       get_atendimento_clientes: {
         Args: {
           p_area_ids?: number[]
