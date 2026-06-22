@@ -257,6 +257,10 @@ export function TaxonomiaTab() {
               <Barras rows={data.resolvidos_por_atendente.slice(0, 15).map((r) => ({ key: r.nome, nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0 }))} />
             </div>
           </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold mb-3">Picos — Dia × Horário</h3>
+            <Heatmap rows={data.heatmap} />
+          </div>
         </>
       )}
     </div>
