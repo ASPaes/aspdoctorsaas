@@ -257,6 +257,11 @@ export function ChatsTab() {
             <h3 className="text-sm font-semibold mb-3">Picos — Dia × Horário</h3>
             <Heatmap rows={data.heatmap} />
           </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold mb-1">Ticket médio por atendimento — tendência (12 meses)</h3>
+            <p className="text-xs text-muted-foreground mb-3">MRR da base ÷ atendimentos do mês. Visão macro — não usa os filtros acima. Série em formação: os primeiros meses refletem a adoção do registro de atendimentos.</p>
+            <LinhaTemporal rows={timeline ?? []} />
+          </div>
         </>
       )}
     </div>
