@@ -71,6 +71,7 @@ export function useAtendimentoTaxonomia() {
         resolvidos_por_atendente: ((d.resolvidos_por_atendente ?? []) as any[]).map((r) => ({ nome: r.nome ?? "(desconhecido)", qtd: Number(r.qtd ?? 0) })),
         heatmap: ((d.heatmap ?? []) as any[]).map((r) => ({ dow: Number(r.dow ?? 0), hora: Number(r.hora ?? 0), qtd: Number(r.qtd ?? 0) })),
         ofensores: ((d.ofensores ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", qtd: Number(r.qtd ?? 0) })),
+        custo_receita: ((d.custo_receita ?? []) as any[]).map((r) => ({ cliente_id: r.cliente_id ?? null, nome: r.nome ?? "(sem nome)", tickets: Number(r.tickets ?? 0), mrr: Number(r.mrr ?? 0), tickets_por_mil: Number(r.tickets_por_mil ?? 0) })),
         concentracao: {
           clientes_com_ticket: Number(d.concentracao?.clientes_com_ticket ?? 0),
           tickets_com_cliente: Number(d.concentracao?.tickets_com_cliente ?? 0),
