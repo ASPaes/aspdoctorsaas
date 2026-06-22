@@ -111,15 +111,38 @@ export function AtendimentoFilterProvider({ children }: { children: ReactNode })
     },
   });
 
+  const { data: opcoes = emptyOpcoes, isLoading: loadingOpc } = useQuery({
+    queryKey: ["atendimento_filtro_opcoes", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_atendimento_filtro_opcoes", { p_tenant_id: tid });
+      if (error) throw error;
+      const d = (data ?? {}) as any;
+      const norm = (arr: any): FiltroOpt[] =>
+        ((arr ?? []) as any[]).map((o) => ({ id: Number(o.id), nome: String(o.nome ?? "") }));
+      return {
+        segmentos: norm(d.segmentos), areas: norm(d.areas), estados: norm(d.estados),
+        cidades: norm(d.cidades), fornecedores: norm(d.fornecedores), produtos: norm(d.produtos),
+      } as FiltroOpcoes;
+    },
+  });
+
   const value = useMemo(
     () => ({
       dateRange, setDateRange,
       departmentId, setDepartmentId,
       agentId, setAgentId,
-      setores, agentes,
-      isLoading: loadingSet || loadingAg,
+      segmentoIds, setSegmentoIds,
+      areaIds, setAreaIds,
+      estadoIds, setEstadoIds,
+      cidadeIds, setCidadeIds,
+      fornecedorIds, setFornecedorIds,
+      produtoIds, setProdutoIds,
+      setores, agentes, opcoes,
+      isLoading: loadingSet || loadingAg || loadingOpc,
     }),
-    [dateRange, departmentId, agentId, setores, agentes, loadingSet, loadingAg]
+    [dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds, setores, agentes, opcoes, loadingSet, loadingAg, loadingOpc]
   );
 
   return (
