@@ -180,6 +180,7 @@ export function AppSidebar() {
                 if (item.children) {
                   const visibleChildren = item.children.filter((c) => {
                     if (c.superAdminOnly && !isSuperAdmin) return false;
+                    if (c.roles && !isSuperAdmin && !c.roles.includes(profile?.role ?? "")) return false;
                     return can(c.resource!, "view");
                   });
                   if (visibleChildren.length === 0) return null;
