@@ -60,6 +60,7 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<Record<string, any> | null>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
