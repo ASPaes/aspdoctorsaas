@@ -221,19 +221,14 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
       const bucket = getConversationBucket(state);
 
-      // Non-admin: "Atendendo" conta só os meus, "Fila" conta todos sem agente
+      // Atendendo e Fila já mostram o setor inteiro (RLS limita ao setor).
+      // "Encerradas" continua só os que o operador atendeu — vínculo de setor
+      // nas encerradas depende de fix da view, tratado em fase posterior.
       if (!isAdmin && user?.id) {
-        if (bucket === "in_progress") {
-          const isMyConv = (conv as any).assigned_to === user.id;
-          const att = attendanceMap.get(conv.id);
-          const isMyAtt = att?.assigned_to === user.id;
-          if (!isMyConv && !isMyAtt) continue;
-        }
         if (bucket === "closed") {
           const att = attendanceMap.get(conv.id);
           if (att && att.assigned_to !== user.id) continue;
         }
-        // "waiting_in_hours" e "waiting_out_of_hours" → visível para todos do setor
       }
 
       switch (bucket) {
