@@ -145,7 +145,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [{ key: "descricao", label: "Descrição" }],
     },
     {
-      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", resource: "cfg.origens_venda", orderBy: "nome",
+      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", resource: "cfg.origens_venda", orderBy: "nome", templateKind: "origens_venda",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
