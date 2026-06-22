@@ -44,6 +44,8 @@ export function useAtendimentoVelocidadeTimeline(
         p_bucket: bucket,
         p_sla_frt_seconds: slaSeconds,
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const num = (v: any) => (v === null || v === undefined ? null : Number(v));
