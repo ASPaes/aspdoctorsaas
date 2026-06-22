@@ -1096,6 +1096,7 @@ function ModuloDialog({
   useMemo(() => {
     if (open) {
       setModuloId(edit?.modulo_id ?? "");
+      setQuantidade(edit?.quantidade ?? 1);
       setVlrMensal(edit?.vlr_mensal ?? 0);
       setVlrCusto(edit?.vlr_custo ?? 0);
       setVlrAtivacao(edit?.vlr_ativacao ?? 0);
