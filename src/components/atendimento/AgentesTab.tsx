@@ -1,8 +1,5 @@
-import { useState } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Users, MessageSquare, Star, RotateCcw } from "lucide-react";
 import { useAtendimentoAgentes } from "./useAtendimentoAgentes";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
