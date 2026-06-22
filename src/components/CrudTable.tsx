@@ -226,6 +226,11 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
         {headerActions}
+        {templateKind && tid && guard("insert", (
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4" /> Importar de template
+          </Button>
+        ))}
         {guard("insert", (
           <Button size="sm" onClick={openNew}>
             <Plus className="h-4 w-4" /> Novo
