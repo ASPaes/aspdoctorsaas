@@ -12,6 +12,7 @@ import { UnidadeFilterProvider } from "@/contexts/UnidadeFilterContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
+import RequireRole from "@/components/auth/RequireRole";
 import LandingRedirect from "@/components/auth/LandingRedirect";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
@@ -97,7 +98,7 @@ const App = () => (
               <Route path="/configuracoes/notificacoes" element={<RequirePermission resource="nav.configuracoes"><ConfiguracoesNotificacoes /></RequirePermission>} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<RequirePermission resource="nav.customer_success"><CustomerSuccess /></RequirePermission>} />
-              <Route path="/atendimento/dashboard" element={<RequirePermission resource="nav.atendimento_dashboard"><Suspense fallback={<PageLoader />}><AtendimentoDashboard /></Suspense></RequirePermission>} />
+              <Route path="/atendimento/dashboard" element={<RequirePermission resource="nav.atendimento_dashboard"><RequireRole roles={["admin", "head"]}><Suspense fallback={<PageLoader />}><AtendimentoDashboard /></Suspense></RequireRole></RequirePermission>} />
               <Route path="/whatsapp" element={<RequirePermission resource="nav.chat"><WhatsApp /></RequirePermission>} />
               <Route path="/whatsapp/contatos" element={<RequirePermission resource="nav.chat"><WhatsAppContatos /></RequirePermission>} />
               
