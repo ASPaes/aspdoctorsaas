@@ -141,7 +141,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", resource: "cfg.motivos_cancelamento", orderBy: "descricao",
+      value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", resource: "cfg.motivos_cancelamento", orderBy: "descricao", templateKind: "motivos_cancelamento",
       columns: [{ key: "descricao", label: "Descrição" }],
     },
     {
