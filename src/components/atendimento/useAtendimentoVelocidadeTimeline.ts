@@ -16,12 +16,12 @@ export interface VelocidadeTimelinePoint {
 }
 
 export function useAtendimentoVelocidadeTimeline(
-  dateRange: { from: Date; to: Date },
   slaSeconds: number,
   bucket: "day" | "week",
 ) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<VelocidadeTimelinePoint[]>({
     queryKey: [
       "atendimento-velocidade-timeline",
@@ -31,6 +31,8 @@ export function useAtendimentoVelocidadeTimeline(
       slaSeconds,
       bucket,
       selectedUnidadeId,
+      departmentId,
+      agentId,
     ],
     enabled: !!tid,
     refetchOnWindowFocus: false,
