@@ -2,6 +2,7 @@ import { Loader2, Users, MessageSquare, Star, RotateCcw } from "lucide-react";
 import { useAtendimentoAgentes } from "./useAtendimentoAgentes";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
+import { LatenciaHistograma } from "./LatenciaHistograma";
 import { cn } from "@/lib/utils";
 
 // Formata duração mostrando segundos (latência/TMA/1ª resp são curtos; "1m" escondia tudo entre 1s e 119s)
@@ -150,6 +151,8 @@ export function AgentesTab() {
               </div>
             )}
           </div>
+
+          <LatenciaHistograma />
         </>
       )}
     </div>
