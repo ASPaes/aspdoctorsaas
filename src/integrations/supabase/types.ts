@@ -8205,6 +8205,13 @@ export type Database = {
           uf: string
         }[]
       }
+      get_catalog_template_products: {
+        Args: { p_template_id: string }
+        Returns: {
+          ocorrencias: number
+          produto: string
+        }[]
+      }
       get_churn_detalhe_uf: {
         Args: {
           p_fim: string
@@ -8727,6 +8734,16 @@ export type Database = {
           tokens_in: number
           tokens_out: number
           tom: string
+        }[]
+      }
+      list_published_catalog_templates: {
+        Args: never
+        Returns: {
+          descricao: string
+          id: string
+          item_count: number
+          nome: string
+          origem: string
         }[]
       }
       mark_all_mentions_seen: { Args: never; Returns: undefined }

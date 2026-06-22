@@ -16,9 +16,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Plus, Pencil } from "lucide-react";
+import { ChevronRight, Plus, Pencil, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/usePermissions";
+import ImportCatalogTemplateModal from "./ImportCatalogTemplateModal";
 
 interface Category {
   id: string;
@@ -51,6 +52,12 @@ export default function CategoriasServicosTab() {
   const guardUpdate = () => { if (!can("cfg.categorias_servico", "update")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [importOpen, setImportOpen] = useState(false);
+
+  const openImport = () => {
+    if (!guardInsert()) return;
+    setImportOpen(true);
+  };
 
   // Category dialog
   const [catOpen, setCatOpen] = useState(false);
@@ -290,15 +297,23 @@ export default function CategoriasServicosTab() {
         <h3 className="text-sm font-medium text-muted-foreground">
           Categorias e subcategorias de serviço
         </h3>
-        <Button size="sm" onClick={openNewCategory}>
-          <Plus className="h-4 w-4" /> Nova categoria
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openImport}>
+            <Upload className="h-4 w-4" /> Importar de template
+          </Button>
+          <Button size="sm" onClick={openNewCategory}>
+            <Plus className="h-4 w-4" /> Nova categoria
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">
         {categorias.length === 0 && (
-          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-            Nenhuma categoria cadastrada.
+          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center space-y-3">
+            <div>Nenhuma categoria cadastrada.</div>
+            <Button size="sm" variant="outline" onClick={openImport}>
+              <Upload className="h-4 w-4" /> Importar de template
+            </Button>
           </div>
         )}
 
@@ -477,6 +492,18 @@ export default function CategoriasServicosTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportCatalogTemplateModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        tenantId={tid}
+        onImported={() => {
+          qc.invalidateQueries({ queryKey: ["cats_categorias"] });
+          qc.invalidateQueries({ queryKey: ["cats_subcategorias"] });
+          qc.invalidateQueries({ queryKey: ["cats_category_products"] });
+          qc.invalidateQueries({ queryKey: ["cats_produtos"] });
+        }}
+      />
     </div>
   );
 }
