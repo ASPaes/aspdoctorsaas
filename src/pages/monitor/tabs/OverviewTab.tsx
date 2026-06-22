@@ -1,6 +1,7 @@
 import { useMonitorData } from '../hooks/useMonitorData';
 import { ScoreRing } from '../shared/ScoreRing';
 import { Sparkline } from '../shared/Sparkline';
+import { computeHealthScore } from '../shared/healthScore';
 
 interface OverviewTabProps {
   queryDateFrom: string;
@@ -11,7 +12,7 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ queryDateFrom, queryDateTo, selectedTenant, refreshKey, onDrillDown }: OverviewTabProps) {
-  const { tenantMetrics, instances, snapshots, todayMetrics, aiCostMetrics, storageMetrics } = useMonitorData({
+  const { tenantMetrics, instances, snapshots, alerts: alertsData, todayMetrics, aiCostMetrics, storageMetrics } = useMonitorData({
     queryDateFrom, queryDateTo, selectedTenant, refreshKey,
   });
 
@@ -29,8 +30,9 @@ export function OverviewTab({ queryDateFrom, queryDateTo, selectedTenant, refres
   const storagePct = Number(storageMetrics?.usage_pct ?? 0);
   const latestSnapshot = snapshots[snapshots.length - 1] as any;
   const activeQueries = latestSnapshot?.active_connections ?? 0;
-  const slowQueryMs = latestSnapshot?.longest_query_duration_ms ?? 0;
-  const score = Math.max(0, Math.min(100, 100 - (totalInst - connectedInst) * 10 - Math.max(0, storagePct - 50)));
+  const slowQueryMs = latestSnapshot?.top_slow_query_ms ?? 0;
+  const pendingAlerts = (alertsData as any[]).filter((a: any) => a.status === 'sent' || a.status === 'snoozed').length;
+  const score = computeHealthScore(latestSnapshot, pendingAlerts);
   interface Alert {
     severity: 'critical' | 'warning' | 'info';
     icon: string;
