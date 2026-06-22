@@ -68,6 +68,7 @@ interface ClienteProdutoModulo {
   id: string;
   cliente_produto_id: string;
   modulo_id: string;
+  quantidade: number | null;
   vlr_ativacao: number | null;
   vlr_mensal: number | null;
   vlr_custo: number | null;
