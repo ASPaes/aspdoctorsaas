@@ -12,7 +12,7 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({ queryDateFrom, queryDateTo, selectedTenant, refreshKey, onDrillDown }: OverviewTabProps) {
-  const { tenantMetrics, instances, snapshots, alerts, todayMetrics, aiCostMetrics, storageMetrics } = useMonitorData({
+  const { tenantMetrics, instances, snapshots, alerts: alertsData, todayMetrics, aiCostMetrics, storageMetrics } = useMonitorData({
     queryDateFrom, queryDateTo, selectedTenant, refreshKey,
   });
 
