@@ -68,6 +68,7 @@ interface ClienteProdutoModulo {
   id: string;
   cliente_produto_id: string;
   modulo_id: string;
+  quantidade: number | null;
   vlr_ativacao: number | null;
   vlr_mensal: number | null;
   vlr_custo: number | null;
@@ -208,8 +209,8 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         setMrrDialog({
           open: true,
           tipo: "downsell",
-          valorDelta: -(Number(m.vlr_mensal) || 0),
-          custoDelta: -(Number(m.vlr_custo) || 0),
+          valorDelta: -((Number(m.vlr_mensal) || 0) * (Number(m.quantidade) || 1)),
+          custoDelta: -((Number(m.vlr_custo) || 0) * (Number(m.quantidade) || 1)),
           descricao: `Módulo ${m.produto_modulos?.nome ?? ""} inativado`,
           moduloId: m.id,
         });
@@ -1085,6 +1086,7 @@ function ModuloDialog({
 }) {
   const isEdit = !!edit;
   const [moduloId, setModuloId] = useState<string>("");
+  const [quantidade, setQuantidade] = useState<number>(1);
   const [vlrMensal, setVlrMensal] = useState<number | null>(0);
   const [vlrCusto, setVlrCusto] = useState<number | null>(0);
   const [vlrAtivacao, setVlrAtivacao] = useState<number | null>(0);
@@ -1094,6 +1096,7 @@ function ModuloDialog({
   useMemo(() => {
     if (open) {
       setModuloId(edit?.modulo_id ?? "");
+      setQuantidade(edit?.quantidade ?? 1);
       setVlrMensal(edit?.vlr_mensal ?? 0);
       setVlrCusto(edit?.vlr_custo ?? 0);
       setVlrAtivacao(edit?.vlr_ativacao ?? 0);
@@ -1123,6 +1126,7 @@ function ModuloDialog({
     setSaving(true);
     try {
       const payload: any = {
+        quantidade: quantidade || 1,
         vlr_mensal: vlrMensal || 0,
         vlr_custo: vlrCusto || 0,
         vlr_ativacao: vlrAtivacao || 0,
@@ -1149,9 +1153,9 @@ function ModuloDialog({
         const nomeModulo = catalogoQuery.data?.find(m => m.id === moduloId)?.nome ?? "";
         onMRRSuggest?.({
           tipo: "upsell",
-          valorDelta: vlrMensal || 0,
-          custoDelta: vlrCusto || 0,
-          descricao: `Módulo ${nomeModulo} adicionado`,
+          valorDelta: (vlrMensal || 0) * (quantidade || 1),
+          custoDelta: (vlrCusto || 0) * (quantidade || 1),
+          descricao: `Módulo ${nomeModulo} adicionado${(quantidade || 1) > 1 ? ` (${quantidade}×)` : ""}`,
           moduloId: null,
         });
       }
@@ -1183,11 +1187,21 @@ function ModuloDialog({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Valor Mensal</Label>
+            <Label>Quantidade</Label>
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={quantidade}
+              onChange={(e) => setQuantidade(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Valor Mensal (unit.)</Label>
             <NumericInput value={vlrMensal} onChange={setVlrMensal} suffix="R$" />
           </div>
           <div className="space-y-1">
-            <Label>Valor Custo</Label>
+            <Label>Valor Custo (unit.)</Label>
             <NumericInput value={vlrCusto} onChange={setVlrCusto} suffix="R$" />
           </div>
           <div className="space-y-1">
@@ -1197,6 +1211,14 @@ function ModuloDialog({
           <div className="space-y-1">
             <Label>Data Ativação</Label>
             <Input type="date" value={dataAt} onChange={(e) => setDataAt(e.target.value)} />
+          </div>
+          <div className="md:col-span-2 rounded-md border bg-muted/30 p-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">Total do módulo ({quantidade}×)</span>
+            <span className="font-semibold">
+              Mensal: <span className="text-primary">R$ {fmtBRL((Number(vlrMensal) || 0) * (quantidade || 1))}</span>
+              {"  ·  "}
+              Custo: <span className="text-muted-foreground">R$ {fmtBRL((Number(vlrCusto) || 0) * (quantidade || 1))}</span>
+            </span>
           </div>
         </div>
         <DialogFooter>
