@@ -91,6 +91,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     open: boolean; clienteProdutoId?: string; produtoId?: number; edit?: ClienteProdutoModulo | null;
   }>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<ClienteProduto | null>(null);
+  const [confirmDeleteModulo, setConfirmDeleteModulo] = useState<ClienteProdutoModulo | null>(null);
   const [mrrDialog, setMrrDialog] = useState<MRRDialogState>({
     open: false, tipo: "upsell", valorDelta: 0, custoDelta: 0, descricao: "",
   });
