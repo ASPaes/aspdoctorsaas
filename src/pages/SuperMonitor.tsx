@@ -12,6 +12,7 @@ import { ScoreRing } from './monitor/shared/ScoreRing';
 import { MiniBar } from './monitor/shared/MiniBar';
 import { HelpTooltip } from './monitor/shared/HelpTooltip';
 import { parseBRDate, formatBRDate } from './monitor/shared/dateUtils';
+import { computeHealthScore } from './monitor/shared/healthScore';
 import { useMonitorData } from './monitor/hooks/useMonitorData';
 import { OverviewTab } from './monitor/tabs/OverviewTab';
 import { ProjectionsTab } from './monitor/tabs/ProjectionsTab';
@@ -130,19 +131,7 @@ export default function SuperMonitor() {
 
   
 
-  const score = Math.max(
-    0,
-    Math.round(
-      100 -
-        (latestSnap?.top_slow_query_ms > 3000 ? 8 : latestSnap?.top_slow_query_ms > 1000 ? 4 : 0) -
-        (latestSnap?.dead_tuples_whatsapp_messages > 2000
-          ? 5
-          : latestSnap?.dead_tuples_whatsapp_messages > 500
-            ? 2
-            : 0) -
-        pendingAlerts * 2,
-    ),
-  );
+  const score = computeHealthScore(latestSnap, pendingAlerts);
   const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#eab308' : '#ef4444';
 
   const checkLabel: Record<string, string> = {
