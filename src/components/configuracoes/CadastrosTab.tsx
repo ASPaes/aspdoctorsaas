@@ -129,7 +129,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       ],
     },
     {
-      value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", resource: "cfg.segmentos", orderBy: "nome",
+      value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", resource: "cfg.segmentos", orderBy: "nome", templateKind: "segmentos",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
