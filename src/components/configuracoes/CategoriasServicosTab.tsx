@@ -309,8 +309,11 @@ export default function CategoriasServicosTab() {
 
       <div className="space-y-2">
         {categorias.length === 0 && (
-          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-            Nenhuma categoria cadastrada.
+          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center space-y-3">
+            <div>Nenhuma categoria cadastrada.</div>
+            <Button size="sm" variant="outline" onClick={openImport}>
+              <Upload className="h-4 w-4" /> Importar de template
+            </Button>
           </div>
         )}
 
