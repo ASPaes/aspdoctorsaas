@@ -137,7 +137,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "areas_atuacao", label: "Áreas de Atuação", table: "areas_atuacao", queryKey: "crud_areas_atuacao", resource: "cfg.areas_atuacao", orderBy: "nome",
+      value: "areas_atuacao", label: "Áreas de Atuação", table: "areas_atuacao", queryKey: "crud_areas_atuacao", resource: "cfg.areas_atuacao", orderBy: "nome", templateKind: "areas_atuacao",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
