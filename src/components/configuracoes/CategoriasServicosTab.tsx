@@ -52,6 +52,12 @@ export default function CategoriasServicosTab() {
   const guardUpdate = () => { if (!can("cfg.categorias_servico", "update")) { toast({ title: DENY_MSG, variant: "destructive" }); return false; } return true; };
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [importOpen, setImportOpen] = useState(false);
+
+  const openImport = () => {
+    if (!guardInsert()) return;
+    setImportOpen(true);
+  };
 
   // Category dialog
   const [catOpen, setCatOpen] = useState(false);
