@@ -114,7 +114,7 @@ export function VelocidadeTab() {
             />
           </div>
 
-          <VelocidadeTimeline dateRange={dateRange} slaSeconds={slaSeconds} />
+          <VelocidadeTimeline slaSeconds={slaSeconds} />
 
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="mb-3 flex items-center gap-2">
