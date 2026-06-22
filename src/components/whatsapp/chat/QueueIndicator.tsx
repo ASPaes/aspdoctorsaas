@@ -189,6 +189,27 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
       )}
 
 
+      <AlertDialog open={takeoverDialogOpen} onOpenChange={setTakeoverDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-primary" />
+              Assumir atendimento
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {assignedOperatorName
+                ? `${assignedOperatorName} está atendendo este chat.`
+                : "Outro operador está atendendo este chat."}{" "}
+              Deseja assumir e continuar o atendimento?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmTakeover}>Assumir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
