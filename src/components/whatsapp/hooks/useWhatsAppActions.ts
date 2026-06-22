@@ -145,7 +145,7 @@ export const useWhatsAppActions = () => {
       const { data: activeAtt } = await supabase
         .from('support_attendances')
         .select(`
-          id, opened_at, assumed_at, attendance_code,
+          id, opened_at, assumed_at, attendance_code, msg_agent_count,
           tenant_id, cliente_id, contact_id, department_id,
           contact:whatsapp_contacts(phone_number)
         `)
@@ -234,7 +234,8 @@ export const useWhatsAppActions = () => {
                   .eq('tenant_id', resolvedTenantId)
                   .maybeSingle();
 
-                if (config?.support_csat_enabled && !skipCsat) {
+                const houveAtendimentoHumano = !!activeAtt.assumed_at || (activeAtt.msg_agent_count ?? 0) > 0;
+                if (config?.support_csat_enabled && !skipCsat && houveAtendimentoHumano) {
                   csatEnabled = true;
 
                   // Get contact name for template
