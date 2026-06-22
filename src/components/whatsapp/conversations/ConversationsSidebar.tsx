@@ -221,19 +221,14 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
       const bucket = getConversationBucket(state);
 
-      // Non-admin: "Atendendo" conta só os meus, "Fila" conta todos sem agente
+      // Atendendo e Fila já mostram o setor inteiro (RLS limita ao setor).
+      // "Encerradas" continua só os que o operador atendeu — vínculo de setor
+      // nas encerradas depende de fix da view, tratado em fase posterior.
       if (!isAdmin && user?.id) {
-        if (bucket === "in_progress") {
-          const isMyConv = (conv as any).assigned_to === user.id;
-          const att = attendanceMap.get(conv.id);
-          const isMyAtt = att?.assigned_to === user.id;
-          if (!isMyConv && !isMyAtt) continue;
-        }
         if (bucket === "closed") {
           const att = attendanceMap.get(conv.id);
           if (att && att.assigned_to !== user.id) continue;
         }
-        // "waiting_in_hours" e "waiting_out_of_hours" → visível para todos do setor
       }
 
       switch (bucket) {
@@ -282,16 +277,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
 
     // Pill filters com visibilidade por papel
     if (activePill === "in_progress") {
-      result = result.filter(c => {
-        if (getConversationBucket(getStateForConv(c)) !== "in_progress") return false;
-        if (!isAdmin && user?.id) {
-          const isMyConv = (c as any).assigned_to === user.id;
-          const att = attendanceMap.get(c.id);
-          const isMyAtt = att?.assigned_to === user.id;
-          if (!isMyConv && !isMyAtt) return false;
-        }
-        return true;
-      });
+      result = result.filter(c => getConversationBucket(getStateForConv(c)) === "in_progress");
     } else if (activePill === "waiting") {
       result = result.filter(c => getConversationBucket(getStateForConv(c)) === "waiting_in_hours");
     } else if (activePill === "after_hours") {
@@ -304,12 +290,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           if (att && att.assigned_to !== user.id) return false;
         }
         return true;
-      });
-    }
-    if (activePill === "all" && !isAdmin && user?.id) {
-      result = result.filter(c => {
-        if (!(c as any).assigned_to) return true;
-        return (c as any).assigned_to === user.id;
       });
     }
 
