@@ -1033,9 +1033,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_sla_util: {
     title: "% SLA (horário útil)",
-    definition: "Mesmo cálculo do SLA de 1ª resposta, mas considerando apenas os atendimentos abertos dentro do horário de expediente.",
-    why_it_matters: "Separa a falha real de SLA daquela que ocorreu fora do horário, quando não havia equipe escalada. É a leitura mais justa para cobrar a operação.",
-    formula: "1ªs respostas ≤ alvo ÷ total de 1ªs respostas, somente onde a conversa foi aberta dentro do expediente (opened_out_of_hours = false)",
+    definition: "% de 1ªs respostas dentro do alvo, medindo o tempo em horário útil — descontando o período fora do expediente entre a abertura e a resposta.",
+    why_it_matters: "Não pune a equipe pelo silêncio da madrugada ou do fim de semana. Cliente que abre 17h59 e é respondido às 8h conta só os minutos úteis, não a noite inteira. É a leitura mais justa do SLA.",
+    formula: "1ªs respostas com tempo ÚTIL ≤ alvo ÷ total de 1ªs respostas. Tempo útil = segundos dentro do expediente do setor (com fallback no global), descontando fora-de-horário e feriados.",
     market_benchmark: "Boas operações miram 90%+ de aderência ao alvo de 1ª resposta.",
   },
   // ── Atendimento — Agentes ──
