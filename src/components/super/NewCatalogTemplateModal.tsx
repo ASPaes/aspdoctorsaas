@@ -43,7 +43,19 @@ interface ParsedItem {
   subcategoria?: string;
 }
 
+const KIND_OPTIONS: { value: string; label: string }[] = [
+  { value: "service_catalog", label: "Catálogo de serviços" },
+  { value: "service_types", label: "Tipos de serviço" },
+  { value: "segmentos", label: "Segmentos" },
+  { value: "areas_atuacao", label: "Áreas de atuação" },
+  { value: "motivos_cancelamento", label: "Motivos de cancelamento" },
+  { value: "motivos_pausa", label: "Motivos de pausa" },
+  { value: "modelos_contrato", label: "Modelos de contrato" },
+  { value: "origens_venda", label: "Origens de venda" },
+];
+
 export default function NewCatalogTemplateModal({ open, onOpenChange, onCreated }: Props) {
+  const [kind, setKind] = useState("service_catalog");
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [saving, setSaving] = useState(false);
@@ -53,6 +65,7 @@ export default function NewCatalogTemplateModal({ open, onOpenChange, onCreated 
   const { data: tenants = [] } = useSuperTenants();
 
   const reset = () => {
+    setKind("service_catalog");
     setNome("");
     setDescricao("");
     setParsedItems([]);
@@ -141,11 +154,24 @@ export default function NewCatalogTemplateModal({ open, onOpenChange, onCreated 
   const handleCreateFromTenant = async () => {
     if (!nome.trim() || !selectedTenantId) return;
     setSaving(true);
-    const { error } = await (supabase as any).rpc("create_catalog_template_from_tenant", {
-      p_source_tenant_id: selectedTenantId,
-      p_nome: nome.trim(),
-      p_descricao: descricao.trim() || null,
-    });
+    const rpcName =
+      kind === "service_catalog"
+        ? "create_catalog_template_from_tenant"
+        : "create_simple_template_from_tenant";
+    const args: any =
+      kind === "service_catalog"
+        ? {
+            p_source_tenant_id: selectedTenantId,
+            p_nome: nome.trim(),
+            p_descricao: descricao.trim() || null,
+          }
+        : {
+            p_kind: kind,
+            p_source_tenant_id: selectedTenantId,
+            p_nome: nome.trim(),
+            p_descricao: descricao.trim() || null,
+          };
+    const { error } = await (supabase as any).rpc(rpcName, args);
     setSaving(false);
     if (error) {
       toast.error("Erro: " + error.message);
@@ -156,6 +182,38 @@ export default function NewCatalogTemplateModal({ open, onOpenChange, onCreated 
     handleOpenChange(false);
   };
 
+  const copyFromTenantBlock = (
+    <div className="space-y-4 pt-2">
+      <div className="space-y-2">
+        <Label>Tenant de origem</Label>
+        <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione um tenant" />
+          </SelectTrigger>
+          <SelectContent>
+            {tenants.map((t: any) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Copia os registros do tenant como estão, incluindo eventuais erros de digitação.
+        </p>
+      </div>
+      <div className="flex justify-end">
+        <Button
+          onClick={handleCreateFromTenant}
+          disabled={!nome.trim() || !selectedTenantId || saving}
+        >
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Criar template
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -164,6 +222,28 @@ export default function NewCatalogTemplateModal({ open, onOpenChange, onCreated 
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Tipo</Label>
+            <Select
+              value={kind}
+              onValueChange={(v) => {
+                setKind(v);
+                setParsedItems([]);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KIND_OPTIONS.map((k) => (
+                  <SelectItem key={k.value} value={k.value}>
+                    {k.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="tpl-nome">Nome</Label>
             <Input
@@ -184,101 +264,73 @@ export default function NewCatalogTemplateModal({ open, onOpenChange, onCreated 
             />
           </div>
 
-          <Tabs defaultValue="arquivo">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="arquivo">Arquivo</TabsTrigger>
-              <TabsTrigger value="tenant">Copiar de tenant</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="arquivo" className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="tpl-file">Planilha (.xlsx, .xls)</Label>
-                <Input
-                  id="tpl-file"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Cabeçalho esperado: produto, categoria, subcategoria.
-                </p>
-              </div>
-
-              {parsedItems.length > 0 && (
+          {kind === "service_catalog" ? (
+            <Tabs defaultValue="arquivo">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="arquivo">Arquivo</TabsTrigger>
+                <TabsTrigger value="tenant">Copiar de tenant</TabsTrigger>
+              </TabsList>
+              <TabsContent value="arquivo" className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    {parsedItems.length} linhas · {distinctProdutos} produtos ·{" "}
-                    {distinctCategorias} categorias
+                  <Label htmlFor="tpl-file">Planilha (.xlsx, .xls)</Label>
+                  <Input
+                    id="tpl-file"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFile(f);
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Cabeçalho esperado: produto, categoria, subcategoria.
                   </p>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Produto</TableHead>
-                          <TableHead>Categoria</TableHead>
-                          <TableHead>Subcategoria</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {parsedItems.slice(0, 5).map((it, i) => (
-                          <TableRow key={i}>
-                            <TableCell>{it.produto ?? "—"}</TableCell>
-                            <TableCell>{it.categoria}</TableCell>
-                            <TableCell>{it.subcategoria ?? "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </div>
-              )}
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleCreateFromFile}
-                  disabled={!nome.trim() || parsedItems.length === 0 || saving}
-                >
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Criar template
-                </Button>
-              </div>
-            </TabsContent>
+                {parsedItems.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {parsedItems.length} linhas · {distinctProdutos} produtos ·{" "}
+                      {distinctCategorias} categorias
+                    </p>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Produto</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead>Subcategoria</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {parsedItems.slice(0, 5).map((it, i) => (
+                            <TableRow key={i}>
+                              <TableCell>{it.produto ?? "—"}</TableCell>
+                              <TableCell>{it.categoria}</TableCell>
+                              <TableCell>{it.subcategoria ?? "—"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
 
-            <TabsContent value="tenant" className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label>Tenant de origem</Label>
-                <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um tenant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenants.map((t: any) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Copia o catálogo de serviços do tenant como está, incluindo eventuais erros
-                  de digitação.
-                </p>
-              </div>
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleCreateFromTenant}
-                  disabled={!nome.trim() || !selectedTenantId || saving}
-                >
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Criar template
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleCreateFromFile}
+                    disabled={!nome.trim() || parsedItems.length === 0 || saving}
+                  >
+                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Criar template
+                  </Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="tenant">{copyFromTenantBlock}</TabsContent>
+            </Tabs>
+          ) : (
+            copyFromTenantBlock
+          )}
         </div>
       </DialogContent>
     </Dialog>
