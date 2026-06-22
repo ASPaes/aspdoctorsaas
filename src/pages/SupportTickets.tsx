@@ -616,7 +616,7 @@ export default function SupportTickets() {
   };
 
   const { data: listData = { rows: [] as TicketRow[], total: 0 }, isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
+    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -679,7 +679,10 @@ export default function SupportTickets() {
         .gte("aberto_em", fromISO)
         .lte("aberto_em", toISO);
 
-      if (!isAdminOrHead && userId) q = q.eq("responsavel_user_id", userId);
+      if (!isAdminOrHead) {
+        if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
+        else if (userId) q = q.eq("responsavel_user_id", userId);
+      }
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (statusFilter !== "all") q = q.eq("status_id", statusFilter);
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
@@ -734,7 +737,7 @@ export default function SupportTickets() {
   const tickets = listData.rows;
 
   const { data: counts = { total: 0, ativos: 0, finalizados: 0 } } = useQuery({
-    queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, ticketStatuses.map((s) => s.id).join(",")],
+    queryKey: ["support_tickets_counts", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -759,7 +762,10 @@ export default function SupportTickets() {
           .is("deleted_at", null)
           .gte("aberto_em", fromISO)
           .lte("aberto_em", toISO);
-        if (!isAdminOrHead && userId) q = q.eq("responsavel_user_id", userId);
+        if (!isAdminOrHead) {
+          if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
+          else if (userId) q = q.eq("responsavel_user_id", userId);
+        }
         if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
         if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
         if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
@@ -863,7 +869,10 @@ export default function SupportTickets() {
         .gte("aberto_em", fromISO)
         .lte("aberto_em", toISO);
 
-      if (!isAdminOrHead && userId) q = q.eq("responsavel_user_id", userId);
+      if (!isAdminOrHead) {
+        if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
+        else if (userId) q = q.eq("responsavel_user_id", userId);
+      }
       if (produtoFilter !== "all") q = q.eq("produto_id", Number(produtoFilter));
       if (atendenteFilter !== "all") q = q.eq("responsavel_user_id", atendenteFilter);
       if (categoriaFilter !== "all") q = q.eq("category_id", categoriaFilter);
@@ -1037,30 +1046,32 @@ export default function SupportTickets() {
       </div>
 
       {/* Setores como pill buttons — drag-and-drop para reordenar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        <button
-          onClick={() => setDepartmentFilter("all")}
-          className={`shrink-0 px-3.5 py-1.5 text-xs rounded-full border transition-colors ${
-            departmentFilter === "all"
-              ? "bg-primary/10 text-primary border-primary/30 font-medium"
-              : "border-border text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Todos
-        </button>
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDeptDragEnd}>
-          <SortableContext items={orderedDepartmentsFromState.map(d => d.id)} strategy={horizontalListSortingStrategy}>
-            {orderedDepartmentsFromState.map((dept) => (
-              <SortableDeptPill
-                key={dept.id}
-                dept={dept}
-                isActive={departmentFilter === dept.id}
-                onClick={() => setDepartmentFilter(dept.id)}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-      </div>
+      {isAdminOrHead && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          <button
+            onClick={() => setDepartmentFilter("all")}
+            className={`shrink-0 px-3.5 py-1.5 text-xs rounded-full border transition-colors ${
+              departmentFilter === "all"
+                ? "bg-primary/10 text-primary border-primary/30 font-medium"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Todos
+          </button>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDeptDragEnd}>
+            <SortableContext items={orderedDepartmentsFromState.map(d => d.id)} strategy={horizontalListSortingStrategy}>
+              {orderedDepartmentsFromState.map((dept) => (
+                <SortableDeptPill
+                  key={dept.id}
+                  dept={dept}
+                  isActive={departmentFilter === dept.id}
+                  onClick={() => setDepartmentFilter(dept.id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+      )}
 
       {/* Toolbar: filtros globais + views */}
       <div className="flex items-center gap-2 flex-wrap">
