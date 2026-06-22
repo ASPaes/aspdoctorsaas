@@ -376,7 +376,7 @@ export default function SuperMonitor() {
         <div style={{ ...panelStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ ...labelStyle, marginBottom: 0 }}>saúde do sistema</div>
-            <HelpTooltip text="Nota de 0 a 100 que resume o estado geral da plataforma. Considera instâncias offline, lentidão, alertas pendentes e uso do banco de dados." />
+            <HelpTooltip text="Nota de 0 a 100 que resume a saúde técnica da plataforma: lentidão de queries, alertas pendentes e uso do banco de dados. As instâncias de WhatsApp têm card próprio." />
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
             <ScoreRing score={score} />
