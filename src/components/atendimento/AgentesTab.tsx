@@ -7,6 +7,27 @@ import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
 
+// Formata duração mostrando segundos (latência/TMA/1ª resp são curtos; "1m" escondia tudo entre 1s e 119s)
+function fmtDur(s: number | null | undefined): string {
+  if (!s || s <= 0) return "—";
+  if (s > 86400) {
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    return `${d}d ${h}h`;
+  }
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+  if (s >= 60) {
+    const m = Math.floor(s / 60);
+    const sec = Math.round(s % 60);
+    return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+  }
+  return `${Math.round(s)}s`;
+}
+
 export function AgentesTab() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
     from: startOfDay(subDays(new Date(), 29)),
