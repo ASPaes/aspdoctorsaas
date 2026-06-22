@@ -16,11 +16,12 @@ export interface AtendimentoBacklog {
   plantao_por_produto: BacklogProdRow[];
 }
 
-export function useAtendimentoBacklog(dateRange: { from: Date; to: Date }) {
+export function useAtendimentoBacklog() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
+  const { dateRange, departmentId, agentId } = useAtendimentoFilter();
   return useQuery<AtendimentoBacklog>({
-    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId],
+    queryKey: ["atendimento-backlog", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId],
     enabled: !!tid,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -29,6 +30,8 @@ export function useAtendimentoBacklog(dateRange: { from: Date; to: Date }) {
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
