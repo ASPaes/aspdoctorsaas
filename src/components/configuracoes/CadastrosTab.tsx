@@ -157,7 +157,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", resource: "cfg.motivos_pausa", orderBy: "sort_order",
+      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", resource: "cfg.motivos_pausa", orderBy: "sort_order", templateKind: "motivos_pausa",
       columns: [
         { key: "name", label: "Nome" },
         { key: "average_minutes", label: "Tempo médio (min)" },
