@@ -38,6 +38,7 @@ const SettingsUsers = lazy(() => import("@/pages/SettingsUsers"));
 const SuperTenants = lazy(() => import("@/pages/SuperTenants"));
 const SuperTenantDetail = lazy(() => import("@/pages/SuperTenantDetail"));
 const SuperMonitor = lazy(() => import("@/pages/SuperMonitor"));
+const SuperCatalogTemplates = lazy(() => import("@/pages/SuperCatalogTemplates"));
 const PainelUso = lazy(() => import("@/pages/painel-uso/PainelUso"));
 const LimpezaUras = lazy(() => import("@/pages/admin/LimpezaUras"));
 const WhatsAppContatos = lazy(() => import("@/pages/WhatsAppContatos"));
@@ -112,6 +113,7 @@ const App = () => (
                 <Route path="/super/tenants" element={<SuperTenants />} />
                 <Route path="/super/tenants/:id" element={<SuperTenantDetail />} />
                 <Route path="/super/monitor" element={<SuperMonitor />} />
+                <Route path="/super/templates" element={<Suspense fallback={<PageLoader />}><SuperCatalogTemplates /></Suspense>} />
               </Route>
             </Route>
 

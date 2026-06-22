@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown } from "lucide-react";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
@@ -311,6 +311,16 @@ export function AppSidebar() {
                 <NavLink to="/super/tenants" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                   <Crown className="h-4 w-4" />
                   <span>Super Admin</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {isSuperAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Templates">
+                <NavLink to="/super/templates" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                  <Library className="h-4 w-4" />
+                  <span>Templates</span>
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
