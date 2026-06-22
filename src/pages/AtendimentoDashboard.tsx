@@ -17,7 +17,13 @@ import { AtendimentoFilterProvider, useAtendimentoFilter } from "@/contexts/Aten
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 
 const ALL = "__all__";
-const MIGRADAS = ["agentes", "velocidade", "satisfacao", "volume"]; // abas que já leem os filtros globais
+type FiltroConfig = { date: boolean; setor: boolean; agente: boolean };
+const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
+  velocidade: { date: true, setor: true, agente: true },
+  agentes:    { date: true, setor: true, agente: true },
+  satisfacao: { date: true, setor: true, agente: true },
+  volume:     { date: true, setor: true, agente: true },
+};
 
 function formatSecondsAgo(seg: number): string {
   if (seg < 5) return "agora";
@@ -28,7 +34,7 @@ function formatSecondsAgo(seg: number): string {
   return `há ${h}h`;
 }
 
-function FiltrosGlobais() {
+function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
   const {
     dateRange,
     setDateRange,
@@ -42,39 +48,45 @@ function FiltrosGlobais() {
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
-      <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-      <Select
-        value={departmentId ?? ALL}
-        onValueChange={(v) => setDepartmentId(v === ALL ? null : v)}
-      >
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Setor" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>Todos os setores</SelectItem>
-          {setores.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={agentId ?? ALL}
-        onValueChange={(v) => setAgentId(v === ALL ? null : v)}
-      >
-        <SelectTrigger className="w-[220px]">
-          <SelectValue placeholder="Agente" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>Todos os agentes</SelectItem>
-          {agentes.map((a) => (
-            <SelectItem key={a.user_id} value={a.user_id}>
-              {a.nome}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {cfg.date && (
+        <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+      )}
+      {cfg.setor && (
+        <Select
+          value={departmentId ?? ALL}
+          onValueChange={(v) => setDepartmentId(v === ALL ? null : v)}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Setor" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os setores</SelectItem>
+            {setores.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {cfg.agente && (
+        <Select
+          value={agentId ?? ALL}
+          onValueChange={(v) => setAgentId(v === ALL ? null : v)}
+        >
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Agente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os agentes</SelectItem>
+            {agentes.map((a) => (
+              <SelectItem key={a.user_id} value={a.user_id}>
+                {a.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 }
@@ -111,7 +123,7 @@ function AtendimentoDashboardInner() {
         )}
       </div>
 
-      {MIGRADAS.includes(tab) && <FiltrosGlobais />}
+      {FILTROS_POR_ABA[tab] && <FiltrosGlobais cfg={FILTROS_POR_ABA[tab]} />}
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
