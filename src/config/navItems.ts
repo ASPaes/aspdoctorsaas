@@ -9,6 +9,7 @@ export interface NavItem {
   icon: LucideIcon;
   resource?: string;
   superAdminOnly?: boolean;
+  roles?: string[];
   children?: NavItem[];
 }
 
