@@ -1,8 +1,5 @@
-import { useState } from "react";
-import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Inbox, UserX, PauseCircle, AlarmClockOff } from "lucide-react";
 import { useAtendimentoBacklog } from "./useAtendimentoBacklog";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 
