@@ -8205,6 +8205,13 @@ export type Database = {
           uf: string
         }[]
       }
+      get_catalog_template_preview: {
+        Args: { p_template_id: string }
+        Returns: {
+          categoria: string
+          subcategorias: string[]
+        }[]
+      }
       get_catalog_template_products: {
         Args: { p_template_id: string }
         Returns: {
