@@ -15,6 +15,7 @@ export interface ChatCustoRow { cliente_id: string | null; nome: string; atendim
 export interface ChatConcentracao { clientes_com_chat: number; chats_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
 export interface ChatMrrAgente { mrr_total: number; agentes_ativos: number; valor: number | null; }
 export interface ChatMediaCliente { clientes_ativos: number; total_atendimentos: number; media: number | null; }
+export interface ChatTimelineRow { mes: string; atendimentos: number; mrr: number; ticket_medio: number | null; }
 export interface AtendimentoChats {
   total: number;
   por_status: ChatStatusRow[];
@@ -85,6 +86,30 @@ export function useAtendimentoChats() {
           media: num(d.media_atend_cliente?.media),
         },
       } as AtendimentoChats;
+    },
+  });
+}
+
+export function useAtendimentoChatsTimeline() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const { selectedUnidadeId } = useUnidadeFilter();
+  return useQuery<ChatTimelineRow[]>({
+    queryKey: ["atendimento-chats-timeline", tid, selectedUnidadeId],
+    enabled: !!tid,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_atendimento_chats_timeline", {
+        p_tenant_id: tid,
+        p_unidade_base_id: selectedUnidadeId ?? null,
+        p_meses: 12,
+      });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({
+        mes: String(r.mes),
+        atendimentos: Number(r.atendimentos ?? 0),
+        mrr: Number(r.mrr ?? 0),
+        ticket_medio: r.ticket_medio === null || r.ticket_medio === undefined ? null : Number(r.ticket_medio),
+      })) as ChatTimelineRow[];
     },
   });
 }
