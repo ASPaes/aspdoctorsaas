@@ -134,7 +134,6 @@ export default function SuperMonitor() {
     0,
     Math.round(
       100 -
-        disconnectedInstances.length * 10 -
         (latestSnap?.top_slow_query_ms > 3000 ? 8 : latestSnap?.top_slow_query_ms > 1000 ? 4 : 0) -
         (latestSnap?.dead_tuples_whatsapp_messages > 2000
           ? 5
