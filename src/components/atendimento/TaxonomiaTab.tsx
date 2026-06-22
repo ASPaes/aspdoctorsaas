@@ -182,6 +182,33 @@ export function TaxonomiaTab() {
             <h3 className="text-sm font-semibold mb-3">Comercial × Plantão</h3>
             <Barras rows={data.por_horario.map((r) => ({ key: r.tipo, nome: r.tipo, qtd: r.qtd, pct: r.pct }))} />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Tickets por cliente ativo</p>
+              <p className="text-2xl font-semibold tabular-nums">{data.media_tickets_cliente.media !== null ? data.media_tickets_cliente.media.toFixed(2) : "—"}</p>
+              <p className="text-xs text-muted-foreground mt-1">{data.media_tickets_cliente.total_tickets.toLocaleString("pt-BR")} tickets ÷ {data.media_tickets_cliente.clientes_ativos.toLocaleString("pt-BR")} clientes</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Maior ofensor</p>
+              <p className="text-2xl font-semibold tabular-nums">{data.concentracao.top1_qtd.toLocaleString("pt-BR")}</p>
+              <p className="text-xs text-muted-foreground mt-1">{Math.round(data.concentracao.top1_pct)}% de todos os tickets, 1 cliente</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs text-muted-foreground">Top 10 clientes concentram</p>
+              <p className="text-2xl font-semibold tabular-nums">{Math.round(data.concentracao.top10_pct)}%</p>
+              <p className="text-xs text-muted-foreground mt-1">{data.concentracao.clientes_com_ticket.toLocaleString("pt-BR")} clientes abriram ticket</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Ranking de Ofensores — tickets por cliente</h3>
+              <Barras rows={data.ofensores.slice(0, 15).map((r) => ({ key: String(r.cliente_id ?? r.nome), nome: r.nome, qtd: r.qtd, pct: data.concentracao.tickets_com_cliente > 0 ? (100 * r.qtd) / data.concentracao.tickets_com_cliente : 0 }))} />
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-sm font-semibold mb-3">Resolvidos por Atendente</h3>
+              <Barras rows={data.resolvidos_por_atendente.slice(0, 15).map((r) => ({ key: r.nome, nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0 }))} />
+            </div>
+          </div>
         </>
       )}
     </div>
