@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { TempoRealTab } from "@/components/atendimento/TempoRealTab";
 import { VelocidadeTab } from "@/components/atendimento/VelocidadeTab";
 import { AgentesTab } from "@/components/atendimento/AgentesTab";
@@ -11,7 +13,11 @@ import { BacklogTab } from "@/components/atendimento/BacklogTab";
 import { CoberturaTab } from "@/components/atendimento/CoberturaTab";
 import { ClientesTab } from "@/components/atendimento/ClientesTab";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { AtendimentoFilterProvider, useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
+
+const ALL = "__all__";
+const MIGRADAS = ["agentes"]; // abas que já leem os filtros globais
 
 function formatSecondsAgo(seg: number): string {
   if (seg < 5) return "agora";
@@ -22,7 +28,58 @@ function formatSecondsAgo(seg: number): string {
   return `há ${h}h`;
 }
 
-export default function AtendimentoDashboard() {
+function FiltrosGlobais() {
+  const {
+    dateRange,
+    setDateRange,
+    departmentId,
+    setDepartmentId,
+    agentId,
+    setAgentId,
+    setores,
+    agentes,
+  } = useAtendimentoFilter();
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+      <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+      <Select
+        value={departmentId ?? ALL}
+        onValueChange={(v) => setDepartmentId(v === ALL ? null : v)}
+      >
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Setor" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Todos os setores</SelectItem>
+          {setores.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        value={agentId ?? ALL}
+        onValueChange={(v) => setAgentId(v === ALL ? null : v)}
+      >
+        <SelectTrigger className="w-[220px]">
+          <SelectValue placeholder="Agente" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Todos os agentes</SelectItem>
+          {agentes.map((a) => (
+            <SelectItem key={a.user_id} value={a.user_id}>
+              {a.nome}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function AtendimentoDashboardInner() {
   const { isSuperAdmin } = useTenantFilter();
   const { dataUpdatedAt } = useAtendimentoRealtime();
   const [now, setNow] = useState(() => Date.now());
@@ -53,6 +110,8 @@ export default function AtendimentoDashboard() {
           </div>
         )}
       </div>
+
+      {MIGRADAS.includes(tab) && <FiltrosGlobais />}
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
@@ -101,5 +160,13 @@ export default function AtendimentoDashboard() {
         )}
       </Tabs>
     </div>
+  );
+}
+
+export default function AtendimentoDashboard() {
+  return (
+    <AtendimentoFilterProvider>
+      <AtendimentoDashboardInner />
+    </AtendimentoFilterProvider>
   );
 }
