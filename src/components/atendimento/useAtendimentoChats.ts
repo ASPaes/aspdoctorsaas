@@ -74,6 +74,11 @@ export function useAtendimentoChats() {
           top1_pct: Number(d.concentracao?.top1_pct ?? 0),
           top10_pct: Number(d.concentracao?.top10_pct ?? 0),
         },
+        mrr_por_agente: {
+          mrr_total: Number(d.mrr_por_agente?.mrr_total ?? 0),
+          agentes_ativos: Number(d.mrr_por_agente?.agentes_ativos ?? 0),
+          valor: num(d.mrr_por_agente?.valor),
+        },
         media_atend_cliente: {
           clientes_ativos: Number(d.media_atend_cliente?.clientes_ativos ?? 0),
           total_atendimentos: Number(d.media_atend_cliente?.total_atendimentos ?? 0),
