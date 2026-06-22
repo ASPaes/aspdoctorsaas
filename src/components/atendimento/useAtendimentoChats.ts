@@ -11,8 +11,9 @@ export interface ChatCsat { enviados: number; respondidos: number; response_rate
 export interface ChatAtendenteRow { nome: string; qtd: number; }
 export interface ChatHeatRow { dow: number; hora: number; qtd: number; }
 export interface ChatOfensorRow { cliente_id: string | null; nome: string; qtd: number; }
-export interface ChatCustoRow { cliente_id: string | null; nome: string; atendimentos: number; mrr: number; atend_por_mil: number; }
+export interface ChatCustoRow { cliente_id: string | null; nome: string; atendimentos: number; mrr: number; atend_por_mil: number; receita_por_atend: number; }
 export interface ChatConcentracao { clientes_com_chat: number; chats_com_cliente: number; top1_qtd: number; top1_pct: number; top10_pct: number; }
+export interface ChatMrrAgente { mrr_total: number; agentes_ativos: number; valor: number | null; }
 export interface ChatMediaCliente { clientes_ativos: number; total_atendimentos: number; media: number | null; }
 export interface AtendimentoChats {
   total: number;
