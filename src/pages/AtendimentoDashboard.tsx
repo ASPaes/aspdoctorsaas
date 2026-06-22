@@ -26,6 +26,7 @@ const FILTROS_POR_ABA: Record<string, FiltroConfig> = {
   satisfacao: { date: true, setor: true, agente: true },
   volume:     { date: true, setor: true, agente: true },
   ura:        { date: true, setor: true, agente: false },
+  chats:      { date: true, setor: true, agente: true, cliente: true },
   taxonomia:  { date: true, setor: true, agente: true, cliente: true },
   backlog:    { date: true, setor: true, agente: true, cliente: true },
   clientes:   { date: true, setor: false, agente: false, cliente: true },
@@ -156,6 +157,7 @@ function AtendimentoDashboardInner() {
           <TabsTrigger value="satisfacao">Satisfação</TabsTrigger>
           <TabsTrigger value="volume">Volume</TabsTrigger>
           <TabsTrigger value="ura">URA</TabsTrigger>
+          <TabsTrigger value="chats">Chats</TabsTrigger>
           <TabsTrigger value="taxonomia">Tickets</TabsTrigger>
           <TabsTrigger value="backlog">Backlog</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
@@ -178,6 +180,9 @@ function AtendimentoDashboardInner() {
         </TabsContent>
         <TabsContent value="ura" className="mt-4">
           <UraTab />
+        </TabsContent>
+        <TabsContent value="chats" className="mt-4">
+          <ChatsTab />
         </TabsContent>
         <TabsContent value="taxonomia" className="mt-4">
           <TaxonomiaTab />
