@@ -56,6 +56,8 @@ export function useAtendimentoSatisfacao() {
         p_date_from: dateRange.from.toISOString(),
         p_date_to: dateRange.to.toISOString(),
         p_unidade_base_id: selectedUnidadeId ?? null,
+        p_department_id: departmentId ?? null,
+        p_agent_id: agentId ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
