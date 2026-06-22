@@ -15,9 +15,11 @@ export function useAtendimentoTaxonomia() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
   const { dateRange, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds } = useAtendimentoFilter();
-...
+  return useQuery<AtendimentoTaxonomia>({
     queryKey: ["atendimento-taxonomia", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), selectedUnidadeId, departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds, fornecedorIds, produtoIds],
-...
+    enabled: !!tid,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
       const orNull = (a: number[]) => (a.length ? a : null);
       const { data, error } = await (supabase.rpc as any)("get_atendimento_taxonomia", {
         p_tenant_id: tid,
