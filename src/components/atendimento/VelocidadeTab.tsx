@@ -14,12 +14,8 @@ const SLA_OPCOES = [
 ];
 
 export function VelocidadeTab() {
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
-    from: startOfDay(subDays(new Date(), 29)),
-    to: endOfDay(new Date()),
-  }));
   const [slaSeconds, setSlaSeconds] = useState(900);
-  const { data, isLoading, isError, error } = useAtendimentoVelocidade(dateRange, slaSeconds);
+  const { data, isLoading, isError, error } = useAtendimentoVelocidade(slaSeconds);
   const dur = (s: number | null | undefined) => (s && s > 0 ? fmtEspera(s) : "—");
 
   return (
