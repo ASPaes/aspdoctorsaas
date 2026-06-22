@@ -2,11 +2,31 @@ import { useState } from "react";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { Loader2, Users, MessageSquare, Star, RotateCcw } from "lucide-react";
 import { useAtendimentoAgentes } from "./useAtendimentoAgentes";
-import { fmtEspera } from "./TempoRealTab";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { KPICardEnhanced } from "@/components/dashboard/cards/KPICardEnhanced";
 import { KpiHelpPopover } from "@/components/dashboard/KpiHelpPopover";
 import { cn } from "@/lib/utils";
+
+// Formata duração mostrando segundos (latência/TMA/1ª resp são curtos; "1m" escondia tudo entre 1s e 119s)
+function fmtDur(s: number | null | undefined): string {
+  if (!s || s <= 0) return "—";
+  if (s > 86400) {
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    return `${d}d ${h}h`;
+  }
+  if (s >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h}h ${m}m`;
+  }
+  if (s >= 60) {
+    const m = Math.floor(s / 60);
+    const sec = Math.round(s % 60);
+    return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+  }
+  return `${Math.round(s)}s`;
+}
 
 export function AgentesTab() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => ({
@@ -14,7 +34,7 @@ export function AgentesTab() {
     to: endOfDay(new Date()),
   }));
   const { data, isLoading, isError, error } = useAtendimentoAgentes(dateRange);
-  const dur = (s: number | null | undefined) => (s && s > 0 ? fmtEspera(s) : "—");
+  const dur = (s: number | null | undefined) => fmtDur(s);
 
   return (
     <div className="space-y-4">
@@ -92,6 +112,7 @@ export function AgentesTab() {
                       <th className="py-2 px-3 text-right font-medium">TMA</th>
                       <th className="py-2 px-3 text-right font-medium">1ª resp</th>
                       <th className="py-2 px-3 text-right font-medium">Latência</th>
+                      <th className="py-2 px-3 text-right font-medium">Faixa + comum</th>
                       <th className="py-2 px-3 text-right font-medium">CSAT</th>
                       <th className="py-2 px-3 text-right font-medium">Reabert.</th>
                       <th className="py-2 pl-3 text-right font-medium">Msgs/at.</th>
@@ -107,6 +128,13 @@ export function AgentesTab() {
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.frt_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.latencia_p50)}</td>
+                        <td className="py-2 px-3 text-right">
+                          {a.latencia_faixa ? (
+                            <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs">{a.latencia_faixa}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="py-2 px-3 text-right tabular-nums">
                           {a.csat !== null ? (
                             <span>

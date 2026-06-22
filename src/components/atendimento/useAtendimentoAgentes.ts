@@ -15,6 +15,7 @@ export interface AgenteRow {
   reabertura_pct: number | null;
   pico_simultaneos: number;
   latencia_p50: number | null;
+  latencia_faixa: string | null;
   msgs_atend: number | null;
 }
 
@@ -62,6 +63,7 @@ export function useAtendimentoAgentes(dateRange: { from: Date; to: Date }) {
           reabertura_pct: num(r.reabertura_pct),
           pico_simultaneos: Number(r.pico_simultaneos ?? 0),
           latencia_p50: num(r.latencia_p50),
+          latencia_faixa: r.latencia_faixa ?? null,
           msgs_atend: num(r.msgs_atend),
         })),
       } as AtendimentoAgentes;

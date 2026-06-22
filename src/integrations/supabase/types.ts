@@ -7801,6 +7801,16 @@ export type Database = {
         Args: { p_date_from: string; p_date_to: string }
         Returns: Json
       }
+      get_atendimento_latencia_histograma: {
+        Args: {
+          p_agent_id?: string
+          p_date_from: string
+          p_date_to: string
+          p_department_id?: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       get_atendimento_realtime: {
         Args: {
           p_department_id?: string
