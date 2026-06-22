@@ -96,7 +96,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
     }
   };
 
-  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode; invalidateKeys?: string[] }[] = [
+  const tabs: { value: string; label: string; table: string; queryKey: string; resource: string; columns: ColumnDef[]; orderBy?: string; selectQuery?: string; onBeforeSave?: (payload: Record<string, any>, isEdit: boolean) => Promise<string | void>; headerActions?: React.ReactNode; invalidateKeys?: string[]; templateKind?: string }[] = [
     {
       value: "setores", label: "Setores", table: "support_departments", queryKey: "crud_support_departments", resource: "cfg.setores", orderBy: "sort_order", invalidateKeys: ["departments_for_crud"],
       columns: [
@@ -129,23 +129,23 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       ],
     },
     {
-      value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", resource: "cfg.segmentos", orderBy: "nome",
+      value: "segmentos", label: "Segmentos", table: "segmentos", queryKey: "crud_segmentos", resource: "cfg.segmentos", orderBy: "nome", templateKind: "segmentos",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", resource: "cfg.modelos_contrato", orderBy: "nome",
+      value: "modelos_contrato", label: "Modelos de Contrato", table: "modelos_contrato", queryKey: "crud_modelos_contrato", resource: "cfg.modelos_contrato", orderBy: "nome", templateKind: "modelos_contrato",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "areas_atuacao", label: "Áreas de Atuação", table: "areas_atuacao", queryKey: "crud_areas_atuacao", resource: "cfg.areas_atuacao", orderBy: "nome",
+      value: "areas_atuacao", label: "Áreas de Atuação", table: "areas_atuacao", queryKey: "crud_areas_atuacao", resource: "cfg.areas_atuacao", orderBy: "nome", templateKind: "areas_atuacao",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", resource: "cfg.motivos_cancelamento", orderBy: "descricao",
+      value: "motivos_cancelamento", label: "Motivos Cancel.", table: "motivos_cancelamento", queryKey: "crud_motivos", resource: "cfg.motivos_cancelamento", orderBy: "descricao", templateKind: "motivos_cancelamento",
       columns: [{ key: "descricao", label: "Descrição" }],
     },
     {
-      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", resource: "cfg.origens_venda", orderBy: "nome",
+      value: "origens_venda", label: "Origens Venda", table: "origens_venda", queryKey: "crud_origens_venda", resource: "cfg.origens_venda", orderBy: "nome", templateKind: "origens_venda",
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
@@ -157,7 +157,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       columns: [{ key: "nome", label: "Nome" }],
     },
     {
-      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", resource: "cfg.motivos_pausa", orderBy: "sort_order",
+      value: "motivos_pausa", label: "Motivos de Pausa", table: "support_pause_reasons", queryKey: "crud_motivos_pausa", resource: "cfg.motivos_pausa", orderBy: "sort_order", templateKind: "motivos_pausa",
       columns: [
         { key: "name", label: "Nome" },
         { key: "average_minutes", label: "Tempo médio (min)" },
@@ -200,6 +200,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
       queryKey: "crud_service_types",
       resource: "cfg.tipos_servico",
       orderBy: "nome",
+      templateKind: "service_types",
       columns: [
         { key: "codigo", label: "Código" },
         { key: "nome", label: "Nome" },
@@ -242,6 +243,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         headerActions={t.headerActions}
         resource={t.resource}
         invalidateKeys={t.invalidateKeys}
+        templateKind={t.templateKind}
       />
     );
   }
@@ -282,6 +284,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
                 headerActions={t.headerActions}
                 resource={t.resource}
                 invalidateKeys={t.invalidateKeys}
+                templateKind={t.templateKind}
               />
             )}
           </TabsContent>

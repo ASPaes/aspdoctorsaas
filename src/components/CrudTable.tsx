@@ -11,10 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Upload } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
 import type { PermissionAction } from "@/hooks/usePermissions";
+import ImportSimpleTemplateModal from "@/components/configuracoes/ImportSimpleTemplateModal";
 
 export interface ColumnDef {
   key: string;
@@ -43,9 +44,10 @@ interface CrudTableProps {
   resource?: string;
   /** Extra React Query keys (by prefix) to invalidate after save/delete — ex.: selects de relação em outras telas. */
   invalidateKeys?: string[];
+  templateKind?: string;
 }
 
-export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource, invalidateKeys }: CrudTableProps) {
+export default function CrudTable({ table, queryKey, columns, selectQuery = "*", orderBy, onBeforeSave, headerActions, resource, invalidateKeys, templateKind }: CrudTableProps) {
   const guard = (action: PermissionAction, btn: React.ReactNode) =>
     resource ? (
       <ProtectedElement resource={resource} action={action} mode="notify">
@@ -58,6 +60,7 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<Record<string, any> | null>(null);
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -223,6 +226,11 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
         {headerActions}
+        {templateKind && tid && guard("insert", (
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4" /> Importar de template
+          </Button>
+        ))}
         {guard("insert", (
           <Button size="sm" onClick={openNew}>
             <Plus className="h-4 w-4" /> Novo
@@ -382,6 +390,16 @@ export default function CrudTable({ table, queryKey, columns, selectQuery = "*",
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {templateKind && (
+        <ImportSimpleTemplateModal
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          kind={templateKind}
+          tenantId={tid}
+          onImported={() => queryClient.invalidateQueries({ queryKey: [queryKey, tid] })}
+        />
+      )}
     </div>
   );
 }
