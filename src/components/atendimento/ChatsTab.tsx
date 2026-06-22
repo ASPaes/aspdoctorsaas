@@ -171,6 +171,15 @@ export function ChatsTab() {
             )}
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-xs text-muted-foreground">MRR sustentado por agente ativo</p>
+                <p className="text-2xl font-semibold tabular-nums">{data.mrr_por_agente.valor !== null ? data.mrr_por_agente.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "—"}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">{data.mrr_por_agente.mrr_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} de MRR ÷ {data.mrr_por_agente.agentes_ativos} agente(s) que atenderam no período</p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="text-sm font-semibold mb-3">Custo de Atendimento × Receita — atendimentos por R$ 1.000 de MRR</h3>
             {data.custo_receita.length === 0 ? (
               <div className="text-xs text-muted-foreground italic py-6 text-center">Sem clientes pagantes vinculados aos atendimentos. Vincule clientes aos chats para liberar esta visão.</div>
@@ -183,6 +192,7 @@ export function ChatsTab() {
                       <th className="text-right py-2 px-3 font-medium">Atendimentos</th>
                       <th className="text-right py-2 px-3 font-medium">MRR</th>
                       <th className="text-right py-2 px-3 font-medium">Atend. / R$ 1.000</th>
+                      <th className="text-right py-2 px-3 font-medium">R$ / atend.</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -192,6 +202,7 @@ export function ChatsTab() {
                         <td className="py-2 px-3 text-right tabular-nums">{r.atendimentos.toLocaleString("pt-BR")}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{r.mrr.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-medium">{r.atend_por_mil.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{r.receita_por_atend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
                       </tr>
                     ))}
                   </tbody>
