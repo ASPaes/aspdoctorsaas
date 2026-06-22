@@ -492,6 +492,18 @@ export default function CategoriasServicosTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportCatalogTemplateModal
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        tenantId={tid}
+        onImported={() => {
+          qc.invalidateQueries({ queryKey: ["cats_categorias"] });
+          qc.invalidateQueries({ queryKey: ["cats_subcategorias"] });
+          qc.invalidateQueries({ queryKey: ["cats_category_products"] });
+          qc.invalidateQueries({ queryKey: ["cats_produtos"] });
+        }}
+      />
     </div>
   );
 }
