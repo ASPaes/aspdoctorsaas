@@ -88,6 +88,24 @@ function Heatmap({ rows }: { rows: { dow: number; hora: number; qtd: number }[] 
   );
 }
 
+function agregarPorHora(heat: { dow: number; hora: number; qtd: number }[]): BarRow[] {
+  const m = new Map<number, number>();
+  heat.forEach((r) => m.set(r.hora, (m.get(r.hora) ?? 0) + r.qtd));
+  const tot = Array.from(m.values()).reduce((a, b) => a + b, 0);
+  return Array.from(m.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([hora, qtd]) => ({ key: `h${hora}`, nome: `${hora}h`, qtd, pct: tot > 0 ? (100 * qtd) / tot : 0 }));
+}
+
+function agregarPorDiaSemana(heat: { dow: number; hora: number; qtd: number }[]): BarRow[] {
+  const m = new Map<number, number>();
+  heat.forEach((r) => m.set(r.dow, (m.get(r.dow) ?? 0) + r.qtd));
+  const ordem = [1, 2, 3, 4, 5, 6, 0];
+  const labels: Record<number, string> = { 0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
+  const tot = Array.from(m.values()).reduce((a, b) => a + b, 0);
+  return ordem.map((d) => ({ key: `d${d}`, nome: labels[d], qtd: m.get(d) ?? 0, pct: tot > 0 ? (100 * (m.get(d) ?? 0)) / tot : 0 }));
+}
+
 export function TaxonomiaTab() {
   const { data, isLoading, isError, error } = useAtendimentoTaxonomia();
 
